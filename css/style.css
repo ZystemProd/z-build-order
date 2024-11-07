@@ -130,21 +130,33 @@ button:hover {
 
 /* Style for bold and purple text on unit names */
 .bold-purple {
-  color: #c227a0; /* Purple color */
+  color: #9b4dca; /* Purple color */
   font-weight: bold;
-  font-size: 1.1em; /* Slightly larger for units */
+}
+
+/* Protoss Units - Bright Blue */
+.bold-blue {
+  color: #00b0f0; /* Bright blue color for Protoss */
+  font-weight: bold;
+}
+
+/* Terran Units - Bright Red */
+.bold-red {
+  color: #ff3b30; /* Bright red color for Terran */
+  font-weight: bold;
 }
 
 /* Style for bold and yellow text on structure names */
 .bold-yellow {
-  color: #ffd23f; /* Yellow color */
+  color: #f0a500; /* Yellow color */
   font-weight: bold;
   font-size: 1.1em; /* Slightly larger for structures */
 }
 
 /* Style for red-colored numbers */
 .red-text {
-  color: #ee4266;
+  color: #00e600; /* Bright green for high visibility */
+  font-weight: bold; /* Bold for more emphasis */
 }
 
 .upperInput {
@@ -181,4 +193,29 @@ button:hover {
   .custom-file-input {
     padding: 12px 18px; /* Larger button padding on smaller screens */
   }
+}
+.footer {
+  position: fixed;
+  bottom: 0; /* Align to the bottom of the page */
+  left: 0;
+  width: 100%; /* Full width of the page */
+  height: 50px; /* Fixed height for the footer */
+  display: flex;
+  justify-content: center; /* Center the text horizontally */
+  align-items: center; /* Center the text vertically within the footer */
+  color: white;
+  font-family: Arial, sans-serif;
+}
+
+.footer-logo {
+  position: absolute; /* Position the logo independently */
+  right: 20px; /* Distance from the right edge */
+  bottom: 10px; /* Distance from the bottom edge */
+  max-width: 50px; /* Adjust the logo size */
+  height: auto;
+}
+
+.footer p {
+  margin: 0;
+  font-size: 14px;
 }

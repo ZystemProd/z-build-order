@@ -58,115 +58,116 @@ const structures = [
   "command center",
 ];
 
-const units = [
-  // Zerg Units
-  "overlord",
-  "overlords",
-  "zergling",
-  "zerglings",
-  "queen",
-  "queens",
-  "drone",
-  "drones",
-  "lurker",
-  "lurkers",
-  "hydra",
-  "hydras",
-  "swarm host",
-  "swarm hosts",
-  "roach",
-  "roaches",
-  "baneling",
-  "banelings",
-  "corruptor",
-  "corruptors",
-  "infestor",
-  "infestors",
-  "ultralisk",
-  "ultralisks",
-  "mutalisk",
-  "mutalisks",
-  "viper",
-  "vipers",
-  "brood lord",
-  "brood lords",
-
-  // Protoss Units
-  "probe",
-  "probes",
-  "zealot",
-  "zealots",
-  "stalker",
-  "stalkers",
-  "sentry",
-  "sentries",
-  "observer",
-  "observers",
-  "immortal",
-  "immortals",
-  "warp prism",
-  "warp prisms",
-  "colossus",
-  "colossi",
-  "phoenix",
-  "phoenixes",
-  "void ray",
-  "void rays",
-  "high templar",
-  "high templars",
-  "dark templar",
-  "dark templars",
-  "archon",
-  "archons",
-  "carrier",
-  "carriers",
-  "mothership",
-  "mothership core",
-  "oracle",
-  "oracles",
-  "tempest",
-  "tempests",
-  "adept",
-  "adepts",
-  "disruptor",
-  "disruptors",
-
-  // Terran Units
-  "scv",
-  "scvs",
-  "marine",
-  "marines",
-  "marauder",
-  "marauders",
-  "reaper",
-  "reapers",
-  "ghost",
-  "ghosts",
-  "hellion",
-  "hellions",
-  "siege tank",
-  "siege tanks",
-  "thor",
-  "thors",
-  "viking",
-  "vikings",
-  "medivac",
-  "medivacs",
-  "banshee",
-  "banshees",
-  "raven",
-  "ravens",
-  "battlecruiser",
-  "battlecruisers",
-  "widow mine",
-  "widow mines",
-  "hellbat",
-  "hellbats",
-  "cyclone",
-  "cyclones",
-  "liberator",
-  "liberators",
-];
+const units = {
+  zerg: [
+    "overlord",
+    "overlords",
+    "zergling",
+    "zerglings",
+    "queen",
+    "queens",
+    "drone",
+    "drones",
+    "lurker",
+    "lurkers",
+    "hydra",
+    "hydras",
+    "swarm host",
+    "swarm hosts",
+    "roach",
+    "roaches",
+    "baneling",
+    "banelings",
+    "corruptor",
+    "corruptors",
+    "infestor",
+    "infestors",
+    "ultralisk",
+    "ultralisks",
+    "mutalisk",
+    "mutalisks",
+    "viper",
+    "vipers",
+    "brood lord",
+    "brood lords",
+  ],
+  protoss: [
+    "probe",
+    "probes",
+    "zealot",
+    "zealots",
+    "stalker",
+    "stalkers",
+    "sentry",
+    "sentries",
+    "observer",
+    "observers",
+    "immortal",
+    "immortals",
+    "warp prism",
+    "warp prisms",
+    "colossus",
+    "colossi",
+    "phoenix",
+    "phoenixes",
+    "void ray",
+    "void rays",
+    "high templar",
+    "high templars",
+    "dark templar",
+    "dark templars",
+    "archon",
+    "archons",
+    "carrier",
+    "carriers",
+    "mothership",
+    "mothership core",
+    "oracle",
+    "oracles",
+    "tempest",
+    "tempests",
+    "adept",
+    "adepts",
+    "disruptor",
+    "disruptors",
+  ],
+  terran: [
+    "scv",
+    "scvs",
+    "marine",
+    "marines",
+    "marauder",
+    "marauders",
+    "reaper",
+    "reapers",
+    "ghost",
+    "ghosts",
+    "hellion",
+    "hellions",
+    "siege tank",
+    "siege tanks",
+    "thor",
+    "thors",
+    "viking",
+    "vikings",
+    "medivac",
+    "medivacs",
+    "banshee",
+    "banshees",
+    "raven",
+    "ravens",
+    "battlecruiser",
+    "battlecruisers",
+    "widow mine",
+    "widow mines",
+    "hellbat",
+    "hellbats",
+    "cyclone",
+    "cyclones",
+    "liberator",
+    "liberators",
+  ],
+};
 
 // Mapping of abbreviations to full names
 const abbreviationMap = {
@@ -181,6 +182,11 @@ const abbreviationMap = {
   gas: "extractor",
   hydra: "hydralisk",
   hatch: "hatchery",
+  tank: "siege tank",
+  tanks: "siege tanks",
+  brood: "brood lord",
+  broods: "brood lords",
+  bc: "battlecruiser",
 };
 
 // Utility to transform abbreviations in the input text
@@ -205,15 +211,41 @@ function formatStructureText(actionText) {
 }
 
 // Function to format specific units with styling, handling plural forms and exceptions
+// Function to format specific units with distinct faction colors
 function formatActionText(actionText) {
-  units.forEach((unit) => {
+  // Zerg Units - Purple
+  units.zerg.forEach((unit) => {
     const regex = new RegExp(
       `\\b${unit}(s)?\\b(?!\\s+warren|\\s+den|\\s+pit|\\s+network)`,
       "gi"
-    ); // Match plural forms and exclude multi-word structures
+    );
     actionText = actionText.replace(
       regex,
       `<span class="bold-purple">${unit}$1</span>`
+    );
+  });
+
+  // Protoss Units - Bright Blue
+  units.protoss.forEach((unit) => {
+    const regex = new RegExp(
+      `\\b${unit}(s)?\\b(?!\\s+core|\\s+shrine|\\s+gate|\\s+forge)`,
+      "gi"
+    );
+    actionText = actionText.replace(
+      regex,
+      `<span class="bold-blue">${unit}$1</span>`
+    );
+  });
+
+  // Terran Units - Bright Red
+  units.terran.forEach((unit) => {
+    const regex = new RegExp(
+      `\\b${unit}(s)?\\b(?!\\s+barracks|\\s+command|\\s+reactor)`,
+      "gi"
+    );
+    actionText = actionText.replace(
+      regex,
+      `<span class="bold-red">${unit}$1</span>`
     );
   });
 
