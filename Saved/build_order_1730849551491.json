@@ -1,0 +1,22 @@
+[
+  {
+    "workersOrTimestamp": "13",
+    "action": "overlord "
+  },
+  {
+    "workersOrTimestamp": "17",
+    "action": "Gas (when you start 17 drone not when its finished) "
+  },
+  {
+    "workersOrTimestamp": "16",
+    "action": "Pool "
+  },
+  {
+    "workersOrTimestamp": "18",
+    "action": "Hatch (can send 17th worker and try and sneak past the probe) "
+  },
+  {
+    "workersOrTimestamp": "22, 04:05",
+    "action": "roach Warren"
+  }
+]

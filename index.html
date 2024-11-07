@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>StarCraft 2 Build Order</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <textarea
+      id="buildOrderInput"
+      placeholder="Paste your build order here..."
+    ></textarea>
+    <!--<button onclick="analyzeBuildOrder()">Analyze Build Order</button>-->
+
+    <table id="buildOrderTable">
+      <tr>
+        <th>Workers/Timestamp</th>
+        <th>Action</th>
+      </tr>
+    </table>
+
+    <button onclick="saveBuildOrderAsFile()">Save Build Order as File</button>
+    <input
+      type="file"
+      id="fileInput"
+      onchange="loadBuildOrderFromFile(event)"
+    />
+
+    <script src="script.js"></script>
+  </body>
+</html>

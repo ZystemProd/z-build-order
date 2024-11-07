@@ -1,0 +1,42 @@
+[
+  {
+    "workersOrTimestamp": "13",
+    "action": "<span class=\"bold-purple\">overlord</span> "
+  },
+  {
+    "workersOrTimestamp": "17",
+    "action": "Gas (when you start 17 <span class=\"bold-purple\">drone</span> not when its finished) "
+  },
+  {
+    "workersOrTimestamp": "16",
+    "action": "<span class=\"bold-purple\">spawning pool</span> "
+  },
+  {
+    "workersOrTimestamp": "18",
+    "action": "Hatch (can send 17th worker and try and sneak past the probe) No more <span class=\"bold-purple\">zergling</span>"
+  },
+  {
+    "workersOrTimestamp": "17",
+    "action": "2x <span class=\"bold-purple\">zergling</span> + speed"
+  },
+  {
+    "workersOrTimestamp": "19",
+    "action": "1x <span class=\"bold-purple\">zergling</span>"
+  },
+  {
+    "workersOrTimestamp": "20",
+    "action": "<span class=\"bold-purple\">roach warren</span>"
+  },
+  {
+    "workersOrTimestamp": "19",
+    "action": "1x <span class=\"bold-purple\">zergling</span> + <span class=\"bold-purple\">queen</span>"
+  },
+  {
+    "workersOrTimestamp": "22",
+    "action": "<span class=\"bold-purple\">overlord</span>"
+  },
+  {
+    "workersOrTimestamp": "22",
+    "action": "keep building <span class=\"bold-purple\">zergling</span> and build 3 roaches once <span class=\"bold-purple\">roach warren</span> is done"
+  }
+]
