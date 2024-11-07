@@ -2,29 +2,37 @@
 <html>
   <head>
     <title>StarCraft 2 Build Order</title>
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="css/style.css" />
   </head>
   <body>
-    <textarea
-      id="buildOrderInput"
-      placeholder="Paste your build order here..."
-    ></textarea>
-    <!--<button onclick="analyzeBuildOrder()">Analyze Build Order</button>-->
+    <div class="upperInput">
+      <textarea
+        id="buildOrderInput"
+        placeholder="Paste your build order here..."
+      ></textarea>
+    </div>
 
-    <table id="buildOrderTable">
-      <tr>
-        <th>Workers/Timestamp</th>
-        <th>Action</th>
-      </tr>
-    </table>
+    <!-- Title input field for the build order -->
+    <div class="titleInput">
+      <input
+        type="text"
+        id="buildOrderTitle"
+        placeholder="Enter build order title here..."
+      />
+    </div>
 
-    <button onclick="saveBuildOrderAsFile()">Save Build Order as File</button>
-    <input
-      type="file"
-      id="fileInput"
-      onchange="loadBuildOrderFromFile(event)"
-    />
+    <div class="buildOrderOutput">
+      <table id="buildOrderTable">
+        <tr>
+          <th>Workers/Timestamp</th>
+          <th>Action</th>
+        </tr>
+      </table>
+      <button onclick="saveBuildOrderAsFile()">Save Build Order</button>
+      <label for="fileInput" class="custom-file-input">Load Build Order</label>
+      <input type="file" id="fileInput" onchange="loadBuildOrderFromFile(event)" hidden />
+      
 
-    <script src="script.js"></script>
+    <script src="js/script.js"></script>
   </body>
 </html>
