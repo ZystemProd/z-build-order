@@ -187,6 +187,7 @@ const abbreviationMap = {
   brood: "brood lord",
   broods: "brood lords",
   bc: "battlecruiser",
+  evo: "evolution chamber",
 };
 
 // Utility to transform abbreviations in the input text
@@ -301,10 +302,30 @@ document
     analyzeBuildOrder(event.target.value);
   });
 
-// Save the build order as a JSON file
+// Function to toggle visibility of a section
+// Function to toggle the visibility of any section
+function toggleSection(sectionId, arrowId) {
+  const section = document.getElementById(sectionId);
+  const arrow = document.getElementById(arrowId);
+
+  // Toggle visibility of the section
+  if (section.style.display === "none") {
+    section.style.display = "block";
+    arrow.classList.remove("down");
+  } else {
+    section.style.display = "none";
+    arrow.classList.add("down");
+  }
+}
+
+// Save the build order as a JSON file, including comment, video link, and input text
 function saveBuildOrderAsFile() {
-  const title = document.getElementById("buildOrderTitle").value;
+  const title = document.getElementById("buildOrderTitleInput").value; // Get title input value
+  const comment = document.getElementById("commentInput").value;
+  const videoLink = document.getElementById("videoInput").value;
+  const buildOrderInput = document.getElementById("buildOrderInput").value; // Get build order input text
   const table = document.getElementById("buildOrderTable");
+
   const buildOrder = Array.from(table.rows)
     .slice(1)
     .map((row) => ({
@@ -314,6 +335,9 @@ function saveBuildOrderAsFile() {
 
   const data = {
     title: title,
+    comment: comment,
+    videoLink: videoLink,
+    buildOrderInput: buildOrderInput,
     buildOrder: buildOrder,
   };
 
@@ -328,7 +352,7 @@ function saveBuildOrderAsFile() {
   URL.revokeObjectURL(url);
 }
 
-// Load the build order from a JSON file
+// Load the build order from a JSON file, including comment, video link, and input text
 function loadBuildOrderFromFile(event) {
   const file = event.target.files[0];
   if (!file) return;
@@ -337,24 +361,41 @@ function loadBuildOrderFromFile(event) {
   reader.onload = function (e) {
     const data = JSON.parse(e.target.result);
 
-    // Set the title if available
-    document.getElementById("buildOrderTitle").value = data.title || "";
+    // Set the title, comment, video link, and input text if available
+    document.getElementById("buildOrderTitleInput").value = data.title || "";
+    document.getElementById("buildOrderTitleText").textContent =
+      data.title || "Enter build order title here...";
+    document.getElementById("commentInput").value = data.comment || "";
+    document.getElementById("videoInput").value = data.videoLink || "";
+    document.getElementById("buildOrderInput").value =
+      data.buildOrderInput || ""; // Load input text
 
     // Display the build order in the table
     displayBuildOrder(data.buildOrder);
 
-    // Load the build order text into the textarea with HTML tags removed
-    const buildOrderText = data.buildOrder
-      .map((step) => {
-        const plainTextAction = step.action.replace(/<\/?[^>]+(>|$)/g, ""); // Remove HTML tags
-        return `[${step.workersOrTimestamp}] ${plainTextAction}`;
-      })
-      .join("\n");
-
-    document.getElementById("buildOrderInput").value = buildOrderText;
+    // Update video iframe if there is a valid link
+    updateVideoIframe(data.videoLink);
   };
   reader.readAsText(file);
 }
+
+// Update the video iframe with the YouTube link
+function updateVideoIframe(link) {
+  const videoIframe = document.getElementById("videoIframe");
+  const videoId = link ? link.split("v=")[1] : null;
+  if (videoId) {
+    videoIframe.src = `https://www.youtube.com/embed/${videoId}`;
+    videoIframe.style.display = "block";
+  } else {
+    videoIframe.src = "";
+    videoIframe.style.display = "none";
+  }
+}
+
+// Event listener to update iframe when video link is changed
+document.getElementById("videoInput").addEventListener("input", (event) => {
+  updateVideoIframe(event.target.value);
+});
 
 function displayBuildOrder(buildOrder) {
   const table = document.getElementById("buildOrderTable");
@@ -371,4 +412,30 @@ function displayBuildOrder(buildOrder) {
       transformAbbreviations(step.action)
     );
   });
+}
+function toggleTitleInput(showInput) {
+  const titleText = document.getElementById("buildOrderTitleText");
+  const titleInput = document.getElementById("buildOrderTitleInput");
+
+  if (showInput) {
+    // Show input box, hide text span, remove dimmed effect, and clear input for typing
+    titleText.style.display = "none";
+    titleInput.style.display = "inline-block";
+    titleInput.value = titleText.classList.contains("dimmed")
+      ? ""
+      : titleText.textContent; // Clear if it's dimmed placeholder
+    titleInput.focus();
+    titleText.classList.remove("dimmed"); // Remove dimmed class
+  } else {
+    // Hide input box, show text span, and restore placeholder if empty
+    titleText.textContent =
+      titleInput.value || "Enter build order title here...";
+    titleInput.style.display = "none";
+    titleText.style.display = "inline-block";
+
+    // Add dimmed effect if no title was entered
+    if (!titleInput.value) {
+      titleText.classList.add("dimmed");
+    }
+  }
 }

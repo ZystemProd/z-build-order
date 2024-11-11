@@ -6,22 +6,45 @@
   </head>
   <body>
     <div class="upperInput">
-      <textarea
-        id="buildOrderInput"
-        placeholder="Paste your build order here..."
-      ></textarea>
+      <!-- Build Order Input Section with Toggle -->
+      <h3
+        onclick="toggleSection('buildOrderInputField', 'buildOrderInputArrow')"
+        class="toggle-title"
+      >
+        <span id="buildOrderInputArrow" class="arrow"></span> Build Order Input
+      </h3>
+      <div
+        id="buildOrderInputField"
+        class="hideable-section"
+        style="display: block"
+      >
+        <textarea
+          id="buildOrderInput"
+          placeholder="Paste your build order here..."
+        ></textarea>
+      </div>
     </div>
 
     <!-- Title input field for the build order -->
-    <div class="titleInput">
+    <div class="titleContainer">
+      <span
+        id="buildOrderTitleText"
+        onclick="toggleTitleInput(true)"
+        class="dimmed"
+        >Enter build order title here...</span
+      >
+
       <input
         type="text"
-        id="buildOrderTitle"
+        id="buildOrderTitleInput"
         placeholder="Enter build order title here..."
+        onblur="toggleTitleInput(false)"
+        style="display: none"
       />
     </div>
 
     <div class="buildOrderOutput">
+      <!-- Existing table and buttons -->
       <table id="buildOrderTable">
         <tr>
           <th>Workers/Timestamp</th>
@@ -36,7 +59,35 @@
         onchange="loadBuildOrderFromFile(event)"
         hidden
       />
+
+      <!-- Comment section -->
+      <h3
+        onclick="toggleSection('commentField', 'commentArrow')"
+        class="toggle-title"
+      >
+        <span id="commentArrow" class="arrow"></span> Comment
+      </h3>
+      <div id="commentField" class="hideable-section">
+        <textarea id="commentInput" placeholder="Add a comment..."></textarea>
+      </div>
+
+      <!-- Video section -->
+      <h3
+        onclick="toggleSection('videoField', 'videoArrow')"
+        class="toggle-title"
+      >
+        <span id="videoArrow" class="arrow"></span> Video
+      </h3>
+      <div id="videoField" class="hideable-section">
+        <input
+          type="text"
+          id="videoInput"
+          placeholder="Paste YouTube link here..."
+        />
+        <iframe id="videoIframe" style="display: none"></iframe>
+      </div>
     </div>
+
     <!-- Footer Section -->
     <div class="footer">
       <p>Made by Zystem</p>
