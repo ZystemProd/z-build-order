@@ -302,21 +302,30 @@ document
     analyzeBuildOrder(event.target.value);
   });
 
-// Function to toggle visibility of a section
-// Function to toggle the visibility of any section
-function toggleSection(sectionId, arrowId) {
+// Function to toggle visibility of a section using data-section attribute
+function toggleSection(header) {
+  const sectionId = header.getAttribute("data-section");
   const section = document.getElementById(sectionId);
-  const arrow = document.getElementById(arrowId);
+  const arrow = header.querySelector(".arrow");
 
-  // Toggle visibility of the section
-  if (section.style.display === "none") {
+  if (section.style.display === "none" || !section.style.display) {
     section.style.display = "block";
-    arrow.classList.remove("down");
+    arrow.classList.add("open"); // Rotate arrow down
   } else {
     section.style.display = "none";
-    arrow.classList.add("down");
+    arrow.classList.remove("open"); // Rotate arrow right
   }
 }
+
+// Add event listeners to headers with the class "toggle-title"
+document.querySelectorAll(".toggle-title").forEach((header) => {
+  header.addEventListener("click", () => toggleSection(header));
+});
+
+// Add event listeners for each header
+document.querySelectorAll(".toggle-header").forEach((header) => {
+  header.addEventListener("click", () => toggleSection(header));
+});
 
 // Save the build order as a JSON file, including comment, video link, and input text
 function saveBuildOrderAsFile() {
@@ -439,3 +448,19 @@ function toggleTitleInput(showInput) {
     }
   }
 }
+
+document.addEventListener("DOMContentLoaded", function () {
+  const toggleHeaders = document.querySelectorAll(".toggle-title");
+  toggleHeaders.forEach((header) => {
+    const sectionId = header.getAttribute("data-section");
+    const section = document.getElementById(sectionId);
+    const arrow = header.querySelector(".arrow");
+
+    // Set arrow based on initial display state
+    if (section.style.display === "block") {
+      arrow.classList.add("open"); // Rotate down if section is open
+    } else {
+      arrow.classList.remove("open"); // Keep right if section is closed
+    }
+  });
+});

@@ -243,10 +243,9 @@ button:hover {
   margin-top: 15px;
 }
 
-/* Arrow Icon for Toggle */
 .arrow {
   display: inline-block;
-  vertical-align: middle; /* Align arrow with the middle of the text */
+  vertical-align: middle;
   margin-right: 8px;
   width: 0;
   height: 0;
@@ -254,12 +253,11 @@ button:hover {
   border-right: 6px solid transparent;
   border-top: 8px solid #e0e0e0;
   transition: transform 0.3s ease;
-  transform-origin: center; /* Rotate around the center */
-  transform: rotate(270deg);
+  transform: rotate(270deg); /* Start pointing right */
 }
 
-.arrow.down {
-  transform: rotate(360deg); /* Rotate 90 degrees to point down when open */
+.arrow.open {
+  transform: rotate(360deg); /* Point up when section is open */
 }
 
 #videoIframe {

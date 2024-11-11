@@ -7,10 +7,7 @@
   <body>
     <div class="upperInput">
       <!-- Build Order Input Section with Toggle -->
-      <h3
-        onclick="toggleSection('buildOrderInputField', 'buildOrderInputArrow')"
-        class="toggle-title"
-      >
+      <h3 data-section="buildOrderInputField" class="toggle-title">
         <span id="buildOrderInputArrow" class="arrow"></span> Build Order Input
       </h3>
       <div
@@ -60,25 +57,19 @@
         hidden
       />
 
-      <!-- Comment section -->
-      <h3
-        onclick="toggleSection('commentField', 'commentArrow')"
-        class="toggle-title"
-      >
+      <!-- Comment Section -->
+      <h3 data-section="commentField" class="toggle-title">
         <span id="commentArrow" class="arrow"></span> Comment
       </h3>
-      <div id="commentField" class="hideable-section">
+      <div id="commentField" class="hideable-section" style="display: none">
         <textarea id="commentInput" placeholder="Add a comment..."></textarea>
       </div>
 
-      <!-- Video section -->
-      <h3
-        onclick="toggleSection('videoField', 'videoArrow')"
-        class="toggle-title"
-      >
+      <!-- Video Section -->
+      <h3 data-section="videoField" class="toggle-title">
         <span id="videoArrow" class="arrow"></span> Video
       </h3>
-      <div id="videoField" class="hideable-section">
+      <div id="videoField" class="hideable-section" style="display: none">
         <input
           type="text"
           id="videoInput"
