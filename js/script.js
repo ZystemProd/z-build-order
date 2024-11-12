@@ -1,10 +1,11 @@
+// Structures and Units Data
 const structures = [
-  // Zerg Structures
   "baneling nest",
   "evolution chamber",
   "extractor",
   "greater spire",
   "hatchery",
+  "hatcheries",
   "hive",
   "hydralisk den",
   "lair",
@@ -17,8 +18,6 @@ const structures = [
   "spore crawler",
   "infestation pit",
   "pool",
-
-  // Protoss Structures
   "assimilator",
   "cybernetics core",
   "dark shrine",
@@ -35,8 +34,6 @@ const structures = [
   "templar archives",
   "twilight council",
   "warp gate",
-
-  // Terran Structures
   "armory",
   "barracks",
   "bunker",
@@ -61,139 +58,177 @@ const structures = [
 const units = {
   zerg: [
     "overlord",
-    "overlords",
     "zergling",
-    "zerglings",
     "queen",
-    "queens",
     "drone",
-    "drones",
     "lurker",
-    "lurkers",
-    "hydra",
-    "hydras",
+    "hydralisk",
     "swarm host",
-    "swarm hosts",
     "roach",
-    "roaches",
     "baneling",
-    "banelings",
     "corruptor",
-    "corruptors",
     "infestor",
-    "infestors",
     "ultralisk",
-    "ultralisks",
     "mutalisk",
-    "mutalisks",
     "viper",
-    "vipers",
     "brood lord",
-    "brood lords",
   ],
   protoss: [
     "probe",
-    "probes",
     "zealot",
-    "zealots",
     "stalker",
-    "stalkers",
     "sentry",
-    "sentries",
     "observer",
-    "observers",
     "immortal",
-    "immortals",
     "warp prism",
-    "warp prisms",
     "colossus",
     "colossi",
     "phoenix",
-    "phoenixes",
     "void ray",
-    "void rays",
     "high templar",
-    "high templars",
     "dark templar",
-    "dark templars",
     "archon",
-    "archons",
     "carrier",
-    "carriers",
     "mothership",
-    "mothership core",
     "oracle",
-    "oracles",
     "tempest",
-    "tempests",
     "adept",
-    "adepts",
     "disruptor",
-    "disruptors",
   ],
   terran: [
     "scv",
-    "scvs",
     "marine",
-    "marines",
     "marauder",
-    "marauders",
     "reaper",
-    "reapers",
     "ghost",
-    "ghosts",
     "hellion",
-    "hellions",
     "siege tank",
-    "siege tanks",
     "thor",
-    "thors",
     "viking",
-    "vikings",
     "medivac",
-    "medivacs",
     "banshee",
-    "banshees",
     "raven",
-    "ravens",
     "battlecruiser",
-    "battlecruisers",
     "widow mine",
-    "widow mines",
     "hellbat",
-    "hellbats",
     "cyclone",
-    "cyclones",
     "liberator",
-    "liberators",
   ],
 };
 
-// Mapping of abbreviations to full names
+const upgrades = [
+  // Zerg Upgrades
+  "metabolic boost",
+  "adrenal glands",
+  "glial reconstitution",
+  "tunneling claws",
+  "grooved spines",
+  "muscular augments",
+  "chitinous plating",
+  "anabolic synthesis",
+  "neural parasite",
+  "range attack",
+  "baneling speed",
+  "centrifugal Hooks",
+  "overlord speed",
+  "borrow",
+  "carapace",
+  "melee attack",
+  "missile attack",
+  "flyer armor",
+  "flyer attack",
+  "adaptive talons",
+  "seismic spines",
+
+  // Protoss Upgrades
+  "research warp gate",
+  "shield",
+  "ground weapons",
+  "ground armor",
+  "air weapons",
+  "air armor",
+  "blink",
+  "charge",
+  "resonation glaives",
+  "psionic storm",
+  "storm",
+  "anion pulse crystals",
+  "phonix range",
+  "colossus range",
+  "extended thermal lances",
+  "thermal lanes",
+  "gravitic boosters",
+  "gravitic drive",
+  "flux vanes",
+  "tectonic destabilizers",
+
+  // Terran Upgrades
+  "stimpack",
+  "combat shields",
+  "concussive shells",
+  "terrans infantry armor",
+  "terrans infantry weapons",
+  "building armor",
+  "banshee cloak",
+  "emp round",
+  "cloak",
+  "battlecruiser yamato cannon",
+];
+
+// Modify the abbreviation map for specific structures and units
 const abbreviationMap = {
   ling: "zergling",
   lings: "zerglings",
   ovi: "overlord",
   ovie: "overlord",
   RW: "roach warren",
-  spore: "spore crawler",
-  spine: "spine crawler",
-  nydus: "nydus network",
   gas: "extractor",
   hydra: "hydralisk",
   hatch: "hatchery",
-  tank: "siege tank",
-  tanks: "siege tanks",
-  brood: "brood lord",
-  broods: "brood lords",
   bc: "battlecruiser",
   evo: "evolution chamber",
+  "zergling speed": "Metabolic Boost",
+  "roach speed": "glial reconstitution",
+  "hydralsik range": "grooved spines",
+  "hydralsik speed": "muscular augments",
+  "ultralisk armor": "chitinous plating",
+  "ultralisk speed": "anabolic synthesis",
+  "lurker range": "seismic spines",
+  gate: "gateway",
+  gates: "gateways",
+  cannon: "photon cannon",
+  cannons: "photon cannons",
 };
 
 // Utility to transform abbreviations in the input text
 function transformAbbreviations(text) {
+  // Prevent duplicated replacements by marking transformed phrases
+  const replacements = {
+    "spine crawler": "Spine Crawler",
+    "spore crawler": "Spore Crawler",
+    "nydus network": "Nydus Network",
+    "brood lord": "Brood Lord",
+    "siege tank": "Siege Tank",
+    "psionic storm": "Psionic Storm",
+  };
+
+  // Specific replacements for full phrases to avoid partial matches
+  Object.keys(replacements).forEach((phrase) => {
+    const regex = new RegExp(`\\b${phrase}\\b`, "gi");
+    text = text.replace(regex, replacements[phrase]);
+  });
+
+  // Abbreviations handling for single words only if they are not part of a larger term
+  text = text.replace(/\bspine\b(?!\s+crawler)/gi, "Spine Crawler");
+  text = text.replace(/\bspore\b(?!\s+crawler)/gi, "Spore Crawler");
+  text = text.replace(/\bnydus\b(?!\s+network)/gi, "Nydus Network");
+  text = text.replace(/\bbrood\b(?!\s+lord)/gi, "Brood Lord");
+  text = text.replace(/\btank\b(?!\s+tank)/gi, "Siege Tank");
+  text = text.replace(/\bstorm\b(?!\s+storm)/gi, "Psionic Storm");
+
+  // Apply other abbreviations from the abbreviationMap only if no previous match occurred
   return Object.keys(abbreviationMap).reduce((updatedText, abbr) => {
-    const regex = new RegExp(`\\b${abbr}\\b`, "gi");
+    const regex = new RegExp(`\\b${abbr}\\b`, "gi"); // Word boundary matching
     return updatedText.replace(regex, abbreviationMap[abbr]);
   }, text);
 }
@@ -211,18 +246,119 @@ function formatStructureText(actionText) {
   return actionText;
 }
 
-// Function to format specific units with styling, handling plural forms and exceptions
-// Function to format specific units with distinct faction colors
+const upgradeImages = {
+  "metabolic boost": "img/upgrade/metabolic_boost.png",
+  "adrenal glands": "img/upgrade/adrenal_glands.png",
+  "glial reconstitution": "img/upgrade/glial_reconstitution.png",
+  "tunneling claws": "img/upgrade/tunneling_claws.png",
+  "overlord speed": "img/upgrade/overlord_speed.png",
+  "muscular augments": "img/upgrade/muscular_augments.png",
+  "chitinous plating": "img/upgrade/chitinous_plating.png",
+  "grooved spines": "img/upgrade/grooved_spines.png",
+  burrow: "img/upgrade/burrow.png",
+  "anabolic synthesis": "img/upgrade/anabolic_synthesis.png",
+  "flyer attack": "img/upgrade/flyer_attack.png",
+  "flyer armor": "img/upgrade/flyer_armor.png",
+  "melee attack": "img/upgrade/melee_attack.png",
+  carapace: "img/upgrade/carapace.png",
+  "missile attack": "img/upgrade/missile_attack.png",
+  "centrifugal hooks": "img/upgrade/centrifugal_hooks.png",
+  "baneling speed": "img/upgrade/centrifugal_hooks.png",
+  "adaptive talons": "img/upgrade/adaptive_talons.png",
+  "seismic spines": "img/upgrade/seismic_spines.png",
+  "neural parasite": "img/upgrade/neural_parasite.png",
+};
+
+// Function to format action text with upgrade images
+// Function to format action text with upgrade images
+function formatUpgrades(actionText) {
+  const upgrades = Object.keys(upgradeImages);
+
+  upgrades.forEach((upgrade) => {
+    const escapedUpgrade = upgrade.replace(/\+/g, "\\+"); // Escape special characters
+    const regex = new RegExp(`\\b${escapedUpgrade}\\b`, "gi");
+
+    // Only replace once to avoid duplication
+    actionText = actionText.replace(regex, (match) => {
+      // Check if the upgrade is "flyer carapace" to handle its image properly
+      if (upgrade === "flyer carapace") {
+        const imageSrc = upgradeImages[upgrade];
+        return `<span class="upgrade-highlight">${upgrade} <img src="${imageSrc}" alt="${upgrade}" class="upgrade-image"></span>`;
+      }
+
+      // For other upgrades, use the default formatting
+      const imageSrc = upgradeImages[upgrade];
+      return `<span class="upgrade-highlight">${upgrade} <img src="${imageSrc}" alt="${upgrade}" class="upgrade-image"></span>`;
+    });
+  });
+
+  return actionText;
+}
+
+// Capitalize the first letter of the text
+function capitalizeFirstLetter(text) {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+// Capitalize the first letter of each word for units, structures, and upgrades
+function capitalizeWords(text) {
+  // Capitalize specific terms (Units, Structures, Upgrades)
+  const allUnitsAndStructures = [
+    ...units.zerg,
+    ...units.protoss,
+    ...units.terran,
+    ...structures,
+    ...upgrades,
+  ];
+
+  allUnitsAndStructures.forEach((term) => {
+    const regex = new RegExp(`\\b${term}\\b`, "gi");
+    text = text.replace(regex, (match) => capitalizeFirstLetter(match));
+  });
+
+  return text;
+}
+
+// Capitalize the first letter of each sentence
+function capitalizeSentences(text) {
+  return text.replace(/(?:^|\.\s+)([a-z])/g, (match, group1) => {
+    return match.toUpperCase();
+  });
+}
+
+// Function to format specific units and structures with styling
 function formatActionText(actionText) {
+  actionText = formatUpgrades(actionText); // Apply upgrade formatting first
+  actionText = formatStructureText(actionText); // Format structures
+  actionText = formatUnits(actionText); // Format units
+
+  // Capitalize first letter of each sentence
+  actionText = capitalizeSentences(actionText);
+
+  // Capitalize the first letter of each word for units, structures, and upgrades
+  actionText = capitalizeWords(actionText);
+
+  // Apply red color to numbers in the action column
+  return actionText.replace(
+    /\d+/g,
+    (match) => `<span class="red-text">${match}</span>`
+  );
+}
+
+// Function to format specific units with styling, handling plural forms and exceptions
+function formatUnits(actionText) {
   // Zerg Units - Purple
   units.zerg.forEach((unit) => {
     const regex = new RegExp(
-      `\\b${unit}(s)?\\b(?!\\s+warren|\\s+den|\\s+pit|\\s+network)`,
+      `\\b${unit}(s)?\\b(?!\\s+warren|\\s+den|\\s+pit|\\s+network|\\s+speed|\\s+armor|\\s+nest)`,
       "gi"
     );
     actionText = actionText.replace(
       regex,
-      `<span class="bold-purple">${unit}$1</span>`
+      (match, plural) =>
+        `<span class="bold-purple">${capitalizeFirstLetter(unit)}${
+          plural || ""
+        }</span>`
     );
   });
 
@@ -234,7 +370,10 @@ function formatActionText(actionText) {
     );
     actionText = actionText.replace(
       regex,
-      `<span class="bold-blue">${unit}$1</span>`
+      (match, plural) =>
+        `<span class="bold-blue">${capitalizeFirstLetter(unit)}${
+          plural || ""
+        }</span>`
     );
   });
 
@@ -246,15 +385,14 @@ function formatActionText(actionText) {
     );
     actionText = actionText.replace(
       regex,
-      `<span class="bold-red">${unit}$1</span>`
+      (match, plural) =>
+        `<span class="bold-red">${capitalizeFirstLetter(unit)}${
+          plural || ""
+        }</span>`
     );
   });
 
-  // Apply red color to numbers in the action column
-  return actionText.replace(
-    /\d+/g,
-    (match) => `<span class="red-text">${match}</span>`
-  );
+  return actionText;
 }
 
 // Function to analyze and update the build order table automatically
@@ -268,31 +406,33 @@ function analyzeBuildOrder(inputText) {
   }
 
   lines.forEach((line) => {
-    // Check if the line contains a timestamp (text in square brackets)
     const match = line.match(/\[(.*?)\]\s*(.*)/);
 
     let workersOrTimestamp = "";
     let actionText = "";
 
     if (match) {
-      // If brackets are present, treat as a regular build order line
       workersOrTimestamp = match[1];
       actionText = match[2];
     } else {
-      // If no brackets, treat as a comment line
       actionText = line;
     }
 
-    // Apply abbreviation transformation, then format structures and units
+    // Apply abbreviation transformation, then format structures, units, and upgrades
     actionText = transformAbbreviations(actionText);
     actionText = formatStructureText(actionText);
     actionText = formatActionText(actionText);
 
     // Insert row in the table
     const row = table.insertRow();
-    row.insertCell(0).textContent = workersOrTimestamp; // Empty if it's a comment
+    row.insertCell(0).textContent = workersOrTimestamp;
     row.insertCell(1).innerHTML = actionText;
   });
+}
+
+function capitalizeFirstWord(text) {
+  // Capitalize only the first word of the actionText
+  return text.replace(/^\w/, (char) => char.toUpperCase());
 }
 
 // Automatically trigger analysis when the user types in the buildOrderInput field

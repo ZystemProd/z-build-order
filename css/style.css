@@ -5,6 +5,7 @@ body {
   font-family: "Roboto", sans-serif;
   font-size: 16px; /* Increase base font size */
   line-height: 1.5; /* Better line height for text */
+  overflow-y: scroll; /* Show vertical scrollbar */
 }
 
 *,
@@ -220,13 +221,18 @@ button:hover {
 .bold-yellow {
   color: #f0a500; /* Yellow color */
   font-weight: bold;
-  font-size: 1.1em; /* Slightly larger for structures */
 }
 
 /* Style for red-colored numbers */
 .red-text {
   color: #00e600; /* Bright green for high visibility */
   font-weight: bold; /* Bold for more emphasis */
+}
+
+/* Unique style for upgrades */
+.upgrade-highlight {
+  color: #ff006a; /* Orange color, you can change this to any color */
+  font-weight: bold;
 }
 
 .upperInput {
@@ -319,4 +325,35 @@ button {
   -webkit-user-select: none; /* Safari */
   -ms-user-select: none; /* IE 10 and IE 11 */
   user-select: none; /* Standard syntax */
+}
+
+/* Custom scrollbar for textarea */
+textarea::-webkit-scrollbar {
+  width: 20px; /* Width of the scrollbar */
+  height: 8px; /* Height of the scrollbar (for horizontal scrollbar) */
+}
+
+textarea::-webkit-scrollbar-thumb {
+  background-color: #444; /* Darker color for the thumb */
+  border-radius: 4px; /* Rounded corners */
+  border: 2px solid #222; /* Border to make it blend with the background */
+}
+
+textarea::-webkit-scrollbar-track {
+  background: #222; /* Dark background for the track */
+  border-radius: 4px; /* Rounded corners for the track */
+}
+
+/* Optional: You can also style the scrollbar when it's hovered */
+textarea::-webkit-scrollbar-thumb:hover {
+  background-color: #666; /* Lighter thumb color on hover */
+  cursor: context-menu;
+}
+
+.upgrade-image {
+  width: 30px; /* Adjust as necessary */
+  height: 30px;
+  margin-left: 5px;
+  vertical-align: middle; /* Align the image properly with the text */
+  object-fit: cover;
 }
