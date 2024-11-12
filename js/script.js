@@ -194,6 +194,7 @@ const abbreviationMap = {
   "ultralisk armor": "chitinous plating",
   "ultralisk speed": "anabolic synthesis",
   "lurker range": "seismic spines",
+  "range attack": "missile attack",
   gate: "gateway",
   gates: "gateways",
   cannon: "photon cannon",
@@ -615,19 +616,16 @@ document
       let textarea = event.target;
       let currentValue = textarea.value;
 
-      // Insert the current line with [] at the end of it
-      let newLine = "[]"; // Define the symbol you want to add at the new line
-
-      // Split the text by newlines, and add the new line with '[]' at the end
-      let lines = currentValue.split("\n");
+      // Define the new line format with '[]' and a space inside for the cursor
+      let newLine = "[]";
 
       // Add the new line with '[]' symbol at the end
-      lines.push(newLine);
+      textarea.value = currentValue + "\n" + newLine;
 
-      // Update the textarea value by joining the lines with a newline
-      textarea.value = lines.join("\n");
+      // Calculate the cursor position to be right inside the brackets
+      let cursorPosition = textarea.value.length - (newLine.length - 1);
 
-      // Move the cursor to the end of the new line
-      textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
+      // Set the cursor position inside the brackets
+      textarea.setSelectionRange(cursorPosition, cursorPosition);
     }
   });

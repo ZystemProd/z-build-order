@@ -354,6 +354,7 @@ textarea::-webkit-scrollbar-thumb:hover {
   width: 30px; /* Adjust as necessary */
   height: 30px;
   margin-left: 5px;
+  border-radius: 7px; /* Rounded corners */
   vertical-align: middle; /* Align the image properly with the text */
   object-fit: cover;
 }
