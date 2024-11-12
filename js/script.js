@@ -604,3 +604,30 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
 });
+
+document
+  .getElementById("buildOrderInput")
+  .addEventListener("keydown", function (event) {
+    // Check if Enter key is pressed
+    if (event.key === "Enter") {
+      event.preventDefault(); // Prevent default new line behavior
+
+      let textarea = event.target;
+      let currentValue = textarea.value;
+
+      // Insert the current line with [] at the end of it
+      let newLine = "[]"; // Define the symbol you want to add at the new line
+
+      // Split the text by newlines, and add the new line with '[]' at the end
+      let lines = currentValue.split("\n");
+
+      // Add the new line with '[]' symbol at the end
+      lines.push(newLine);
+
+      // Update the textarea value by joining the lines with a newline
+      textarea.value = lines.join("\n");
+
+      // Move the cursor to the end of the new line
+      textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
+    }
+  });
