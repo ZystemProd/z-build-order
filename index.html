@@ -50,14 +50,27 @@
           <th>Action</th>
         </tr>
       </table>
-      <button onclick="saveBuildOrderAsFile()">Save Build Order</button>
-      <label for="fileInput" class="custom-file-input">Load Build Order</label>
-      <input
-        type="file"
-        id="fileInput"
-        onchange="loadBuildOrderFromFile(event)"
-        hidden
-      />
+      <div>
+        <button id="saveBuildButton">Save Current Build</button>
+        <button id="saveBuildsButton">Save All Builds</button>
+        <input type="file" id="loadBuildsInput" hidden />
+        <button id="loadBuildsButton">Load Builds</button>
+      </div>
+
+      <button id="showBuildsButton" onclick="showAllBuilds()">
+        Show All Builds
+      </button>
+
+      <!-- Modal for showing all builds -->
+      <div id="buildsModal" class="modal">
+        <div class="modal-content">
+          <span id="closeModalButton" class="close">&times;</span>
+          <h3>All Builds</h3>
+          <div id="modalBuildsContainer" class="builds-container">
+            <!-- Builds will be dynamically populated here -->
+          </div>
+        </div>
+      </div>
 
       <!-- Comment Section -->
       <h3 data-section="commentField" class="toggle-title">
@@ -91,7 +104,7 @@
           class="footer-logo"
         />
       </a>
-      <p>︱Version 0.0.7</p>
+      <p>︱Version 0.0.71</p>
       <!-- Version number here -->
     </div>
     <script src="js/script.js"></script>

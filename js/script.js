@@ -1,3 +1,31 @@
+document
+  .getElementById("buildOrderInput")
+  .addEventListener("keydown", function (event) {
+    // Check if Enter key is pressed
+    if (event.key === "Enter") {
+      event.preventDefault(); // Prevent default new line behavior
+
+      let textarea = event.target;
+      let currentValue = textarea.value;
+
+      // Define the new line format with '[]' and a space inside for the cursor
+      let newLine = "[]";
+
+      // Add the new line with '[]' symbol at the end
+      textarea.value = currentValue + "\n" + newLine;
+
+      // Calculate the cursor position to be right inside the brackets
+      let cursorPosition = textarea.value.length - (newLine.length - 1);
+
+      // Set the cursor position inside the brackets
+      textarea.setSelectionRange(cursorPosition, cursorPosition);
+    }
+  });
+
+document
+  .getElementById("saveBuildButton")
+  .addEventListener("click", saveCurrentBuild);
+
 // Structures and Units Data
 const structures = [
   "baneling nest",
@@ -43,7 +71,7 @@ const structures = [
   "ghost academy",
   "missile turret",
   "orbital command",
-  "planetary fortress",
+  "planetary fAortress",
   "reactor",
   "refinery",
   "sensor tower",
@@ -58,6 +86,7 @@ const structures = [
 const units = {
   zerg: [
     "overlord",
+    "overseer",
     "zergling",
     "queen",
     "drone",
@@ -131,7 +160,7 @@ const upgrades = [
   "baneling speed",
   "centrifugal Hooks",
   "overlord speed",
-  "borrow",
+  "burrow",
   "carapace",
   "melee attack",
   "missile attack",
@@ -149,30 +178,39 @@ const upgrades = [
   "air armor",
   "blink",
   "charge",
-  "resonation glaives",
+  "resonating glaives",
   "psionic storm",
   "storm",
-  "anion pulse crystals",
-  "phonix range",
+  "anion pulse-crystals",
   "colossus range",
-  "extended thermal lances",
-  "thermal lanes",
+  "extended thermal lance",
   "gravitic boosters",
   "gravitic drive",
   "flux vanes",
   "tectonic destabilizers",
+  "shadow stride",
 
   // Terran Upgrades
-  "stimpack",
-  "combat shields",
+  "weapon refit",
+  "vehicle and ship plating",
+  "vehicle weapons",
+  "stim",
+  "ship weapons",
+  "smart servos",
+  "neosteel armor",
+  "infernal pre-igniter",
+  "interference matrix",
+  "infantry weapons",
+  "hyperflight rotors",
+  "infantry armor",
+  "hi-sec auto tracking",
+  "hurricane engines",
+  "drilling claws",
+  "combat shield",
   "concussive shells",
-  "terrans infantry armor",
-  "terrans infantry weapons",
-  "building armor",
-  "banshee cloak",
-  "emp round",
   "cloak",
-  "battlecruiser yamato cannon",
+  "advanced ballistics",
+  "caduceus reactor",
 ];
 
 // Modify the abbreviation map for specific structures and units
@@ -195,28 +233,36 @@ const abbreviationMap = {
   "ultralisk speed": "anabolic synthesis",
   "lurker range": "seismic spines",
   "range attack": "missile attack",
-  gate: "gateway",
-  gates: "gateways",
   cannon: "photon cannon",
   cannons: "photon cannons",
+  "phoenix range": "anion pulse-crystals",
+  "building armor": "Neosteel armor",
+  "blue flame": "Infernal pre-igniter",
 };
 
-// Utility to transform abbreviations in the input text
 function transformAbbreviations(text) {
-  // Prevent duplicated replacements by marking transformed phrases
+  // Specific replacements for full phrases to avoid partial matches
   const replacements = {
     "spine crawler": "Spine Crawler",
     "spore crawler": "Spore Crawler",
     "nydus network": "Nydus Network",
     "brood lord": "Brood Lord",
     "siege tank": "Siege Tank",
-    "psionic storm": "Psionic Storm",
+    "psionic storm": "Psionic Storm", // Prioritize this replacement
   };
 
-  // Specific replacements for full phrases to avoid partial matches
+  // Replace full phrases first
   Object.keys(replacements).forEach((phrase) => {
     const regex = new RegExp(`\\b${phrase}\\b`, "gi");
     text = text.replace(regex, replacements[phrase]);
+  });
+
+  // Specific handling for "storm" to transform to "Psionic Storm" only if not already part of "Psionic Storm"
+  text = text.replace(/\bstorm\b(?!\s+storm)/gi, (match) => {
+    if (!/\bpsionic storm\b/gi.test(text)) {
+      return "Psionic Storm";
+    }
+    return match;
   });
 
   // Abbreviations handling for single words only if they are not part of a larger term
@@ -225,7 +271,7 @@ function transformAbbreviations(text) {
   text = text.replace(/\bnydus\b(?!\s+network)/gi, "Nydus Network");
   text = text.replace(/\bbrood\b(?!\s+lord)/gi, "Brood Lord");
   text = text.replace(/\btank\b(?!\s+tank)/gi, "Siege Tank");
-  text = text.replace(/\bstorm\b(?!\s+storm)/gi, "Psionic Storm");
+  text = text.replace(/\bcaduceus\b(?!\s+reactor)/gi, "Caduceus Reactor");
 
   // Apply other abbreviations from the abbreviationMap only if no previous match occurred
   return Object.keys(abbreviationMap).reduce((updatedText, abbr) => {
@@ -234,20 +280,8 @@ function transformAbbreviations(text) {
   }, text);
 }
 
-// Function to format specific structures with styling
-function formatStructureText(actionText) {
-  // Process multi-word structures first
-  structures.forEach((structure) => {
-    const regex = new RegExp(`\\b${structure}\\b`, "gi");
-    actionText = actionText.replace(
-      regex,
-      `<span class="bold-yellow">${structure}</span>`
-    );
-  });
-  return actionText;
-}
-
 const upgradeImages = {
+  // zerg
   "metabolic boost": "img/upgrade/metabolic_boost.png",
   "adrenal glands": "img/upgrade/adrenal_glands.png",
   "glial reconstitution": "img/upgrade/glial_reconstitution.png",
@@ -268,9 +302,47 @@ const upgradeImages = {
   "adaptive talons": "img/upgrade/adaptive_talons.png",
   "seismic spines": "img/upgrade/seismic_spines.png",
   "neural parasite": "img/upgrade/neural_parasite.png",
+  // protoss
+  "air armor": "img/upgrade/air_armor.png",
+  "air weapons": "img/upgrade/air_weapons.png",
+  blink: "img/upgrade/blink.png",
+  "anion pulse-crystals": "img/upgrade/anion_pulse-crystals.png",
+  "extended thermal lance": "img/upgrade/extended_thermal_lance.png",
+  charge: "img/upgrade/charge.png",
+  "flux vanes": "img/upgrade/flux_vanes.png",
+  "gravitic drive": "img/upgrade/gravitic_drive.png",
+  "gravitic boosters": "img/upgrade/gravitic_boosters.png",
+  "ground armor": "img/upgrade/ground_armor.png",
+  "psionic storm": "img/upgrade/psionic_storm.png",
+  "ground weapons": "img/upgrade/ground_weapons.png",
+  "research warp gate": "img/upgrade/research_warpgate.png",
+  "shadow stride": "img/upgrade/shadow_stride.png",
+  "resonating glaives": "img/upgrade/resonating_glaives.png",
+  shields: "img/upgrade/shields.png",
+  "tectonic destabilizers": "img/upgrade/tectonic_desabilizers.png",
+  // terran
+  "weapon refit": "img/upgrade/weapon_refit.png",
+  "vehicle and ship plating": "img/upgrade/vehicle_and_ship_plating.png",
+  "vehicle weapons": "img/upgrade/vehicle_weapons.png",
+  stim: "img/upgrade/stim.png",
+  "ship weapons": "img/upgrade/ship_weapons.png",
+  "smart servos": "img/upgrade/smart_servos.png",
+  "neosteel armor": "img/upgrade/neosteel_armor.png",
+  "infernal pre-igniter": "img/upgrade/infernal_pre-igniter.png",
+  "interference matrix": "img/upgrade/interference_matrix.png",
+  "infantry weapons": "img/upgrade/infantry_weapons.png",
+  "hyperflight rotors": "img/upgrade/hyperflight_rotors.png",
+  "infantry armor": "img/upgrade/infantry_armor.png",
+  "hi-sec auto tracking": "img/upgrade/hi-sec_auto_tracking.png",
+  "hurricane engines": "img/upgrade/hurricane_engines.png",
+  "drilling claws": "img/upgrade/drilling_claws.png",
+  "combat shield": "img/upgrade/combat_shield.png",
+  "concussive shells": "img/upgrade/concussive_shells.png",
+  cloak: "img/upgrade/cloak.png",
+  "advanced ballistics": "img/upgrade/advanced_ballistics.png",
+  "caduceus reactor": "img/upgrade/caduceus_reactor.png",
 };
 
-// Function to format action text with upgrade images
 // Function to format action text with upgrade images
 function formatUpgrades(actionText) {
   const upgrades = Object.keys(upgradeImages);
@@ -327,23 +399,43 @@ function capitalizeSentences(text) {
   });
 }
 
-// Function to format specific units and structures with styling
-function formatActionText(actionText) {
-  actionText = formatUpgrades(actionText); // Apply upgrade formatting first
-  actionText = formatStructureText(actionText); // Format structures
-  actionText = formatUnits(actionText); // Format units
+// Function to format specific structures with styling
+function formatStructureText(actionText) {
+  // Handle multi-word upgrades as exceptions first
+  const exceptions = [
+    {
+      regex: /\bcaduceus reactor\b/gi,
+      replacement: `<span class="upgrade-highlight">Caduceus Reactor</span>`,
+    },
+    {
+      regex: /\bresearch warp gate\b/gi,
+      replacement: `<span class="upgrade-highlight">Research Warp Gate</span>`,
+    },
+  ];
 
-  // Capitalize first letter of each sentence
-  actionText = capitalizeSentences(actionText);
+  // Replace exceptions first
+  exceptions.forEach((exception) => {
+    actionText = actionText.replace(exception.regex, exception.replacement);
+  });
 
-  // Capitalize the first letter of each word for units, structures, and upgrades
-  actionText = capitalizeWords(actionText);
+  // Process remaining structures, skipping replacements for matches already handled by exceptions
+  structures.forEach((structure) => {
+    const regex = new RegExp(`\\b${structure}\\b`, "gi");
+    actionText = actionText.replace(regex, (match) => {
+      if (exceptions.some((exception) => exception.regex.test(actionText)))
+        return match; // Skip if part of an exception
+      return `<span class="bold-yellow">${structure}</span>`;
+    });
+  });
 
-  // Apply red color to numbers in the action column
-  return actionText.replace(
-    /\d+/g,
-    (match) => `<span class="red-text">${match}</span>`
-  );
+  // Process standalone "Warp Gate" as a structure only if not part of "Research Warp Gate"
+  const warpGateRegex = /\bwarp gate\b/gi;
+  actionText = actionText.replace(warpGateRegex, (match) => {
+    if (/research warp gate/i.test(actionText)) return match; // Skip if part of "Research Warp Gate"
+    return `<span class="bold-yellow">${match}</span>`;
+  });
+
+  return actionText;
 }
 
 // Function to format specific units with styling, handling plural forms and exceptions
@@ -366,7 +458,7 @@ function formatUnits(actionText) {
   // Protoss Units - Bright Blue
   units.protoss.forEach((unit) => {
     const regex = new RegExp(
-      `\\b${unit}(s)?\\b(?!\\s+core|\\s+shrine|\\s+gate|\\s+forge)`,
+      `\\b${unit}(s)?\\b(?!\\s+core|\\s+shrine|\\s+gate|\\s+forge|\\s+range)`,
       "gi"
     );
     actionText = actionText.replace(
@@ -393,6 +485,27 @@ function formatUnits(actionText) {
     );
   });
 
+  return actionText;
+}
+
+// Function to format specific units and structures with styling
+function formatActionText(actionText) {
+  actionText = transformAbbreviations(actionText); // Transform abbreviations first
+  actionText = formatStructureText(actionText); // Format structures
+  actionText = formatUnits(actionText); // Format units (purple for Zerg, red for Terran, blue for Protoss)
+  actionText = formatUpgrades(actionText); // Format upgrades
+
+  // Capitalize first letter of each sentence
+  actionText = capitalizeSentences(actionText);
+
+  // Capitalize the first letter of each word for units, structures, and upgrades
+  actionText = capitalizeWords(actionText);
+
+  // Apply red color to numbers in the action column
+  return actionText.replace(
+    /\d+/g,
+    (match) => `<span class="red-text">${match}</span>`
+  );
   return actionText;
 }
 
@@ -468,89 +581,206 @@ document.querySelectorAll(".toggle-header").forEach((header) => {
   header.addEventListener("click", () => toggleSection(header));
 });
 
-// Save the build order as a JSON file, including comment, video link, and input text
-function saveBuildOrderAsFile() {
-  const title = document.getElementById("buildOrderTitleInput").value; // Get title input value
-  const comment = document.getElementById("commentInput").value;
-  const videoLink = document.getElementById("videoInput").value;
-  const buildOrderInput = document.getElementById("buildOrderInput").value; // Get build order input text
-  const table = document.getElementById("buildOrderTable");
+document.addEventListener("DOMContentLoaded", () => {
+  initializeEventListeners();
+});
 
-  const buildOrder = Array.from(table.rows)
-    .slice(1)
-    .map((row) => ({
+// Global variable for storing all builds
+let savedBuilds = [];
+
+// Setup event listeners
+function initializeEventListeners() {
+  document
+    .getElementById("saveBuildsButton")
+    .addEventListener("click", saveBuildsToFile);
+  document
+    .getElementById("loadBuildsButton")
+    .addEventListener("change", loadBuildsFromFile);
+  document
+    .getElementById("showBuildsButton")
+    .addEventListener("click", showAllBuilds);
+  document
+    .getElementById("closeModalButton")
+    .addEventListener("click", closeModal);
+
+  // Close modal on outside click
+  window.addEventListener("click", (event) => {
+    const modal = document.getElementById("buildsModal");
+    if (event.target === modal) {
+      closeModal();
+    }
+  });
+}
+
+function saveCurrentBuild() {
+  const title = document.getElementById("buildOrderTitleInput").value.trim();
+  const comment = document.getElementById("commentInput").value.trim();
+  const videoLink = document.getElementById("videoInput").value.trim();
+  const buildOrderInput = document
+    .getElementById("buildOrderInput")
+    .value.trim();
+
+  const buildOrder = [];
+  const table = document.getElementById("buildOrderTable");
+  for (let i = 1; i < table.rows.length; i++) {
+    const row = table.rows[i];
+    buildOrder.push({
       workersOrTimestamp: row.cells[0].textContent,
       action: row.cells[1].innerHTML,
-    }));
+    });
+  }
 
-  const data = {
-    title: title,
-    comment: comment,
-    videoLink: videoLink,
-    buildOrderInput: buildOrderInput,
-    buildOrder: buildOrder,
+  if (!title) {
+    alert("Please provide a title for the build.");
+    return;
+  }
+
+  const build = {
+    title,
+    comment,
+    videoLink,
+    buildOrderInput,
+    buildOrder,
   };
 
-  const blob = new Blob([JSON.stringify(data, null, 2)], {
+  // Check for duplicate titles
+  const existingIndex = savedBuilds.findIndex((b) => b.title === title);
+  if (existingIndex !== -1) {
+    if (
+      !confirm(
+        `A build with the title "${title}" already exists. Overwrite it?`
+      )
+    ) {
+      return;
+    }
+    savedBuilds[existingIndex] = build; // Overwrite existing build
+  } else {
+    savedBuilds.push(build); // Add new build
+  }
+
+  alert("Build saved successfully!");
+}
+
+// Save all builds to a JSON file
+function saveBuildsToFile() {
+  console.log(savedBuilds); // Debugging line
+  const blob = new Blob([JSON.stringify(savedBuilds, null, 2)], {
     type: "application/json",
   });
   const url = URL.createObjectURL(blob);
   const downloadLink = document.createElement("a");
   downloadLink.href = url;
-  downloadLink.download = `build_order_${Date.now()}.json`;
+  downloadLink.download = "build_orders.json";
   downloadLink.click();
   URL.revokeObjectURL(url);
 }
 
-// Load the build order from a JSON file, including comment, video link, and input text
-function loadBuildOrderFromFile(event) {
+// Load builds from a file
+function loadBuildsFromFile(event) {
+  console.log("Load Builds button clicked"); // Debugging log
   const file = event.target.files[0];
-  if (!file) return;
+  if (!file) {
+    alert("No file selected.");
+    return;
+  }
 
   const reader = new FileReader();
+
   reader.onload = function (e) {
-    const data = JSON.parse(e.target.result);
+    try {
+      const loadedBuilds = JSON.parse(e.target.result);
 
-    // Set the title, comment, video link, and input text if available
-    document.getElementById("buildOrderTitleInput").value = data.title || "";
-    document.getElementById("buildOrderTitleText").textContent =
-      data.title || "Enter build order title here...";
-    document.getElementById("commentInput").value = data.comment || "";
-    document.getElementById("videoInput").value = data.videoLink || "";
-    document.getElementById("buildOrderInput").value =
-      data.buildOrderInput || ""; // Load input text
+      if (!Array.isArray(loadedBuilds)) {
+        alert("Invalid file format. Please upload a valid builds JSON file.");
+        return;
+      }
 
-    // Display the build order in the table
-    displayBuildOrder(data.buildOrder);
-
-    // Update video iframe if there is a valid link
-    updateVideoIframe(data.videoLink);
+      savedBuilds = loadedBuilds; // Update the savedBuilds array
+      alert("Builds loaded successfully!");
+      console.log("Loaded Builds:", savedBuilds); // Debugging log
+    } catch (error) {
+      console.error("Error parsing JSON file:", error);
+      alert("Failed to load builds. Ensure the file is a valid JSON.");
+    }
   };
+
+  reader.onerror = function () {
+    alert("Failed to read the file.");
+  };
+
   reader.readAsText(file);
 }
 
-// Update the video iframe with the YouTube link
-function updateVideoIframe(link) {
-  const videoIframe = document.getElementById("videoIframe");
-  const videoId = link ? link.split("v=")[1] : null;
-  if (videoId) {
-    videoIframe.src = `https://www.youtube.com/embed/${videoId}`;
-    videoIframe.style.display = "block";
-  } else {
-    videoIframe.src = "";
-    videoIframe.style.display = "none";
+document.getElementById("loadBuildsButton").addEventListener("click", () => {
+  document.getElementById("loadBuildsInput").click();
+});
+
+document
+  .getElementById("loadBuildsInput")
+  .addEventListener("change", loadBuildsFromFile);
+
+// Display all builds in the modal
+function showAllBuilds() {
+  const modal = document.getElementById("buildsModal");
+  const buildsContainer = document.getElementById("modalBuildsContainer");
+  buildsContainer.innerHTML = ""; // Clear existing builds
+
+  savedBuilds.forEach((build, index) => {
+    const buildElement = document.createElement("div");
+    buildElement.classList.add("build-card");
+    buildElement.innerHTML = `
+      <h4>${build.title}</h4>
+      <button onclick="viewBuild(${index})">View</button>
+      <button onclick="deleteBuild(${index})">Delete</button>
+    `;
+    buildsContainer.appendChild(buildElement);
+  });
+
+  modal.style.display = "block"; // Show the modal
+}
+
+// Close the modal
+function closeModal() {
+  const modal = document.getElementById("buildsModal");
+  modal.style.display = "none";
+}
+
+// View a specific build
+function viewBuild(index) {
+  const build = savedBuilds[index];
+  if (!build) return;
+
+  const titleInput = document.getElementById("buildOrderTitleInput");
+  const titleText = document.getElementById("buildOrderTitleText");
+
+  // Update the title input and text display
+  titleInput.value = build.title;
+  titleText.textContent = build.title;
+  titleText.classList.remove("dimmed");
+
+  document.getElementById("commentInput").value = build.comment;
+  document.getElementById("videoInput").value = build.videoLink;
+  document.getElementById("buildOrderInput").value = build.buildOrderInput;
+
+  // Populate the build order table
+  displayBuildOrder(build.buildOrder);
+
+  closeModal();
+}
+
+// Delete a specific build
+function deleteBuild(index) {
+  if (confirm("Are you sure you want to delete this build?")) {
+    savedBuilds.splice(index, 1);
+    showAllBuilds(); // Refresh the popup
   }
 }
 
-// Event listener to update iframe when video link is changed
-document.getElementById("videoInput").addEventListener("input", (event) => {
-  updateVideoIframe(event.target.value);
-});
-
+// Function to display the build order in the table
 function displayBuildOrder(buildOrder) {
   const table = document.getElementById("buildOrderTable");
 
-  // Clear existing rows (except header)
+  // Clear existing rows (except the header)
   while (table.rows.length > 1) {
     table.deleteRow(1);
   }
@@ -558,33 +788,30 @@ function displayBuildOrder(buildOrder) {
   buildOrder.forEach((step) => {
     const row = table.insertRow();
     row.insertCell(0).textContent = step.workersOrTimestamp;
-    row.insertCell(1).innerHTML = formatActionText(
-      transformAbbreviations(step.action)
-    );
+    row.insertCell(1).innerHTML = step.action;
   });
 }
+
+// Function to toggle the title input field
 function toggleTitleInput(showInput) {
   const titleText = document.getElementById("buildOrderTitleText");
   const titleInput = document.getElementById("buildOrderTitleInput");
 
   if (showInput) {
-    // Show input box, hide text span, remove dimmed effect, and clear input for typing
     titleText.style.display = "none";
     titleInput.style.display = "inline-block";
     titleInput.value = titleText.classList.contains("dimmed")
       ? ""
-      : titleText.textContent; // Clear if it's dimmed placeholder
+      : titleText.textContent;
     titleInput.focus();
-    titleText.classList.remove("dimmed"); // Remove dimmed class
+    titleText.classList.remove("dimmed");
   } else {
-    // Hide input box, show text span, and restore placeholder if empty
-    titleText.textContent =
-      titleInput.value || "Enter build order title here...";
+    const titleValue = titleInput.value.trim();
+    titleText.textContent = titleValue || "Enter build order title here...";
     titleInput.style.display = "none";
     titleText.style.display = "inline-block";
 
-    // Add dimmed effect if no title was entered
-    if (!titleInput.value) {
+    if (!titleValue) {
       titleText.classList.add("dimmed");
     }
   }
@@ -605,27 +832,3 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
 });
-
-document
-  .getElementById("buildOrderInput")
-  .addEventListener("keydown", function (event) {
-    // Check if Enter key is pressed
-    if (event.key === "Enter") {
-      event.preventDefault(); // Prevent default new line behavior
-
-      let textarea = event.target;
-      let currentValue = textarea.value;
-
-      // Define the new line format with '[]' and a space inside for the cursor
-      let newLine = "[]";
-
-      // Add the new line with '[]' symbol at the end
-      textarea.value = currentValue + "\n" + newLine;
-
-      // Calculate the cursor position to be right inside the brackets
-      let cursorPosition = textarea.value.length - (newLine.length - 1);
-
-      // Set the cursor position inside the brackets
-      textarea.setSelectionRange(cursorPosition, cursorPosition);
-    }
-  });
