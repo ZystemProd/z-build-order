@@ -45,7 +45,6 @@ const structures = [
   "spire",
   "spore crawler",
   "infestation pit",
-  "pool",
   "assimilator",
   "cybernetics core",
   "dark shrine",
@@ -238,6 +237,7 @@ const abbreviationMap = {
   "phoenix range": "anion pulse-crystals",
   "building armor": "Neosteel armor",
   "blue flame": "Infernal pre-igniter",
+  pool: "spawning pool",
 };
 
 function transformAbbreviations(text) {
@@ -266,17 +266,53 @@ function transformAbbreviations(text) {
   });
 
   // Abbreviations handling for single words only if they are not part of a larger term
-  text = text.replace(/\bspine\b(?!\s+crawler)/gi, "Spine Crawler");
-  text = text.replace(/\bspore\b(?!\s+crawler)/gi, "Spore Crawler");
-  text = text.replace(/\bnydus\b(?!\s+network)/gi, "Nydus Network");
-  text = text.replace(/\bbrood\b(?!\s+lord)/gi, "Brood Lord");
-  text = text.replace(/\btank\b(?!\s+tank)/gi, "Siege Tank");
-  text = text.replace(/\bcaduceus\b(?!\s+reactor)/gi, "Caduceus Reactor");
+  text = text.replace(/\bspine\b(?!\s+crawler)/gi, (match) => {
+    if (!/\bspine crawler\b/gi.test(text)) {
+      return "Spine Crawler";
+    }
+    return match;
+  });
+  text = text.replace(/\bspore\b(?!\s+crawler)/gi, (match) => {
+    if (!/\bspore crawler\b/gi.test(text)) {
+      return "Spore Crawler";
+    }
+    return match;
+  });
+  text = text.replace(/\bnydus\b(?!\s+network)/gi, (match) => {
+    if (!/\bnydus network\b/gi.test(text)) {
+      return "Nydus Network";
+    }
+    return match;
+  });
+  text = text.replace(/\bbrood\b(?!\s+lord)/gi, (match) => {
+    if (!/\bbrood lord\b/gi.test(text)) {
+      return "Brood Lord";
+    }
+    return match;
+  });
+  text = text.replace(/\btank\b(?!\s+tank)/gi, (match) => {
+    if (!/\bsiege tank\b/gi.test(text)) {
+      return "Siege Tank";
+    }
+    return match;
+  });
+  text = text.replace(/\bcaduceus\b(?!\s+reactor)/gi, (match) => {
+    if (!/\bcaduceus reactor\b/gi.test(text)) {
+      return "Caduceus Reactor";
+    }
+    return match;
+  });
 
   // Apply other abbreviations from the abbreviationMap only if no previous match occurred
   return Object.keys(abbreviationMap).reduce((updatedText, abbr) => {
     const regex = new RegExp(`\\b${abbr}\\b`, "gi"); // Word boundary matching
-    return updatedText.replace(regex, abbreviationMap[abbr]);
+    const replacement = abbreviationMap[abbr];
+    return updatedText.replace(regex, (match) => {
+      if (!new RegExp(`\\b${replacement}\\b`, "gi").test(updatedText)) {
+        return replacement;
+      }
+      return match;
+    });
   }, text);
 }
 
@@ -473,7 +509,7 @@ function formatUnits(actionText) {
   // Terran Units - Bright Red
   units.terran.forEach((unit) => {
     const regex = new RegExp(
-      `\\b${unit}(s)?\\b(?!\\s+barracks|\\s+command|\\s+reactor)`,
+      `\\b${unit}(s)?\\b(?!\\s+barracks|\\s+command|\\s+reactor|\\s+academy)`,
       "gi"
     );
     actionText = actionText.replace(
@@ -588,6 +624,15 @@ document.addEventListener("DOMContentLoaded", () => {
 // Global variable for storing all builds
 let savedBuilds = [];
 
+// Load saved builds from local storage on page load
+window.addEventListener("load", () => {
+  const storedBuilds = localStorage.getItem("savedBuilds");
+  if (storedBuilds) {
+    savedBuilds = JSON.parse(storedBuilds);
+    filterBuilds("all"); // Display all builds on load
+  }
+});
+
 // Setup event listeners
 function initializeEventListeners() {
   document
@@ -619,6 +664,7 @@ function saveCurrentBuild() {
   const buildOrderInput = document
     .getElementById("buildOrderInput")
     .value.trim();
+  const category = document.getElementById("buildCategoryDropdown").value;
 
   const buildOrder = [];
   const table = document.getElementById("buildOrderTable");
@@ -636,11 +682,12 @@ function saveCurrentBuild() {
   }
 
   const build = {
-    title,
-    comment,
-    videoLink,
-    buildOrderInput,
-    buildOrder,
+    title: title,
+    comment: comment,
+    videoLink: videoLink,
+    buildOrder: buildOrder,
+    category: category,
+    timestamp: Date.now(), // Add creation timestamp
   };
 
   // Check for duplicate titles
@@ -658,7 +705,11 @@ function saveCurrentBuild() {
     savedBuilds.push(build); // Add new build
   }
 
+  // Save builds to local storage
+  localStorage.setItem("savedBuilds", JSON.stringify(savedBuilds));
+
   alert("Build saved successfully!");
+  filterBuilds("all"); // Refresh the build list
 }
 
 // Save all builds to a JSON file
@@ -677,7 +728,6 @@ function saveBuildsToFile() {
 
 // Load builds from a file
 function loadBuildsFromFile(event) {
-  console.log("Load Builds button clicked"); // Debugging log
   const file = event.target.files[0];
   if (!file) {
     alert("No file selected.");
@@ -685,29 +735,33 @@ function loadBuildsFromFile(event) {
   }
 
   const reader = new FileReader();
-
   reader.onload = function (e) {
     try {
-      const loadedBuilds = JSON.parse(e.target.result);
+      const importedBuilds = JSON.parse(e.target.result);
 
-      if (!Array.isArray(loadedBuilds)) {
-        alert("Invalid file format. Please upload a valid builds JSON file.");
-        return;
-      }
+      // Validate imported builds
+      importedBuilds.forEach((build) => {
+        if (!build.title || !build.category) {
+          throw new Error(
+            "Invalid build format. Each build must include a title and category."
+          );
+        }
+      });
 
-      savedBuilds = loadedBuilds; // Update the savedBuilds array
+      // Replace the saved builds array with the imported builds
+      savedBuilds = importedBuilds;
+
+      // Update local storage
+      localStorage.setItem("savedBuilds", JSON.stringify(savedBuilds));
+
       alert("Builds loaded successfully!");
-      console.log("Loaded Builds:", savedBuilds); // Debugging log
+
+      // Refresh the build list
+      filterBuilds("all");
     } catch (error) {
-      console.error("Error parsing JSON file:", error);
-      alert("Failed to load builds. Ensure the file is a valid JSON.");
+      alert(`Error loading builds: ${error.message}`);
     }
   };
-
-  reader.onerror = function () {
-    alert("Failed to read the file.");
-  };
-
   reader.readAsText(file);
 }
 
@@ -728,11 +782,13 @@ function showAllBuilds() {
   savedBuilds.forEach((build, index) => {
     const buildElement = document.createElement("div");
     buildElement.classList.add("build-card");
+
     buildElement.innerHTML = `
-      <h4>${build.title}</h4>
+      <div class="delete-icon" onclick="deleteBuild(${index})">×</div>
+      <h4 class="build-card-title">${build.title}</h4>
       <button onclick="viewBuild(${index})">View</button>
-      <button onclick="deleteBuild(${index})">Delete</button>
     `;
+
     buildsContainer.appendChild(buildElement);
   });
 
@@ -768,12 +824,20 @@ function viewBuild(index) {
   closeModal();
 }
 
-// Delete a specific build
 function deleteBuild(index) {
-  if (confirm("Are you sure you want to delete this build?")) {
-    savedBuilds.splice(index, 1);
-    showAllBuilds(); // Refresh the popup
+  if (!confirm("Are you sure you want to delete this build?")) {
+    return;
   }
+
+  // Remove the build from the array
+  savedBuilds.splice(index, 1);
+
+  // Update local storage
+  localStorage.setItem("savedBuilds", JSON.stringify(savedBuilds));
+
+  // Refresh the build list
+  filterBuilds("all");
+  alert("Build deleted successfully!");
 }
 
 // Function to display the build order in the table
@@ -832,3 +896,113 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
 });
+
+// Build storage example
+let builds = [
+  { title: "ZvP Build 1", category: "zvp" },
+  { title: "ZvT Build 2", category: "zvt" },
+  { title: "PvP Build 1", category: "pvp" },
+  { title: "TvT Build 1", category: "tvt" },
+  { title: "ZvZ Build 1", category: "zvz" },
+];
+
+// Function to filter builds by category or subcategory
+function filterBuilds(category) {
+  const buildList = document.getElementById("modalBuildsContainer");
+  const modalTitle = document.querySelector(".modal-content h3"); // Reference the modal's h3 title
+
+  // Clear existing cards
+  buildList.innerHTML = "";
+
+  // Filter builds by category
+  const filteredBuilds =
+    category === "all"
+      ? savedBuilds
+      : savedBuilds.filter((build) => build.category === category);
+
+  // Sort by timestamp (newest first)
+  const sortedBuilds = filteredBuilds.sort((a, b) => b.timestamp - a.timestamp);
+
+  // Dynamically update the modal title based on the selected category
+  const categoryTitles = {
+    all: "All Builds",
+    zerg: "Zerg Builds",
+    protoss: "Protoss Builds",
+    terran: "Terran Builds",
+    zvp: "ZvP Builds",
+    zvt: "ZvT Builds",
+    zvz: "ZvZ Builds",
+    pvp: "PvP Builds",
+    pvz: "PvZ Builds",
+    pvt: "PvT Builds",
+    tvp: "TvP Builds",
+    tvt: "TvT Builds",
+    tvz: "TvZ Builds",
+  };
+
+  modalTitle.textContent = categoryTitles[category] || "Builds"; // Default to "Builds" if category not found
+
+  // Display sorted and filtered builds
+  sortedBuilds.forEach((build, index) => {
+    const buildCard = document.createElement("div");
+    buildCard.classList.add("build-card");
+
+    // Populate build card content without comment section
+    buildCard.innerHTML = `
+      <div class="delete-icon" onclick="deleteBuild(${index})">×</div>
+      <h4 class="build-card-title">${build.title}</h4>
+      <button onclick="viewBuild(${index})">View</button>
+    `;
+
+    // Append build card to the container
+    buildList.appendChild(buildCard);
+  });
+}
+
+function highlightActiveTab(category) {
+  document
+    .querySelectorAll("#buildCategoryTabs button, #buildSubCategoryTabs button")
+    .forEach((button) => {
+      button.classList.remove("active-tab");
+    });
+  document
+    .querySelector(`[onclick="filterBuilds('${category}')"]`)
+    .classList.add("active-tab");
+}
+
+// Function to open the modal
+function openModal() {
+  const modal = document.getElementById("buildsModal");
+  modal.style.display = "block";
+  filterBuilds("all"); // Default to show all builds
+}
+
+// Function to close the modal
+function closeModal() {
+  const modal = document.getElementById("buildsModal");
+  modal.style.display = "none";
+}
+
+function showSubcategories(category) {
+  const subcategories = document.querySelectorAll(".subcategory-container");
+  subcategories.forEach((container) => {
+    container.style.display = "none"; // Hide all subcategories
+  });
+
+  const activeSubcategory = document.querySelector(
+    `.subcategory-container.${category}`
+  );
+  if (activeSubcategory) {
+    activeSubcategory.style.display = "block";
+  }
+}
+
+// Optional: Hide subcategories when the mouse leaves the category tab
+document
+  .getElementById("buildCategoryTabs")
+  .addEventListener("mouseleave", () => {
+    const subcategories = document.querySelectorAll(".subcategory-container");
+    subcategories.forEach((container) => {
+      container.style.display = "none"; // Hide all subcategories
+    });
+  });

@@ -5,95 +5,144 @@
     <link rel="stylesheet" href="css/style.css" />
   </head>
   <body>
-    <div class="upperInput">
-      <!-- Build Order Input Section with Toggle -->
-      <h3 data-section="buildOrderInputField" class="toggle-title">
-        <span id="buildOrderInputArrow" class="arrow"></span> Build Order Input
-      </h3>
-      <div
-        id="buildOrderInputField"
-        class="hideable-section"
-        style="display: block"
-      >
-        <textarea
-          id="buildOrderInput"
-          placeholder="Paste your build order here..."
+    <div id="content">
+      <div class="upperInput">
+        <!-- Build Order Input Section with Toggle -->
+        <h3 data-section="buildOrderInputField" class="toggle-title">
+          <span id="buildOrderInputArrow" class="arrow"></span> Build Order
+          Input
+        </h3>
+        <div
+          id="buildOrderInputField"
+          class="hideable-section"
+          style="display: block"
         >
+          <textarea
+            id="buildOrderInput"
+            placeholder="Paste your build order here..."
+          >
 []</textarea
-        >
-      </div>
-    </div>
-
-    <!-- Title input field for the build order -->
-    <div class="titleContainer">
-      <span
-        id="buildOrderTitleText"
-        onclick="toggleTitleInput(true)"
-        class="dimmed"
-        >Enter build order title here...</span
-      >
-
-      <input
-        type="text"
-        id="buildOrderTitleInput"
-        placeholder="Enter build order title here..."
-        onblur="toggleTitleInput(false)"
-        style="display: none"
-      />
-    </div>
-
-    <div class="buildOrderOutput">
-      <!-- Existing table and buttons -->
-      <table id="buildOrderTable">
-        <tr>
-          <th>Workers/Timestamp</th>
-          <th>Action</th>
-        </tr>
-      </table>
-      <div>
-        <button id="saveBuildButton">Save Current Build</button>
-        <button id="saveBuildsButton">Save All Builds</button>
-        <input type="file" id="loadBuildsInput" hidden />
-        <button id="loadBuildsButton">Load Builds</button>
-      </div>
-
-      <button id="showBuildsButton" onclick="showAllBuilds()">
-        Show All Builds
-      </button>
-
-      <!-- Modal for showing all builds -->
-      <div id="buildsModal" class="modal">
-        <div class="modal-content">
-          <span id="closeModalButton" class="close">&times;</span>
-          <h3>All Builds</h3>
-          <div id="modalBuildsContainer" class="builds-container">
-            <!-- Builds will be dynamically populated here -->
-          </div>
+          >
         </div>
       </div>
 
-      <!-- Comment Section -->
-      <h3 data-section="commentField" class="toggle-title">
-        <span id="commentArrow" class="arrow"></span> Comment
-      </h3>
-      <div id="commentField" class="hideable-section" style="display: none">
-        <textarea id="commentInput" placeholder="Add a comment..."></textarea>
+      <!-- Title input field for the build order -->
+      <div class="form-container">
+        <div class="titleContainer">
+          <span
+            id="buildOrderTitleText"
+            onclick="toggleTitleInput(true)"
+            class="dimmed"
+            >Enter build order title here...</span
+          >
+          <input
+            type="text"
+            id="buildOrderTitleInput"
+            placeholder="Enter build order title here..."
+            onblur="toggleTitleInput(false)"
+            style="display: none"
+          />
+        </div>
       </div>
 
-      <!-- Video Section -->
-      <h3 data-section="videoField" class="toggle-title">
-        <span id="videoArrow" class="arrow"></span> Video
-      </h3>
-      <div id="videoField" class="hideable-section" style="display: none">
-        <input
-          type="text"
-          id="videoInput"
-          placeholder="Paste YouTube link here..."
-        />
-        <iframe id="videoIframe" style="display: none"></iframe>
+      <div class="buildOrderOutput">
+        <!-- Existing table and buttons -->
+        <table id="buildOrderTable">
+          <tr>
+            <th>Workers/Timestamp</th>
+            <th>Action</th>
+          </tr>
+        </table>
+        <!-- Dropdown Section -->
+        <div class="dropdown-container">
+          <label for="buildCategoryDropdown">Match-up</label>
+          <select id="buildCategoryDropdown" class="styled-dropdown">
+            <option value="zvp">ZvP</option>
+            <option value="zvt">ZvT</option>
+            <option value="zvz">ZvZ</option>
+            <option value="pvp">PvP</option>
+            <option value="pvz">PvZ</option>
+            <option value="pvt">PvT</option>
+            <option value="tvp">TvP</option>
+            <option value="tvt">TvT</option>
+            <option value="tvz">TvZ</option>
+          </select>
+        </div>
+        <div class="saveLoadContainer">
+          <button id="saveBuildButton">Save Current Build</button>
+          <button id="saveBuildsButton">Save All Builds to File</button>
+          <input type="file" id="loadBuildsInput" hidden />
+          <button id="loadBuildsButton">Load Builds</button>
+        </div>
+
+        <button id="showBuildsButton" onclick="showAllBuilds()">
+          Show All Builds
+        </button>
+
+        <!-- Modal for showing all builds -->
+        <div id="buildsModal" class="modal">
+          <div class="modal-content">
+            <!-- Tab System -->
+            <div id="buildCategoryTabs" class="category-tabs">
+              <button class="all-builds" onclick="filterBuilds('all')">
+                All Builds
+              </button>
+              <div class="category" onmouseover="showSubcategories('zerg')">
+                Zerg Builds
+                <div class="subcategory-container zerg">
+                  <button onclick="filterBuilds('zvp')">ZvP</button>
+                  <button onclick="filterBuilds('zvt')">ZvT</button>
+                  <button onclick="filterBuilds('zvz')">ZvZ</button>
+                </div>
+              </div>
+              <div class="category" onmouseover="showSubcategories('protoss')">
+                Protoss Builds
+                <div class="subcategory-container protoss">
+                  <button onclick="filterBuilds('pvp')">PvP</button>
+                  <button onclick="filterBuilds('pvz')">PvZ</button>
+                  <button onclick="filterBuilds('pvt')">PvT</button>
+                </div>
+              </div>
+              <div class="category" onmouseover="showSubcategories('terran')">
+                Terran Builds
+                <div class="subcategory-container terran">
+                  <button onclick="filterBuilds('tvp')">TvP</button>
+                  <button onclick="filterBuilds('tvt')">TvT</button>
+                  <button onclick="filterBuilds('tvz')">TvZ</button>
+                </div>
+              </div>
+            </div>
+
+            <span id="closeModalButton" class="close">&times;</span>
+            <h3>All Builds</h3>
+            <div id="modalBuildsContainer" class="builds-container">
+              <!-- Builds will be dynamically populated here -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Comment Section -->
+        <h3 data-section="commentField" class="toggle-title">
+          <span id="commentArrow" class="arrow"></span> Comment
+        </h3>
+        <div id="commentField" class="hideable-section" style="display: none">
+          <textarea id="commentInput" placeholder="Add a comment..."></textarea>
+        </div>
+
+        <!-- Video Section -->
+        <h3 data-section="videoField" class="toggle-title">
+          <span id="videoArrow" class="arrow"></span> Video
+        </h3>
+        <div id="videoField" class="hideable-section" style="display: none">
+          <input
+            type="text"
+            id="videoInput"
+            placeholder="Paste YouTube link here..."
+          />
+          <iframe id="videoIframe" style="display: none"></iframe>
+        </div>
       </div>
     </div>
-
     <!-- Footer Section -->
     <div class="footer">
       <p>Made by Zystem</p>
@@ -104,7 +153,7 @@
           class="footer-logo"
         />
       </a>
-      <p>︱Version 0.0.81</p>
+      <p>︱Version 0.1.0</p>
       <!-- Version number here -->
     </div>
     <script src="js/script.js"></script>

@@ -7,6 +7,18 @@ body {
   line-height: 1.5; /* Better line height for text */
   overflow-y: scroll; /* Show vertical scrollbar */
 }
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%; /* Ensures the full height covers the viewport */
+  display: flex;
+  flex-direction: column; /* Makes the body a vertical flex container */
+}
+
+#content {
+  flex: 1; /* Fills available space, pushing the footer down when content grows */
+}
 
 *,
 *::before,
@@ -170,6 +182,7 @@ button:hover {
   display: flex;
   align-items: center; /* Aligns items in center of the container */
   font-size: 1.1em;
+  max-width: 165px;
   color: #e0e0e0;
   cursor: pointer;
   margin-top: 15px;
@@ -305,7 +318,7 @@ button:hover {
   padding: 10px 0;
   font-size: 14px;
   color: white;
-  margin-top: 20px; /* Space above the footer */
+  position: relative; /* Ensures no overlap */
 }
 
 .footer-logo {
@@ -417,8 +430,10 @@ textarea::-webkit-scrollbar-thumb:hover {
   padding: 20px;
   border: 1px solid #888;
   width: 50%; /* Width of the modal */
+  height: 50%;
   border-radius: 8px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+  overflow-y: auto;
 }
 
 /* Close button */
@@ -438,6 +453,7 @@ textarea::-webkit-scrollbar-thumb:hover {
 
 /* Build cards */
 .build-card {
+  position: relative;
   background-color: #292929;
   border: 1px solid #444;
   border-radius: 8px;
@@ -445,12 +461,23 @@ textarea::-webkit-scrollbar-thumb:hover {
   margin: 10px;
   text-align: center;
   cursor: pointer;
+  text-align: center;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   transition: transform 0.2s ease-in-out, background-color 0.2s ease-in-out;
 }
-
-.build-card:hover {
-  background-color: #444;
-  transform: scale(1.05);
+.build-card .delete-icon {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  cursor: pointer;
+  font-size: 18px;
+  color: #ff5c5c;
+  font-weight: bold;
+  transition: transform 0.2s, color 0.2s;
+}
+.build-card .delete-icon:hover {
+  transform: scale(1.2);
+  color: #ff1c1c;
 }
 
 /* Build card title */
@@ -465,4 +492,137 @@ textarea::-webkit-scrollbar-thumb:hover {
   flex-wrap: wrap;
   gap: 15px;
   justify-content: center;
+}
+
+#buildCategoryTabs button,
+#buildSubCategoryTabs button {
+  padding: 10px;
+  margin-right: 5px;
+  cursor: pointer;
+}
+
+.active-tab {
+  background-color: #ccc;
+}
+
+.zerg,
+.protoss,
+.terran {
+  display: none;
+}
+
+.category-tabs {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+
+.category {
+  position: relative;
+  cursor: pointer;
+}
+
+.category,
+.all-builds {
+  padding: 10px 15px;
+  cursor: pointer;
+  background-color: #f9f9f900;
+  border-radius: 8px;
+  text-align: center;
+  transition: background-color 0.2s, transform 0.2s, box-shadow 0.2s;
+}
+.category:hover,
+.all-builds:hover {
+  background-color: #eaeaea00; /* Subtle color change */
+  transform: scale(1.05); /* Slight scaling */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.9); /* Shadow for depth */
+}
+
+.subcategory-container {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  background-color: #1e1e1e;
+  border: 1px solid #ccc;
+  padding: 10px;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.8);
+}
+
+.category:hover .subcategory-container {
+  display: block;
+}
+
+.subcategory-container button {
+  display: block;
+  margin: 5px 0;
+  padding: 5px 10px;
+  cursor: pointer;
+  background-color: #ffffff00;
+  border-radius: 4px;
+  text-align: left;
+  transition: background-color 0.1s;
+}
+
+.subcategory-container button:hover {
+  background-color: #2f2f2f;
+  box-shadow: inset 0px 0px 5px rgba(0, 0, 0, 1);
+}
+
+.dropdown-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* Center align with other elements */
+  margin: 15px 0; /* Add spacing above and below */
+}
+
+.dropdown-container label {
+  margin-bottom: 5px;
+  font-size: 14px;
+  color: #e0e0e0; /* Match the dark mode text color */
+}
+
+.styled-dropdown {
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid #555; /* Darker border */
+  border-radius: 8px;
+  background-color: #2c2c2c; /* Match the program's dark background */
+  color: #e0e0e0; /* Light text for readability */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5); /* Subtle shadow */
+  transition: background-color 0.3s, box-shadow 0.3s;
+  width: 100px; /* Consistent width */
+  text-align: center; /* Center text inside dropdown */
+}
+
+.styled-dropdown:focus {
+  outline: none;
+  background-color: #444; /* Highlight on focus */
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.8); /* Subtle shadow */
+}
+
+.styled-dropdown:hover {
+  background-color: #333; /* Slightly lighter on hover */
+}
+
+.form-container {
+  display: flex;
+  justify-content: center; /* Center all items horizontally */
+  gap: 20px; /* Add spacing between elements */
+  align-items: center; /* Align vertically */
+  margin: 20px 0; /* Space around the section */
+}
+.titleContainer {
+  flex: 1; /* Ensure consistent sizing */
+  max-width: 300px; /* Limit width for better layout */
+}
+
+.form-container > * {
+  flex: 1; /* Adjust as needed for proportional sizing */
+}
+
+.saveLoadContainer button {
+  margin-right: 10px;
 }
