@@ -1,24 +1,22 @@
 document
   .getElementById("buildOrderInput")
   .addEventListener("keydown", function (event) {
-    // Check if Enter key is pressed
     if (event.key === "Enter") {
-      event.preventDefault(); // Prevent default new line behavior
+      event.preventDefault(); // Prevent the default behavior of adding a new line
 
-      let textarea = event.target;
-      let currentValue = textarea.value;
+      const textarea = event.target;
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
 
-      // Define the new line format with '[]' and a space inside for the cursor
-      let newLine = "[]";
+      // Get the current value of the textarea
+      const text = textarea.value;
 
-      // Add the new line with '[]' symbol at the end
-      textarea.value = currentValue + "\n" + newLine;
+      // Insert a new row with brackets "[]" at the cursor position
+      const newText = text.slice(0, start) + "\n[]" + text.slice(end);
 
-      // Calculate the cursor position to be right inside the brackets
-      let cursorPosition = textarea.value.length - (newLine.length - 1);
-
-      // Set the cursor position inside the brackets
-      textarea.setSelectionRange(cursorPosition, cursorPosition);
+      // Update the textarea value and cursor position
+      textarea.value = newText;
+      textarea.selectionStart = textarea.selectionEnd = start + 3; // Place cursor inside the brackets
     }
   });
 
@@ -70,16 +68,15 @@ const structures = [
   "ghost academy",
   "missile turret",
   "orbital command",
-  "planetary fAortress",
+  "planetary fortress",
   "reactor",
   "refinery",
   "sensor tower",
   "starport",
   "supply depot",
   "tech lab",
-  "fusion core",
   "factory",
-  "command center",
+  "creep tumor",
 ];
 
 const units = {
@@ -100,6 +97,8 @@ const units = {
     "mutalisk",
     "viper",
     "brood lord",
+    "larva",
+    "changling",
   ],
   protoss: [
     "probe",
@@ -110,7 +109,6 @@ const units = {
     "immortal",
     "warp prism",
     "colossus",
-    "colossi",
     "phoenix",
     "void ray",
     "high templar",
@@ -219,7 +217,9 @@ const abbreviationMap = {
   ovi: "overlord",
   ovie: "overlord",
   RW: "roach warren",
-  gas: "extractor",
+  zgas: "extractor",
+  tgas: "refinery",
+  pgas: "assimilator",
   hydra: "hydralisk",
   hatch: "hatchery",
   bc: "battlecruiser",
@@ -238,6 +238,15 @@ const abbreviationMap = {
   "building armor": "Neosteel armor",
   "blue flame": "Infernal pre-igniter",
   pool: "spawning pool",
+  ebay: "engineering bay",
+  CC: "command center",
+  "Bane nest": "baneling nest",
+  SG: "stargate",
+  "Lurker speed": "adaptive talons",
+  rax: "barracks",
+  SP: "starport",
+  PF: "planetary fortress",
+  robo: "robotics facility",
 };
 
 function transformAbbreviations(text) {
@@ -249,6 +258,7 @@ function transformAbbreviations(text) {
     "brood lord": "Brood Lord",
     "siege tank": "Siege Tank",
     "psionic storm": "Psionic Storm", // Prioritize this replacement
+    "greater spire": "Greater Spire", // Add specific replacement for Greater Spire
   };
 
   // Replace full phrases first
@@ -257,13 +267,18 @@ function transformAbbreviations(text) {
     text = text.replace(regex, replacements[phrase]);
   });
 
-  // Specific handling for "storm" to transform to "Psionic Storm" only if not already part of "Psionic Storm"
-  text = text.replace(/\bstorm\b(?!\s+storm)/gi, (match) => {
-    if (!/\bpsionic storm\b/gi.test(text)) {
-      return "Psionic Storm";
+  // Handle "spire" separately, ensuring no overlap with "Greater Spire"
+  text = text.replace(/\bspire\b(?!\s+spire)/gi, (match) => {
+    if (!/\bgreater spire\b/gi.test(text)) {
+      return "Spire";
     }
     return match;
   });
+
+  // Handle singular forms without affecting plural forms
+  text = text.replace(/\broach\b(?!es)/gi, "Roach"); // Only replace singular "roach"
+  text = text.replace(/\bzergling\b(?!s)/gi, "Zergling"); // Only replace singular "zergling"
+  text = text.replace(/\bqueen\b(?!s)/gi, "Queen"); // Only replace singular "queen"
 
   // Abbreviations handling for single words only if they are not part of a larger term
   text = text.replace(/\bspine\b(?!\s+crawler)/gi, (match) => {
@@ -379,6 +394,119 @@ const upgradeImages = {
   "caduceus reactor": "img/upgrade/caduceus_reactor.png",
 };
 
+const structureImages = {
+  armory: "img/structure/armory.png",
+  assimilator: "img/structure/assimilator.png",
+  "baneling nest": "img/structure/baneling_nest.png",
+  barracks: "img/structure/barracks.png",
+  bunker: "img/structure/bunker.png",
+  "command center": "img/structure/command_center.png",
+  "creep tumor": "img/structure/creep_tumor.png",
+  "cybernetics core": "img/structure/cybernetics_core.png",
+  "dark shrine": "img/structure/dark_shrine.png",
+  "engineering bay": "img/structure/engineering_bay.png",
+  "evolution chamber": "img/structure/evolution_chamber.png",
+  extractor: "img/structure/extractor.png",
+  factory: "img/structure/factory.png",
+  "fleet beacon": "img/structure/fleet_beacon.png",
+  forge: "img/structure/forge.png",
+  "fusion core": "img/structure/fusion_core.png",
+  gateway: "img/structure/gateway.png",
+  "ghost academy": "img/structure/ghost_academy.png",
+  "greater spire": "img/structure/greater_spire.png",
+  hatchery: "img/structure/hatchery.png",
+  hive: "img/structure/hive.png",
+  "hydralisk den": "img/structure/hydralisk_den.png",
+  "infestation pit": "img/structure/infestation_pit.png",
+  lair: "img/structure/lair.png",
+  "missile turret": "img/structure/missile_turret.png",
+  nexus: "img/structure/nexus.png",
+  "nydus network": "img/structure/nydus_network.png",
+  "orbital command": "img/structure/orbital_command.png",
+  "photon cannon": "img/structure/photon_cannon.png",
+  "planetary fortress": "img/structure/planetary_fortress.png",
+  pylon: "img/structure/pylon.png",
+  reactor: "img/structure/reactor.png",
+  refinery: "img/structure/refinery.png",
+  "roach warren": "img/structure/roach_warren.png",
+  "robotics bay": "img/structure/robotics_bay.png",
+  "robotics facility": "img/structure/robotics_facility.png",
+  "sensor tower": "img/structure/sensor_tower.png",
+  "spawning pool": "img/structure/spawning_pool.png",
+  "spine crawler": "img/structure/spine_crawler.png",
+  spire: "img/structure/spire.png",
+  "spore crawler": "img/structure/spore_crawler.png",
+  stargate: "img/structure/stargate.png",
+  starport: "img/structure/starport.png",
+  "supply depot": "img/structure/supply_depot.png",
+  "tech lab": "img/structure/tech_lab.png",
+  "templar archives": "img/structure/templar_archives.png",
+  "twilight council": "img/structure/twilight_council.png",
+  "ultralisk cavern": "img/structure/ultralisk_cavern.png",
+  "warp gate": "img/structure/warp_gate.png",
+
+  // Add paths for all structures
+};
+
+const unitImages = {
+  adept: "img/unit/adept.png",
+  archon: "img/unit/archon.png",
+  baneling: "img/unit/baneling.png",
+  banshee: "img/unit/banshee.png",
+  battlecruiser: "img/unit/battlecruiser.png",
+  "brood lord": "img/unit/brood_lord.png",
+  carrier: "img/unit/carrier.png",
+  changling: "img/unit/changling.png",
+  colossus: "img/unit/colossus.png",
+  corruptor: "img/unit/corruptor.png",
+  cyclone: "img/unit/cyclone.png",
+  "dark templar": "img/unit/dark_templar.png",
+  drone: "img/unit/drone.png",
+  disruptor: "img/unit/disruptor.png",
+  ghost: "img/unit/ghost.png",
+  hellion: "img/unit/hellion.png",
+  hellbat: "img/unit/hellbat.png",
+  "high templar": "img/unit/high_templar.png",
+  hydralisk: "img/unit/hydralisk.png",
+  immortal: "img/unit/immortal.png",
+  infestor: "img/unit/infestor.png",
+  larva: "img/unit/larva.png",
+  liberator: "img/unit/liberator.png",
+  lurker: "img/unit/lurker.png",
+  marauder: "img/unit/marauder.png",
+  marine: "img/unit/marine.png",
+  medivac: "img/unit/medivac.png",
+  mothership: "img/unit/mothership.png",
+  mule: "img/unit/mule.png",
+  mutalisk: "img/unit/mutalisk.png",
+  observer: "img/unit/observer.png",
+  oracle: "img/unit/oracle.png",
+  overlord: "img/unit/overlord.png",
+  overseer: "img/unit/overseer.png",
+  tempest: "img/unit/tempest.png",
+  phoenix: "img/unit/phoenix.png",
+  probe: "img/unit/probe.png",
+  queen: "img/unit/queen.png",
+  raven: "img/unit/raven.png",
+  reaper: "img/unit/reaper.png",
+  roach: "img/unit/roach.png",
+  scv: "img/unit/scv.png",
+  sentry: "img/unit/sentry.png",
+  "siege tank": "img/unit/siege_tank.png",
+  stalker: "img/unit/stalker.png",
+  "swarm host": "img/unit/swarm_host.png",
+  thor: "img/unit/thor.png",
+  ultralisk: "img/unit/ultralisk.png",
+  viking: "img/unit/viking.png",
+  viper: "img/unit/viper.png",
+  "void ray": "img/unit/void_ray.png",
+  "warp prism": "img/unit/warp_prism.png",
+  "widow mine": "img/unit/widow_mine.png",
+  zealot: "img/unit/zealot.png",
+  zergling: "img/unit/zergling.png",
+  // Add paths for all units
+};
+
 // Function to format action text with upgrade images
 function formatUpgrades(actionText) {
   const upgrades = Object.keys(upgradeImages);
@@ -435,7 +563,6 @@ function capitalizeSentences(text) {
   });
 }
 
-// Function to format specific structures with styling
 function formatStructureText(actionText) {
   // Handle multi-word upgrades as exceptions first
   const exceptions = [
@@ -454,21 +581,26 @@ function formatStructureText(actionText) {
     actionText = actionText.replace(exception.regex, exception.replacement);
   });
 
-  // Process remaining structures, skipping replacements for matches already handled by exceptions
+  // Process remaining structures, ensuring no conflicts with exceptions
   structures.forEach((structure) => {
     const regex = new RegExp(`\\b${structure}\\b`, "gi");
     actionText = actionText.replace(regex, (match) => {
-      if (exceptions.some((exception) => exception.regex.test(actionText)))
-        return match; // Skip if part of an exception
-      return `<span class="bold-yellow">${structure}</span>`;
-    });
-  });
+      // Avoid duplicating replacements
+      const alreadyProcessed = actionText.includes(
+        `<span class="bold-yellow">${match}`
+      );
+      if (alreadyProcessed) {
+        return match; // Skip if already processed
+      }
 
-  // Process standalone "Warp Gate" as a structure only if not part of "Research Warp Gate"
-  const warpGateRegex = /\bwarp gate\b/gi;
-  actionText = actionText.replace(warpGateRegex, (match) => {
-    if (/research warp gate/i.test(actionText)) return match; // Skip if part of "Research Warp Gate"
-    return `<span class="bold-yellow">${match}</span>`;
+      // Get image path if available
+      const imageSrc = structureImages[structure.toLowerCase()] || "";
+      const imageTag = imageSrc
+        ? ` <img src="${imageSrc}" alt="${structure}" class="structure-image">`
+        : "";
+
+      return `<span class="bold-yellow">${structure}${imageTag}</span>`;
+    });
   });
 
   return actionText;
@@ -482,13 +614,15 @@ function formatUnits(actionText) {
       `\\b${unit}(s)?\\b(?!\\s+warren|\\s+den|\\s+pit|\\s+network|\\s+speed|\\s+armor|\\s+nest)`,
       "gi"
     );
-    actionText = actionText.replace(
-      regex,
-      (match, plural) =>
-        `<span class="bold-purple">${capitalizeFirstLetter(unit)}${
-          plural || ""
-        }</span>`
-    );
+    actionText = actionText.replace(regex, (match, plural) => {
+      const imageSrc = unitImages[unit.toLowerCase()] || ""; // Get image path if available
+      const imageTag = imageSrc
+        ? ` <img src="${imageSrc}" alt="${unit}" class="unit-image">`
+        : "";
+      return `<span class="bold-purple">${capitalizeFirstLetter(unit)}${
+        plural || ""
+      }${imageTag}</span>`;
+    });
   });
 
   // Protoss Units - Bright Blue
@@ -497,13 +631,15 @@ function formatUnits(actionText) {
       `\\b${unit}(s)?\\b(?!\\s+core|\\s+shrine|\\s+gate|\\s+forge|\\s+range)`,
       "gi"
     );
-    actionText = actionText.replace(
-      regex,
-      (match, plural) =>
-        `<span class="bold-blue">${capitalizeFirstLetter(unit)}${
-          plural || ""
-        }</span>`
-    );
+    actionText = actionText.replace(regex, (match, plural) => {
+      const imageSrc = unitImages[unit.toLowerCase()] || ""; // Get image path if available
+      const imageTag = imageSrc
+        ? ` <img src="${imageSrc}" alt="${unit}" class="unit-image">`
+        : "";
+      return `<span class="bold-blue">${capitalizeFirstLetter(unit)}${
+        plural || ""
+      }${imageTag}</span>`;
+    });
   });
 
   // Terran Units - Bright Red
@@ -512,13 +648,15 @@ function formatUnits(actionText) {
       `\\b${unit}(s)?\\b(?!\\s+barracks|\\s+command|\\s+reactor|\\s+academy)`,
       "gi"
     );
-    actionText = actionText.replace(
-      regex,
-      (match, plural) =>
-        `<span class="bold-red">${capitalizeFirstLetter(unit)}${
-          plural || ""
-        }</span>`
-    );
+    actionText = actionText.replace(regex, (match, plural) => {
+      const imageSrc = unitImages[unit.toLowerCase()] || ""; // Get image path if available
+      const imageTag = imageSrc
+        ? ` <img src="${imageSrc}" alt="${unit}" class="unit-image">`
+        : "";
+      return `<span class="bold-red">${capitalizeFirstLetter(unit)}${
+        plural || ""
+      }${imageTag}</span>`;
+    });
   });
 
   return actionText;
@@ -814,9 +952,22 @@ function viewBuild(index) {
   titleText.textContent = build.title;
   titleText.classList.remove("dimmed");
 
-  document.getElementById("commentInput").value = build.comment;
-  document.getElementById("videoInput").value = build.videoLink;
-  document.getElementById("buildOrderInput").value = build.buildOrderInput;
+  // Populate comment and video link
+  document.getElementById("commentInput").value = build.comment || "";
+  document.getElementById("videoInput").value = build.videoLink || "";
+
+  // Populate build order input as a formatted string
+  const buildOrderInput = document.getElementById("buildOrderInput");
+  const formattedBuildOrder = build.buildOrder
+    .map(
+      (step) =>
+        `[${step.workersOrTimestamp}] ${step.action.replace(
+          /<\/?[^>]+(>|$)/g,
+          ""
+        )}` // Strip HTML tags
+    )
+    .join("\n");
+  buildOrderInput.value = formattedBuildOrder;
 
   // Populate the build order table
   displayBuildOrder(build.buildOrder);

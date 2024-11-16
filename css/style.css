@@ -363,13 +363,20 @@ textarea::-webkit-scrollbar-thumb:hover {
   cursor: context-menu;
 }
 
-.upgrade-image {
+.upgrade-image,
+.unit-image,
+.structure-image {
   width: 30px; /* Adjust as necessary */
   height: 30px;
   margin-left: 5px;
   border-radius: 7px; /* Rounded corners */
   vertical-align: middle; /* Align the image properly with the text */
   object-fit: cover;
+}
+
+.upgrade-image {
+  box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.3);
+  border: 1px solid #1e1e1e;
 }
 
 .popup {
