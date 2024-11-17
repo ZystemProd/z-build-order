@@ -460,22 +460,22 @@ textarea::-webkit-scrollbar-thumb:hover {
 
 /* Build cards */
 .build-card {
-  position: relative;
+  position: relative; /* Ensures it stays in its own stacking context */
+  z-index: 1; /* Lower than subcategory-container */
   background-color: #292929;
   border: 1px solid #444;
   border-radius: 8px;
   padding: 10px;
   margin: 10px;
   text-align: center;
-  cursor: pointer;
-  text-align: center;
+  transition: transform 0.2s, background-color 0.2s;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  transition: transform 0.2s ease-in-out, background-color 0.2s ease-in-out;
 }
+
 .build-card .delete-icon {
   position: absolute;
   top: 5px;
-  right: 5px;
+  right: 15px;
   cursor: pointer;
   font-size: 18px;
   color: #ff5c5c;
@@ -525,7 +525,8 @@ textarea::-webkit-scrollbar-thumb:hover {
 }
 
 .category {
-  position: relative;
+  position: relative; /* Set positioning for stacking context */
+  z-index: 5; /* Ensure this layer stays above others if needed */
   cursor: pointer;
 }
 
@@ -544,18 +545,22 @@ textarea::-webkit-scrollbar-thumb:hover {
   transform: scale(1.05); /* Slight scaling */
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.9); /* Shadow for depth */
 }
+.category:hover .subcategory-container {
+  display: block; /* Show dropdown on hover of the parent */
+}
 
 .subcategory-container {
-  display: none;
-  position: absolute;
-  top: 100%;
-  left: 0;
-  width: 100%;
+  position: absolute; /* Position it relative to the parent category */
+  top: 100%; /* Position below the category */
+  left: 0; /* Align with the left edge of the category */
+  display: none; /* Hide dropdown by default */
+  z-index: 10; /* Ensure it appears above other elements */
   background-color: #1e1e1e;
-  border: 1px solid #ccc;
-  padding: 10px;
+  border: 1px solid #444;
   border-radius: 8px;
+  padding: 10px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.8);
+  width: 200px; /* Optional: Adjust width */
 }
 
 .category:hover .subcategory-container {
@@ -563,19 +568,23 @@ textarea::-webkit-scrollbar-thumb:hover {
 }
 
 .subcategory-container button {
-  display: block;
-  margin: 5px 0;
-  padding: 5px 10px;
+  width: 100%; /* Full width clickable buttons */
+  text-align: left; /* Align text to the left */
+  padding: 10px;
+  background: none;
+  border: none;
+  color: white;
   cursor: pointer;
-  background-color: #ffffff00;
-  border-radius: 4px;
-  text-align: left;
-  transition: background-color 0.1s;
+  transition: background-color 0.3s ease;
 }
 
 .subcategory-container button:hover {
-  background-color: #2f2f2f;
-  box-shadow: inset 0px 0px 5px rgba(0, 0, 0, 1);
+  background-color: #555; /* Highlight button on hover */
+}
+
+.subcategory-container button:active {
+  transform: scale(1); /* Reset scale on click */
+  background-color: #666; /* Darker background when active */
 }
 
 .dropdown-container {
