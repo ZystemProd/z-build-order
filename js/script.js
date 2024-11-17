@@ -247,6 +247,8 @@ const abbreviationMap = {
   SP: "starport",
   PF: "planetary fortress",
   robo: "robotics facility",
+  battery: "shield battery",
+  Infestation: "Infestation pit",
 };
 
 function transformAbbreviations(text) {
@@ -444,6 +446,7 @@ const structureImages = {
   "twilight council": "img/structure/twilight_council.png",
   "ultralisk cavern": "img/structure/ultralisk_cavern.png",
   "warp gate": "img/structure/warp_gate.png",
+  "shield battery": "img/structure/shield_battery.png",
 
   // Add paths for all structures
 };
@@ -675,9 +678,9 @@ function formatActionText(actionText) {
   // Capitalize the first letter of each word for units, structures, and upgrades
   actionText = capitalizeWords(actionText);
 
-  // Highlight numbers followed by "gas" or "minerals"
+  // Highlight numbers followed by "gas" or "minerals" (with or without space)
   actionText = actionText.replace(
-    /(\d+)\s+(gas|minerals)/gi,
+    /(\d+)\s*(gas|minerals)/gi,
     (match, num, resource) => {
       const colorClass =
         resource.toLowerCase() === "gas" ? "green-text" : "blue-text";
@@ -693,10 +696,20 @@ function formatActionText(actionText) {
     }
   );
 
-  // Highlight numbers not followed by "gas" or "minerals" in red
-  actionText = actionText.replace(/\b\d+\b(?!\s+(gas|minerals))/gi, (match) => {
-    return `<span class="red-text">${match}</span>`;
-  });
+  // Highlight other numbers (including those attached to words like "1x marine")
+  actionText = actionText.replace(
+    /(\d+)(\s*x\s*)?([a-z]+)/gi,
+    (match, num, x, word) => {
+      const colorClass = "red-text"; // Default red for general numbers
+      const formattedWord = capitalizeFirstLetter(word);
+
+      if (x) {
+        return `<span class="${colorClass}">${num}${x}${formattedWord}</span>`;
+      }
+
+      return `<span class="${colorClass}">${num}</span> ${formattedWord}`;
+    }
+  );
 
   return actionText;
 }
