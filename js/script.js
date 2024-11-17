@@ -666,7 +666,7 @@ function formatUnits(actionText) {
 function formatActionText(actionText) {
   actionText = transformAbbreviations(actionText); // Transform abbreviations first
   actionText = formatStructureText(actionText); // Format structures
-  actionText = formatUnits(actionText); // Format units (purple for Zerg, red for Terran, blue for Protoss)
+  actionText = formatUnits(actionText); // Format units
   actionText = formatUpgrades(actionText); // Format upgrades
 
   // Capitalize first letter of each sentence
@@ -675,11 +675,29 @@ function formatActionText(actionText) {
   // Capitalize the first letter of each word for units, structures, and upgrades
   actionText = capitalizeWords(actionText);
 
-  // Apply red color to numbers in the action column
-  return actionText.replace(
-    /\d+/g,
-    (match) => `<span class="red-text">${match}</span>`
+  // Highlight numbers followed by "gas" or "minerals"
+  actionText = actionText.replace(
+    /(\d+)\s+(gas|minerals)/gi,
+    (match, num, resource) => {
+      const colorClass =
+        resource.toLowerCase() === "gas" ? "green-text" : "blue-text";
+      const imageSrc =
+        resource.toLowerCase() === "gas"
+          ? "img/resources/gas.png"
+          : "img/resources/minerals.png";
+      const imageTag = `<img src="${imageSrc}" alt="${resource}" class="resource-image">`;
+
+      return `<span class="${colorClass}">${num} ${capitalizeFirstLetter(
+        resource
+      )}</span> ${imageTag}`;
+    }
   );
+
+  // Highlight numbers not followed by "gas" or "minerals" in red
+  actionText = actionText.replace(/\b\d+\b(?!\s+(gas|minerals))/gi, (match) => {
+    return `<span class="red-text">${match}</span>`;
+  });
+
   return actionText;
 }
 
@@ -706,6 +724,9 @@ function analyzeBuildOrder(inputText) {
       actionText = line;
     }
 
+    // Format Workers/Timestamp
+    workersOrTimestamp = formatWorkersOrTimestamp(workersOrTimestamp);
+
     // Apply abbreviation transformation, then format structures, units, and upgrades
     actionText = transformAbbreviations(actionText);
     actionText = formatStructureText(actionText);
@@ -713,8 +734,25 @@ function analyzeBuildOrder(inputText) {
 
     // Insert row in the table
     const row = table.insertRow();
-    row.insertCell(0).textContent = workersOrTimestamp;
+    row.insertCell(0).innerHTML = workersOrTimestamp;
     row.insertCell(1).innerHTML = actionText;
+  });
+}
+
+function formatWorkersOrTimestamp(text) {
+  // Highlight numbers followed by "gas" or "minerals"
+  return text.replace(/(\d+)\s+(gas|minerals)/gi, (match, num, resource) => {
+    const colorClass =
+      resource.toLowerCase() === "gas" ? "green-text" : "blue-text";
+    const imageSrc =
+      resource.toLowerCase() === "gas"
+        ? "img/resources/gas.png"
+        : "img/resources/minerals.png";
+    const imageTag = `<img src="${imageSrc}" alt="${resource}" class="resource-image">`;
+
+    return `<span class="${colorClass}">${num} ${capitalizeFirstLetter(
+      resource
+    )}</span> ${imageTag}`;
   });
 }
 
@@ -757,6 +795,9 @@ document.querySelectorAll(".toggle-header").forEach((header) => {
 
 document.addEventListener("DOMContentLoaded", () => {
   initializeEventListeners();
+  document
+    .getElementById("videoInput")
+    .addEventListener("input", updateYouTubeEmbed);
 });
 
 // Global variable for storing all builds
@@ -1002,7 +1043,9 @@ function displayBuildOrder(buildOrder) {
 
   buildOrder.forEach((step) => {
     const row = table.insertRow();
-    row.insertCell(0).textContent = step.workersOrTimestamp;
+    row.insertCell(0).innerHTML = formatWorkersOrTimestamp(
+      step.workersOrTimestamp
+    );
     row.insertCell(1).innerHTML = step.action;
   });
 }
@@ -1157,3 +1200,28 @@ document
       container.style.display = "none"; // Hide all subcategories
     });
   });
+
+function getYouTubeVideoID(url) {
+  const regex =
+    /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+  const match = url.match(regex);
+  return match ? match[1] : null;
+}
+
+function updateYouTubeEmbed() {
+  const videoInput = document.getElementById("videoInput");
+  const videoIframe = document.getElementById("videoIframe");
+
+  const videoURL = videoInput.value.trim();
+  const videoID = getYouTubeVideoID(videoURL);
+
+  if (videoID) {
+    // Show iframe with the video
+    videoIframe.src = `https://www.youtube.com/embed/${videoID}`;
+    videoIframe.style.display = "block";
+  } else {
+    // Hide iframe if the URL is invalid
+    videoIframe.style.display = "none";
+    videoIframe.src = "";
+  }
+}

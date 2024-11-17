@@ -238,7 +238,7 @@ button:hover {
 
 /* Style for red-colored numbers */
 .red-text {
-  color: #00e600; /* Bright green for high visibility */
+  color: #ff03b3; /* Bright green for high visibility */
   font-weight: bold; /* Bold for more emphasis */
 }
 
@@ -632,4 +632,22 @@ textarea::-webkit-scrollbar-thumb:hover {
 
 .saveLoadContainer button {
   margin-right: 10px;
+}
+
+.green-text {
+  color: #44e418;
+  font-weight: bold;
+}
+
+.blue-text {
+  color: #5fe5ff;
+  font-weight: bold;
+}
+
+.resource-image {
+  width: 16px; /* Adjust the size of the image */
+  height: 16px;
+  vertical-align: middle;
+  margin-left: 0px; /* Add some spacing between text and image */
+  margin-bottom: 3px;
 }
