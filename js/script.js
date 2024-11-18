@@ -82,6 +82,7 @@ const structures = [
 const units = {
   zerg: [
     "overlord",
+    "ventral sacks",
     "overseer",
     "zergling",
     "queen",
@@ -249,6 +250,8 @@ const abbreviationMap = {
   robo: "robotics facility",
   battery: "shield battery",
   Infestation: "Infestation pit",
+  "drop overlord": "ventral sacks",
+  "overlord drop": "ventral sacks",
 };
 
 function transformAbbreviations(text) {
@@ -485,6 +488,7 @@ const unitImages = {
   observer: "img/unit/observer.png",
   oracle: "img/unit/oracle.png",
   overlord: "img/unit/overlord.png",
+  "ventral sacks": "img/unit/overlord_drop.png",
   overseer: "img/unit/overseer.png",
   tempest: "img/unit/tempest.png",
   phoenix: "img/unit/phoenix.png",
