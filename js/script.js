@@ -542,6 +542,11 @@ function capitalizeFirstLetter(text) {
 
 // Capitalize the first letter of each word for units, structures, and upgrades
 function capitalizeWords(text) {
+  // Avoid capitalizing suffixes like "st," "nd," "rd," "th"
+  text = text.replace(/\b(\d+)(st|nd|rd|th)\b/gi, (match, num, suffix) => {
+    return `${num}${suffix}`; // Keep the number and suffix as-is
+  });
+
   // Capitalize specific terms (Units, Structures, Upgrades)
   const allUnitsAndStructures = [
     ...units.zerg,
@@ -561,7 +566,8 @@ function capitalizeWords(text) {
 
 // Capitalize the first letter of each sentence
 function capitalizeSentences(text) {
-  return text.replace(/(?:^|\.\s+)([a-z])/g, (match, group1) => {
+  // Avoid capitalizing suffixes like "st," "nd," "rd," "th"
+  return text.replace(/(?:^|\.\s+)([a-z](?!st|nd|rd|th))/g, (match, group1) => {
     return match.toUpperCase();
   });
 }
@@ -737,10 +743,13 @@ function analyzeBuildOrder(inputText) {
       actionText = line;
     }
 
+    // Replace `->` and `<-` with arrows in the action text
+    actionText = actionText.replace(/->/g, "→").replace(/<-/g, "←");
+
     // Format Workers/Timestamp
     workersOrTimestamp = formatWorkersOrTimestamp(workersOrTimestamp);
 
-    // Apply abbreviation transformation, then format structures, units, and upgrades
+    // Apply additional formatting to action text
     actionText = transformAbbreviations(actionText);
     actionText = formatStructureText(actionText);
     actionText = formatActionText(actionText);
@@ -1009,6 +1018,9 @@ function viewBuild(index) {
   // Populate comment and video link
   document.getElementById("commentInput").value = build.comment || "";
   document.getElementById("videoInput").value = build.videoLink || "";
+
+  // Update the YouTube embed with the new video link
+  updateYouTubeEmbed();
 
   // Populate build order input as a formatted string
   const buildOrderInput = document.getElementById("buildOrderInput");
