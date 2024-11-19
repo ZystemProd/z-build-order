@@ -153,10 +153,11 @@ button:hover {
 
 #buildOrderTitleText {
   font-size: 1.5em;
-  color: #e0e0e0;
+  color: white;
   cursor: pointer;
-  display: inline-block;
+  text-align: center;
 }
+
 #buildOrderTitleText.dimmed {
   color: #888888; /* Dimmed color */
 }
@@ -168,7 +169,7 @@ button:hover {
   border: 1px solid #444;
   border-radius: 5px;
   background-color: #2c2c2c;
-  color: #e0e0e0;
+  color: white;
   text-align: center;
 }
 
@@ -601,22 +602,24 @@ textarea::-webkit-scrollbar-thumb:hover {
 }
 
 .styled-dropdown {
-  padding: 8px 12px;
+  padding: 5px 10px;
   font-size: 14px;
-  border: 1px solid #555; /* Darker border */
-  border-radius: 8px;
-  background-color: #2c2c2c; /* Match the program's dark background */
-  color: #e0e0e0; /* Light text for readability */
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5); /* Subtle shadow */
-  transition: background-color 0.3s, box-shadow 0.3s;
-  width: 100px; /* Consistent width */
-  text-align: center; /* Center text inside dropdown */
+  border: 1px solid #555; /* Border styling */
+  border-radius: 8px; /* Rounded corners */
+  background-color: #2c2c2c; /* Dark background */
+  color: #e0e0e0; /* Light text */
+  width: auto; /* Automatically adjust width to fit content */
+  text-align: center;
+  align-items: flex-end;
+}
+
+.styled-dropdown option[disabled] {
+  display: none;
 }
 
 .styled-dropdown:focus {
   outline: none;
-  background-color: #444; /* Highlight on focus */
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.8); /* Subtle shadow */
+  background-color: #333; /* Highlight when focused */
 }
 
 .styled-dropdown:hover {
@@ -624,15 +627,28 @@ textarea::-webkit-scrollbar-thumb:hover {
 }
 
 .form-container {
-  display: flex;
-  justify-content: center; /* Center all items horizontally */
-  gap: 20px; /* Add spacing between elements */
-  align-items: center; /* Align vertically */
-  margin: 20px 0; /* Space around the section */
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr; /* Three-column layout */
+  align-items: center; /* Center vertically */
+  gap: 10px; /* Space between columns */
+  margin: 20px 0; /* Vertical spacing */
 }
+
+.form-center,
+.form-right {
+  display: flex;
+  justify-content: center; /* Center content horizontally */
+  align-items: center; /* Center content vertically */
+}
+.form-left {
+  justify-content: flex-end;
+}
+
 .titleContainer {
-  flex: 1; /* Ensure consistent sizing */
-  max-width: 300px; /* Limit width for better layout */
+  display: flex;
+  justify-content: center;
+  flex-direction: column; /* Stack elements vertically */
+  text-align: center;
 }
 
 .form-container > * {
@@ -659,4 +675,30 @@ textarea::-webkit-scrollbar-thumb:hover {
   vertical-align: middle;
   margin-left: 0px; /* Add some spacing between text and image */
   margin-bottom: 3px;
+}
+
+.remove-all-builds-button {
+  position: absolute;
+  bottom: 20px; /* Adjust as needed to place at the bottom-right */
+  right: 20px; /* Adjust as needed for spacing */
+  background-color: #d32f2f; /* Warning red */
+  color: white; /* White text for contrast */
+  border: none; /* Remove default border */
+  padding: 10px 20px; /* Add padding for better clickability */
+  font-size: 14px; /* Adjust font size */
+  font-weight: bold; /* Make it stand out */
+  border-radius: 5px; /* Smooth edges */
+  cursor: pointer; /* Indicate interactivity */
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2); /* Subtle shadow for depth */
+  transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.remove-all-builds-button:hover {
+  background-color: #c62828; /* Slightly darker red on hover */
+  transform: scale(1.05); /* Slight enlargement on hover */
+}
+
+.remove-all-builds-button:active {
+  background-color: #b71c1c; /* Even darker red when clicked */
+  transform: scale(1); /* Reset scale on click */
 }

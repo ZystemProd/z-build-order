@@ -830,13 +830,17 @@ document.addEventListener("DOMContentLoaded", () => {
 let savedBuilds = [];
 
 // Load saved builds from local storage on page load
-window.addEventListener("load", () => {
-  const storedBuilds = localStorage.getItem("savedBuilds");
-  if (storedBuilds) {
-    savedBuilds = JSON.parse(storedBuilds);
-    filterBuilds("all"); // Display all builds on load
-  }
-});
+window.addEventListener(
+  "load",
+  () => {
+    const storedBuilds = localStorage.getItem("savedBuilds");
+    if (storedBuilds) {
+      savedBuilds = JSON.parse(storedBuilds);
+      filterBuilds("all"); // Display all builds on load
+    }
+  },
+  { passive: true }
+);
 
 // Setup event listeners
 function initializeEventListeners() {
@@ -854,12 +858,16 @@ function initializeEventListeners() {
     .addEventListener("click", closeModal);
 
   // Close modal on outside click
-  window.addEventListener("click", (event) => {
-    const modal = document.getElementById("buildsModal");
-    if (event.target === modal) {
-      closeModal();
-    }
-  });
+  window.addEventListener(
+    "click",
+    (event) => {
+      const modal = document.getElementById("buildsModal");
+      if (event.target === modal) {
+        closeModal();
+      }
+    },
+    { passive: true }
+  );
 }
 
 function saveCurrentBuild() {
@@ -1013,11 +1021,25 @@ function viewBuild(index) {
 
   const titleInput = document.getElementById("buildOrderTitleInput");
   const titleText = document.getElementById("buildOrderTitleText");
+  const categoryDropdown = document.getElementById("buildCategoryDropdown");
 
   // Update the title input and text display
   titleInput.value = build.title;
   titleText.textContent = build.title;
   titleText.classList.remove("dimmed");
+
+  // Populate the match-up dropdown
+  if (build.category) {
+    categoryDropdown.value = build.category; // Set the dropdown to the build's category
+    const selectedOption =
+      categoryDropdown.options[categoryDropdown.selectedIndex];
+    const optgroup = selectedOption.parentElement;
+
+    // Update the dropdown text color to match the selected category
+    if (optgroup && optgroup.style.color) {
+      categoryDropdown.style.color = optgroup.style.color;
+    }
+  }
 
   // Populate comment and video link
   document.getElementById("commentInput").value = build.comment || "";
@@ -1254,3 +1276,62 @@ function updateYouTubeEmbed() {
     videoIframe.src = "";
   }
 }
+
+// Function to remove all builds
+function removeAllBuilds() {
+  // Confirm with the user
+  if (
+    !confirm(
+      "Are you sure you want to delete all builds? This action cannot be undone."
+    )
+  ) {
+    return;
+  }
+
+  // Clear the builds array
+  savedBuilds = [];
+
+  // Clear localStorage
+  localStorage.removeItem("savedBuilds");
+
+  // Clear the modal content dynamically
+  const modalBuildsContainer = document.getElementById("modalBuildsContainer");
+  if (modalBuildsContainer) {
+    modalBuildsContainer.innerHTML = ""; // Remove all build cards from the modal
+  }
+
+  alert("All builds have been removed.");
+}
+
+document
+  .getElementById("removeAllBuildsButton")
+  .addEventListener("click", removeAllBuilds);
+
+document
+  .getElementById("buildCategoryDropdown")
+  .addEventListener("change", function () {
+    const dropdown = this;
+    const selectedOption = dropdown.options[dropdown.selectedIndex];
+    const optgroup = selectedOption.parentElement;
+
+    // Apply the color of the optgroup to the dropdown
+    if (optgroup && optgroup.style.color) {
+      dropdown.style.color = optgroup.style.color;
+    }
+  });
+
+document
+  .getElementById("buildCategoryDropdown")
+  .addEventListener("change", function () {
+    const dropdown = this;
+    const selectedValue = dropdown.value;
+
+    if (!selectedValue) {
+      // Handle cases where no match-up is selected
+      console.warn("No match-up selected.");
+      return;
+    }
+
+    // Proceed with normal logic for selected match-up
+    console.log(`Selected match-up: ${selectedValue}`);
+  });

@@ -26,15 +26,44 @@
         </div>
       </div>
 
+
+      
+
+      <div class="buildOrderOutput">
+
       <!-- Title input field for the build order -->
       <div class="form-container">
-        <div class="titleContainer">
+        <!-- Left Column: Matchup Dropdown -->
+        <div class="form-left">
+          <select id="buildCategoryDropdown" class="styled-dropdown">
+            <option value="" disabled selected>Match-Up</option>
+            <optgroup label="Zerg" style="color: #c07aeb;">
+              <option value="zvp">ZvP</option>
+              <option value="zvt">ZvT</option>
+              <option value="zvz">ZvZ</option>
+            </optgroup>
+            <optgroup label="Protoss" style="color: #5fe5ff;">
+              <option value="pvp">PvP</option>
+              <option value="pvz">PvZ</option>
+              <option value="pvt">PvT</option>
+            </optgroup>
+            <optgroup label="Terran" style="color: #ff3a30;">
+              <option value="tvp">TvP</option>
+              <option value="tvt">TvT</option>
+              <option value="tvz">TvZ</option>
+            </optgroup>
+          </select>
+        </div>
+      
+        <!-- Center Column: Title -->
+        <div class="form-center">
           <span
             id="buildOrderTitleText"
             onclick="toggleTitleInput(true)"
             class="dimmed"
-            >Enter build order title here...</span
           >
+            Enter build order title here...
+          </span>
           <input
             type="text"
             id="buildOrderTitleInput"
@@ -43,9 +72,12 @@
             style="display: none"
           />
         </div>
+      
+        <!-- Right Column: Empty -->
+        <div class="form-right"></div>
       </div>
+      
 
-      <div class="buildOrderOutput">
         <!-- Existing table and buttons -->
         <table id="buildOrderTable">
           <tr>
@@ -53,21 +85,7 @@
             <th>Action</th>
           </tr>
         </table>
-        <!-- Dropdown Section -->
-        <div class="dropdown-container">
-          <label for="buildCategoryDropdown">Match-up</label>
-          <select id="buildCategoryDropdown" class="styled-dropdown">
-            <option value="zvp">ZvP</option>
-            <option value="zvt">ZvT</option>
-            <option value="zvz">ZvZ</option>
-            <option value="pvp">PvP</option>
-            <option value="pvz">PvZ</option>
-            <option value="pvt">PvT</option>
-            <option value="tvp">TvP</option>
-            <option value="tvt">TvT</option>
-            <option value="tvz">TvZ</option>
-          </select>
-        </div>
+
         <div class="saveLoadContainer">
           <button id="saveBuildButton">Save Current Build</button>
           <button id="saveBuildsButton">Save All Builds to File</button>
@@ -118,6 +136,7 @@
             <div id="modalBuildsContainer" class="builds-container">
               <!-- Builds will be dynamically populated here -->
             </div>
+            <button id="removeAllBuildsButton" class="remove-all-builds-button">Delete All</button>
           </div>
         </div>
 
@@ -163,7 +182,7 @@
           class="footer-logo"
         />
       </a>
-      <p>︱Version 0.1.24</p>
+      <p>︱Version 0.1.3</p>
       <!-- Version number here -->
     </div>
     <script src="js/script.js"></script>
