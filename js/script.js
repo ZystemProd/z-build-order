@@ -1,3 +1,10 @@
+import { 
+  MapAnnotations,
+  initializeMapControls,
+  initializeInteractiveMap,
+} from './interactive_map.js';
+
+
 document
   .getElementById("buildOrderInput")
   .addEventListener("keydown", function (event) {
@@ -141,6 +148,51 @@ const units = {
     "cyclone",
     "liberator",
   ],
+  vanguard: [
+    "Atlas",
+    "B.O.B.",
+    "Bomber",
+    "Evac",
+    "Exo",
+    "Atlas",
+    "Graven",
+    "Hedgehog",
+    "Helicarrier",
+    "Hornet",
+    "Lancer",
+    "MedTech",
+    "S.C.O.U.T.",
+    "Sentinel",
+    "Vulcan",
+  ],
+  infernal: [
+    "Brute",
+    "Fiend",
+    "Flayed Dragon",
+    "Gaunt",
+    "Harbinger",
+    "Hellborne",
+    "Hexen",
+    "Imp",
+    "Magmadon",
+    "Shadowflyer",
+    "Spriggan",
+    "Weaver",   
+  ],
+  celestial: [
+    "Animancer",
+    "Archangel",
+    "Argent",
+    "Cabal",
+    "Kri",
+    "Morph Core",
+    "Prism",
+    "Saber",
+    "Scanner",
+    "Scythe",
+    "Seraphim",
+    "Vector",
+  ]
 };
 
 const upgrades = [
@@ -556,6 +608,9 @@ function capitalizeWords(text) {
     ...units.zerg,
     ...units.protoss,
     ...units.terran,
+    ...units.vanguard,
+    ...units.infernal,
+    ...units.celestial,
     ...structures,
     ...upgrades,
   ];
@@ -671,6 +726,48 @@ function formatUnits(actionText) {
       }${imageTag}</span>`;
     });
   });
+
+    // Vanguard Units - Bright Blue
+    units.vanguard.forEach((unit) => {
+      const regex = new RegExp(`\\b${unit}(s)?\\b`, "gi");
+      actionText = actionText.replace(regex, (match, plural) => {
+        const imageSrc = unitImages[unit.toLowerCase()] || ""; // Get image path if available
+        const imageTag = imageSrc
+          ? ` <img src="${imageSrc}" alt="${unit}" class="unit-image">`
+          : "";
+        return `<span class="bold-blue">${capitalizeFirstLetter(unit)}${
+          plural || ""
+        }${imageTag}</span>`;
+      });
+    });
+
+    // Infernal Units - Bright Red
+    units.infernal.forEach((unit) => {
+      const regex = new RegExp(`\\b${unit}(s)?\\b`, "gi");
+      actionText = actionText.replace(regex, (match, plural) => {
+        const imageSrc = unitImages[unit.toLowerCase()] || ""; // Get image path if available
+        const imageTag = imageSrc
+          ? ` <img src="${imageSrc}" alt="${unit}" class="unit-image">`
+          : "";
+        return `<span class="bold-red">${capitalizeFirstLetter(unit)}${
+          plural || ""
+        }${imageTag}</span>`;
+      });
+    });
+
+    // Celestial Units - Purple
+    units.celestial.forEach((unit) => {
+      const regex = new RegExp(`\\b${unit}(s)?\\b`, "gi");
+      actionText = actionText.replace(regex, (match, plural) => {
+        const imageSrc = unitImages[unit.toLowerCase()] || ""; // Get image path if available
+        const imageTag = imageSrc
+          ? ` <img src="${imageSrc}" alt="${unit}" class="unit-image">`
+          : "";
+        return `<span class="bold-purple">${capitalizeFirstLetter(unit)}${
+          plural || ""
+        }${imageTag}</span>`;
+      });
+    });    
 
   return actionText;
 }
@@ -1008,11 +1105,7 @@ function showAllBuilds() {
   modal.style.display = "block"; // Show the modal
 }
 
-// Close the modal
-function closeModal() {
-  const modal = document.getElementById("buildsModal");
-  modal.style.display = "none";
-}
+
 
 // View a specific build
 function viewBuild(index) {
@@ -1335,3 +1428,81 @@ document
     // Proceed with normal logic for selected match-up
     console.log(`Selected match-up: ${selectedValue}`);
   });
+
+
+
+
+
+
+
+
+  
+  let currentGame = "Starcraft 2"; // Default game
+
+  function switchGame(game) {
+    currentGame = game;
+  
+    // Highlight the active button
+    document
+      .querySelectorAll(".menu-button")
+      .forEach((btn) => btn.classList.remove("active"));
+    document
+      .getElementById(`${game.toLowerCase().replace(" ", "")}Button`)
+      .classList.add("active");
+  
+    if (game === "Stormgate") {
+      importStormgateFiles();
+  
+      // Show the map preview for Stormgate
+      updateMapPreview("Titan's Causeway", "img/SG/titans_causeway.jpg");
+    } else {
+      importStarcraft2Files();
+  
+      // Hide the map preview for Starcraft 2
+      hideMapPreview();
+    }
+  
+    console.log(`Switched to ${game}`);
+  }
+  
+  
+
+// Add event listeners for the buttons
+document.getElementById("starcraft2Button").addEventListener("click", () => {
+  switchGame("Starcraft 2");
+});
+
+document.getElementById("stormgateButton").addEventListener("click", () => {
+  switchGame("Stormgate");
+});
+
+function importStormgateFiles() {
+  // Dynamically load sg_map.js
+  import("/js/sg_map.js")
+    .then((module) => {
+      console.log("Stormgate files loaded", module);
+      // Execute additional setup for Stormgate here
+    })
+    .catch((err) => console.error("Error loading Stormgate files:", err));
+}
+
+function importStarcraft2Files() {
+  // If needed, load additional SC2-specific files here
+  console.log("Starcraft 2 setup complete.");
+}
+
+
+
+document.addEventListener('DOMContentLoaded', () => {
+  const mapAnnotations = new MapAnnotations('map-preview-image', 'map-annotations');
+
+  // Pass mapAnnotations to initializeMapControls
+  initializeMapControls(mapAnnotations);
+
+
+}); 
+
+
+
+
+
