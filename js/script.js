@@ -1,215 +1,26 @@
-document
-  .getElementById("buildOrderInput")
-  .addEventListener("keydown", function (event) {
-    if (event.key === "Enter") {
-      event.preventDefault(); // Prevent the default behavior of adding a new line
-
-      const textarea = event.target;
-      const start = textarea.selectionStart;
-      const end = textarea.selectionEnd;
-
-      // Get the current value of the textarea
-      const text = textarea.value;
-
-      // Insert a new row with brackets "[]" at the cursor position
-      const newText = text.slice(0, start) + "\n[]" + text.slice(end);
-
-      // Update the textarea value and cursor position
-      textarea.value = newText;
-      textarea.selectionStart = textarea.selectionEnd = start + 3; // Place cursor inside the brackets
-    }
-  });
+import { units } from "./data/units.js";
+import { structures } from "./data/structures.js";
+import { upgrades } from "./data/upgrades.js";
+import { unitImages, structureImages, upgradeImages } from "./data/images.js";
+import { updateYouTubeEmbed, toggleTitleInput } from "./modules/uiHandlers.js";
+import {
+  initializeEventListeners,
+  initializeModalEventListeners,
+} from "./modules/eventHandlers.js";
+import { getSavedBuilds } from "./modules/buildStorage.js";
+import {
+  showAllBuilds,
+  showSubcategories,
+  openModal,
+} from "./modules/modal.js";
+import {
+  saveCurrentBuild,
+  loadBuildsFromFile,
+} from "./modules/buildManagement.js";
 
 document
   .getElementById("saveBuildButton")
   .addEventListener("click", saveCurrentBuild);
-
-// Structures and Units Data
-const structures = [
-  "baneling nest",
-  "evolution chamber",
-  "extractor",
-  "greater spire",
-  "hatchery",
-  "hatcheries",
-  "hive",
-  "hydralisk den",
-  "lair",
-  "lurker den",
-  "nydus network",
-  "roach warren",
-  "spawning pool",
-  "spine crawler",
-  "spire",
-  "spore crawler",
-  "infestation pit",
-  "assimilator",
-  "cybernetics core",
-  "dark shrine",
-  "fleet beacon",
-  "forge",
-  "gateway",
-  "nexus",
-  "photon cannon",
-  "pylon",
-  "robotics bay",
-  "robotics facility",
-  "shield battery",
-  "stargate",
-  "templar archives",
-  "twilight council",
-  "warp gate",
-  "armory",
-  "barracks",
-  "bunker",
-  "command center",
-  "engineering bay",
-  "fusion core",
-  "ghost academy",
-  "missile turret",
-  "orbital command",
-  "planetary fortress",
-  "reactor",
-  "refinery",
-  "sensor tower",
-  "starport",
-  "supply depot",
-  "tech lab",
-  "factory",
-  "creep tumor",
-];
-
-const units = {
-  zerg: [
-    "overlord",
-    "ventral sacks",
-    "overseer",
-    "zergling",
-    "queen",
-    "drone",
-    "lurker",
-    "hydralisk",
-    "swarm host",
-    "roach",
-    "baneling",
-    "corruptor",
-    "infestor",
-    "ultralisk",
-    "mutalisk",
-    "viper",
-    "brood lord",
-    "larva",
-    "changling",
-  ],
-  protoss: [
-    "probe",
-    "zealot",
-    "stalker",
-    "sentry",
-    "observer",
-    "immortal",
-    "warp prism",
-    "colossus",
-    "phoenix",
-    "void ray",
-    "high templar",
-    "dark templar",
-    "archon",
-    "carrier",
-    "mothership",
-    "oracle",
-    "tempest",
-    "adept",
-    "disruptor",
-  ],
-  terran: [
-    "scv",
-    "marine",
-    "marauder",
-    "reaper",
-    "ghost",
-    "hellion",
-    "siege tank",
-    "thor",
-    "viking",
-    "medivac",
-    "banshee",
-    "raven",
-    "battlecruiser",
-    "widow mine",
-    "hellbat",
-    "cyclone",
-    "liberator",
-  ],
-};
-
-const upgrades = [
-  // Zerg Upgrades
-  "metabolic boost",
-  "adrenal glands",
-  "glial reconstitution",
-  "tunneling claws",
-  "grooved spines",
-  "muscular augments",
-  "chitinous plating",
-  "anabolic synthesis",
-  "neural parasite",
-  "range attack",
-  "baneling speed",
-  "centrifugal Hooks",
-  "overlord speed",
-  "burrow",
-  "carapace",
-  "melee attack",
-  "missile attack",
-  "flyer armor",
-  "flyer attack",
-  "adaptive talons",
-  "seismic spines",
-
-  // Protoss Upgrades
-  "research warp gate",
-  "shield",
-  "ground weapons",
-  "ground armor",
-  "air weapons",
-  "air armor",
-  "blink",
-  "charge",
-  "resonating glaives",
-  "psionic storm",
-  "storm",
-  "anion pulse-crystals",
-  "colossus range",
-  "extended thermal lance",
-  "gravitic boosters",
-  "gravitic drive",
-  "flux vanes",
-  "tectonic destabilizers",
-  "shadow stride",
-
-  // Terran Upgrades
-  "weapon refit",
-  "vehicle and ship plating",
-  "vehicle weapons",
-  "stim",
-  "ship weapons",
-  "smart servos",
-  "neosteel armor",
-  "infernal pre-igniter",
-  "interference matrix",
-  "infantry weapons",
-  "hyperflight rotors",
-  "infantry armor",
-  "hi-sec auto tracking",
-  "hurricane engines",
-  "drilling claws",
-  "combat shield",
-  "concussive shells",
-  "cloak",
-  "advanced ballistics",
-  "caduceus reactor",
-];
 
 // Modify the abbreviation map for specific structures and units
 const abbreviationMap = {
@@ -335,184 +146,6 @@ function transformAbbreviations(text) {
     });
   }, text);
 }
-
-const upgradeImages = {
-  // zerg
-  "metabolic boost": "img/upgrade/metabolic_boost.png",
-  "adrenal glands": "img/upgrade/adrenal_glands.png",
-  "glial reconstitution": "img/upgrade/glial_reconstitution.png",
-  "tunneling claws": "img/upgrade/tunneling_claws.png",
-  "overlord speed": "img/upgrade/overlord_speed.png",
-  "muscular augments": "img/upgrade/muscular_augments.png",
-  "chitinous plating": "img/upgrade/chitinous_plating.png",
-  "grooved spines": "img/upgrade/grooved_spines.png",
-  burrow: "img/upgrade/burrow.png",
-  "anabolic synthesis": "img/upgrade/anabolic_synthesis.png",
-  "flyer attack": "img/upgrade/flyer_attack.png",
-  "flyer armor": "img/upgrade/flyer_armor.png",
-  "melee attack": "img/upgrade/melee_attack.png",
-  carapace: "img/upgrade/carapace.png",
-  "missile attack": "img/upgrade/missile_attack.png",
-  "centrifugal hooks": "img/upgrade/centrifugal_hooks.png",
-  "baneling speed": "img/upgrade/centrifugal_hooks.png",
-  "adaptive talons": "img/upgrade/adaptive_talons.png",
-  "seismic spines": "img/upgrade/seismic_spines.png",
-  "neural parasite": "img/upgrade/neural_parasite.png",
-  // protoss
-  "air armor": "img/upgrade/air_armor.png",
-  "air weapons": "img/upgrade/air_weapons.png",
-  blink: "img/upgrade/blink.png",
-  "anion pulse-crystals": "img/upgrade/anion_pulse-crystals.png",
-  "extended thermal lance": "img/upgrade/extended_thermal_lance.png",
-  charge: "img/upgrade/charge.png",
-  "flux vanes": "img/upgrade/flux_vanes.png",
-  "gravitic drive": "img/upgrade/gravitic_drive.png",
-  "gravitic boosters": "img/upgrade/gravitic_boosters.png",
-  "ground armor": "img/upgrade/ground_armor.png",
-  "psionic storm": "img/upgrade/psionic_storm.png",
-  "ground weapons": "img/upgrade/ground_weapons.png",
-  "research warp gate": "img/upgrade/research_warpgate.png",
-  "shadow stride": "img/upgrade/shadow_stride.png",
-  "resonating glaives": "img/upgrade/resonating_glaives.png",
-  shields: "img/upgrade/shields.png",
-  "tectonic destabilizers": "img/upgrade/tectonic_desabilizers.png",
-  // terran
-  "weapon refit": "img/upgrade/weapon_refit.png",
-  "vehicle and ship plating": "img/upgrade/vehicle_and_ship_plating.png",
-  "vehicle weapons": "img/upgrade/vehicle_weapons.png",
-  stim: "img/upgrade/stim.png",
-  "ship weapons": "img/upgrade/ship_weapons.png",
-  "smart servos": "img/upgrade/smart_servos.png",
-  "neosteel armor": "img/upgrade/neosteel_armor.png",
-  "infernal pre-igniter": "img/upgrade/infernal_pre-igniter.png",
-  "interference matrix": "img/upgrade/interference_matrix.png",
-  "infantry weapons": "img/upgrade/infantry_weapons.png",
-  "hyperflight rotors": "img/upgrade/hyperflight_rotors.png",
-  "infantry armor": "img/upgrade/infantry_armor.png",
-  "hi-sec auto tracking": "img/upgrade/hi-sec_auto_tracking.png",
-  "hurricane engines": "img/upgrade/hurricane_engines.png",
-  "drilling claws": "img/upgrade/drilling_claws.png",
-  "combat shield": "img/upgrade/combat_shield.png",
-  "concussive shells": "img/upgrade/concussive_shells.png",
-  cloak: "img/upgrade/cloak.png",
-  "advanced ballistics": "img/upgrade/advanced_ballistics.png",
-  "caduceus reactor": "img/upgrade/caduceus_reactor.png",
-};
-
-const structureImages = {
-  armory: "img/structure/armory.png",
-  assimilator: "img/structure/assimilator.png",
-  "baneling nest": "img/structure/baneling_nest.png",
-  barracks: "img/structure/barracks.png",
-  bunker: "img/structure/bunker.png",
-  "command center": "img/structure/command_center.png",
-  "creep tumor": "img/structure/creep_tumor.png",
-  "cybernetics core": "img/structure/cybernetics_core.png",
-  "dark shrine": "img/structure/dark_shrine.png",
-  "engineering bay": "img/structure/engineering_bay.png",
-  "evolution chamber": "img/structure/evolution_chamber.png",
-  extractor: "img/structure/extractor.png",
-  factory: "img/structure/factory.png",
-  "fleet beacon": "img/structure/fleet_beacon.png",
-  forge: "img/structure/forge.png",
-  "fusion core": "img/structure/fusion_core.png",
-  gateway: "img/structure/gateway.png",
-  "ghost academy": "img/structure/ghost_academy.png",
-  "greater spire": "img/structure/greater_spire.png",
-  hatchery: "img/structure/hatchery.png",
-  hive: "img/structure/hive.png",
-  "hydralisk den": "img/structure/hydralisk_den.png",
-  "infestation pit": "img/structure/infestation_pit.png",
-  lair: "img/structure/lair.png",
-  "missile turret": "img/structure/missile_turret.png",
-  nexus: "img/structure/nexus.png",
-  "nydus network": "img/structure/nydus_network.png",
-  "orbital command": "img/structure/orbital_command.png",
-  "photon cannon": "img/structure/photon_cannon.png",
-  "planetary fortress": "img/structure/planetary_fortress.png",
-  pylon: "img/structure/pylon.png",
-  reactor: "img/structure/reactor.png",
-  refinery: "img/structure/refinery.png",
-  "roach warren": "img/structure/roach_warren.png",
-  "robotics bay": "img/structure/robotics_bay.png",
-  "robotics facility": "img/structure/robotics_facility.png",
-  "sensor tower": "img/structure/sensor_tower.png",
-  "spawning pool": "img/structure/spawning_pool.png",
-  "spine crawler": "img/structure/spine_crawler.png",
-  spire: "img/structure/spire.png",
-  "spore crawler": "img/structure/spore_crawler.png",
-  stargate: "img/structure/stargate.png",
-  starport: "img/structure/starport.png",
-  "supply depot": "img/structure/supply_depot.png",
-  "tech lab": "img/structure/tech_lab.png",
-  "templar archives": "img/structure/templar_archives.png",
-  "twilight council": "img/structure/twilight_council.png",
-  "ultralisk cavern": "img/structure/ultralisk_cavern.png",
-  "warp gate": "img/structure/warp_gate.png",
-  "shield battery": "img/structure/shield_battery.png",
-
-  // Add paths for all structures
-};
-
-const unitImages = {
-  adept: "img/unit/adept.png",
-  archon: "img/unit/archon.png",
-  baneling: "img/unit/baneling.png",
-  banshee: "img/unit/banshee.png",
-  battlecruiser: "img/unit/battlecruiser.png",
-  "brood lord": "img/unit/brood_lord.png",
-  carrier: "img/unit/carrier.png",
-  changling: "img/unit/changling.png",
-  colossus: "img/unit/colossus.png",
-  corruptor: "img/unit/corruptor.png",
-  cyclone: "img/unit/cyclone.png",
-  "dark templar": "img/unit/dark_templar.png",
-  drone: "img/unit/drone.png",
-  disruptor: "img/unit/disruptor.png",
-  ghost: "img/unit/ghost.png",
-  hellion: "img/unit/hellion.png",
-  hellbat: "img/unit/hellbat.png",
-  "high templar": "img/unit/high_templar.png",
-  hydralisk: "img/unit/hydralisk.png",
-  immortal: "img/unit/immortal.png",
-  infestor: "img/unit/infestor.png",
-  larva: "img/unit/larva.png",
-  liberator: "img/unit/liberator.png",
-  lurker: "img/unit/lurker.png",
-  marauder: "img/unit/marauder.png",
-  marine: "img/unit/marine.png",
-  medivac: "img/unit/medivac.png",
-  mothership: "img/unit/mothership.png",
-  mule: "img/unit/mule.png",
-  mutalisk: "img/unit/mutalisk.png",
-  observer: "img/unit/observer.png",
-  oracle: "img/unit/oracle.png",
-  overlord: "img/unit/overlord.png",
-  "ventral sacks": "img/unit/overlord_drop.png",
-  overseer: "img/unit/overseer.png",
-  tempest: "img/unit/tempest.png",
-  phoenix: "img/unit/phoenix.png",
-  probe: "img/unit/probe.png",
-  queen: "img/unit/queen.png",
-  raven: "img/unit/raven.png",
-  reaper: "img/unit/reaper.png",
-  roach: "img/unit/roach.png",
-  scv: "img/unit/scv.png",
-  sentry: "img/unit/sentry.png",
-  "siege tank": "img/unit/siege_tank.png",
-  stalker: "img/unit/stalker.png",
-  "swarm host": "img/unit/swarm_host.png",
-  thor: "img/unit/thor.png",
-  ultralisk: "img/unit/ultralisk.png",
-  viking: "img/unit/viking.png",
-  viper: "img/unit/viper.png",
-  "void ray": "img/unit/void_ray.png",
-  "warp prism": "img/unit/warp_prism.png",
-  "widow mine": "img/unit/widow_mine.png",
-  zealot: "img/unit/zealot.png",
-  zergling: "img/unit/zergling.png",
-  // Add paths for all units
-};
 
 // Function to format action text with upgrade images
 function formatUpgrades(actionText) {
@@ -819,165 +452,6 @@ document.querySelectorAll(".toggle-header").forEach((header) => {
   header.addEventListener("click", () => toggleSection(header));
 });
 
-document.addEventListener("DOMContentLoaded", () => {
-  initializeEventListeners();
-  document
-    .getElementById("videoInput")
-    .addEventListener("input", updateYouTubeEmbed);
-});
-
-// Global variable for storing all builds
-let savedBuilds = [];
-
-// Load saved builds from local storage on page load
-window.addEventListener(
-  "load",
-  () => {
-    const storedBuilds = localStorage.getItem("savedBuilds");
-    if (storedBuilds) {
-      savedBuilds = JSON.parse(storedBuilds);
-      filterBuilds("all"); // Display all builds on load
-    }
-  },
-  { passive: true }
-);
-
-// Setup event listeners
-function initializeEventListeners() {
-  document
-    .getElementById("saveBuildsButton")
-    .addEventListener("click", saveBuildsToFile);
-  document
-    .getElementById("loadBuildsButton")
-    .addEventListener("change", loadBuildsFromFile);
-  document
-    .getElementById("showBuildsButton")
-    .addEventListener("click", showAllBuilds);
-  document
-    .getElementById("closeModalButton")
-    .addEventListener("click", closeModal);
-
-  // Close modal on outside click
-  window.addEventListener(
-    "click",
-    (event) => {
-      const modal = document.getElementById("buildsModal");
-      if (event.target === modal) {
-        closeModal();
-      }
-    },
-    { passive: true }
-  );
-}
-
-function saveCurrentBuild() {
-  const title = document.getElementById("buildOrderTitleInput").value.trim();
-  const comment = document.getElementById("commentInput").value.trim();
-  const videoLink = document.getElementById("videoInput").value.trim();
-  const buildOrderInput = document
-    .getElementById("buildOrderInput")
-    .value.trim();
-  const category = document.getElementById("buildCategoryDropdown").value;
-
-  const buildOrder = [];
-  const table = document.getElementById("buildOrderTable");
-  for (let i = 1; i < table.rows.length; i++) {
-    const row = table.rows[i];
-    buildOrder.push({
-      workersOrTimestamp: row.cells[0].textContent,
-      action: row.cells[1].innerHTML,
-    });
-  }
-
-  if (!title) {
-    alert("Please provide a title for the build.");
-    return;
-  }
-
-  const build = {
-    title: title,
-    comment: comment,
-    videoLink: videoLink,
-    buildOrder: buildOrder,
-    category: category,
-    timestamp: Date.now(), // Add creation timestamp
-  };
-
-  // Check for duplicate titles
-  const existingIndex = savedBuilds.findIndex((b) => b.title === title);
-  if (existingIndex !== -1) {
-    if (
-      !confirm(
-        `A build with the title "${title}" already exists. Overwrite it?`
-      )
-    ) {
-      return;
-    }
-    savedBuilds[existingIndex] = build; // Overwrite existing build
-  } else {
-    savedBuilds.push(build); // Add new build
-  }
-
-  // Save builds to local storage
-  localStorage.setItem("savedBuilds", JSON.stringify(savedBuilds));
-
-  alert("Build saved successfully!");
-  filterBuilds("all"); // Refresh the build list
-}
-
-// Save all builds to a JSON file
-function saveBuildsToFile() {
-  console.log(savedBuilds); // Debugging line
-  const blob = new Blob([JSON.stringify(savedBuilds, null, 2)], {
-    type: "application/json",
-  });
-  const url = URL.createObjectURL(blob);
-  const downloadLink = document.createElement("a");
-  downloadLink.href = url;
-  downloadLink.download = "build_orders.json";
-  downloadLink.click();
-  URL.revokeObjectURL(url);
-}
-
-// Load builds from a file
-function loadBuildsFromFile(event) {
-  const file = event.target.files[0];
-  if (!file) {
-    alert("No file selected.");
-    return;
-  }
-
-  const reader = new FileReader();
-  reader.onload = function (e) {
-    try {
-      const importedBuilds = JSON.parse(e.target.result);
-
-      // Validate imported builds
-      importedBuilds.forEach((build) => {
-        if (!build.title || !build.category) {
-          throw new Error(
-            "Invalid build format. Each build must include a title and category."
-          );
-        }
-      });
-
-      // Replace the saved builds array with the imported builds
-      savedBuilds = importedBuilds;
-
-      // Update local storage
-      localStorage.setItem("savedBuilds", JSON.stringify(savedBuilds));
-
-      alert("Builds loaded successfully!");
-
-      // Refresh the build list
-      filterBuilds("all");
-    } catch (error) {
-      alert(`Error loading builds: ${error.message}`);
-    }
-  };
-  reader.readAsText(file);
-}
-
 document.getElementById("loadBuildsButton").addEventListener("click", () => {
   document.getElementById("loadBuildsInput").click();
 });
@@ -986,36 +460,8 @@ document
   .getElementById("loadBuildsInput")
   .addEventListener("change", loadBuildsFromFile);
 
-// Display all builds in the modal
-function showAllBuilds() {
-  const modal = document.getElementById("buildsModal");
-  const buildsContainer = document.getElementById("modalBuildsContainer");
-  buildsContainer.innerHTML = ""; // Clear existing builds
-
-  savedBuilds.forEach((build, index) => {
-    const buildElement = document.createElement("div");
-    buildElement.classList.add("build-card");
-
-    buildElement.innerHTML = `
-      <div class="delete-icon" onclick="deleteBuild(${index})">×</div>
-      <h4 class="build-card-title">${build.title}</h4>
-      <button onclick="viewBuild(${index})">View</button>
-    `;
-
-    buildsContainer.appendChild(buildElement);
-  });
-
-  modal.style.display = "block"; // Show the modal
-}
-
-// Close the modal
-function closeModal() {
-  const modal = document.getElementById("buildsModal");
-  modal.style.display = "none";
-}
-
-// View a specific build
 function viewBuild(index) {
+  const savedBuilds = getSavedBuilds(); // Retrieve builds
   const build = savedBuilds[index];
   if (!build) return;
 
@@ -1030,7 +476,7 @@ function viewBuild(index) {
 
   // Populate the match-up dropdown
   if (build.category) {
-    categoryDropdown.value = build.category; // Set the dropdown to the build's category
+    categoryDropdown.value = build.category;
     const selectedOption =
       categoryDropdown.options[categoryDropdown.selectedIndex];
     const optgroup = selectedOption.parentElement;
@@ -1056,7 +502,7 @@ function viewBuild(index) {
         `[${step.workersOrTimestamp}] ${step.action.replace(
           /<\/?[^>]+(>|$)/g,
           ""
-        )}` // Strip HTML tags
+        )}`
     )
     .join("\n");
   buildOrderInput.value = formattedBuildOrder;
@@ -1067,21 +513,8 @@ function viewBuild(index) {
   closeModal();
 }
 
-function deleteBuild(index) {
-  if (!confirm("Are you sure you want to delete this build?")) {
-    return;
-  }
-
-  // Remove the build from the array
-  savedBuilds.splice(index, 1);
-
-  // Update local storage
-  localStorage.setItem("savedBuilds", JSON.stringify(savedBuilds));
-
-  // Refresh the build list
-  filterBuilds("all");
-  alert("Build deleted successfully!");
-}
+// Expose to global scope
+window.viewBuild = viewBuild;
 
 // Function to display the build order in the table
 function displayBuildOrder(buildOrder) {
@@ -1101,47 +534,6 @@ function displayBuildOrder(buildOrder) {
   });
 }
 
-// Function to toggle the title input field
-function toggleTitleInput(showInput) {
-  const titleText = document.getElementById("buildOrderTitleText");
-  const titleInput = document.getElementById("buildOrderTitleInput");
-
-  if (showInput) {
-    titleText.style.display = "none";
-    titleInput.style.display = "inline-block";
-    titleInput.value = titleText.classList.contains("dimmed")
-      ? ""
-      : titleText.textContent;
-    titleInput.focus();
-    titleText.classList.remove("dimmed");
-  } else {
-    const titleValue = titleInput.value.trim();
-    titleText.textContent = titleValue || "Enter build order title here...";
-    titleInput.style.display = "none";
-    titleText.style.display = "inline-block";
-
-    if (!titleValue) {
-      titleText.classList.add("dimmed");
-    }
-  }
-}
-
-document.addEventListener("DOMContentLoaded", function () {
-  const toggleHeaders = document.querySelectorAll(".toggle-title");
-  toggleHeaders.forEach((header) => {
-    const sectionId = header.getAttribute("data-section");
-    const section = document.getElementById(sectionId);
-    const arrow = header.querySelector(".arrow");
-
-    // Set arrow based on initial display state
-    if (section.style.display === "block") {
-      arrow.classList.add("open"); // Rotate down if section is open
-    } else {
-      arrow.classList.remove("open"); // Keep right if section is closed
-    }
-  });
-});
-
 // Build storage example
 let builds = [
   { title: "ZvP Build 1", category: "zvp" },
@@ -1150,59 +542,6 @@ let builds = [
   { title: "TvT Build 1", category: "tvt" },
   { title: "ZvZ Build 1", category: "zvz" },
 ];
-
-// Function to filter builds by category or subcategory
-function filterBuilds(category) {
-  const buildList = document.getElementById("modalBuildsContainer");
-  const modalTitle = document.querySelector(".modal-content h3"); // Reference the modal's h3 title
-
-  // Clear existing cards
-  buildList.innerHTML = "";
-
-  // Filter builds by category
-  const filteredBuilds =
-    category === "all"
-      ? savedBuilds
-      : savedBuilds.filter((build) => build.category === category);
-
-  // Sort by timestamp (newest first)
-  const sortedBuilds = filteredBuilds.sort((a, b) => b.timestamp - a.timestamp);
-
-  // Dynamically update the modal title based on the selected category
-  const categoryTitles = {
-    all: "All Builds",
-    zerg: "Zerg Builds",
-    protoss: "Protoss Builds",
-    terran: "Terran Builds",
-    zvp: "ZvP Builds",
-    zvt: "ZvT Builds",
-    zvz: "ZvZ Builds",
-    pvp: "PvP Builds",
-    pvz: "PvZ Builds",
-    pvt: "PvT Builds",
-    tvp: "TvP Builds",
-    tvt: "TvT Builds",
-    tvz: "TvZ Builds",
-  };
-
-  modalTitle.textContent = categoryTitles[category] || "Builds"; // Default to "Builds" if category not found
-
-  // Display sorted and filtered builds
-  sortedBuilds.forEach((build, index) => {
-    const buildCard = document.createElement("div");
-    buildCard.classList.add("build-card");
-
-    // Populate build card content without comment section
-    buildCard.innerHTML = `
-      <div class="delete-icon" onclick="deleteBuild(${index})">×</div>
-      <h4 class="build-card-title">${build.title}</h4>
-      <button onclick="viewBuild(${index})">View</button>
-    `;
-
-    // Append build card to the container
-    buildList.appendChild(buildCard);
-  });
-}
 
 function highlightActiveTab(category) {
   document
@@ -1213,33 +552,6 @@ function highlightActiveTab(category) {
   document
     .querySelector(`[onclick="filterBuilds('${category}')"]`)
     .classList.add("active-tab");
-}
-
-// Function to open the modal
-function openModal() {
-  const modal = document.getElementById("buildsModal");
-  modal.style.display = "block";
-  filterBuilds("all"); // Default to show all builds
-}
-
-// Function to close the modal
-function closeModal() {
-  const modal = document.getElementById("buildsModal");
-  modal.style.display = "none";
-}
-
-function showSubcategories(category) {
-  const subcategories = document.querySelectorAll(".subcategory-container");
-  subcategories.forEach((container) => {
-    container.style.display = "none"; // Hide all subcategories
-  });
-
-  const activeSubcategory = document.querySelector(
-    `.subcategory-container.${category}`
-  );
-  if (activeSubcategory) {
-    activeSubcategory.style.display = "block";
-  }
 }
 
 // Optional: Hide subcategories when the mouse leaves the category tab
@@ -1259,67 +571,6 @@ function getYouTubeVideoID(url) {
   return match ? match[1] : null;
 }
 
-function updateYouTubeEmbed() {
-  const videoInput = document.getElementById("videoInput");
-  const videoIframe = document.getElementById("videoIframe");
-
-  const videoURL = videoInput.value.trim();
-  const videoID = getYouTubeVideoID(videoURL);
-
-  if (videoID) {
-    // Show iframe with the video
-    videoIframe.src = `https://www.youtube.com/embed/${videoID}`;
-    videoIframe.style.display = "block";
-  } else {
-    // Hide iframe if the URL is invalid
-    videoIframe.style.display = "none";
-    videoIframe.src = "";
-  }
-}
-
-// Function to remove all builds
-function removeAllBuilds() {
-  // Confirm with the user
-  if (
-    !confirm(
-      "Are you sure you want to delete all builds? This action cannot be undone."
-    )
-  ) {
-    return;
-  }
-
-  // Clear the builds array
-  savedBuilds = [];
-
-  // Clear localStorage
-  localStorage.removeItem("savedBuilds");
-
-  // Clear the modal content dynamically
-  const modalBuildsContainer = document.getElementById("modalBuildsContainer");
-  if (modalBuildsContainer) {
-    modalBuildsContainer.innerHTML = ""; // Remove all build cards from the modal
-  }
-
-  alert("All builds have been removed.");
-}
-
-document
-  .getElementById("removeAllBuildsButton")
-  .addEventListener("click", removeAllBuilds);
-
-document
-  .getElementById("buildCategoryDropdown")
-  .addEventListener("change", function () {
-    const dropdown = this;
-    const selectedOption = dropdown.options[dropdown.selectedIndex];
-    const optgroup = selectedOption.parentElement;
-
-    // Apply the color of the optgroup to the dropdown
-    if (optgroup && optgroup.style.color) {
-      dropdown.style.color = optgroup.style.color;
-    }
-  });
-
 document
   .getElementById("buildCategoryDropdown")
   .addEventListener("change", function () {
@@ -1335,3 +586,10 @@ document
     // Proceed with normal logic for selected match-up
     console.log(`Selected match-up: ${selectedValue}`);
   });
+
+window.showSubcategories = showSubcategories;
+
+document.addEventListener("DOMContentLoaded", () => {
+  initializeEventListeners();
+  initializeModalEventListeners();
+});

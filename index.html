@@ -2,7 +2,10 @@
 <html>
   <head>
     <title>StarCraft 2 Build Order</title>
-    <link rel="stylesheet" href="css/style.css" />
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" type="text/css" href="css/style.css" />
+    <script type="module" src="js/script.js"></script>
+    <script type="module" src="js/modules/eventHandlers.js"></script>
   </head>
   <body>
     <div id="content">
@@ -56,22 +59,20 @@
         </div>
       
         <!-- Center Column: Title -->
-        <div class="form-center">
-          <span
-            id="buildOrderTitleText"
-            onclick="toggleTitleInput(true)"
-            class="dimmed"
-          >
-            Enter build order title here...
-          </span>
-          <input
-            type="text"
-            id="buildOrderTitleInput"
-            placeholder="Enter build order title here..."
-            onblur="toggleTitleInput(false)"
-            style="display: none"
-          />
-        </div>
+        <span
+        id="buildOrderTitleText"
+        class="dimmed"
+        onclick="toggleTitleInput(true)"
+      >
+        Enter build order title here...
+      </span>
+      <input
+        type="text"
+        id="buildOrderTitleInput"
+        placeholder="Enter build order title here..."
+        style="display: none;"
+        onblur="toggleTitleInput(false)"
+      />
       
         <!-- Right Column: Empty -->
         <div class="form-right"></div>
@@ -88,12 +89,12 @@
 
         <div class="saveLoadContainer">
           <button id="saveBuildButton">Save Current Build</button>
-          <button id="saveBuildsButton">Save All Builds to File</button>
+          <button id="exportBuildsButton">Save All Builds to File</button>
           <input type="file" id="loadBuildsInput" hidden />
           <button id="loadBuildsButton">Load Builds</button>
         </div>
 
-        <button id="showBuildsButton" onclick="showAllBuilds()">
+        <button id="showBuildsButton">
           Show All Builds
         </button>
 
@@ -131,7 +132,7 @@
               </div>
             </div>
 
-            <span id="closeModalButton" class="close">&times;</span>
+            <span id="closeModalButton" class="close-modal" onclick="closeModal()">&times;</span>
             <h3>All Builds</h3>
             <div id="modalBuildsContainer" class="builds-container">
               <!-- Builds will be dynamically populated here -->
@@ -185,6 +186,6 @@
       <p>︱Version 0.1.3</p>
       <!-- Version number here -->
     </div>
-    <script src="js/script.js"></script>
+
   </body>
 </html>
