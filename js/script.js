@@ -427,11 +427,6 @@ document
     analyzeBuildOrder(event.target.value);
   });
 
-// Add event listeners for each header
-document.querySelectorAll(".toggle-header").forEach((header) => {
-  header.addEventListener("click", () => toggleSection(header));
-});
-
 document.getElementById("loadBuildsButton").addEventListener("click", () => {
   document.getElementById("loadBuildsInput").click();
 });
@@ -466,10 +461,6 @@ function viewBuild(index) {
       categoryDropdown.style.color = optgroup.style.color;
     }
   }
-
-  // Populate comment and video link
-  document.getElementById("commentInput").value = build.comment || "";
-  document.getElementById("videoInput").value = build.videoLink || "";
 
   // Update the YouTube embed with the new video link
   updateYouTubeEmbed();

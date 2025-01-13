@@ -128,10 +128,18 @@ export function initializeSectionToggles() {
 }
 
 export function populateBuildDetails(build) {
-  // Populate comment and video link
-  document.getElementById("commentInput").value = build.comment || "";
-  document.getElementById("videoInput").value = build.videoLink || "";
+  if (!build) {
+    console.error("No build provided to populate details.");
+    return;
+  }
 
-  // Update the YouTube embed with the new video link
+  const commentInput = document.getElementById("commentInput");
+  const videoInput = document.getElementById("videoInput");
+
+  // Safely access properties with default fallbacks
+  commentInput.value = build.comment || "";
+  videoInput.value = build.videoLink || "";
+
+  // Update the YouTube embed if needed
   updateYouTubeEmbed();
 }
