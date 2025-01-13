@@ -4,21 +4,33 @@ import {
   removeAllBuilds,
   saveBuildsToFile,
 } from "./buildManagement.js";
+
 import {
   getSavedBuilds,
   saveSavedBuildsToLocalStorage,
 } from "./buildStorage.js";
+
 import {
   updateYouTubeEmbed,
   toggleTitleInput,
   filterBuilds,
+  populateBuildDetails,
 } from "./uiHandlers.js";
+
 import {
   showAllBuilds,
   closeModal,
   showSubcategories,
   openModal,
 } from "./modal.js";
+
+import {
+  MapAnnotations,
+  initializeMapControls,
+  initializeInteractiveMap,
+} from "./interactive_map.js";
+
+import { initializeSectionToggles } from "./uiHandlers.js";
 
 // Initialize event listeners
 export function initializeEventListeners() {
@@ -126,3 +138,23 @@ export function initializeModalEventListeners() {
     });
   });
 }
+
+// Interactive Map
+document.addEventListener("DOMContentLoaded", () => {
+  const mapAnnotations = new MapAnnotations(
+    "map-preview-image",
+    "map-annotations"
+  );
+
+  // Pass mapAnnotations to initializeMapControls
+  initializeMapControls(mapAnnotations);
+});
+
+// Initialize the toggle functionality for sections
+document.addEventListener("DOMContentLoaded", () => {
+  initializeSectionToggles();
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  populateBuildDetails();
+});

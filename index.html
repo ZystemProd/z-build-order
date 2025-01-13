@@ -1,13 +1,31 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>StarCraft 2 Build Order</title>
+    <title>Z-Build Order</title>
     <meta charset="UTF-8" />
+    <link rel="icon" type="image/x-icon" href="/img/favicon.ico" />
     <link rel="stylesheet" type="text/css" href="css/style.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <script type="module" src="js/script.js"></script>
     <script type="module" src="js/modules/eventHandlers.js"></script>
+    
   </head>
   <body>
+    <div id="floating-map" class="floating-container">
+      <div id="map-title-bar" class="title-bar">
+        <span>Map</span>
+        <button class="close-map-button">✖</button>
+      </div>
+      <div id="map-preview-container" class="map-preview">
+        <img id="map-preview-image" class="map-image" src="img/SG/titans_causeway.jpg" alt="Map Preview" />
+        <div id="map-annotations" class="annotations"></div>
+        <button class="clear-annotations-button"><i class="fa fa-eraser" style="font-size:20px;"></i></button>
+      </div>
+    </div>
+  <div id="game-selector" class="menu">
+    <button id="starcraft2Button" class="menu-button">Starcraft 2</button>
+    <button id="stormgateButton" class="menu-button">Stormgate</button>
+  </div>
     <div id="content">
       <div class="upperInput">
         <!-- Build Order Input Section with Toggle -->
@@ -97,6 +115,7 @@
         <button id="showBuildsButton">
           Show All Builds
         </button>
+        <button id="showMapButton">Show Map</button>
 
         <!-- Modal for showing all builds -->
         <div id="buildsModal" class="modal">
@@ -183,7 +202,7 @@
           class="footer-logo"
         />
       </a>
-      <p>︱Version 0.1.3</p>
+      <p>︱Version 0.1.32</p>
       <!-- Version number here -->
     </div>
 

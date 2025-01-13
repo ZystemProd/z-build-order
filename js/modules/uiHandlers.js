@@ -18,6 +18,13 @@ export function updateYouTubeEmbed() {
   }
 }
 
+function getYouTubeVideoID(url) {
+  const regex =
+    /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+  const match = url.match(regex);
+  return match ? match[1] : null;
+}
+
 // Function to toggle the title input field
 export function toggleTitleInput(showInput) {
   const titleText = document.getElementById("buildOrderTitleText");
@@ -96,4 +103,35 @@ export function filterBuilds(category) {
 
     buildList.appendChild(buildCard);
   });
+}
+
+// Function to toggle visibility of a section using data-section attribute
+export function toggleSection(header) {
+  const sectionId = header.getAttribute("data-section");
+  const section = document.getElementById(sectionId);
+  const arrow = header.querySelector(".arrow");
+
+  if (section.style.display === "none" || !section.style.display) {
+    section.style.display = "block";
+    arrow.classList.add("open"); // Rotate arrow down
+  } else {
+    section.style.display = "none";
+    arrow.classList.remove("open"); // Rotate arrow right
+  }
+}
+
+// Add event listeners to headers with the class "toggle-title"
+export function initializeSectionToggles() {
+  document.querySelectorAll(".toggle-title").forEach((header) => {
+    header.addEventListener("click", () => toggleSection(header));
+  });
+}
+
+export function populateBuildDetails(build) {
+  // Populate comment and video link
+  document.getElementById("commentInput").value = build.comment || "";
+  document.getElementById("videoInput").value = build.videoLink || "";
+
+  // Update the YouTube embed with the new video link
+  updateYouTubeEmbed();
 }
