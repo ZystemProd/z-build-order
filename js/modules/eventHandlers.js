@@ -35,15 +35,18 @@ import { initializeSectionToggles } from "./uiHandlers.js";
 // Initialize event listeners
 export function initializeEventListeners() {
   // Build management buttons
+  /*
   document.getElementById("saveBuildButton").addEventListener("click", () => {
     const savedBuilds = JSON.parse(localStorage.getItem("savedBuilds")) || [];
     saveCurrentBuild(savedBuilds, filterBuilds);
   });
-
+*/
+  /*
   document
     .getElementById("showBuildsButton")
     .addEventListener("click", showAllBuilds);
-
+*/
+  /*
   document
     .getElementById("removeAllBuildsButton")
     .addEventListener("click", () => {
@@ -51,7 +54,7 @@ export function initializeEventListeners() {
       removeAllBuilds(savedBuilds, modalBuildsContainer);
       saveSavedBuildsToLocalStorage();
     });
-
+*/
   document
     .getElementById("loadBuildsInput")
     .addEventListener("change", (event) => {
@@ -95,24 +98,27 @@ export function initializeEventListeners() {
     });
 
   // Video embed updates
+  /*
   document
     .getElementById("videoInput")
     .addEventListener("input", updateYouTubeEmbed);
-
+*/
   // Section toggle logic
-  document.querySelectorAll(".toggle-title").forEach((header) => {
-    header.addEventListener("click", () => {
-      const sectionId = header.getAttribute("data-section");
-      const section = document.getElementById(sectionId);
-      const arrow = header.querySelector(".arrow");
+  document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll(".toggle-title").forEach((header) => {
+      header.addEventListener("click", () => {
+        const sectionId = header.getAttribute("data-section");
+        const section = document.getElementById(sectionId);
+        const arrow = header.querySelector(".arrow");
 
-      if (section.style.display === "none" || !section.style.display) {
-        section.style.display = "block";
-        arrow.classList.add("open"); // Rotate arrow down
-      } else {
-        section.style.display = "none";
-        arrow.classList.remove("open"); // Rotate arrow right
-      }
+        if (section.style.display === "none" || !section.style.display) {
+          section.style.display = "block";
+          arrow.classList.add("open"); // Rotate arrow down
+        } else {
+          section.style.display = "none";
+          arrow.classList.remove("open"); // Rotate arrow right
+        }
+      });
     });
   });
 }
@@ -138,7 +144,7 @@ export function initializeModalEventListeners() {
     });
   });
 }
-
+/*
 // Interactive Map
 document.addEventListener("DOMContentLoaded", () => {
   const mapAnnotations = new MapAnnotations(
@@ -149,12 +155,44 @@ document.addEventListener("DOMContentLoaded", () => {
   // Pass mapAnnotations to initializeMapControls
   initializeMapControls(mapAnnotations);
 });
+*/
 
 // Initialize the toggle functionality for sections
+/*
 document.addEventListener("DOMContentLoaded", () => {
   initializeSectionToggles();
 });
+*/
 
 document.addEventListener("DOMContentLoaded", () => {
   populateBuildDetails();
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  initializeSectionToggles(); // Ensure toggles are attached globally
+
+  const mapAnnotations = new MapAnnotations(
+    "map-preview-image",
+    "map-annotations"
+  );
+  initializeMapControls(mapAnnotations); // Pass mapAnnotations for map controls
+
+  document.getElementById("saveBuildButton").addEventListener("click", () => {
+    saveCurrentBuild(getSavedBuilds(), filterBuilds);
+  });
+
+  document
+    .getElementById("showBuildsButton")
+    .addEventListener("click", showAllBuilds);
+  document
+    .getElementById("removeAllBuildsButton")
+    .addEventListener("click", () => {
+      const savedBuilds = getSavedBuilds();
+      removeAllBuilds(savedBuilds, modalBuildsContainer);
+      saveSavedBuildsToLocalStorage();
+    });
+
+  document
+    .getElementById("videoInput")
+    .addEventListener("input", updateYouTubeEmbed);
 });

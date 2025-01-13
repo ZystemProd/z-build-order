@@ -127,19 +127,14 @@ export function initializeSectionToggles() {
   });
 }
 
-export function populateBuildDetails(build) {
-  if (!build) {
-    console.error("No build provided to populate details.");
-    return;
-  }
-
+export function populateBuildDetails(build = {}) {
   const commentInput = document.getElementById("commentInput");
   const videoInput = document.getElementById("videoInput");
 
-  // Safely access properties with default fallbacks
+  // Assign safe defaults
   commentInput.value = build.comment || "";
   videoInput.value = build.videoLink || "";
 
-  // Update the YouTube embed if needed
+  // Update video embed
   updateYouTubeEmbed();
 }
