@@ -47,7 +47,6 @@ export function saveCurrentBuild() {
 
   setSavedBuilds(savedBuilds);
   saveSavedBuildsToLocalStorage();
-
   alert("Build saved successfully!");
   filterBuilds("all");
 }
@@ -66,7 +65,7 @@ export function saveBuildsToFile(savedBuilds) {
 }
 
 // Load builds from a file
-export function loadBuildsFromFile(event, savedBuilds, filterBuilds) {
+export function loadBuildsFromFile(event) {
   const file = event.target.files[0];
   if (!file) {
     alert("No file selected.");
@@ -86,9 +85,12 @@ export function loadBuildsFromFile(event, savedBuilds, filterBuilds) {
         }
       });
 
+      const savedBuilds = getSavedBuilds();
       savedBuilds.splice(0, savedBuilds.length, ...importedBuilds);
-      localStorage.setItem("savedBuilds", JSON.stringify(savedBuilds));
+      saveSavedBuildsToLocalStorage(savedBuilds);
+
       alert("Builds loaded successfully!");
+      console.log("load 1st");
       filterBuilds("all");
     } catch (error) {
       alert(`Error loading builds: ${error.message}`);
@@ -126,4 +128,11 @@ export function deleteBuild(index, savedBuilds, filterBuilds) {
   localStorage.setItem("savedBuilds", JSON.stringify(savedBuilds));
   filterBuilds("all");
   alert("Build deleted successfully!");
+}
+
+function getYouTubeVideoID(url) {
+  const regex =
+    /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+  const match = url.match(regex);
+  return match ? match[1] : null;
 }

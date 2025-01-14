@@ -1,4 +1,11 @@
 import { getSavedBuilds } from "./buildStorage.js";
+import { closeModal } from "./modal.js";
+
+import {
+  formatActionText,
+  transformAbbreviations,
+  formatStructureText,
+} from "./textFormatters.js";
 
 export function updateYouTubeEmbed() {
   const videoInput = document.getElementById("videoInput");
@@ -137,4 +144,140 @@ export function populateBuildDetails(build = {}) {
 
   // Update video embed
   updateYouTubeEmbed();
+}
+
+export function viewBuild(index) {
+  const savedBuilds = getSavedBuilds(); // Retrieve builds
+  const build = savedBuilds[index];
+  if (!build) return;
+
+  const titleInput = document.getElementById("buildOrderTitleInput");
+  const titleText = document.getElementById("buildOrderTitleText");
+  const categoryDropdown = document.getElementById("buildCategoryDropdown");
+
+  // Update the title input and text display
+  titleInput.value = build.title;
+  titleText.textContent = build.title;
+  titleText.classList.remove("dimmed");
+
+  // Populate the match-up dropdown
+  if (build.category) {
+    categoryDropdown.value = build.category;
+    const selectedOption =
+      categoryDropdown.options[categoryDropdown.selectedIndex];
+    const optgroup = selectedOption.parentElement;
+
+    // Update the dropdown text color to match the selected category
+    if (optgroup && optgroup.style.color) {
+      categoryDropdown.style.color = optgroup.style.color;
+    }
+  }
+
+  // Update the YouTube embed with the new video link
+  updateYouTubeEmbed();
+
+  // Populate build order input as a formatted string
+  const buildOrderInput = document.getElementById("buildOrderInput");
+  const formattedBuildOrder = build.buildOrder
+    .map(
+      (step) =>
+        `[${step.workersOrTimestamp}] ${step.action.replace(
+          /<\/?[^>]+(>|$)/g,
+          ""
+        )}`
+    )
+    .join("\n");
+  buildOrderInput.value = formattedBuildOrder;
+
+  // Populate the build order table
+  displayBuildOrder(build.buildOrder);
+
+  closeModal();
+}
+window.viewBuild = viewBuild;
+
+function displayBuildOrder(buildOrder) {
+  const table = document.getElementById("buildOrderTable");
+
+  // Clear existing rows (except the header)
+  while (table.rows.length > 1) {
+    table.deleteRow(1);
+  }
+
+  buildOrder.forEach((step) => {
+    const row = table.insertRow();
+    row.insertCell(0).innerHTML = formatWorkersOrTimestamp(
+      step.workersOrTimestamp
+    );
+    row.insertCell(1).innerHTML = step.action;
+  });
+}
+
+function formatWorkersOrTimestamp(text) {
+  // Highlight numbers followed by "gas" or "minerals"
+  return text.replace(/(\d+)\s+(gas|minerals)/gi, (match, num, resource) => {
+    const colorClass =
+      resource.toLowerCase() === "gas" ? "green-text" : "blue-text";
+    const imageSrc =
+      resource.toLowerCase() === "gas"
+        ? "img/resources/gas.png"
+        : "img/resources/minerals.png";
+    const imageTag = `<img src="${imageSrc}" alt="${resource}" class="resource-image">`;
+
+    return `<span class="${colorClass}">${num} ${capitalizeFirstLetter(
+      resource
+    )}</span> ${imageTag}`;
+  });
+}
+
+// Function to analyze and update the build order table automatically
+export function analyzeBuildOrder(inputText) {
+  const lines = inputText.split("\n");
+  const table = document.getElementById("buildOrderTable");
+
+  // Clear existing rows (except the header)
+  while (table.rows.length > 1) {
+    table.deleteRow(1);
+  }
+
+  lines.forEach((line) => {
+    const match = line.match(/\[(.*?)\]\s*(.*)/);
+
+    let workersOrTimestamp = "";
+    let actionText = "";
+
+    if (match) {
+      workersOrTimestamp = match[1];
+      actionText = match[2];
+    } else {
+      actionText = line;
+    }
+
+    // Replace `->` and `<-` with arrows in the action text
+    actionText = actionText.replace(/->/g, "→").replace(/<-/g, "←");
+
+    // Format Workers/Timestamp
+    workersOrTimestamp = formatWorkersOrTimestamp(workersOrTimestamp);
+
+    // Apply additional formatting to action text
+    actionText = transformAbbreviations(actionText);
+    actionText = formatStructureText(actionText);
+    actionText = formatActionText(actionText);
+
+    // Insert row in the table
+    const row = table.insertRow();
+    row.insertCell(0).innerHTML = workersOrTimestamp;
+    row.insertCell(1).innerHTML = actionText;
+  });
+}
+
+function highlightActiveTab(category) {
+  document
+    .querySelectorAll("#buildCategoryTabs button, #buildSubCategoryTabs button")
+    .forEach((button) => {
+      button.classList.remove("active-tab");
+    });
+  document
+    .querySelector(`[onclick="filterBuilds('${category}')"]`)
+    .classList.add("active-tab");
 }

@@ -2,7 +2,6 @@ import {
   saveCurrentBuild,
   loadBuildsFromFile,
   removeAllBuilds,
-  saveBuildsToFile,
 } from "./buildManagement.js";
 
 import {
@@ -12,55 +11,81 @@ import {
 
 import {
   updateYouTubeEmbed,
-  toggleTitleInput,
-  filterBuilds,
   populateBuildDetails,
+  analyzeBuildOrder,
 } from "./uiHandlers.js";
 
-import {
-  showAllBuilds,
-  closeModal,
-  showSubcategories,
-  openModal,
-} from "./modal.js";
+import { showAllBuilds, closeModal, showSubcategories } from "./modal.js";
 
-import {
-  MapAnnotations,
-  initializeMapControls,
-  initializeInteractiveMap,
-} from "./interactive_map.js";
+import { MapAnnotations, initializeMapControls } from "./interactive_map.js";
 
 import { initializeSectionToggles } from "./uiHandlers.js";
 
 // Initialize event listeners
 export function initializeEventListeners() {
-  // Build management buttons
-  /*
-  document.getElementById("saveBuildButton").addEventListener("click", () => {
-    const savedBuilds = JSON.parse(localStorage.getItem("savedBuilds")) || [];
-    saveCurrentBuild(savedBuilds, filterBuilds);
-  });
-*/
-  /*
   document
-    .getElementById("showBuildsButton")
-    .addEventListener("click", showAllBuilds);
-*/
-  /*
+    .getElementById("buildCategoryDropdown")
+    .addEventListener("change", function () {
+      const dropdown = this;
+      const selectedValue = dropdown.value;
+
+      if (!selectedValue) {
+        // Handle cases where no match-up is selected
+        console.warn("No match-up selected.");
+        return;
+      }
+
+      // Proceed with normal logic for selected match-up
+      console.log(`Selected match-up: ${selectedValue}`);
+    });
+
+  window.showSubcategories = showSubcategories;
+
+  document
+    .getElementById("buildCategoryTabs")
+    .addEventListener("mouseleave", () => {
+      const subcategories = document.querySelectorAll(".subcategory-container");
+      subcategories.forEach((container) => {
+        container.style.display = "none"; // Hide all subcategories
+      });
+    });
+
+  // Automatically trigger analysis when the user types in the buildOrderInput field
+  document
+    .getElementById("buildOrderInput")
+    .addEventListener("input", (event) => {
+      analyzeBuildOrder(event.target.value);
+    });
+
+  document.getElementById("loadBuildsButton").addEventListener("click", () => {
+    document.getElementById("loadBuildsInput").click();
+  });
+
+  // Save Build
+  document.getElementById("saveBuildButton").addEventListener("click", () => {
+    saveCurrentBuild();
+  });
+
+  // Load Builds from File
+  document
+    .getElementById("loadBuildsInput")
+    .addEventListener("change", (event) => {
+      loadBuildsFromFile(event);
+    });
+
+  // Remove All Builds
   document
     .getElementById("removeAllBuildsButton")
     .addEventListener("click", () => {
       const savedBuilds = getSavedBuilds();
-      removeAllBuilds(savedBuilds, modalBuildsContainer);
+      removeAllBuilds(savedBuilds);
       saveSavedBuildsToLocalStorage();
     });
-*/
+
+  // Update YouTube Embed
   document
-    .getElementById("loadBuildsInput")
-    .addEventListener("change", (event) => {
-      const savedBuilds = JSON.parse(localStorage.getItem("savedBuilds")) || [];
-      loadBuildsFromFile(event, savedBuilds, filterBuilds);
-    });
+    .getElementById("videoInput")
+    .addEventListener("input", updateYouTubeEmbed);
 
   // Input interactions
   document
@@ -176,10 +201,6 @@ document.addEventListener("DOMContentLoaded", () => {
     "map-annotations"
   );
   initializeMapControls(mapAnnotations); // Pass mapAnnotations for map controls
-
-  document.getElementById("saveBuildButton").addEventListener("click", () => {
-    saveCurrentBuild(getSavedBuilds(), filterBuilds);
-  });
 
   document
     .getElementById("showBuildsButton")
