@@ -6,6 +6,7 @@ import {
   formatActionText,
   transformAbbreviations,
   formatStructureText,
+  capitalizeFirstLetter,
 } from "./textFormatters.js";
 /*
 export function updateYouTubeEmbed() {
@@ -208,17 +209,22 @@ export function analyzeBuildOrder(inputText) {
     // Replace `->` and `<-` with arrows in the action text
     actionText = actionText.replace(/->/g, "→").replace(/<-/g, "←");
 
-    // Format Workers/Timestamp
-    workersOrTimestamp = formatWorkersOrTimestamp(workersOrTimestamp);
+    // Replace `posX` with images
+    actionText = actionText.replace(/pos(\d+)/g, (_, number) => {
+      const imagePath = `img/pos/pos${number}.png`; // Adjust path if needed
+      return `<img src="${imagePath}" alt="Position ${number}" class="pos-image">`;
+    });
 
-    // Apply additional formatting to action text
-    actionText = transformAbbreviations(actionText);
-    actionText = formatStructureText(actionText);
-    actionText = formatActionText(actionText);
+    // Ensure other formatting does not overwrite `posX` replacement
+    if (!actionText.includes("pos")) {
+      actionText = transformAbbreviations(actionText);
+      actionText = formatStructureText(actionText);
+      actionText = formatActionText(actionText);
+    }
 
     // Insert row in the table
     const row = table.insertRow();
-    row.insertCell(0).innerHTML = workersOrTimestamp;
+    row.insertCell(0).innerHTML = formatWorkersOrTimestamp(workersOrTimestamp);
     row.insertCell(1).innerHTML = actionText;
   });
 }

@@ -11,7 +11,6 @@
     
   </head>
   <body>
-
     <div id="toast-container"></div>
 
     <div id="floating-map" class="floating-container">
@@ -99,7 +98,7 @@
         <!-- Existing table and buttons -->
         <table id="buildOrderTable">
           <tr>
-            <th>Supply/Timestamp</th>
+            <th>Supply/Time</th>
             <th>Action</th>
           </tr>
         </table>
@@ -115,6 +114,21 @@
           Show All Builds
         </button>
         <button id="showMapButton">Show Map</button>
+
+        <div id="map-controls">
+          <button id="openMapModalButton" class="menu-button">Select Map</button>
+        </div>
+
+        <!-- Map Selection Modal -->
+        <div id="mapSelectionModal" class="modal">
+          <div class="modal-content">
+            <span class="close-modal" id="closeMapModal">&times;</span>
+            <h3>Select a Map</h3>
+            <div class="builds-container">
+              <!-- Dynamic content for build cards -->
+            </div>
+          </div>
+        </div>
 
         <!-- Modal for showing all builds -->
         <div id="buildsModal" class="modal">
@@ -204,6 +218,5 @@
       <p>︱Version 0.1.36</p>
       <!-- Version number here -->
     </div>
-
   </body>
 </html>

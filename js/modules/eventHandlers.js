@@ -17,15 +17,18 @@ import { updateYouTubeEmbed } from "./youtube.js";
 
 import { showAllBuilds, closeModal, showSubcategories } from "./modal.js";
 
-import { MapAnnotations, initializeMapControls } from "./interactive_map.js";
+import {
+  MapAnnotations,
+  initializeMapControls,
+  initializeMapSelection,
+} from "./interactive_map.js";
 
 import { initializeSectionToggles } from "./uiHandlers.js";
+
 document.addEventListener("DOMContentLoaded", initializeAutoCorrect);
+
 // Initialize event listeners
 export function initializeEventListeners() {
-  // Initialize autocomplete
-  //document.addEventListener("DOMContentLoaded", initializeAutoCorrect);
-
   document
     .getElementById("buildCategoryDropdown")
     .addEventListener("change", function () {
@@ -211,6 +214,7 @@ document.addEventListener("DOMContentLoaded", () => {
     "map-annotations"
   );
   initializeMapControls(mapAnnotations); // Pass mapAnnotations for map controls
+  initializeMapSelection(mapAnnotations);
 
   document
     .getElementById("showBuildsButton")

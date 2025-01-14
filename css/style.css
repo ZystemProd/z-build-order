@@ -406,11 +406,25 @@ textarea::-webkit-scrollbar-thumb:hover {
   margin: 10% auto; /* 10% from the top and centered */
   padding: 20px;
   border: 1px solid #888;
-  width: 50%; /* Width of the modal */
-  height: 50%;
+  max-width: 70%; /* Width of the modal */
+  height: 70%;
   border-radius: 8px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
   overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.modal-content::-webkit-scrollbar {
+  width: 6px; /* Narrow scrollbar */
+}
+
+.modal-content::-webkit-scrollbar-thumb {
+  background: #444; /* Dark scrollbar thumb */
+  border-radius: 3px;
+}
+
+.modal-content::-webkit-scrollbar-thumb:hover {
+  background: #666; /* Lighter thumb on hover */
 }
 
 /* Close button */
@@ -429,9 +443,10 @@ textarea::-webkit-scrollbar-thumb:hover {
 }
 
 /* Build cards */
+/*
 .build-card {
-  position: relative; /* Ensures it stays in its own stacking context */
-  z-index: 1; /* Lower than subcategory-container */
+  position: relative; 
+  z-index: 1; 
   background-color: #292929;
   border: 1px solid #444;
   border-radius: 8px;
@@ -440,6 +455,44 @@ textarea::-webkit-scrollbar-thumb:hover {
   text-align: center;
   transition: transform 0.2s, background-color 0.2s;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+*/
+.build-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 220px; /* Slightly larger than the image to allow spacing */
+  height: 260px; /* Adjust to fit the image and title */
+  xborder: 1px solid #ccc;
+  border-radius: 10px;
+  margin: 10px;
+  padding: 10px;
+  background-color: #1e1e1e;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease-in-out;
+}
+
+.build-card::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  border-radius: 5px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+  transition: opacity 0.3s ease-in-out;
+}
+
+.build-card:hover {
+  transform: scale(1.1, 1.1);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.6);
+}
+
+.build-card:hover::after {
+  opacity: 1;
 }
 
 .build-card .delete-icon {
@@ -458,9 +511,20 @@ textarea::-webkit-scrollbar-thumb:hover {
 }
 
 /* Build card title */
+/*
 .build-card-title {
   font-size: 1.2rem;
   font-weight: bold;
+}
+*/
+.build-card-title {
+  font-size: 1rem;
+  color: white;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-bottom: 20px;
 }
 
 /* Flex container for build cards */
@@ -706,7 +770,7 @@ textarea::-webkit-scrollbar-thumb:hover {
   top: 50px; /* Initial position */
   left: 50px; /* Initial position */
   z-index: 1000; /* Ensure it's above other elements */
-  border: 2px solid #333;
+  xborder: 2px solid #333;
   border-radius: 8px;
   background-color: #333;
   box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.4);
@@ -718,9 +782,9 @@ textarea::-webkit-scrollbar-thumb:hover {
   max-height: fit-content;
   min-height: fit-content;
   min-width: 200px;
-  width: 400px;
-  resize: both;
-  padding: 0 10px 10px 10px;
+  width: 450px;
+  xresize: both;
+  xpadding: 0 10px 10px 10px;
 }
 
 .close-map-button {
@@ -789,7 +853,7 @@ textarea::-webkit-scrollbar-thumb:hover {
 
 .map-image {
   width: 100%; /* Resize map to container width */
-  height: auto; /* Maintain aspect ratio */
+  height: 350px; /* Maintain aspect ratio */
   box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.3);
 }
 
@@ -799,11 +863,18 @@ textarea::-webkit-scrollbar-thumb:hover {
   margin: 0 auto;
   width: 100%;
   max-width: 600px;
+  height: 350px;
   user-select: none;
 }
 
 .map-preview.hidden {
   display: none;
+}
+
+#map-preview-image {
+  margin: 0;
+  padding: 0;
+  border: none;
 }
 
 .annotations {
@@ -870,6 +941,13 @@ textarea::-webkit-scrollbar-thumb:hover {
   height: 15px;
   border-top: 3px solid rgb(0, 153, 255);
   border-right: 3px solid rgb(0, 153, 255);
+}
+
+.pos-image {
+  width: 30px;
+  height: 30px;
+  vertical-align: middle;
+  margin-left: 5px;
 }
 
 .preview-arrow {
@@ -956,38 +1034,62 @@ textarea::-webkit-scrollbar-thumb:hover {
 
 .autocomplete-popup {
   position: absolute;
-  background-color: #1e1e1e;
-  border: 1px solid #ccc;
-  border-radius: 15px;
+  background-color: rgba(30, 30, 30, 0.95); /* Slight transparency */
+  border: 1px solid #444; /* Darker border for a subtle look */
+  border-radius: 12px; /* Rounded edges */
   max-height: 200px;
   max-width: fit-content;
   overflow-y: auto;
   z-index: 1000;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  width: 300px; /* Or whatever width you want */
-  padding: 5px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4); /* Soft shadow */
+  width: 300px; /* Adjustable width */
+  padding: 8px; /* Add some padding */
   visibility: hidden; /* Hidden by default */
 }
 
 .autocomplete-popup .suggestion {
-  padding: 8px;
+  padding: 10px;
   cursor: pointer;
   display: flex;
   align-items: center;
+  gap: 10px; /* Space between text and image */
+  font-size: 14px; /* Adjust text size */
+  font-family: "Roboto", Arial, sans-serif; /* Ensure font consistency */
+  color: #f0f0f0; /* Lighter text for dark background */
+  transition: background-color 0.2s ease, transform 0.2s ease;
+  border-radius: 12px; /* Rounded edges */
 }
 
 .autocomplete-popup .suggestion img {
-  width: 20px;
-  height: 20px;
-  margin-right: 10px;
+  width: 24px; /* Slightly larger images */
+  height: 24px;
+  margin-right: 10px; /* Consistent spacing */
+  border-radius: 4px; /* Rounded corners for images */
 }
 
 .autocomplete-popup .suggestion:hover {
-  background-color: black;
-  border-radius: 15px;
+  background-color: rgba(60, 60, 60, 0.9); /* Hover effect */
+  xtransform: scale(1.02); /* Slightly scale up on hover */
+  border-radius: 12px;
 }
 
 .suggestion.active {
-  background-color: black; /* Highlight color */
-  cursor: pointer;
+  background-color: rgba(80, 80, 80, 1); /* Active highlight */
+  color: #ffffff; /* Ensure high contrast */
+  font-weight: bold; /* Make the active suggestion stand out */
+  transform: scale(1.04); /* Subtle scale effect */
+  border-radius: 12px; /* Rounded edges */
+}
+
+.autocomplete-popup::-webkit-scrollbar {
+  width: 6px; /* Narrow scrollbar */
+}
+
+.autocomplete-popup::-webkit-scrollbar-thumb {
+  background: #444; /* Dark scrollbar thumb */
+  border-radius: 3px;
+}
+
+.autocomplete-popup::-webkit-scrollbar-thumb:hover {
+  background: #666; /* Lighter thumb on hover */
 }

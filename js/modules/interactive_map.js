@@ -15,8 +15,11 @@ export class MapAnnotations {
 
   calculateCoordinates(event) {
     const rect = this.mapContainer.getBoundingClientRect();
-    const x = ((event.clientX - rect.left) / rect.width) * 100;
-    const y = ((event.clientY - rect.top) / rect.height) * 100;
+
+    // Calculate coordinates as percentages relative to the image dimensions
+    const x = ((event.clientX - rect.left - 6) / rect.width) * 100;
+    const y = ((event.clientY - rect.top - 2) / rect.height) * 100;
+
     return { x, y };
   }
 
@@ -75,15 +78,29 @@ export class MapAnnotations {
   }
 
   updateArrow(arrow, startX, startY, endX, endY) {
-    const deltaX = endX - startX;
-    const deltaY = endY - startY;
-    const angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
-    const length = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+    const rect = this.mapContainer.getBoundingClientRect();
 
-    arrow.style.left = `${startX}%`;
-    arrow.style.top = `${startY}%`;
-    arrow.style.width = `${length}%`;
+    // Ensure coordinates are calculated as percentages of the map container
+    const mapWidth = rect.width;
+    const mapHeight = rect.height;
+
+    const startXPixels = (startX / 100) * mapWidth;
+    const startYPixels = (startY / 100) * mapHeight;
+    const endXPixels = (endX / 100) * mapWidth;
+    const endYPixels = (endY / 100) * mapHeight;
+
+    const deltaX = endXPixels - startXPixels;
+    const deltaY = endYPixels - startYPixels;
+
+    const angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI); // Calculate angle in degrees
+    const length = Math.sqrt(deltaX * deltaX + deltaY * deltaY); // Calculate length
+
+    // Apply styles to position and transform the arrow
+    arrow.style.left = `${startXPixels}px`;
+    arrow.style.top = `${startYPixels}px`;
+    arrow.style.width = `${length}px`;
     arrow.style.transform = `rotate(${angle}deg)`;
+    arrow.style.transformOrigin = "0 0"; // Ensure arrow anchors from start point
   }
 
   initializeEventListeners() {
@@ -223,4 +240,67 @@ export function initializeInteractiveMap() {
   );
   initializeMapControls();
   return mapAnnotations;
+}
+
+export function initializeMapSelection(mapAnnotations) {
+  const modal = document.getElementById("mapSelectionModal");
+  const closeModal = document.getElementById("closeMapModal");
+  const buildsContainer = modal.querySelector(".builds-container");
+  const mapImage = document.getElementById("map-preview-image");
+
+  // List of maps with paths
+  const maps = [
+    { name: "Abyssal Reef", imagePath: "img/maps/abyssal_reef.jpg" },
+    { name: "Amygdala", imagePath: "img/maps/amygdala.jpg" },
+    { name: "El Dorado", imagePath: "img/maps/el_dorado.jpg" },
+    { name: "Frostline", imagePath: "img/maps/frostline.jpg" },
+    { name: "King's Cove", imagePath: "img/maps/king's_cove.jpg" },
+    { name: "Ley Lines", imagePath: "img/maps/ley_lines.jpg" },
+    {
+      name: "Neon Violet Square",
+      imagePath: "img/maps/neon_violet_square.jpg",
+    },
+    { name: "Ultralove", imagePath: "img/maps/ultralove.jpg" },
+    { name: "Whispers of Gold", imagePath: "img/maps/whispers_of_gold.jpg" },
+  ];
+
+  // Populate modal with map cards
+  buildsContainer.innerHTML = maps
+    .map(
+      (map) => `
+      <div class="build-card" data-map="${map.imagePath}">
+        <div class="build-card-title">${map.name}</div>
+        <img src="${map.imagePath}" alt="${map.name}" class="map-image">
+      </div>`
+    )
+    .join("");
+
+  // Open the modal
+  document
+    .getElementById("openMapModalButton")
+    .addEventListener("click", () => {
+      modal.style.display = "block";
+    });
+
+  // Close the modal
+  closeModal.addEventListener("click", () => {
+    modal.style.display = "none";
+  });
+
+  // Update map on card click
+  buildsContainer.addEventListener("click", (event) => {
+    const card = event.target.closest(".build-card");
+    if (card) {
+      const selectedMapPath = card.getAttribute("data-map");
+      mapImage.src = selectedMapPath;
+
+      // Clear existing annotations
+      mapAnnotations.circles = [];
+      mapAnnotations.arrows = [];
+      mapAnnotations.annotationsContainer.innerHTML = "";
+
+      // Close the modal
+      modal.style.display = "none";
+    }
+  });
 }
