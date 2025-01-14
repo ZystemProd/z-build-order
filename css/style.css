@@ -953,3 +953,41 @@ textarea::-webkit-scrollbar-thumb:hover {
     transform: translateY(0px);
   }
 }
+
+.autocomplete-popup {
+  position: absolute;
+  background-color: #1e1e1e;
+  border: 1px solid #ccc;
+  border-radius: 15px;
+  max-height: 200px;
+  max-width: fit-content;
+  overflow-y: auto;
+  z-index: 1000;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  width: 300px; /* Or whatever width you want */
+  padding: 5px;
+  visibility: hidden; /* Hidden by default */
+}
+
+.autocomplete-popup .suggestion {
+  padding: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.autocomplete-popup .suggestion img {
+  width: 20px;
+  height: 20px;
+  margin-right: 10px;
+}
+
+.autocomplete-popup .suggestion:hover {
+  background-color: black;
+  border-radius: 15px;
+}
+
+.suggestion.active {
+  background-color: black; /* Highlight color */
+  cursor: pointer;
+}

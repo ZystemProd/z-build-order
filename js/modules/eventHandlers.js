@@ -4,6 +4,7 @@ import {
   loadBuildsFromFile,
   removeAllBuilds,
 } from "./buildManagement.js";
+import { initializeAutoCorrect } from "./textFormatters.js";
 
 import {
   getSavedBuilds,
@@ -19,9 +20,12 @@ import { showAllBuilds, closeModal, showSubcategories } from "./modal.js";
 import { MapAnnotations, initializeMapControls } from "./interactive_map.js";
 
 import { initializeSectionToggles } from "./uiHandlers.js";
-
+document.addEventListener("DOMContentLoaded", initializeAutoCorrect);
 // Initialize event listeners
 export function initializeEventListeners() {
+  // Initialize autocomplete
+  //document.addEventListener("DOMContentLoaded", initializeAutoCorrect);
+
   document
     .getElementById("buildCategoryDropdown")
     .addEventListener("change", function () {
@@ -92,7 +96,7 @@ export function initializeEventListeners() {
   document
     .getElementById("videoInput")
     .addEventListener("input", updateYouTubeEmbed);
-
+  /*
   // Input interactions
   document
     .getElementById("buildOrderInput")
@@ -113,7 +117,7 @@ export function initializeEventListeners() {
         textarea.selectionStart = textarea.selectionEnd = start + 3; // Place cursor inside the brackets
       }
     });
-
+*/
   // Dropdown styling
   document
     .getElementById("buildCategoryDropdown")
