@@ -1,7 +1,13 @@
 import { units } from "../data/units.js";
 import { structures } from "../data/structures.js";
 import { upgrades } from "../data/upgrades.js";
-import { unitImages, structureImages, upgradeImages } from "../data/images.js";
+import { abilities } from "../data/abilities.js";
+import {
+  unitImages,
+  structureImages,
+  upgradeImages,
+  abilitiesImages,
+} from "../data/images.js";
 import { analyzeBuildOrder } from "./uiHandlers.js";
 
 // Modify the abbreviation map for specific structures and units

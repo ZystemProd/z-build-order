@@ -175,3 +175,8 @@ export const unitImages = {
   zergling: "img/unit/zergling.png",
   // Add paths for all units
 };
+
+export const abilitiesImages = {
+  "lift off": "img/abilities/liftoff.png",
+  // Add paths for all abilities
+};
