@@ -1,5 +1,6 @@
 import {
   saveCurrentBuild,
+  saveBuildsToFile,
   loadBuildsFromFile,
   removeAllBuilds,
 } from "./buildManagement.js";
@@ -9,11 +10,9 @@ import {
   saveSavedBuildsToLocalStorage,
 } from "./buildStorage.js";
 
-import {
-  updateYouTubeEmbed,
-  populateBuildDetails,
-  analyzeBuildOrder,
-} from "./uiHandlers.js";
+import { populateBuildDetails, analyzeBuildOrder } from "./uiHandlers.js";
+
+import { updateYouTubeEmbed } from "./youtube.js";
 
 import { showAllBuilds, closeModal, showSubcategories } from "./modal.js";
 
@@ -65,6 +64,13 @@ export function initializeEventListeners() {
   document.getElementById("saveBuildButton").addEventListener("click", () => {
     saveCurrentBuild();
   });
+  // Save Builds from File
+  document
+    .getElementById("exportBuildsButton")
+    .addEventListener("click", () => {
+      const savedBuilds = getSavedBuilds(); // Retrieve all saved builds
+      saveBuildsToFile(savedBuilds); // Call the function to save builds to a file
+    });
 
   // Load Builds from File
   document

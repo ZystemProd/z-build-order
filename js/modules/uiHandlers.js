@@ -1,12 +1,13 @@
 import { getSavedBuilds } from "./buildStorage.js";
 import { closeModal } from "./modal.js";
+import { updateYouTubeEmbed } from "./youtube.js";
 
 import {
   formatActionText,
   transformAbbreviations,
   formatStructureText,
 } from "./textFormatters.js";
-
+/*
 export function updateYouTubeEmbed() {
   const videoInput = document.getElementById("videoInput");
   const videoIframe = document.getElementById("videoIframe");
@@ -24,14 +25,15 @@ export function updateYouTubeEmbed() {
     videoIframe.src = "";
   }
 }
-
+*/
+/*
 function getYouTubeVideoID(url) {
   const regex =
     /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
   const match = url.match(regex);
   return match ? match[1] : null;
 }
-
+*/
 // Function to toggle the title input field
 export function toggleTitleInput(showInput) {
   const titleText = document.getElementById("buildOrderTitleText");
@@ -146,57 +148,7 @@ export function populateBuildDetails(build = {}) {
   updateYouTubeEmbed();
 }
 
-export function viewBuild(index) {
-  const savedBuilds = getSavedBuilds(); // Retrieve builds
-  const build = savedBuilds[index];
-  if (!build) return;
-
-  const titleInput = document.getElementById("buildOrderTitleInput");
-  const titleText = document.getElementById("buildOrderTitleText");
-  const categoryDropdown = document.getElementById("buildCategoryDropdown");
-
-  // Update the title input and text display
-  titleInput.value = build.title;
-  titleText.textContent = build.title;
-  titleText.classList.remove("dimmed");
-
-  // Populate the match-up dropdown
-  if (build.category) {
-    categoryDropdown.value = build.category;
-    const selectedOption =
-      categoryDropdown.options[categoryDropdown.selectedIndex];
-    const optgroup = selectedOption.parentElement;
-
-    // Update the dropdown text color to match the selected category
-    if (optgroup && optgroup.style.color) {
-      categoryDropdown.style.color = optgroup.style.color;
-    }
-  }
-
-  // Update the YouTube embed with the new video link
-  updateYouTubeEmbed();
-
-  // Populate build order input as a formatted string
-  const buildOrderInput = document.getElementById("buildOrderInput");
-  const formattedBuildOrder = build.buildOrder
-    .map(
-      (step) =>
-        `[${step.workersOrTimestamp}] ${step.action.replace(
-          /<\/?[^>]+(>|$)/g,
-          ""
-        )}`
-    )
-    .join("\n");
-  buildOrderInput.value = formattedBuildOrder;
-
-  // Populate the build order table
-  displayBuildOrder(build.buildOrder);
-
-  closeModal();
-}
-window.viewBuild = viewBuild;
-
-function displayBuildOrder(buildOrder) {
+export function displayBuildOrder(buildOrder) {
   const table = document.getElementById("buildOrderTable");
 
   // Clear existing rows (except the header)
@@ -280,4 +232,67 @@ function highlightActiveTab(category) {
   document
     .querySelector(`[onclick="filterBuilds('${category}')"]`)
     .classList.add("active-tab");
+}
+
+export function showToast(message, type = "success", duration = 3000) {
+  // Ensure the toast container exists
+  let container = document.getElementById("toast-container");
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "toast-container";
+    container.style.position = "fixed";
+    container.style.top = "20px"; // Near the top
+    container.style.left = "50%"; // Center horizontally
+    container.style.transform = "translate(-50%, 0)"; // Adjust for perfect centering
+    container.style.zIndex = "9999"; // High priority
+    container.style.pointerEvents = "none"; // Avoid blocking clicks
+    document.body.appendChild(container);
+  }
+
+  // Clear any existing notification
+  while (container.firstChild) {
+    container.removeChild(container.firstChild);
+  }
+
+  // Create a toast element
+  const toast = document.createElement("div");
+  toast.textContent = message;
+  toast.className = `toast toast-${type}`;
+  toast.style.cssText = `
+    background-color: ${type === "success" ? "#4CAF50" : "#f44336"};
+    color: white;
+    padding: 10px 20px;
+    margin: 10px 0;
+    border-radius: 5px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    opacity: 0;
+    transform: translateY(-20px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    text-align: center;
+    max-width: 300px; /* Limit width */
+    word-wrap: break-word;
+    position: relative; /* Ensure proper positioning */
+    display: inline-block;
+    position: fixed;
+  `;
+
+  // Append the toast to the container
+  container.appendChild(toast);
+
+  // Animate the toast (fade in and slide down)
+  setTimeout(() => {
+    toast.style.opacity = "1";
+    toast.style.transform = "translateY(0)";
+  }, 10);
+
+  // Remove the toast after the duration
+  setTimeout(() => {
+    toast.style.opacity = "0";
+    toast.style.transform = "translateY(-20px)";
+    setTimeout(() => {
+      if (toast.parentElement === container) {
+        container.removeChild(toast);
+      }
+    }, 300); // Ensure the fade-out animation completes
+  }, duration);
 }

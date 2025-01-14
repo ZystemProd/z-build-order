@@ -1,4 +1,66 @@
 import { getSavedBuilds } from "./buildStorage.js";
+import { displayBuildOrder } from "./uiHandlers.js";
+import { updateYouTubeEmbed } from "./youtube.js";
+
+export function viewBuild(index) {
+  const savedBuilds = getSavedBuilds(); // Retrieve builds
+  const build = savedBuilds[index];
+  if (!build) return;
+
+  const titleInput = document.getElementById("buildOrderTitleInput");
+  const titleText = document.getElementById("buildOrderTitleText");
+  const categoryDropdown = document.getElementById("buildCategoryDropdown");
+
+  // Update the title input and text display
+  titleInput.value = build.title;
+  titleText.textContent = build.title;
+  titleText.classList.remove("dimmed");
+
+  // Populate the match-up dropdown
+  if (build.category) {
+    categoryDropdown.value = build.category;
+    const selectedOption =
+      categoryDropdown.options[categoryDropdown.selectedIndex];
+    const optgroup = selectedOption.parentElement;
+
+    // Update the dropdown text color to match the selected category
+    if (optgroup && optgroup.style.color) {
+      categoryDropdown.style.color = optgroup.style.color;
+    }
+  }
+
+  // Populate comment and video link
+  const commentInput = document.getElementById("commentInput");
+  const videoInput = document.getElementById("videoInput");
+
+  commentInput.value = build.comment || ""; // Populate comment
+  videoInput.value = build.videoLink || ""; // Populate video link
+
+  // Update the YouTube embed with the new video link
+  if (build.videoLink) {
+    updateYouTubeEmbed(build.videoLink);
+  }
+
+  // Populate build order input as a formatted string
+  const buildOrderInput = document.getElementById("buildOrderInput");
+  const formattedBuildOrder = build.buildOrder
+    .map(
+      (step) =>
+        `[${step.workersOrTimestamp}] ${step.action.replace(
+          /<\/?[^>]+(>|$)/g,
+          ""
+        )}`
+    )
+    .join("\n");
+  buildOrderInput.value = formattedBuildOrder;
+
+  // Populate the build order table
+  displayBuildOrder(build.buildOrder);
+
+  closeModal();
+}
+
+window.viewBuild = viewBuild;
 
 export function showAllBuilds() {
   const modal = document.getElementById("buildsModal");

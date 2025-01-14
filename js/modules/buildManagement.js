@@ -3,7 +3,7 @@ import {
   setSavedBuilds,
   saveSavedBuildsToLocalStorage,
 } from "./buildStorage.js";
-import { filterBuilds } from "./uiHandlers.js";
+import { filterBuilds, showToast } from "./uiHandlers.js";
 
 export function saveCurrentBuild() {
   const titleInput = document.getElementById("buildOrderTitleInput");
@@ -14,12 +14,23 @@ export function saveCurrentBuild() {
   const title = titleInput.value.trim();
   const comment = commentInput.value.trim();
   const videoLink = videoInput.value.trim();
-  const buildOrder = buildOrderInput.value.trim();
+  const buildOrderText = buildOrderInput.value.trim();
 
   if (!title) {
-    alert("Please provide a title for the build.");
+    showToast("Please provide a title for the build.", "error");
     return;
   }
+
+  // Parse the build order input into an array of objects
+  const buildOrder = buildOrderText.split("\n").map((line) => {
+    const match = line.match(/\[(.*?)\]\s*(.*)/);
+    return match
+      ? {
+          workersOrTimestamp: match[1],
+          action: match[2],
+        }
+      : { workersOrTimestamp: "", action: line };
+  });
 
   const savedBuilds = getSavedBuilds();
   const existingIndex = savedBuilds.findIndex((build) => build.title === title);
@@ -47,7 +58,7 @@ export function saveCurrentBuild() {
 
   setSavedBuilds(savedBuilds);
   saveSavedBuildsToLocalStorage();
-  alert("Build saved successfully!");
+  showToast("Build saved successfully!", "success");
   filterBuilds("all");
 }
 
@@ -68,7 +79,7 @@ export function saveBuildsToFile(savedBuilds) {
 export function loadBuildsFromFile(event) {
   const file = event.target.files[0];
   if (!file) {
-    alert("No file selected.");
+    showToast("No file selected.", "error");
     return;
   }
 
@@ -89,11 +100,10 @@ export function loadBuildsFromFile(event) {
       savedBuilds.splice(0, savedBuilds.length, ...importedBuilds);
       saveSavedBuildsToLocalStorage(savedBuilds);
 
-      alert("Builds loaded successfully!");
-      console.log("load 1st");
+      showToast("Builds loaded successfully!", "success");
       filterBuilds("all");
     } catch (error) {
-      alert(`Error loading builds: ${error.message}`);
+      showToast(`Error loading builds: ${error.message}`, "error");
     }
   };
   reader.readAsText(file);
@@ -116,7 +126,7 @@ export function removeAllBuilds(savedBuilds, modalBuildsContainer) {
     modalBuildsContainer.innerHTML = "";
   }
 
-  alert("All builds have been removed.");
+  showToast("All builds have been removed.", "success");
 }
 
 export function deleteBuild(index, savedBuilds, filterBuilds) {
@@ -127,7 +137,7 @@ export function deleteBuild(index, savedBuilds, filterBuilds) {
   savedBuilds.splice(index, 1);
   localStorage.setItem("savedBuilds", JSON.stringify(savedBuilds));
   filterBuilds("all");
-  alert("Build deleted successfully!");
+  showToast("Build deleted successfully!", "success");
 }
 
 function getYouTubeVideoID(url) {
