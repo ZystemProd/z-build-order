@@ -12,7 +12,6 @@ export const upgrades = [
   "range attack",
   "baneling speed",
   "centrifugal Hooks",
-  "overlord speed",
   "burrow",
   "carapace",
   "melee attack",
@@ -21,6 +20,7 @@ export const upgrades = [
   "flyer attack",
   "adaptive talons",
   "seismic spines",
+  "overlord speed",
 
   // Protoss Upgrades
   "research warp gate",
@@ -64,4 +64,5 @@ export const upgrades = [
   "cloak",
   "advanced ballistics",
   "caduceus reactor",
+  "lift off",
 ];

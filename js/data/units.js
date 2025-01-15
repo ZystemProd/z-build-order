@@ -1,7 +1,6 @@
 export const units = {
   zerg: [
     "overlord",
-    "ventral sacks",
     "overseer",
     "zergling",
     "queen",
@@ -19,6 +18,7 @@ export const units = {
     "brood lord",
     "larva",
     "changling",
+    "drop overlord",
   ],
   protoss: [
     "probe",

@@ -32,6 +32,7 @@ const abbreviationMap = {
   "ultralisk speed": "anabolic synthesis",
   "lurker range": "seismic spines",
   "range attack": "missile attack",
+  "pneumatized carapace": "overlord speed",
   cannon: "photon cannon",
   cannons: "photon cannons",
   "phoenix range": "anion pulse-crystals",
@@ -49,8 +50,7 @@ const abbreviationMap = {
   robo: "robotics facility",
   battery: "shield battery",
   Infestation: "Infestation pit",
-  "drop overlord": "ventral sacks",
-  "overlord drop": "ventral sacks",
+  "colossus range": "extended thermal lance",
 };
 
 export function transformAbbreviations(text) {
@@ -242,7 +242,23 @@ export function formatStructureText(actionText) {
 
 // Function to format specific units with styling, handling plural forms and exceptions
 function formatUnits(actionText) {
-  // Zerg Units - Purple
+  // Prioritize multi-word units
+  const multiWordUnits = ["drop overlord"];
+
+  multiWordUnits.forEach((unit) => {
+    const regex = new RegExp(`\\b${unit}\\b`, "gi");
+    actionText = actionText.replace(regex, (match) => {
+      const imageSrc = unitImages[unit.toLowerCase().replace(/ /g, "_")] || "";
+      const imageTag = imageSrc
+        ? ` <img src="${imageSrc}" alt="${unit}" class="unit-image">`
+        : "";
+      return `<span class="bold-purple">${capitalizeFirstLetter(
+        unit
+      )}${imageTag}</span>`;
+    });
+  });
+
+  // Process single-word units, ensuring they don't conflict with multi-word units
   units.zerg.forEach((unit) => {
     const regex = new RegExp(
       `\\b${unit}(s)?\\b(?!\\s+warren|\\s+den|\\s+pit|\\s+network|\\s+speed|\\s+armor|\\s+nest)`,
@@ -297,12 +313,32 @@ function formatUnits(actionText) {
 }
 
 export function formatActionText(actionText) {
-  actionText = transformAbbreviations(actionText); // Transform abbreviations first
-  actionText = formatStructureText(actionText); // Format structures
-  actionText = formatUnits(actionText); // Format units
-  actionText = formatUpgrades(actionText); // Format upgrades
+  // Format abilities
+  abilities.forEach((ability) => {
+    const regex = new RegExp(`\\b${ability}\\b`, "gi");
+    actionText = actionText.replace(regex, (match) => {
+      const imageSrc =
+        abilitiesImages[ability.toLowerCase().replace(/ /g, "_")] || "";
+      const imageTag = imageSrc
+        ? ` <img src="${imageSrc}" alt="${ability}" class="ability-image">`
+        : "";
+      return `<span class="bold-orange">${ability}${imageTag}</span>`;
+    });
+  });
 
-  // Capitalize first letter of each sentence
+  // Transform abbreviations
+  actionText = transformAbbreviations(actionText);
+
+  // Format structures
+  actionText = formatStructureText(actionText);
+
+  // Format units
+  actionText = formatUnits(actionText);
+
+  // Format upgrades
+  actionText = formatUpgrades(actionText);
+
+  // Capitalize the first letter of each sentence
   actionText = capitalizeSentences(actionText);
 
   // Capitalize the first letter of each word for units, structures, and upgrades
@@ -415,6 +451,7 @@ export function initializeAutoCorrect() {
     ...units.zerg.map((name) => ({ category: "Units", name, type: "unit" })),
     ...units.protoss.map((name) => ({ category: "Units", name, type: "unit" })),
     ...units.terran.map((name) => ({ category: "Units", name, type: "unit" })),
+    ...units.terran.map((name) => ({ category: "Units", name, type: "unit" })),
     ...structures.map((name) => ({
       category: "Structures",
       name,
@@ -434,6 +471,15 @@ export function initializeAutoCorrect() {
     allSuggestions.forEach((suggestion, i) => {
       suggestion.classList.toggle("active", i === index);
     });
+
+    // Scroll the active suggestion into view
+    const activeSuggestion = allSuggestions[index];
+    if (activeSuggestion) {
+      activeSuggestion.scrollIntoView({
+        block: "nearest",
+        inline: "nearest",
+      });
+    }
   }
 
   function applySuggestion() {
@@ -485,9 +531,9 @@ export function initializeAutoCorrect() {
       return;
     }
 
-    const currentWord = match[1];
-    const matches = suggestions.filter((item) =>
-      item.name.toLowerCase().startsWith(currentWord.toLowerCase())
+    const currentWord = match[1].toLowerCase();
+    const matches = suggestions.filter(
+      (item) => item.name.toLowerCase().includes(currentWord) // Check if the suggestion contains the word
     );
 
     if (matches.length === 0) {

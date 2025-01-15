@@ -225,6 +225,11 @@ button:hover {
   font-weight: bold;
 }
 
+.bold-orange {
+  color: orange;
+  font-weight: bold;
+}
+
 /* Terran Units - Bright Red */
 .bold-red {
   color: #ff3b30; /* Bright red color for Terran */
@@ -365,6 +370,7 @@ textarea::-webkit-scrollbar-thumb:hover {
 }
 
 .upgrade-image,
+.ability-image,
 .unit-image,
 .structure-image {
   width: 30px; /* Adjust as necessary */
@@ -375,7 +381,8 @@ textarea::-webkit-scrollbar-thumb:hover {
   object-fit: cover;
 }
 
-.upgrade-image {
+.upgrade-image,
+.ability-image {
   box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.3);
   border: 1px solid #1e1e1e;
 }
@@ -464,7 +471,6 @@ textarea::-webkit-scrollbar-thumb:hover {
   justify-content: center;
   width: 220px; /* Slightly larger than the image to allow spacing */
   height: 260px; /* Adjust to fit the image and title */
-  xborder: 1px solid #ccc;
   border-radius: 10px;
   margin: 10px;
   padding: 10px;
@@ -770,7 +776,6 @@ textarea::-webkit-scrollbar-thumb:hover {
   top: 50px; /* Initial position */
   left: 50px; /* Initial position */
   z-index: 1000; /* Ensure it's above other elements */
-  xborder: 2px solid #333;
   border-radius: 8px;
   background-color: #333;
   box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.4);
@@ -783,8 +788,6 @@ textarea::-webkit-scrollbar-thumb:hover {
   min-height: fit-content;
   min-width: 200px;
   width: 450px;
-  xresize: both;
-  xpadding: 0 10px 10px 10px;
 }
 
 .close-map-button {
@@ -995,7 +998,7 @@ textarea::-webkit-scrollbar-thumb:hover {
 
 .toast {
   font-family: Arial, sans-serif;
-  font-size: 20px;
+  font-size: 15px;
   line-height: 1.5;
   position: fixed;
   margin-bottom: 10px;
@@ -1069,7 +1072,6 @@ textarea::-webkit-scrollbar-thumb:hover {
 
 .autocomplete-popup .suggestion:hover {
   background-color: rgba(60, 60, 60, 0.9); /* Hover effect */
-  xtransform: scale(1.02); /* Slightly scale up on hover */
   border-radius: 12px;
 }
 

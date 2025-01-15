@@ -4,7 +4,6 @@ export const upgradeImages = {
   "adrenal glands": "img/upgrade/adrenal_glands.png",
   "glial reconstitution": "img/upgrade/glial_reconstitution.png",
   "tunneling claws": "img/upgrade/tunneling_claws.png",
-  "overlord speed": "img/upgrade/overlord_speed.png",
   "muscular augments": "img/upgrade/muscular_augments.png",
   "chitinous plating": "img/upgrade/chitinous_plating.png",
   "grooved spines": "img/upgrade/grooved_spines.png",
@@ -20,6 +19,7 @@ export const upgradeImages = {
   "adaptive talons": "img/upgrade/adaptive_talons.png",
   "seismic spines": "img/upgrade/seismic_spines.png",
   "neural parasite": "img/upgrade/neural_parasite.png",
+  "overlord speed": "img/upgrade/overlord_speed.png",
   // protoss
   "air armor": "img/upgrade/air_armor.png",
   "air weapons": "img/upgrade/air_weapons.png",
@@ -37,7 +37,7 @@ export const upgradeImages = {
   "shadow stride": "img/upgrade/shadow_stride.png",
   "resonating glaives": "img/upgrade/resonating_glaives.png",
   shields: "img/upgrade/shields.png",
-  "tectonic destabilizers": "img/upgrade/tectonic_desabilizers.png",
+  "tectonic destabilizers": "img/upgrade/tectonic_destabilizers.png",
   // terran
   "weapon refit": "img/upgrade/weapon_refit.png",
   "vehicle and ship plating": "img/upgrade/vehicle_and_ship_plating.png",
@@ -59,6 +59,7 @@ export const upgradeImages = {
   cloak: "img/upgrade/cloak.png",
   "advanced ballistics": "img/upgrade/advanced_ballistics.png",
   "caduceus reactor": "img/upgrade/caduceus_reactor.png",
+  "lift off": "img/abilities/lift_off.png",
 };
 
 export const structureImages = {
@@ -86,6 +87,7 @@ export const structureImages = {
   "hydralisk den": "img/structure/hydralisk_den.png",
   "infestation pit": "img/structure/infestation_pit.png",
   lair: "img/structure/lair.png",
+  "lurker den": "img/structure/lurker_den.png",
   "missile turret": "img/structure/missile_turret.png",
   nexus: "img/structure/nexus.png",
   "nydus network": "img/structure/nydus_network.png",
@@ -130,6 +132,7 @@ export const unitImages = {
   cyclone: "img/unit/cyclone.png",
   "dark templar": "img/unit/dark_templar.png",
   drone: "img/unit/drone.png",
+  "drop overlord": "img/unit/drop_overlord.png",
   disruptor: "img/unit/disruptor.png",
   ghost: "img/unit/ghost.png",
   hellion: "img/unit/hellion.png",
@@ -150,7 +153,6 @@ export const unitImages = {
   observer: "img/unit/observer.png",
   oracle: "img/unit/oracle.png",
   overlord: "img/unit/overlord.png",
-  "ventral sacks": "img/unit/overlord_drop.png",
   overseer: "img/unit/overseer.png",
   tempest: "img/unit/tempest.png",
   phoenix: "img/unit/phoenix.png",
@@ -177,6 +179,6 @@ export const unitImages = {
 };
 
 export const abilitiesImages = {
-  "lift off": "img/abilities/liftoff.png",
-  // Add paths for all abilities
+  "lift off": "img/abilities/lift_off.png",
+  // Other abilities...
 };
