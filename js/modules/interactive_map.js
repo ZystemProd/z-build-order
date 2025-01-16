@@ -287,6 +287,13 @@ export function initializeMapSelection(mapAnnotations) {
     modal.style.display = "none";
   });
 
+  // Close modal when clicking outside the modal content
+  window.addEventListener("click", (event) => {
+    if (event.target === mapSelectionModal) {
+      mapSelectionModal.style.display = "none";
+    }
+  });
+
   // Update map on card click
   buildsContainer.addEventListener("click", (event) => {
     const card = event.target.closest(".build-card");

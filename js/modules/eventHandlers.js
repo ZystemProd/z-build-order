@@ -25,10 +25,37 @@ import {
 
 import { initializeSectionToggles } from "./uiHandlers.js";
 
+import {
+  saveTemplate,
+  showTemplatesModal,
+  setupTemplateModal,
+} from "./template.js";
+
+import { searchTemplates, showSaveTemplateModal } from "./template.js";
+
+setupTemplateModal();
+
 document.addEventListener("DOMContentLoaded", initializeAutoCorrect);
 
 // Initialize event listeners
 export function initializeEventListeners() {
+  document
+    .getElementById("templateSearchBar")
+    .addEventListener("input", (event) => {
+      const query = event.target.value;
+      searchTemplates(query);
+    });
+
+  document
+    .getElementById("openTemplatesButton")
+    .addEventListener("click", showTemplatesModal);
+
+  document
+    .getElementById("saveTemplateButton")
+    .addEventListener("click", () => {
+      showSaveTemplateModal();
+    });
+
   document
     .getElementById("buildCategoryDropdown")
     .addEventListener("change", function () {
@@ -231,3 +258,44 @@ document.addEventListener("DOMContentLoaded", () => {
     .getElementById("videoInput")
     .addEventListener("input", updateYouTubeEmbed);
 });
+/*
+document.addEventListener("DOMContentLoaded", () => {
+  // Initialize Templates
+  loadTemplates();
+
+  // Open Templates Modal
+  document
+    .getElementById("openTemplatesButton")
+    .addEventListener("click", () => {
+      const modal = document.getElementById("templateModal");
+      modal.style.display = "block";
+      renderTemplates(); // Load templates into the modal
+    });
+
+  // Close Templates Modal
+  document
+    .getElementById("closeTemplateModal")
+    .addEventListener("click", () => {
+      closeTemplateModal();
+    });
+
+  // Save Template Button
+  document
+    .getElementById("saveTemplateButton")
+    .addEventListener("click", () => {
+      const name = prompt("Enter template name:");
+      if (!name) return alert("Template name is required!");
+
+      const description = prompt("Enter template description:");
+      saveTemplate(name, description);
+      alert("Template saved successfully!");
+    });
+
+  // Search Templates
+  document
+    .getElementById("templateSearchBar")
+    .addEventListener("input", (e) => {
+      handleSearch(e.target.value);
+    });
+});
+*/

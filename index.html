@@ -5,6 +5,7 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/x-icon" href="/img/favicon.ico" />
     <link rel="stylesheet" type="text/css" href="css/style.css" />
+    <link rel="stylesheet" type="text/css" href="css/template.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <script type="module" src="js/script.js"></script>
     <script type="module" src="js/modules/eventHandlers.js"></script>
@@ -119,6 +120,75 @@
           <button id="openMapModalButton" class="menu-button">Select Map</button>
         </div>
 
+        <div class="template-controls">
+          <button id="openTemplatesButton" class="btn">Open Templates</button>
+          <button id="saveTemplateButton" class="btn">Save Template</button>
+        </div>
+
+
+        <div id="templateModal" class="modal">
+          <div class="modal-content-template">
+            <div class="template-header">
+              <span class="close-modal" id="closeTemplateModal">&times;</span>
+              <h3>Templates</h3>
+              <div id="templateHeaderControls" class="header-controls">
+                <input id="templateSearchBar" type="text" placeholder="Search templates..." class="search-bar" />
+                <div id="templateFilters">
+                  <button onclick="filterTemplates('all')">All</button>
+                  <button onclick="filterTemplates('zerg')">Zerg</button>
+                  <button onclick="filterTemplates('terran')">Terran</button>
+                  <button onclick="filterTemplates('protoss')">Protoss</button>
+                </div>
+              </div>
+            </div>
+            <div class="template-content-container">
+              <div id="templatePreview">
+                <!-- Preview Content -->
+                <h4>Template Preview</h4>
+                <p>Select a template to view details here.</p>
+              </div>
+              <div class="template-list" id="templateList">
+                <!-- Dynamically added template cards -->
+              </div>
+            </div>
+          </div>
+        </div>
+        
+
+        <div id="saveTemplateModal" class="modal" style="display: none;">
+          <div class="modal-content">
+            <span id="closeSaveTemplateModal" class="close-modal">&times;</span>
+            <h3>Save Template</h3>
+            <div>
+              <label for="templateTitleInput">Template Title:</label>
+              <input type="text" id="templateTitleInput" placeholder="Enter template title" />
+            </div>
+            <div>
+              <label>Select Race:</label>
+              <div class="race-selection">
+                <label>
+                  <input type="radio" name="templateRace" value="zerg" />
+                  <img src="img/race/zerg.png" alt="Zerg" />
+                </label>
+                <label>
+                  <input type="radio" name="templateRace" value="terran" />
+                  <img src="img/race/terran.png" alt="Terran" />
+                </label>
+                <label>
+                  <input type="radio" name="templateRace" value="protoss" />
+                  <img src="img/race/protoss.png" alt="Protoss" />
+                </label>
+              </div>
+            </div>
+            <button id="saveTemplateConfirmButton">Save Template</button>
+          </div>
+        </div>
+        
+        
+
+
+      
+
         <!-- Map Selection Modal -->
         <div id="mapSelectionModal" class="modal">
           <div class="modal-content">
@@ -215,7 +285,7 @@
           class="footer-logo"
         />
       </a>
-      <p>︱Version 0.1.38</p>
+      <p>︱Version 0.1.4</p>
       <!-- Version number here -->
     </div>
   </body>

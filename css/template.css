@@ -1,0 +1,363 @@
+/* Template Header */
+.template-header {
+  position: sticky;
+  top: 0;
+  background-color: #2a2a2a;
+  z-index: 10;
+  padding: 15px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.template-controls {
+  display: flex;
+  gap: 10px;
+  margin: 10px 0;
+}
+
+.template-controls .btn {
+  padding: 8px 16px;
+  border: none;
+  background-color: #4caf50;
+  color: white;
+  cursor: pointer;
+  border-radius: 5px;
+  font-size: 14px;
+}
+
+.template-controls .btn:hover {
+  background-color: #45a049;
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 15px; /* Space between search bar and filters */
+  padding: 10px; /* Adjust padding if needed */
+}
+
+.template-list {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 15px;
+  overflow-y: auto; /* Enable vertical scrolling */
+  padding: 15px;
+  max-height: 100%; /* Ensure it respects the parent's height */
+  height: 700px; /* Allow grid container to calculate height flexibly */
+}
+
+.template-preview {
+  position: sticky;
+  top: 20px;
+  width: 300px;
+  height: 400px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background-color: #2e2e2e;
+  color: white;
+  overflow: hidden;
+  padding: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+#templateFilters {
+  display: flex;
+  gap: 10px; /* Space between buttons */
+}
+
+#templateFilters button {
+  padding: 8px 12px;
+  background-color: #444; /* Example styling */
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+#templateFilters button:hover {
+  background-color: #666; /* Example hover effect */
+}
+
+.search-bar {
+  flex: 1; /* Makes the search bar expand to take available space */
+  max-width: 300px; /* Optional: Limit the max width */
+  width: 100%;
+  padding: 10px;
+  padding-bottom: 10px;
+  padding-top: 10px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}
+
+.template-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 200px;
+  width: 200px;
+  justify-content: space-between;
+  background: #2e2e2e;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.template-card:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.template-card-header {
+  width: 100%;
+  height: 150px;
+  background-size: cover;
+  background-position: center;
+}
+
+.template-card-title {
+  padding: 10px;
+  color: #fff;
+  font-size: 16px;
+  text-align: center;
+  font-weight: bold;
+}
+
+.template-card img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 5px;
+}
+
+.template-card button {
+  margin: 5px;
+  padding: 10px;
+  border: none;
+  background-color: #5a5a5a;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.template-card button:hover {
+  background-color: #777;
+}
+
+.modal-content-template {
+  background-color: rgba(
+    30,
+    30,
+    30,
+    0.5
+  ); /* Semi-transparent modal background */
+  backdrop-filter: blur(10px); /* Apply blur effect */
+  color: white; /* Text color */
+  margin: 10% auto; /* 10% from the top and centered */
+  border: 1px solid #888;
+  max-width: 70%; /* Width of the modal */
+  height: 70%;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+  overflow-y: hidden;
+  overflow-x: hidden;
+}
+
+.template-list::-webkit-scrollbar {
+  width: 6px; /* Narrow scrollbar */
+}
+
+.template-list::-webkit-scrollbar-thumb {
+  background: #444; /* Dark scrollbar thumb */
+  border-radius: 3px;
+}
+
+.template-list::-webkit-scrollbar-thumb:hover {
+  background: #666; /* Lighter thumb on hover */
+}
+
+.template-content-container {
+  display: flex;
+  height: calc(100vh - 100px); /* Full height minus header and padding */
+  overflow: hidden; /* Prevent scrolling for the entire modal */
+}
+
+.close-modal {
+  position: absolute;
+  top: 10px;
+  right: 20px;
+  color: #fff;
+  font-size: 24px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: color 0.3s ease;
+}
+
+.close-modal:hover {
+  color: #ff5555;
+}
+
+#templatePreview {
+  flex: 1;
+  min-width: 300px;
+  max-width: 400px;
+  padding: 20px;
+  border-right: 6px solid #2a2a2a;
+  overflow-y: auto;
+}
+
+#templatePreview h4 {
+  margin: 0;
+  font-size: 18px;
+  text-align: center;
+  color: #ffcc00;
+}
+
+#templatePreview p {
+  margin-top: 10px;
+  font-size: 14px;
+  color: #ddd;
+}
+
+#templateModal .modal-content {
+  display: flex;
+  flex-direction: column;
+  max-width: 90%;
+  max-height: 90%;
+  width: 800px;
+  height: 600px;
+  margin: auto;
+  background-color: #1e1e1e;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.race-selection {
+  display: flex;
+  justify-content: center;
+  margin: 10px 0;
+}
+
+.race-selection label {
+  display: inline-block;
+  text-align: center;
+  cursor: pointer;
+  justify-content: center;
+}
+
+.race-selection img {
+  width: 100px;
+  height: 100px;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  transition: border 0.3s;
+}
+
+.race-selection input[type="radio"] {
+  display: none;
+}
+
+.race-selection input[type="radio"]:checked + img {
+  border: 2px solid #ffcc00; /* Highlight selected race */
+}
+
+#saveTemplateModal .modal-content {
+  width: 400px; /* Adjust width */
+  height: 400px;
+  margin: auto;
+  padding: 20px;
+  background-color: rgba(30, 30, 30, 0.5);
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+  position: relative;
+  text-align: center; /* Center content */
+}
+
+#saveTemplateModal h3 {
+  margin-top: 0;
+  font-size: 20px; /* Adjust title size */
+}
+
+#saveTemplateModal input[type="text"] {
+  width: 90%; /* Make input smaller */
+  margin: 10px 0;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+}
+
+#saveTemplateModal .race-selection {
+  display: flex;
+  justify-content: space-around;
+  margin: 15px 0;
+}
+
+#saveTemplateModal .race-selection img {
+  width: 100px; /* Smaller race icons */
+  height: 100px;
+
+  transition: transform 0.2s ease, border 0.2s ease;
+}
+
+#saveTemplateModal .race-selection img:hover {
+  transform: scale(1.1); /* Add a hover effect */
+}
+
+#saveTemplateModal .race-selection input[type="radio"]:checked + img {
+  border: 3px solid #ffcc00; /* Highlight selected icon */
+}
+
+#saveTemplateModal button {
+  background-color: #4caf50;
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  margin-top: 10px;
+}
+
+#saveTemplateModal button:hover {
+  background-color: #45a049;
+}
+
+.template-header h3 {
+  text-align: center;
+}
+
+/* Modal layout for small screens */
+@media (max-width: 768px) {
+  #templateModal .modal-content {
+    flex-direction: column;
+    width: 90%;
+    height: auto;
+  }
+
+  #templatePreview {
+    display: none;
+  }
+
+  .template-list {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  }
+  .template-card {
+    width: 150px;
+    height: 220px;
+    padding: 5px;
+  }
+  .template-card img {
+    max-height: 100px; /* Reduce image height */
+  }
+  .template-card h4 {
+    font-size: 14px; /* Smaller title font */
+  }
+  .template-card p {
+    font-size: 12px; /* Smaller description font */
+  }
+}

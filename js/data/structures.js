@@ -5,7 +5,6 @@ export const structures = [
   "extractor",
   "greater spire",
   "hatchery",
-  "hatcheries",
   "hive",
   "hydralisk den",
   "lair",
