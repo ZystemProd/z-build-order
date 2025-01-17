@@ -11,7 +11,15 @@ export function capitalizeFirstLetter(text) {
 }
 
 // Utility: Format matched terms with images and styles
-function formatMatchedTerm(term, imageSrc, cssClass) {
+function formatMatchedTerm(term, imageSrc, cssClass, category) {
+  // If the category is "pos", return only the image tag with no surrounding text
+  if (category === "pos") {
+    return imageSrc
+      ? `<img src="${imageSrc}" alt="${term}" class="pos-image">`
+      : "";
+  }
+
+  // For other categories, return the term and image
   const imageTag = imageSrc
     ? `<img src="${imageSrc}" alt="${term}" class="term-image">`
     : "";
@@ -86,6 +94,8 @@ function matchActorsWithTrie(actionText, actorTrie) {
           ? structureImages[key]
           : category === "upgrade"
           ? upgradeImages[key]
+          : category === "pos"
+          ? `img/pos/${key}.png`
           : "";
 
       const cssClass =
@@ -95,7 +105,10 @@ function matchActorsWithTrie(actionText, actorTrie) {
           ? "bold-yellow"
           : category === "upgrade"
           ? "upgrade-highlight"
+          : category === "pos"
+          ? "pos-image"
           : "";
+
       result.push(formatMatchedTerm(term, imageSrc, cssClass));
       i = end + 1;
     } else {
@@ -128,6 +141,10 @@ export function formatActionText(actionText) {
     { term: "Greater Spire", category: "structure" },
     { term: "Research Warp Gate", category: "upgrade" },
     { term: "Drop Overlord", category: "unit" },
+    ...Array.from({ length: 9 }, (_, i) => ({
+      term: `pos${i + 1}`,
+      category: "pos",
+    })),
   ];
 
   const actorTrie = buildActorTrie(actorData);
