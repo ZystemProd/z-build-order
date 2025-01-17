@@ -32,7 +32,7 @@ export const upgradeImages = {
   ground_armor: "img/upgrade/ground_armor.png",
   psionic_storm: "img/upgrade/psionic_storm.png",
   ground_weapons: "img/upgrade/ground_weapons.png",
-  research_warp_gate: "img/upgrade/research_warpgate.png",
+  research_warp_gate: "img/upgrade/research_warp_gate.png",
   shadow_stride: "img/upgrade/shadow_stride.png",
   resonating_glaives: "img/upgrade/resonating_glaives.png",
   shields: "img/upgrade/shields.png",

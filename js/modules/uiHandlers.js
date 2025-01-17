@@ -200,63 +200,31 @@ function highlightActiveTab(category) {
 }
 
 export function showToast(message, type = "success", duration = 3000) {
-  // Ensure the toast container exists
   let container = document.getElementById("toast-container");
   if (!container) {
     container = document.createElement("div");
     container.id = "toast-container";
-    container.style.position = "fixed";
-    container.style.top = "20px"; // Near the top
-    container.style.left = "50%"; // Center horizontally
-    container.style.transform = "translate(-50%, 0)"; // Adjust for perfect centering
-    container.style.zIndex = "9999"; // High priority
-    container.style.pointerEvents = "none"; // Avoid blocking clicks
     document.body.appendChild(container);
   }
 
-  // Clear any existing notification
   while (container.firstChild) {
     container.removeChild(container.firstChild);
   }
 
-  // Create a toast element
   const toast = document.createElement("div");
-  toast.innerHTML = `
-    ${
-      type === "error"
-        ? `<span style="color: white; margin-right: 10px;">⚠</span>` // Unicode for warning triangle
-        : ""
-    }
-    ${message}`;
   toast.className = `toast toast-${type}`;
-  toast.style.cssText = `
-    background-color: ${type === "success" ? "#4CAF50" : "#f44336"};
-    color: white;
-    padding: 10px 20px;
-    margin: 10px 0;
-    border-radius: 5px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-    opacity: 0;
-    transform: translateY(-20px);
-    transition: opacity 0.3s ease, transform 0.3s ease;
-    text-align: center;
-    max-width: 300px; /* Limit width */
-    word-wrap: break-word;
-    position: relative; /* Ensure proper positioning */
-    display: inline-block;
-    position: fixed;
+  toast.innerHTML = `
+    ${type === "error" || type === "warning" ? "⚠ " : ""}
+    ${message}
   `;
 
-  // Append the toast to the container
   container.appendChild(toast);
 
-  // Animate the toast (fade in and slide down)
   setTimeout(() => {
     toast.style.opacity = "1";
     toast.style.transform = "translateY(0)";
   }, 10);
 
-  // Remove the toast after the duration
   setTimeout(() => {
     toast.style.opacity = "0";
     toast.style.transform = "translateY(-20px)";
@@ -264,6 +232,6 @@ export function showToast(message, type = "success", duration = 3000) {
       if (toast.parentElement === container) {
         container.removeChild(toast);
       }
-    }, 300); // Ensure the fade-out animation completes
+    }, 300);
   }, duration);
 }

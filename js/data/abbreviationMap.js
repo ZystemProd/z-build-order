@@ -21,7 +21,6 @@ export const abbreviationMap = {
   "ultralisk speed": "anabolic synthesis",
   "lurker range": "seismic spines",
   "range attack": "missile attack",
-  "pneumatized carapace": "overlord speed",
   "phoenix range": "anion pulse-crystals",
   "building armor": "Neosteel armor",
   "blue flame": "Infernal pre-igniter",

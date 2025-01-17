@@ -1,6 +1,39 @@
-import { getSavedBuilds } from "./buildStorage.js";
-import { displayBuildOrder } from "./uiHandlers.js";
+import { displayBuildOrder, showToast } from "./uiHandlers.js";
 import { updateYouTubeEmbed } from "./youtube.js";
+import { saveBuilds, getSavedBuilds } from "./buildStorage.js";
+
+export function deleteBuild(index) {
+  const deleteModal = document.getElementById("deleteConfirmationModal");
+  const confirmButton = document.getElementById("confirmDeleteButton");
+  const cancelButton = document.getElementById("cancelDeleteButton");
+
+  // Show the confirmation modal
+  deleteModal.style.display = "flex";
+
+  // Automatically focus on the "Yes" button
+  confirmButton.focus();
+
+  // Handle confirmation
+  confirmButton.onclick = () => {
+    const savedBuilds = getSavedBuilds();
+    if (index >= 0 && index < savedBuilds.length) {
+      savedBuilds.splice(index, 1); // Remove the build
+      saveBuilds(savedBuilds); // Save updated builds to storage
+      showAllBuilds(); // Refresh build cards
+    }
+    deleteModal.style.display = "none"; // Close the modal
+  };
+
+  // Handle cancellation
+  cancelButton.onclick = () => {
+    deleteModal.style.display = "none";
+  };
+}
+
+// Ensure the function is globally accessible for inline onclick handlers
+window.deleteBuild = deleteBuild;
+
+window.deleteBuild = deleteBuild;
 
 export function viewBuild(index) {
   const savedBuilds = getSavedBuilds(); // Retrieve builds

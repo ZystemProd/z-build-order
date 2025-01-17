@@ -12,7 +12,6 @@ export function saveSavedBuildsToLocalStorage() {
   localStorage.setItem("savedBuilds", JSON.stringify(savedBuilds));
 }
 
-export function loadSavedBuildsFromLocalStorage() {
-  const storedBuilds = localStorage.getItem("savedBuilds");
-  savedBuilds = storedBuilds ? JSON.parse(storedBuilds) : [];
+export function saveBuilds(builds) {
+  localStorage.setItem("savedBuilds", JSON.stringify(builds));
 }
