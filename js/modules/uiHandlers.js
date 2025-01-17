@@ -2,12 +2,7 @@ import { getSavedBuilds } from "./buildStorage.js";
 import { closeModal } from "./modal.js";
 import { updateYouTubeEmbed } from "./youtube.js";
 
-import {
-  formatActionText,
-  transformAbbreviations,
-  formatStructureText,
-  capitalizeFirstLetter,
-} from "./textFormatters.js";
+import { formatActionText, capitalizeFirstLetter } from "./textFormatters.js";
 
 // Function to toggle the title input field
 export function toggleTitleInput(showInput) {
@@ -180,25 +175,15 @@ export function analyzeBuildOrder(inputText) {
       actionText = line;
     }
 
-    // Replace `->` and `<-` with arrows in the action text
+    // Replace `->` and `<-` with arrows
     actionText = actionText.replace(/->/g, "→").replace(/<-/g, "←");
 
-    // Replace `posX` with images
-    actionText = actionText.replace(/pos(\d+)/g, (_, number) => {
-      const imagePath = `img/pos/pos${number}.png`; // Adjust path if needed
-      return `<img src="${imagePath}" alt="Position ${number}" class="pos-image">`;
-    });
+    // Format using Trie-based formatting
+    actionText = formatActionText(actionText);
 
-    // Ensure other formatting does not overwrite `posX` replacement
-    if (!actionText.includes("pos")) {
-      actionText = transformAbbreviations(actionText);
-      actionText = formatStructureText(actionText);
-      actionText = formatActionText(actionText);
-    }
-
-    // Insert row in the table
+    // Insert row into the table
     const row = table.insertRow();
-    row.insertCell(0).innerHTML = formatWorkersOrTimestamp(workersOrTimestamp);
+    row.insertCell(0).innerHTML = workersOrTimestamp;
     row.insertCell(1).innerHTML = actionText;
   });
 }

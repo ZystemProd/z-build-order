@@ -4,7 +4,7 @@ import {
   loadBuildsFromFile,
   removeAllBuilds,
 } from "./buildManagement.js";
-import { initializeAutoCorrect } from "./textFormatters.js";
+import { initializeAutoCorrect } from "./autoCorrect.js";
 
 import {
   getSavedBuilds,

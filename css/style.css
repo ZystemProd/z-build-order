@@ -373,6 +373,7 @@ textarea::-webkit-scrollbar-thumb:hover {
   cursor: context-menu;
 }
 
+.term-image,
 .upgrade-image,
 .ability-image,
 .unit-image,

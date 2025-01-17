@@ -10,8 +10,7 @@ export const upgrades = [
   "anabolic synthesis",
   "neural parasite",
   "range attack",
-  "baneling speed",
-  "centrifugal Hooks",
+  "centrifugal hooks",
   "burrow",
   "carapace",
   "melee attack",
@@ -21,7 +20,6 @@ export const upgrades = [
   "adaptive talons",
   "seismic spines",
   "overlord speed",
-  "baneling speed",
 
   // Protoss Upgrades
   "research warp gate",
