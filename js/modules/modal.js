@@ -20,6 +20,7 @@ export function deleteBuild(index) {
       savedBuilds.splice(index, 1); // Remove the build
       saveBuilds(savedBuilds); // Save updated builds to storage
       showAllBuilds(); // Refresh build cards
+      showBuildsModal();
     }
     deleteModal.style.display = "none"; // Close the modal
   };
@@ -30,9 +31,15 @@ export function deleteBuild(index) {
   };
 }
 
-// Ensure the function is globally accessible for inline onclick handlers
-window.deleteBuild = deleteBuild;
+function deleteBuild(index) {
+  const builds = getSavedBuilds();
+  builds.splice(index, 1); // Remove the selected build
+  setSavedBuilds(builds);
+  saveSavedBuildsToLocalStorage();
+  showBuildsModal(); // Refresh the modal content
+}
 
+// Ensure the function is globally accessible for inline onclick handlers
 window.deleteBuild = deleteBuild;
 
 export function viewBuild(index) {
@@ -146,4 +153,44 @@ export function showSubcategories(category) {
   if (activeSubcategory) {
     activeSubcategory.style.display = "block";
   }
+}
+
+import {
+  getSavedBuilds,
+  setSavedBuilds,
+  saveSavedBuildsToLocalStorage,
+} from "./buildStorage.js";
+
+export function showBuildsModal() {
+  const buildsModal = document.getElementById("buildsModal");
+  const buildListContainer = document.getElementById("buildList");
+  buildListContainer.innerHTML = ""; // Clear the list before populating
+
+  const builds = getSavedBuilds();
+
+  builds.forEach((build, index) => {
+    const buildCard = document.createElement("div");
+    buildCard.classList.add("template-card");
+
+    buildCard.innerHTML = `
+      <div class="delete-icon" onclick="deleteBuild(${index})">&times;</div>
+      <h4>${build.title || "Untitled Build"}</h4>
+      <p>${build.description || "No description provided"}</p>
+    `;
+
+    buildCard.addEventListener("click", () => loadBuild(build));
+    buildListContainer.appendChild(buildCard);
+  });
+
+  buildsModal.style.display = "block";
+}
+
+export function hideBuildsModal() {
+  const buildsModal = document.getElementById("buildsModal");
+  buildsModal.style.display = "none";
+}
+
+function loadBuild(build) {
+  // Logic to load the selected build into the application
+  console.log("Loading build:", build);
 }

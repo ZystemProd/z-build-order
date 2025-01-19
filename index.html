@@ -11,11 +11,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <script type="module" src="js/script.js"></script>
     <script type="module" src="js/modules/eventHandlers.js"></script>
-    
   </head>
   <body>
     <div id="toast-container"></div>
-
     <div id="floating-map" class="floating-container">
       <div id="map-title-bar" class="title-bar">
         <span>Map</span>
@@ -113,7 +111,7 @@
           <button id="loadBuildsButton">Load Builds</button>
         </div>
 
-        <button id="showBuildsButton">
+        <button id="showBuildsButton" onclick="openModal()">
           Show All Builds
         </button>
         <button id="showMapButton">Show Map</button>
@@ -186,11 +184,6 @@
           </div>
         </div>
         
-        
-
-
-      
-
         <!-- Map Selection Modal -->
         <div id="mapSelectionModal" class="modal">
           <div class="modal-content">
@@ -205,47 +198,33 @@
         <!-- Modal for showing all builds -->
         <div id="buildsModal" class="modal">
           <div class="modal-content">
-            <!-- Tab System -->
-            <div id="buildCategoryTabs" class="category-tabs">
-              <button class="all-builds" onclick="filterBuilds('all')">
-                All Builds
-              </button>
-              <div class="category" onmouseover="showSubcategories('zerg')">
-                Zerg Builds
-                <div class="subcategory-container zerg">
-                  <button onclick="filterBuilds('zvp')">ZvP</button>
-                  <button onclick="filterBuilds('zvt')">ZvT</button>
-                  <button onclick="filterBuilds('zvz')">ZvZ</button>
-                </div>
-              </div>
-              <div class="category" onmouseover="showSubcategories('protoss')">
-                Protoss Builds
-                <div class="subcategory-container protoss">
-                  <button onclick="filterBuilds('pvp')">PvP</button>
-                  <button onclick="filterBuilds('pvz')">PvZ</button>
-                  <button onclick="filterBuilds('pvt')">PvT</button>
-                </div>
-              </div>
-              <div class="category" onmouseover="showSubcategories('terran')">
-                Terran Builds
-                <div class="subcategory-container terran">
-                  <button onclick="filterBuilds('tvp')">TvP</button>
-                  <button onclick="filterBuilds('tvt')">TvT</button>
-                  <button onclick="filterBuilds('tvz')">TvZ</button>
-                </div>
+            <div class="template-header">  
+              <span class="close-modal" id="closeBuildsModal">&times;</span>
+              <h3>Build Orders</h3>
+                      
+              <!-- Search Bar -->
+              <input id="buildSearchBar" type="text" placeholder="Search builds..." class="search-bar" />
+        
+              <!-- Category Filters -->
+              <div id="buildFilters">
+                <button onclick="filterBuilds('all')">All</button>
+                <button onclick="filterBuilds('zerg')">Zerg</button>
+                <button onclick="filterBuilds('terran')">Terran</button>
+                <button onclick="filterBuilds('protoss')">Protoss</button>
               </div>
             </div>
-
-            <span id="closeModalButton" class="close-modal" onclick="closeModal()">&times;</span>
-            <h3>All Builds</h3>
-            <div id="modalBuildsContainer" class="builds-container">
-              <!-- Builds will be dynamically populated here -->
+            <div class="template-content-container">
+              <div id="buildPreview">
+                <!-- Preview content -->
+                <h4>Build Preview</h4>
+                <p>Select a build to view details here.</p>
+              </div>
+              <div class="template-list" id="buildList">
+                <!-- Build cards will be dynamically added here -->
+              </div>
             </div>
-            <button class="close-modal" id="closeBuildsModal">&times;</button>
-            <button id="removeAllBuildsButton" class="remove-all-builds-button">Delete All</button>
           </div>
         </div>
-        
         <!-- Modal for delete notification -->
         <div id="deleteConfirmationModal" class="modal">
           <div class="modal-content">
@@ -286,7 +265,6 @@
             allowfullscreen
           ></iframe>
         </div>
-        
         </div>
       </div>
     </div>
@@ -300,7 +278,7 @@
           class="footer-logo"
         />
       </a>
-      <p>︱Version 0.1.43</p>
+      <p>︱Version 0.1.44</p>
       <!-- Version number here -->
     </div>
   </body>

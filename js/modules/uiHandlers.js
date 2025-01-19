@@ -135,15 +135,34 @@ export function displayBuildOrder(buildOrder) {
   });
 }
 
+export function updateBuildPreview(buildData) {
+  const previewContainer = document.getElementById("buildPreview");
+  if (!buildData) {
+    previewContainer.innerHTML = "<p>Select a build to view details here.</p>";
+    return;
+  }
+
+  previewContainer.innerHTML = `
+    <h4>${buildData.title}</h4>
+    <p>${buildData.description || "No description available."}</p>
+    <pre>${buildData.content || "No build content available."}</pre>
+  `;
+}
+/*
 function formatWorkersOrTimestamp(text) {
-  // Highlight numbers followed by "gas" or "minerals"
   return text.replace(/(\d+)\s+(gas|minerals)/gi, (match, num, resource) => {
+    console.log(`Matched resource: ${resource} with quantity: ${num}`); // Debugging
     const colorClass =
       resource.toLowerCase() === "gas" ? "green-text" : "blue-text";
     const imageSrc =
       resource.toLowerCase() === "gas"
         ? "img/resources/gas.png"
         : "img/resources/minerals.png";
+
+    if (!imageSrc) {
+      console.warn(`Image for ${resource} not found!`);
+    }
+
     const imageTag = `<img src="${imageSrc}" alt="${resource}" class="resource-image">`;
 
     return `<span class="${colorClass}">${num} ${capitalizeFirstLetter(
@@ -151,7 +170,7 @@ function formatWorkersOrTimestamp(text) {
     )}</span> ${imageTag}`;
   });
 }
-
+*/
 // Function to analyze and update the build order table automatically
 export function analyzeBuildOrder(inputText) {
   const lines = inputText.split("\n");

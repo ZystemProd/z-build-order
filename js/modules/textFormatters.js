@@ -11,15 +11,25 @@ export function capitalizeFirstLetter(text) {
 }
 
 // Utility: Format matched terms with images and styles
-function formatMatchedTerm(term, imageSrc, cssClass, category) {
-  // If the category is "pos", return only the image tag with no surrounding text
+function formatMatchedTerm(
+  term,
+  imageSrc,
+  cssClass,
+  category,
+  previousWord = null
+) {
   if (category === "pos") {
     return imageSrc
       ? `<img src="${imageSrc}" alt="${term}" class="pos-image">`
       : "";
   }
-
-  // For other categories, return the term and image
+  if (category === "resource") {
+    const numberPrefix =
+      previousWord && !isNaN(previousWord)
+        ? `<span class="${cssClass}">${previousWord}</span> `
+        : "";
+    return `${numberPrefix}<span class="${cssClass}">${term} <img src="${imageSrc}" alt="${term}" class="resource-image"></span>`;
+  }
   const imageTag = imageSrc
     ? `<img src="${imageSrc}" alt="${term}" class="term-image">`
     : "";
@@ -28,7 +38,7 @@ function formatMatchedTerm(term, imageSrc, cssClass, category) {
   )}${imageTag}</span>`;
 }
 
-// Ensure consistent key generation for image lookup
+// Generate key for consistent lookup
 function generateKey(term) {
   return term.toLowerCase().replace(/\s+/g, "_");
 }
@@ -60,7 +70,7 @@ function buildActorTrie(actorData) {
   return root;
 }
 
-// Match Actors Using the Trie
+// Match actors using the Trie
 function matchActorsWithTrie(actionText, actorTrie) {
   const words = actionText.split(/\s+/);
   const result = [];
@@ -70,6 +80,7 @@ function matchActorsWithTrie(actionText, actorTrie) {
     let currentNode = actorTrie;
     let match = null;
     let end = i;
+    let previousWord = i > 0 ? words[i - 1] : null;
 
     for (let j = i; j < words.length; j++) {
       const word = words[j].toLowerCase();
@@ -87,29 +98,44 @@ function matchActorsWithTrie(actionText, actorTrie) {
     if (match) {
       const { term, category } = match;
       const key = generateKey(term);
-      const imageSrc =
-        category === "unit"
-          ? unitImages[key]
-          : category === "structure"
-          ? structureImages[key]
-          : category === "upgrade"
-          ? upgradeImages[key]
-          : category === "pos"
-          ? `img/pos/${key}.png`
-          : "";
+      let imageSrc;
+      let cssClass;
 
-      const cssClass =
-        category === "unit"
-          ? "bold-purple"
-          : category === "structure"
-          ? "bold-yellow"
-          : category === "upgrade"
-          ? "upgrade-highlight"
-          : category === "pos"
-          ? "pos-image"
-          : "";
+      if (category === "unit") {
+        imageSrc = unitImages[key];
+        cssClass = "bold-purple";
+      } else if (category === "structure") {
+        imageSrc = structureImages[key];
+        cssClass = "bold-yellow";
+      } else if (category === "upgrade") {
+        imageSrc = upgradeImages[key];
+        cssClass = "upgrade-highlight";
+      } else if (category === "resource") {
+        imageSrc =
+          term === "minerals"
+            ? "img/resources/minerals.png"
+            : "img/resources/gas.png";
+        cssClass = term === "minerals" ? "blue-text" : "green-text";
+      } else if (category === "pos") {
+        imageSrc = `img/pos/${key}.png`;
+        cssClass = "pos-image";
+      }
 
-      result.push(formatMatchedTerm(term, imageSrc, cssClass));
+      // Include previous word for resource category
+      const formattedTerm = formatMatchedTerm(
+        term,
+        imageSrc,
+        cssClass,
+        category,
+        category === "resource" ? previousWord : null
+      );
+
+      // Replace the previous word if it's a number and the current match is a resource
+      if (category === "resource" && !isNaN(previousWord)) {
+        result.pop();
+      }
+
+      result.push(formattedTerm);
       i = end + 1;
     } else {
       result.push(words[i]);
@@ -120,7 +146,7 @@ function matchActorsWithTrie(actionText, actorTrie) {
   return result.join(" ");
 }
 
-// Preprocess abbreviations
+// Preprocess abbreviations before matching actors
 function preprocessAbbreviations(actionText) {
   Object.entries(abbreviationMap).forEach(([abbr, full]) => {
     const regex = new RegExp(`\\b${abbr}\\b`, "gi");
@@ -129,7 +155,7 @@ function preprocessAbbreviations(actionText) {
   return actionText;
 }
 
-// Main Function to Format Action Text
+// Main function to format action text
 export function formatActionText(actionText) {
   const actorData = [
     ...units.zerg.map((name) => ({ term: name, category: "unit" })),
@@ -137,10 +163,8 @@ export function formatActionText(actionText) {
     ...units.terran.map((name) => ({ term: name, category: "unit" })),
     ...structures.map((name) => ({ term: name, category: "structure" })),
     ...upgrades.map((name) => ({ term: name, category: "upgrade" })),
-    { term: "Caduceus Reactor", category: "upgrade" },
-    { term: "Greater Spire", category: "structure" },
-    { term: "Research Warp Gate", category: "upgrade" },
-    { term: "Drop Overlord", category: "unit" },
+    { term: "minerals", category: "resource" },
+    { term: "gas", category: "resource" },
     ...Array.from({ length: 9 }, (_, i) => ({
       term: `pos${i + 1}`,
       category: "pos",
@@ -152,7 +176,7 @@ export function formatActionText(actionText) {
   // Preprocess abbreviations first
   actionText = preprocessAbbreviations(actionText);
 
-  // Process action text with the actor trie after preprocessing abbreviations
+  // Match actors with the Trie
   actionText = matchActorsWithTrie(actionText, actorTrie);
 
   return actionText;

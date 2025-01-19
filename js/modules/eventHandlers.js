@@ -229,6 +229,10 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 */
 
+document
+  .getElementById("closeBuildsModal")
+  .addEventListener("click", closeBuildsModal);
+
 document.addEventListener("DOMContentLoaded", () => {
   populateBuildDetails();
 });
