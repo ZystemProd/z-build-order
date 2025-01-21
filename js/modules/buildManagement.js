@@ -5,59 +5,103 @@ import {
 } from "./buildStorage.js";
 import { showToast } from "./uiHandlers.js";
 import { filterBuilds } from "./modal.js";
+
+import { parseBuildOrder } from "./utils.js";
+
 export function saveCurrentBuild() {
   const titleInput = document.getElementById("buildOrderTitleInput");
+  const titleText = document.getElementById("buildOrderTitleText");
   const commentInput = document.getElementById("commentInput");
   const videoInput = document.getElementById("videoInput");
   const buildOrderInput = document.getElementById("buildOrderInput");
+  const categoryDropdown = document.getElementById("buildCategoryDropdown");
 
   const title = titleInput.value.trim();
   const comment = commentInput.value.trim();
   const videoLink = videoInput.value.trim();
   const buildOrderText = buildOrderInput.value.trim();
+  const selectedMatchup = categoryDropdown.value;
 
+  // Missing title handling
   if (!title) {
+    // Highlight the title input
+    titleText.classList.add("highlight");
+    console.log("Adding highlight to title input.");
     showToast("Please provide a title for the build.", "error");
+
+    // Remove the highlight on user interaction
+    const stopHighlight = () => {
+      titleText.classList.remove("highlight");
+      titleText.removeEventListener("click", stopHighlight);
+      titleText.removeEventListener("input", stopHighlight);
+    };
+
+    titleText.addEventListener("click", stopHighlight);
+    titleText.addEventListener("input", stopHighlight);
+
     return;
   }
 
-  // Parse the build order input into an array of objects
-  const buildOrder = buildOrderText.split("\n").map((line) => {
-    const match = line.match(/\[(.*?)\]\s*(.*)/);
-    return match
-      ? {
-          workersOrTimestamp: match[1],
-          action: match[2],
-        }
-      : { workersOrTimestamp: "", action: line };
-  });
+  if (!selectedMatchup) {
+    // Highlight the match-up dropdown
+    categoryDropdown.classList.add("highlight");
+    showToast("Please select a match-up.", "error");
 
-  const savedBuilds = getSavedBuilds();
-  const existingIndex = savedBuilds.findIndex((build) => build.title === title);
+    // Remove the highlight on user interaction
+    const stopHighlight = () => {
+      categoryDropdown.classList.remove("highlight");
+      categoryDropdown.removeEventListener("click", stopHighlight);
+      categoryDropdown.removeEventListener("change", stopHighlight);
+      categoryDropdown.removeEventListener("keydown", stopHighlight);
+    };
+
+    categoryDropdown.addEventListener("click", stopHighlight);
+    categoryDropdown.addEventListener("change", stopHighlight);
+    categoryDropdown.addEventListener("keydown", stopHighlight);
+
+    return;
+  }
+
+  // Parse the build order using a helper function
+  const buildOrder = parseBuildOrder(buildOrderText);
+  if (buildOrder.length === 0) {
+    showToast("Build order cannot be empty.", "error");
+    return;
+  }
+
+  // Determine category and subcategory
+  const category = selectedMatchup.startsWith("zv")
+    ? "Zerg"
+    : selectedMatchup.startsWith("pv")
+    ? "Protoss"
+    : "Terran";
+  const subcategory = selectedMatchup;
 
   const newBuild = {
     title,
     comment,
     videoLink,
     buildOrder,
-    category: document.getElementById("buildCategoryDropdown").value,
+    category, // Race
+    subcategory, // Match-up
     timestamp: Date.now(),
   };
 
+  const savedBuilds = getSavedBuilds();
+  const existingIndex = savedBuilds.findIndex((build) => build.title === title);
+
   if (existingIndex !== -1) {
-    if (
-      confirm(`A build with the title "${title}" already exists. Overwrite it?`)
-    ) {
-      savedBuilds[existingIndex] = newBuild;
-    } else {
-      return;
-    }
+    const overwrite = confirm(
+      `A build with the title "${title}" already exists. Overwrite it?`
+    );
+    if (!overwrite) return;
+
+    savedBuilds[existingIndex] = newBuild;
   } else {
     savedBuilds.push(newBuild);
   }
 
   setSavedBuilds(savedBuilds);
-  saveSavedBuildsToLocalStorage();
   showToast("Build saved successfully!", "success");
   filterBuilds("all");
 }

@@ -76,20 +76,25 @@
           </select>
           -->
 
-          <select id="buildCategoryDropdown">
-            <option value="Zerg">Zerg</option>
-            <option value="ZvZ">ZvZ</option>
-            <option value="ZvP">ZvP</option>
-            <option value="ZvT">ZvT</option>
-            <option value="Protoss">Protoss</option>
-            <option value="PvP">PvP</option>
-            <option value="PvZ">PvZ</option>
-            <option value="PvT">PvT</option>
-            <option value="Terran">Terran</option>
-            <option value="TvP">TvP</option>
-            <option value="TvT">TvT</option>
-            <option value="TvZ">TvZ</option>
+          <select id="buildCategoryDropdown" class="styled-dropdown">
+            <option value="" disabled selected>Match-Up</option>
+            <optgroup label="Zerg" style="color: #c07aeb;">
+              <option value="zvp">ZvP</option>
+              <option value="zvt">ZvT</option>
+              <option value="zvz">ZvZ</option>
+            </optgroup>
+            <optgroup label="Protoss" style="color: #5fe5ff;">
+              <option value="pvp">PvP</option>
+              <option value="pvz">PvZ</option>
+              <option value="pvt">PvT</option>
+            </optgroup>
+            <optgroup label="Terran" style="color: #ff3a30;">
+              <option value="tvp">TvP</option>
+              <option value="tvt">TvT</option>
+              <option value="tvz">TvZ</option>
+            </optgroup>
           </select>
+          
         </div>
       
         <!-- Center Column: Title -->
@@ -131,10 +136,9 @@
         <button id="showBuildsButton" onclick="showAllBuilds()">
           Show All Builds
         </button>
-        <button id="showMapButton">Show Map</button>
-
         <div id="map-controls">
           <button id="openMapModalButton" class="menu-button">Select Map</button>
+          <button id="showMapButton">Show Map</button>
         </div>
 
         <div class="template-controls">
@@ -221,35 +225,42 @@
               <div id="buildHeaderControls" class="header-controls">
                 <input id="buildSearchBar" type="text" placeholder="Search builds..." class="search-bar" />
                 <div class="filters-container">
+                  <!-- All Builds Category -->
+                  <div class="filter-category" data-category="all">
+                    All
+                  </div>
                   <!-- Zerg Category -->
-                  <div class="filter-category" onclick="filterBuilds('Zerg')" onmouseover="showSubmenu(this)" onmouseout="hideSubmenu(this)">
+                  <div class="filter-category" data-category="Zerg">
                     Zerg
                     <div class="submenu">
-                      <div class="subcategory" onclick="filterBuilds('ZvZ')">ZvZ</div>
-                      <div class="subcategory" onclick="filterBuilds('ZvP')">ZvP</div>
-                      <div class="subcategory" onclick="filterBuilds('ZvT')">ZvT</div>
+                      <div class="subcategory" data-subcategory="ZvZ">ZvZ</div>
+                      <div class="subcategory" data-subcategory="ZvP">ZvP</div>
+                      <div class="subcategory" data-subcategory="ZvT">ZvT</div>
                     </div>
                   </div>
+                  
                 
                   <!-- Protoss Category -->
-                  <div class="filter-category" onclick="filterBuilds('Protoss')" onmouseover="showSubmenu(this)" onmouseout="hideSubmenu(this)">
+                  <div class="filter-category" data-category="Protoss">
                     Protoss
                     <div class="submenu">
-                      <div class="subcategory" onclick="filterBuilds('PvP')">PvP</div>
-                      <div class="subcategory" onclick="filterBuilds('PvZ')">PvZ</div>
-                      <div class="subcategory" onclick="filterBuilds('PvT')">PvT</div>
+                      <div class="subcategory" data-subcategory="PvZ">PvZ</div>
+                      <div class="subcategory" data-subcategory="PvP">PvP</div>
+                      <div class="subcategory" data-subcategory="PvT">PvT</div>
                     </div>
                   </div>
+                  
                 
                   <!-- Terran Category -->
-                  <div class="filter-category" onclick="filterBuilds('Terran')" onmouseover="showSubmenu(this)" onmouseout="hideSubmenu(this)">
+                  <div class="filter-category" data-category="Terran">
                     Terran
                     <div class="submenu">
-                      <div class="subcategory" onclick="filterBuilds('TvT')">TvT</div>
-                      <div class="subcategory" onclick="filterBuilds('TvZ')">TvZ</div>
-                      <div class="subcategory" onclick="filterBuilds('TvP')">TvP</div>
+                      <div class="subcategory" data-subcategory="TvZ">TvZ</div>
+                      <div class="subcategory" data-subcategory="TvP">TvP</div>
+                      <div class="subcategory" data-subcategory="TvT">TvT</div>
                     </div>
                   </div>
+                  
                 </div>
                 
                 

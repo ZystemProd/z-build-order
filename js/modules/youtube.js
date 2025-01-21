@@ -22,3 +22,8 @@ function getYouTubeVideoID(url) {
   const match = url.match(regex);
   return match ? match[1] : null;
 }
+
+export function clearYouTubeEmbed() {
+  const embedContainer = document.getElementById("videoField");
+  embedContainer.innerHTML = ""; // Clears the embed
+}

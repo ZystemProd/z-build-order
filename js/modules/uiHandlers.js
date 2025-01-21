@@ -1,8 +1,10 @@
 import { getSavedBuilds } from "./buildStorage.js";
 import { closeModal, populateBuildList } from "./modal.js";
 import { updateYouTubeEmbed } from "./youtube.js";
-
-import { formatActionText, capitalizeFirstLetter } from "./textFormatters.js";
+import {
+  formatActionText,
+  formatWorkersOrTimestampText,
+} from "./textFormatters.js";
 
 // Function to toggle the title input field
 export function toggleTitleInput(showInput) {
@@ -58,7 +60,7 @@ export function populateBuildDetails(index) {
   const build = savedBuilds[index];
 
   if (!build) {
-    console.error("Build not found at index:", index);
+    console.log("Build not found at index:", index);
     return;
   }
 
@@ -115,49 +117,38 @@ export function displayBuildOrder(buildOrder) {
 
   buildOrder.forEach((step) => {
     const row = table.insertRow();
-    row.insertCell(0).innerHTML = formatWorkersOrTimestamp(
-      step.workersOrTimestamp
-    );
-    row.insertCell(1).innerHTML = step.action;
+
+    // Apply formatting logic to workersOrTimestamp
+    row.insertCell(0).innerHTML = formatActionText(step.workersOrTimestamp);
+
+    // Apply formatting logic to action
+    row.insertCell(1).innerHTML = formatActionText(step.action);
   });
 }
 
-export function updateBuildPreview(buildData) {
-  const previewContainer = document.getElementById("buildPreview");
-  if (!buildData) {
-    previewContainer.innerHTML = "<p>Select a build to view details here.</p>";
-    return;
-  }
+export function formatWorkersOrTimestamp(
+  workersOrTimestamp,
+  minerals = 0,
+  gas = 0
+) {
+  if (!workersOrTimestamp) workersOrTimestamp = "-";
 
-  previewContainer.innerHTML = `
-    <h4>${buildData.title}</h4>
-    <p>${buildData.description || "No description available."}</p>
-    <pre>${buildData.content || "No build content available."}</pre>
+  // Create formatted resources
+  const formattedResources = `
+    <span class="resources">
+      <span class="minerals">${minerals}</span>
+      <span class="gas">${gas}</span>
+    </span>
+  `;
+
+  // Combine workers/timestamp with resources
+  return `
+    <span class="workers-timestamp">
+      ${workersOrTimestamp} ${formattedResources}
+    </span>
   `;
 }
-/*
-function formatWorkersOrTimestamp(text) {
-  return text.replace(/(\d+)\s+(gas|minerals)/gi, (match, num, resource) => {
-    console.log(`Matched resource: ${resource} with quantity: ${num}`); // Debugging
-    const colorClass =
-      resource.toLowerCase() === "gas" ? "green-text" : "blue-text";
-    const imageSrc =
-      resource.toLowerCase() === "gas"
-        ? "img/resources/gas.png"
-        : "img/resources/minerals.png";
 
-    if (!imageSrc) {
-      console.warn(`Image for ${resource} not found!`);
-    }
-
-    const imageTag = `<img src="${imageSrc}" alt="${resource}" class="resource-image">`;
-
-    return `<span class="${colorClass}">${num} ${capitalizeFirstLetter(
-      resource
-    )}</span> ${imageTag}`;
-  });
-}
-*/
 // Function to analyze and update the build order table automatically
 export function analyzeBuildOrder(inputText) {
   const lines = inputText.split("\n");

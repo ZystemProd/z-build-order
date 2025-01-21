@@ -181,3 +181,20 @@ export function formatActionText(actionText) {
 
   return actionText;
 }
+
+export function formatWorkersOrTimestampText(workersOrTimestamp) {
+  const resourceData = [
+    { term: "minerals", category: "resource" },
+    { term: "gas", category: "resource" },
+  ];
+
+  const resourceTrie = buildActorTrie(resourceData);
+
+  // Preprocess abbreviations if necessary
+  workersOrTimestamp = preprocessAbbreviations(workersOrTimestamp);
+
+  // Match resources with the Trie
+  workersOrTimestamp = matchActorsWithTrie(workersOrTimestamp, resourceTrie);
+
+  return workersOrTimestamp;
+}

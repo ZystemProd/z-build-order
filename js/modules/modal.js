@@ -1,5 +1,5 @@
 import { displayBuildOrder, showToast } from "./uiHandlers.js";
-import { updateYouTubeEmbed } from "./youtube.js";
+import { updateYouTubeEmbed, clearYouTubeEmbed } from "./youtube.js";
 import {
   getSavedBuilds,
   saveBuilds,
@@ -42,61 +42,66 @@ function deleteBuild(index) {
 */
 
 export function viewBuild(index) {
-  const savedBuilds = getSavedBuilds(); // Retrieve builds
+  const savedBuilds = getSavedBuilds(); // Retrieve saved builds
   const build = savedBuilds[index];
-  if (!build) return;
+
+  if (!build) {
+    console.error(`Build with index ${index} not found.`);
+    return;
+  }
 
   const titleInput = document.getElementById("buildOrderTitleInput");
   const titleText = document.getElementById("buildOrderTitleText");
   const categoryDropdown = document.getElementById("buildCategoryDropdown");
+  const commentInput = document.getElementById("commentInput");
+  const videoInput = document.getElementById("videoInput");
+  const buildOrderInput = document.getElementById("buildOrderInput");
 
   // Update the title input and text display
   titleInput.value = build.title;
   titleText.textContent = build.title;
   titleText.classList.remove("dimmed");
 
-  // Populate the match-up dropdown
-  if (build.category) {
-    categoryDropdown.value = build.category;
+  // Populate match-up dropdown and apply the selected category's color
+  if (build.subcategory) {
+    categoryDropdown.value = build.subcategory;
     const selectedOption =
       categoryDropdown.options[categoryDropdown.selectedIndex];
-    const optgroup = selectedOption.parentElement;
+    const optgroup = selectedOption?.parentElement;
 
-    // Update the dropdown text color to match the selected category
-    if (optgroup && optgroup.style.color) {
+    if (optgroup?.style.color) {
       categoryDropdown.style.color = optgroup.style.color;
     }
   }
 
   // Populate comment and video link
-  const commentInput = document.getElementById("commentInput");
-  const videoInput = document.getElementById("videoInput");
+  commentInput.value = build.comment || "";
+  videoInput.value = build.videoLink || "";
 
-  commentInput.value = build.comment || ""; // Populate comment
-  videoInput.value = build.videoLink || ""; // Populate video link
-
-  // Update the YouTube embed with the new video link
+  // Update the YouTube embed if a video link exists
   if (build.videoLink) {
     updateYouTubeEmbed(build.videoLink);
+  } else {
+    clearYouTubeEmbed(); // Clear embed if no link exists
   }
 
-  // Populate build order input as a formatted string
-  const buildOrderInput = document.getElementById("buildOrderInput");
+  // Format build order as a string
   const formattedBuildOrder = build.buildOrder
-    .map(
-      (step) =>
-        `[${step.workersOrTimestamp}] ${step.action.replace(
-          /<\/?[^>]+(>|$)/g,
-          ""
-        )}`
-    )
+    .map((step) => `[${step.workersOrTimestamp}] ${sanitizeHTML(step.action)}`)
     .join("\n");
   buildOrderInput.value = formattedBuildOrder;
 
-  // Populate the build order table
+  // Populate build order table
   displayBuildOrder(build.buildOrder);
 
   closeModal();
+}
+
+// Helper to sanitize potentially unsafe HTML input
+function sanitizeHTML(str) {
+  const tempDiv = document.createElement("div");
+  tempDiv.textContent = str;
+  return tempDiv.innerHTML;
 }
 
 window.viewBuild = viewBuild;
@@ -255,27 +260,34 @@ export function loadBuild(index) {
   closeBuildsModal();
 }
 
-export function filterBuilds(category) {
+export function filterBuilds(categoryOrSubcategory) {
   const savedBuilds = getSavedBuilds();
 
   console.log("All saved builds:", savedBuilds);
-  console.log("Filter category:", category);
+  console.log("Filter category or subcategory:", categoryOrSubcategory);
 
+  // Filter builds based on category or subcategory
   const filteredBuilds = savedBuilds.filter((build) => {
-    if (category === "all") return true;
+    if (categoryOrSubcategory === "all") {
+      return true; // Show all builds
+    }
+
+    // Match by subcategory first
     if (
-      ["ZvP", "ZvT", "ZvZ", "PvP", "PvT", "PvZ", "TvP", "TvT", "TvZ"].includes(
-        category
+      ["zvz", "zvp", "zvt", "pvp", "pvz", "pvt", "tvt", "tvz", "tvp"].includes(
+        categoryOrSubcategory.toLowerCase()
       )
     ) {
-      return build.subcategory === category;
+      return build.subcategory === categoryOrSubcategory.toLowerCase();
     }
-    return build.category.toLowerCase() === category.toLowerCase();
+
+    // Otherwise, match by category
+    return build.category.toLowerCase() === categoryOrSubcategory.toLowerCase();
   });
 
   console.log("Filtered builds:", filteredBuilds);
 
-  populateBuildList(filteredBuilds);
+  populateBuildList(filteredBuilds); // Refresh the displayed builds
 }
 
 function searchBuilds(query) {
