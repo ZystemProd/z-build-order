@@ -15,7 +15,13 @@ import { populateBuildDetails, analyzeBuildOrder } from "./uiHandlers.js";
 
 import { updateYouTubeEmbed } from "./youtube.js";
 
-import { showAllBuilds, closeModal, showSubcategories } from "./modal.js";
+import {
+  showAllBuilds,
+  closeModal,
+  showSubcategories,
+  hideSubcategories,
+  filterBuilds,
+} from "./modal.js";
 
 import {
   MapAnnotations,
@@ -73,15 +79,52 @@ export function initializeEventListeners() {
     });
 
   window.showSubcategories = showSubcategories;
+  /*
+  document.querySelectorAll("#buildFilters").forEach((filter) => {
+    filter.addEventListener("mouseout", hideSubcategories);
+  });
+  */
 
-  document
-    .getElementById("buildCategoryTabs")
-    .addEventListener("mouseleave", () => {
-      const subcategories = document.querySelectorAll(".subcategory-container");
-      subcategories.forEach((container) => {
-        container.style.display = "none"; // Hide all subcategories
+  document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll(".filter-category").forEach((category) => {
+      category.addEventListener("mouseover", () => {
+        const submenu = category.querySelector(".submenu");
+        if (submenu) {
+          submenu.style.display = "block";
+        }
+      });
+
+      category.addEventListener("mouseout", () => {
+        const submenu = category.querySelector(".submenu");
+        if (submenu) {
+          submenu.style.display = "none";
+        }
       });
     });
+  });
+
+  document.querySelectorAll(".filter-category").forEach((element) => {
+    element.addEventListener("click", () => {
+      const category = element.getAttribute("data-category"); // Assuming you add a data-category attribute
+      filterBuilds(category);
+    });
+  });
+
+  document.querySelectorAll(".subcategory").forEach((element) => {
+    element.addEventListener("click", (event) => {
+      event.stopPropagation(); // Prevent triggering parent category click
+      const subcategory = element.textContent; // Get the subcategory name
+      filterBuilds(subcategory);
+    });
+  });
+
+  document.getElementById("buildSearchBar").addEventListener("input", (e) => {
+    searchBuilds(e.target.value);
+  });
+
+  document.getElementById("closeBuildsModal").addEventListener("click", () => {
+    closeBuildsModal();
+  });
 
   // Automatically trigger analysis when the user types in the buildOrderInput field
   document
@@ -113,41 +156,11 @@ export function initializeEventListeners() {
       loadBuildsFromFile(event);
     });
 
-  // Remove All Builds
-  document
-    .getElementById("removeAllBuildsButton")
-    .addEventListener("click", () => {
-      const savedBuilds = getSavedBuilds();
-      removeAllBuilds(savedBuilds);
-      saveSavedBuildsToLocalStorage();
-    });
-
   // Update YouTube Embed
   document
     .getElementById("videoInput")
     .addEventListener("input", updateYouTubeEmbed);
-  /*
-  // Input interactions
-  document
-    .getElementById("buildOrderInput")
-    .addEventListener("keydown", (event) => {
-      if (event.key === "Enter") {
-        event.preventDefault(); // Prevent the default behavior of adding a new line
 
-        const textarea = event.target;
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
-
-        const text = textarea.value;
-
-        // Insert a new row with brackets "[]" at the cursor position
-        const newText = text.slice(0, start) + "\n[]" + text.slice(end);
-
-        textarea.value = newText;
-        textarea.selectionStart = textarea.selectionEnd = start + 3; // Place cursor inside the brackets
-      }
-    });
-*/
   // Dropdown styling
   document
     .getElementById("buildCategoryDropdown")
@@ -163,11 +176,7 @@ export function initializeEventListeners() {
     });
 
   // Video embed updates
-  /*
-  document
-    .getElementById("videoInput")
-    .addEventListener("input", updateYouTubeEmbed);
-*/
+
   // Section toggle logic
   document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll(".toggle-title").forEach((header) => {
@@ -209,25 +218,6 @@ export function initializeModalEventListeners() {
     });
   });
 }
-/*
-// Interactive Map
-document.addEventListener("DOMContentLoaded", () => {
-  const mapAnnotations = new MapAnnotations(
-    "map-preview-image",
-    "map-annotations"
-  );
-
-  // Pass mapAnnotations to initializeMapControls
-  initializeMapControls(mapAnnotations);
-});
-*/
-
-// Initialize the toggle functionality for sections
-/*
-document.addEventListener("DOMContentLoaded", () => {
-  initializeSectionToggles();
-});
-*/
 
 document
   .getElementById("closeBuildsModal")
@@ -250,56 +240,8 @@ document.addEventListener("DOMContentLoaded", () => {
   document
     .getElementById("showBuildsButton")
     .addEventListener("click", showAllBuilds);
-  document
-    .getElementById("removeAllBuildsButton")
-    .addEventListener("click", () => {
-      const savedBuilds = getSavedBuilds();
-      removeAllBuilds(savedBuilds, modalBuildsContainer);
-      saveSavedBuildsToLocalStorage();
-    });
 
   document
     .getElementById("videoInput")
     .addEventListener("input", updateYouTubeEmbed);
 });
-/*
-document.addEventListener("DOMContentLoaded", () => {
-  // Initialize Templates
-  loadTemplates();
-
-  // Open Templates Modal
-  document
-    .getElementById("openTemplatesButton")
-    .addEventListener("click", () => {
-      const modal = document.getElementById("templateModal");
-      modal.style.display = "block";
-      renderTemplates(); // Load templates into the modal
-    });
-
-  // Close Templates Modal
-  document
-    .getElementById("closeTemplateModal")
-    .addEventListener("click", () => {
-      closeTemplateModal();
-    });
-
-  // Save Template Button
-  document
-    .getElementById("saveTemplateButton")
-    .addEventListener("click", () => {
-      const name = prompt("Enter template name:");
-      if (!name) return alert("Template name is required!");
-
-      const description = prompt("Enter template description:");
-      saveTemplate(name, description);
-      alert("Template saved successfully!");
-    });
-
-  // Search Templates
-  document
-    .getElementById("templateSearchBar")
-    .addEventListener("input", (e) => {
-      handleSearch(e.target.value);
-    });
-});
-*/

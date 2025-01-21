@@ -3,8 +3,8 @@ import {
   setSavedBuilds,
   saveSavedBuildsToLocalStorage,
 } from "./buildStorage.js";
-import { filterBuilds, showToast } from "./uiHandlers.js";
-
+import { showToast } from "./uiHandlers.js";
+import { filterBuilds } from "./modal.js";
 export function saveCurrentBuild() {
   const titleInput = document.getElementById("buildOrderTitleInput");
   const commentInput = document.getElementById("commentInput");
@@ -129,16 +129,32 @@ export function removeAllBuilds(savedBuilds, modalBuildsContainer) {
   showToast("All builds have been removed.", "success");
 }
 
-export function deleteBuild(index, savedBuilds, filterBuilds) {
-  if (!confirm("Are you sure you want to delete this build?")) {
-    return;
-  }
+export function deleteBuild(index) {
+  const deleteModal = document.getElementById("deleteConfirmationModal");
+  const confirmButton = document.getElementById("confirmDeleteButton");
+  const cancelButton = document.getElementById("cancelDeleteButton");
 
-  savedBuilds.splice(index, 1);
-  localStorage.setItem("savedBuilds", JSON.stringify(savedBuilds));
-  filterBuilds("all");
-  showToast("Build deleted successfully!", "success");
+  // Show the confirmation modal
+  deleteModal.style.display = "flex";
+  confirmButton.focus();
+
+  confirmButton.onclick = () => {
+    const savedBuilds = getSavedBuilds();
+    if (index >= 0 && index < savedBuilds.length) {
+      savedBuilds.splice(index, 1); // Remove build
+      saveBuilds(savedBuilds); // Save changes
+      showBuildsModal(); // Refresh modal content
+    }
+    deleteModal.style.display = "none"; // Close modal
+  };
+
+  cancelButton.onclick = () => {
+    deleteModal.style.display = "none"; // Close modal
+  };
 }
+
+// Ensure the function is globally accessible for inline onclick handlers
+window.deleteBuild = deleteBuild;
 
 function getYouTubeVideoID(url) {
   const regex =

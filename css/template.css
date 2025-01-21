@@ -189,8 +189,8 @@
 
 .close-modal {
   position: absolute;
-  top: 10px;
-  right: 20px;
+  top: 5px;
+  right: 15px;
   color: #fff;
   font-size: 24px;
   font-weight: bold;
@@ -425,4 +425,54 @@
 .build-card:hover {
   transform: scale(1.05);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+#buildPreview {
+  flex: 1;
+  padding: 20px;
+  border-right: 1px solid #ddd;
+}
+
+.filters-container {
+  display: flex;
+  gap: 20px; /* Space between categories */
+}
+
+.filter-category {
+  position: relative;
+  padding: 10px 15px;
+  background-color: #2a2a2a;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  cursor: pointer;
+  text-align: center;
+  font-size: 16px;
+}
+
+.submenu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: #2a2a2a;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  z-index: 10;
+  min-width: 120px; /* Ensure it fits the text */
+  pointer-events: auto;
+}
+
+.filter-category:hover .submenu {
+  display: block;
+}
+
+.subcategory {
+  padding: 8px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.subcategory:hover {
+  background-color: #504f4f;
 }

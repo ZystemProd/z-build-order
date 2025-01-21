@@ -10,7 +10,7 @@
     <link rel="stylesheet" type="text/css" href="css/alertNotification.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <script type="module" src="js/script.js"></script>
-    <script type="module" src="js/modules/eventHandlers.js"></script>
+    <script type="module" src="js/modules/eventHandlers.js" defer></script>
   </head>
   <body>
     <div id="toast-container"></div>
@@ -55,6 +55,7 @@
       <div class="form-container">
         <!-- Left Column: Matchup Dropdown -->
         <div class="form-left">
+          <!--
           <select id="buildCategoryDropdown" class="styled-dropdown">
             <option value="" disabled selected>Match-Up</option>
             <optgroup label="Zerg" style="color: #c07aeb;">
@@ -72,6 +73,22 @@
               <option value="tvt">TvT</option>
               <option value="tvz">TvZ</option>
             </optgroup>
+          </select>
+          -->
+
+          <select id="buildCategoryDropdown">
+            <option value="Zerg">Zerg</option>
+            <option value="ZvZ">ZvZ</option>
+            <option value="ZvP">ZvP</option>
+            <option value="ZvT">ZvT</option>
+            <option value="Protoss">Protoss</option>
+            <option value="PvP">PvP</option>
+            <option value="PvZ">PvZ</option>
+            <option value="PvT">PvT</option>
+            <option value="Terran">Terran</option>
+            <option value="TvP">TvP</option>
+            <option value="TvT">TvT</option>
+            <option value="TvZ">TvZ</option>
           </select>
         </div>
       
@@ -111,7 +128,7 @@
           <button id="loadBuildsButton">Load Builds</button>
         </div>
 
-        <button id="showBuildsButton" onclick="openModal()">
+        <button id="showBuildsButton" onclick="showAllBuilds()">
           Show All Builds
         </button>
         <button id="showMapButton">Show Map</button>
@@ -197,20 +214,46 @@
 
         <!-- Modal for showing all builds -->
         <div id="buildsModal" class="modal">
-          <div class="modal-content">
-            <div class="template-header">  
+          <div class="modal-content-template">
+            <div class="template-header">
               <span class="close-modal" id="closeBuildsModal">&times;</span>
               <h3>Build Orders</h3>
-                      
-              <!-- Search Bar -->
-              <input id="buildSearchBar" type="text" placeholder="Search builds..." class="search-bar" />
-        
-              <!-- Category Filters -->
-              <div id="buildFilters">
-                <button onclick="filterBuilds('all')">All</button>
-                <button onclick="filterBuilds('zerg')">Zerg</button>
-                <button onclick="filterBuilds('terran')">Terran</button>
-                <button onclick="filterBuilds('protoss')">Protoss</button>
+              <div id="buildHeaderControls" class="header-controls">
+                <input id="buildSearchBar" type="text" placeholder="Search builds..." class="search-bar" />
+                <div class="filters-container">
+                  <!-- Zerg Category -->
+                  <div class="filter-category" onclick="filterBuilds('Zerg')" onmouseover="showSubmenu(this)" onmouseout="hideSubmenu(this)">
+                    Zerg
+                    <div class="submenu">
+                      <div class="subcategory" onclick="filterBuilds('ZvZ')">ZvZ</div>
+                      <div class="subcategory" onclick="filterBuilds('ZvP')">ZvP</div>
+                      <div class="subcategory" onclick="filterBuilds('ZvT')">ZvT</div>
+                    </div>
+                  </div>
+                
+                  <!-- Protoss Category -->
+                  <div class="filter-category" onclick="filterBuilds('Protoss')" onmouseover="showSubmenu(this)" onmouseout="hideSubmenu(this)">
+                    Protoss
+                    <div class="submenu">
+                      <div class="subcategory" onclick="filterBuilds('PvP')">PvP</div>
+                      <div class="subcategory" onclick="filterBuilds('PvZ')">PvZ</div>
+                      <div class="subcategory" onclick="filterBuilds('PvT')">PvT</div>
+                    </div>
+                  </div>
+                
+                  <!-- Terran Category -->
+                  <div class="filter-category" onclick="filterBuilds('Terran')" onmouseover="showSubmenu(this)" onmouseout="hideSubmenu(this)">
+                    Terran
+                    <div class="submenu">
+                      <div class="subcategory" onclick="filterBuilds('TvT')">TvT</div>
+                      <div class="subcategory" onclick="filterBuilds('TvZ')">TvZ</div>
+                      <div class="subcategory" onclick="filterBuilds('TvP')">TvP</div>
+                    </div>
+                  </div>
+                </div>
+                
+                
+                
               </div>
             </div>
             <div class="template-content-container">
@@ -225,6 +268,7 @@
             </div>
           </div>
         </div>
+
         <!-- Modal for delete notification -->
         <div id="deleteConfirmationModal" class="modal">
           <div class="modal-content">
@@ -278,7 +322,7 @@
           class="footer-logo"
         />
       </a>
-      <p>︱Version 0.1.44</p>
+      <p>︱Version 0.1.45</p>
       <!-- Version number here -->
     </div>
   </body>

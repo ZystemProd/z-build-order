@@ -1,5 +1,5 @@
 import { getSavedBuilds } from "./buildStorage.js";
-import { closeModal } from "./modal.js";
+import { closeModal, populateBuildList } from "./modal.js";
 import { updateYouTubeEmbed } from "./youtube.js";
 
 import { formatActionText, capitalizeFirstLetter } from "./textFormatters.js";
@@ -31,59 +31,6 @@ export function toggleTitleInput(showInput) {
 
 window.toggleTitleInput = toggleTitleInput;
 
-// Function to filter builds by category or subcategory
-export function filterBuilds(category) {
-  const buildList = document.getElementById("modalBuildsContainer");
-  const modalTitle = document.querySelector(".modal-content h3");
-
-  // Clear existing cards
-  buildList.innerHTML = "";
-
-  // Fetch saved builds
-  const savedBuilds = getSavedBuilds();
-
-  // Filter builds by category
-  const filteredBuilds =
-    category === "all"
-      ? savedBuilds
-      : savedBuilds.filter((build) => build.category === category);
-
-  // Sort by timestamp (newest first)
-  const sortedBuilds = filteredBuilds.sort((a, b) => b.timestamp - a.timestamp);
-
-  // Update the modal title
-  const categoryTitles = {
-    all: "All Builds",
-    zerg: "Zerg Builds",
-    protoss: "Protoss Builds",
-    terran: "Terran Builds",
-    zvp: "ZvP Builds",
-    zvt: "ZvT Builds",
-    zvz: "ZvZ Builds",
-    pvp: "PvP Builds",
-    pvz: "PvZ Builds",
-    pvt: "PvT Builds",
-    tvp: "TvP Builds",
-    tvt: "TvT Builds",
-    tvz: "TvZ Builds",
-  };
-  modalTitle.textContent = categoryTitles[category] || "Builds";
-
-  // Render filtered builds
-  sortedBuilds.forEach((build, index) => {
-    const buildCard = document.createElement("div");
-    buildCard.classList.add("build-card");
-
-    buildCard.innerHTML = `
-        <div class="delete-icon" onclick="deleteBuild(${index})">×</div>
-        <h4 class="build-card-title">${build.title}</h4>
-        <button onclick="viewBuild(${index})">View</button>
-      `;
-
-    buildList.appendChild(buildCard);
-  });
-}
-
 // Function to toggle visibility of a section using data-section attribute
 export function toggleSection(header) {
   const sectionId = header.getAttribute("data-section");
@@ -106,16 +53,56 @@ export function initializeSectionToggles() {
   });
 }
 
-export function populateBuildDetails(build = {}) {
+export function populateBuildDetails(index) {
+  const savedBuilds = getSavedBuilds();
+  const build = savedBuilds[index];
+
+  if (!build) {
+    console.error("Build not found at index:", index);
+    return;
+  }
+
+  // Update comment and video input fields
   const commentInput = document.getElementById("commentInput");
   const videoInput = document.getElementById("videoInput");
 
-  // Assign safe defaults
-  commentInput.value = build.comment || "";
-  videoInput.value = build.videoLink || "";
+  if (commentInput) {
+    commentInput.value = build.comment || "";
+  } else {
+    console.warn("commentInput not found!");
+  }
+
+  if (videoInput) {
+    videoInput.value = build.videoLink || "";
+  } else {
+    console.warn("videoInput not found!");
+  }
 
   // Update video embed
   updateYouTubeEmbed();
+
+  // Populate the modal details section
+  const buildDetailsContainer = document.getElementById(
+    "buildDetailsContainer"
+  );
+
+  if (!buildDetailsContainer) {
+    console.error("buildDetailsContainer not found!");
+    return;
+  }
+
+  buildDetailsContainer.innerHTML = `
+    <h3>${build.title}</h3>
+    <p>${build.comment || "No comments provided."}</p>
+    <pre>${build.buildOrder
+      .map((step) => `[${step.workersOrTimestamp}] ${step.action}`)
+      .join("\n")}</pre>
+    ${
+      build.videoLink
+        ? `<iframe src="${build.videoLink}" frameborder="0"></iframe>`
+        : ""
+    }
+  `;
 }
 
 export function displayBuildOrder(buildOrder) {

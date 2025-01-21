@@ -1,6 +1,10 @@
 import { displayBuildOrder, showToast } from "./uiHandlers.js";
 import { updateYouTubeEmbed } from "./youtube.js";
-import { saveBuilds, getSavedBuilds } from "./buildStorage.js";
+import {
+  getSavedBuilds,
+  saveBuilds,
+  deleteBuildFromStorage,
+} from "./buildStorage.js";
 
 export function deleteBuild(index) {
   const deleteModal = document.getElementById("deleteConfirmationModal");
@@ -15,12 +19,9 @@ export function deleteBuild(index) {
 
   // Handle confirmation
   confirmButton.onclick = () => {
-    const savedBuilds = getSavedBuilds();
-    if (index >= 0 && index < savedBuilds.length) {
-      savedBuilds.splice(index, 1); // Remove the build
-      saveBuilds(savedBuilds); // Save updated builds to storage
+    if (index >= 0 && index < getSavedBuilds().length) {
+      deleteBuildFromStorage(index); // Use the modular delete function
       showAllBuilds(); // Refresh build cards
-      showBuildsModal();
     }
     deleteModal.style.display = "none"; // Close the modal
   };
@@ -30,7 +31,7 @@ export function deleteBuild(index) {
     deleteModal.style.display = "none";
   };
 }
-
+/*
 function deleteBuild(index) {
   const builds = getSavedBuilds();
   builds.splice(index, 1); // Remove the selected build
@@ -38,9 +39,7 @@ function deleteBuild(index) {
   saveSavedBuildsToLocalStorage();
   showBuildsModal(); // Refresh the modal content
 }
-
-// Ensure the function is globally accessible for inline onclick handlers
-window.deleteBuild = deleteBuild;
+*/
 
 export function viewBuild(index) {
   const savedBuilds = getSavedBuilds(); // Retrieve builds
@@ -103,27 +102,8 @@ export function viewBuild(index) {
 window.viewBuild = viewBuild;
 
 export function showAllBuilds() {
-  const modal = document.getElementById("buildsModal");
-  const buildsContainer = document.getElementById("modalBuildsContainer");
-
-  buildsContainer.innerHTML = ""; // Clear existing builds
-
-  const savedBuilds = getSavedBuilds(); // Retrieve builds from storage
-
-  savedBuilds.forEach((build, index) => {
-    const buildElement = document.createElement("div");
-    buildElement.classList.add("build-card");
-
-    buildElement.innerHTML = `
-      <div class="delete-icon" onclick="deleteBuild(${index})">×</div>
-      <h4 class="build-card-title">${build.title}</h4>
-      <button onclick="viewBuild(${index})">View</button>
-    `;
-
-    buildsContainer.appendChild(buildElement);
-  });
-
-  modal.style.display = "block"; // Show the modal
+  openModal("buildsModal"); // Open the builds modal
+  populateBuildList(getSavedBuilds()); // Populate the build list using the saved builds
 }
 
 // Close the modal
@@ -135,54 +115,127 @@ export function closeModal() {
 }
 
 // Function to open the modal
-export function openModal() {
-  const modal = document.getElementById("buildsModal");
-  modal.style.display = "block";
-  filterBuilds("all"); // Default to show all builds
-}
-
-export function showSubcategories(category) {
-  const subcategories = document.querySelectorAll(".subcategory-container");
-  subcategories.forEach((container) => {
-    container.style.display = "none"; // Hide all subcategories
-  });
-
-  const activeSubcategory = document.querySelector(
-    `.subcategory-container.${category}`
-  );
-  if (activeSubcategory) {
-    activeSubcategory.style.display = "block";
+export function openModal(modalId) {
+  const modal = document.getElementById(modalId);
+  if (modal) {
+    modal.style.display = "block";
+  } else {
+    console.error(`Modal with ID "${modalId}" not found.`);
   }
 }
 
-import {
-  getSavedBuilds,
-  setSavedBuilds,
-  saveSavedBuildsToLocalStorage,
-} from "./buildStorage.js";
+// Make functions globally accessible
+window.openModal = openModal;
+window.showAllBuilds = showAllBuilds;
+
+export function showSubcategories(event) {
+  const subcategoriesMenu = event.target.querySelector(".subcategories-menu");
+  if (subcategoriesMenu) {
+    subcategoriesMenu.style.display = "block";
+  }
+}
+
+window.showSubcategories = showSubcategories;
+
+export function hideSubcategories(event) {
+  const subcategoriesMenu = event.target.querySelector(".subcategories-menu");
+  if (subcategoriesMenu) {
+    subcategoriesMenu.style.display = "none";
+  }
+}
+
+window.hideSubcategories = hideSubcategories;
 
 export function showBuildsModal() {
-  const buildsModal = document.getElementById("buildsModal");
-  const buildListContainer = document.getElementById("buildList");
-  buildListContainer.innerHTML = ""; // Clear the list before populating
+  const buildModal = document.getElementById("buildModal");
+  const buildList = document.getElementById("buildList");
+  const buildPreview = document.getElementById("buildPreview");
 
-  const builds = getSavedBuilds();
+  if (!buildModal || !buildList || !buildPreview) {
+    console.error("Build modal elements not found!");
+    return;
+  }
+
+  // Populate the build list
+  populateBuildList();
+
+  // Display the modal
+  buildModal.style.display = "block";
+
+  // Close modal logic
+  document.getElementById("closeBuildModal").onclick = () => {
+    buildModal.style.display = "none";
+  };
+
+  // Close modal on clicking outside
+  window.onclick = (event) => {
+    if (event.target === buildModal) {
+      buildModal.style.display = "none";
+    }
+  };
+}
+
+export function populateBuildList(builds = getSavedBuilds()) {
+  const buildList = document.getElementById("buildList");
+  const buildPreview = document.getElementById("buildPreview");
+
+  if (!buildList || !buildPreview) {
+    console.error("Build modal elements not found!");
+    return;
+  }
+
+  buildList.innerHTML = ""; // Clear existing builds
+
+  // Create a document fragment for performance
+  const fragment = document.createDocumentFragment();
 
   builds.forEach((build, index) => {
     const buildCard = document.createElement("div");
-    buildCard.classList.add("template-card");
+    buildCard.classList.add("build-card");
+
+    // Add category and subcategory attributes for filtering
+    buildCard.setAttribute("data-category", build.category || "undefined");
+    buildCard.setAttribute(
+      "data-subcategory",
+      build.subcategory || "undefined"
+    );
 
     buildCard.innerHTML = `
-      <div class="delete-icon" onclick="deleteBuild(${index})">&times;</div>
-      <h4>${build.title || "Untitled Build"}</h4>
-      <p>${build.description || "No description provided"}</p>
+      <h4>${build.title}</h4>
+      <p>${build.comment || "No comments provided."}</p>
     `;
 
-    buildCard.addEventListener("click", () => loadBuild(build));
-    buildListContainer.appendChild(buildCard);
+    // Hover to show preview
+    buildCard.onmouseover = () => updatePreview(build, buildPreview);
+
+    // Click to view the build
+    buildCard.onclick = () => viewBuild(index);
+
+    fragment.appendChild(buildCard);
   });
 
-  buildsModal.style.display = "block";
+  buildList.appendChild(fragment);
+}
+
+// Helper function to update the preview
+function updatePreview(build, buildPreview) {
+  buildPreview.innerHTML = `
+    <h4>${build.title}</h4>
+    <p>${build.comment || "No comments available."}</p>
+    <pre>${build.buildOrder
+      .map((step) => `[${step.workersOrTimestamp}] ${step.action}`)
+      .join("\n")}</pre>
+    ${
+      build.videoLink
+        ? `<iframe src="${build.videoLink}" frameborder="0" allowfullscreen></iframe>`
+        : ""
+    }
+  `;
+}
+
+function closeBuildsModal() {
+  const buildsModal = document.getElementById("buildsModal");
+  buildsModal.style.display = "none";
 }
 
 export function hideBuildsModal() {
@@ -190,7 +243,47 @@ export function hideBuildsModal() {
   buildsModal.style.display = "none";
 }
 
-function loadBuild(build) {
-  // Logic to load the selected build into the application
-  console.log("Loading build:", build);
+export function loadBuild(index) {
+  const build = getSavedBuilds()[index];
+  const inputField = document.getElementById("buildOrderInput");
+  inputField.value = build.data;
+
+  // Analyze the build and update output
+  analyzeBuildOrder(inputField.value);
+
+  // Close the modal
+  closeBuildsModal();
 }
+
+export function filterBuilds(category) {
+  const savedBuilds = getSavedBuilds();
+
+  console.log("All saved builds:", savedBuilds);
+  console.log("Filter category:", category);
+
+  const filteredBuilds = savedBuilds.filter((build) => {
+    if (category === "all") return true;
+    if (
+      ["ZvP", "ZvT", "ZvZ", "PvP", "PvT", "PvZ", "TvP", "TvT", "TvZ"].includes(
+        category
+      )
+    ) {
+      return build.subcategory === category;
+    }
+    return build.category.toLowerCase() === category.toLowerCase();
+  });
+
+  console.log("Filtered builds:", filteredBuilds);
+
+  populateBuildList(filteredBuilds);
+}
+
+function searchBuilds(query) {
+  const lowerCaseQuery = query.toLowerCase();
+  const filteredBuilds = getSavedBuilds().filter((build) =>
+    build.title.toLowerCase().includes(lowerCaseQuery)
+  );
+  populateBuildList(filteredBuilds);
+}
+
+export { closeBuildsModal };
