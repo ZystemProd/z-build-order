@@ -1,15 +1,16 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
     <title>Z-Build Order</title>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/x-icon" href="/img/favicon.ico" />
     <link rel="stylesheet" type="text/css" href="css/style.css" />
     <link rel="stylesheet" type="text/css" href="css/template.css" />
     <link rel="stylesheet" type="text/css" href="css/showToast.css" />
     <link rel="stylesheet" type="text/css" href="css/alertNotification.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
-    <script type="module" src="js/script.js"></script>
+    <script type="module" src="app.js" defer></script>
     <script type="module" src="js/modules/eventHandlers.js" defer></script>
   </head>
   <body>
@@ -26,6 +27,19 @@
       </div>
     </div>
   <div id="game-selector" class="menu">
+    <section id="whenSignedOut">
+      <button id="signInBtn">Sign in with Google</button>
+    </section>
+
+    <section id="whenSignedIn" hidden="true">
+      
+      <div id="userDetails"></div>
+
+      <button id="signOutBtn">Sign Out</button>
+    </section>
+
+
+
     <button id="starcraft2Button" class="menu-button">Starcraft 2</button>
     <button id="stormgateButton" class="menu-button">Stormgate</button>
   </div>
@@ -338,3 +352,5 @@
     </div>
   </body>
 </html>
+
+
