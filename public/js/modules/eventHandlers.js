@@ -1,9 +1,4 @@
-import {
-  saveCurrentBuild,
-  saveBuildsToFile,
-  loadBuildsFromFile,
-  removeAllBuilds,
-} from "./buildManagement.js";
+import { saveCurrentBuild } from "./buildManagement.js";
 import { initializeAutoCorrect } from "./autoCorrect.js";
 
 import {
@@ -16,11 +11,11 @@ import { populateBuildDetails, analyzeBuildOrder } from "./uiHandlers.js";
 import { updateYouTubeEmbed } from "./youtube.js";
 
 import {
-  showAllBuilds,
   closeModal,
   showSubcategories,
   hideSubcategories,
   filterBuilds,
+  searchBuilds,
 } from "./modal.js";
 
 import {
@@ -35,9 +30,9 @@ import {
   saveTemplate,
   showTemplatesModal,
   setupTemplateModal,
+  searchTemplates,
+  showSaveTemplateModal,
 } from "./template.js";
-
-import { searchTemplates, showSaveTemplateModal } from "./template.js";
 
 setupTemplateModal();
 
@@ -105,25 +100,77 @@ export function initializeEventListeners() {
 
   document.querySelectorAll(".filter-category").forEach((element) => {
     element.addEventListener("click", () => {
-      const category = element.getAttribute("data-category"); // Assuming you add a data-category attribute
-      filterBuilds(category);
+      const category = element.getAttribute("data-category");
+      if (category) {
+        // Clear the search bar
+        const searchBar = document.getElementById("buildSearchBar");
+        if (searchBar) searchBar.value = "";
+
+        filterBuilds(category);
+
+        // Highlight active category
+        document
+          .querySelectorAll(".filter-category")
+          .forEach((el) => el.classList.remove("active"));
+        element.classList.add("active");
+      }
     });
   });
 
   document.querySelectorAll(".subcategory").forEach((element) => {
     element.addEventListener("click", (event) => {
       event.stopPropagation(); // Prevent triggering parent category click
-      const subcategory = element.textContent; // Get the subcategory name
-      filterBuilds(subcategory);
+      const subcategory = element.getAttribute("data-subcategory");
+      if (subcategory) {
+        // Clear the search bar
+        const searchBar = document.getElementById("buildSearchBar");
+        if (searchBar) searchBar.value = "";
+
+        filterBuilds(subcategory);
+
+        // Highlight active subcategory
+        document
+          .querySelectorAll(".subcategory")
+          .forEach((el) => el.classList.remove("active"));
+        element.classList.add("active");
+      }
     });
   });
 
-  document.getElementById("buildSearchBar").addEventListener("input", (e) => {
-    searchBuilds(e.target.value);
+  document.addEventListener("DOMContentLoaded", () => {
+    const searchBar = document.getElementById("buildSearchBar");
+
+    if (searchBar) {
+      searchBar.addEventListener("input", (event) => {
+        const query = event.target.value.trim();
+        searchBuilds(query); // Call searchBuilds with the query
+      });
+    }
   });
 
   document.getElementById("closeBuildsModal").addEventListener("click", () => {
     closeBuildsModal();
+  });
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const textarea = document.getElementById("buildOrderInput"); // Ensure this matches your textarea's ID
+    if (textarea) {
+      textarea.addEventListener("click", function () {
+        console.log("Textarea clicked! Current value:", textarea.value); // Logs the current value on click
+        if (textarea.value.trim() === "") {
+          console.log("Textarea is empty, adding brackets []"); // Logs when brackets are being added
+          // If the textarea is empty, set its value to "[]"
+          textarea.value = "[]";
+          // Position the caret inside the brackets
+          textarea.selectionStart = 1;
+          textarea.selectionEnd = 1;
+        } else {
+          console.log("Textarea is not empty. No changes made."); // Logs when the textarea is not empty
+        }
+      });
+    } else {
+      console.error("Textarea with ID 'buildOrderInput' not found!"); // Logs an error if the textarea is not found
+    }
   });
 
   // Automatically trigger analysis when the user types in the buildOrderInput field
@@ -133,28 +180,10 @@ export function initializeEventListeners() {
       analyzeBuildOrder(event.target.value);
     });
 
-  document.getElementById("loadBuildsButton").addEventListener("click", () => {
-    document.getElementById("loadBuildsInput").click();
-  });
-
   // Save Build
   document.getElementById("saveBuildButton").addEventListener("click", () => {
     saveCurrentBuild();
   });
-  // Save Builds from File
-  document
-    .getElementById("exportBuildsButton")
-    .addEventListener("click", () => {
-      const savedBuilds = getSavedBuilds(); // Retrieve all saved builds
-      saveBuildsToFile(savedBuilds); // Call the function to save builds to a file
-    });
-
-  // Load Builds from File
-  document
-    .getElementById("loadBuildsInput")
-    .addEventListener("change", (event) => {
-      loadBuildsFromFile(event);
-    });
 
   // Update YouTube Embed
   document
@@ -236,11 +265,11 @@ document.addEventListener("DOMContentLoaded", () => {
   );
   initializeMapControls(mapAnnotations); // Pass mapAnnotations for map controls
   initializeMapSelection(mapAnnotations);
-
+  /*
   document
     .getElementById("showBuildsButton")
     .addEventListener("click", showAllBuilds);
-
+*/
   document
     .getElementById("videoInput")
     .addEventListener("input", updateYouTubeEmbed);

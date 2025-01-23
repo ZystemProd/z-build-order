@@ -26,6 +26,14 @@ body {
   box-sizing: border-box;
 }
 
+#authLoading {
+  color: gray;
+  font-style: italic;
+  text-align: center;
+  margin-bottom: 10px;
+  font-size: 1rem;
+}
+
 .highlight {
   animation: highlight 1.5s ease-in-out 0s infinite alternate;
 }
@@ -136,6 +144,24 @@ button:active,
 
 button:hover {
   background-color: #555; /* Slightly lighter on hover */
+}
+
+.icon-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 20px;
+  color: #333; /* Adjust the color */
+  padding: 5px;
+  transition: color 0.3s ease;
+}
+
+.icon-button:hover {
+  color: #007bff; /* Change color on hover */
+}
+
+.icon-button:focus {
+  outline: none;
 }
 
 /* Set the first column (workers/timestamp) max width */

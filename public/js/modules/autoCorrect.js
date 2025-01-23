@@ -133,10 +133,14 @@ export function initializeAutoCorrect() {
     const textBeforeCaret = inputField.value.substring(0, cursorPosition);
     const textAfterCaret = inputField.value.substring(cursorPosition);
 
+    // Insert a new row placeholder and a newline character
     inputField.value = textBeforeCaret + "\n[]" + textAfterCaret;
 
     // Move the cursor inside the newly inserted brackets
-    inputField.selectionStart = inputField.selectionEnd = cursorPosition + 3;
+    inputField.selectionStart = inputField.selectionEnd = cursorPosition + 2;
+
+    // Scroll to ensure the cursor is visible
+    inputField.scrollTop = inputField.scrollHeight;
 
     // Call analyzeBuildOrder to update the buildOrderTable
     analyzeBuildOrder(inputField.value);

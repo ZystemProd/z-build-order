@@ -26,23 +26,23 @@
         <button class="clear-annotations-button"><i class="fa fa-eraser" style="font-size:20px;"></i></button>
       </div>
     </div>
-  <div id="game-selector" class="menu">
-    <section id="whenSignedOut">
-      <button id="signInBtn">Sign in with Google</button>
-    </section>
-
-    <section id="whenSignedIn" hidden="true">
-      
-      <div id="userDetails"></div>
-
-      <button id="signOutBtn">Sign Out</button>
-    </section>
-
-
-
+    <div id="game-selector" class="menu">
+      <p id="authLoading">Checking authentication status...</p>
+    
+      <section id="whenSignedOut">
+        <button id="signInBtn">Sign in with Google</button>
+      </section>
+    
+      <section id="whenSignedIn" hidden="true">
+        <div id="userDetails"></div>
+        <button id="signOutBtn">Sign Out</button>
+      </section>
+    </div>
+    
+  <!--
     <button id="starcraft2Button" class="menu-button">Starcraft 2</button>
     <button id="stormgateButton" class="menu-button">Stormgate</button>
-  </div>
+    -->
     <div id="content">
       <div class="upperInput">
         <!-- Build Order Input Section with Toggle -->
@@ -57,8 +57,8 @@
         >
           <textarea
             id="buildOrderInput"
-            placeholder="Paste your build order here..."
-          >[]</textarea>
+            placeholder="[12] Spawning Pool"
+          ></textarea>
         </div>
       </div>
 
@@ -142,17 +142,17 @@
 
         <div class="saveLoadContainer">
           <button id="saveBuildButton">Save Current Build</button>
-          <button id="exportBuildsButton">Save All Builds to File</button>
-          <input type="file" id="loadBuildsInput" hidden />
-          <button id="loadBuildsButton">Load Builds</button>
+
         </div>
 
-        <button id="showBuildsButton" onclick="showAllBuilds()">
+        <button id="showBuildsButton" onclick="showBuildsModal()">
           Show All Builds
         </button>
         <div id="map-controls">
           <button id="openMapModalButton" class="menu-button">Select Map</button>
-          <button id="showMapButton">Show Map</button>
+          <button id="showMapButton" class="icon-button">
+            <i class="fa-solid fa-eye"></i>
+          </button>
         </div>
 
         <div class="template-controls">
@@ -239,11 +239,9 @@
               <div id="buildHeaderControls" class="header-controls">
                 <input id="buildSearchBar" type="text" placeholder="Search builds..." class="search-bar" />
                 <div class="filters-container">
-                  <!-- All Builds Category -->
                   <div class="filter-category" data-category="all">
                     All
                   </div>
-                  <!-- Zerg Category -->
                   <div class="filter-category" data-category="Zerg">
                     Zerg
                     <div class="submenu">
@@ -252,9 +250,6 @@
                       <div class="subcategory" data-subcategory="ZvT">ZvT</div>
                     </div>
                   </div>
-                  
-                
-                  <!-- Protoss Category -->
                   <div class="filter-category" data-category="Protoss">
                     Protoss
                     <div class="submenu">
@@ -263,9 +258,6 @@
                       <div class="subcategory" data-subcategory="PvT">PvT</div>
                     </div>
                   </div>
-                  
-                
-                  <!-- Terran Category -->
                   <div class="filter-category" data-category="Terran">
                     Terran
                     <div class="submenu">
@@ -274,7 +266,6 @@
                       <div class="subcategory" data-subcategory="TvT">TvT</div>
                     </div>
                   </div>
-                  
                 </div>
                 
                 
@@ -347,7 +338,7 @@
           class="footer-logo"
         />
       </a>
-      <p>︱Version 0.2.1</p>
+      <p>︱Version 0.2.12</p>
       <!-- Version number here -->
     </div>
   </body>

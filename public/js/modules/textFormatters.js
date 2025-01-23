@@ -103,7 +103,7 @@ function matchActorsWithTrie(actionText, actorTrie) {
 
       if (category === "unit") {
         imageSrc = unitImages[key];
-        cssClass = "bold-purple";
+        cssClass = determineUnitClass(term); // Determine the CSS class based on the race
       } else if (category === "structure") {
         imageSrc = structureImages[key];
         cssClass = "bold-yellow";
@@ -144,6 +144,15 @@ function matchActorsWithTrie(actionText, actorTrie) {
   }
 
   return result.join(" ");
+}
+
+// Determine the CSS class for a unit based on its race
+function determineUnitClass(unitName) {
+  const unit = unitName.toLowerCase();
+  if (units.zerg.includes(unit)) return "bold-purple";
+  if (units.protoss.includes(unit)) return "bold-blue";
+  if (units.terran.includes(unit)) return "bold-red";
+  return ""; // Default: No class
 }
 
 // Preprocess abbreviations before matching actors

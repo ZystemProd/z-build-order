@@ -1,4 +1,12 @@
 import {
+  getFirestore,
+  collection,
+  doc,
+  setDoc,
+  getDocs,
+} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+import {
   getSavedBuilds,
   setSavedBuilds,
   saveSavedBuildsToLocalStorage,
@@ -7,6 +15,28 @@ import { showToast } from "./uiHandlers.js";
 import { filterBuilds } from "./modal.js";
 
 import { parseBuildOrder } from "./utils.js";
+import { mapAnnotations } from "./interactive_map.js"; // Ensure this export exists
+
+export async function fetchUserBuilds() {
+  const auth = getAuth();
+  const db = getFirestore();
+
+  const user = auth.currentUser;
+  if (!user) {
+    console.error("User not logged in.");
+    return [];
+  }
+
+  const buildsRef = collection(db, `users/${user.uid}/builds`);
+  const snapshot = await getDocs(buildsRef);
+
+  const builds = snapshot.docs.map((doc) => ({
+    id: doc.id, // Document ID
+    ...doc.data(), // Document data
+  }));
+
+  return builds;
+}
 
 export function saveCurrentBuild() {
   const titleInput = document.getElementById("buildOrderTitleInput");
@@ -15,21 +45,20 @@ export function saveCurrentBuild() {
   const videoInput = document.getElementById("videoInput");
   const buildOrderInput = document.getElementById("buildOrderInput");
   const categoryDropdown = document.getElementById("buildCategoryDropdown");
+  const mapImage = document.getElementById("map-preview-image");
 
   const title = titleInput.value.trim();
   const comment = commentInput.value.trim();
   const videoLink = videoInput.value.trim();
   const buildOrderText = buildOrderInput.value.trim();
   const selectedMatchup = categoryDropdown.value;
+  const selectedMapPath = mapImage.src; // Capture the map path
 
   // Missing title handling
   if (!title) {
-    // Highlight the title input
     titleText.classList.add("highlight");
-    console.log("Adding highlight to title input.");
     showToast("Please provide a title for the build.", "error");
 
-    // Remove the highlight on user interaction
     const stopHighlight = () => {
       titleText.classList.remove("highlight");
       titleText.removeEventListener("click", stopHighlight);
@@ -43,11 +72,9 @@ export function saveCurrentBuild() {
   }
 
   if (!selectedMatchup) {
-    // Highlight the match-up dropdown
     categoryDropdown.classList.add("highlight");
     showToast("Please select a match-up.", "error");
 
-    // Remove the highlight on user interaction
     const stopHighlight = () => {
       categoryDropdown.classList.remove("highlight");
       categoryDropdown.removeEventListener("click", stopHighlight);
@@ -62,14 +89,12 @@ export function saveCurrentBuild() {
     return;
   }
 
-  // Parse the build order using a helper function
   const buildOrder = parseBuildOrder(buildOrderText);
   if (buildOrder.length === 0) {
     showToast("Build order cannot be empty.", "error");
     return;
   }
 
-  // Determine category and subcategory
   const category = selectedMatchup.startsWith("zv")
     ? "Zerg"
     : selectedMatchup.startsWith("pv")
@@ -82,11 +107,22 @@ export function saveCurrentBuild() {
     comment,
     videoLink,
     buildOrder,
-    category, // Race
-    subcategory, // Match-up
+    category,
+    subcategory,
     timestamp: Date.now(),
+    map: selectedMapPath, // Save map path
+    interactiveMap: {
+      circles: mapAnnotations.circles.map(({ x, y }) => ({ x, y })),
+      arrows: mapAnnotations.arrows.map(({ startX, startY, endX, endY }) => ({
+        startX,
+        startY,
+        endX,
+        endY,
+      })),
+    },
   };
 
+  // Save locally
   const savedBuilds = getSavedBuilds();
   const existingIndex = savedBuilds.findIndex((build) => build.title === title);
 
@@ -102,57 +138,33 @@ export function saveCurrentBuild() {
   }
 
   setSavedBuilds(savedBuilds);
-  showToast("Build saved successfully!", "success");
-  filterBuilds("all");
-}
 
-// Save all builds to a JSON file
-export function saveBuildsToFile(savedBuilds) {
-  const blob = new Blob([JSON.stringify(savedBuilds, null, 2)], {
-    type: "application/json",
-  });
-  const url = URL.createObjectURL(blob);
-  const downloadLink = document.createElement("a");
-  downloadLink.href = url;
-  downloadLink.download = "build_orders.json";
-  downloadLink.click();
-  URL.revokeObjectURL(url);
-}
+  // Save to Firestore
+  const db = getFirestore();
+  const auth = getAuth();
+  const user = auth.currentUser;
 
-// Load builds from a file
-export function loadBuildsFromFile(event) {
-  const file = event.target.files[0];
-  if (!file) {
-    showToast("No file selected.", "error");
+  if (!user) {
+    showToast("You must be signed in to save builds to the database.", "error");
     return;
   }
 
-  const reader = new FileReader();
-  reader.onload = function (e) {
-    try {
-      const importedBuilds = JSON.parse(e.target.result);
+  const buildsRef = collection(db, `users/${user.uid}/builds`);
+  const buildDoc = doc(buildsRef, title); // Use title as the document ID for easy lookup
 
-      importedBuilds.forEach((build) => {
-        if (!build.title || !build.category) {
-          throw new Error(
-            "Invalid build format. Each build must include a title and category."
-          );
-        }
-      });
+  setDoc(buildDoc, newBuild)
+    .then(() => {
+      showToast("Build saved to database successfully!", "success");
+    })
+    .catch((error) => {
+      console.error("Error saving build to Firestore:", error);
+      showToast("Failed to save build to the database.", "error");
+    });
 
-      const savedBuilds = getSavedBuilds();
-      savedBuilds.splice(0, savedBuilds.length, ...importedBuilds);
-      saveSavedBuildsToLocalStorage(savedBuilds);
-
-      showToast("Builds loaded successfully!", "success");
-      filterBuilds("all");
-    } catch (error) {
-      showToast(`Error loading builds: ${error.message}`, "error");
-    }
-  };
-  reader.readAsText(file);
+  showToast("Build saved successfully!", "success");
+  filterBuilds("all");
 }
-
+/*
 // Function to remove all builds
 export function removeAllBuilds(savedBuilds, modalBuildsContainer) {
   if (
@@ -171,6 +183,41 @@ export function removeAllBuilds(savedBuilds, modalBuildsContainer) {
   }
 
   showToast("All builds have been removed.", "success");
+}
+*/
+
+export async function loadBuildAnnotations(buildId) {
+  const db = getFirestore();
+  const auth = getAuth();
+  const user = auth.currentUser;
+
+  if (!user) {
+    console.error("User not logged in.");
+    return;
+  }
+
+  const buildDoc = doc(db, `users/${user.uid}/builds`, buildId);
+  const buildSnapshot = await getDoc(buildDoc);
+
+  if (buildSnapshot.exists()) {
+    const data = buildSnapshot.data();
+    const { interactiveMap } = data;
+
+    if (interactiveMap) {
+      mapAnnotations.circles = interactiveMap.circles || [];
+      mapAnnotations.arrows = interactiveMap.arrows || [];
+
+      // Render circles and arrows on the map
+      mapAnnotations.circles.forEach(({ x, y }) =>
+        mapAnnotations.createCircle(x, y)
+      );
+      mapAnnotations.arrows.forEach(({ startX, startY, endX, endY }) =>
+        mapAnnotations.createArrow(startX, startY, endX, endY)
+      );
+    }
+  } else {
+    console.error("Build not found!");
+  }
 }
 
 export function deleteBuild(index) {

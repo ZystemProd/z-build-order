@@ -1,3 +1,10 @@
+import {
+  getDoc,
+  doc,
+  getFirestore,
+  deleteDoc,
+} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
 import { displayBuildOrder, showToast } from "./uiHandlers.js";
 import { updateYouTubeEmbed, clearYouTubeEmbed } from "./youtube.js";
 import {
@@ -5,7 +12,34 @@ import {
   saveBuilds,
   deleteBuildFromStorage,
 } from "./buildStorage.js";
+import { fetchUserBuilds } from "./buildManagement.js";
+import { mapAnnotations } from "./interactive_map.js";
 
+export async function deleteBuildFromFirestore(buildId) {
+  const db = getFirestore();
+  const auth = getAuth();
+  const user = auth.currentUser;
+
+  if (!user) {
+    console.error("User not logged in.");
+    showToast("You must be signed in to delete a build.", "error");
+    return;
+  }
+
+  try {
+    const buildRef = doc(db, `users/${user.uid}/builds/${buildId}`);
+    await deleteDoc(buildRef);
+    showToast("Build deleted successfully!", "success");
+
+    // Refresh the build list
+    populateBuildList();
+  } catch (error) {
+    console.error("Error deleting build:", error);
+    showToast("Failed to delete the build. Please try again.", "error");
+  }
+}
+
+/*
 export function deleteBuild(index) {
   const deleteModal = document.getElementById("deleteConfirmationModal");
   const confirmButton = document.getElementById("confirmDeleteButton");
@@ -31,6 +65,7 @@ export function deleteBuild(index) {
     deleteModal.style.display = "none";
   };
 }
+*/
 /*
 function deleteBuild(index) {
   const builds = getSavedBuilds();
@@ -41,62 +76,6 @@ function deleteBuild(index) {
 }
 */
 
-export function viewBuild(index) {
-  const savedBuilds = getSavedBuilds(); // Retrieve saved builds
-  const build = savedBuilds[index];
-
-  if (!build) {
-    console.error(`Build with index ${index} not found.`);
-    return;
-  }
-
-  const titleInput = document.getElementById("buildOrderTitleInput");
-  const titleText = document.getElementById("buildOrderTitleText");
-  const categoryDropdown = document.getElementById("buildCategoryDropdown");
-  const commentInput = document.getElementById("commentInput");
-  const videoInput = document.getElementById("videoInput");
-  const buildOrderInput = document.getElementById("buildOrderInput");
-
-  // Update the title input and text display
-  titleInput.value = build.title;
-  titleText.textContent = build.title;
-  titleText.classList.remove("dimmed");
-
-  // Populate match-up dropdown and apply the selected category's color
-  if (build.subcategory) {
-    categoryDropdown.value = build.subcategory;
-    const selectedOption =
-      categoryDropdown.options[categoryDropdown.selectedIndex];
-    const optgroup = selectedOption?.parentElement;
-
-    if (optgroup?.style.color) {
-      categoryDropdown.style.color = optgroup.style.color;
-    }
-  }
-
-  // Populate comment and video link
-  commentInput.value = build.comment || "";
-  videoInput.value = build.videoLink || "";
-
-  // Update the YouTube embed if a video link exists
-  if (build.videoLink) {
-    updateYouTubeEmbed(build.videoLink);
-  } else {
-    clearYouTubeEmbed(); // Clear embed if no link exists
-  }
-
-  // Format build order as a string
-  const formattedBuildOrder = build.buildOrder
-    .map((step) => `[${step.workersOrTimestamp}] ${sanitizeHTML(step.action)}`)
-    .join("\n");
-  buildOrderInput.value = formattedBuildOrder;
-
-  // Populate build order table
-  displayBuildOrder(build.buildOrder);
-
-  closeModal();
-}
-
 // Helper to sanitize potentially unsafe HTML input
 function sanitizeHTML(str) {
   const tempDiv = document.createElement("div");
@@ -104,18 +83,145 @@ function sanitizeHTML(str) {
   return tempDiv.innerHTML;
 }
 
-window.viewBuild = viewBuild;
+export function viewBuild(buildId) {
+  const db = getFirestore();
+  const auth = getAuth();
+  const user = auth.currentUser;
 
+  if (!user) {
+    console.error("User not logged in.");
+    return;
+  }
+
+  const buildRef = doc(db, `users/${user.uid}/builds/${buildId}`);
+  getDoc(buildRef)
+    .then((docSnap) => {
+      if (docSnap.exists()) {
+        const build = docSnap.data();
+        const mapImage = document.getElementById("map-preview-image");
+        console.log("Loaded build:", build);
+
+        // Check for mandatory fields
+        if (!build.title || !build.subcategory) {
+          console.error(
+            "Mandatory fields (Title or Match-Up) are missing in the build data."
+          );
+          showToast(
+            "This build cannot be viewed due to missing mandatory fields.",
+            "error"
+          );
+          return;
+        }
+
+        // Display the selected map
+        if (build.map) {
+          mapImage.src = build.map; // Set map image source
+        }
+
+        // Load annotations
+        if (build.interactiveMap) {
+          mapAnnotations.circles = build.interactiveMap.circles || [];
+          mapAnnotations.arrows = build.interactiveMap.arrows || [];
+          mapAnnotations.circles.forEach(({ x, y }) =>
+            mapAnnotations.createCircle(x, y)
+          );
+          mapAnnotations.arrows.forEach(({ startX, startY, endX, endY }) =>
+            mapAnnotations.createArrow(startX, startY, endX, endY)
+          );
+        }
+
+        // Retrieve or recreate DOM elements
+        const titleInput =
+          document.getElementById("buildOrderTitleInput") ||
+          recreateInput("buildOrderTitleInput");
+        const titleText =
+          document.getElementById("buildOrderTitleText") ||
+          recreateText("buildOrderTitleText");
+        const categoryDropdown =
+          document.getElementById("buildCategoryDropdown") ||
+          recreateDropdown("buildCategoryDropdown");
+        const commentInput =
+          document.getElementById("commentInput") ||
+          recreateInput("commentInput");
+        const videoInput =
+          document.getElementById("videoInput") || recreateInput("videoInput");
+        const buildOrderInput =
+          document.getElementById("buildOrderInput") ||
+          recreateInput("buildOrderInput");
+
+        // Populate title
+        titleInput.value = build.title || "";
+        titleText.textContent = build.title || "";
+        titleText.classList.remove("dimmed");
+
+        // Populate match-up dropdown
+        categoryDropdown.value = build.subcategory || "";
+
+        // Populate comment and video link
+        commentInput.value = build.comment || "";
+        videoInput.value = build.videoLink || "";
+
+        // Update YouTube embed
+        if (build.videoLink) {
+          updateYouTubeEmbed(build.videoLink);
+        } else {
+          clearYouTubeEmbed();
+        }
+
+        // Populate build order
+        const formattedBuildOrder = build.buildOrder
+          .map((step) => `[${step.workersOrTimestamp}] ${step.action}`)
+          .join("\n");
+        buildOrderInput.value = formattedBuildOrder;
+
+        // Update build order table
+        displayBuildOrder(build.buildOrder);
+
+        // Close the modal
+        closeModal();
+      } else {
+        console.error("No such build found.");
+      }
+    })
+    .catch((error) => {
+      console.error("Error loading build:", error);
+    });
+}
+
+// Helper to recreate missing elements
+function recreateInput(id) {
+  const input = document.createElement("input");
+  input.id = id;
+  document.body.appendChild(input); // Adjust this to append to the correct parent
+  return input;
+}
+
+function recreateText(id) {
+  const text = document.createElement("span");
+  text.id = id;
+  document.body.appendChild(text); // Adjust this to append to the correct parent
+  return text;
+}
+
+function recreateDropdown(id) {
+  const dropdown = document.createElement("select");
+  dropdown.id = id;
+  document.body.appendChild(dropdown); // Adjust this to append to the correct parent
+  return dropdown;
+}
+
+window.viewBuild = viewBuild;
+/*
 export function showAllBuilds() {
   openModal("buildsModal"); // Open the builds modal
   populateBuildList(getSavedBuilds()); // Populate the build list using the saved builds
 }
-
+*/
 // Close the modal
 export function closeModal() {
   const modal = document.getElementById("buildsModal");
   if (modal) {
-    modal.style.display = "none";
+    modal.style.display = "none"; // Only hide the modal
   }
 }
 
@@ -131,7 +237,7 @@ export function openModal(modalId) {
 
 // Make functions globally accessible
 window.openModal = openModal;
-window.showAllBuilds = showAllBuilds;
+//window.showAllBuilds = showAllBuilds;
 
 export function showSubcategories(event) {
   const subcategoriesMenu = event.target.querySelector(".subcategories-menu");
@@ -152,27 +258,24 @@ export function hideSubcategories(event) {
 window.hideSubcategories = hideSubcategories;
 
 export function showBuildsModal() {
-  const buildModal = document.getElementById("buildModal");
-  const buildList = document.getElementById("buildList");
-  const buildPreview = document.getElementById("buildPreview");
+  const buildModal = document.getElementById("buildsModal");
 
-  if (!buildModal || !buildList || !buildPreview) {
-    console.error("Build modal elements not found!");
+  if (!buildModal) {
+    console.error("Build modal not found!");
     return;
   }
 
-  // Populate the build list
+  // Clear and populate the build list
   populateBuildList();
 
-  // Display the modal
+  // Open the modal
   buildModal.style.display = "block";
 
   // Close modal logic
-  document.getElementById("closeBuildModal").onclick = () => {
+  document.getElementById("closeBuildsModal").onclick = () => {
     buildModal.style.display = "none";
   };
 
-  // Close modal on clicking outside
   window.onclick = (event) => {
     if (event.target === buildModal) {
       buildModal.style.display = "none";
@@ -180,7 +283,10 @@ export function showBuildsModal() {
   };
 }
 
-export function populateBuildList(builds = getSavedBuilds()) {
+// Attach to the global window object
+window.showBuildsModal = showBuildsModal;
+
+export async function populateBuildList(filteredBuilds = null) {
   const buildList = document.getElementById("buildList");
   const buildPreview = document.getElementById("buildPreview");
 
@@ -189,37 +295,88 @@ export function populateBuildList(builds = getSavedBuilds()) {
     return;
   }
 
-  buildList.innerHTML = ""; // Clear existing builds
+  // Clear the current list
+  buildList.innerHTML = "";
 
-  // Create a document fragment for performance
+  // If no filtered builds are provided, fetch all builds
+  const builds = filteredBuilds || (await fetchUserBuilds());
+
+  if (builds.length === 0) {
+    buildList.innerHTML = "<p>No builds available.</p>";
+    return;
+  }
+
   const fragment = document.createDocumentFragment();
 
-  builds.forEach((build, index) => {
+  builds.forEach((build) => {
     const buildCard = document.createElement("div");
     buildCard.classList.add("build-card");
 
-    // Add category and subcategory attributes for filtering
-    buildCard.setAttribute("data-category", build.category || "undefined");
-    buildCard.setAttribute(
-      "data-subcategory",
-      build.subcategory || "undefined"
-    );
-
     buildCard.innerHTML = `
-      <h4>${build.title}</h4>
+      <div class="card-header">
+        <h4>${build.title}</h4>
+        <button class="delete-build-btn" title="Delete Build">&times;</button>
+      </div>
       <p>${build.comment || "No comments provided."}</p>
+      <button class="view-build-btn">View Build</button>
     `;
 
-    // Hover to show preview
-    buildCard.onmouseover = () => updatePreview(build, buildPreview);
+    // Add hover functionality for preview
+    buildCard.addEventListener("mouseover", () => updateBuildPreview(build));
+    buildCard.addEventListener("mouseleave", () => clearBuildPreview());
 
-    // Click to view the build
-    buildCard.onclick = () => viewBuild(index);
+    // Add delete functionality
+    const deleteButton = buildCard.querySelector(".delete-build-btn");
+    deleteButton.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      await deleteBuildFromFirestore(build.id);
+      populateBuildList(filteredBuilds); // Refresh the list after deletion
+    });
+
+    // Add view build functionality
+    const viewBuildButton = buildCard.querySelector(".view-build-btn");
+    viewBuildButton.addEventListener("click", () => viewBuild(build.id));
 
     fragment.appendChild(buildCard);
   });
 
   buildList.appendChild(fragment);
+}
+
+function updateBuildPreview(build) {
+  const buildPreview = document.getElementById("buildPreview");
+
+  if (!buildPreview) {
+    console.error("Build preview element not found.");
+    return;
+  }
+
+  const formattedBuildOrder = build.buildOrder
+    .map((step) => `[${step.workersOrTimestamp}] ${step.action}`)
+    .join("\n");
+
+  buildPreview.innerHTML = `
+    <h4>${build.title}</h4>
+    <p><strong>Comment:</strong> ${build.comment || "No comments provided."}</p>
+    <p><strong>Match-Up:</strong> ${build.subcategory || "Unknown"}</p>
+    <pre>${formattedBuildOrder}</pre>
+    ${
+      build.videoLink
+        ? `<iframe src="${build.videoLink}" frameborder="0" allowfullscreen></iframe>`
+        : ""
+    }
+  `;
+}
+
+function clearBuildPreview() {
+  const buildPreview = document.getElementById("buildPreview");
+
+  if (!buildPreview) {
+    console.error("Build preview element not found.");
+    return;
+  }
+
+  buildPreview.innerHTML = "<p>Hover over a build to see its details here.</p>";
 }
 
 // Helper function to update the preview
@@ -260,41 +417,50 @@ export function loadBuild(index) {
   closeBuildsModal();
 }
 
-export function filterBuilds(categoryOrSubcategory) {
-  const savedBuilds = getSavedBuilds();
-
-  console.log("All saved builds:", savedBuilds);
-  console.log("Filter category or subcategory:", categoryOrSubcategory);
+export async function filterBuilds(
+  categoryOrSubcategory = "all",
+  searchQuery = ""
+) {
+  const builds = await fetchUserBuilds(); // Fetch all builds from Firestore
+  const lowerCaseQuery = searchQuery.toLowerCase();
 
   // Filter builds based on category or subcategory
-  const filteredBuilds = savedBuilds.filter((build) => {
-    if (categoryOrSubcategory === "all") {
-      return true; // Show all builds
-    }
-
-    // Match by subcategory first
-    if (
-      ["zvz", "zvp", "zvt", "pvp", "pvz", "pvt", "tvt", "tvz", "tvp"].includes(
+  const filteredBuilds = builds.filter((build) => {
+    const matchesCategory =
+      categoryOrSubcategory === "all" ||
+      (["zvz", "zvp", "zvt", "pvp", "pvz", "pvt", "tvt", "tvz", "tvp"].includes(
         categoryOrSubcategory.toLowerCase()
-      )
-    ) {
-      return build.subcategory === categoryOrSubcategory.toLowerCase();
-    }
+      ) &&
+        build.subcategory.toLowerCase() ===
+          categoryOrSubcategory.toLowerCase()) ||
+      (["zerg", "protoss", "terran"].includes(
+        categoryOrSubcategory.toLowerCase()
+      ) &&
+        build.category.toLowerCase() === categoryOrSubcategory.toLowerCase());
 
-    // Otherwise, match by category
-    return build.category.toLowerCase() === categoryOrSubcategory.toLowerCase();
+    const matchesSearch =
+      build.title.toLowerCase().includes(lowerCaseQuery) ||
+      (build.comment && build.comment.toLowerCase().includes(lowerCaseQuery));
+
+    return matchesCategory && matchesSearch;
   });
 
-  console.log("Filtered builds:", filteredBuilds);
-
-  populateBuildList(filteredBuilds); // Refresh the displayed builds
+  // Populate the filtered list
+  populateBuildList(filteredBuilds);
 }
 
-function searchBuilds(query) {
+export async function searchBuilds(query) {
   const lowerCaseQuery = query.toLowerCase();
-  const filteredBuilds = getSavedBuilds().filter((build) =>
+
+  // Fetch all builds
+  const builds = await fetchUserBuilds();
+
+  // Filter builds based on the query
+  const filteredBuilds = builds.filter((build) =>
     build.title.toLowerCase().includes(lowerCaseQuery)
   );
+
+  // Populate the build list with filtered results
   populateBuildList(filteredBuilds);
 }
 

@@ -311,3 +311,9 @@ export function initializeMapSelection(mapAnnotations) {
     }
   });
 }
+
+// Export the instantiated `MapAnnotations` object
+export const mapAnnotations = new MapAnnotations(
+  "map-preview-image",
+  "map-annotations"
+);
