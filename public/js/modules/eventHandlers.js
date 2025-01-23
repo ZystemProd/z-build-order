@@ -1,15 +1,7 @@
 import { saveCurrentBuild } from "./buildManagement.js";
 import { initializeAutoCorrect } from "./autoCorrect.js";
-
-import {
-  getSavedBuilds,
-  saveSavedBuildsToLocalStorage,
-} from "./buildStorage.js";
-
 import { populateBuildDetails, analyzeBuildOrder } from "./uiHandlers.js";
-
 import { updateYouTubeEmbed } from "./youtube.js";
-
 import {
   closeModal,
   showSubcategories,
@@ -17,15 +9,16 @@ import {
   filterBuilds,
   searchBuilds,
 } from "./modal.js";
-
 import {
   MapAnnotations,
   initializeMapControls,
   initializeMapSelection,
+  mapAnnotations,
 } from "./interactive_map.js";
-
-import { initializeSectionToggles } from "./uiHandlers.js";
-
+import {
+  initializeSectionToggles,
+  initializeTextareaClickHandler,
+} from "./uiHandlers.js";
 import {
   saveTemplate,
   showTemplatesModal,
@@ -74,11 +67,6 @@ export function initializeEventListeners() {
     });
 
   window.showSubcategories = showSubcategories;
-  /*
-  document.querySelectorAll("#buildFilters").forEach((filter) => {
-    filter.addEventListener("mouseout", hideSubcategories);
-  });
-  */
 
   document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll(".filter-category").forEach((category) => {
@@ -152,27 +140,6 @@ export function initializeEventListeners() {
     closeBuildsModal();
   });
 
-  document.addEventListener("DOMContentLoaded", () => {
-    const textarea = document.getElementById("buildOrderInput"); // Ensure this matches your textarea's ID
-    if (textarea) {
-      textarea.addEventListener("click", function () {
-        console.log("Textarea clicked! Current value:", textarea.value); // Logs the current value on click
-        if (textarea.value.trim() === "") {
-          console.log("Textarea is empty, adding brackets []"); // Logs when brackets are being added
-          // If the textarea is empty, set its value to "[]"
-          textarea.value = "[]";
-          // Position the caret inside the brackets
-          textarea.selectionStart = 1;
-          textarea.selectionEnd = 1;
-        } else {
-          console.log("Textarea is not empty. No changes made."); // Logs when the textarea is not empty
-        }
-      });
-    } else {
-      console.error("Textarea with ID 'buildOrderInput' not found!"); // Logs an error if the textarea is not found
-    }
-  });
-
   // Automatically trigger analysis when the user types in the buildOrderInput field
   document
     .getElementById("buildOrderInput")
@@ -204,8 +171,6 @@ export function initializeEventListeners() {
       }
     });
 
-  // Video embed updates
-
   // Section toggle logic
   document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll(".toggle-title").forEach((header) => {
@@ -225,6 +190,10 @@ export function initializeEventListeners() {
     });
   });
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+  initializeTextareaClickHandler();
+});
 
 export function initializeModalEventListeners() {
   // Close modal when clicking outside of it
@@ -259,18 +228,13 @@ document.addEventListener("DOMContentLoaded", () => {
 document.addEventListener("DOMContentLoaded", () => {
   initializeSectionToggles(); // Ensure toggles are attached globally
 
-  const mapAnnotations = new MapAnnotations(
-    "map-preview-image",
-    "map-annotations"
-  );
-  initializeMapControls(mapAnnotations); // Pass mapAnnotations for map controls
-  initializeMapSelection(mapAnnotations);
-  /*
-  document
-    .getElementById("showBuildsButton")
-    .addEventListener("click", showAllBuilds);
-*/
   document
     .getElementById("videoInput")
     .addEventListener("input", updateYouTubeEmbed);
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  // Initialize map controls and selection only once
+  initializeMapControls(mapAnnotations);
+  initializeMapSelection(mapAnnotations);
 });

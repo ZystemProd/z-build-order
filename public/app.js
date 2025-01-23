@@ -104,24 +104,3 @@ document.addEventListener("DOMContentLoaded", () => {
   initializeModalEventListeners();
   attachEventListeners();
 });
-
-document.addEventListener("DOMContentLoaded", () => {
-  const textarea = document.getElementById("buildOrderInput"); // Ensure this matches your textarea's ID
-  if (textarea) {
-    textarea.addEventListener("click", function () {
-      console.log("Textarea clicked! Current value:", textarea.value); // Logs the current value on click
-      if (textarea.value.trim() === "") {
-        console.log("Textarea is empty, adding brackets []"); // Logs when brackets are being added
-        // If the textarea is empty, set its value to "[]"
-        textarea.value = "[]";
-        // Position the caret inside the brackets
-        textarea.selectionStart = 1;
-        textarea.selectionEnd = 1;
-      } else {
-        console.log("Textarea is not empty. No changes made."); // Logs when the textarea is not empty
-      }
-    });
-  } else {
-    console.error("Textarea with ID 'buildOrderInput' not found!"); // Logs an error if the textarea is not found
-  }
-});

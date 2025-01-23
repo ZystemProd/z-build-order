@@ -39,43 +39,6 @@ export async function deleteBuildFromFirestore(buildId) {
   }
 }
 
-/*
-export function deleteBuild(index) {
-  const deleteModal = document.getElementById("deleteConfirmationModal");
-  const confirmButton = document.getElementById("confirmDeleteButton");
-  const cancelButton = document.getElementById("cancelDeleteButton");
-
-  // Show the confirmation modal
-  deleteModal.style.display = "flex";
-
-  // Automatically focus on the "Yes" button
-  confirmButton.focus();
-
-  // Handle confirmation
-  confirmButton.onclick = () => {
-    if (index >= 0 && index < getSavedBuilds().length) {
-      deleteBuildFromStorage(index); // Use the modular delete function
-      showAllBuilds(); // Refresh build cards
-    }
-    deleteModal.style.display = "none"; // Close the modal
-  };
-
-  // Handle cancellation
-  cancelButton.onclick = () => {
-    deleteModal.style.display = "none";
-  };
-}
-*/
-/*
-function deleteBuild(index) {
-  const builds = getSavedBuilds();
-  builds.splice(index, 1); // Remove the selected build
-  setSavedBuilds(builds);
-  saveSavedBuildsToLocalStorage();
-  showBuildsModal(); // Refresh the modal content
-}
-*/
-
 // Helper to sanitize potentially unsafe HTML input
 function sanitizeHTML(str) {
   const tempDiv = document.createElement("div");
@@ -118,16 +81,25 @@ export function viewBuild(buildId) {
           mapImage.src = build.map; // Set map image source
         }
 
-        // Load annotations
         if (build.interactiveMap) {
-          mapAnnotations.circles = build.interactiveMap.circles || [];
-          mapAnnotations.arrows = build.interactiveMap.arrows || [];
-          mapAnnotations.circles.forEach(({ x, y }) =>
-            mapAnnotations.createCircle(x, y)
+          // Clear existing annotations and DOM elements
+          mapAnnotations.circles = [];
+          mapAnnotations.annotationsContainer.innerHTML = "";
+
+          // Load circles
+          build.interactiveMap.circles.forEach(({ x, y }) => {
+            mapAnnotations.createCircle(x, y);
+          });
+
+          // Load arrows
+          build.interactiveMap.arrows.forEach(
+            ({ startX, startY, endX, endY }) => {
+              mapAnnotations.createArrow(startX, startY, endX, endY);
+            }
           );
-          mapAnnotations.arrows.forEach(({ startX, startY, endX, endY }) =>
-            mapAnnotations.createArrow(startX, startY, endX, endY)
-          );
+
+          // Recalculate numbering to ensure consistency
+          mapAnnotations.updateCircleNumbers();
         }
 
         // Retrieve or recreate DOM elements
@@ -211,12 +183,7 @@ function recreateDropdown(id) {
 }
 
 window.viewBuild = viewBuild;
-/*
-export function showAllBuilds() {
-  openModal("buildsModal"); // Open the builds modal
-  populateBuildList(getSavedBuilds()); // Populate the build list using the saved builds
-}
-*/
+
 // Close the modal
 export function closeModal() {
   const modal = document.getElementById("buildsModal");

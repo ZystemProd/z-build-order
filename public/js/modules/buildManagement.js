@@ -13,7 +13,6 @@ import {
 } from "./buildStorage.js";
 import { showToast } from "./uiHandlers.js";
 import { filterBuilds } from "./modal.js";
-
 import { parseBuildOrder } from "./utils.js";
 import { mapAnnotations } from "./interactive_map.js"; // Ensure this export exists
 
@@ -164,27 +163,6 @@ export function saveCurrentBuild() {
   showToast("Build saved successfully!", "success");
   filterBuilds("all");
 }
-/*
-// Function to remove all builds
-export function removeAllBuilds(savedBuilds, modalBuildsContainer) {
-  if (
-    !confirm(
-      "Are you sure you want to delete all builds? This action cannot be undone."
-    )
-  ) {
-    return;
-  }
-
-  savedBuilds.length = 0;
-  localStorage.removeItem("savedBuilds");
-
-  if (modalBuildsContainer) {
-    modalBuildsContainer.innerHTML = "";
-  }
-
-  showToast("All builds have been removed.", "success");
-}
-*/
 
 export async function loadBuildAnnotations(buildId) {
   const db = getFirestore();

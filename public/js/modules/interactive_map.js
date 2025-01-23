@@ -24,6 +24,7 @@ export class MapAnnotations {
   }
 
   createCircle(x, y) {
+    console.log("createCircle");
     const container = document.createElement("div");
     container.classList.add("annotation-circle-container");
     container.style.left = `${x}%`;
@@ -31,6 +32,8 @@ export class MapAnnotations {
 
     const number = document.createElement("span");
     number.classList.add("annotation-number");
+
+    // Assign the number based on the current count of circles
     number.textContent = this.circles.length + 1;
 
     const circle = document.createElement("div");
@@ -43,19 +46,26 @@ export class MapAnnotations {
         (circleData) => circleData.element === container
       );
       if (index !== -1) this.circles.splice(index, 1);
-      this.updateCircleNumbers();
+      this.updateCircleNumbers(); // Recalculate numbers
     });
 
     container.appendChild(number);
     container.appendChild(circle);
     this.annotationsContainer.appendChild(container);
+
+    // Add to circles array with the correct element reference
     this.circles.push({ x, y, element: container });
   }
 
   updateCircleNumbers() {
     this.circles.forEach((circleData, index) => {
-      const number = circleData.element.querySelector(".annotation-number");
-      number.textContent = index + 1;
+      if (circleData.element) {
+        // Ensure the element exists
+        const number = circleData.element.querySelector(".annotation-number");
+        if (number) {
+          number.textContent = index + 1; // Reassign correct number
+        }
+      }
     });
   }
 
@@ -104,7 +114,14 @@ export class MapAnnotations {
   }
 
   initializeEventListeners() {
-    this.mapContainer.addEventListener("mousedown", (event) => {
+    // Remove existing listeners to avoid duplicates
+    this.mapContainer.removeEventListener("mousedown", this.handleMouseDown);
+    this.mapContainer.removeEventListener("mouseup", this.handleMouseUp);
+    this.mapContainer.removeEventListener("mousemove", this.handleMouseMove);
+    this.mapContainer.removeEventListener("mouseleave", this.handleMouseLeave);
+
+    // Define handlers as class properties to ensure they are only bound once
+    this.handleMouseDown = (event) => {
       const { x, y } = this.calculateCoordinates(event);
       this.mousedownTimer = setTimeout(() => {
         this.isDrawingArrow = true;
@@ -114,9 +131,9 @@ export class MapAnnotations {
         this.previewArrow.classList.add("annotation-arrow", "preview-arrow");
         this.annotationsContainer.appendChild(this.previewArrow);
       }, 200);
-    });
+    };
 
-    this.mapContainer.addEventListener("mouseup", (event) => {
+    this.handleMouseUp = (event) => {
       clearTimeout(this.mousedownTimer);
       const { x, y } = this.calculateCoordinates(event);
 
@@ -130,23 +147,28 @@ export class MapAnnotations {
       } else {
         this.createCircle(x, y);
       }
-    });
+    };
 
-    this.mapContainer.addEventListener("mousemove", (event) => {
+    this.handleMouseMove = (event) => {
       if (this.isDrawingArrow && this.previewArrow) {
         const { x, y } = this.calculateCoordinates(event);
         this.updateArrow(this.previewArrow, this.startX, this.startY, x, y);
       }
-    });
+    };
 
-    this.mapContainer.addEventListener("mouseleave", () => {
+    this.handleMouseLeave = () => {
       if (this.isDrawingArrow && this.previewArrow) {
         this.annotationsContainer.removeChild(this.previewArrow);
         this.previewArrow = null;
       }
       clearTimeout(this.mousedownTimer);
-    });
+    };
 
+    // Add listeners
+    this.mapContainer.addEventListener("mousedown", this.handleMouseDown);
+    this.mapContainer.addEventListener("mouseup", this.handleMouseUp);
+    this.mapContainer.addEventListener("mousemove", this.handleMouseMove);
+    this.mapContainer.addEventListener("mouseleave", this.handleMouseLeave);
     this.mapContainer.addEventListener("dragstart", (e) => e.preventDefault());
   }
 }

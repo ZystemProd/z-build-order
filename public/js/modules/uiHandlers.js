@@ -232,3 +232,22 @@ export function showToast(message, type = "success", duration = 3000) {
     }, 300);
   }, duration);
 }
+
+export function initializeTextareaClickHandler() {
+  const textarea = document.getElementById("buildOrderInput"); // Ensure this matches your textarea's ID
+  if (!textarea) {
+    console.error("Textarea with ID 'buildOrderInput' not found!"); // Logs an error if the textarea is not found
+    return;
+  }
+
+  textarea.addEventListener("click", function () {
+    if (textarea.value.trim() === "") {
+      // If the textarea is empty, set its value to "[]"
+      textarea.value = "[]";
+      // Position the caret inside the brackets
+      textarea.selectionStart = 1;
+      textarea.selectionEnd = 1;
+    } else {
+    }
+  });
+}
