@@ -913,7 +913,7 @@ textarea::-webkit-scrollbar-thumb:hover {
 #map-preview-container {
   position: relative;
   width: 100%;
-  max-width: 600px; /* Adjust as necessary */
+  max-width: 350px; /* Adjust as necessary */
   margin: 0 auto;
 }
 
@@ -934,9 +934,13 @@ textarea::-webkit-scrollbar-thumb:hover {
 
 .clear-annotations-button {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: 0px;
+  right: 0px;
   z-index: 10;
+  width: 40px;
+  height: 30px;
+  padding: 0px;
+  margin: 0px;
 }
 /*
 .clear-annotations-button {

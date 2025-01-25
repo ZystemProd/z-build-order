@@ -50,6 +50,7 @@ export class MapAnnotations {
     });
 
     container.appendChild(number);
+    s;
     container.appendChild(circle);
     this.annotationsContainer.appendChild(container);
 
