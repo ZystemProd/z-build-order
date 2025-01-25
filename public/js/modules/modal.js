@@ -91,12 +91,16 @@ export function viewBuild(buildId) {
             mapAnnotations.createCircle(x, y);
           });
 
-          // Load arrows
-          build.interactiveMap.arrows.forEach(
-            ({ startX, startY, endX, endY }) => {
-              mapAnnotations.createArrow(startX, startY, endX, endY);
-            }
-          );
+          // Load arrows (Insert your code here)
+          if (build.interactiveMap.arrows) {
+            console.log("Arrow Data Loaded:", build.interactiveMap.arrows);
+            build.interactiveMap.arrows.forEach(
+              ({ startX, startY, endX, endY }) => {
+                console.log("Creating Arrow:", { startX, startY, endX, endY });
+                mapAnnotations.createArrow(startX, startY, endX, endY);
+              }
+            );
+          }
 
           // Recalculate numbering to ensure consistency
           mapAnnotations.updateCircleNumbers();

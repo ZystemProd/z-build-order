@@ -163,7 +163,7 @@ export function saveCurrentBuild() {
   showToast("Build saved successfully!", "success");
   filterBuilds("all");
 }
-
+// maybe remove, is not used anywhere
 export async function loadBuildAnnotations(buildId) {
   const db = getFirestore();
   const auth = getAuth();
@@ -197,7 +197,7 @@ export async function loadBuildAnnotations(buildId) {
     console.error("Build not found!");
   }
 }
-
+// ........................
 export function deleteBuild(index) {
   const deleteModal = document.getElementById("deleteConfirmationModal");
   const confirmButton = document.getElementById("confirmDeleteButton");

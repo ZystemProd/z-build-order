@@ -12,13 +12,23 @@ export class MapAnnotations {
 
     this.initializeEventListeners();
   }
-
+  /*
   calculateCoordinates(event) {
     const rect = this.mapContainer.getBoundingClientRect();
 
     // Calculate coordinates as percentages relative to the image dimensions
     const x = ((event.clientX - rect.left - 6) / rect.width) * 100;
     const y = ((event.clientY - rect.top - 2) / rect.height) * 100;
+
+    return { x, y };
+  }
+*/
+  calculateCoordinates(event) {
+    const rect = this.mapContainer.getBoundingClientRect();
+
+    // Calculate coordinates as percentages relative to the actual displayed dimensions
+    const x = ((event.clientX - rect.left) / rect.width) * 100;
+    const y = ((event.clientY - rect.top) / rect.height) * 100;
 
     return { x, y };
   }
@@ -174,25 +184,9 @@ export class MapAnnotations {
 }
 
 export function initializeMapControls(mapAnnotations) {
-  const mapContainer = document.querySelector(".floating-container");
-  const mapImage = document.getElementById("map-preview-container");
   const clearAnnotationsButton = document.querySelector(
     ".clear-annotations-button"
   );
-  const closeMapButton = document.querySelector(".close-map-button");
-  const showMapButton = document.getElementById("showMapButton");
-
-  // Initially hide the map
-  mapContainer.style.display = "none";
-
-  // Show/hide Clear All Annotations button
-  mapImage.addEventListener("mouseenter", () => {
-    clearAnnotationsButton.style.display = "block";
-  });
-
-  mapImage.addEventListener("mouseleave", () => {
-    clearAnnotationsButton.style.display = "none";
-  });
 
   // Clear annotations
   clearAnnotationsButton.addEventListener("click", () => {
@@ -202,56 +196,7 @@ export function initializeMapControls(mapAnnotations) {
       );
     }
     mapAnnotations.circles = [];
-  });
-
-  // Close map
-  closeMapButton.addEventListener("click", () => {
-    mapContainer.style.display = "none";
-    showMapButton.textContent = "Show Map";
-  });
-
-  // Show/hide map
-  showMapButton.addEventListener("click", () => {
-    const isHidden = mapContainer.style.display === "none";
-    mapContainer.style.display = isHidden ? "block" : "none";
-    showMapButton.textContent = isHidden ? "Hide Map" : "Show Map";
-  });
-
-  // Floating map draggable functionality
-  const titleBar = document.getElementById("map-title-bar");
-  let isDragging = false;
-  let offsetX = 0;
-  let offsetY = 0;
-
-  // Helper function to handle dragging
-  function startDragging(event, element) {
-    isDragging = true;
-    offsetX = event.clientX - element.offsetLeft;
-    offsetY = event.clientY - element.offsetTop;
-    document.body.style.userSelect = "none"; // Prevent text selection
-  }
-
-  // Add listeners for starting drag
-  titleBar.addEventListener("mousedown", (event) =>
-    startDragging(event, mapContainer)
-  );
-  mapContainer.addEventListener("mousedown", (event) => {
-    if (event.target === mapContainer) startDragging(event, mapContainer);
-  });
-
-  // Handle mouse movement
-  document.addEventListener("mousemove", (event) => {
-    if (!isDragging) return;
-    const x = event.clientX - offsetX;
-    const y = event.clientY - offsetY;
-    mapContainer.style.left = `${x}px`;
-    mapContainer.style.top = `${y}px`;
-  });
-
-  // Stop dragging on mouseup
-  document.addEventListener("mouseup", () => {
-    isDragging = false;
-    document.body.style.userSelect = ""; // Re-enable text selection
+    mapAnnotations.arrows = [];
   });
 }
 
@@ -260,7 +205,9 @@ export function initializeInteractiveMap() {
     "map-preview-image",
     "map-annotations"
   );
-  initializeMapControls();
+
+  // Remove floating container logic
+  initializeMapControls(mapAnnotations);
   return mapAnnotations;
 }
 

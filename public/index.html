@@ -15,6 +15,7 @@
   </head>
   <body>
     <div id="toast-container"></div>
+    <!--
     <div id="floating-map" class="floating-container">
       <div id="map-title-bar" class="title-bar">
         <span>Map</span>
@@ -26,6 +27,7 @@
         <button class="clear-annotations-button"><i class="fa fa-eraser" style="font-size:20px;"></i></button>
       </div>
     </div>
+    --> 
     <div id="game-selector" class="menu">
       <p id="authLoading">Checking authentication status...</p>
     
@@ -139,6 +141,14 @@
             <th>Action</th>
           </tr>
         </table>
+        <!-- Map -->
+        <div id="map-container">
+          <div id="map-preview-container" class="map-preview">
+            <img id="map-preview-image" class="map-image" src="img/SG/titans_causeway.jpg" alt="Map Preview" />
+            <div id="map-annotations" class="annotations"></div>
+            <button class="clear-annotations-button"><i class="fa fa-eraser" style="font-size:20px;"></i></button>
+          </div>
+        </div>
 
         <div class="saveLoadContainer">
           <button id="saveBuildButton">Save Current Build</button>
