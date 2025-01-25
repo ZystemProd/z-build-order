@@ -63,8 +63,18 @@ export function viewBuild(buildId) {
         const build = docSnap.data();
         const mapImage = document.getElementById("map-preview-image");
         const selectedMapText = document.getElementById("selected-map-text");
+        const titleInput = document.getElementById("buildOrderTitleInput");
+        const titleText = document.getElementById("buildOrderTitleText");
 
         console.log("Loaded build:", build);
+
+        // Helper function to capitalize each word
+        const capitalizeWords = (str) => {
+          return str
+            .split(" ")
+            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(" ");
+        };
 
         // Check for mandatory fields
         if (!build.title || !build.subcategory) {
@@ -80,14 +90,18 @@ export function viewBuild(buildId) {
 
         // Update the map preview and selected map text
         if (build.map) {
-          mapImage.src = build.map; // Update map image
+          const mapName = build.map; // The map field contains the name, e.g., "abyssal reef"
+          const formattedMapName = capitalizeWords(mapName);
+          const mapUrl = `https://z-build-order.web.app/img/maps/${mapName
+            .replace(/ /g, "_")
+            .toLowerCase()}.jpg`; // Construct the full URL dynamically
+
+          mapImage.src = mapUrl; // Set the map image
           if (selectedMapText) {
-            selectedMapText.innerText = `Selected Map: ${
-              build.mapName || "Unknown"
-            }`; // Use "Unknown" if mapName is missing
+            selectedMapText.innerText = `Selected Map: ${formattedMapName}`;
           }
         } else if (selectedMapText) {
-          selectedMapText.innerText = "No map selected";
+          selectedMapText.innerText = "No map selected"; // Fallback text for no map
         }
 
         // Load annotations (circles and arrows)
@@ -108,25 +122,35 @@ export function viewBuild(buildId) {
           mapAnnotations.updateCircleNumbers();
         }
 
-        // Populate other fields (title, comment, video, build order)
-        const titleInput =
-          document.getElementById("buildOrderTitleInput") ||
-          recreateInput("buildOrderTitleInput");
-        titleInput.value = build.title || "";
+        // Update titleText and titleInput
+        if (titleText) {
+          titleText.textContent =
+            build.title || "Enter build order title here...";
+          titleText.classList.remove("dimmed"); // Remove dimmed style if applicable
+        }
 
+        if (titleInput) {
+          titleInput.value = build.title || "";
+        }
+
+        // Populate comment
         const commentInput = document.getElementById("commentInput");
         if (commentInput) {
           commentInput.value = build.comment || "";
         }
 
+        // Populate video link and embed
         const videoInput = document.getElementById("videoInput");
         if (videoInput) {
           videoInput.value = build.videoLink || "";
-          build.videoLink
-            ? updateYouTubeEmbed(build.videoLink)
-            : clearYouTubeEmbed();
+          if (build.videoLink) {
+            updateYouTubeEmbed(build.videoLink);
+          } else {
+            clearYouTubeEmbed();
+          }
         }
 
+        // Populate build order
         const buildOrderInput = document.getElementById("buildOrderInput");
         if (buildOrderInput) {
           buildOrderInput.value = build.buildOrder
@@ -310,14 +334,9 @@ function updateBuildPreview(build) {
 
   buildPreview.innerHTML = `
     <h4>${build.title}</h4>
-    <p><strong>Comment:</strong> ${build.comment || "No comments provided."}</p>
     <p><strong>Match-Up:</strong> ${build.subcategory || "Unknown"}</p>
+    <p><strong>Comment:</strong> ${build.comment || "No comments provided."}</p>
     <pre>${formattedBuildOrder}</pre>
-    ${
-      build.videoLink
-        ? `<iframe src="${build.videoLink}" frameborder="0" allowfullscreen></iframe>`
-        : ""
-    }
   `;
 }
 

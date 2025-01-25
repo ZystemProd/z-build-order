@@ -1,29 +1,33 @@
-export function updateYouTubeEmbed() {
-  const videoInput = document.getElementById("videoInput");
-  const videoIframe = document.getElementById("videoIframe");
-
-  const videoURL = videoInput.value.trim();
-  const videoID = getYouTubeVideoID(videoURL);
-
-  if (videoID) {
-    // Show iframe with the video
-    videoIframe.src = `https://www.youtube.com/embed/${videoID}`;
-    videoIframe.style.display = "block";
+export function updateYouTubeEmbed(videoLink) {
+  const iframe = document.getElementById("videoIframe");
+  if (iframe) {
+    const videoId = extractYouTubeVideoId(videoLink); // Helper function to get video ID
+    if (videoId) {
+      iframe.src = `https://www.youtube.com/embed/${videoId}`;
+      iframe.style.display = "block"; // Show the iframe
+    } else {
+      console.error("Invalid YouTube link.");
+      clearYouTubeEmbed(); // Hide the iframe if the link is invalid
+    }
   } else {
-    // Hide iframe if the URL is invalid
-    videoIframe.style.display = "none";
-    videoIframe.src = "";
+    console.warn("videoIframe element not found. Cannot update YouTube embed.");
   }
 }
 
-function getYouTubeVideoID(url) {
+// Helper function to extract YouTube video ID from a link
+function extractYouTubeVideoId(link) {
   const regex =
-    /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
-  const match = url.match(regex);
+    /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+  const match = link.match(regex);
   return match ? match[1] : null;
 }
 
 export function clearYouTubeEmbed() {
-  const embedContainer = document.getElementById("videoField");
-  embedContainer.innerHTML = ""; // Clears the embed
+  const iframe = document.getElementById("videoIframe");
+  if (iframe) {
+    iframe.style.display = "none"; // Hide the iframe
+    iframe.src = ""; // Clear the video source
+  } else {
+    console.warn("videoIframe element not found. Cannot clear YouTube embed.");
+  }
 }

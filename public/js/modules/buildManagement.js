@@ -50,10 +50,17 @@ export function saveCurrentBuild() {
   const videoLink = videoInput.value.trim();
   const buildOrderText = buildOrderInput.value.trim();
   const selectedMatchup = categoryDropdown.value;
-  const selectedMapPath = mapImage.src; // Get the map path
-  const selectedMapName = selectedMapPath.split("/").pop() || "Unknown"; // Extract map name
 
-  // Missing title handling
+  // Extract and clean map name from the image path
+  const selectedMapPath = mapImage.src;
+  const selectedMapName = selectedMapPath
+    .split("/")
+    .pop()
+    .replace(/_/g, " ")
+    .replace(".jpg", "")
+    .toLowerCase();
+
+  // Validation: Title is required
   if (!title) {
     titleText.classList.add("highlight");
     showToast("Please provide a title for the build.", "error");
@@ -70,6 +77,7 @@ export function saveCurrentBuild() {
     return;
   }
 
+  // Validation: Match-up is required
   if (!selectedMatchup) {
     categoryDropdown.classList.add("highlight");
     showToast("Please select a match-up.", "error");
@@ -88,6 +96,7 @@ export function saveCurrentBuild() {
     return;
   }
 
+  // Parse and validate build order
   const buildOrder = parseBuildOrder(buildOrderText);
   if (buildOrder.length === 0) {
     showToast("Build order cannot be empty.", "error");
@@ -99,7 +108,6 @@ export function saveCurrentBuild() {
     : selectedMatchup.startsWith("pv")
     ? "Protoss"
     : "Terran";
-  const subcategory = selectedMatchup;
 
   const newBuild = {
     title,
@@ -107,10 +115,9 @@ export function saveCurrentBuild() {
     videoLink,
     buildOrder,
     category,
-    subcategory,
+    subcategory: selectedMatchup,
     timestamp: Date.now(),
-    map: selectedMapPath, // Save map path
-    mapName: selectedMapName, // Save map name
+    map: selectedMapName, // Save only the map name
     interactiveMap: {
       circles: mapAnnotations.circles.map(({ x, y }) => ({ x, y })),
       arrows: mapAnnotations.arrows.map(({ startX, startY, endX, endY }) => ({
@@ -150,7 +157,7 @@ export function saveCurrentBuild() {
   }
 
   const buildsRef = collection(db, `users/${user.uid}/builds`);
-  const buildDoc = doc(buildsRef, title); // Use title as the document ID for easy lookup
+  const buildDoc = doc(buildsRef, title);
 
   setDoc(buildDoc, newBuild)
     .then(() => {
@@ -164,6 +171,7 @@ export function saveCurrentBuild() {
   showToast("Build saved successfully!", "success");
   filterBuilds("all");
 }
+
 // maybe remove, is not used anywhere
 export async function loadBuildAnnotations(buildId) {
   const db = getFirestore();
