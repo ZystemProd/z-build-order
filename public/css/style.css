@@ -549,10 +549,27 @@ textarea::-webkit-scrollbar-thumb:hover {
 }
 */
 .build-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 300px;
+  width: 300px;
+  justify-content: space-between;
+  overflow: hidden;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.build-list .build-card {
   position: relative;
   z-index: 1;
   width: 150px;
   height: 200px;
+  background-image: url("../img/frames/framev1.png");
+  background-size: cover; /* Ensures the image covers the entire card */
+  background-repeat: no-repeat; /* Prevents the image from repeating */
+  background-position: center; /* Centers the image on the card */
   background-color: #292929;
   border: 1px solid #444;
   border-radius: 8px;
@@ -568,7 +585,7 @@ textarea::-webkit-scrollbar-thumb:hover {
 }
 
 .build-card .map-image {
-  height: 135px;
+  height: 250px;
 }
 /*
 .build-card::after {
@@ -583,6 +600,15 @@ textarea::-webkit-scrollbar-thumb:hover {
   transition: opacity 0.3s ease-in-out;
 }
 */
+
+.matchup-text {
+  font-size: 14px;
+  font-weight: bold;
+  color: #ccc; /* Adjust color for better visibility */
+  margin-top: 10px;
+  text-align: center;
+}
+
 .build-card:hover {
   transform: scale(1.1, 1.1);
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.6);

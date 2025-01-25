@@ -50,8 +50,8 @@
 .template-list {
   flex: 1;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 15px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 10px;
   overflow-y: auto; /* Enable vertical scrolling */
   padding: 15px;
   max-height: 100%; /* Ensure it respects the parent's height */
@@ -340,7 +340,7 @@
 }
 
 /* Modal layout for small screens */
-@media (max-width: 768px) {
+@media (max-width: 1040px) {
   #templateModal .modal-content {
     flex-direction: column;
     width: 90%;
@@ -353,7 +353,7 @@
   }
 
   .template-list {
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   }
   .template-card {
     width: 150px;
@@ -416,15 +416,17 @@
   max-height: 100%;
 }
 
-.build-card {
+.template-list .build-card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  height: 200px;
-  width: 200px;
+  background-image: url("../img/frames/framev3.png") !important;
+  background-size: contain !important; /* Ensures the image covers the entire card */
+  background-repeat: no-repeat !important; /* Prevents the image from repeating */
+  background-position: center !important; /* Centers the image on the card */
+  height: 300px;
+  width: 300px;
   justify-content: space-between;
-  background: #2e2e2e;
-  border-radius: 10px;
   overflow: hidden;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
   cursor: pointer;

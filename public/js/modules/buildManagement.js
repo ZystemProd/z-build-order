@@ -39,85 +39,86 @@ export async function fetchUserBuilds() {
 
 export function saveCurrentBuild() {
   const titleInput = document.getElementById("buildOrderTitleInput");
+  const categoryDropdown = document.getElementById("buildCategoryDropdown");
   const commentInput = document.getElementById("commentInput");
   const videoInput = document.getElementById("videoInput");
   const buildOrderInput = document.getElementById("buildOrderInput");
-  const categoryDropdown = document.getElementById("buildCategoryDropdown");
   const mapImage = document.getElementById("map-preview-image");
 
+  // Check if required elements exist
+  if (!titleInput || !categoryDropdown) {
+    console.error("Title or match-up dropdown is missing from the DOM.");
+    showToast(
+      "Failed to save the build. Title or match-up is missing.",
+      "error"
+    );
+    return;
+  }
+
   const title = titleInput.value.trim();
-  const comment = commentInput.value.trim();
-  const videoLink = videoInput.value.trim();
-  const buildOrderText = buildOrderInput.value.trim();
   const selectedMatchup = categoryDropdown.value;
 
-  // Extract and clean map name from the image path
-  const selectedMapPath = mapImage.src;
-  const selectedMapName = selectedMapPath
-    .split("/")
-    .pop()
-    .replace(/_/g, " ")
-    .replace(".jpg", "")
-    .toLowerCase();
-
-  // Validation: Title is required
+  // Validation: Ensure title is not empty
   if (!title) {
-    titleText.classList.add("highlight");
     showToast("Please provide a title for the build.", "error");
-
-    const stopHighlight = () => {
-      titleText.classList.remove("highlight");
-      titleText.removeEventListener("click", stopHighlight);
-      titleText.removeEventListener("input", stopHighlight);
-    };
-
-    titleText.addEventListener("click", stopHighlight);
-    titleText.addEventListener("input", stopHighlight);
-
+    titleInput.classList.add("highlight");
+    titleInput.addEventListener("input", () => {
+      titleInput.classList.remove("highlight");
+    });
     return;
   }
 
-  // Validation: Match-up is required
+  // Validation: Ensure a match-up is selected
   if (!selectedMatchup) {
+    showToast("Please select a valid match-up.", "error");
     categoryDropdown.classList.add("highlight");
-    showToast("Please select a match-up.", "error");
-
-    const stopHighlight = () => {
+    categoryDropdown.addEventListener("change", () => {
       categoryDropdown.classList.remove("highlight");
-      categoryDropdown.removeEventListener("click", stopHighlight);
-      categoryDropdown.removeEventListener("change", stopHighlight);
-      categoryDropdown.removeEventListener("keydown", stopHighlight);
-    };
-
-    categoryDropdown.addEventListener("click", stopHighlight);
-    categoryDropdown.addEventListener("change", stopHighlight);
-    categoryDropdown.addEventListener("keydown", stopHighlight);
-
+    });
     return;
   }
 
-  // Parse and validate build order
-  const buildOrder = parseBuildOrder(buildOrderText);
-  if (buildOrder.length === 0) {
-    showToast("Build order cannot be empty.", "error");
-    return;
-  }
+  // Helper function to format match-up (e.g., zvp -> ZvP)
+  const formatMatchup = (matchup) => {
+    return matchup
+      .toLowerCase()
+      .replace(
+        /([a-z])([a-z])/g,
+        (match, p1, p2) => `${p1.toUpperCase()}${p2}`
+      );
+  };
 
-  const category = selectedMatchup.startsWith("zv")
-    ? "Zerg"
-    : selectedMatchup.startsWith("pv")
-    ? "Protoss"
-    : "Terran";
+  const formattedMatchup = formatMatchup(selectedMatchup);
 
+  // Extract optional fields
+  const comment = commentInput?.value.trim() || "";
+  const videoLink = videoInput?.value.trim() || "";
+  const buildOrderText = buildOrderInput?.value.trim() || "";
+  const buildOrder = buildOrderText ? parseBuildOrder(buildOrderText) : []; // Parse build order if provided
+  const mapSrc = mapImage?.src || "";
+  const mapName = mapSrc
+    ? mapSrc
+        .split("/")
+        .pop()
+        .replace(/_/g, " ")
+        .replace(".jpg", "")
+        .toLowerCase()
+    : "";
+
+  // Prepare the build object
   const newBuild = {
     title,
+    category: formattedMatchup.startsWith("Zv")
+      ? "Zerg"
+      : formattedMatchup.startsWith("Pv")
+      ? "Protoss"
+      : "Terran",
+    subcategory: formattedMatchup, // Save formatted match-up
+    timestamp: Date.now(),
     comment,
     videoLink,
     buildOrder,
-    category,
-    subcategory: selectedMatchup,
-    timestamp: Date.now(),
-    map: selectedMapName, // Save only the map name
+    map: mapName, // Save only the cleaned map name
     interactiveMap: {
       circles: mapAnnotations.circles.map(({ x, y }) => ({ x, y })),
       arrows: mapAnnotations.arrows.map(({ startX, startY, endX, endY }) => ({
@@ -138,7 +139,6 @@ export function saveCurrentBuild() {
       `A build with the title "${title}" already exists. Overwrite it?`
     );
     if (!overwrite) return;
-
     savedBuilds[existingIndex] = newBuild;
   } else {
     savedBuilds.push(newBuild);
@@ -157,7 +157,7 @@ export function saveCurrentBuild() {
   }
 
   const buildsRef = collection(db, `users/${user.uid}/builds`);
-  const buildDoc = doc(buildsRef, title);
+  const buildDoc = doc(buildsRef, title); // Use title as the document ID for easy lookup
 
   setDoc(buildDoc, newBuild)
     .then(() => {

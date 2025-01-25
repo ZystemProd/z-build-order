@@ -133,21 +133,23 @@ export function viewBuild(buildId) {
           titleInput.value = build.title || "";
         }
 
+        // Format and display match-up
+        const categoryDropdown = document.getElementById("categoryDropdown");
+        if (categoryDropdown) {
+          categoryDropdown.value = build.subcategory || "";
+        }
+        const matchUpElement = document.getElementById("matchUpDisplay");
+        if (matchUpElement) {
+          const formattedMatchUp = build.subcategory
+            ? capitalizeWords(build.subcategory)
+            : "Unknown";
+          matchUpElement.textContent = `Match-Up: ${formattedMatchUp}`;
+        }
+
         // Populate comment
         const commentInput = document.getElementById("commentInput");
         if (commentInput) {
           commentInput.value = build.comment || "";
-        }
-
-        // Populate video link and embed
-        const videoInput = document.getElementById("videoInput");
-        if (videoInput) {
-          videoInput.value = build.videoLink || "";
-          if (build.videoLink) {
-            updateYouTubeEmbed(build.videoLink);
-          } else {
-            clearYouTubeEmbed();
-          }
         }
 
         // Populate build order
@@ -278,7 +280,7 @@ export async function populateBuildList(filteredBuilds = null) {
   // If no filtered builds are provided, fetch all builds
   const builds = filteredBuilds || (await fetchUserBuilds());
 
-  if (builds.length === 0) {
+  if (!builds.length) {
     buildList.innerHTML = "<p>No builds available.</p>";
     return;
   }
@@ -294,25 +296,29 @@ export async function populateBuildList(filteredBuilds = null) {
         <h4>${build.title}</h4>
         <button class="delete-build-btn" title="Delete Build">&times;</button>
       </div>
-      <p>${build.comment || "No comments provided."}</p>
-      <button class="view-build-btn">View Build</button>
+      <p class="matchup-text">${build.subcategory || "Unknown Match-Up"}</p>
     `;
 
     // Add hover functionality for preview
     buildCard.addEventListener("mouseover", () => updateBuildPreview(build));
     buildCard.addEventListener("mouseleave", () => clearBuildPreview());
 
+    // Add view build functionality
+    buildCard.addEventListener("click", () => viewBuild(build.id)); // <--- Add this here
+
     // Add delete functionality
     const deleteButton = buildCard.querySelector(".delete-build-btn");
     deleteButton.addEventListener("click", async (event) => {
-      event.stopPropagation();
-      await deleteBuildFromFirestore(build.id);
-      populateBuildList(filteredBuilds); // Refresh the list after deletion
+      event.stopPropagation(); // Prevent card click from firing
+      const confirmation = confirm(
+        `Are you sure you want to delete the build "${build.title}"?`
+      );
+      if (confirmation) {
+        await deleteBuildFromFirestore(build.id); // Delete from Firestore
+        const updatedBuilds = await fetchUserBuilds(); // Fetch updated build list
+        populateBuildList(updatedBuilds); // Refresh the list
+      }
     });
-
-    // Add view build functionality
-    const viewBuildButton = buildCard.querySelector(".view-build-btn");
-    viewBuildButton.addEventListener("click", () => viewBuild(build.id));
 
     fragment.appendChild(buildCard);
   });
@@ -328,14 +334,26 @@ function updateBuildPreview(build) {
     return;
   }
 
+  // Helper function to format match-up
+  const formatMatchup = (matchup) => {
+    return matchup
+      .toLowerCase()
+      .replace(
+        /([a-z])([a-z])/g,
+        (match, p1, p2) => `${p1.toUpperCase()}${p2}`
+      );
+  };
+
+  const formattedMatchup = formatMatchup(build.subcategory || "Unknown");
+
   const formattedBuildOrder = build.buildOrder
     .map((step) => `[${step.workersOrTimestamp}] ${step.action}`)
     .join("\n");
 
   buildPreview.innerHTML = `
     <h4>${build.title}</h4>
-    <p><strong>Match-Up:</strong> ${build.subcategory || "Unknown"}</p>
     <p><strong>Comment:</strong> ${build.comment || "No comments provided."}</p>
+    <p><strong>Match-Up:</strong> ${formattedMatchup}</p>
     <pre>${formattedBuildOrder}</pre>
   `;
 }
