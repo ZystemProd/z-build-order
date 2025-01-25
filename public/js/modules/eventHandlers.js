@@ -26,6 +26,7 @@ import {
   searchTemplates,
   showSaveTemplateModal,
 } from "./template.js";
+import { initializeTooltips } from "./tooltip.js";
 
 setupTemplateModal();
 
@@ -237,4 +238,9 @@ document.addEventListener("DOMContentLoaded", () => {
   // Initialize map controls and selection only once
   initializeMapControls(mapAnnotations);
   initializeMapSelection(mapAnnotations);
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  // Initialize tooltips
+  initializeTooltips();
 });

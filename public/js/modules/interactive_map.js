@@ -50,7 +50,6 @@ export class MapAnnotations {
     });
 
     container.appendChild(number);
-    s;
     container.appendChild(circle);
     this.annotationsContainer.appendChild(container);
 
@@ -259,12 +258,24 @@ export function initializeMapSelection(mapAnnotations) {
     const card = event.target.closest(".build-card");
     if (card) {
       const selectedMapPath = card.getAttribute("data-map");
+      const selectedMapName = card.querySelector(".build-card-title").innerText;
+      const mapImage = document.getElementById("map-preview-image");
+      const selectedMapText = document.getElementById("selected-map-text");
+      const clearAnnotationsButton = document.querySelector(
+        ".clear-annotations-button"
+      );
+
+      // Update map image and selected map text
       mapImage.src = selectedMapPath;
+      selectedMapText.innerText = `Selected Map: ${selectedMapName}`;
 
       // Clear existing annotations
       mapAnnotations.circles = [];
       mapAnnotations.arrows = [];
       mapAnnotations.annotationsContainer.innerHTML = "";
+
+      // Show the Clear Annotations button
+      clearAnnotationsButton.style.display = "inline-block";
 
       // Close the modal
       modal.style.display = "none";

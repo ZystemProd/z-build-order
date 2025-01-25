@@ -26,6 +26,26 @@ body {
   box-sizing: border-box;
 }
 
+.utility-container {
+  max-width: 70%;
+  margin: 0 auto;
+  margin-top: 15px;
+}
+#map-controls {
+  max-width: 70%;
+  margin: 0 auto;
+}
+
+.mapAndButtons {
+  display: flex;
+  flex-direction: row; /* Align items horizontally */
+  align-items: flex-start; /* Align at the top */
+  gap: 20px; /* Add spacing between the map and the content */
+  margin-top: 20px;
+  margin: auto;
+  max-width: 70%;
+}
+
 #authLoading {
   color: gray;
   font-style: italic;
@@ -265,6 +285,7 @@ button:hover {
   -webkit-user-select: none; /* Safari */
   -ms-user-select: none; /* IE 10 and IE 11 */
   user-select: none; /* Standard syntax */
+  margin-bottom: 15px;
 }
 
 #videoInput {
@@ -822,13 +843,14 @@ textarea::-webkit-scrollbar-thumb:hover {
 }
 
 .menu-button {
-  padding: 10px 20px;
+  padding: 0px 10px;
   font-size: 14px;
-  background-color: #333;
+  background-color: #555;
   color: white;
   border: none;
   cursor: pointer;
   border-radius: 5px;
+  padding: 5px 10px;
 }
 
 .menu-button:hover {
@@ -837,27 +859,6 @@ textarea::-webkit-scrollbar-thumb:hover {
 
 .menu-button.active {
   background-color: #007bff;
-}
-
-.floating-container {
-  position: fixed;
-  display: none;
-  flex-direction: column;
-  top: 50px; /* Initial position */
-  left: 50px; /* Initial position */
-  z-index: 1000; /* Ensure it's above other elements */
-  border-radius: 8px;
-  background-color: #333;
-  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.4);
-  overflow: hidden; /* Prevent content from overflowing */
-  -webkit-user-select: none; /* Safari */
-  -ms-user-select: none; /* IE 10 and IE 11 */
-  user-select: none; /* Standard syntax */
-  max-width: fit-content;
-  max-height: fit-content;
-  min-height: fit-content;
-  min-width: 200px;
-  width: 450px;
 }
 
 .close-map-button {
@@ -905,24 +906,57 @@ textarea::-webkit-scrollbar-thumb:hover {
 }
 
 #map-container {
+  /*
+  left: 0px;
   margin: 20px 0;
   display: block;
   width: 100%;
+  */
+  grid-column: 1; /* Place in the first column */
+  display: block;
 }
 
 #map-preview-container {
   position: relative;
-  width: 100%;
-  max-width: 350px; /* Adjust as necessary */
-  margin: 0 auto;
+  width: 100%; /* Takes up available width */
+  max-width: 600px; /* Optional: Adjust the maximum size */
+  margin: 0 auto; /* Center the container */
+  border: 2px dashed #333; /* Dashed border */
+  border-radius: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden; /* Prevent overflow of child elements */
+}
+
+#map-preview-container::after {
+  content: "Map"; /* Placeholder text */
+  color: #888; /* Text color */
+  font-size: 1.5rem; /* Adjust text size */
+  font-weight: bold; /* Make the text stand out */
+  font-style: italic;
+  text-align: center;
+  pointer-events: none; /* Prevent interactions with the placeholder */
 }
 
 #map-preview-image {
-  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
-  height: auto; /* Maintain aspect ratio */
+  height: 100%; /* Matches container's height */
+  object-fit: contain; /* Ensures the image scales to fill the container */
+  display: none; /* Hidden by default until a map is selected */
 }
 
+#map-preview-image[src]:not([src=""]) {
+  display: block; /* Show the image when a valid source is present */
+}
+
+#map-preview-container:has(#map-preview-image[src]:not([src=""])) {
+  border: none; /* Remove border when a map is selected */
+  border-radius: 0px;
+}
 #map-annotations {
   position: absolute;
   top: 0;
@@ -932,15 +966,41 @@ textarea::-webkit-scrollbar-thumb:hover {
   pointer-events: none; /* Prevent interference */
 }
 
+/* Map Controls Row Styling */
+#map-controls-row {
+  display: flex;
+  justify-content: space-between; /* Space out the elements */
+  align-items: center;
+  padding: 10px;
+  border-radius: 8px; /* Smooth corners */
+}
+
+#selected-map-text {
+  font-size: 16px;
+  color: #888; /* Dimmed text color for unselected state */
+}
+
+#map-controls-row button,
+#map-controls-row span {
+  color: #e0e0e0; /* Light text color */
+  font-size: 14px;
+}
+
 .clear-annotations-button {
-  position: absolute;
-  top: 0px;
-  right: 0px;
-  z-index: 10;
-  width: 40px;
-  height: 30px;
-  padding: 0px;
-  margin: 0px;
+  display: none; /* Hidden by default */
+  position: relative; /* Place it inside the layout */
+  background-color: #555;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+#map-preview-image[src]:not([src=""])
+  + #map-controls-row
+  .clear-annotations-button {
+  display: inline-block; /* Show the button when a valid map is selected */
 }
 /*
 .clear-annotations-button {
@@ -976,12 +1036,6 @@ textarea::-webkit-scrollbar-thumb:hover {
 #map-title-bar .title-bar-right {
   display: flex;
   gap: 10px; /* Add spacing between buttons */
-}
-
-.map-image {
-  width: 100%; /* Resize map to container width */
-  height: 350px; /* Maintain aspect ratio */
-  box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.3);
 }
 
 .map-preview {
@@ -1084,10 +1138,6 @@ textarea::-webkit-scrollbar-thumb:hover {
 .clear-annotations-button:hover,
 .close-map-button:hover {
   background-color: #777;
-}
-
-.floating-container:hover .clear-annotations-button {
-  display: block;
 }
 
 .toast {
@@ -1198,4 +1248,95 @@ textarea::-webkit-scrollbar-thumb:hover {
 .resource::before {
   content: url("path/to/resource-icon.png"); /* Replace with an icon path */
   margin-right: 4px;
+}
+/* General Layout for Main Sections */
+.main-layout {
+  display: flex;
+  flex-direction: column; /* Stack rows vertically */
+  gap: 20px; /* Space between rows */
+  margin: 20px auto;
+  max-width: 70%; /* Optional: Limit the container width */
+}
+
+/* First Row: Buttons */
+.first-row {
+  display: flex;
+  justify-content: space-between; /* Space out the buttons */
+  align-items: center;
+}
+
+/* Second Row: Map and Comment/Video */
+.second-row {
+  display: flex;
+  gap: 20px; /* Space between the columns */
+}
+
+/* Map Container (First Column) */
+#map-container {
+  flex: 1; /* Map container takes up available space */
+  max-width: 400px; /* Optional: Limit the map width */
+  display: flex;
+  flex-direction: column; /* Stack map and controls vertically */
+}
+
+/* Map Controls */
+#map-controls {
+  display: flex;
+  justify-content: center; /* Center controls under the map */
+  gap: 10px; /* Space between buttons */
+}
+
+/* Comment and Video Container (Second Column) */
+.comment-video-container {
+  flex: 2; /* Takes more space compared to the map */
+  display: flex;
+  flex-direction: column; /* Stack Comment and Video sections */
+  gap: 0px; /* Space between comment and video sections */
+}
+
+.comment-video-container h3 {
+  margin-top: 0px;
+}
+
+/* Comment and Video Inputs */
+#commentInput,
+#videoInput {
+  width: 100%;
+  padding: 10px;
+  font-size: 1rem;
+  border: 1px solid #444;
+  border-radius: 5px;
+  background-color: #2c2c2c;
+  color: #e0e0e0;
+  resize: vertical;
+}
+
+#videoInput {
+  height: 40px; /* Smaller height for input field */
+}
+
+.tooltip {
+  position: absolute;
+  transform: translateX(-50%);
+  background-color: #333; /* Background */
+  color: #fff; /* Text color */
+  padding: 5px 10px;
+  font-size: 12px;
+  border-radius: 5px;
+  white-space: nowrap; /* Prevent wrapping */
+  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.2); /* Add shadow */
+  opacity: 0; /* Hidden by default */
+  visibility: hidden; /* Hidden by default */
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+  z-index: 1000;
+}
+
+.tooltip::after {
+  content: "";
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #333; /* Arrow color matches tooltip */
 }

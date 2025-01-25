@@ -9,25 +9,12 @@
     <link rel="stylesheet" type="text/css" href="css/template.css" />
     <link rel="stylesheet" type="text/css" href="css/showToast.css" />
     <link rel="stylesheet" type="text/css" href="css/alertNotification.css" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
-    <script type="module" src="app.js" defer></script>
+    <link
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet"/>    <script type="module" src="app.js" defer></script>
     <script type="module" src="js/modules/eventHandlers.js" defer></script>
   </head>
   <body>
     <div id="toast-container"></div>
-    <!--
-    <div id="floating-map" class="floating-container">
-      <div id="map-title-bar" class="title-bar">
-        <span>Map</span>
-        <button class="close-map-button">✖</button>
-      </div>
-      <div id="map-preview-container" class="map-preview">
-        <img id="map-preview-image" class="map-image" src="img/SG/titans_causeway.jpg" alt="Map Preview" />
-        <div id="map-annotations" class="annotations"></div>
-        <button class="clear-annotations-button"><i class="fa fa-eraser" style="font-size:20px;"></i></button>
-      </div>
-    </div>
-    --> 
     <div id="game-selector" class="menu">
       <p id="authLoading">Checking authentication status...</p>
     
@@ -40,13 +27,13 @@
         <button id="signOutBtn">Sign Out</button>
       </section>
     </div>
-    
-  <!--
-    <button id="starcraft2Button" class="menu-button">Starcraft 2</button>
-    <button id="stormgateButton" class="menu-button">Stormgate</button>
-    -->
+  
     <div id="content">
       <div class="upperInput">
+        <div class="template-controls">
+          <button id="openTemplatesButton" class="btn">Open Templates</button>
+          <button id="saveTemplateButton" class="btn">Save Template</button>
+        </div>
         <!-- Build Order Input Section with Toggle -->
         <h3 data-section="buildOrderInputField" class="toggle-title">
           <span id="buildOrderInputArrow" class="arrow"></span> Build Order
@@ -68,70 +55,49 @@
 
       <div class="buildOrderOutput">
       <!-- Title input field for the build order -->
-      <div class="form-container">
-        <!-- Left Column: Matchup Dropdown -->
-        <div class="form-left">
-          <!--
-          <select id="buildCategoryDropdown" class="styled-dropdown">
-            <option value="" disabled selected>Match-Up</option>
-            <optgroup label="Zerg" style="color: #c07aeb;">
-              <option value="zvp">ZvP</option>
-              <option value="zvt">ZvT</option>
-              <option value="zvz">ZvZ</option>
-            </optgroup>
-            <optgroup label="Protoss" style="color: #5fe5ff;">
-              <option value="pvp">PvP</option>
-              <option value="pvz">PvZ</option>
-              <option value="pvt">PvT</option>
-            </optgroup>
-            <optgroup label="Terran" style="color: #ff3a30;">
-              <option value="tvp">TvP</option>
-              <option value="tvt">TvT</option>
-              <option value="tvz">TvZ</option>
-            </optgroup>
-          </select>
-          -->
-
-          <select id="buildCategoryDropdown" class="styled-dropdown">
-            <option value="" disabled selected>Match-Up</option>
-            <optgroup label="Zerg" style="color: #c07aeb;">
-              <option value="zvp">ZvP</option>
-              <option value="zvt">ZvT</option>
-              <option value="zvz">ZvZ</option>
-            </optgroup>
-            <optgroup label="Protoss" style="color: #5fe5ff;">
-              <option value="pvp">PvP</option>
-              <option value="pvz">PvZ</option>
-              <option value="pvt">PvT</option>
-            </optgroup>
-            <optgroup label="Terran" style="color: #ff3a30;">
-              <option value="tvp">TvP</option>
-              <option value="tvt">TvT</option>
-              <option value="tvz">TvZ</option>
-            </optgroup>
-          </select>
-          
+        <div class="form-container">
+          <!-- Left Column: Matchup Dropdown -->
+          <div class="form-left">
+            <select id="buildCategoryDropdown" class="styled-dropdown">
+              <option value="" disabled selected>Match-Up</option>
+              <optgroup label="Zerg" style="color: #c07aeb;">
+                <option value="zvp">ZvP</option>
+                <option value="zvt">ZvT</option>
+                <option value="zvz">ZvZ</option>
+              </optgroup>
+              <optgroup label="Protoss" style="color: #5fe5ff;">
+                <option value="pvp">PvP</option>
+                <option value="pvz">PvZ</option>
+                <option value="pvt">PvT</option>
+              </optgroup>
+              <optgroup label="Terran" style="color: #ff3a30;">
+                <option value="tvp">TvP</option>
+                <option value="tvt">TvT</option>
+                <option value="tvz">TvZ</option>
+              </optgroup>
+            </select>
+            
+          </div>
+        
+          <!-- Center Column: Title -->
+          <span
+          id="buildOrderTitleText"
+          class="dimmed"
+          onclick="toggleTitleInput(true)"
+          >
+          Enter build order title here...
+          </span>
+          <input
+          type="text"
+          id="buildOrderTitleInput"
+          placeholder="Enter build order title here..."
+          style="display: none;"
+          onblur="toggleTitleInput(false)"
+          />
+      
+          <!-- Right Column: Empty -->
+          <div class="form-right"></div>
         </div>
-      
-        <!-- Center Column: Title -->
-        <span
-        id="buildOrderTitleText"
-        class="dimmed"
-        onclick="toggleTitleInput(true)"
-      >
-        Enter build order title here...
-      </span>
-      <input
-        type="text"
-        id="buildOrderTitleInput"
-        placeholder="Enter build order title here..."
-        style="display: none;"
-        onblur="toggleTitleInput(false)"
-      />
-      
-        <!-- Right Column: Empty -->
-        <div class="form-right"></div>
-      </div>
       
 
         <!-- Existing table and buttons -->
@@ -141,201 +107,219 @@
             <th>Action</th>
           </tr>
         </table>
-        <!-- Map -->
-        <div id="map-container">
-          <div id="map-preview-container" class="map-preview">
-            <img id="map-preview-image" class="map-image" src="img/SG/titans_causeway.jpg" alt="Map Preview" />
-            <div id="map-annotations" class="annotations"></div>
-            <button class="clear-annotations-button"><i class="fa fa-eraser" style="font-size:20px;"></i></button>
+      </div>  
+
+
+
+
+
+
+
+
+
+      <div class="main-layout">
+        <!-- First Row: Buttons -->
+        <div class="row first-row">
+          <div class="saveLoadContainer">
+            <button id="saveBuildButton">Save Current Build</button>
+            <button id="showBuildsButton" onclick="showBuildsModal()">Show All Builds</button>
           </div>
         </div>
+      
+        <!-- Second Row: Map and Comment/Video -->
+        <div class="row second-row">
+          <div id="map-container">
+          <!-- New Row for Map Controls -->
+          <div id="map-controls-row">
+            <span id="selected-map-text">No map selected</span>
+            <button id="openMapModalButton" class="menu-button" data-tooltip="Map Selection"><i class='fas fa-map' style='font-size:20px'></i></button>
 
-        <div class="saveLoadContainer">
-          <button id="saveBuildButton">Save Current Build</button>
-
+            <button class="clear-annotations-button" data-tooltip="Erase All">
+              <i class="fa fa-eraser" style="font-size:20px;"></i>
+            </button>
+          </div>
+          
+          
+            <div id="map-preview-container" class="map-preview">
+              <img id="map-preview-image" class="map-image" src="" alt="Map Preview" />
+              <div id="map-annotations" class="annotations"></div>
+            </div>
+      
+            <!-- Map Controls under the Map -->
+            <div id="map-controls">
+            </div>
+          </div>
+      
+          <div class="comment-video-container">
+            <h3 class="toggle-title">Comment</h3>
+            <textarea id="commentInput" placeholder="Add a comment..."></textarea>
+      
+            <h3 class="toggle-title">Video</h3>
+            <input type="text" id="videoInput" placeholder="Paste YouTube link here..." />
+            <iframe
+              id="videoIframe"
+              style="display: none;"
+              width="560"
+              height="315"
+              frameborder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowfullscreen
+            ></iframe>
+          </div>
         </div>
+      </div>
+      
+      
 
-        <button id="showBuildsButton" onclick="showBuildsModal()">
-          Show All Builds
-        </button>
-        <div id="map-controls">
-          <button id="openMapModalButton" class="menu-button">Select Map</button>
-          <button id="showMapButton" class="icon-button">
-            <i class="fa-solid fa-eye"></i>
-          </button>
+
+
+
+
+
+
+
+
+
+
+
+
+      <div id="templateModal" class="modal">
+        <div class="modal-content-template">
+          <div class="template-header">
+            <span class="close-modal" id="closeTemplateModal">&times;</span>
+            <h3>Templates</h3>
+            <div id="templateHeaderControls" class="header-controls">
+              <input id="templateSearchBar" type="text" placeholder="Search templates..." class="search-bar" />
+              <div id="templateFilters">
+                <button onclick="filterTemplates('all')">All</button>
+                <button onclick="filterTemplates('zerg')">Zerg</button>
+                <button onclick="filterTemplates('terran')">Terran</button>
+                <button onclick="filterTemplates('protoss')">Protoss</button>
+              </div>
+            </div>
+          </div>
+          <div class="template-content-container">
+            <div id="templatePreview">
+              <!-- Preview Content -->
+              <h4>Template Preview</h4>
+              <p>Select a template to view details here.</p>
+            </div>
+            <div class="template-list" id="templateList">
+              <!-- Dynamically added template cards -->
+            </div>
+          </div>
         </div>
-
-        <div class="template-controls">
-          <button id="openTemplatesButton" class="btn">Open Templates</button>
-          <button id="saveTemplateButton" class="btn">Save Template</button>
+      </div>
+      
+      <div id="saveTemplateModal" class="modal" style="display: none;">
+        <div class="modal-content">
+          <span id="closeSaveTemplateModal" class="close-modal">&times;</span>
+          <h3>Save Template</h3>
+          <div>
+            <label for="templateTitleInput">Template Title:</label>
+            <input type="text" id="templateTitleInput" placeholder="Enter template title" />
+          </div>
+          <div>
+            <label>Select Race:</label>
+            <div class="race-selection">
+              <label>
+                <input type="radio" name="templateRace" value="zerg" />
+                <img src="img/race/zerg.png" alt="Zerg" />
+              </label>
+              <label>
+                <input type="radio" name="templateRace" value="terran" />
+                <img src="img/race/terran.png" alt="Terran" />
+              </label>
+              <label>
+                <input type="radio" name="templateRace" value="protoss" />
+                <img src="img/race/protoss.png" alt="Protoss" />
+              </label>
+            </div>
+          </div>
+          <button id="saveTemplateConfirmButton">Save Template</button>
         </div>
+      </div>
+      
+      <!-- Map Selection Modal -->
+      <div id="mapSelectionModal" class="modal">
+        <div class="modal-content">
+          <span class="close-modal" id="closeMapModal">&times;</span>
+          <h3>Select a Map</h3>
+          <div class="builds-container">
+            <!-- Dynamic content for build cards -->
+          </div>
+        </div>
+      </div>
 
-
-        <div id="templateModal" class="modal">
-          <div class="modal-content-template">
-            <div class="template-header">
-              <span class="close-modal" id="closeTemplateModal">&times;</span>
-              <h3>Templates</h3>
-              <div id="templateHeaderControls" class="header-controls">
-                <input id="templateSearchBar" type="text" placeholder="Search templates..." class="search-bar" />
-                <div id="templateFilters">
-                  <button onclick="filterTemplates('all')">All</button>
-                  <button onclick="filterTemplates('zerg')">Zerg</button>
-                  <button onclick="filterTemplates('terran')">Terran</button>
-                  <button onclick="filterTemplates('protoss')">Protoss</button>
+      <!-- Modal for showing all builds -->
+      <div id="buildsModal" class="modal">
+        <div class="modal-content-template">
+          <div class="template-header">
+            <span class="close-modal" id="closeBuildsModal">&times;</span>
+            <h3>Build Orders</h3>
+            <div id="buildHeaderControls" class="header-controls">
+              <input id="buildSearchBar" type="text" placeholder="Search builds..." class="search-bar" />
+              <div class="filters-container">
+                <div class="filter-category" data-category="all">
+                  All
+                </div>
+                <div class="filter-category" data-category="Zerg">
+                  Zerg
+                  <div class="submenu">
+                    <div class="subcategory" data-subcategory="ZvZ">ZvZ</div>
+                    <div class="subcategory" data-subcategory="ZvP">ZvP</div>
+                    <div class="subcategory" data-subcategory="ZvT">ZvT</div>
+                  </div>
+                </div>
+                <div class="filter-category" data-category="Protoss">
+                  Protoss
+                  <div class="submenu">
+                    <div class="subcategory" data-subcategory="PvZ">PvZ</div>
+                    <div class="subcategory" data-subcategory="PvP">PvP</div>
+                    <div class="subcategory" data-subcategory="PvT">PvT</div>
+                  </div>
+                </div>
+                <div class="filter-category" data-category="Terran">
+                  Terran
+                  <div class="submenu">
+                    <div class="subcategory" data-subcategory="TvZ">TvZ</div>
+                    <div class="subcategory" data-subcategory="TvP">TvP</div>
+                    <div class="subcategory" data-subcategory="TvT">TvT</div>
+                  </div>
                 </div>
               </div>
+              
+              
+              
             </div>
-            <div class="template-content-container">
-              <div id="templatePreview">
-                <!-- Preview Content -->
-                <h4>Template Preview</h4>
-                <p>Select a template to view details here.</p>
-              </div>
-              <div class="template-list" id="templateList">
-                <!-- Dynamically added template cards -->
-              </div>
+          </div>
+          <div class="template-content-container">
+            <div id="buildPreview">
+              <!-- Preview content -->
+              <h4>Build Preview</h4>
+              <p>Select a build to view details here.</p>
+            </div>
+            <div class="template-list" id="buildList">
+              <!-- Build cards will be dynamically added here -->
             </div>
           </div>
         </div>
-        
+      </div>
 
-        <div id="saveTemplateModal" class="modal" style="display: none;">
-          <div class="modal-content">
-            <span id="closeSaveTemplateModal" class="close-modal">&times;</span>
-            <h3>Save Template</h3>
-            <div>
-              <label for="templateTitleInput">Template Title:</label>
-              <input type="text" id="templateTitleInput" placeholder="Enter template title" />
-            </div>
-            <div>
-              <label>Select Race:</label>
-              <div class="race-selection">
-                <label>
-                  <input type="radio" name="templateRace" value="zerg" />
-                  <img src="img/race/zerg.png" alt="Zerg" />
-                </label>
-                <label>
-                  <input type="radio" name="templateRace" value="terran" />
-                  <img src="img/race/terran.png" alt="Terran" />
-                </label>
-                <label>
-                  <input type="radio" name="templateRace" value="protoss" />
-                  <img src="img/race/protoss.png" alt="Protoss" />
-                </label>
-              </div>
-            </div>
-            <button id="saveTemplateConfirmButton">Save Template</button>
+      <!-- Modal for delete notification -->
+      <div id="deleteConfirmationModal" class="modal">
+        <div class="modal-content">
+          <h3>Confirm Deletion</h3>
+          <p>Are you sure you want to delete this build?</p>
+          <div class="modal-actions">
+            <button id="confirmDeleteButton" class="btn btn-danger">Yes</button>
+            <button id="cancelDeleteButton" class="btn">No</button>
           </div>
         </div>
-        
-        <!-- Map Selection Modal -->
-        <div id="mapSelectionModal" class="modal">
-          <div class="modal-content">
-            <span class="close-modal" id="closeMapModal">&times;</span>
-            <h3>Select a Map</h3>
-            <div class="builds-container">
-              <!-- Dynamic content for build cards -->
-            </div>
-          </div>
-        </div>
+      </div>
 
-        <!-- Modal for showing all builds -->
-        <div id="buildsModal" class="modal">
-          <div class="modal-content-template">
-            <div class="template-header">
-              <span class="close-modal" id="closeBuildsModal">&times;</span>
-              <h3>Build Orders</h3>
-              <div id="buildHeaderControls" class="header-controls">
-                <input id="buildSearchBar" type="text" placeholder="Search builds..." class="search-bar" />
-                <div class="filters-container">
-                  <div class="filter-category" data-category="all">
-                    All
-                  </div>
-                  <div class="filter-category" data-category="Zerg">
-                    Zerg
-                    <div class="submenu">
-                      <div class="subcategory" data-subcategory="ZvZ">ZvZ</div>
-                      <div class="subcategory" data-subcategory="ZvP">ZvP</div>
-                      <div class="subcategory" data-subcategory="ZvT">ZvT</div>
-                    </div>
-                  </div>
-                  <div class="filter-category" data-category="Protoss">
-                    Protoss
-                    <div class="submenu">
-                      <div class="subcategory" data-subcategory="PvZ">PvZ</div>
-                      <div class="subcategory" data-subcategory="PvP">PvP</div>
-                      <div class="subcategory" data-subcategory="PvT">PvT</div>
-                    </div>
-                  </div>
-                  <div class="filter-category" data-category="Terran">
-                    Terran
-                    <div class="submenu">
-                      <div class="subcategory" data-subcategory="TvZ">TvZ</div>
-                      <div class="subcategory" data-subcategory="TvP">TvP</div>
-                      <div class="subcategory" data-subcategory="TvT">TvT</div>
-                    </div>
-                  </div>
-                </div>
-                
-                
-                
-              </div>
-            </div>
-            <div class="template-content-container">
-              <div id="buildPreview">
-                <!-- Preview content -->
-                <h4>Build Preview</h4>
-                <p>Select a build to view details here.</p>
-              </div>
-              <div class="template-list" id="buildList">
-                <!-- Build cards will be dynamically added here -->
-              </div>
-            </div>
-          </div>
-        </div>
 
-        <!-- Modal for delete notification -->
-        <div id="deleteConfirmationModal" class="modal">
-          <div class="modal-content">
-            <h3>Confirm Deletion</h3>
-            <p>Are you sure you want to delete this build?</p>
-            <div class="modal-actions">
-              <button id="confirmDeleteButton" class="btn btn-danger">Yes</button>
-              <button id="cancelDeleteButton" class="btn">No</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Comment Section -->
-        <h3 data-section="commentField" class="toggle-title">
-          <span id="commentArrow" class="arrow"></span> Comment
-        </h3>
-        <div id="commentField" class="hideable-section" style="display: none">
-          <textarea id="commentInput" placeholder="Add a comment..."></textarea>
-        </div>
-
-        <!-- Video Section -->
-        <h3 data-section="videoField" class="toggle-title">
-          <span id="videoArrow" class="arrow"></span> Video
-        </h3>
-        <div id="videoField" class="hideable-section" style="display: none">
-          <input
-            type="text"
-            id="videoInput"
-            placeholder="Paste YouTube link here..."
-          />
-          <iframe
-            id="videoIframe"
-            style="display: none;"
-            width="560"
-            height="315"
-            frameborder="0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowfullscreen
-          ></iframe>
-        </div>
-        </div>
+      </div>
       </div>
     </div>
     <!-- Footer Section -->
@@ -348,7 +332,7 @@
           class="footer-logo"
         />
       </a>
-      <p>︱Version 0.2.15</p>
+      <p>︱Version 0.2.20</p>
       <!-- Version number here -->
     </div>
   </body>
