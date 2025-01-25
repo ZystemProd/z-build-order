@@ -12,23 +12,13 @@ export class MapAnnotations {
 
     this.initializeEventListeners();
   }
-  /*
+
   calculateCoordinates(event) {
     const rect = this.mapContainer.getBoundingClientRect();
 
     // Calculate coordinates as percentages relative to the image dimensions
     const x = ((event.clientX - rect.left - 6) / rect.width) * 100;
     const y = ((event.clientY - rect.top - 2) / rect.height) * 100;
-
-    return { x, y };
-  }
-*/
-  calculateCoordinates(event) {
-    const rect = this.mapContainer.getBoundingClientRect();
-
-    // Calculate coordinates as percentages relative to the actual displayed dimensions
-    const x = ((event.clientX - rect.left) / rect.width) * 100;
-    const y = ((event.clientY - rect.top) / rect.height) * 100;
 
     return { x, y };
   }
