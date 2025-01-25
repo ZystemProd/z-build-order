@@ -62,6 +62,8 @@ export function viewBuild(buildId) {
       if (docSnap.exists()) {
         const build = docSnap.data();
         const mapImage = document.getElementById("map-preview-image");
+        const selectedMapText = document.getElementById("selected-map-text");
+
         console.log("Loaded build:", build);
 
         // Check for mandatory fields
@@ -76,84 +78,64 @@ export function viewBuild(buildId) {
           return;
         }
 
-        // Display the selected map
+        // Update the map preview and selected map text
         if (build.map) {
-          mapImage.src = build.map; // Set map image source
+          mapImage.src = build.map; // Update map image
+          if (selectedMapText) {
+            selectedMapText.innerText = `Selected Map: ${
+              build.mapName || "Unknown"
+            }`; // Use "Unknown" if mapName is missing
+          }
+        } else if (selectedMapText) {
+          selectedMapText.innerText = "No map selected";
         }
 
+        // Load annotations (circles and arrows)
         if (build.interactiveMap) {
-          // Clear existing annotations and DOM elements
           mapAnnotations.circles = [];
           mapAnnotations.annotationsContainer.innerHTML = "";
 
-          // Load circles
-          build.interactiveMap.circles.forEach(({ x, y }) => {
+          build.interactiveMap.circles?.forEach(({ x, y }) => {
             mapAnnotations.createCircle(x, y);
           });
 
-          // Load arrows (Insert your code here)
-          if (build.interactiveMap.arrows) {
-            console.log("Arrow Data Loaded:", build.interactiveMap.arrows);
-            build.interactiveMap.arrows.forEach(
-              ({ startX, startY, endX, endY }) => {
-                console.log("Creating Arrow:", { startX, startY, endX, endY });
-                mapAnnotations.createArrow(startX, startY, endX, endY);
-              }
-            );
-          }
+          build.interactiveMap.arrows?.forEach(
+            ({ startX, startY, endX, endY }) => {
+              mapAnnotations.createArrow(startX, startY, endX, endY);
+            }
+          );
 
-          // Recalculate numbering to ensure consistency
           mapAnnotations.updateCircleNumbers();
         }
 
-        // Retrieve or recreate DOM elements
+        // Populate other fields (title, comment, video, build order)
         const titleInput =
           document.getElementById("buildOrderTitleInput") ||
           recreateInput("buildOrderTitleInput");
-        const titleText =
-          document.getElementById("buildOrderTitleText") ||
-          recreateText("buildOrderTitleText");
-        const categoryDropdown =
-          document.getElementById("buildCategoryDropdown") ||
-          recreateDropdown("buildCategoryDropdown");
-        const commentInput =
-          document.getElementById("commentInput") ||
-          recreateInput("commentInput");
-        const videoInput =
-          document.getElementById("videoInput") || recreateInput("videoInput");
-        const buildOrderInput =
-          document.getElementById("buildOrderInput") ||
-          recreateInput("buildOrderInput");
-
-        // Populate title
         titleInput.value = build.title || "";
-        titleText.textContent = build.title || "";
-        titleText.classList.remove("dimmed");
 
-        // Populate match-up dropdown
-        categoryDropdown.value = build.subcategory || "";
-
-        // Populate comment and video link
-        commentInput.value = build.comment || "";
-        videoInput.value = build.videoLink || "";
-
-        // Update YouTube embed
-        if (build.videoLink) {
-          updateYouTubeEmbed(build.videoLink);
-        } else {
-          clearYouTubeEmbed();
+        const commentInput = document.getElementById("commentInput");
+        if (commentInput) {
+          commentInput.value = build.comment || "";
         }
 
-        // Populate build order
-        const formattedBuildOrder = build.buildOrder
-          .map((step) => `[${step.workersOrTimestamp}] ${step.action}`)
-          .join("\n");
-        buildOrderInput.value = formattedBuildOrder;
+        const videoInput = document.getElementById("videoInput");
+        if (videoInput) {
+          videoInput.value = build.videoLink || "";
+          build.videoLink
+            ? updateYouTubeEmbed(build.videoLink)
+            : clearYouTubeEmbed();
+        }
 
-        // Update build order table
+        const buildOrderInput = document.getElementById("buildOrderInput");
+        if (buildOrderInput) {
+          buildOrderInput.value = build.buildOrder
+            .map((step) => `[${step.workersOrTimestamp}] ${step.action}`)
+            .join("\n");
+        }
+
         displayBuildOrder(build.buildOrder);
 
-        // Close the modal
         closeModal();
       } else {
         console.error("No such build found.");

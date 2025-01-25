@@ -39,7 +39,6 @@ export async function fetchUserBuilds() {
 
 export function saveCurrentBuild() {
   const titleInput = document.getElementById("buildOrderTitleInput");
-  const titleText = document.getElementById("buildOrderTitleText");
   const commentInput = document.getElementById("commentInput");
   const videoInput = document.getElementById("videoInput");
   const buildOrderInput = document.getElementById("buildOrderInput");
@@ -51,7 +50,8 @@ export function saveCurrentBuild() {
   const videoLink = videoInput.value.trim();
   const buildOrderText = buildOrderInput.value.trim();
   const selectedMatchup = categoryDropdown.value;
-  const selectedMapPath = mapImage.src; // Capture the map path
+  const selectedMapPath = mapImage.src; // Get the map path
+  const selectedMapName = selectedMapPath.split("/").pop() || "Unknown"; // Extract map name
 
   // Missing title handling
   if (!title) {
@@ -110,6 +110,7 @@ export function saveCurrentBuild() {
     subcategory,
     timestamp: Date.now(),
     map: selectedMapPath, // Save map path
+    mapName: selectedMapName, // Save map name
     interactiveMap: {
       circles: mapAnnotations.circles.map(({ x, y }) => ({ x, y })),
       arrows: mapAnnotations.arrows.map(({ startX, startY, endX, endY }) => ({
