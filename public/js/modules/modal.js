@@ -15,6 +15,15 @@ import {
 import { fetchUserBuilds } from "./buildManagement.js";
 import { mapAnnotations } from "./interactive_map.js";
 
+function formatMatchup(matchup) {
+  if (!matchup) return "Unknown Match-Up";
+  return (
+    matchup.charAt(0).toUpperCase() +
+    matchup.slice(1, -1).toLowerCase() +
+    matchup.charAt(matchup.length - 1).toUpperCase()
+  );
+}
+
 export async function deleteBuildFromFirestore(buildId) {
   const db = getFirestore();
   const auth = getAuth();
@@ -291,12 +300,17 @@ export async function populateBuildList(filteredBuilds = null) {
     const buildCard = document.createElement("div");
     buildCard.classList.add("build-card");
 
+    // Determine the background image based on the match-up
+    const matchup = build.subcategory || "unknown";
+    const backgroundImageUrl = `../img/frames/${matchup.toLowerCase()}.png`;
+    buildCard.style.backgroundImage = `url("${backgroundImageUrl}")`;
+
     buildCard.innerHTML = `
       <div class="card-header">
         <h4>${build.title}</h4>
-        <button class="delete-build-btn" title="Delete Build">&times;</button>
+        <button class="delete-build-btn" data-tooltip="Delete Build" title="Delete Build">&times;</button>        <div class="delete-bg"></div>
       </div>
-      <p class="matchup-text">${build.subcategory || "Unknown Match-Up"}</p>
+      <p class="matchup-text">${formatMatchup(matchup)}</p>
     `;
 
     // Add hover functionality for preview
@@ -304,7 +318,7 @@ export async function populateBuildList(filteredBuilds = null) {
     buildCard.addEventListener("mouseleave", () => clearBuildPreview());
 
     // Add view build functionality
-    buildCard.addEventListener("click", () => viewBuild(build.id)); // <--- Add this here
+    buildCard.addEventListener("click", () => viewBuild(build.id));
 
     // Add delete functionality
     const deleteButton = buildCard.querySelector(".delete-build-btn");
@@ -334,17 +348,7 @@ function updateBuildPreview(build) {
     return;
   }
 
-  // Helper function to format match-up
-  const formatMatchup = (matchup) => {
-    return matchup
-      .toLowerCase()
-      .replace(
-        /([a-z])([a-z])/g,
-        (match, p1, p2) => `${p1.toUpperCase()}${p2}`
-      );
-  };
-
-  const formattedMatchup = formatMatchup(build.subcategory || "Unknown");
+  const formattedMatchup = formatMatchup(build.subcategory);
 
   const formattedBuildOrder = build.buildOrder
     .map((step) => `[${step.workersOrTimestamp}] ${step.action}`)

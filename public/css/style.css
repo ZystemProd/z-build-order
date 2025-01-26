@@ -585,7 +585,7 @@ textarea::-webkit-scrollbar-thumb:hover {
 }
 
 .build-card .map-image {
-  height: 250px;
+  height: 135px;
 }
 /*
 .build-card::after {
@@ -600,15 +600,6 @@ textarea::-webkit-scrollbar-thumb:hover {
   transition: opacity 0.3s ease-in-out;
 }
 */
-
-.matchup-text {
-  font-size: 14px;
-  font-weight: bold;
-  color: #ccc; /* Adjust color for better visibility */
-  margin-top: 10px;
-  text-align: center;
-}
-
 .build-card:hover {
   transform: scale(1.1, 1.1);
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.6);
