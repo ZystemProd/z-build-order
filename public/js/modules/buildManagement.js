@@ -161,7 +161,7 @@ export function saveCurrentBuild() {
 
   setDoc(buildDoc, newBuild)
     .then(() => {
-      showToast("Build saved to database successfully!", "success");
+      //showToast("Build saved to database successfully!", "success");
     })
     .catch((error) => {
       console.error("Error saving build to Firestore:", error);

@@ -944,6 +944,7 @@ textarea::-webkit-scrollbar-thumb:hover {
   justify-content: center;
   align-items: center;
   overflow: hidden; /* Prevent overflow of child elements */
+  cursor: pointer; /* Indicate clickability */
 }
 
 #map-preview-container::after {

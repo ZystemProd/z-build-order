@@ -218,6 +218,57 @@ export function initializeModalEventListeners() {
   });
 }
 
+document.addEventListener("DOMContentLoaded", () => {
+  const mapPreviewContainer = document.getElementById("map-preview-container");
+  const mapSelectionModal = document.getElementById("mapSelectionModal");
+  const mapPreviewImage = document.getElementById("map-preview-image");
+
+  // Track whether a map is selected
+  let isMapSelected = false;
+
+  if (mapPreviewContainer && mapSelectionModal) {
+    mapPreviewContainer.addEventListener("click", () => {
+      // Open modal only if no map is selected
+      if (!isMapSelected) {
+        mapSelectionModal.style.display = "block";
+      }
+    });
+
+    // Example: Set the state when a map is selected
+    document
+      .querySelector(".builds-container")
+      .addEventListener("click", (event) => {
+        const mapCard = event.target.closest(".map-card");
+        if (mapCard) {
+          const mapImageSrc = mapCard.getAttribute("data-map");
+          const mapName = mapCard.querySelector(".map-card-title").innerText;
+
+          // Update the map preview
+          mapPreviewImage.src = mapImageSrc;
+          mapPreviewImage.style.display = "block";
+          document.getElementById(
+            "selected-map-text"
+          ).innerText = `Selected Map: ${mapName}`;
+
+          // Set the map as selected
+          isMapSelected = true;
+
+          // Close the modal
+          mapSelectionModal.style.display = "none";
+        }
+      });
+
+    // Optional: Close modal when clicking outside
+    window.addEventListener("click", (event) => {
+      if (event.target === mapSelectionModal) {
+        mapSelectionModal.style.display = "none";
+      }
+    });
+  } else {
+    console.error("Map Preview Container or Map Selection Modal not found!");
+  }
+});
+
 document
   .getElementById("closeBuildsModal")
   .addEventListener("click", closeBuildsModal);
