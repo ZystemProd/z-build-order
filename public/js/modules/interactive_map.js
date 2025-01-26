@@ -205,7 +205,13 @@ export function initializeMapSelection(mapAnnotations) {
   const modal = document.getElementById("mapSelectionModal");
   const closeModal = document.getElementById("closeMapModal");
   const buildsContainer = modal.querySelector(".builds-container");
-  const mapImage = document.getElementById("map-preview-image");
+
+  if (!buildsContainer) {
+    console.error(
+      "Error: .builds-container not found inside #mapSelectionModal"
+    );
+    return;
+  }
 
   // List of maps with paths
   const maps = [
@@ -227,8 +233,8 @@ export function initializeMapSelection(mapAnnotations) {
   buildsContainer.innerHTML = maps
     .map(
       (map) => `
-      <div class="build-card" data-map="${map.imagePath}">
-        <div class="build-card-title">${map.name}</div>
+      <div class="map-card" data-map="${map.imagePath}">
+        <div class="map-card-title">${map.name}</div>
         <img src="${map.imagePath}" alt="${map.name}" class="map-image">
       </div>`
     )
@@ -248,17 +254,17 @@ export function initializeMapSelection(mapAnnotations) {
 
   // Close modal when clicking outside the modal content
   window.addEventListener("click", (event) => {
-    if (event.target === mapSelectionModal) {
-      mapSelectionModal.style.display = "none";
+    if (event.target === modal) {
+      modal.style.display = "none";
     }
   });
 
   // Update map on card click
   buildsContainer.addEventListener("click", (event) => {
-    const card = event.target.closest(".build-card");
+    const card = event.target.closest(".map-card");
     if (card) {
       const selectedMapPath = card.getAttribute("data-map");
-      const selectedMapName = card.querySelector(".build-card-title").innerText;
+      const selectedMapName = card.querySelector(".map-card-title").innerText;
       const mapImage = document.getElementById("map-preview-image");
       const selectedMapText = document.getElementById("selected-map-text");
       const clearAnnotationsButton = document.querySelector(

@@ -1357,3 +1357,85 @@ textarea::-webkit-scrollbar-thumb:hover {
   border: 5px solid transparent;
   border-top-color: #333; /* Arrow color matches tooltip */
 }
+
+/* Map Modal Styles */
+.map-modal {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: rgba(0, 0, 0, 0.6); /* Darker overlay */
+}
+
+.map-modal-content {
+  display: none;
+  max-width: 800px;
+  padding: 20px;
+  background-color: #2c2c2c; /* Dark background */
+  color: #fff; /* Light text */
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+
+.map-cards-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 20px;
+  padding: 10px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.map-cards-container .map-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid #444;
+  border-radius: 8px;
+  background-color: #333;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.map-cards-container .map-card:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+}
+
+.map-cards-container .map-card img {
+  max-width: 100%;
+  border-radius: 5px;
+}
+
+.map-card {
+  display: flex;
+  width: 200px;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid #444;
+  border-radius: 8px;
+  background-color: #333;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s, box-shadow 0.2s;
+  cursor: pointer;
+}
+
+.map-card:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+}
+
+.map-card-title {
+  font-size: 14px;
+  color: #fff;
+  margin-bottom: 5px;
+  text-align: center;
+}
+
+.map-card img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 5px;
+}

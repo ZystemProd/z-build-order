@@ -458,4 +458,26 @@ export async function searchBuilds(query) {
   populateBuildList(filteredBuilds);
 }
 
+export async function populateMapModal(maps) {
+  const mapContainer = document.querySelector(".map-cards-container");
+  mapContainer.innerHTML = ""; // Clear existing maps
+
+  maps.forEach((map) => {
+    const mapCard = document.createElement("div");
+    mapCard.classList.add("map-card");
+
+    mapCard.innerHTML = `
+      <img src="${map.image}" alt="${map.name}" />
+      <h4>${map.name}</h4>
+    `;
+
+    // Add click event for selecting a map
+    mapCard.addEventListener("click", () => {
+      selectMap(map.name);
+    });
+
+    mapContainer.appendChild(mapCard);
+  });
+}
+
 export { closeBuildsModal };
