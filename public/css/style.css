@@ -9,6 +9,8 @@ body {
 }
 html,
 body {
+  width: 100%;
+  height: 100%;
   margin: 0;
   padding: 0;
   height: 100%; /* Ensures the full height covers the viewport */
@@ -18,6 +20,11 @@ body {
 
 #content {
   flex: 1; /* Fills available space, pushing the footer down when content grows */
+  margin: 0 auto;
+  width: 60%;
+  max-width: 1200px;
+  min-width: 768px;
+  padding-bottom: 60px; /* Adjust to match the footer height */
 }
 
 *,
@@ -27,13 +34,7 @@ body {
 }
 
 .utility-container {
-  max-width: 70%;
-  margin: 0 auto;
   margin-top: 15px;
-}
-#map-controls {
-  max-width: 70%;
-  margin: 0 auto;
 }
 
 .mapAndButtons {
@@ -209,13 +210,6 @@ button:hover {
   font-size: 1.4em; /* Slightly larger for the title */
 }
 
-.titleContainer {
-  max-width: 70%;
-  margin: 0 auto;
-  text-align: center;
-  margin-top: 20px;
-}
-
 #buildOrderTitleText {
   font-size: 1.5em;
   height: 50px; /* Set a fixed height */
@@ -227,6 +221,8 @@ button:hover {
   font-size: 1.5em;
   vertical-align: middle;
   line-height: 27px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 #buildOrderTitleText.dimmed {
@@ -334,8 +330,6 @@ button:hover {
 }
 
 .upperInput {
-  max-width: 70%; /* Ensure it's consistent with other sections */
-  margin: 0 auto; /* Center the input field */
   margin-top: 150px; /* Adjust if needed for spacing */
   padding-left: 10px; /* Optional, for a more consistent look with other inputs */
   padding-right: 10px; /* Optional */
@@ -346,8 +340,6 @@ button:hover {
 }
 
 .buildOrderOutput {
-  max-width: 70%;
-  margin: 0 auto;
   margin-top: 15px;
 }
 
@@ -401,13 +393,17 @@ button:hover {
   }
 }
 .footer {
-  width: 100%;
-  background-color: #1e1e1e;
+  width: 100%; /* Full width */
+  background-color: #1e1e1e; /* Footer background color */
   text-align: center;
   padding: 10px 0;
   font-size: 14px;
   color: white;
-  position: relative; /* Ensures no overlap */
+  flex-shrink: 0; /* Ensure footer doesn't shrink */
+  position: fixed; /* Fix the footer at the bottom of the viewport */
+  bottom: 0;
+  left: 0;
+  z-index: 10; /* Ensure it stays above other content */
 }
 
 .footer img {
@@ -851,7 +847,7 @@ textarea::-webkit-scrollbar-thumb:hover {
 }
 
 .menu {
-  position: absolute;
+  position: fixed;
   top: 10px;
   right: 10px;
   display: flex;
@@ -937,6 +933,7 @@ textarea::-webkit-scrollbar-thumb:hover {
   position: relative;
   width: 100%; /* Takes up available width */
   max-width: 600px; /* Optional: Adjust the maximum size */
+  aspect-ratio: 16 / 9; /* Set the ratio (e.g., 16:9) */
   margin: 0 auto; /* Center the container */
   border: 2px dashed #333; /* Dashed border */
   border-radius: 20px;
@@ -1006,13 +1003,15 @@ textarea::-webkit-scrollbar-thumb:hover {
 
 .clear-annotations-button {
   display: none; /* Hidden by default */
-  position: relative; /* Place it inside the layout */
+  position: flex; /* Place it inside the layout */
   background-color: #555;
   color: white;
   border: none;
   padding: 5px 10px;
   border-radius: 5px;
   cursor: pointer;
+  justify-content: center;
+  align-items: center; /* Centers the content vertically */
 }
 
 #map-preview-image[src]:not([src=""])
@@ -1273,7 +1272,6 @@ textarea::-webkit-scrollbar-thumb:hover {
   flex-direction: column; /* Stack rows vertically */
   gap: 20px; /* Space between rows */
   margin: 20px auto;
-  max-width: 70%; /* Optional: Limit the container width */
 }
 
 /* First Row: Buttons */
@@ -1439,4 +1437,75 @@ textarea::-webkit-scrollbar-thumb:hover {
   max-width: 100%;
   height: auto;
   border-radius: 5px;
+}
+
+@media screen and (max-width: 768px) {
+  html #content {
+    width: 100%;
+    padding: 30px;
+    margin: 0;
+  }
+  .footer {
+    font-size: 12px; /* Slightly smaller text for small screens */
+    padding: 8px 0;
+  }
+  .main-layout {
+    display: flex;
+    flex-direction: column; /* Stack elements vertically */
+    gap: 20px; /* Add spacing between sections */
+  }
+  .second-row {
+    flex-direction: column; /* Stack the second row vertically */
+    align-items: stretch; /* Ensure elements take full width */
+    gap: 20px; /* Add spacing between elements */
+  }
+  #map-preview-container {
+    max-width: 100%; /* Full width */
+    width: 100%; /* Ensure it scales with the parent */
+  }
+  .comment-video-container {
+    max-width: 100%; /* Full width */
+    width: 100%; /* Ensure it scales with the parent */
+  }
+
+  #buildOrderTitleText span {
+    font-size: 5px;
+  }
+  #map-container {
+    margin: auto;
+  }
+}
+
+@media screen and (max-width: 425px) {
+  .content {
+    margin: 0 auto;
+    width: 100%;
+    padding-left: 5px;
+    padding-right: 5px;
+    font-size: 14px; /* Reduce font size for smaller screens */
+  }
+}
+
+@media screen and (max-width: 1024px) {
+  .content {
+    margin: 0 auto;
+    width: 90%; /* Slightly narrower width for better readability */
+    padding-left: 15px;
+    padding-right: 15px;
+  }
+}
+
+.svg-icon {
+  width: 20px;
+  height: 20px;
+  filter: brightness(0) invert(1); /* Makes the icon white */
+  vertical-align: middle; /* Aligns the SVG with the text baseline */
+}
+
+.svg-icon:hover {
+  filter: brightness(0.8) invert(1); /* Example hover effect */
+}
+
+#openMapModalButton {
+  margin-right: 5px;
 }

@@ -1,3 +1,4 @@
+import DOMPurify from "dompurify";
 import { analyzeBuildOrder } from "./uiHandlers.js";
 
 const predefinedTemplates = [

@@ -2,15 +2,16 @@
 <html lang="en">
   <head>
     <title>Z-Build Order</title>
+    <meta name="description" content="Plan and save your StarCraft 2 build orders with Z-Build Order. Supports custom builds, categories, and templates.">
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/x-icon" href="/img/favicon.ico" />
     <link rel="stylesheet" type="text/css" href="css/style.css" />
     <link rel="stylesheet" type="text/css" href="css/template.css" />
     <link rel="stylesheet" type="text/css" href="css/showToast.css" />
-    <link rel="stylesheet" type="text/css" href="css/alertNotification.css" />
-    <link
-    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet"/>    <script type="module" src="app.js" defer></script>
+    <link rel="stylesheet" type="text/css" href="css/alertNotification.css" />  
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.4/purify.min.js" integrity="sha512-..." crossorigin="anonymous"></script>  
+    <script type="module" src="app.js" defer></script>
     <script type="module" src="js/modules/eventHandlers.js" defer></script>
   </head>
   <body>
@@ -107,35 +108,30 @@
             <th>Action</th>
           </tr>
         </table>
+      </div>
+      <!-- First Row: Buttons -->
+      <div class="row first-row">
+        <div class="saveLoadContainer">
+          <button id="saveBuildButton">Save Current Build</button>
+          <button id="showBuildsButton" onclick="showBuildsModal()">Show All Builds</button>
+        </div>
       </div>  
 
 
 
-
-
-
-
-
-
-      <div class="main-layout">
-        <!-- First Row: Buttons -->
-        <div class="row first-row">
-          <div class="saveLoadContainer">
-            <button id="saveBuildButton">Save Current Build</button>
-            <button id="showBuildsButton" onclick="showBuildsModal()">Show All Builds</button>
-          </div>
-        </div>
-      
+      <div class="main-layout">      
         <!-- Second Row: Map and Comment/Video -->
         <div class="row second-row">
           <div id="map-container">
           <!-- New Row for Map Controls -->
           <div id="map-controls-row">
             <span id="selected-map-text">No map selected</span>
-            <button id="openMapModalButton" class="menu-button" data-tooltip="Map Selection"><i class='fas fa-map' style='font-size:20px'></i></button>
+            <button id="openMapModalButton" class="menu-button" data-tooltip="Map Selection">
+              <img src="img/SVG/map-solid.svg" alt="Map Icon" style="width:20px; height:20px;" class="svg-icon">
+            </button>
 
             <button class="clear-annotations-button" data-tooltip="Erase All">
-              <i class="fa fa-eraser" style="font-size:20px;"></i>
+              <img src="img/SVG/eraser-solid.svg" alt="Eraser Icon" style="width:20px; height:20px;" class="svg-icon">
             </button>
           </div>
           

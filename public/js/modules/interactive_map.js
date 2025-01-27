@@ -273,7 +273,7 @@ export function initializeMapSelection(mapAnnotations) {
 
       // Update map image and selected map text
       mapImage.src = selectedMapPath;
-      selectedMapText.innerText = `Selected Map: ${selectedMapName}`;
+      selectedMapText.innerText = `${selectedMapName}`;
 
       // Clear existing annotations
       mapAnnotations.circles = [];

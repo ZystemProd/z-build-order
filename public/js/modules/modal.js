@@ -107,7 +107,7 @@ export function viewBuild(buildId) {
 
           mapImage.src = mapUrl; // Set the map image
           if (selectedMapText) {
-            selectedMapText.innerText = `Selected Map: ${formattedMapName}`;
+            selectedMapText.innerText = `${formattedMapName}`;
           }
         } else if (selectedMapText) {
           selectedMapText.innerText = "No map selected"; // Fallback text for no map

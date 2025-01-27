@@ -246,9 +246,7 @@ document.addEventListener("DOMContentLoaded", () => {
           // Update the map preview
           mapPreviewImage.src = mapImageSrc;
           mapPreviewImage.style.display = "block";
-          document.getElementById(
-            "selected-map-text"
-          ).innerText = `Selected Map: ${mapName}`;
+          document.getElementById("selected-map-text").innerText = `${mapName}`;
 
           // Set the map as selected
           isMapSelected = true;
