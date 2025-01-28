@@ -5,6 +5,7 @@ import {
   deleteDoc,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+//import * as DOMPurify from "./dompurify/dist/purify.min.js";
 import { displayBuildOrder, showToast } from "./uiHandlers.js";
 import { updateYouTubeEmbed, clearYouTubeEmbed } from "./youtube.js";
 import {
@@ -46,13 +47,6 @@ export async function deleteBuildFromFirestore(buildId) {
     console.error("Error deleting build:", error);
     showToast("Failed to delete the build. Please try again.", "error");
   }
-}
-
-// Helper to sanitize potentially unsafe HTML input
-function sanitizeHTML(str) {
-  const tempDiv = document.createElement("div");
-  tempDiv.textContent = str;
-  return tempDiv.innerHTML;
 }
 
 export function viewBuild(buildId) {
@@ -134,7 +128,8 @@ export function viewBuild(buildId) {
         // Update titleText and titleInput
         if (titleText) {
           titleText.textContent =
-            build.title || "Enter build order title here...";
+            DOMPurify.sanitize(build.title) ||
+            "Enter build order title here...";
           titleText.classList.remove("dimmed"); // Remove dimmed style if applicable
         }
 
@@ -158,7 +153,7 @@ export function viewBuild(buildId) {
         // Populate comment
         const commentInput = document.getElementById("commentInput");
         if (commentInput) {
-          commentInput.value = build.comment || "";
+          commentInput.value = DOMPurify.sanitize(build.comment) || "";
         }
 
         // Populate build order
@@ -307,10 +302,10 @@ export async function populateBuildList(filteredBuilds = null) {
 
     buildCard.innerHTML = `
       <div class="card-header">
-        <h4>${build.title}</h4>
+        <h4>${DOMPurify.sanitize(build.title)}</h4>
         <button class="delete-build-btn" data-tooltip="Delete Build" title="Delete Build">&times;</button>        <div class="delete-bg"></div>
       </div>
-      <p class="matchup-text">${formatMatchup(matchup)}</p>
+      <p class="matchup-text">${DOMPurify.sanitize(formatMatchup(matchup))}</p>
     `;
 
     // Add hover functionality for preview
@@ -351,14 +346,21 @@ function updateBuildPreview(build) {
   const formattedMatchup = formatMatchup(build.subcategory);
 
   const formattedBuildOrder = build.buildOrder
-    .map((step) => `[${step.workersOrTimestamp}] ${step.action}`)
+    .map(
+      (step) =>
+        `[${DOMPurify.sanitize(step.workersOrTimestamp)}] ${DOMPurify.sanitize(
+          step.action
+        )}`
+    )
     .join("\n");
 
   buildPreview.innerHTML = `
-    <h4>${build.title}</h4>
-    <p><strong>Comment:</strong> ${build.comment || "No comments provided."}</p>
-    <p><strong>Match-Up:</strong> ${formattedMatchup}</p>
-    <pre>${formattedBuildOrder}</pre>
+    <h4>${DOMPurify.sanitize(build.title)}</h4>
+    <p><strong>Comment:</strong> ${DOMPurify.sanitize(
+      build.comment || "No comments provided."
+    )}</p>
+    <p><strong>Match-Up:</strong> ${DOMPurify.sanitize(formattedMatchup)}</p>
+    <pre>${DOMPurify.sanitize(formattedBuildOrder)}</pre>
   `;
 }
 
@@ -467,8 +469,10 @@ export async function populateMapModal(maps) {
     mapCard.classList.add("map-card");
 
     mapCard.innerHTML = `
-      <img src="${map.image}" alt="${map.name}" />
-      <h4>${map.name}</h4>
+      <img src="${DOMPurify.sanitize(map.image)}" alt="${DOMPurify.sanitize(
+      map.name
+    )}" />
+      <h4>${DOMPurify.sanitize(map.name)}</h4>
     `;
 
     // Add click event for selecting a map

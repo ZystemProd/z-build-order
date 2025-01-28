@@ -3,7 +3,9 @@ export function initializeTooltips() {
   const tooltipElements = document.querySelectorAll("[data-tooltip]");
 
   tooltipElements.forEach((element) => {
-    const tooltipText = element.getAttribute("data-tooltip");
+    const tooltipText = DOMPurify.sanitize(
+      element.getAttribute("data-tooltip")
+    );
 
     // Create a tooltip element
     const tooltip = document.createElement("div");

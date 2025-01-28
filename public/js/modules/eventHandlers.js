@@ -132,7 +132,7 @@ export function initializeEventListeners() {
 
     if (searchBar) {
       searchBar.addEventListener("input", (event) => {
-        const query = event.target.value.trim();
+        const query = DOMPurify.sanitize(event.target.value.trim());
         searchBuilds(query); // Call searchBuilds with the query
       });
     }
@@ -155,9 +155,10 @@ export function initializeEventListeners() {
   });
 
   // Update YouTube Embed
-  document
-    .getElementById("videoInput")
-    .addEventListener("input", updateYouTubeEmbed);
+  document.getElementById("videoInput").addEventListener("input", (event) => {
+    const videoLink = event.target.value.trim(); // Extract the input value
+    updateYouTubeEmbed(videoLink); // Pass the extracted value
+  });
 
   // Dropdown styling
   document
@@ -241,8 +242,12 @@ document.addEventListener("DOMContentLoaded", () => {
       .addEventListener("click", (event) => {
         const mapCard = event.target.closest(".map-card");
         if (mapCard) {
-          const mapImageSrc = mapCard.getAttribute("data-map");
-          const mapName = mapCard.querySelector(".map-card-title").innerText;
+          const mapImageSrc = DOMPurify.sanitize(
+            mapCard.getAttribute("data-map")
+          );
+          const mapName = DOMPurify.sanitize(
+            mapCard.querySelector(".map-card-title").innerText
+          );
 
           // Update the map preview
           mapPreviewImage.src = mapImageSrc;

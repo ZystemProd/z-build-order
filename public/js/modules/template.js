@@ -76,9 +76,11 @@ export function populateTemplateList(templateList) {
     templateCard.setAttribute("data-template", JSON.stringify(template));
 
     templateCard.innerHTML = `
-        <div class="template-card-header" style="background-image: url('${template.image}');"></div>
-        <div class="template-card-title">${template.title}</div>
-      `;
+    <div class="template-card-header" style="background-image: url('${DOMPurify.sanitize(
+      template.image
+    )}');"></div>
+    <div class="template-card-title">${DOMPurify.sanitize(template.title)}</div>
+    `;
 
     // Click to load the template
     templateCard.addEventListener("click", () => loadTemplate(index));
@@ -90,8 +92,8 @@ export function populateTemplateList(templateList) {
 export function previewTemplate(template) {
   const previewDiv = document.getElementById("templatePreview");
   previewDiv.innerHTML = `
-      <h4>${template.title}</h4>
-      <p>${template.data.replace(/\n/g, "<br>")}</p>
+      <h4>${DOMPurify.sanitize(template.title)}</h4>
+      <p>${DOMPurify.sanitize(template.data).replace(/\n/g, "<br>")}</p>
     `;
 }
 
@@ -110,12 +112,14 @@ document
 function updateTemplatePreview(templateData) {
   const previewContainer = document.getElementById("templatePreview");
   previewContainer.innerHTML = `
-      <h4>${templateData.title}</h4>
-      <p>${templateData.description || "No description available."}</p>
-      <textarea readonly>${
-        templateData.input || "No input available."
-      }</textarea>
-    `;
+  <h4>${DOMPurify.sanitize(templateData.title)}</h4>
+  <p>${DOMPurify.sanitize(
+    templateData.description || "No description available."
+  )}</p>
+  <textarea readonly>${DOMPurify.sanitize(
+    templateData.input || "No input available."
+  )}</textarea>
+`;
 }
 
 export function showSaveTemplateModal() {
@@ -136,11 +140,13 @@ export function showSaveTemplateModal() {
   const saveButton = document.getElementById("saveTemplateConfirmButton");
   saveButton.onclick = () => {
     const title = document.getElementById("templateTitleInput").value.trim();
+    const sanitizedTitle = DOMPurify.sanitize(title);
+
     const selectedRace = document.querySelector(
       'input[name="templateRace"]:checked'
     )?.value;
 
-    if (!title || !selectedRace) {
+    if (!sanitizedTitle || !selectedRace) {
       alert("Please provide a title and select a race.");
       return;
     }
@@ -148,7 +154,9 @@ export function showSaveTemplateModal() {
     const buildOrderInput = document
       .getElementById("buildOrderInput")
       .value.trim();
-    if (!buildOrderInput) {
+    const sanitizedBuildOrderInput = DOMPurify.sanitize(buildOrderInput);
+
+    if (!sanitizedBuildOrderInput) {
       alert("Build order input cannot be empty.");
       return;
     }
@@ -157,10 +165,10 @@ export function showSaveTemplateModal() {
 
     // Save the new template
     templates.push({
-      title,
+      title: sanitizedTitle,
       category: selectedRace,
       image: raceImage,
-      data: buildOrderInput,
+      data: sanitizedBuildOrderInput,
     });
 
     populateTemplateList(templates);
@@ -178,7 +186,7 @@ export function loadTemplate(index) {
   const inputField = document.getElementById("buildOrderInput");
 
   // Set the template data in the input field
-  inputField.value = template.data;
+  inputField.value = DOMPurify.sanitize(template.data);
 
   // Analyze and update the output
   analyzeBuildOrder(inputField.value);

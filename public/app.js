@@ -48,8 +48,13 @@ function updateAuthUI(user) {
     console.log("User is signed in:", user);
 
     if (elements.userDetails) {
+      const sanitizedDisplayName = user.displayName
+        ? DOMPurify.sanitize(user.displayName)
+        : null;
+      const sanitizedEmail = user.email ? DOMPurify.sanitize(user.email) : null;
+
       elements.userDetails.innerText = `Welcome, ${
-        user.displayName || user.email
+        sanitizedDisplayName || sanitizedEmail
       }`;
     }
     if (elements.whenSignedIn) elements.whenSignedIn.hidden = false;
@@ -71,7 +76,10 @@ function handleSignIn() {
       updateAuthUI(result.user);
     })
     .catch((error) => {
-      console.error("Sign-in error:", error);
+      console.error(
+        "Sign-in error:",
+        DOMPurify.sanitize(error.message || error)
+      );
     });
 }
 
