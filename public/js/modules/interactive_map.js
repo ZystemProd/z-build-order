@@ -233,10 +233,12 @@ export function initializeMapSelection(mapAnnotations) {
   buildsContainer.innerHTML = maps
     .map(
       (map) => `
-      <div class="map-card" data-map="${map.imagePath}">
-        <div class="map-card-title">${map.name}</div>
-        <img src="${map.imagePath}" alt="${map.name}" class="map-image">
-      </div>`
+    <div class="map-card" data-map="${DOMPurify.sanitize(map.imagePath)}">
+      <div class="map-card-title">${DOMPurify.sanitize(map.name)}</div>
+      <img src="${DOMPurify.sanitize(map.imagePath)}" alt="${DOMPurify.sanitize(
+        map.name
+      )}" class="map-image">
+    </div>`
     )
     .join("");
 
@@ -272,8 +274,8 @@ export function initializeMapSelection(mapAnnotations) {
       );
 
       // Update map image and selected map text
-      mapImage.src = selectedMapPath;
-      selectedMapText.innerText = `${selectedMapName}`;
+      selectedMapText.innerText = DOMPurify.sanitize(selectedMapName);
+      mapImage.src = DOMPurify.sanitize(selectedMapPath);
 
       // Clear existing annotations
       mapAnnotations.circles = [];

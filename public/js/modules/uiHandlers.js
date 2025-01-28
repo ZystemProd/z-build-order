@@ -94,17 +94,24 @@ export function populateBuildDetails(index) {
   }
 
   buildDetailsContainer.innerHTML = `
-    <h3>${build.title}</h3>
-    <p>${build.comment || "No comments provided."}</p>
-    <pre>${build.buildOrder
-      .map((step) => `[${step.workersOrTimestamp}] ${step.action}`)
-      .join("\n")}</pre>
-    ${
-      build.videoLink
-        ? `<iframe src="${build.videoLink}" frameborder="0"></iframe>`
-        : ""
-    }
-  `;
+  <h3>${DOMPurify.sanitize(build.title)}</h3>
+  <p>${DOMPurify.sanitize(build.comment || "No comments provided.")}</p>
+  <pre>${build.buildOrder
+    .map(
+      (step) =>
+        `[${DOMPurify.sanitize(step.workersOrTimestamp)}] ${DOMPurify.sanitize(
+          step.action
+        )}`
+    )
+    .join("\n")}</pre>
+  ${
+    build.videoLink
+      ? `<iframe src="${DOMPurify.sanitize(
+          build.videoLink
+        )}" frameborder="0"></iframe>`
+      : ""
+  }
+`;
 }
 
 export function displayBuildOrder(buildOrder) {
@@ -119,10 +126,14 @@ export function displayBuildOrder(buildOrder) {
     const row = table.insertRow();
 
     // Apply formatting logic to workersOrTimestamp
-    row.insertCell(0).innerHTML = formatActionText(step.workersOrTimestamp);
+    row.insertCell(0).innerHTML = DOMPurify.sanitize(
+      formatActionText(step.workersOrTimestamp)
+    );
 
     // Apply formatting logic to action
-    row.insertCell(1).innerHTML = formatActionText(step.action);
+    row.insertCell(1).innerHTML = DOMPurify.sanitize(
+      formatActionText(step.action)
+    );
   });
 }
 
@@ -180,8 +191,8 @@ export function analyzeBuildOrder(inputText) {
 
     // Insert row into the table
     const row = table.insertRow();
-    row.insertCell(0).innerHTML = workersOrTimestamp;
-    row.insertCell(1).innerHTML = actionText;
+    row.insertCell(0).innerHTML = DOMPurify.sanitize(workersOrTimestamp);
+    row.insertCell(1).innerHTML = DOMPurify.sanitize(actionText);
   });
 }
 
@@ -211,9 +222,10 @@ export function showToast(message, type = "success", duration = 3000) {
   const toast = document.createElement("div");
   toast.className = `toast toast-${type}`;
   toast.innerHTML = `
-    ${type === "error" || type === "warning" ? "⚠ " : ""}
-    ${message}
-  `;
+  ${type === "error" || type === "warning" ? "⚠ " : ""} ${DOMPurify.sanitize(
+    message
+  )}
+`;
 
   container.appendChild(toast);
 

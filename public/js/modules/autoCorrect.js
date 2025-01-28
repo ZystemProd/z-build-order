@@ -177,13 +177,13 @@ export function initializeAutoCorrect() {
       if (index === 0) suggestion.classList.add("active"); // Mark first suggestion as active
 
       const img = document.createElement("img");
-      img.src = `img/${match.type}/${match.name
-        .toLowerCase()
-        .replace(/ /g, "_")}.png`;
-      img.alt = match.name;
+      img.src = `img/${DOMPurify.sanitize(match.type)}/${DOMPurify.sanitize(
+        match.name.toLowerCase().replace(/ /g, "_")
+      )}.png`;
+      img.alt = DOMPurify.sanitize(match.name);
 
       const text = document.createElement("span");
-      text.textContent = match.name;
+      text.textContent = DOMPurify.sanitize(match.name);
 
       suggestion.appendChild(img);
       suggestion.appendChild(text);

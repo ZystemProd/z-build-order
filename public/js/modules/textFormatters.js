@@ -31,10 +31,12 @@ function formatMatchedTerm(
     return `${numberPrefix}<span class="${cssClass}">${term} <img src="${imageSrc}" alt="${term}" class="resource-image"></span>`;
   }
   const imageTag = imageSrc
-    ? `<img src="${imageSrc}" alt="${term}" class="term-image">`
+    ? `<img src="${DOMPurify.sanitize(imageSrc)}" alt="${DOMPurify.sanitize(
+        term
+      )}" class="term-image">`
     : "";
-  return `<span class="${cssClass}">${capitalizeFirstLetter(
-    term
+  return `<span class="${DOMPurify.sanitize(cssClass)}">${capitalizeFirstLetter(
+    DOMPurify.sanitize(term)
   )}${imageTag}</span>`;
 }
 

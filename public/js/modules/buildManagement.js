@@ -55,8 +55,8 @@ export function saveCurrentBuild() {
     return;
   }
 
-  const title = titleInput.value.trim();
-  const selectedMatchup = categoryDropdown.value;
+  const title = DOMPurify.sanitize(titleInput.value.trim());
+  const selectedMatchup = DOMPurify.sanitize(categoryDropdown.value);
 
   // Validation: Ensure title is not empty
   if (!title) {
@@ -91,9 +91,11 @@ export function saveCurrentBuild() {
   const formattedMatchup = formatMatchup(selectedMatchup);
 
   // Extract optional fields
-  const comment = commentInput?.value.trim() || "";
-  const videoLink = videoInput?.value.trim() || "";
-  const buildOrderText = buildOrderInput?.value.trim() || "";
+  const comment = DOMPurify.sanitize(commentInput?.value.trim() || "");
+  const videoLink = DOMPurify.sanitize(videoInput?.value.trim() || "");
+  const buildOrderText = DOMPurify.sanitize(
+    buildOrderInput?.value.trim() || ""
+  );
   const buildOrder = buildOrderText ? parseBuildOrder(buildOrderText) : []; // Parse build order if provided
   const mapSrc = mapImage?.src || "";
   const mapName = mapSrc
@@ -191,8 +193,20 @@ export async function loadBuildAnnotations(buildId) {
     const { interactiveMap } = data;
 
     if (interactiveMap) {
-      mapAnnotations.circles = interactiveMap.circles || [];
-      mapAnnotations.arrows = interactiveMap.arrows || [];
+      mapAnnotations.circles = (interactiveMap.circles || []).map(
+        ({ x, y }) => ({
+          x,
+          y,
+        })
+      );
+      mapAnnotations.arrows = (interactiveMap.arrows || []).map(
+        ({ startX, startY, endX, endY }) => ({
+          startX,
+          startY,
+          endX,
+          endY,
+        })
+      );
 
       // Render circles and arrows on the map
       mapAnnotations.circles.forEach(({ x, y }) =>
