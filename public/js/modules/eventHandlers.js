@@ -27,6 +27,7 @@ import {
   showSaveTemplateModal,
 } from "./template.js";
 import { initializeTooltips } from "./tooltip.js";
+import { populateCommunityBuilds } from "./community.js";
 
 setupTemplateModal();
 
@@ -292,4 +293,13 @@ document.addEventListener("DOMContentLoaded", () => {
 document.addEventListener("DOMContentLoaded", () => {
   // Initialize tooltips
   initializeTooltips();
+});
+
+document.getElementById("showCommunityModalButton").addEventListener("click", () => {
+  document.getElementById("communityModal").style.display = "block";
+  populateCommunityBuilds();
+});
+
+document.getElementById("closeCommunityModal").addEventListener("click", () => {
+  document.getElementById("communityModal").style.display = "none";
 });

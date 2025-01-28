@@ -10,7 +10,7 @@
     <link rel="stylesheet" type="text/css" href="css/template.css" />
     <link rel="stylesheet" type="text/css" href="css/showToast.css" />
     <link rel="stylesheet" type="text/css" href="css/alertNotification.css" />  
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.4/purify.min.js" integrity="sha512-..." crossorigin="anonymous"></script>  
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.3/purify.min.js" integrity="sha512-..." crossorigin="anonymous"></script>  
     <script type="module" src="app.js" defer></script>
     <script type="module" src="js/modules/eventHandlers.js" defer></script>
   </head>
@@ -34,6 +34,7 @@
         <div class="template-controls">
           <button id="openTemplatesButton" class="btn">Open Templates</button>
           <button id="saveTemplateButton" class="btn">Save Template</button>
+          <button id="showCommunityModalButton" class="btn">Community Builds</button>
         </div>
         <!-- Build Order Input Section with Toggle -->
         <h3 data-section="buildOrderInputField" class="toggle-title">
@@ -299,6 +300,42 @@
           </div>
         </div>
       </div>
+
+      <!-- Community Modal -->
+      <div id="communityModal" class="modal">
+        <div class="modal-content-template">
+          <div class="template-header">
+            <span class="close-modal" id="closeCommunityModal">&times;</span>
+            <h3>Community Builds</h3>
+            <div id="communityHeaderControls" class="header-controls">
+              <input
+                id="communitySearchBar"
+                type="text"
+                placeholder="Search community builds..."
+                class="search-bar"
+              />
+            </div>
+          </div>
+          <div class="template-content-container">
+            <table id="communityBuildsTable">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Matchup</th>
+                  <th>Publisher</th>
+                  <th>Date Published</th>
+                  <th>Score</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="communityBuildsTableBody">
+                <!-- Dynamic rows added here -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
 
       <!-- Modal for delete notification -->
       <div id="deleteConfirmationModal" class="modal">
