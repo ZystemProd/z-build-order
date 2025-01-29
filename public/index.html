@@ -5,19 +5,19 @@
     <meta name="description" content="Plan and save your StarCraft 2 build orders with Z-Build Order. Supports custom builds, categories, and templates.">
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="
+    <!--<meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
     script-src 'self' https://cdnjs.cloudflare.com https://www.gstatic.com;
     style-src 'self' 'unsafe-inline';
     img-src 'self' data:;
     frame-src https://www.youtube.com;
-  ">    
+  ">  --> 
     <link rel="icon" type="image/x-icon" href="/img/favicon.ico" />
     <link rel="stylesheet" type="text/css" href="css/style.css" />
     <link rel="stylesheet" type="text/css" href="css/template.css" />
     <link rel="stylesheet" type="text/css" href="css/showToast.css" />
     <link rel="stylesheet" type="text/css" href="css/alertNotification.css" />  
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.3/purify.min.js" integrity="sha512-..." crossorigin="anonymous"></script>  
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.3/purify.min.js"></script>  
     <script type="module" src="app.js" defer></script>
     <script type="module" src="js/modules/eventHandlers.js" defer></script>
     
@@ -123,6 +123,7 @@
         <div class="saveLoadContainer">
           <button id="saveBuildButton">Save Current Build</button>
           <button id="showBuildsButton" onclick="showBuildsModal()">Show All Builds</button>
+          <button id="publishBuildButton" class="btn publish-btn" style="display: none;">Publish Build</button>
         </div>
       </div>  
 
@@ -325,21 +326,30 @@
             </div>
           </div>
           <div class="template-content-container">
-            <table id="communityBuildsTable">
-              <thead>
-                <tr>
-                  <th>Title</th>
-                  <th>Matchup</th>
-                  <th>Publisher</th>
-                  <th>Date Published</th>
-                  <th>Score</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody id="communityBuildsTableBody">
-                <!-- Dynamic rows added here -->
-              </tbody>
-            </table>
+            <div class="community-layout">
+              <!-- Build Preview Panel -->
+              <div id="buildPreview" class="build-preview">
+                <h4>Build Preview</h4>
+                <p>Hover over a build to preview details.</p>
+              </div>
+
+              <!-- Community Builds Table -->
+              <table id="communityBuildsTable">
+                <thead>
+                  <tr>
+                    <th>Title</th>
+                    <th>Matchup</th>
+                    <th>Publisher</th>
+                    <th>Date Published</th>
+                    <th>Score</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="communityBuildsTableBody">
+                  <!-- Dynamic rows added here -->
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>

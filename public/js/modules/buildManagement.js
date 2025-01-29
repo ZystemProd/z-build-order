@@ -15,6 +15,7 @@ import { showToast } from "./uiHandlers.js";
 import { filterBuilds } from "./modal.js";
 import { parseBuildOrder } from "./utils.js";
 import { mapAnnotations } from "./interactive_map.js"; // Ensure this export exists
+import { checkPublishButtonVisibility } from "./community.js";
 
 export async function fetchUserBuilds() {
   const auth = getAuth();
@@ -154,7 +155,7 @@ export function saveCurrentBuild() {
   const user = auth.currentUser;
 
   if (!user) {
-    showToast("You must be signed in to save builds to the database.", "error");
+    showToast("You must be signed in to save builds.", "error");
     return;
   }
 
@@ -164,6 +165,7 @@ export function saveCurrentBuild() {
   setDoc(buildDoc, newBuild)
     .then(() => {
       //showToast("Build saved to database successfully!", "success");
+      checkPublishButtonVisibility();
     })
     .catch((error) => {
       console.error("Error saving build to Firestore:", error);

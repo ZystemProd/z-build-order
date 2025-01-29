@@ -27,7 +27,10 @@ import {
   showSaveTemplateModal,
 } from "./template.js";
 import { initializeTooltips } from "./tooltip.js";
-import { populateCommunityBuilds } from "./community.js";
+import {
+  populateCommunityBuilds,
+  checkPublishButtonVisibility,
+} from "./community.js";
 
 setupTemplateModal();
 
@@ -300,11 +303,17 @@ document.addEventListener("DOMContentLoaded", () => {
   initializeTooltips();
 });
 
-document.getElementById("showCommunityModalButton").addEventListener("click", () => {
-  document.getElementById("communityModal").style.display = "block";
-  populateCommunityBuilds();
-});
+document
+  .getElementById("showCommunityModalButton")
+  .addEventListener("click", () => {
+    document.getElementById("communityModal").style.display = "block";
+    populateCommunityBuilds();
+  });
 
 document.getElementById("closeCommunityModal").addEventListener("click", () => {
   document.getElementById("communityModal").style.display = "none";
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  checkPublishButtonVisibility(); // Ensure button is checked on page load
 });

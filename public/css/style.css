@@ -1510,13 +1510,12 @@ textarea::-webkit-scrollbar-thumb:hover {
   margin-right: 5px;
 }
 
-
 /* Community Modal Styles */
 #communityModal .modal-content-template {
   background-color: #1e1e1e;
   color: #e0e0e0;
   width: 90%;
-  max-width: 800px;
+  max-width: 1100px;
   height: auto;
   margin: 5% auto;
   padding: 20px;
@@ -1529,7 +1528,6 @@ textarea::-webkit-scrollbar-thumb:hover {
   border-collapse: collapse;
   margin-top: 10px;
 }
-
 
 #communityBuildsTable td,
 #communityBuildsTable th {
@@ -1584,7 +1582,6 @@ textarea::-webkit-scrollbar-thumb:hover {
   background-color: #555;
 }
 
-
 .vote-button {
   background: none;
   border: none;
@@ -1611,4 +1608,49 @@ textarea::-webkit-scrollbar-thumb:hover {
   font-size: 14px;
   margin-left: 10px;
   color: #e0e0e0;
+}
+
+.community-layout {
+  display: flex;
+  gap: 20px; /* Space between preview and table */
+  align-items: flex-start;
+}
+
+.build-preview {
+  width: 250px; /* Fixed width for preview */
+  padding: 10px;
+  background-color: #2c2c2c;
+  color: #e0e0e0;
+  border: 1px solid #444;
+  border-radius: 8px;
+  overflow: auto;
+  min-height: 200px;
+}
+
+.build-preview pre {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-size: 14px;
+  background: none;
+  color: #e0e0e0;
+}
+
+.publish-btn {
+  background-color: #007bff; /* Blue color */
+  color: white;
+  font-weight: bold;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.publish-btn:hover {
+  background-color: #0056b3; /* Darker blue on hover */
+  transform: scale(1.05);
+}
+
+.publish-btn:active {
+  transform: scale(1);
 }

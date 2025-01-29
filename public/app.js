@@ -90,7 +90,7 @@ async function handleSignOut() {
     console.log("User signed out successfully.");
     updateAuthUI(null);
   } catch (error) {
-    console.error("Error signing out:", error);
+    console.error("Error signing out:", DOMPurify.sanitize(error.message));
   }
 }
 
@@ -112,3 +112,6 @@ document.addEventListener("DOMContentLoaded", () => {
   initializeModalEventListeners();
   attachEventListeners();
 });
+
+// Export Firebase utilities
+export { app, auth, db };
