@@ -52,10 +52,9 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 10px;
-  overflow-y: auto; /* Enable vertical scrolling */
+  overflow-y: auto; /* ✅ Enables scrolling */
+  max-height: 60vh; /* ✅ Limits height to fit screen */
   padding: 15px;
-  max-height: 100%; /* Ensure it respects the parent's height */
-  height: 700px; /* Allow grid container to calculate height flexibly */
 }
 
 .template-preview {
@@ -191,8 +190,8 @@
 
 .template-content-container {
   display: flex;
-  height: calc(100vh - 100px); /* Full height minus header and padding */
-  overflow: hidden; /* Prevent scrolling for the entire modal */
+  height: 100%; /* Full height to ensure proper scrolling */
+  overflow: hidden; /* Prevents the entire modal from scrolling */
 }
 
 .close-modal {

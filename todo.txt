@@ -1,1 +1,3 @@
 Fix inline style in index.html
+
+Fixa username because we need an identifier for the community build. Only one username can exist.

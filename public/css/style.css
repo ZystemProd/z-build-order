@@ -1654,3 +1654,17 @@ textarea::-webkit-scrollbar-thumb:hover {
 .publish-btn:active {
   transform: scale(1);
 }
+
+.modal input {
+  width: 90%;
+  padding: 10px;
+  margin: 10px 0;
+}
+
+.modal button {
+  padding: 10px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
