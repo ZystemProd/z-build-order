@@ -61,9 +61,12 @@ export async function populateCommunityBuilds() {
             }">👎</button>
             <span class="vote-percentage" data-id="${build.id}">0%</span>
         </td>
-        <td><button class="import-button" data-id="${
-          build.id
-        }">Import</button></td>
+        <td>
+          <button class="import-button" data-id="${build.id}">Import</button>
+          <button class="view-build-button" data-id="${
+            build.id
+          }">🔍 View</button>
+        </td> 
       `;
 
       tableBody.appendChild(row);
@@ -86,6 +89,13 @@ function initializeCommunityBuildEvents() {
 
   document.querySelectorAll(".import-button").forEach((button) => {
     button.addEventListener("click", (event) => handleImport(event));
+  });
+
+  document.addEventListener("click", (event) => {
+    if (event.target.classList.contains("view-build-button")) {
+      const buildId = event.target.getAttribute("data-id");
+      window.location.href = `viewBuild.html?id=${buildId}`;
+    }
   });
 }
 
