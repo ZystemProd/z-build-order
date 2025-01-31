@@ -4,7 +4,9 @@ import {
   getDoc,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
+import { formatActionText } from "../modules/textFormatters.js";
 
+// Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyBBLnneYwLDfIp-Oep2MvExGnVk_EvDQoo",
   authDomain: "z-build-order.firebaseapp.com",
@@ -27,6 +29,9 @@ async function loadBuild() {
     return;
   }
 
+  // Save the last viewed build ID in session storage
+  sessionStorage.setItem("lastViewedBuild", buildId);
+
   const buildRef = doc(db, "communityBuilds", buildId);
   const buildSnapshot = await getDoc(buildRef);
 
@@ -39,15 +44,21 @@ async function loadBuild() {
     document.getElementById("buildDate").innerText = new Date(
       build.datePublished
     ).toLocaleDateString();
-    document.getElementById("buildOrder").innerText = Array.isArray(
-      build.buildOrder
-    )
-      ? build.buildOrder.join("\n")
-      : build.buildOrder || "No build order available.";
+
+    const formattedBuildOrder = Array.isArray(build.buildOrder)
+      ? build.buildOrder.map(formatActionText).join("<br>")
+      : formatActionText(build.buildOrder || "No build order available.");
+
+    document.getElementById("buildOrder").innerHTML = formattedBuildOrder;
   } else {
     document.getElementById("buildTitle").innerText = "Build not found.";
   }
 }
 
-loadBuild();
-console.log("Loading build:", build);
+document.addEventListener("DOMContentLoaded", () => {
+  loadBuild();
+});
+
+window.addEventListener("popstate", () => {
+  loadBuild();
+});

@@ -1668,3 +1668,74 @@ textarea::-webkit-scrollbar-thumb:hover {
   border: none;
   cursor: pointer;
 }
+
+.view-build-container {
+  width: 60%;
+  margin: 40px auto;
+  padding: 20px;
+  background-color: #2c2c2c;
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+  color: white;
+  text-align: center;
+}
+
+.build-info {
+  text-align: left;
+  font-size: 1.1rem;
+  background-color: #1e1e1e;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 15px;
+}
+
+.build-order-container {
+  background-color: #1e1e1e;
+  padding: 15px;
+  border-radius: 8px;
+  text-align: left;
+  font-size: 1.1rem;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.build-order-container pre {
+  font-size: 1rem;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  color: #e0e0e0;
+}
+
+.back-button {
+  margin-top: 20px;
+  padding: 10px 15px;
+  font-size: 1rem;
+  color: white;
+  background-color: #007bff;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.back-button:hover {
+  background-color: #0056b3;
+  transform: scale(1.05);
+}
+
+.build-output {
+  font-size: 1rem;
+  background-color: #1e1e1e;
+  padding: 15px;
+  border-radius: 8px;
+  text-align: left;
+  max-height: 300px;
+  overflow-y: auto;
+  color: white;
+}
+
+.build-output img {
+  vertical-align: middle;
+  height: 20px;
+  margin-left: 5px;
+}

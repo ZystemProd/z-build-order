@@ -263,3 +263,31 @@ export function initializeTextareaClickHandler() {
     }
   });
 }
+
+window.addEventListener("popstate", () => {
+  const lastViewedBuild = sessionStorage.getItem("lastViewedBuild");
+  if (lastViewedBuild) {
+    refreshBuildList(lastViewedBuild);
+  }
+});
+
+function refreshBuildList(lastViewedBuild) {
+  const savedBuilds = getSavedBuilds();
+  const updatedBuild = savedBuilds.find(
+    (build) => build.id === lastViewedBuild
+  );
+
+  if (updatedBuild) {
+    console.log("Updating build list after navigation:", updatedBuild);
+
+    // Find and update the correct build in the UI
+    document.querySelectorAll(".build-card").forEach((card) => {
+      if (card.dataset.buildId === lastViewedBuild) {
+        card.querySelector(".build-card-title").innerText = updatedBuild.title;
+      }
+    });
+
+    // Optionally, reload the entire build list if needed
+    populateBuildList(savedBuilds);
+  }
+}

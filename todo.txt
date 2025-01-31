@@ -1,3 +1,4 @@
 Fix inline style in index.html
 
-Fixa username because we need an identifier for the community build. Only one username can exist.
+30/1-25
+output need to update when going back from viewBuild.html
