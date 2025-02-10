@@ -1515,7 +1515,7 @@ textarea::-webkit-scrollbar-thumb:hover {
   background-color: #1e1e1e;
   color: #e0e0e0;
   width: 90%;
-  max-width: 1100px;
+  max-width: 1200px;
   height: auto;
   margin: 5% auto;
   padding: 20px;
@@ -1611,20 +1611,24 @@ textarea::-webkit-scrollbar-thumb:hover {
 }
 
 .community-layout {
-  display: flex;
-  gap: 20px; /* Space between preview and table */
+  display: grid;
+  grid-template-columns: 1fr 2fr; /* Allocate more space for table */
+  gap: 20px;
   align-items: flex-start;
+  width: 100%;
 }
 
 .build-preview {
-  width: 250px; /* Fixed width for preview */
-  padding: 10px;
+  flex: 1; /* Make it take available space */
+  min-width: 300px; /* Ensure it has a reasonable minimum size */
+  max-width: 400px; /* Keep it similar to the build modal */
+  padding: 15px;
   background-color: #2c2c2c;
   color: #e0e0e0;
   border: 1px solid #444;
   border-radius: 8px;
   overflow: auto;
-  min-height: 200px;
+  min-height: 250px;
 }
 
 .build-preview pre {
@@ -1738,4 +1742,19 @@ textarea::-webkit-scrollbar-thumb:hover {
   vertical-align: middle;
   height: 20px;
   margin-left: 5px;
+}
+
+/* Style for the View button */
+.view-preview-button {
+  background-color: #444;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.view-preview-button:hover {
+  background-color: #555;
 }

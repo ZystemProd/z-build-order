@@ -10,6 +10,7 @@ import {
   orderBy,
   limit,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+import { formatActionText } from "./textFormatters.js";
 
 async function fetchCommunityBuilds() {
   const db = getFirestore();
@@ -18,48 +19,55 @@ async function fetchCommunityBuilds() {
 
   return snapshot.docs.map((doc) => {
     const data = doc.data();
+    console.log("📥 FETCHED BUILD DATA:", data); // ✅ Log fetched data
+
     return {
       id: doc.id,
       title: data.title || "Untitled Build",
       matchup: data.subcategory || "Unknown",
-      publisher: data.username || "Anonymous", // Fetch username instead of publisherId
-      datePublished: data.timestamp
-        ? new Date(data.timestamp).toISOString()
-        : "Unknown",
+      publisher: data.username || "Anonymous",
+      datePublished: data.datePublished || "Unknown",
       buildOrder: Array.isArray(data.buildOrder)
-        ? data.buildOrder.join("\n")
-        : data.buildOrder || "No build order available.",
+        ? data.buildOrder
+        : typeof data.buildOrder === "string"
+        ? data.buildOrder.split("\n")
+        : ["No build order available"],
     };
   });
 }
 
 // Function to populate the community builds table
+let communityBuilds = []; // Global variable to store builds
+
 export async function populateCommunityBuilds() {
   const tableBody = document.getElementById("communityBuildsTableBody");
-  const buildPreview = document.getElementById("buildPreview");
-
   tableBody.innerHTML = ""; // Clear existing rows
 
   try {
-    const builds = await fetchCommunityBuilds();
+    communityBuilds = await fetchCommunityBuilds(); // ✅ Ensure builds are stored
 
-    builds.forEach((build) => {
+    communityBuilds.forEach((build) => {
       const row = document.createElement("tr");
-      row.dataset.id = build.id; // Store build ID for reference
+      row.dataset.id = build.id; // Store build ID
 
       row.innerHTML = `
+        <td>
+          <button class="view-preview-button" data-id="${
+            build.id
+          }">👁️ Preview</button>
+        </td>
         <td>${build.title}</td>
         <td>${build.matchup}</td>
         <td>${build.publisher}</td>
         <td>${new Date(build.datePublished).toLocaleDateString()}</td>
         <td>
-            <button class="vote-button thumbs-up" data-id="${
-              build.id
-            }">👍</button>
-            <button class="vote-button thumbs-down" data-id="${
-              build.id
-            }">👎</button>
-            <span class="vote-percentage" data-id="${build.id}">0%</span>
+          <button class="vote-button thumbs-up" data-id="${
+            build.id
+          }">👍</button>
+          <button class="vote-button thumbs-down" data-id="${
+            build.id
+          }">👎</button>
+          <span class="vote-percentage" data-id="${build.id}">0%</span>
         </td>
         <td>
           <button class="import-button" data-id="${build.id}">Import</button>
@@ -72,44 +80,139 @@ export async function populateCommunityBuilds() {
       tableBody.appendChild(row);
     });
 
-    initializeCommunityBuildEvents();
+    // ✅ Attach event listeners for preview buttons after rows are created
+    attachPreviewButtonEvents();
   } catch (error) {
     console.error("Error loading community builds:", error);
   }
 }
 
-function initializeCommunityBuildEvents() {
-  document.querySelectorAll(".thumbs-up").forEach((button) => {
-    button.addEventListener("click", (event) => handleVote(event, 1));
-  });
-
-  document.querySelectorAll(".thumbs-down").forEach((button) => {
-    button.addEventListener("click", (event) => handleVote(event, -1));
-  });
-
-  document.querySelectorAll(".import-button").forEach((button) => {
-    button.addEventListener("click", (event) => handleImport(event));
-  });
-
-  document.addEventListener("click", (event) => {
-    if (event.target.classList.contains("view-build-button")) {
+function attachPreviewButtonEvents() {
+  document.querySelectorAll(".view-preview-button").forEach((button) => {
+    button.addEventListener("click", (event) => {
       const buildId = event.target.getAttribute("data-id");
-      window.location.href = `viewBuild.html?id=${buildId}`;
-    }
+      console.log("🔍 Preview Button Clicked - Build ID:", buildId); // ✅ Debugging
+
+      const build = communityBuilds.find((b) => b.id === buildId);
+
+      if (build) {
+        console.log("✅ Found Build:", build.title); // ✅ Debugging
+        showBuildPreview(build);
+      } else {
+        console.error("❌ Error: Build not found with ID", buildId);
+      }
+    });
   });
 }
 
-// Attach a single event listener to the table body for hover functionality
-document
-  .getElementById("communityBuildsTableBody")
-  .addEventListener("mouseover", (event) => {
-    const row = event.target.closest("tr"); // Get the row element
-    if (!row) return;
+communityBuilds.forEach((build) => {
+  const row = document.createElement("tr");
+  row.dataset.id = build.id; // Store build ID for reference
 
-    const buildId = row.dataset.id;
-    const build = builds.find((build) => build.id.toString() === buildId);
-    if (build) showBuildPreview(build);
+  row.innerHTML = `
+    <td>${build.title}</td>
+    <td>${build.matchup}</td>
+    <td>${build.publisher}</td>
+    <td>${new Date(build.datePublished).toLocaleDateString()}</td>
+    <td>
+        <button class="vote-button thumbs-up" data-id="${build.id}">👍</button>
+        <button class="vote-button thumbs-down" data-id="${
+          build.id
+        }">👎</button>
+        <span class="vote-percentage" data-id="${build.id}">0%</span>
+    </td>
+    <td>
+      <button class="import-button" data-id="${build.id}">Import</button>
+      <button class="view-build-button" data-id="${build.id}">🔍 View</button>
+    </td> 
+  `;
+
+  tableBody.appendChild(row);
+});
+
+// ✅ Update Build Preview
+function showBuildPreview(build) {
+  const communityBuildPreview = document.getElementById(
+    "communityBuildPreview"
+  );
+
+  if (!communityBuildPreview) {
+    console.error("❌ Error: communityBuildPreview element not found!");
+    return;
+  }
+
+  console.log("✅ Displaying build preview for:", build);
+
+  // Ensure the preview container is visible
+  communityBuildPreview.style.display = "block";
+
+  console.log("📝 RAW BUILD ORDER:", build.buildOrder);
+
+  // Format the build order as HTML
+  const formattedBuildOrder = Array.isArray(build.buildOrder)
+    ? build.buildOrder
+        .map((step) => {
+          if (!step || !step.action || !step.workersOrTimestamp) return ""; // Skip invalid steps
+          return `<p><strong>[${step.workersOrTimestamp}]</strong> ${step.action}</p>`;
+        })
+        .join("")
+    : "<p>No build order available.</p>";
+
+  console.log("🔍 FORMATTED BUILD ORDER:", formattedBuildOrder);
+
+  // ✅ Clear the old content before inserting the new one
+  communityBuildPreview.innerHTML = "";
+
+  // ✅ Inject the updated preview content
+  communityBuildPreview.innerHTML = `
+    <div class="preview-header">
+      <h3>${build.title}</h3>
+      <p><strong>Matchup:</strong> ${build.matchup}</p>
+      <p><strong>Publisher:</strong> ${build.publisher}</p>
+      <p><strong>Date:</strong> ${new Date(
+        build.datePublished
+      ).toLocaleDateString()}</p>
+    </div>
+    <div class="preview-build-order">
+      <h4>Build Order</h4>
+      <div id="buildOrderOutput">${formattedBuildOrder}</div>
+    </div>
+  `;
+
+  console.log(
+    "✅ Community Build Preview Updated with Data:",
+    communityBuildPreview.innerHTML
+  );
+}
+
+// ✅ Clear Build Preview
+function clearBuildPreview() {
+  const buildPreview = document.getElementById("buildPreview");
+  if (!buildPreview) return;
+  buildPreview.innerHTML = `<p>Hover over a build to see the details.</p>`;
+}
+
+function initializeCommunityBuildEvents() {
+  console.log("✅ Initializing event listeners for community builds...");
+
+  // Attach event listeners for "View Preview" buttons
+  attachPreviewButtonEvents();
+
+  // Attach click events to "View Build" buttons
+  document.querySelectorAll(".view-build-button").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      const buildId = event.target.getAttribute("data-id");
+
+      if (!buildId) {
+        console.error("❌ Error: No build ID found for view-build-button");
+        return;
+      }
+
+      console.log("✅ Redirecting to viewBuild.html for build ID:", buildId);
+      window.location.href = `viewBuild.html?id=${buildId}`;
+    });
   });
+}
 
 document
   .getElementById("communityBuildsTableBody")

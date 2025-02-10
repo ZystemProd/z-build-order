@@ -159,10 +159,13 @@ function determineUnitClass(unitName) {
 
 // Preprocess abbreviations before matching actors
 function preprocessAbbreviations(actionText) {
+  if (!actionText || typeof actionText !== "string") return ""; // Ensure input is valid
+
   Object.entries(abbreviationMap).forEach(([abbr, full]) => {
     const regex = new RegExp(`\\b${abbr}\\b`, "gi");
     actionText = actionText.replace(regex, full);
   });
+
   return actionText;
 }
 

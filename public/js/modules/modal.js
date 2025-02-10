@@ -68,6 +68,9 @@ export function viewBuild(buildId) {
         const selectedMapText = document.getElementById("selected-map-text");
         const titleInput = document.getElementById("buildOrderTitleInput");
         const titleText = document.getElementById("buildOrderTitleText");
+        const matchUpDropdown = document.getElementById(
+          "buildCategoryDropdown"
+        );
 
         console.log("Loaded build:", build);
 
@@ -81,9 +84,7 @@ export function viewBuild(buildId) {
 
         // Check for mandatory fields
         if (!build.title || !build.subcategory) {
-          console.error(
-            "Mandatory fields (Title or Match-Up) are missing in the build data."
-          );
+          console.error("Mandatory fields (Title or Match-Up) are missing.");
           showToast(
             "This build cannot be viewed due to missing mandatory fields.",
             "error"
@@ -91,23 +92,52 @@ export function viewBuild(buildId) {
           return;
         }
 
-        // Update the map preview and selected map text
+        // ✅ **Update Match-Up Dropdown & Set Color**
+        if (matchUpDropdown) {
+          const subcategoryValue = build.subcategory.toLowerCase();
+          let matchFound = false;
+
+          for (const option of matchUpDropdown.options) {
+            if (option.value.toLowerCase() === subcategoryValue) {
+              matchUpDropdown.value = option.value;
+              matchFound = true;
+              break;
+            }
+          }
+
+          if (!matchFound) {
+            console.warn(
+              `No match found for subcategory: ${build.subcategory}`
+            );
+          }
+
+          // ✅ **Update the Dropdown Color**
+          if (subcategoryValue.startsWith("zv")) {
+            matchUpDropdown.style.color = "#c07aeb"; // Purple (Zerg)
+          } else if (subcategoryValue.startsWith("pv")) {
+            matchUpDropdown.style.color = "#5fe5ff"; // Blue (Protoss)
+          } else if (subcategoryValue.startsWith("tv")) {
+            matchUpDropdown.style.color = "#ff3a30"; // Red (Terran)
+          } else {
+            matchUpDropdown.style.color = ""; // Default color if unmatched
+          }
+        }
+
+        // ✅ **Update the map preview and selected map text**
         if (build.map) {
-          const mapName = build.map; // The map field contains the name, e.g., "abyssal reef"
+          const mapName = build.map;
           const formattedMapName = capitalizeWords(mapName);
           const mapUrl = `https://z-build-order.web.app/img/maps/${mapName
             .replace(/ /g, "_")
-            .toLowerCase()}.jpg`; // Construct the full URL dynamically
+            .toLowerCase()}.jpg`;
 
-          mapImage.src = mapUrl; // Set the map image
-          if (selectedMapText) {
-            selectedMapText.innerText = `${formattedMapName}`;
-          }
+          if (mapImage) mapImage.src = mapUrl;
+          if (selectedMapText) selectedMapText.innerText = formattedMapName;
         } else if (selectedMapText) {
-          selectedMapText.innerText = "No map selected"; // Fallback text for no map
+          selectedMapText.innerText = "No map selected";
         }
 
-        // Load annotations (circles and arrows)
+        // ✅ **Load annotations (circles and arrows)**
         if (build.interactiveMap) {
           mapAnnotations.circles = [];
           mapAnnotations.annotationsContainer.innerHTML = "";
@@ -125,23 +155,19 @@ export function viewBuild(buildId) {
           mapAnnotations.updateCircleNumbers();
         }
 
-        // Update titleText and titleInput
+        // ✅ **Update titleText and titleInput**
         if (titleText) {
           titleText.textContent =
             DOMPurify.sanitize(build.title) ||
             "Enter build order title here...";
-          titleText.classList.remove("dimmed"); // Remove dimmed style if applicable
+          titleText.classList.remove("dimmed");
         }
 
         if (titleInput) {
           titleInput.value = build.title || "";
         }
 
-        // Format and display match-up
-        const categoryDropdown = document.getElementById("categoryDropdown");
-        if (categoryDropdown) {
-          categoryDropdown.value = build.subcategory || "";
-        }
+        // ✅ **Format and display match-up**
         const matchUpElement = document.getElementById("matchUpDisplay");
         if (matchUpElement) {
           const formattedMatchUp = build.subcategory
@@ -150,21 +176,31 @@ export function viewBuild(buildId) {
           matchUpElement.textContent = `Match-Up: ${formattedMatchUp}`;
         }
 
-        // Populate comment
+        // ✅ **Populate comment**
         const commentInput = document.getElementById("commentInput");
         if (commentInput) {
           commentInput.value = DOMPurify.sanitize(build.comment) || "";
         }
 
-        // Populate build order
+        // ✅ **Validate build order**
+        const validBuildOrder = Array.isArray(build.buildOrder)
+          ? build.buildOrder.filter(
+              (step) => step && step.workersOrTimestamp && step.action
+            ) // Remove invalid steps
+          : [];
+
+        // ✅ **Prevent undefined values in build order input**
         const buildOrderInput = document.getElementById("buildOrderInput");
         if (buildOrderInput) {
-          buildOrderInput.value = build.buildOrder
-            .map((step) => `[${step.workersOrTimestamp}] ${step.action}`)
-            .join("\n");
+          buildOrderInput.value = validBuildOrder.length
+            ? validBuildOrder
+                .map((step) => `[${step.workersOrTimestamp}] ${step.action}`)
+                .join("\n")
+            : "No build order available."; // Default message if empty
         }
 
-        displayBuildOrder(build.buildOrder);
+        // ✅ **Pass only valid build steps to `displayBuildOrder()`**
+        displayBuildOrder(validBuildOrder);
 
         closeModal();
       } else {

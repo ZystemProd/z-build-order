@@ -348,7 +348,9 @@
 
   #templatePreview,
   #buildPreview {
-    display: none;
+    display: block; /* Ensure it's visible */
+    visibility: visible;
+    opacity: 1;
   }
 
   .template-list {
@@ -383,26 +385,9 @@
   overflow: hidden;
 }
 
-#buildPreview {
-  flex: 1;
-  min-width: 300px;
-  max-width: 400px;
-  padding: 20px;
-  border-right: 6px solid #2a2a2a;
-  overflow-y: auto;
-}
-
-#buildPreview h4 {
-  margin: 0;
-  font-size: 18px;
-  text-align: center;
-  color: #ffcc00;
-}
-
-#buildPreview p {
-  margin-top: 10px;
-  font-size: 14px;
-  color: #ddd;
+.preview-header {
+  text-align: left;
+  font-size: 1.2rem;
 }
 
 .build-list {

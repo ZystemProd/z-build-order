@@ -67,6 +67,30 @@ export function saveCurrentBuild() {
     .toLowerCase()
     .replace(/([a-z])([a-z])/g, (match, p1, p2) => `${p1.toUpperCase()}${p2}`);
 
+  // ✅ **Fix: Convert text-based build order into structured objects**
+  const buildOrder = buildOrderInput.value
+    .split("\n")
+    .map((line) => {
+      const match = line.match(/\[(.*?)\]\s*(.*)/); // Extract [workersOrTimestamp] action
+      if (match) {
+        return {
+          workersOrTimestamp: match[1], // Extract the supply/timestamp
+          action: match[2], // Extract the action
+        };
+      }
+      return null; // Ignore invalid lines
+    })
+    .filter((step) => step !== null); // Remove any null values
+
+  // ✅ **Extract the Map Name Instead of Full Image URL**
+  let mapName = "No map selected";
+  if (mapImage?.src) {
+    const match = mapImage.src.match(/\/img\/maps\/(.+)\.jpg/);
+    if (match) {
+      mapName = match[1].replace(/_/g, " "); // Convert underscores to spaces
+    }
+  }
+
   const newBuild = {
     title,
     category: formattedMatchup.startsWith("Zv")
@@ -78,10 +102,8 @@ export function saveCurrentBuild() {
     timestamp: Date.now(),
     comment: DOMPurify.sanitize(commentInput?.value.trim() || ""),
     videoLink: DOMPurify.sanitize(videoInput?.value.trim() || ""),
-    buildOrder: DOMPurify.sanitize(buildOrderInput?.value.trim() || "").split(
-      "\n"
-    ),
-    map: mapImage?.src || "",
+    buildOrder: buildOrder, // ✅ Save as structured objects
+    map: mapName, // ✅ Save only the map name
     interactiveMap: {
       circles: mapAnnotations.circles.map(({ x, y }) => ({ x, y })),
       arrows: mapAnnotations.arrows.map(({ startX, startY, endX, endY }) => ({
@@ -128,6 +150,7 @@ export function saveCurrentBuild() {
       showToast("Failed to save build.", "error");
     });
 
+  // ✅ **Ensure UI updates after saving**
   filterBuilds("all");
 }
 

@@ -125,15 +125,20 @@ export function displayBuildOrder(buildOrder) {
   buildOrder.forEach((step) => {
     const row = table.insertRow();
 
-    // Apply formatting logic to workersOrTimestamp
-    row.insertCell(0).innerHTML = DOMPurify.sanitize(
-      formatActionText(step.workersOrTimestamp)
-    );
+    // Validate step data before formatting
+    const workersOrTimestamp = step.workersOrTimestamp
+      ? DOMPurify.sanitize(
+          formatWorkersOrTimestampText(step.workersOrTimestamp)
+        )
+      : "-";
 
-    // Apply formatting logic to action
-    row.insertCell(1).innerHTML = DOMPurify.sanitize(
-      formatActionText(step.action)
-    );
+    const actionText = step.action
+      ? DOMPurify.sanitize(formatActionText(step.action))
+      : "Unknown Action"; // Prevents errors
+
+    // Insert formatted data into table
+    row.insertCell(0).innerHTML = workersOrTimestamp;
+    row.insertCell(1).innerHTML = actionText;
   });
 }
 
