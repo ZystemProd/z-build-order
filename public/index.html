@@ -24,16 +24,40 @@
   </head>
   <body>
     <div id="toast-container"></div>
-    <div id="auth-container" class="menu">
-      <p id="authLoading">Checking authentication status...</p>
-      <section id="whenSignedOut">
-        <button id="signInBtn">Sign in with Google</button>
-      </section>
-      <section id="whenSignedIn" hidden="true">
-        <div id="userDetails"></div>
-        <button id="signOutBtn">Sign Out</button>
-        <button id="switchAccountBtn">Switch Account</button>
-      </section>
+
+    <!-- Auth Container -->
+    <div id="auth-container">
+      <div class="auth-info">
+        <img
+          id="userPhoto"
+          class="user-avatar"
+          src="img/default-avatar.png"
+          alt="User Avatar"
+          style="width: 50px; height: 50px;"
+        />
+        <div class="user-details">
+          <!-- We only show the user’s username, not the email -->
+          <p id="userName" class="user-name">Guest</p>
+        </div>
+      </div>
+
+      <!-- Auth Buttons -->
+      <button id="signInBtn" class="auth-button">Sign In</button>
+      <button id="switchAccountBtn" class="auth-button" style="display: none;">Switch Account</button>
+      <button id="signOutBtn" class="auth-button" style="display: none;">Sign Out</button>
+    </div>
+
+    <!-- Optional Loading Status -->
+    <p id="authLoading" style="color: #555;"></p>
+
+    <!-- Username Modal -->
+    <div id="usernameModal" class="modal" style="display: none;">
+      <div class="modal-content">
+        <h3>Choose a Username</h3>
+        <input type="text" id="usernameInput" placeholder="Enter your username">
+        <br /><br />
+        <button id="confirmUsernameButton">Confirm</button>
+      </div>
     </div>
   
     <div id="content">
@@ -367,14 +391,7 @@
         </div>
       </div>
 
-      <!-- Username Modal -->
-      <div id="usernameModal" class="modal">
-        <div class="modal-content">
-          <h3>Choose a Username</h3>
-          <input type="text" id="usernameInput" placeholder="Enter your username">
-          <button id="confirmUsernameButton">Confirm</button>
-        </div>
-      </div>
+
 
 
       </div>
