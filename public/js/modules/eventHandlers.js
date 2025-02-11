@@ -31,6 +31,7 @@ import {
   populateCommunityBuilds,
   checkPublishButtonVisibility,
 } from "./community.js";
+import { populateBuildsModal } from "./buildManagement.js"; // ✅ Corrected import
 
 setupTemplateModal();
 
@@ -296,6 +297,12 @@ document.addEventListener("DOMContentLoaded", () => {
 document.addEventListener("DOMContentLoaded", () => {
   // Initialize tooltips
   initializeTooltips();
+});
+
+document.addEventListener("DOMContentLoaded", async () => {
+  console.log("🔥 Loading community and user builds...");
+  await populateCommunityBuilds();
+  await populateBuildsModal(); // ✅ Ensure builds are loaded after importing
 });
 
 document

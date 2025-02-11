@@ -1,4 +1,3 @@
-import { getAuth } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
 import {
   getFirestore,
   collection,
@@ -13,6 +12,8 @@ import {
   limit,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { formatActionText } from "./textFormatters.js";
+import { populateBuildsModal } from "./buildManagement.js"; // ✅ Corrected import
+import { auth, db } from "../../app.js"; // ✅ Ensure auth and db are imported correctly
 
 async function fetchCommunityBuilds() {
   const db = getFirestore();
@@ -192,10 +193,10 @@ function clearBuildPreview() {
 function initializeCommunityBuildEvents() {
   console.log("✅ Initializing event listeners for community builds...");
 
-  // Attach event listeners for "View Preview" buttons
+  // ✅ Attach event listeners for "View Preview" buttons (Unchanged)
   attachPreviewButtonEvents();
 
-  // Attach click events to "View Build" buttons
+  // ✅ Attach click events to "View Build" buttons (Unchanged)
   document.querySelectorAll(".view-build-button").forEach((button) => {
     button.addEventListener("click", (event) => {
       const buildId = event.target.getAttribute("data-id");
@@ -207,6 +208,52 @@ function initializeCommunityBuildEvents() {
 
       console.log("✅ Redirecting to viewBuild.html for build ID:", buildId);
       window.location.href = `viewBuild.html?id=${buildId}`;
+    });
+  });
+
+  // ✅ Attach event listeners for "Import" buttons (Fix for Publisher Issue)
+  document.querySelectorAll(".import-button").forEach((button) => {
+    button.addEventListener("click", async (event) => {
+      const buildId = event.target.getAttribute("data-id");
+      console.log("📥 Import Button Clicked - Build ID:", buildId);
+
+      if (!auth.currentUser) {
+        alert("You must be signed in to import builds.");
+        return;
+      }
+
+      const userId = auth.currentUser.uid;
+      const communityBuildRef = doc(db, "communityBuilds", buildId);
+      const userBuildsRef = collection(db, `users/${userId}/builds`);
+
+      try {
+        const buildDoc = await getDoc(communityBuildRef);
+        if (!buildDoc.exists()) {
+          console.error("❌ Build not found in community builds.");
+          alert("Build not found.");
+          return;
+        }
+
+        const buildData = buildDoc.data();
+        const userBuildDocRef = doc(userBuildsRef, buildData.title);
+
+        // ✅ Ensure `publisher` is properly saved
+        await setDoc(userBuildDocRef, {
+          ...buildData,
+          publisher: buildData.username || buildData.publisher || "Unknown", // ✅ Ensure publisher is correctly assigned
+          imported: true, // ✅ Mark as imported
+          timestamp: Date.now(),
+        });
+
+        console.log("✅ Build imported successfully!", buildData);
+        alert("Build successfully imported!");
+
+        // ✅ Refresh the user's Builds Modal
+        populateBuildsModal();
+      } catch (error) {
+        console.error("❌ Error importing build:", error);
+        alert("Failed to import build. Please try again.");
+      }
     });
   });
 }
@@ -231,7 +278,6 @@ export async function checkPublishButtonVisibility() {
   const publishButton = document.getElementById("publishBuildButton");
   if (!publishButton) return;
 
-  const auth = getAuth();
   const user = auth.currentUser;
   if (!user) {
     publishButton.style.display = "none";
@@ -274,7 +320,6 @@ export async function checkPublishButtonVisibility() {
 document
   .getElementById("publishBuildButton")
   .addEventListener("click", async () => {
-    const auth = getAuth();
     const user = auth.currentUser;
 
     if (!user) {

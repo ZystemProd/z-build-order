@@ -385,6 +385,9 @@ function updateBuildPreview(build) {
   const buildPreview = document.getElementById("buildPreview");
   if (!buildPreview) return;
 
+  // ✅ Ensure `publisher` field is properly referenced
+  const publisherName = build.publisher || build.username || "Unknown";
+
   // Format the build order using formatActionText
   const formattedBuildOrder = build.buildOrder
     .map(
@@ -392,17 +395,13 @@ function updateBuildPreview(build) {
     )
     .join("<br>"); // Use <br> for line breaks in HTML output
 
-  // Apply the formatted text
+  // Apply the formatted text, including publisher (without video link)
   buildPreview.innerHTML = `
     <h4>${DOMPurify.sanitize(build.title)}</h4>
+    <p><strong>Publisher:</strong> ${DOMPurify.sanitize(
+      publisherName
+    )}</p> <!-- ✅ Publisher correctly assigned -->
     <pre>${formattedBuildOrder}</pre>
-    ${
-      build.videoLink
-        ? `<iframe src="${DOMPurify.sanitize(
-            build.videoLink
-          )}" frameborder="0" allowfullscreen></iframe>`
-        : ""
-    }
   `;
 }
 
