@@ -128,21 +128,53 @@ export function initializeAutoCorrect() {
     }
   }
 
-  function insertNewRow() {
+  function insertNewRow(event) {
     const cursorPosition = inputField.selectionStart;
-    const textBeforeCaret = inputField.value.substring(0, cursorPosition);
-    const textAfterCaret = inputField.value.substring(cursorPosition);
+    const text = inputField.value;
+    const textBeforeCaret = text.substring(0, cursorPosition);
+    const textAfterCaret = text.substring(cursorPosition);
 
-    // Insert a new row placeholder and a newline character
-    inputField.value = textBeforeCaret + "\n[]" + textAfterCaret;
+    // 1️⃣ Check if cursor is inside brackets `[13|]` or `[4:00|]`
+    const insideBracketsMatch = textBeforeCaret.match(/\[(\d*:?[\d]*)$/); // ✅ Now detects `[4:00]` too
 
-    // Move the cursor inside the newly inserted brackets
+    if (insideBracketsMatch) {
+      // ✅ Move cursor **right after `]`**
+      event.preventDefault();
+      inputField.value = textBeforeCaret + textAfterCaret + " "; // Add space after `]`
+      inputField.selectionStart = inputField.selectionEnd = cursorPosition + 2; // Move cursor after `]`
+      return;
+    }
+
+    // 2️⃣ Check if cursor is **right after** brackets `[13]|` or `[4:00]|`
+    const afterBracketsMatch = textBeforeCaret.match(/\[\d*:?[\d]*\]$/); // ✅ Now detects `[4:00]`
+
+    if (afterBracketsMatch) {
+      // ✅ Create a **new row** and move cursor inside `[|]`
+      event.preventDefault();
+      inputField.value = textBeforeCaret + "\n[]" + textAfterCaret; // No extra space inside brackets
+
+      // Move cursor **inside** the new brackets `[|]`
+      inputField.selectionStart = inputField.selectionEnd = cursorPosition + 2;
+
+      // Scroll to ensure visibility
+      inputField.scrollTop = inputField.scrollHeight;
+
+      // Update build order
+      analyzeBuildOrder(inputField.value);
+      return;
+    }
+
+    // 3️⃣ Default behavior: Create new row and move cursor inside `[|]`
+    event.preventDefault();
+    inputField.value = textBeforeCaret + "\n[]" + textAfterCaret; // No extra space inside brackets
+
+    // Move cursor inside the new brackets `[|]`
     inputField.selectionStart = inputField.selectionEnd = cursorPosition + 2;
 
-    // Scroll to ensure the cursor is visible
+    // Scroll to ensure cursor visibility
     inputField.scrollTop = inputField.scrollHeight;
 
-    // Call analyzeBuildOrder to update the buildOrderTable
+    // Update build order
     analyzeBuildOrder(inputField.value);
   }
 
@@ -212,10 +244,11 @@ export function initializeAutoCorrect() {
 
   inputField.addEventListener("keydown", (event) => {
     const allSuggestions = popup.querySelectorAll(".suggestion");
+
     if (!popup.style.visibility || popup.style.visibility === "hidden") {
       if (event.key === "Enter") {
         event.preventDefault(); // Prevent default new-line behavior
-        insertNewRow(); // Insert new row
+        insertNewRow(event); // Pass event to the function
       }
       return;
     }

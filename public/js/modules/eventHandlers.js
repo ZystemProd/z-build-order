@@ -145,13 +145,6 @@ export function initializeEventListeners() {
     closeBuildsModal();
   });
 
-  // Automatically trigger analysis when the user types in the buildOrderInput field
-  document
-    .getElementById("buildOrderInput")
-    .addEventListener("input", (event) => {
-      analyzeBuildOrder(event.target.value);
-    });
-
   // Save Build
   document.getElementById("saveBuildButton").addEventListener("click", () => {
     saveCurrentBuild();
@@ -316,4 +309,12 @@ document.getElementById("closeCommunityModal").addEventListener("click", () => {
 
 document.addEventListener("DOMContentLoaded", () => {
   checkPublishButtonVisibility(); // Ensure button is checked on page load
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  document
+    .getElementById("buildOrderInput")
+    .addEventListener("input", (event) => {
+      analyzeBuildOrder(event.target.value);
+    });
 });

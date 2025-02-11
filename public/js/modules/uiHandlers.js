@@ -167,40 +167,40 @@ export function formatWorkersOrTimestamp(
 
 // Function to analyze and update the build order table automatically
 export function analyzeBuildOrder(inputText) {
-  const lines = inputText.split("\n");
-  const table = document.getElementById("buildOrderTable");
+  console.log("Updating build order: ", inputText);
+  requestAnimationFrame(() => {
+    // Ensures real-time UI update
+    const lines = inputText.split("\n");
+    const table = document.getElementById("buildOrderTable");
 
-  // Clear existing rows (except the header)
-  while (table.rows.length > 1) {
-    table.deleteRow(1);
-  }
-
-  lines.forEach((line) => {
-    const match = line.match(/\[(.*?)\]\s*(.*)/);
-
-    let workersOrTimestamp = "";
-    let actionText = "";
-
-    if (match) {
-      workersOrTimestamp = match[1];
-      actionText = match[2];
-    } else {
-      actionText = line;
+    while (table.rows.length > 1) {
+      table.deleteRow(1);
     }
 
-    // Replace `->` and `<-` with arrows
-    actionText = actionText.replace(/->/g, "→").replace(/<-/g, "←");
+    lines.forEach((line) => {
+      const match = line.match(/\[(.*?)\]\s*(.*)/);
 
-    // Format using Trie-based formatting
-    actionText = formatActionText(actionText);
+      let workersOrTimestamp = "";
+      let actionText = "";
 
-    // Insert row into the table
-    const row = table.insertRow();
-    row.insertCell(0).innerHTML = DOMPurify.sanitize(workersOrTimestamp);
-    row.insertCell(1).innerHTML = DOMPurify.sanitize(actionText);
+      if (match) {
+        workersOrTimestamp = match[1];
+        actionText = match[2];
+      } else {
+        actionText = line;
+      }
+
+      actionText = actionText.replace(/->/g, "→").replace(/<-/g, "←");
+
+      // Format using Trie-based formatting
+      actionText = formatActionText(actionText);
+
+      const row = table.insertRow();
+      row.insertCell(0).innerHTML = DOMPurify.sanitize(workersOrTimestamp);
+      row.insertCell(1).innerHTML = DOMPurify.sanitize(actionText);
+    });
   });
 }
-
 function highlightActiveTab(category) {
   document
     .querySelectorAll("#buildCategoryTabs button, #buildSubCategoryTabs button")
