@@ -167,7 +167,6 @@ export function formatWorkersOrTimestamp(
 
 // Function to analyze and update the build order table automatically
 export function analyzeBuildOrder(inputText) {
-  console.log("Updating build order: ", inputText);
   requestAnimationFrame(() => {
     // Ensures real-time UI update
     const lines = inputText.split("\n");

@@ -4,9 +4,11 @@ import {
   collection,
   getDocs,
   doc,
+  addDoc,
   getDoc,
   setDoc,
   query,
+  where,
   orderBy,
   limit,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
@@ -240,8 +242,32 @@ export async function checkPublishButtonVisibility() {
   const buildsRef = collection(db, `users/${user.uid}/builds`);
   const snapshot = await getDocs(buildsRef);
 
-  // ✅ Show button only if there are saved builds
-  publishButton.style.display = snapshot.docs.length > 0 ? "block" : "none";
+  if (snapshot.docs.length === 0) {
+    publishButton.style.display = "none";
+    return;
+  }
+
+  const latestBuild = snapshot.docs[0].data();
+  const communityBuildsRef = collection(db, "communityBuilds");
+
+  // ✅ Query the community builds collection for this specific user's build
+  const userCommunityBuildQuery = query(
+    communityBuildsRef,
+    where("publisherId", "==", user.uid),
+    where("title", "==", latestBuild.title) // Only check if this specific title exists
+  );
+  const userCommunityBuildSnapshot = await getDocs(userCommunityBuildQuery);
+
+  if (!userCommunityBuildSnapshot.empty) {
+    // ✅ Build is already published
+    publishButton.innerText = "✅ Published";
+    publishButton.disabled = true;
+  } else {
+    // ✅ Build is not published yet, show the button
+    publishButton.innerText = "📢 Publish Build";
+    publishButton.disabled = false;
+    publishButton.style.display = "block"; // ✅ Ensure button is visible
+  }
 }
 
 // Publish build function
@@ -275,32 +301,36 @@ document
       return;
     }
 
-    // Get the latest saved build
     const buildToPublish = snapshot.docs[0].data();
-    const communityBuildsRef = collection(db, "communityBuilds");
+    const communityBuildsRef = collection(db, "communityBuilds"); // ✅ Collection reference
 
     try {
-      // Ensure Firestore document ID is valid (replace spaces with underscores)
-      const docId = buildToPublish.title.replace(/\s+/g, "_");
-
-      await setDoc(doc(communityBuildsRef, docId), {
-        title: buildToPublish.title || "Untitled Build",
-        category: buildToPublish.category || "Unknown",
-        subcategory: buildToPublish.subcategory || "Unknown",
-        publisherId: user.uid,
-        username: username,
+      // ✅ Correct Usage of addDoc - Adds to the collection with an auto-generated ID
+      const docRef = await addDoc(communityBuildsRef, {
+        ...buildToPublish,
+        publisherId: user.uid, // ✅ Ensure publisher ID is included
+        username: username, // ✅ Ensure username is included
+        isPublished: true, // ✅ Mark as published
         datePublished: new Date().toISOString(),
-        buildOrder: Array.isArray(buildToPublish.buildOrder)
-          ? buildToPublish.buildOrder
-          : buildToPublish.buildOrder
-          ? buildToPublish.buildOrder.split("\n")
-          : ["No build order available"],
       });
 
+      console.log(`✅ Build published with ID: ${docRef.id}`);
+
       alert("Build successfully published to the community!");
+
+      // ✅ Update Local Firestore Build
+      const buildDocRef = snapshot.docs[0].ref;
+      await setDoc(buildDocRef, { ...buildToPublish, isPublished: true });
+
+      // ✅ Update the Publish Button UI
+      const publishButton = document.getElementById("publishBuildButton");
+      if (publishButton) {
+        publishButton.innerText = "✅ Published";
+        publishButton.disabled = true; // Disable button after publishing
+      }
     } catch (error) {
-      console.error("Error publishing build:", error);
-      alert("Failed to publish build. Please try again.");
+      console.error("❌ Error publishing build:", error);
+      alert("Failed to publish build. Please check your permissions.");
     }
   });
 

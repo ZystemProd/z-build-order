@@ -12,6 +12,11 @@ import {
   getDoc,
   setDoc,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+import {
+  initializeEventListeners,
+  initializeModalEventListeners,
+} from "./js/modules/eventHandlers.js";
+import { resetBuildInputs } from "./js/modules/utils.js";
 
 // Firebase configuration
 const firebaseConfig = {
@@ -144,11 +149,15 @@ function handleSignIn() {
 function handleSignOut() {
   signOut(auth)
     .then(() => {
-      console.log("User signed out successfully.");
-      updateAuthUI(null);
+      console.log("✅ User signed out successfully.");
+
+      resetBuildInputs(); // ✅ Reset UI when signing out
+
+      updateAuthUI(null); // Ensure UI updates
+      window.location.reload(); // Optional: Reload to fully refresh the page
     })
     .catch((error) => {
-      console.error("Sign out error:", error);
+      console.error("❌ Sign out error:", error);
     });
 }
 
@@ -159,12 +168,19 @@ function handleSignOut() {
 async function handleSwitchAccount() {
   try {
     await signOut(auth);
-    console.log("Signed out. Now let's sign in with another account...");
+    console.log("🔄 Signed out. Now signing in with another account...");
+
+    resetBuildInputs(); // ✅ Reset all inputs when switching accounts
+
+    const provider = new GoogleAuthProvider();
     const result = await signInWithPopup(auth, provider);
-    console.log("Switched to new account:", result.user);
+
+    console.log("✅ Switched to new account:", result.user);
+
     updateAuthUI(result.user);
+    window.location.reload(); // Optional: Reload to fully refresh UI
   } catch (err) {
-    console.error("Error switching accounts:", err);
+    console.error("❌ Error switching accounts:", err);
   }
 }
 
@@ -184,8 +200,16 @@ function attachEventListeners() {
 /*********************************************************************
  * 6. AUTH STATE CHANGE LISTENER
  *********************************************************************/
+
 onAuthStateChanged(auth, (user) => {
-  updateAuthUI(user);
+  if (!user) {
+    console.log("🚫 No user logged in. Resetting UI...");
+    resetBuildInputs(); // ✅ Reset everything when user logs out
+    updateAuthUI(null);
+  } else {
+    console.log("✅ User logged in:", user.displayName);
+    updateAuthUI(user);
+  }
 });
 
 /*********************************************************************
@@ -211,6 +235,11 @@ function enableCloseModalOnOutsideClick() {
     }
   });
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+  initializeEventListeners();
+  initializeModalEventListeners();
+});
 
 // Export Firebase utilities
 export { app, auth, db };

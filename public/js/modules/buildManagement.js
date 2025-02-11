@@ -37,6 +37,7 @@ export async function fetchUserBuilds() {
 }
 
 export function saveCurrentBuild() {
+  console.log("Saving build..."); // Debugging
   const titleInput = document.getElementById("buildOrderTitleInput");
   const categoryDropdown = document.getElementById("buildCategoryDropdown");
   const commentInput = document.getElementById("commentInput");
@@ -67,22 +68,10 @@ export function saveCurrentBuild() {
     .toLowerCase()
     .replace(/([a-z])([a-z])/g, (match, p1, p2) => `${p1.toUpperCase()}${p2}`);
 
-  // ✅ **Fix: Convert text-based build order into structured objects**
-  const buildOrder = buildOrderInput.value
-    .split("\n")
-    .map((line) => {
-      const match = line.match(/\[(.*?)\]\s*(.*)/); // Extract [workersOrTimestamp] action
-      if (match) {
-        return {
-          workersOrTimestamp: match[1], // Extract the supply/timestamp
-          action: match[2], // Extract the action
-        };
-      }
-      return null; // Ignore invalid lines
-    })
-    .filter((step) => step !== null); // Remove any null values
+  // ✅ Use `parseBuildOrder` instead of manual parsing
+  const buildOrder = parseBuildOrder(buildOrderInput.value);
 
-  // ✅ **Extract the Map Name Instead of Full Image URL**
+  // ✅ Extract only the map name instead of full image URL
   let mapName = "No map selected";
   if (mapImage?.src) {
     const match = mapImage.src.match(/\/img\/maps\/(.+)\.jpg/);
@@ -97,12 +86,14 @@ export function saveCurrentBuild() {
       ? "Zerg"
       : formattedMatchup.startsWith("Pv")
       ? "Protoss"
-      : "Terran",
+      : formattedMatchup.startsWith("Tv")
+      ? "Terran"
+      : "Unknown",
     subcategory: formattedMatchup,
     timestamp: Date.now(),
     comment: DOMPurify.sanitize(commentInput?.value.trim() || ""),
     videoLink: DOMPurify.sanitize(videoInput?.value.trim() || ""),
-    buildOrder: buildOrder, // ✅ Save as structured objects
+    buildOrder, // ✅ Save as structured objects
     map: mapName, // ✅ Save only the map name
     interactiveMap: {
       circles: mapAnnotations.circles.map(({ x, y }) => ({ x, y })),
@@ -113,6 +104,7 @@ export function saveCurrentBuild() {
         endY,
       })),
     },
+    isPublished: false, // Resets published status when re-saved
   };
 
   const savedBuilds = getSavedBuilds();
@@ -127,6 +119,7 @@ export function saveCurrentBuild() {
   }
 
   setSavedBuilds(savedBuilds);
+  saveSavedBuildsToLocalStorage(); // ✅ Ensure local storage is updated
 
   const db = getFirestore();
   const auth = getAuth();
@@ -143,14 +136,18 @@ export function saveCurrentBuild() {
   setDoc(buildDoc, newBuild)
     .then(() => {
       showToast("Build saved successfully!", "success");
-      checkPublishButtonVisibility();
+
+      // ✅ Wait before checking visibility to ensure Firestore update
+      setTimeout(() => {
+        checkPublishButtonVisibility();
+      }, 500); // Small delay to let Firestore update properly
     })
     .catch((error) => {
       console.error("Error saving to Firestore:", error);
       showToast("Failed to save build.", "error");
     });
 
-  // ✅ **Ensure UI updates after saving**
+  // ✅ Ensure UI updates after saving
   filterBuilds("all");
 }
 

@@ -38,6 +38,7 @@ document.addEventListener("DOMContentLoaded", initializeAutoCorrect);
 
 // Initialize event listeners
 export function initializeEventListeners() {
+  console.log("Initializing event listeners..."); // Debugging
   document
     .getElementById("templateSearchBar")
     .addEventListener("input", (event) => {
@@ -147,6 +148,7 @@ export function initializeEventListeners() {
 
   // Save Build
   document.getElementById("saveBuildButton").addEventListener("click", () => {
+    console.log("Save button clicked!"); // Debugging
     saveCurrentBuild();
   });
 
