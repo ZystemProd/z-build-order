@@ -26,34 +26,61 @@ async function loadBuild() {
 
   if (!buildId) {
     document.getElementById("buildTitle").innerText = "Build not found.";
+    console.error("❌ Error: No build ID in URL.");
     return;
   }
 
-  // Save the last viewed build ID in session storage
-  sessionStorage.setItem("lastViewedBuild", buildId);
+  console.log("🔍 Loading build with ID:", buildId);
 
   const buildRef = doc(db, "communityBuilds", buildId);
   const buildSnapshot = await getDoc(buildRef);
 
   if (buildSnapshot.exists()) {
     const build = buildSnapshot.data();
-    document.getElementById("buildTitle").innerText = build.title;
-    document.getElementById("buildCategory").innerText = build.category;
-    document.getElementById("buildMatchup").innerText = build.subcategory;
-    document.getElementById("buildPublisher").innerText = build.username;
+    console.log("✅ Build Loaded:", build);
+
+    // Populate build details
+    document.getElementById("buildTitle").innerText =
+      build.title || "Untitled Build";
+    document.getElementById("buildCategory").innerText =
+      build.category || "Unknown";
+    document.getElementById("buildMatchup").innerText =
+      build.subcategory || "Unknown";
+    document.getElementById("buildPublisher").innerText =
+      build.username || "Anonymous";
     document.getElementById("buildDate").innerText = new Date(
       build.datePublished
     ).toLocaleDateString();
 
-    const formattedBuildOrder = Array.isArray(build.buildOrder)
-      ? build.buildOrder.map(formatActionText).join("<br>")
-      : formatActionText(build.buildOrder || "No build order available.");
+    // ✅ Fixing Build Order Display
+    const buildOrderContainer = document.getElementById("buildOrder");
+    buildOrderContainer.innerHTML = ""; // Clear previous content
 
-    document.getElementById("buildOrder").innerHTML = formattedBuildOrder;
+    if (Array.isArray(build.buildOrder) && build.buildOrder.length > 0) {
+      // ✅ Ensure each action is formatted properly
+      build.buildOrder.forEach((step) => {
+        if (typeof step === "string") {
+          buildOrderContainer.innerHTML += `<p>${formatActionText(step)}</p>`;
+        } else if (
+          typeof step === "object" &&
+          step.workersOrTimestamp &&
+          step.action
+        ) {
+          buildOrderContainer.innerHTML += `<p><strong>[${
+            step.workersOrTimestamp
+          }]</strong> ${formatActionText(step.action)}</p>`;
+        }
+      });
+    } else {
+      buildOrderContainer.innerHTML = "<p>No build order available.</p>";
+    }
   } else {
+    console.error("❌ Build not found in Firestore:", buildId);
     document.getElementById("buildTitle").innerText = "Build not found.";
   }
 }
+
+document.addEventListener("DOMContentLoaded", loadBuild);
 
 document.addEventListener("DOMContentLoaded", () => {
   loadBuild();

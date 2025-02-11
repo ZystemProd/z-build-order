@@ -81,6 +81,7 @@ export async function populateCommunityBuilds() {
     });
 
     // ✅ Attach event listeners for preview buttons after rows are created
+    initializeCommunityBuildEvents();
     attachPreviewButtonEvents();
   } catch (error) {
     console.error("Error loading community builds:", error);
@@ -148,39 +149,33 @@ function showBuildPreview(build) {
 
   console.log("📝 RAW BUILD ORDER:", build.buildOrder);
 
-  // Format the build order as HTML
+  // ✅ Format each build action using `formatActionText()`
   const formattedBuildOrder = Array.isArray(build.buildOrder)
     ? build.buildOrder
         .map((step) => {
           if (!step || !step.action || !step.workersOrTimestamp) return ""; // Skip invalid steps
-          return `<p><strong>[${step.workersOrTimestamp}]</strong> ${step.action}</p>`;
+          const formattedAction = formatActionText(step.action); // ✅ Format Action
+          return `<p><strong>[${step.workersOrTimestamp}]</strong> ${formattedAction}</p>`;
         })
         .join("")
     : "<p>No build order available.</p>";
 
   console.log("🔍 FORMATTED BUILD ORDER:", formattedBuildOrder);
 
-  // ✅ Clear the old content before inserting the new one
+  // ✅ Clear old content before inserting new one
   communityBuildPreview.innerHTML = "";
 
-  // ✅ Inject the updated preview content
+  // ✅ Inject the formatted preview content
   communityBuildPreview.innerHTML = `
     <div class="preview-header">
       <h3>${build.title}</h3>
-      <p><strong>Matchup:</strong> ${build.matchup}</p>
-      <p><strong>Publisher:</strong> ${build.publisher}</p>
-      <p><strong>Date:</strong> ${new Date(
-        build.datePublished
-      ).toLocaleDateString()}</p>
-    </div>
     <div class="preview-build-order">
-      <h4>Build Order</h4>
       <div id="buildOrderOutput">${formattedBuildOrder}</div>
     </div>
   `;
 
   console.log(
-    "✅ Community Build Preview Updated with Data:",
+    "✅ Community Build Preview Updated with Formatted Data:",
     communityBuildPreview.innerHTML
   );
 }

@@ -103,6 +103,23 @@ async function updateAuthUI(user) {
   }
 }
 
+// ✅ "Switch Account" Button Logic (Added Inside updateAuthUI)
+document
+  .getElementById("switchAccountBtn")
+  .addEventListener("click", async () => {
+    try {
+      await signOut(auth);
+      console.log("User signed out. Switching accounts...");
+
+      const result = await signInWithPopup(auth, provider);
+      console.log("User signed in:", result.user);
+
+      updateAuthUI(result.user); // ✅ Refresh UI after switching accounts
+    } catch (error) {
+      console.error("Switch account error:", error);
+    }
+  });
+
 // Grab references to DOM elements
 const elements = {
   signInBtn: document.getElementById("signInBtn"),

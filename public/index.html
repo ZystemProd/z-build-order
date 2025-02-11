@@ -24,16 +24,15 @@
   </head>
   <body>
     <div id="toast-container"></div>
-    <div id="game-selector" class="menu">
+    <div id="auth-container" class="menu">
       <p id="authLoading">Checking authentication status...</p>
-    
       <section id="whenSignedOut">
         <button id="signInBtn">Sign in with Google</button>
       </section>
-    
       <section id="whenSignedIn" hidden="true">
         <div id="userDetails"></div>
         <button id="signOutBtn">Sign Out</button>
+        <button id="switchAccountBtn">Switch Account</button>
       </section>
     </div>
   
@@ -341,7 +340,7 @@
                     <th>Title</th>
                     <th>Matchup</th>
                     <th>Publisher</th>
-                    <th>Date Published</th>
+                    <th>Published</th>
                     <th>Score</th>
                     <th></th>
                   </tr>

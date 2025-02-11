@@ -15,6 +15,7 @@ import {
 } from "./buildStorage.js";
 import { fetchUserBuilds } from "./buildManagement.js";
 import { mapAnnotations } from "./interactive_map.js";
+import { formatActionText } from "./textFormatters.js";
 
 function formatMatchup(matchup) {
   if (!matchup) return "Unknown Match-Up";
@@ -325,6 +326,8 @@ export async function populateBuildList(filteredBuilds = null) {
     return;
   }
 
+  let lastHoveredBuild = null; // Track the last hovered build
+
   const fragment = document.createDocumentFragment();
 
   builds.forEach((build) => {
@@ -339,14 +342,21 @@ export async function populateBuildList(filteredBuilds = null) {
     buildCard.innerHTML = `
       <div class="card-header">
         <h4>${DOMPurify.sanitize(build.title)}</h4>
-        <button class="delete-build-btn" data-tooltip="Delete Build" title="Delete Build">&times;</button>        <div class="delete-bg"></div>
+        <button class="delete-build-btn" data-tooltip="Delete Build" title="Delete Build">&times;</button>
+        <div class="delete-bg"></div>
       </div>
       <p class="matchup-text">${DOMPurify.sanitize(formatMatchup(matchup))}</p>
     `;
 
     // Add hover functionality for preview
-    buildCard.addEventListener("mouseover", () => updateBuildPreview(build));
-    buildCard.addEventListener("mouseleave", () => clearBuildPreview());
+    buildCard.addEventListener("mouseover", () => {
+      if (lastHoveredBuild !== build) {
+        updateBuildPreview(build);
+        lastHoveredBuild = build;
+      }
+    });
+
+    // Remove `mouseleave` event to keep the hover effect active
 
     // Add view build functionality
     buildCard.addEventListener("click", () => viewBuild(build.id));
@@ -373,30 +383,26 @@ export async function populateBuildList(filteredBuilds = null) {
 
 function updateBuildPreview(build) {
   const buildPreview = document.getElementById("buildPreview");
+  if (!buildPreview) return;
 
-  if (!buildPreview) {
-    console.error("Build preview element not found.");
-    return;
-  }
-
-  const formattedMatchup = formatMatchup(build.subcategory);
-
+  // Format the build order using formatActionText
   const formattedBuildOrder = build.buildOrder
     .map(
-      (step) =>
-        `[${DOMPurify.sanitize(step.workersOrTimestamp)}] ${DOMPurify.sanitize(
-          step.action
-        )}`
+      (step) => `[${step.workersOrTimestamp}] ${formatActionText(step.action)}`
     )
-    .join("\n");
+    .join("<br>"); // Use <br> for line breaks in HTML output
 
+  // Apply the formatted text
   buildPreview.innerHTML = `
     <h4>${DOMPurify.sanitize(build.title)}</h4>
-    <p><strong>Comment:</strong> ${DOMPurify.sanitize(
-      build.comment || "No comments provided."
-    )}</p>
-    <p><strong>Match-Up:</strong> ${DOMPurify.sanitize(formattedMatchup)}</p>
-    <pre>${DOMPurify.sanitize(formattedBuildOrder)}</pre>
+    <pre>${formattedBuildOrder}</pre>
+    ${
+      build.videoLink
+        ? `<iframe src="${DOMPurify.sanitize(
+            build.videoLink
+          )}" frameborder="0" allowfullscreen></iframe>`
+        : ""
+    }
   `;
 }
 

@@ -427,9 +427,41 @@
 }
 
 #buildPreview {
-  flex: 1;
-  padding: 20px;
-  border-right: 1px solid #888;
+  flex: 1; /* Make it take available space */
+  min-width: 300px; /* Ensure it has a reasonable minimum size */
+  max-width: 400px; /* Keep it similar to the build modal */
+  padding: 15px;
+  background-color: #2c2c2c;
+  color: #e0e0e0;
+  border: 1px solid #444;
+  border-radius: 8px;
+  overflow-x: hidden;
+  min-height: 250px;
+  height: 90%;
+  white-space: pre-wrap; /* Ensures long text wraps */
+  word-wrap: break-word; /* Breaks long words */
+  overflow-wrap: break-word; /* Ensures text wraps in all cases */
+}
+
+#buildPreview h4 {
+  font-size: 1.2rem; /* Make title slightly smaller */
+  margin: 5px 0; /* Reduce top and bottom margin */
+  text-align: center; /* Center the title */
+  padding: 5px;
+  white-space: pre-wrap; /* Ensures long text wraps */
+  word-wrap: break-word; /* Breaks long words */
+  overflow-wrap: break-word; /* Ensures text wraps in all cases */
+}
+
+#buildPreview pre {
+  font-size: 1rem; /* Ensure text is readable */
+  margin: 0; /* Remove unnecessary spacing */
+  flex-grow: 1; /* Allow build order to take up remaining space */
+  overflow-y: auto; /* Ensure scrolling inside the build order */
+  overflow-x: hidden;
+  white-space: pre-wrap; /* Ensures long text wraps */
+  word-wrap: break-word; /* Breaks long words */
+  overflow-wrap: break-word; /* Ensures text wraps in all cases */
 }
 
 .filters-container {
