@@ -52,7 +52,7 @@ export async function saveCurrentBuild() {
     return;
   }
 
-  const title = DOMPurify.sanitize(titleInput.value.trim());
+  let title = DOMPurify.sanitize(titleInput.value.trim());
   const selectedMatchup = DOMPurify.sanitize(categoryDropdown.value);
 
   if (!title) {
@@ -65,14 +65,15 @@ export async function saveCurrentBuild() {
     return;
   }
 
+  // ✅ Fix: Replace invalid characters for Firestore document ID
+  const safeTitle = title.replace(/\//g, "_"); // Replace "/" with "_"
+
   const formattedMatchup = selectedMatchup
     .toLowerCase()
     .replace(/([a-z])([a-z])/g, (match, p1, p2) => `${p1.toUpperCase()}${p2}`);
 
-  // ✅ Use `parseBuildOrder` instead of manual parsing
   const buildOrder = parseBuildOrder(buildOrderInput.value);
 
-  // ✅ Extract only the map name instead of full image URL
   let mapName = "No map selected";
   if (mapImage?.src) {
     const match = mapImage.src.match(/\/img\/maps\/(.+)\.jpg/);
@@ -95,14 +96,14 @@ export async function saveCurrentBuild() {
   try {
     const userSnapshot = await getDoc(userRef);
     if (userSnapshot.exists() && userSnapshot.data().username) {
-      username = userSnapshot.data().username; // ✅ Retrieve username from Firestore
+      username = userSnapshot.data().username;
     }
   } catch (error) {
     console.error("Error fetching username:", error);
   }
 
   const newBuild = {
-    title,
+    title: safeTitle, // ✅ Save the safe title
     category: formattedMatchup.startsWith("Zv")
       ? "Zerg"
       : formattedMatchup.startsWith("Pv")
@@ -114,8 +115,8 @@ export async function saveCurrentBuild() {
     timestamp: Date.now(),
     comment: DOMPurify.sanitize(commentInput?.value.trim() || ""),
     videoLink: DOMPurify.sanitize(videoInput?.value.trim() || ""),
-    buildOrder, // ✅ Save as structured objects
-    map: mapName, // ✅ Save only the map name
+    buildOrder,
+    map: mapName,
     interactiveMap: {
       circles: mapAnnotations.circles.map(({ x, y }) => ({ x, y })),
       arrows: mapAnnotations.arrows.map(({ startX, startY, endX, endY }) => ({
@@ -125,12 +126,12 @@ export async function saveCurrentBuild() {
         endY,
       })),
     },
-    isPublished: false, // Resets published status when re-saved
-    publisher: username, // ✅ Save the username
+    isPublished: false,
+    publisher: username,
   };
 
   const buildsRef = collection(db, `users/${user.uid}/builds`);
-  const buildDoc = doc(buildsRef, title);
+  const buildDoc = doc(buildsRef, safeTitle); // ✅ Use the sanitized title
 
   await setDoc(buildDoc, newBuild)
     .then(() => {
@@ -142,7 +143,6 @@ export async function saveCurrentBuild() {
       showToast("Failed to save build.", "error");
     });
 
-  // ✅ Ensure UI updates after saving
   filterBuilds("all");
 }
 
