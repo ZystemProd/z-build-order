@@ -42,52 +42,72 @@ async function fetchCommunityBuilds() {
 // Function to populate the community builds table
 let communityBuilds = []; // Global variable to store builds
 
-export async function populateCommunityBuilds() {
+export async function populateCommunityBuilds(filteredBuilds = null) {
   const tableBody = document.getElementById("communityBuildsTableBody");
   tableBody.innerHTML = ""; // Clear existing rows
 
   try {
-    communityBuilds = await fetchCommunityBuilds(); // ✅ Ensure builds are stored
+    if (!filteredBuilds) {
+      communityBuilds = await fetchCommunityBuilds();
+    }
 
-    communityBuilds.forEach((build) => {
+    const buildsToShow = filteredBuilds || communityBuilds;
+
+    // If no builds found, display a message
+    if (buildsToShow.length === 0) {
+      tableBody.innerHTML = "<tr><td colspan='7'>No builds found.</td></tr>";
+      return;
+    }
+
+    buildsToShow.forEach((build) => {
       const row = document.createElement("tr");
       row.dataset.id = build.id; // Store build ID
 
+      // ✅ Ensure match-up formatting (First and Last letter uppercase)
+      const formattedMatchup = build.matchup
+        ? build.matchup.charAt(0).toUpperCase() +
+          build.matchup.slice(1, -1).toLowerCase() +
+          build.matchup.charAt(build.matchup.length - 1).toUpperCase()
+        : "Unknown";
+
       row.innerHTML = `
-        <td>
-          <button class="view-preview-button" data-id="${
-            build.id
-          }">👁️ Preview</button>
-        </td>
-        <td>${build.title}</td>
-        <td>${build.matchup}</td>
-        <td>${build.publisher}</td>
-        <td>${new Date(build.datePublished).toLocaleDateString()}</td>
-        <td>
-          <button class="vote-button thumbs-up" data-id="${
-            build.id
-          }">👍</button>
-          <button class="vote-button thumbs-down" data-id="${
-            build.id
-          }">👎</button>
-          <span class="vote-percentage" data-id="${build.id}">0%</span>
-        </td>
-        <td>
-          <button class="import-button" data-id="${build.id}">Import</button>
-          <button class="view-build-button" data-id="${
-            build.id
-          }">🔍 View</button>
-        </td> 
-      `;
+              <td>
+                  <button class="view-preview-button" data-id="${
+                    build.id
+                  }">👁️ Preview</button>
+              </td>
+              <td>${DOMPurify.sanitize(build.title)}</td>
+              <td>${DOMPurify.sanitize(formattedMatchup)}</td>
+              <td>${DOMPurify.sanitize(build.publisher)}</td>
+              <td>${new Date(build.datePublished).toLocaleDateString()}</td>
+              <td>
+                  <button class="vote-button thumbs-up" data-id="${
+                    build.id
+                  }">👍</button>
+                  <button class="vote-button thumbs-down" data-id="${
+                    build.id
+                  }">👎</button>
+                  <span class="vote-percentage" data-id="${build.id}">0%</span>
+              </td>
+              <td>
+                  <button class="import-button" data-id="${
+                    build.id
+                  }">Import</button>
+                  <button class="view-build-button" data-id="${
+                    build.id
+                  }">🔍 View</button>
+              </td> 
+          `;
 
       tableBody.appendChild(row);
     });
 
     // ✅ Attach event listeners for preview buttons after rows are created
-    initializeCommunityBuildEvents();
     attachPreviewButtonEvents();
   } catch (error) {
     console.error("Error loading community builds:", error);
+    tableBody.innerHTML =
+      "<tr><td colspan='7'>Failed to load builds.</td></tr>";
   }
 }
 
@@ -378,6 +398,26 @@ document
       alert("Failed to publish build. Please check your permissions.");
     }
   });
+
+export function searchCommunityBuilds(query) {
+  const lowerCaseQuery = DOMPurify.sanitize(query.toLowerCase());
+
+  // Ensure we have community builds loaded
+  if (!communityBuilds || communityBuilds.length === 0) {
+    console.error("No community builds available.");
+    return;
+  }
+
+  // Filter builds based on title
+  const filteredBuilds = communityBuilds.filter((build) =>
+    build.title.toLowerCase().includes(lowerCaseQuery)
+  );
+
+  console.log("🔍 Filtered Builds:", filteredBuilds.length); // Debugging
+
+  // Update UI
+  populateCommunityBuilds(filteredBuilds);
+}
 
 // Call check function on page load
 document.addEventListener("DOMContentLoaded", checkPublishButtonVisibility);

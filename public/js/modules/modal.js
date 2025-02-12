@@ -130,7 +130,7 @@ export function viewBuild(buildId) {
           const formattedMapName = capitalizeWords(mapName);
           const mapUrl = `https://z-build-order.web.app/img/maps/${mapName
             .replace(/ /g, "_")
-            .toLowerCase()}.jpg`;
+            .toLowerCase()}.webp`;
 
           if (mapImage) mapImage.src = mapUrl;
           if (selectedMapText) selectedMapText.innerText = formattedMapName;
@@ -488,17 +488,14 @@ export async function filterBuilds(
 
 export async function searchBuilds(query) {
   const lowerCaseQuery = query.toLowerCase();
-
-  // Fetch all builds
-  const builds = await fetchUserBuilds();
+  const builds = await fetchUserBuilds(); // Fetch all builds
 
   // Filter builds based on the query
   const filteredBuilds = builds.filter((build) =>
     build.title.toLowerCase().includes(lowerCaseQuery)
   );
 
-  // Populate the build list with filtered results
-  populateBuildList(filteredBuilds);
+  populateBuildList(filteredBuilds); // Update UI with filtered results
 }
 
 export async function populateMapModal(maps) {

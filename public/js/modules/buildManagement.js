@@ -31,10 +31,18 @@ export async function fetchUserBuilds() {
   const buildsRef = collection(db, `users/${user.uid}/builds`);
   const snapshot = await getDocs(buildsRef);
 
-  return snapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  }));
+  return snapshot.docs.map((doc) => {
+    const data = doc.data();
+
+    // ✅ Decode "__SLASH__" back to "/"
+    const decodedTitle = doc.id.replace(/__SLASH__/g, "/");
+
+    return {
+      id: doc.id,
+      title: decodedTitle, // ✅ Show the original title
+      ...data,
+    };
+  });
 }
 
 export async function saveCurrentBuild() {
@@ -65,8 +73,8 @@ export async function saveCurrentBuild() {
     return;
   }
 
-  // ✅ Fix: Replace invalid characters for Firestore document ID
-  const safeTitle = title.replace(/\//g, "_"); // Replace "/" with "_"
+  // ✅ Encode "/" as "__SLASH__" for Firestore document ID
+  const encodedTitle = title.replace(/\//g, "__SLASH__");
 
   const formattedMatchup = selectedMatchup
     .toLowerCase()
@@ -76,7 +84,7 @@ export async function saveCurrentBuild() {
 
   let mapName = "No map selected";
   if (mapImage?.src) {
-    const match = mapImage.src.match(/\/img\/maps\/(.+)\.jpg/);
+    const match = mapImage.src.match(/\/img\/maps\/(.+)\.webp/);
     if (match) {
       mapName = match[1].replace(/_/g, " "); // Convert underscores to spaces
     }
@@ -103,7 +111,8 @@ export async function saveCurrentBuild() {
   }
 
   const newBuild = {
-    title: safeTitle, // ✅ Save the safe title
+    title: title, // ✅ Save original title (with "/")
+    encodedTitle: encodedTitle, // ✅ Store the encoded title for Firestore reference
     category: formattedMatchup.startsWith("Zv")
       ? "Zerg"
       : formattedMatchup.startsWith("Pv")
@@ -131,12 +140,12 @@ export async function saveCurrentBuild() {
   };
 
   const buildsRef = collection(db, `users/${user.uid}/builds`);
-  const buildDoc = doc(buildsRef, safeTitle); // ✅ Use the sanitized title
+  const buildDoc = doc(buildsRef, encodedTitle); // ✅ Use encoded title for Firestore
 
   await setDoc(buildDoc, newBuild)
     .then(() => {
       showToast("Build saved successfully!", "success");
-      console.log("✅ Build saved with publisher:", username);
+      console.log("✅ Build saved with title:", title);
     })
     .catch((error) => {
       console.error("Error saving to Firestore:", error);

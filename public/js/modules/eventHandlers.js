@@ -5,7 +5,6 @@ import { updateYouTubeEmbed } from "./youtube.js";
 import {
   closeModal,
   showSubcategories,
-  hideSubcategories,
   filterBuilds,
   searchBuilds,
 } from "./modal.js";
@@ -22,14 +21,14 @@ import {
 import {
   showTemplatesModal,
   setupTemplateModal,
-  searchTemplates,
   showSaveTemplateModal,
-  saveTemplate,
+  searchTemplates,
 } from "./template.js";
 import { initializeTooltips } from "./tooltip.js";
 import {
   populateCommunityBuilds,
   checkPublishButtonVisibility,
+  searchCommunityBuilds,
 } from "./community.js";
 import { populateBuildsModal } from "./buildManagement.js"; // ✅ Corrected import
 
@@ -93,14 +92,40 @@ export function initializeEventListeners() {
     });
   });
 
+  const buildSearchBar = document.getElementById("buildSearchBar");
+  if (buildSearchBar) {
+    buildSearchBar.addEventListener("input", (event) => {
+      const query = DOMPurify.sanitize(event.target.value.trim());
+      searchBuilds(query);
+    });
+  }
+
+  // Template Search Bar
+  const templateSearchBar = document.getElementById("templateSearchBar");
+  if (templateSearchBar) {
+    templateSearchBar.addEventListener("input", (event) => {
+      const query = DOMPurify.sanitize(event.target.value.trim());
+      searchTemplates(query);
+    });
+  }
+
+  // Community Search Bar
+  const communitySearchBar = document.getElementById("communitySearchBar");
+  if (communitySearchBar) {
+    communitySearchBar.addEventListener("input", (event) => {
+      const query = DOMPurify.sanitize(event.target.value.trim());
+      searchCommunityBuilds(query);
+    });
+  }
+
+  // Handle Category Click
   document.querySelectorAll(".filter-category").forEach((element) => {
     element.addEventListener("click", () => {
-      const category = element.getAttribute("data-category");
+      const category = DOMPurify.sanitize(
+        element.getAttribute("data-category")
+      );
       if (category) {
-        // Clear the search bar
-        const searchBar = document.getElementById("buildSearchBar");
-        if (searchBar) searchBar.value = "";
-
+        if (buildSearchBar) buildSearchBar.value = ""; // Clear search bar
         filterBuilds(category);
 
         // Highlight active category
@@ -112,15 +137,15 @@ export function initializeEventListeners() {
     });
   });
 
+  // Handle Subcategory Click
   document.querySelectorAll(".subcategory").forEach((element) => {
     element.addEventListener("click", (event) => {
       event.stopPropagation(); // Prevent triggering parent category click
-      const subcategory = element.getAttribute("data-subcategory");
+      const subcategory = DOMPurify.sanitize(
+        element.getAttribute("data-subcategory")
+      );
       if (subcategory) {
-        // Clear the search bar
-        const searchBar = document.getElementById("buildSearchBar");
-        if (searchBar) searchBar.value = "";
-
+        if (buildSearchBar) buildSearchBar.value = ""; // Clear search bar
         filterBuilds(subcategory);
 
         // Highlight active subcategory
@@ -130,17 +155,6 @@ export function initializeEventListeners() {
         element.classList.add("active");
       }
     });
-  });
-
-  document.addEventListener("DOMContentLoaded", () => {
-    const searchBar = document.getElementById("buildSearchBar");
-
-    if (searchBar) {
-      searchBar.addEventListener("input", (event) => {
-        const query = DOMPurify.sanitize(event.target.value.trim());
-        searchBuilds(query); // Call searchBuilds with the query
-      });
-    }
   });
 
   document.getElementById("closeBuildsModal").addEventListener("click", () => {

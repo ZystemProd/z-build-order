@@ -230,7 +230,7 @@ export function searchTemplates(query) {
   const filteredTemplates = templates.filter((template) =>
     template.title.toLowerCase().includes(lowerCaseQuery)
   );
-  populateTemplateList(filteredTemplates);
+  populateTemplateList(filteredTemplates); // Update template UI
 }
 
 // Call this function during initialization
