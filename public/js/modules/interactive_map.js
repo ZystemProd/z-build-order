@@ -29,8 +29,8 @@ document.addEventListener("DOMContentLoaded", () => {
     mapCards.forEach((card) => {
       const img = card.querySelector(".map-image");
       const mapSrc = img.getAttribute("data-src"); // Get stored lazy source
-      if (mapSrc) {
-        img.src = mapSrc; // Set the actual source
+      if (mapSrc && !img.src) {
+        img.src = mapSrc; // Load actual image
         img.removeAttribute("data-src"); // Prevent duplicate loads
       }
     });
