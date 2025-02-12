@@ -115,11 +115,11 @@ function matchActorsWithTrie(actionText, actorTrie) {
       } else if (category === "resource") {
         imageSrc =
           term === "minerals"
-            ? "img/resources/minerals.png"
-            : "img/resources/gas.png";
+            ? "img/resources/minerals.webp"
+            : "img/resources/gas.webp";
         cssClass = term === "minerals" ? "blue-text" : "green-text";
       } else if (category === "pos") {
-        imageSrc = `img/pos/${key}.png`;
+        imageSrc = `img/pos/${key}.webp`;
         cssClass = "pos-image";
       }
 

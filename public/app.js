@@ -17,6 +17,7 @@ import {
   initializeModalEventListeners,
 } from "./js/modules/eventHandlers.js";
 import { resetBuildInputs } from "./js/modules/utils.js";
+import { getPerformance } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-performance.js";
 
 // Firebase configuration
 const firebaseConfig = {
@@ -35,6 +36,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
+const perf = getPerformance(app);
 
 /*********************************************************************
  * 2. CHECK & SET USERNAME
@@ -105,7 +107,7 @@ async function updateAuthUI(user) {
     document.getElementById("userName").innerText = username || "Guest";
 
     // Show user photo
-    const userPhoto = user.photoURL || "img/default-avatar.png";
+    const userPhoto = user.photoURL || "img/default-avatar.webp";
     document.getElementById("userPhoto").src = userPhoto;
 
     // Show Switch & Sign Out buttons, hide Sign In
@@ -117,7 +119,7 @@ async function updateAuthUI(user) {
 
     // Reset display
     document.getElementById("userName").innerText = "Guest";
-    document.getElementById("userPhoto").src = "img/default-avatar.png";
+    document.getElementById("userPhoto").src = "img/default-avatar.webp";
 
     // Show Sign In, hide Switch & Sign Out
     document.getElementById("signInBtn").style.display = "inline-block";

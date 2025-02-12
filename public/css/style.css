@@ -1384,7 +1384,7 @@ textarea::-webkit-scrollbar-thumb:hover {
 }
 
 .resource::before {
-  content: url("path/to/resource-icon.png"); /* Replace with an icon path */
+  content: url("path/to/resource-icon.webp"); /* Replace with an icon path */
   margin-right: 4px;
 }
 /* General Layout for Main Sections */

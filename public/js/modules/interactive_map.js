@@ -1,3 +1,44 @@
+document.addEventListener("DOMContentLoaded", () => {
+  const mapPreviewContainer = document.getElementById("map-preview-container");
+  let mapsLoaded = false;
+
+  function loadMaps() {
+    if (!mapsLoaded) {
+      console.log("🔄 Loading maps...");
+      loadMapsOnDemand();
+      mapsLoaded = true; // Prevent multiple loads
+    }
+  }
+
+  // ✅ Detect if the user is on a mobile device
+  const isMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent);
+
+  if (isMobile) {
+    // 🛠 For mobile: Load maps on the first tap
+    mapPreviewContainer.addEventListener("click", loadMaps, { once: true });
+  } else {
+    // 🖥 For desktops: Load maps on hover
+    mapPreviewContainer.addEventListener("mouseenter", loadMaps, {
+      once: true,
+    });
+  }
+
+  function loadMapsOnDemand() {
+    const mapCards = document.querySelectorAll(".map-card");
+
+    mapCards.forEach((card) => {
+      const img = card.querySelector(".map-image");
+      const mapSrc = img.getAttribute("data-src"); // Get stored lazy source
+      if (mapSrc) {
+        img.src = mapSrc; // Set the actual source
+        img.removeAttribute("data-src"); // Prevent duplicate loads
+      }
+    });
+
+    console.log("✅ All maps loaded!");
+  }
+});
+
 export class MapAnnotations {
   constructor(mapContainerId, annotationsContainerId) {
     this.mapContainer = document.getElementById(mapContainerId);
@@ -215,18 +256,18 @@ export function initializeMapSelection(mapAnnotations) {
 
   // List of maps with paths
   const maps = [
-    { name: "Abyssal Reef", imagePath: "img/maps/abyssal_reef.jpg" },
-    { name: "Amygdala", imagePath: "img/maps/amygdala.jpg" },
-    { name: "El Dorado", imagePath: "img/maps/el_dorado.jpg" },
-    { name: "Frostline", imagePath: "img/maps/frostline.jpg" },
-    { name: "King's Cove", imagePath: "img/maps/king's_cove.jpg" },
-    { name: "Ley Lines", imagePath: "img/maps/ley_lines.jpg" },
+    { name: "Abyssal Reef", imagePath: "img/maps/abyssal_reef.webp" },
+    { name: "Amygdala", imagePath: "img/maps/amygdala.webp" },
+    { name: "El Dorado", imagePath: "img/maps/el_dorado.webp" },
+    { name: "Frostline", imagePath: "img/maps/frostline.webp" },
+    { name: "King's Cove", imagePath: "img/maps/king's_cove.webp" },
+    { name: "Ley Lines", imagePath: "img/maps/ley_lines.webp" },
     {
       name: "Neon Violet Square",
-      imagePath: "img/maps/neon_violet_square.jpg",
+      imagePath: "img/maps/neon_violet_square.webp",
     },
-    { name: "Ultralove", imagePath: "img/maps/ultralove.jpg" },
-    { name: "Whispers of Gold", imagePath: "img/maps/whispers_of_gold.jpg" },
+    { name: "Ultralove", imagePath: "img/maps/ultralove.webp" },
+    { name: "Whispers of Gold", imagePath: "img/maps/whispers_of_gold.webp" },
   ];
 
   // Populate modal with map cards
@@ -235,9 +276,9 @@ export function initializeMapSelection(mapAnnotations) {
       (map) => `
     <div class="map-card" data-map="${DOMPurify.sanitize(map.imagePath)}">
       <div class="map-card-title">${DOMPurify.sanitize(map.name)}</div>
-      <img src="${DOMPurify.sanitize(map.imagePath)}" alt="${DOMPurify.sanitize(
-        map.name
-      )}" class="map-image">
+      <img data-src="${DOMPurify.sanitize(
+        map.imagePath
+      )}" alt="${DOMPurify.sanitize(map.name)}" class="map-image">
     </div>`
     )
     .join("");

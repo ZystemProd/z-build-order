@@ -336,7 +336,7 @@ export async function populateBuildList(filteredBuilds = null) {
 
     // Determine the background image based on the match-up
     const matchup = build.subcategory || "unknown";
-    const backgroundImageUrl = `../img/frames/${matchup.toLowerCase()}.png`;
+    const backgroundImageUrl = `../img/frames/${matchup.toLowerCase()}.webp`;
     buildCard.style.backgroundImage = `url("${backgroundImageUrl}")`;
 
     buildCard.innerHTML = `

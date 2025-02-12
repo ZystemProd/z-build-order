@@ -20,11 +20,11 @@ import {
   initializeTextareaClickHandler,
 } from "./uiHandlers.js";
 import {
-  saveTemplate,
   showTemplatesModal,
   setupTemplateModal,
   searchTemplates,
   showSaveTemplateModal,
+  saveTemplate,
 } from "./template.js";
 import { initializeTooltips } from "./tooltip.js";
 import {

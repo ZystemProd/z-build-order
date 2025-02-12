@@ -211,7 +211,7 @@ export function initializeAutoCorrect() {
       const img = document.createElement("img");
       img.src = `img/${DOMPurify.sanitize(match.type)}/${DOMPurify.sanitize(
         match.name.toLowerCase().replace(/ /g, "_")
-      )}.png`;
+      )}.webp`;
       img.alt = DOMPurify.sanitize(match.name);
 
       const text = document.createElement("span");

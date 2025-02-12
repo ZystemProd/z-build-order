@@ -42,7 +42,6 @@ export function resetBuildInputs() {
   // ✅ Reset Selected Map Preview
   const mapImage = document.getElementById("map-preview-image");
   const selectedMapText = document.getElementById("selected-map-text");
-  if (mapImage) mapImage.src = "img/default-map.png"; // Replace with a default map image
   if (selectedMapText) selectedMapText.innerText = "No map selected";
 
   // ✅ Reset Annotations (Circles & Arrows)
