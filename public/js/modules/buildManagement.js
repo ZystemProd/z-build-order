@@ -31,11 +31,20 @@ export async function fetchUserBuilds() {
   const buildsRef = collection(db, `users/${user.uid}/builds`);
   const snapshot = await getDocs(buildsRef);
 
-  return snapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  }));
+  return snapshot.docs.map((doc) => {
+    const data = doc.data();
+    
+    // ✅ Decode "__SLASH__" back to "/"
+    const decodedTitle = doc.id.replace(/__SLASH__/g, "/");
+    
+    return {
+      id: doc.id,
+      title: decodedTitle, // ✅ Show the original title
+      ...data,
+    };
+  });
 }
+
 
 export async function saveCurrentBuild() {
   console.log("Saving build..."); // Debugging
@@ -52,7 +61,7 @@ export async function saveCurrentBuild() {
     return;
   }
 
-  const title = DOMPurify.sanitize(titleInput.value.trim());
+  let title = DOMPurify.sanitize(titleInput.value.trim());
   const selectedMatchup = DOMPurify.sanitize(categoryDropdown.value);
 
   if (!title) {
@@ -65,14 +74,15 @@ export async function saveCurrentBuild() {
     return;
   }
 
+  // ✅ Encode "/" as "__SLASH__" for Firestore document ID
+  const encodedTitle = title.replace(/\//g, "__SLASH__");
+
   const formattedMatchup = selectedMatchup
     .toLowerCase()
     .replace(/([a-z])([a-z])/g, (match, p1, p2) => `${p1.toUpperCase()}${p2}`);
 
-  // ✅ Use `parseBuildOrder` instead of manual parsing
   const buildOrder = parseBuildOrder(buildOrderInput.value);
 
-  // ✅ Extract only the map name instead of full image URL
   let mapName = "No map selected";
   if (mapImage?.src) {
     const match = mapImage.src.match(/\/img\/maps\/(.+)\.jpg/);
@@ -95,14 +105,15 @@ export async function saveCurrentBuild() {
   try {
     const userSnapshot = await getDoc(userRef);
     if (userSnapshot.exists() && userSnapshot.data().username) {
-      username = userSnapshot.data().username; // ✅ Retrieve username from Firestore
+      username = userSnapshot.data().username;
     }
   } catch (error) {
     console.error("Error fetching username:", error);
   }
 
   const newBuild = {
-    title,
+    title: title, // ✅ Save original title (with "/")
+    encodedTitle: encodedTitle, // ✅ Store the encoded title for Firestore reference
     category: formattedMatchup.startsWith("Zv")
       ? "Zerg"
       : formattedMatchup.startsWith("Pv")
@@ -114,8 +125,8 @@ export async function saveCurrentBuild() {
     timestamp: Date.now(),
     comment: DOMPurify.sanitize(commentInput?.value.trim() || ""),
     videoLink: DOMPurify.sanitize(videoInput?.value.trim() || ""),
-    buildOrder, // ✅ Save as structured objects
-    map: mapName, // ✅ Save only the map name
+    buildOrder,
+    map: mapName,
     interactiveMap: {
       circles: mapAnnotations.circles.map(({ x, y }) => ({ x, y })),
       arrows: mapAnnotations.arrows.map(({ startX, startY, endX, endY }) => ({
@@ -125,26 +136,26 @@ export async function saveCurrentBuild() {
         endY,
       })),
     },
-    isPublished: false, // Resets published status when re-saved
-    publisher: username, // ✅ Save the username
+    isPublished: false,
+    publisher: username,
   };
 
   const buildsRef = collection(db, `users/${user.uid}/builds`);
-  const buildDoc = doc(buildsRef, title);
+  const buildDoc = doc(buildsRef, encodedTitle); // ✅ Use encoded title for Firestore
 
   await setDoc(buildDoc, newBuild)
     .then(() => {
       showToast("Build saved successfully!", "success");
-      console.log("✅ Build saved with publisher:", username);
+      console.log("✅ Build saved with title:", title);
     })
     .catch((error) => {
       console.error("Error saving to Firestore:", error);
       showToast("Failed to save build.", "error");
     });
 
-  // ✅ Ensure UI updates after saving
   filterBuilds("all");
 }
+
 
 export async function loadBuildAnnotations(buildId) {
   const db = getFirestore();
