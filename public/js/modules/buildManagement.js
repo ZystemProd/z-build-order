@@ -10,7 +10,6 @@ import { getAuth } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth
 import {
   getSavedBuilds,
   setSavedBuilds,
-  saveSavedBuildsToLocalStorage,
 } from "./buildStorage.js";
 import { showToast } from "./uiHandlers.js";
 import { filterBuilds } from "./modal.js";
@@ -114,8 +113,11 @@ export async function saveCurrentBuild() {
 
   const auth = getAuth();
   const user = auth.currentUser;
+
+  // 🔴 If user is not signed in, show toast warning and prevent save
   if (!user) {
-    showToast("Sign in to save builds to the database.", "error");
+    console.error("⚠ Attempted to save without signing in.");
+    showToast("⚠ You must sign in to save your build!", "error");
     return;
   }
 
@@ -166,7 +168,7 @@ export async function saveCurrentBuild() {
 
   await setDoc(buildDoc, newBuild)
     .then(() => {
-      showToast("Build saved successfully!", "success");
+      showToast("✅ Build saved successfully!", "success");
       console.log("✅ Build saved with title:", title);
       checkPublishButtonVisibility();
     })
@@ -177,6 +179,7 @@ export async function saveCurrentBuild() {
 
   filterBuilds("all");
 }
+
 
 export async function loadBuildAnnotations(buildId) {
   const db = getFirestore();
