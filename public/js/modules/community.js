@@ -10,6 +10,7 @@ import {
   where,
   orderBy,
   limit,
+  updateDoc,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { formatActionText } from "./textFormatters.js";
 import { populateBuildsModal } from "./buildManagement.js"; // ✅ Corrected import
@@ -22,10 +23,13 @@ async function fetchCommunityBuilds() {
 
   return snapshot.docs.map((doc) => {
     const data = doc.data();
-    console.log("📥 FETCHED BUILD DATA:", data); // ✅ Log fetched data
+
+    if (!doc.id) {
+      console.error("❌ Error: Build is missing an ID", data);
+    }
 
     return {
-      id: doc.id,
+      id: doc.id || null, // ✅ Ensure ID is assigned
       title: data.title || "Untitled Build",
       matchup: data.subcategory || "Unknown",
       publisher: data.username || "Anonymous",
@@ -53,57 +57,82 @@ export async function populateCommunityBuilds(filteredBuilds = null) {
 
     const buildsToShow = filteredBuilds || communityBuilds;
 
-    // If no builds found, display a message
     if (buildsToShow.length === 0) {
       tableBody.innerHTML = "<tr><td colspan='7'>No builds found.</td></tr>";
       return;
     }
 
+    const user = auth.currentUser;
+    const userId = user ? user.uid : null;
+
     buildsToShow.forEach((build) => {
       const row = document.createElement("tr");
-      row.dataset.id = build.id; // Store build ID
+      row.dataset.id = build.id; // ✅ Ensure build ID is stored
 
-      // ✅ Ensure match-up formatting (First and Last letter uppercase)
       const formattedMatchup = build.matchup
         ? build.matchup.charAt(0).toUpperCase() +
           build.matchup.slice(1, -1).toLowerCase() +
           build.matchup.charAt(build.matchup.length - 1).toUpperCase()
         : "Unknown";
 
+      const upvotes = build.upvotes || 0;
+      const downvotes = build.downvotes || 0;
+      const totalVotes = upvotes + downvotes;
+      const votePercentage =
+        totalVotes > 0 ? Math.round((upvotes / totalVotes) * 100) : 0;
+
+      const userVote =
+        build.userVotes && userId ? build.userVotes[userId] : null;
+
       row.innerHTML = `
-              <td>
-                  <button class="view-preview-button" data-id="${
-                    build.id
-                  }">👁️ Preview</button>
-              </td>
-              <td>${DOMPurify.sanitize(build.title)}</td>
-              <td>${DOMPurify.sanitize(formattedMatchup)}</td>
-              <td>${DOMPurify.sanitize(build.publisher)}</td>
-              <td>${new Date(build.datePublished).toLocaleDateString()}</td>
-              <td>
-                  <button class="vote-button thumbs-up" data-id="${
-                    build.id
-                  }">👍</button>
-                  <button class="vote-button thumbs-down" data-id="${
-                    build.id
-                  }">👎</button>
-                  <span class="vote-percentage" data-id="${build.id}">0%</span>
-              </td>
-              <td>
-                  <button class="import-button" data-id="${
-                    build.id
-                  }">Import</button>
-                  <button class="view-build-button" data-id="${
-                    build.id
-                  }">🔍 View</button>
-              </td> 
-          `;
+        <td>
+            <button class="view-preview-button" data-id="${
+              build.id
+            }" data-tooltip="Preview">
+                <img src="./img/SVG/preview.svg" alt="Preview" class="community-icon">
+            </button>
+        </td>
+        <td>${DOMPurify.sanitize(build.title)}</td>
+        <td>${DOMPurify.sanitize(formattedMatchup)}</td>
+        <td>${DOMPurify.sanitize(build.publisher)}</td>
+        <td>${new Date(build.datePublished).toLocaleDateString()}</td>
+        <td>
+            <button class="vote-button vote-up" data-id="${
+              build.id
+            }" data-tooltip="Upvote">
+                <img src="./img/SVG/${
+                  userVote === "up" ? "voted-up" : "vote-up"
+                }.svg" alt="Upvote" class="community-icon">
+            </button>
+            <button class="vote-button vote-down" data-id="${
+              build.id
+            }" data-tooltip="Downvote">
+                <img src="./img/SVG/${
+                  userVote === "down" ? "voted-down" : "vote-down"
+                }.svg" alt="Downvote" class="community-icon">
+            </button>
+            <span class="vote-percentage" data-id="${
+              build.id
+            }">${votePercentage}%</span>
+        </td>
+        <td>
+            <button class="import-button" data-id="${
+              build.id
+            }" data-tooltip="Import">
+                <img src="./img/SVG/import.svg" alt="Import" class="community-icon">
+            </button>
+            <button class="view-build-button" data-id="${
+              build.id
+            }" data-tooltip="View Build">
+                <img src="./img/SVG/view.svg" alt="View" class="community-icon">
+            </button>
+        </td> 
+      `;
 
       tableBody.appendChild(row);
     });
 
-    // ✅ Attach event listeners for preview buttons after rows are created
-    attachPreviewButtonEvents();
+    initializeCommunityBuildEvents(); // ✅ Attach event listeners for all buttons
   } catch (error) {
     console.error("Error loading community builds:", error);
     tableBody.innerHTML =
@@ -213,16 +242,35 @@ function clearBuildPreview() {
 function initializeCommunityBuildEvents() {
   console.log("✅ Initializing event listeners for community builds...");
 
-  // ✅ Attach event listeners for "View Preview" buttons (Unchanged)
-  attachPreviewButtonEvents();
-
-  // ✅ Attach click events to "View Build" buttons (Unchanged)
-  document.querySelectorAll(".view-build-button").forEach((button) => {
+  // ✅ Attach event listeners for "View Preview" buttons
+  document.querySelectorAll(".view-preview-button").forEach((button) => {
     button.addEventListener("click", (event) => {
-      const buildId = event.target.getAttribute("data-id");
+      const buildId = event.currentTarget.getAttribute("data-id");
 
       if (!buildId) {
-        console.error("❌ Error: No build ID found for view-build-button");
+        console.error("❌ Error: No Build ID found for preview.");
+        return;
+      }
+
+      console.log("🔍 Preview Button Clicked - Build ID:", buildId);
+      const build = communityBuilds.find((b) => b.id === buildId);
+
+      if (build) {
+        console.log("✅ Found Build:", build.title);
+        showBuildPreview(build);
+      } else {
+        console.error("❌ Error: Build not found with ID", buildId);
+      }
+    });
+  });
+
+  // ✅ Attach event listeners for "View Build" buttons
+  document.querySelectorAll(".view-build-button").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      const buildId = event.currentTarget.getAttribute("data-id");
+
+      if (!buildId) {
+        console.error("❌ Error: No Build ID found for view-build-button");
         return;
       }
 
@@ -231,10 +279,10 @@ function initializeCommunityBuildEvents() {
     });
   });
 
-  // ✅ Attach event listeners for "Import" buttons (Fix for Publisher Issue)
+  // ✅ Attach event listeners for "Import" buttons
   document.querySelectorAll(".import-button").forEach((button) => {
     button.addEventListener("click", async (event) => {
-      const buildId = event.target.getAttribute("data-id");
+      const buildId = event.currentTarget.getAttribute("data-id");
       console.log("📥 Import Button Clicked - Build ID:", buildId);
 
       if (!auth.currentUser) {
@@ -257,25 +305,156 @@ function initializeCommunityBuildEvents() {
         const buildData = buildDoc.data();
         const userBuildDocRef = doc(userBuildsRef, buildData.title);
 
-        // ✅ Ensure `publisher` is properly saved
         await setDoc(userBuildDocRef, {
           ...buildData,
-          publisher: buildData.username || buildData.publisher || "Unknown", // ✅ Ensure publisher is correctly assigned
-          imported: true, // ✅ Mark as imported
+          publisher: buildData.username || buildData.publisher || "Unknown",
+          imported: true,
           timestamp: Date.now(),
         });
 
         console.log("✅ Build imported successfully!", buildData);
         alert("Build successfully imported!");
-
-        // ✅ Refresh the user's Builds Modal
-        populateBuildsModal();
+        populateBuildsModal(); // ✅ Refresh user's builds
       } catch (error) {
         console.error("❌ Error importing build:", error);
         alert("Failed to import build. Please try again.");
       }
     });
   });
+
+  // ✅ Attach event listeners for voting buttons (with SVG update)
+  document.querySelectorAll(".vote-button").forEach((button) => {
+    button.addEventListener("click", async (event) => {
+      const buildId = event.currentTarget.getAttribute("data-id");
+      const isUpvote = event.currentTarget.classList.contains("vote-up");
+      console.log(
+        `${isUpvote ? "👍 Upvote" : "👎 Downvote"} clicked - Build ID:`,
+        buildId
+      );
+
+      try {
+        await handleVote(buildId, isUpvote ? "up" : "down");
+
+        // ✅ After voting, update the SVG icon immediately
+        updateVoteButtonIcons(buildId);
+      } catch (error) {
+        console.error("❌ Error voting:", error);
+      }
+    });
+  });
+}
+
+// ✅ Update Vote Button Icons After Voting
+function updateVoteButtonIcons(buildId) {
+  const upvoteButton = document.querySelector(`.vote-up[data-id="${buildId}"]`);
+  const downvoteButton = document.querySelector(
+    `.vote-down[data-id="${buildId}"]`
+  );
+
+  if (!upvoteButton || !downvoteButton) return;
+
+  // ✅ Fetch the user's vote from Firestore
+  getDoc(doc(db, "communityBuilds", buildId)).then((buildDoc) => {
+    if (buildDoc.exists()) {
+      const user = auth.currentUser;
+      if (!user) return;
+
+      const buildData = buildDoc.data();
+      const userVote = buildData.userVotes?.[user.uid];
+
+      // ✅ Change icons based on user vote
+      upvoteButton.querySelector("img").src =
+        userVote === "up" ? "./img/SVG/voted-up.svg" : "./img/SVG/vote-up.svg";
+
+      downvoteButton.querySelector("img").src =
+        userVote === "down"
+          ? "./img/SVG/voted-down.svg"
+          : "./img/SVG/vote-down.svg";
+    }
+  });
+}
+
+async function handleVote(buildId, voteType) {
+  const user = auth.currentUser;
+  if (!user) {
+    alert("You must be signed in to vote.");
+    return;
+  }
+
+  const userId = user.uid;
+  const buildRef = doc(db, "communityBuilds", buildId);
+
+  try {
+    const buildDoc = await getDoc(buildRef);
+    if (!buildDoc.exists()) {
+      console.error("❌ Error: Build not found.");
+      return;
+    }
+
+    const buildData = buildDoc.data();
+    const userVotes = buildData.userVotes || {};
+    let upvotes = buildData.upvotes || 0;
+    let downvotes = buildData.downvotes || 0;
+
+    const previousVote = userVotes[userId];
+
+    if (previousVote === voteType) {
+      // Remove vote if user clicks the same button again
+      if (voteType === "up") upvotes--;
+      if (voteType === "down") downvotes--;
+      delete userVotes[userId];
+    } else {
+      // If switching vote, adjust counts accordingly
+      if (previousVote === "up" && voteType === "down") {
+        upvotes--;
+        downvotes++;
+      } else if (previousVote === "down" && voteType === "up") {
+        downvotes--;
+        upvotes++;
+      } else {
+        // First time voting
+        if (voteType === "up") upvotes++;
+        if (voteType === "down") downvotes++;
+      }
+      userVotes[userId] = voteType;
+    }
+
+    await updateDoc(buildRef, { upvotes, downvotes, userVotes });
+    updateVoteUI(buildId, upvotes, downvotes, userVotes[userId] || null);
+  } catch (error) {
+    console.error("❌ Error updating vote:", error);
+  }
+}
+
+function updateVoteUI(buildId, upvotes, downvotes, userVote) {
+  const upvoteButton = document.querySelector(`.vote-up[data-id="${buildId}"]`);
+  const downvoteButton = document.querySelector(
+    `.vote-down[data-id="${buildId}"]`
+  );
+  const votePercentage = document.querySelector(
+    `.vote-percentage[data-id="${buildId}"]`
+  );
+
+  if (!upvoteButton || !downvoteButton || !votePercentage) return;
+
+  // ✅ Update SVG icons
+  upvoteButton.querySelector("img").src =
+    userVote === "up" ? "./img/SVG/voted-up.svg" : "./img/SVG/vote-up.svg";
+
+  downvoteButton.querySelector("img").src =
+    userVote === "down"
+      ? "./img/SVG/voted-down.svg"
+      : "./img/SVG/vote-down.svg";
+
+  // ✅ Highlight selected vote
+  upvoteButton.classList.toggle("voted-up", userVote === "up");
+  downvoteButton.classList.toggle("voted-down", userVote === "down");
+
+  // ✅ Calculate vote percentage
+  const totalVotes = upvotes + downvotes;
+  const percentage =
+    totalVotes > 0 ? Math.round((upvotes / totalVotes) * 100) : 0;
+  votePercentage.textContent = `${percentage}%`;
 }
 
 document

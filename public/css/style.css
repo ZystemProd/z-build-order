@@ -1688,47 +1688,137 @@ textarea::-webkit-scrollbar-thumb:hover {
   margin-bottom: 10px;
 }
 
-.rate-button,
-.import-button {
-  background-color: #444;
-  color: #e0e0e0;
-  border: none;
-  padding: 5px 10px;
-  border-radius: 5px;
-  cursor: pointer;
-}
-
-.rate-button:hover,
-.import-button:hover {
-  background-color: #555;
-}
-
-.vote-button {
+/* General button styling */
+.vote-button,
+.import-button,
+.view-build-button,
+.view-preview-button {
   background: none;
   border: none;
-  font-size: 18px;
   cursor: pointer;
-  margin: 0 5px;
-  color: #e0e0e0;
+  padding: 5px;
+  display: inline-flex; /* Ensures buttons stay in a row */
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease, background-color 0.2s ease;
+  background-color: #444 !important;
+}
+
+/* Ensure all SVGs inside buttons have the same size */
+.vote-button img,
+.import-button img,
+.view-build-button img,
+.view-preview-button img {
+  width: 20px;
+  height: 20px;
   transition: transform 0.2s ease;
 }
 
-.vote-button:hover {
+/* Hover effect: slightly enlarge icons */
+.vote-button:hover img,
+.import-button:hover img,
+.view-build-button:hover img,
+.view-preview-button:hover img {
   transform: scale(1.2);
 }
 
-.vote-button.thumbs-up {
-  color: #44e418; /* Green for thumbs up */
+/* Click effect */
+.vote-button:active img,
+.import-button:active img,
+.view-build-button:active img,
+.view-preview-button:active img {
+  transform: scale(0.9);
 }
 
-.vote-button.thumbs-down {
-  color: #ff3a30; /* Red for thumbs down */
+/* Add a subtle background on hover for all buttons */
+.vote-button:hover,
+.import-button:hover,
+.view-build-button:hover,
+.view-preview-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
 }
 
+/* Vote-up (green) and vote-down (red) specific styles */
+.vote-button.vote-up img {
+  filter: brightness(0) invert(1) sepia(1) hue-rotate(90deg) saturate(10);
+}
+
+.vote-button.vote-down img {
+  filter: brightness(0) invert(1) sepia(1) hue-rotate(0deg) saturate(10);
+}
+
+/* Keep vote-up and vote-down buttons horizontally aligned */
+.vote-button.vote-up,
+.vote-button.vote-down {
+  margin: 0 4px; /* Space between upvote/downvote */
+}
+
+/* Keep import and view buttons horizontally aligned */
+.import-button,
+.view-build-button {
+  margin: 0 4px; /* Space between import/view */
+}
+
+/* Proper spacing inside table cells */
+td {
+  display: table-cell;
+  vertical-align: middle;
+}
+
+/* Styling for the vote percentage display */
 .vote-percentage {
   font-size: 14px;
   margin-left: 10px;
   color: #e0e0e0;
+}
+
+/* Default vote buttons */
+.vote-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+/* Default icons */
+.vote-button img {
+  width: 24px;
+  height: 24px;
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+/* Hover effect */
+.vote-button:hover img {
+  transform: scale(1.1);
+}
+
+/* Click effect */
+.vote-button:active img {
+  transform: scale(0.9);
+}
+
+/* Mark selected vote with a filled color */
+.vote-button.voted-up {
+  background-color: rgba(0, 255, 0, 0.2); /* Light green */
+  border-radius: 5px;
+}
+
+.vote-button.voted-up img {
+  filter: brightness(0) invert(1) sepia(1) hue-rotate(90deg) saturate(3);
+}
+
+.vote-button.voted-down {
+  background-color: rgba(255, 0, 0, 0.2); /* Light red */
+  border-radius: 5px;
+}
+
+.vote-button.voted-down img {
+  filter: brightness(0) invert(1) sepia(1) hue-rotate(0deg) saturate(3);
 }
 
 .community-layout {

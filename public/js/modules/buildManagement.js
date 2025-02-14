@@ -48,13 +48,14 @@ export async function fetchUserBuilds() {
 export async function saveCurrentBuild() {
   console.log("Saving build..."); // Debugging
   const titleInput = document.getElementById("buildOrderTitleInput");
+  const titleText = document.getElementById("buildOrderTitleText"); // Title Text
   const categoryDropdown = document.getElementById("buildCategoryDropdown");
   const commentInput = document.getElementById("commentInput");
   const videoInput = document.getElementById("videoInput");
   const buildOrderInput = document.getElementById("buildOrderInput");
   const mapImage = document.getElementById("map-preview-image");
 
-  if (!titleInput || !categoryDropdown) {
+  if (!titleInput || !categoryDropdown || !titleText) {
     console.error("Title or match-up dropdown is missing.");
     showToast("Failed to save. Title or match-up missing.", "error");
     return;
@@ -63,15 +64,36 @@ export async function saveCurrentBuild() {
   let title = DOMPurify.sanitize(titleInput.value.trim());
   const selectedMatchup = DOMPurify.sanitize(categoryDropdown.value);
 
+  // ✅ ADD BORDER ANIMATION FOR EMPTY FIELDS
+  function highlightField(field) {
+    field.classList.add("highlight"); // Add highlight class
+    setTimeout(() => field.classList.remove("highlight"), 5000); // Remove after 5s
+  }
+
+  function removeHighlightOnFocus(field) {
+    field.addEventListener("focus", () => field.classList.remove("highlight"));
+    field.addEventListener("change", () => field.classList.remove("highlight")); // For dropdowns
+  }
+
+  // Apply remove highlight on focus
+  removeHighlightOnFocus(titleInput);
+  removeHighlightOnFocus(categoryDropdown);
+
   if (!title) {
     showToast("Please provide a title.", "error");
+    highlightField(titleInput);
+    highlightField(titleText); // Highlight `buildOrderTitleText`
     return;
   }
 
   if (!selectedMatchup) {
     showToast("Please select a valid match-up.", "error");
+    highlightField(categoryDropdown);
     return;
   }
+
+  // ✅ Fix: Remove highlight when user selects a category
+  titleText.classList.remove("highlight");
 
   // ✅ Encode "/" as "__SLASH__" for Firestore document ID
   const encodedTitle = title.replace(/\//g, "__SLASH__");
@@ -111,8 +133,8 @@ export async function saveCurrentBuild() {
   }
 
   const newBuild = {
-    title: title, // ✅ Save original title (with "/")
-    encodedTitle: encodedTitle, // ✅ Store the encoded title for Firestore reference
+    title: title,
+    encodedTitle: encodedTitle,
     category: formattedMatchup.startsWith("Zv")
       ? "Zerg"
       : formattedMatchup.startsWith("Pv")
@@ -140,12 +162,13 @@ export async function saveCurrentBuild() {
   };
 
   const buildsRef = collection(db, `users/${user.uid}/builds`);
-  const buildDoc = doc(buildsRef, encodedTitle); // ✅ Use encoded title for Firestore
+  const buildDoc = doc(buildsRef, encodedTitle);
 
   await setDoc(buildDoc, newBuild)
     .then(() => {
       showToast("Build saved successfully!", "success");
       console.log("✅ Build saved with title:", title);
+      checkPublishButtonVisibility();
     })
     .catch((error) => {
       console.error("Error saving to Firestore:", error);
