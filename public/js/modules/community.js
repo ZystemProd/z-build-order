@@ -29,7 +29,7 @@ async function fetchCommunityBuilds() {
     }
 
     return {
-      id: doc.id || null, // ✅ Ensure ID is assigned
+      id: doc.id || null, // Ensure ID is assigned
       title: data.title || "Untitled Build",
       matchup: data.subcategory || "Unknown",
       publisher: data.username || "Anonymous",
@@ -39,26 +39,40 @@ async function fetchCommunityBuilds() {
         : typeof data.buildOrder === "string"
         ? data.buildOrder.split("\n")
         : ["No build order available"],
+      upvotes: data.upvotes || 0,
+      downvotes: data.downvotes || 0,
+      userVotes: data.userVotes || {},
     };
   });
 }
 
 // Function to populate the community builds table
 let communityBuilds = []; // Global variable to store builds
+let communityBuildsLoaded = false;
+let isPopulatingCommunityBuilds = false;
 
 export async function populateCommunityBuilds(filteredBuilds = null) {
+  // If a population is already in progress, return immediately.
+  if (isPopulatingCommunityBuilds) return;
+  // If builds have already been loaded and no filtering is requested, no need to reload.
+  if (communityBuildsLoaded && !filteredBuilds) return;
+
+  isPopulatingCommunityBuilds = true;
+
   const tableBody = document.getElementById("communityBuildsTableBody");
   tableBody.innerHTML = ""; // Clear existing rows
 
   try {
     if (!filteredBuilds) {
       communityBuilds = await fetchCommunityBuilds();
+      communityBuildsLoaded = true;
     }
 
     const buildsToShow = filteredBuilds || communityBuilds;
 
     if (buildsToShow.length === 0) {
       tableBody.innerHTML = "<tr><td colspan='7'>No builds found.</td></tr>";
+      isPopulatingCommunityBuilds = false;
       return;
     }
 
@@ -67,7 +81,7 @@ export async function populateCommunityBuilds(filteredBuilds = null) {
 
     buildsToShow.forEach((build) => {
       const row = document.createElement("tr");
-      row.dataset.id = build.id; // ✅ Ensure build ID is stored
+      row.dataset.id = build.id; // Ensure build ID is stored
 
       const formattedMatchup = build.matchup
         ? build.matchup.charAt(0).toUpperCase() +
@@ -111,9 +125,10 @@ export async function populateCommunityBuilds(filteredBuilds = null) {
                   userVote === "down" ? "voted-down" : "vote-down"
                 }.svg" alt="Downvote" class="community-icon">
             </button>
-            <span class="vote-percentage" data-id="${
-              build.id
-            }">${votePercentage}%</span>
+            <div class="vote-info" data-id="${build.id}">
+              <span class="vote-percentage">${votePercentage}%</span>
+              <span class="vote-count">${totalVotes} votes</span>
+            </div>
         </td>
         <td>
             <button class="import-button" data-id="${
@@ -132,11 +147,13 @@ export async function populateCommunityBuilds(filteredBuilds = null) {
       tableBody.appendChild(row);
     });
 
-    initializeCommunityBuildEvents(); // ✅ Attach event listeners for all buttons
+    initializeCommunityBuildEvents(); // Attach event listeners for all buttons
   } catch (error) {
     console.error("Error loading community builds:", error);
     tableBody.innerHTML =
       "<tr><td colspan='7'>Failed to load builds.</td></tr>";
+  } finally {
+    isPopulatingCommunityBuilds = false;
   }
 }
 
@@ -399,27 +416,31 @@ async function handleVote(buildId, voteType) {
     const previousVote = userVotes[userId];
 
     if (previousVote === voteType) {
-      // Remove vote if user clicks the same button again
+      // Toggle off: remove vote if user clicks the same button again
       if (voteType === "up") upvotes--;
-      if (voteType === "down") downvotes--;
+      else if (voteType === "down") downvotes--;
       delete userVotes[userId];
     } else {
-      // If switching vote, adjust counts accordingly
-      if (previousVote === "up" && voteType === "down") {
+      // If switching vote, first remove the previous vote if any
+      if (previousVote === "up") {
         upvotes--;
-        downvotes++;
-      } else if (previousVote === "down" && voteType === "up") {
+      } else if (previousVote === "down") {
         downvotes--;
+      }
+
+      // Now add the new vote
+      if (voteType === "up") {
         upvotes++;
-      } else {
-        // First time voting
-        if (voteType === "up") upvotes++;
-        if (voteType === "down") downvotes++;
+      } else if (voteType === "down") {
+        downvotes++;
       }
       userVotes[userId] = voteType;
     }
 
+    // Update Firestore with the new vote counts and userVotes
     await updateDoc(buildRef, { upvotes, downvotes, userVotes });
+
+    // Update UI accordingly
     updateVoteUI(buildId, upvotes, downvotes, userVotes[userId] || null);
   } catch (error) {
     console.error("❌ Error updating vote:", error);
@@ -434,27 +455,32 @@ function updateVoteUI(buildId, upvotes, downvotes, userVote) {
   const votePercentage = document.querySelector(
     `.vote-percentage[data-id="${buildId}"]`
   );
+  const voteCount = document.querySelector(`.vote-count[data-id="${buildId}"]`);
 
   if (!upvoteButton || !downvoteButton || !votePercentage) return;
 
-  // ✅ Update SVG icons
+  // Update SVG icons
   upvoteButton.querySelector("img").src =
     userVote === "up" ? "./img/SVG/voted-up.svg" : "./img/SVG/vote-up.svg";
-
   downvoteButton.querySelector("img").src =
     userVote === "down"
       ? "./img/SVG/voted-down.svg"
       : "./img/SVG/vote-down.svg";
 
-  // ✅ Highlight selected vote
+  // Highlight selected vote
   upvoteButton.classList.toggle("voted-up", userVote === "up");
   downvoteButton.classList.toggle("voted-down", userVote === "down");
 
-  // ✅ Calculate vote percentage
+  // Calculate vote percentage
   const totalVotes = upvotes + downvotes;
   const percentage =
     totalVotes > 0 ? Math.round((upvotes / totalVotes) * 100) : 0;
   votePercentage.textContent = `${percentage}%`;
+
+  // Update vote count text
+  if (voteCount) {
+    voteCount.textContent = `${totalVotes} votes`;
+  }
 }
 
 document

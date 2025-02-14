@@ -1,3 +1,4 @@
+import { auth } from "../../app.js";
 import { saveCurrentBuild } from "./buildManagement.js";
 import { initializeAutoCorrect } from "./autoCorrect.js";
 import { populateBuildDetails, analyzeBuildOrder } from "./uiHandlers.js";
@@ -340,4 +341,14 @@ document.addEventListener("DOMContentLoaded", () => {
     .addEventListener("input", (event) => {
       analyzeBuildOrder(event.target.value);
     });
+});
+
+// Then enable it when DOM is fully loaded and auth is resolved
+document.addEventListener("DOMContentLoaded", () => {
+  // Check if auth is ready or wait for onAuthStateChanged
+  auth.onAuthStateChanged((user) => {
+    if (user) {
+      document.getElementById("showCommunityModalButton").disabled = false;
+    }
+  });
 });

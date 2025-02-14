@@ -48,6 +48,8 @@ body {
 }
 
 #authLoading {
+  position: absolute;
+  margin: auto;
   color: gray;
   font-style: italic;
   text-align: center;
@@ -1769,7 +1771,6 @@ td {
 /* Styling for the vote percentage display */
 .vote-percentage {
   font-size: 14px;
-  margin-left: 10px;
   color: #e0e0e0;
 }
 
@@ -1819,6 +1820,35 @@ td {
 
 .vote-button.voted-down img {
   filter: brightness(0) invert(1) sepia(1) hue-rotate(0deg) saturate(3);
+}
+
+.vote-info {
+  display: inline-block;
+  text-align: center;
+  vertical-align: middle;
+  margin-left: 8px; /* adjust as needed */
+  line-height: 12px;
+}
+
+.vote-info .vote-percentage {
+  margin-bottom: 2px;
+  margin-top: 2px;
+}
+
+.vote-info .vote-percentage,
+.vote-info .vote-count {
+  display: block;
+}
+.vote-info .vote-count {
+  font-size: 0.8em;
+  color: #666;
+}
+
+.vote-button-container {
+  display: inline-block;
+  text-align: center;
+  vertical-align: middle;
+  margin-left: 8px; /* adjust as needed */
 }
 
 .community-layout {
