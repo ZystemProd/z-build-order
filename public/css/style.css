@@ -515,32 +515,8 @@ button:hover {
     padding: 12px 18px; /* Larger button padding on smaller screens */
   }
 }
-.footer {
-  width: 100%; /* Full width */
-  background-color: #1e1e1e; /* Footer background color */
-  text-align: center;
-  padding: 10px 0;
-  font-size: 14px;
-  color: white;
-  flex-shrink: 0; /* Ensure footer doesn't shrink */
-  position: fixed; /* Fix the footer at the bottom of the viewport */
-  bottom: 0;
-  left: 0;
-  z-index: 10; /* Ensure it stays above other content */
-}
 
-.footer img {
-  position: absolute; /* Position the logo independently */
-  right: 20px; /* Distance from the right edge */
-  bottom: 10px; /* Distance from the bottom edge */
-  max-width: 50px; /* Adjust the logo size */
-  height: auto;
-}
 
-.footer p {
-  margin: 0;
-  font-size: 14px;
-}
 
 button {
   -webkit-user-select: none; /* Safari */
@@ -2146,4 +2122,140 @@ td {
   100% {
     transform: rotate(360deg);
   }
+}
+
+/* Left side with links */
+.footer-left {
+  position: absolute;
+  left: 20px; /* matches the horizontal padding */
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* Common link styling */
+#legalNoticeLink,
+#discordLink {
+  color: #ffcc00;
+  text-decoration: none;
+}
+
+#legalNoticeLink:hover,
+#discordLink:hover {
+  text-decoration: underline;
+}
+
+/* Centered site-info */
+.footer-center {
+  display: inline-block;
+}
+
+/* Right side: clickable logo */
+.footer-right {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.footer-right img {
+  max-width: 50px; /* Adjust as needed */
+  height: auto;
+}
+
+.notification {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background-color: #333;
+  color: #fff;
+  padding: 15px;
+  padding-right: 25px;
+  padding-left: 25px; 
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  display: none; /* Initially hidden */
+  max-width: 300px;
+  font-size: 14px;
+  z-index: 1000;
+}
+
+.notification p {
+  margin: 0;
+}
+
+.notification a {
+  color: #ffcc00;
+  text-decoration: none;
+}
+
+.notification a:hover {
+  text-decoration: underline;
+}
+
+.notification button {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 16px;
+  cursor: pointer;
+  position: absolute;
+  top: 5px;
+  right: 10px;
+}
+
+#notification #closeNotification {
+  top: 0px;
+  right: 5px;
+  padding:0px;
+  margin: 5px;
+}
+
+/* Right side: clickable logo */
+#site-logo {
+  flex: 0 0 auto;
+  text-align: right;
+} 
+
+#site-logo img {
+  max-width: 50px; /* Adjust as needed */
+  height: auto;
+  position: static; /* Override any absolute positioning */
+}
+
+/* Optional: responsive stacking on small screens */
+@media (max-width: 600px) {
+  .footer {
+    flex-direction: column;
+    text-align: center;
+  }
+  #site-info {
+    margin: 10px 0;
+  }
+  #site-logo {
+    margin-top: 5px;
+  }
+}
+
+.footer {
+  position: relative;
+  text-align: center;
+  background-color: #151515;
+  color: #fff;
+  padding: 10px 20px;
+  width: 100%;
+}
+
+.footer img {
+  position: absolute; /* Position the logo independently */
+  max-width: 50px; /* Adjust the logo size */
+  height: auto;
+}
+
+.footer p {
+  margin: 0;
+}
+
+.divider {
+  color: #fff;
+  font-weight: bold;
 }

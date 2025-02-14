@@ -353,3 +353,27 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 });
+
+document.addEventListener("DOMContentLoaded", function () {
+  const legalNoticeLink = document.getElementById("legalNoticeLink");
+  const notification = document.getElementById("notification");
+  const closeNotification = document.getElementById("closeNotification");
+
+  // Show notification when clicking the footer link
+  legalNoticeLink.addEventListener("click", function (event) {
+    event.preventDefault(); // Prevent the link from navigating
+    notification.style.display = "block";
+  });
+
+  // Hide notification when clicking the close button
+  closeNotification.addEventListener("click", function () {
+    notification.style.display = "none";
+  });
+
+  // Hide notification when clicking outside of it
+  window.addEventListener("click", function (event) {
+    if (event.target !== notification && !notification.contains(event.target) && event.target !== legalNoticeLink) {
+      notification.style.display = "none";
+    }
+  });
+});
