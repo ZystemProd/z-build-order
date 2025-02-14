@@ -1,4 +1,3 @@
 Fix inline style in index.html
 
-30/1-25
-output need to update when going back from viewBuild.html
+Need to loads build after everything is loaded before showing. Build modal, maybe template. 

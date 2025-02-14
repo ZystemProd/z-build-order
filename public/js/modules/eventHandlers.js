@@ -349,6 +349,7 @@ document.addEventListener("DOMContentLoaded", () => {
   auth.onAuthStateChanged((user) => {
     if (user) {
       document.getElementById("showCommunityModalButton").disabled = false;
+      document.getElementById("showBuildsButton").disabled = false;
     }
   });
 });

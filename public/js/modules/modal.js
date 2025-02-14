@@ -277,25 +277,54 @@ export function hideSubcategories(event) {
 
 window.hideSubcategories = hideSubcategories;
 
-export function showBuildsModal() {
+export async function showBuildsModal() {
   const buildModal = document.getElementById("buildsModal");
+  const showBuildsButton = document.getElementById("showBuildsButton");
+  const buildList = document.getElementById("buildList");
 
   if (!buildModal) {
     console.error("Build modal not found!");
     return;
   }
 
-  // Clear and populate the build list
-  populateBuildList();
+  // Disable the button to prevent multiple clicks
+  showBuildsButton.disabled = true;
 
-  // Open the modal
+  // Find or create the loader element
+  let loader = buildList.querySelector(".lds-roller");
+  if (!loader) {
+    loader = document.createElement("div");
+    loader.className = "lds-roller";
+    loader.innerHTML =
+      "<div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>";
+    buildList.appendChild(loader);
+  }
+  // Show the loader
+  loader.style.display = "block";
+
+  // Optionally, clear any existing build cards but keep the loader
+  Array.from(buildList.children).forEach((child) => {
+    if (!child.classList.contains("lds-roller")) {
+      buildList.removeChild(child);
+    }
+  });
+
+  // Populate the build list and wait for it to finish
+  await populateBuildList();
+
+  // Hide the loader once the build list is populated
+  loader.style.display = "none";
+
+  // Open the modal once the build list is fully loaded
   buildModal.style.display = "block";
 
-  // Close modal logic
+  // Re-enable the button
+  showBuildsButton.disabled = false;
+
+  // Set up closing behavior for the modal
   document.getElementById("closeBuildsModal").onclick = () => {
     buildModal.style.display = "none";
   };
-
   window.onclick = (event) => {
     if (event.target === buildModal) {
       buildModal.style.display = "none";
@@ -306,6 +335,8 @@ export function showBuildsModal() {
 // Attach to the global window object
 window.showBuildsModal = showBuildsModal;
 
+let isPopulatingBuildList = false;
+
 export async function populateBuildList(filteredBuilds = null) {
   const buildList = document.getElementById("buildList");
   const buildPreview = document.getElementById("buildPreview");
@@ -315,6 +346,10 @@ export async function populateBuildList(filteredBuilds = null) {
     return;
   }
 
+  // Prevent multiple simultaneous population calls.
+  if (isPopulatingBuildList) return;
+  isPopulatingBuildList = true;
+
   // Clear the current list
   buildList.innerHTML = "";
 
@@ -323,11 +358,11 @@ export async function populateBuildList(filteredBuilds = null) {
 
   if (!builds.length) {
     buildList.innerHTML = "<p>No builds available.</p>";
+    isPopulatingBuildList = false;
     return;
   }
 
   let lastHoveredBuild = null; // Track the last hovered build
-
   const fragment = document.createDocumentFragment();
 
   builds.forEach((build) => {
@@ -356,8 +391,6 @@ export async function populateBuildList(filteredBuilds = null) {
       }
     });
 
-    // Remove `mouseleave` event to keep the hover effect active
-
     // Add view build functionality
     buildCard.addEventListener("click", () => viewBuild(build.id));
 
@@ -379,6 +412,7 @@ export async function populateBuildList(filteredBuilds = null) {
   });
 
   buildList.appendChild(fragment);
+  isPopulatingBuildList = false;
 }
 
 function updateBuildPreview(build) {
