@@ -50,7 +50,7 @@
 .template-list {
   flex: 1;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   gap: 10px;
   overflow-y: auto; /* ✅ Enables scrolling */
   max-height: 60vh; /* ✅ Limits height to fit screen */
@@ -348,13 +348,13 @@
 
   #templatePreview,
   #buildPreview {
-    display: block; /* Ensure it's visible */
-    visibility: visible;
-    opacity: 1;
+    display: none; /* Ensure it's visible */
+    visibility: hidden;
+    opacity: 0;
   }
 
   .template-list {
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   }
   .template-card {
     width: 150px;
@@ -403,8 +403,8 @@
 .template-list .build-card {
   position: relative;
   z-index: 1;
-  width: 250px;
-  height: 250px;
+  width: 210px;
+  height: 210px;
   background-size: contain; /* Ensure the image covers the entire card */
   background-repeat: no-repeat; /* Prevent repeating the image */
   background-position: center; /* Center the image */
@@ -526,6 +526,7 @@
   z-index: 2; /* Place above the background */
   padding: 0px;
   margin: auto;
+  line-height: 0.7;
 }
 
 .delete-bg {

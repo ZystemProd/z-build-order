@@ -79,6 +79,71 @@ body {
   display: none;
 }
 
+.dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+/* Dropdown button */
+.dropdown-btn {
+  background-color: #444;
+  color: white;
+  padding: 10px 15px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.dropdown-btn:hover {
+  background-color: #555;
+  transform: scale(1.05);
+}
+
+/* Show dropdown when the class is toggled */
+#templateDropdown.active {
+  display: block;
+}
+
+/* Default state (hidden) */
+#templateDropdown {
+  display: none;
+  position: absolute;
+  right: 0;
+  background-color: #2a2a2a; /* Darker background */
+  min-width: 150px; /* Adjust width */
+  border-radius: 5px;
+  box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.3); /* Softer shadow */
+  z-index: 1000;
+  padding: 5px 0; /* Reduce excess space */
+}
+
+/* Dropdown Buttons */
+#templateDropdown button {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  color: white;
+  text-align: left;
+  padding: 8px 12px; /* Reduce padding for compact spacing */
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Remove transform animation on hover */
+#templateDropdown button:hover {
+  background-color: #444;
+  transform: none; /* No scaling */
+}
+
+#openTemplatesButton,
+#saveTemplateButton {
+  margin: 0px;
+}
+
 /* Hide #userMenu (the dropdown) by default */
 .dropdown-content {
   display: none;
@@ -86,7 +151,7 @@ body {
   right: 0;
   background-color: #f9f9f9;
   min-width: 120px;
-  border: 1px solid #ccc;
+  border: 1px solid #444;
   padding: 5px 0;
   z-index: 1;
 }
@@ -104,7 +169,7 @@ body {
 }
 
 .dropdown-content button:hover {
-  background-color: #ddd;
+  background-color: #504f4f;
 }
 
 /* User Info */
@@ -287,7 +352,7 @@ button:active,
 }
 
 button:hover {
-  background-color: #555; /* Slightly lighter on hover */
+  background-color: #963325; /* Slightly lighter on hover */
 }
 
 .icon-button {
@@ -380,7 +445,7 @@ button:hover {
   display: flex;
   align-items: center; /* Aligns items in center of the container */
   font-size: 1.1em;
-  max-width: 165px;
+  max-width: 200px;
   color: #e0e0e0;
   cursor: pointer;
   margin-top: 15px;
@@ -515,8 +580,6 @@ button:hover {
     padding: 12px 18px; /* Larger button padding on smaller screens */
   }
 }
-
-
 
 button {
   -webkit-user-select: none; /* Safari */
@@ -1403,10 +1466,11 @@ textarea::-webkit-scrollbar-thumb:hover {
 
 /* Comment and Video Container (Second Column) */
 .comment-video-container {
-  flex: 2; /* Takes more space compared to the map */
+  flex: 1; /* Takes up the remaining space */
+  max-width: 50%; /* Limit width */
   display: flex;
-  flex-direction: column; /* Stack Comment and Video sections */
-  gap: 0px; /* Space between comment and video sections */
+  flex-direction: column; /* Stack comment and video sections */
+  gap: 10px; /* Space between comment & video */
 }
 
 .comment-video-container h3 {
@@ -1598,7 +1662,7 @@ textarea::-webkit-scrollbar-thumb:hover {
   width: 20px;
   height: 20px;
   filter: brightness(0) invert(1); /* Makes the icon white */
-  vertical-align: middle; /* Aligns the SVG with the text baseline */
+  vertical-align: top; /* Aligns the SVG with the text baseline */
 }
 
 .svg-icon:hover {
@@ -2124,6 +2188,17 @@ td {
   }
 }
 
+#saveBuildButton img {
+  width: 20px; /* Adjust size of the icon */
+  height: 20px;
+  filter: brightness(0) invert(1); /* Makes the icon white */
+  transition: transform 0.2s ease;
+}
+
+#saveBuildButton:hover img {
+  transform: scale(1.1); /* Slight animation effect */
+}
+
 /* Left side with links */
 .footer-left {
   position: absolute;
@@ -2170,7 +2245,7 @@ td {
   color: #fff;
   padding: 15px;
   padding-right: 25px;
-  padding-left: 25px; 
+  padding-left: 25px;
   border-radius: 8px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
   display: none; /* Initially hidden */
@@ -2206,7 +2281,7 @@ td {
 #notification #closeNotification {
   top: 0px;
   right: 5px;
-  padding:0px;
+  padding: 0px;
   margin: 5px;
 }
 
@@ -2214,7 +2289,7 @@ td {
 #site-logo {
   flex: 0 0 auto;
   text-align: right;
-} 
+}
 
 #site-logo img {
   max-width: 50px; /* Adjust as needed */
@@ -2258,4 +2333,24 @@ td {
 .divider {
   color: #fff;
   font-weight: bold;
+}
+
+/* Default state - shown */
+
+.hideable-section {
+  display: flex;
+  flex-direction: row;
+  gap: 20px;
+  align-items: flex-start;
+  justify-content: space-between;
+  transition: max-height 0.3s ease-in-out, opacity 0.3s ease-in-out;
+  opacity: 1;
+  max-height: 1000px; /* Ensure this value exceeds the expected content height */
+  overflow: hidden;
+}
+
+.hideable-section.hidden {
+  opacity: 0;
+  max-height: 0;
+  pointer-events: none;
 }

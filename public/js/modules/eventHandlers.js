@@ -48,16 +48,6 @@ export function initializeEventListeners() {
     });
 
   document
-    .getElementById("openTemplatesButton")
-    .addEventListener("click", showTemplatesModal);
-
-  document
-    .getElementById("saveTemplateButton")
-    .addEventListener("click", () => {
-      showSaveTemplateModal();
-    });
-
-  document
     .getElementById("buildCategoryDropdown")
     .addEventListener("change", function () {
       const dropdown = this;
@@ -76,22 +66,51 @@ export function initializeEventListeners() {
   window.showSubcategories = showSubcategories;
 
   document.addEventListener("DOMContentLoaded", () => {
-    document.querySelectorAll(".filter-category").forEach((category) => {
-      category.addEventListener("mouseover", () => {
-        const submenu = category.querySelector(".submenu");
-        if (submenu) {
-          submenu.style.display = "block";
-        }
-      });
+    document.querySelectorAll(".toggle-title").forEach((header) => {
+      header.addEventListener("click", () => {
+        const sectionId = header.getAttribute("data-section");
+        const section = document.getElementById(sectionId);
+        const arrow = header.querySelector(".arrow");
 
-      category.addEventListener("mouseout", () => {
-        const submenu = category.querySelector(".submenu");
-        if (submenu) {
-          submenu.style.display = "none";
+        if (!section) {
+          console.error(`❌ Error: Section with ID "${sectionId}" not found.`);
+          return;
         }
+
+        console.log(`🔄 Toggling section: ${sectionId}`);
+        console.log(
+          "Before toggle - Style:",
+          window.getComputedStyle(section).display
+        );
+
+        // Toggle visibility and height
+        if (section.classList.contains("hidden")) {
+          section.classList.remove("hidden");
+          section.classList.add("visible");
+          arrow.classList.add("open"); // Rotate arrow down
+        } else {
+          section.classList.remove("visible");
+          section.classList.add("hidden");
+          arrow.classList.remove("open"); // Rotate arrow right
+        }
+
+        console.log(
+          "After toggle - Style:",
+          window.getComputedStyle(section).display
+        );
       });
     });
   });
+
+  document
+    .getElementById("openTemplatesButton")
+    .addEventListener("click", showTemplatesModal);
+
+  document
+    .getElementById("saveTemplateButton")
+    .addEventListener("click", () => {
+      showSaveTemplateModal();
+    });
 
   const buildSearchBar = document.getElementById("buildSearchBar");
   if (buildSearchBar) {
@@ -187,25 +206,6 @@ export function initializeEventListeners() {
         dropdown.style.color = optgroup.style.color;
       }
     });
-
-  // Section toggle logic
-  document.addEventListener("DOMContentLoaded", () => {
-    document.querySelectorAll(".toggle-title").forEach((header) => {
-      header.addEventListener("click", () => {
-        const sectionId = header.getAttribute("data-section");
-        const section = document.getElementById(sectionId);
-        const arrow = header.querySelector(".arrow");
-
-        if (section.style.display === "none" || !section.style.display) {
-          section.style.display = "block";
-          arrow.classList.add("open"); // Rotate arrow down
-        } else {
-          section.style.display = "none";
-          arrow.classList.remove("open"); // Rotate arrow right
-        }
-      });
-    });
-  });
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -372,8 +372,57 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // Hide notification when clicking outside of it
   window.addEventListener("click", function (event) {
-    if (event.target !== notification && !notification.contains(event.target) && event.target !== legalNoticeLink) {
+    if (
+      event.target !== notification &&
+      !notification.contains(event.target) &&
+      event.target !== legalNoticeLink
+    ) {
       notification.style.display = "none";
+    }
+  });
+});
+
+document.addEventListener("DOMContentLoaded", function () {
+  const templateMenuButton = document.getElementById("templateMenuButton");
+  const templateDropdown = document.getElementById("templateDropdown");
+
+  if (!templateMenuButton || !templateDropdown) {
+    console.error("❌ Error: Missing template menu elements.");
+    return;
+  }
+
+  console.log("✅ Template menu initialized.");
+
+  // Toggle dropdown menu on click
+  templateMenuButton.addEventListener("click", function (event) {
+    event.stopPropagation(); // Prevents window click from closing it immediately
+    console.log("📌 Template menu button clicked.");
+
+    // Only toggle if it's not already active
+    if (!templateDropdown.classList.contains("active")) {
+      templateDropdown.classList.add("active");
+    } else {
+      templateDropdown.classList.remove("active");
+    }
+  });
+
+  // Stop click inside the dropdown from closing it
+  templateDropdown.addEventListener("click", function (event) {
+    event.stopPropagation(); // Prevents the window click listener from triggering
+  });
+
+  // Close dropdown when clicking outside
+  window.addEventListener("click", function (event) {
+    // If the menu is already inactive, no need to check anything
+    if (!templateDropdown.classList.contains("active")) return;
+
+    // If the click is outside both the button and dropdown, close it
+    if (
+      event.target !== templateMenuButton &&
+      !templateDropdown.contains(event.target)
+    ) {
+      templateDropdown.classList.remove("active");
+      console.log("📌 Template menu closed.");
     }
   });
 });

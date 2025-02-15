@@ -39,12 +39,14 @@ export function toggleSection(header) {
   const section = document.getElementById(sectionId);
   const arrow = header.querySelector(".arrow");
 
-  if (section.style.display === "none" || !section.style.display) {
-    section.style.display = "block";
-    arrow.classList.add("open"); // Rotate arrow down
+  if (section.classList.contains("hidden")) {
+    section.classList.remove("hidden");
+    section.classList.add("visible");
+    arrow.classList.add("open");
   } else {
-    section.style.display = "none";
-    arrow.classList.remove("open"); // Rotate arrow right
+    section.classList.remove("visible");
+    section.classList.add("hidden");
+    arrow.classList.remove("open");
   }
 }
 
