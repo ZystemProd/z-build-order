@@ -2359,7 +2359,7 @@ td {
 #communityBuildsContainer {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 0px;
   padding: 10px;
 }
 
@@ -2372,16 +2372,24 @@ td {
   border-bottom: 1px solid #444;
   font-size: 16px;
   color: white;
+  cursor: pointer; /* ✅ Make div clickable */
+  transition: background-color 0.2s ease, transform 0.1s ease;
 }
 
-/* Title on first row */
+/* Hover effect */
+.build-entry:hover {
+  background-color: #3a3a3a;
+  transform: scale(1.02);
+}
+
+/* Title row */
 .build-title {
   font-weight: bold;
   font-size: 18px;
   margin-bottom: 5px;
 }
 
-/* Metadata (Publisher, Date, Views, Season) */
+/* Metadata row */
 .build-meta {
   display: flex;
   gap: 10px;
@@ -2399,6 +2407,14 @@ td {
   padding: 4px 10px;
   border-radius: 12px;
   font-size: 14px;
+}
+
+/* Vote info */
+.vote-info {
+  display: flex;
+  gap: 5px;
+  font-size: 14px;
+  color: white;
 }
 
 /* Icons inside meta chips */

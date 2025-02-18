@@ -26,7 +26,6 @@ async function fetchCommunityBuilds() {
     return {
       id: doc.id,
       title: data.title || "Untitled Build",
-      matchup: data.subcategory || "Unknown",
       publisher: data.username || "Anonymous",
       datePublished: data.datePublished
         ? new Date(data.datePublished).toLocaleDateString()
@@ -35,6 +34,7 @@ async function fetchCommunityBuilds() {
       upvotes: data.upvotes || 0,
       downvotes: data.downvotes || 0,
       userVotes: data.userVotes || {},
+      buildOrder: data.buildOrder || [],
     };
   });
 }
@@ -54,79 +54,54 @@ export async function populateCommunityBuilds() {
     const userId = user ? user.uid : null;
 
     builds.forEach((build) => {
-      const userVote = build.userVotes[userId] || null;
       const totalVotes = build.upvotes + build.downvotes;
       const votePercentage =
         totalVotes > 0 ? Math.round((build.upvotes / totalVotes) * 100) : 0;
 
       const buildEntry = document.createElement("div");
       buildEntry.classList.add("build-entry");
+      buildEntry.dataset.id = build.id; // Store build ID for reference
+
+      // ✅ Make entire div clickable
+      buildEntry.addEventListener("click", () => {
+        window.location.href = `viewBuild.html?id=${build.id}`;
+      });
+
+      // ✅ Show build preview on hover
+      buildEntry.addEventListener("mouseover", () => {
+        showBuildPreview(build);
+      });
+
+      // ✅ Clear preview when mouse leaves
+      buildEntry.addEventListener("mouseleave", () => {
+        clearBuildPreview();
+      });
 
       buildEntry.innerHTML = `
         <div class="build-title">${build.title}</div>
-        
+
         <div class="build-meta">
           <span class="meta-chip">
-            <img src="./img/SVG/account.svg" alt="Publisher" class="meta-icon">
+            <img src="./img/SVG/user-svgrepo-com.svg" alt="Publisher" class="meta-icon">
             ${build.publisher}
           </span>
           <span class="meta-chip">
-            <img src="./img/SVG/calendar.svg" alt="Date" class="meta-icon">
+            <img src="./img/SVG/time.svg" alt="Date" class="meta-icon">
             ${build.datePublished}
           </span>
           <span class="meta-chip">
             <img src="./img/SVG/preview.svg" alt="Views" class="meta-icon">
             ${build.views} Views
           </span>
-        </div>
-
-        <div class="build-actions">
-          <button class="view-preview-button" data-id="${
-            build.id
-          }" data-tooltip="Preview">
-            <img src="./img/SVG/preview.svg" alt="Preview" class="community-icon">
-          </button>
-        </div>
-        
-        <div class="build-voting">
-          <button class="vote-button vote-up" data-id="${
-            build.id
-          }" data-tooltip="Upvote">
-            <img src="./img/SVG/${
-              userVote === "up" ? "voted-up" : "vote-up"
-            }.svg" alt="Upvote" class="community-icon">
-          </button>
-          <div class="vote-info" data-id="${build.id}">
+          <div class="vote-info">
             <span class="vote-percentage">${votePercentage}%</span>
             <span class="vote-count">${totalVotes} votes</span>
           </div>
-          <button class="vote-button vote-down" data-id="${
-            build.id
-          }" data-tooltip="Downvote">
-            <img src="./img/SVG/${
-              userVote === "down" ? "voted-down" : "vote-down"
-            }.svg" alt="Downvote" class="community-icon">
-          </button>
-        </div>
-        
-        <div class="build-actions">
-          <button class="import-button" data-id="${
-            build.id
-          }" data-tooltip="Import">
-            <img src="./img/SVG/import.svg" alt="Import" class="community-icon">
-          </button>
-          <button class="view-build-button" data-id="${
-            build.id
-          }" data-tooltip="View Build">
-            <img src="./img/SVG/view.svg" alt="View" class="community-icon">
-          </button>
         </div>
       `;
 
       container.appendChild(buildEntry);
     });
-
-    initializeCommunityBuildEvents();
   } catch (error) {
     console.error("Error loading community builds:", error);
   }
@@ -186,49 +161,41 @@ function showBuildPreview(build) {
     return;
   }
 
-  console.log("✅ Displaying build preview for:", build);
-
-  // Ensure the preview container is visible
-  communityBuildPreview.style.display = "block";
-
-  console.log("📝 RAW BUILD ORDER:", build.buildOrder);
-
-  // ✅ Format each build action using `formatActionText()`
+  // ✅ Format each build action properly using `formatActionText()`
   const formattedBuildOrder = Array.isArray(build.buildOrder)
     ? build.buildOrder
         .map((step) => {
-          if (!step || !step.action || !step.workersOrTimestamp) return ""; // Skip invalid steps
-          const formattedAction = formatActionText(step.action); // ✅ Format Action
-          return `<p><strong>[${step.workersOrTimestamp}]</strong> ${formattedAction}</p>`;
+          if (!step || !step.action || !step.workersOrTimestamp) return "";
+          return `<p><strong>[${
+            step.workersOrTimestamp
+          }]</strong> ${formatActionText(step.action)}</p>`;
         })
         .join("")
     : "<p>No build order available.</p>";
 
-  console.log("🔍 FORMATTED BUILD ORDER:", formattedBuildOrder);
-
-  // ✅ Clear old content before inserting new one
-  communityBuildPreview.innerHTML = "";
-
-  // ✅ Inject the formatted preview content
+  // ✅ Inject formatted content
   communityBuildPreview.innerHTML = `
     <div class="preview-header">
       <h3>${build.title}</h3>
+    </div>
     <div class="preview-build-order">
       <div id="buildOrderOutput">${formattedBuildOrder}</div>
     </div>
   `;
 
-  console.log(
-    "✅ Community Build Preview Updated with Formatted Data:",
-    communityBuildPreview.innerHTML
-  );
+  // ✅ Ensure the preview container is visible
+  communityBuildPreview.style.display = "block";
 }
 
 // ✅ Clear Build Preview
 function clearBuildPreview() {
-  const buildPreview = document.getElementById("buildPreview");
-  if (!buildPreview) return;
-  buildPreview.innerHTML = `<p>Hover over a build to see the details.</p>`;
+  const communityBuildPreview = document.getElementById(
+    "communityBuildPreview"
+  );
+  if (communityBuildPreview) {
+    communityBuildPreview.innerHTML =
+      "<p>Hover over a build to preview details.</p>";
+  }
 }
 
 function initializeCommunityBuildEvents() {
