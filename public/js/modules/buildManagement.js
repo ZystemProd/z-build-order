@@ -4,17 +4,15 @@ import {
   doc,
   setDoc,
   getDocs,
+  getDoc,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
-import {
-  getSavedBuilds,
-  setSavedBuilds,
-  saveSavedBuildsToLocalStorage,
-} from "./buildStorage.js";
+import { getSavedBuilds, setSavedBuilds } from "./buildStorage.js";
 import { showToast } from "./uiHandlers.js";
 import { filterBuilds } from "./modal.js";
 import { parseBuildOrder } from "./utils.js";
-import { mapAnnotations } from "./interactive_map.js"; // Ensure this export exists
+import { mapAnnotations } from "./interactive_map.js";
+import { checkPublishButtonVisibility } from "./community.js";
 
 export async function fetchUserBuilds() {
   const auth = getAuth();
@@ -29,98 +27,126 @@ export async function fetchUserBuilds() {
   const buildsRef = collection(db, `users/${user.uid}/builds`);
   const snapshot = await getDocs(buildsRef);
 
-  const builds = snapshot.docs.map((doc) => ({
-    id: doc.id, // Document ID
-    ...doc.data(), // Document data
-  }));
+  return snapshot.docs.map((doc) => {
+    const data = doc.data();
 
-  return builds;
+    // ✅ Decode "__SLASH__" back to "/"
+    const decodedTitle = doc.id.replace(/__SLASH__/g, "/");
+
+    return {
+      id: doc.id,
+      title: decodedTitle, // ✅ Show the original title
+      ...data,
+    };
+  });
 }
 
-export function saveCurrentBuild() {
+export async function saveCurrentBuild() {
+  console.log("Saving build..."); // Debugging
   const titleInput = document.getElementById("buildOrderTitleInput");
+  const titleText = document.getElementById("buildOrderTitleText"); // Title Text
   const categoryDropdown = document.getElementById("buildCategoryDropdown");
   const commentInput = document.getElementById("commentInput");
   const videoInput = document.getElementById("videoInput");
   const buildOrderInput = document.getElementById("buildOrderInput");
   const mapImage = document.getElementById("map-preview-image");
 
-  // Check if required elements exist
-  if (!titleInput || !categoryDropdown) {
-    console.error("Title or match-up dropdown is missing from the DOM.");
-    showToast(
-      "Failed to save the build. Title or match-up is missing.",
-      "error"
-    );
+  if (!titleInput || !categoryDropdown || !titleText) {
+    console.error("Title or match-up dropdown is missing.");
+    showToast("Failed to save. Title or match-up missing.", "error");
     return;
   }
 
-  const title = DOMPurify.sanitize(titleInput.value.trim());
+  let title = DOMPurify.sanitize(titleInput.value.trim());
   const selectedMatchup = DOMPurify.sanitize(categoryDropdown.value);
 
-  // Validation: Ensure title is not empty
+  // ✅ ADD BORDER ANIMATION FOR EMPTY FIELDS
+  function highlightField(field) {
+    field.classList.add("highlight"); // Add highlight class
+    setTimeout(() => field.classList.remove("highlight"), 5000); // Remove after 5s
+  }
+
+  function removeHighlightOnFocus(field) {
+    field.addEventListener("focus", () => field.classList.remove("highlight"));
+    field.addEventListener("change", () => field.classList.remove("highlight")); // For dropdowns
+  }
+
+  // Apply remove highlight on focus
+  removeHighlightOnFocus(titleInput);
+  removeHighlightOnFocus(categoryDropdown);
+
   if (!title) {
-    showToast("Please provide a title for the build.", "error");
-    titleInput.classList.add("highlight");
-    titleInput.addEventListener("input", () => {
-      titleInput.classList.remove("highlight");
-    });
+    showToast("Please provide a title.", "error");
+    highlightField(titleInput);
+    highlightField(titleText); // Highlight `buildOrderTitleText`
     return;
   }
 
-  // Validation: Ensure a match-up is selected
   if (!selectedMatchup) {
     showToast("Please select a valid match-up.", "error");
-    categoryDropdown.classList.add("highlight");
-    categoryDropdown.addEventListener("change", () => {
-      categoryDropdown.classList.remove("highlight");
-    });
+    highlightField(categoryDropdown);
     return;
   }
 
-  // Helper function to format match-up (e.g., zvp -> ZvP)
-  const formatMatchup = (matchup) => {
-    return matchup
-      .toLowerCase()
-      .replace(
-        /([a-z])([a-z])/g,
-        (match, p1, p2) => `${p1.toUpperCase()}${p2}`
-      );
-  };
+  // ✅ Fix: Remove highlight when user selects a category
+  titleText.classList.remove("highlight");
 
-  const formattedMatchup = formatMatchup(selectedMatchup);
+  // ✅ Encode "/" as "__SLASH__" for Firestore document ID
+  const encodedTitle = title.replace(/\//g, "__SLASH__");
 
-  // Extract optional fields
-  const comment = DOMPurify.sanitize(commentInput?.value.trim() || "");
-  const videoLink = DOMPurify.sanitize(videoInput?.value.trim() || "");
-  const buildOrderText = DOMPurify.sanitize(
-    buildOrderInput?.value.trim() || ""
-  );
-  const buildOrder = buildOrderText ? parseBuildOrder(buildOrderText) : []; // Parse build order if provided
-  const mapSrc = mapImage?.src || "";
-  const mapName = mapSrc
-    ? mapSrc
-        .split("/")
-        .pop()
-        .replace(/_/g, " ")
-        .replace(".jpg", "")
-        .toLowerCase()
-    : "";
+  const formattedMatchup = selectedMatchup
+    .toLowerCase()
+    .replace(/([a-z])([a-z])/g, (match, p1, p2) => `${p1.toUpperCase()}${p2}`);
 
-  // Prepare the build object
+  const buildOrder = parseBuildOrder(buildOrderInput.value);
+
+  let mapName = "No map selected";
+  if (mapImage?.src) {
+    const match = mapImage.src.match(/\/img\/maps\/(.+)\.webp/);
+    if (match) {
+      mapName = match[1].replace(/_/g, " "); // Convert underscores to spaces
+    }
+  }
+
+  const auth = getAuth();
+  const user = auth.currentUser;
+
+  // 🔴 If user is not signed in, show toast warning and prevent save
+  if (!user) {
+    console.error("⚠ Attempted to save without signing in.");
+    showToast("⚠ You must sign in to save your build!", "error");
+    return;
+  }
+
+  const db = getFirestore();
+  const userRef = doc(db, "users", user.uid);
+  let username = "Unknown"; // Default if username is not found
+
+  try {
+    const userSnapshot = await getDoc(userRef);
+    if (userSnapshot.exists() && userSnapshot.data().username) {
+      username = userSnapshot.data().username;
+    }
+  } catch (error) {
+    console.error("Error fetching username:", error);
+  }
+
   const newBuild = {
-    title,
+    title: title,
+    encodedTitle: encodedTitle,
     category: formattedMatchup.startsWith("Zv")
       ? "Zerg"
       : formattedMatchup.startsWith("Pv")
       ? "Protoss"
-      : "Terran",
-    subcategory: formattedMatchup, // Save formatted match-up
+      : formattedMatchup.startsWith("Tv")
+      ? "Terran"
+      : "Unknown",
+    subcategory: formattedMatchup,
     timestamp: Date.now(),
-    comment,
-    videoLink,
+    comment: DOMPurify.sanitize(commentInput?.value.trim() || ""),
+    videoLink: DOMPurify.sanitize(videoInput?.value.trim() || ""),
     buildOrder,
-    map: mapName, // Save only the cleaned map name
+    map: mapName,
     interactiveMap: {
       circles: mapAnnotations.circles.map(({ x, y }) => ({ x, y })),
       arrows: mapAnnotations.arrows.map(({ startX, startY, endX, endY }) => ({
@@ -130,51 +156,27 @@ export function saveCurrentBuild() {
         endY,
       })),
     },
+    isPublished: false,
+    publisher: username,
   };
 
-  // Save locally
-  const savedBuilds = getSavedBuilds();
-  const existingIndex = savedBuilds.findIndex((build) => build.title === title);
-
-  if (existingIndex !== -1) {
-    const overwrite = confirm(
-      `A build with the title "${title}" already exists. Overwrite it?`
-    );
-    if (!overwrite) return;
-    savedBuilds[existingIndex] = newBuild;
-  } else {
-    savedBuilds.push(newBuild);
-  }
-
-  setSavedBuilds(savedBuilds);
-
-  // Save to Firestore
-  const db = getFirestore();
-  const auth = getAuth();
-  const user = auth.currentUser;
-
-  if (!user) {
-    showToast("You must be signed in to save builds to the database.", "error");
-    return;
-  }
-
   const buildsRef = collection(db, `users/${user.uid}/builds`);
-  const buildDoc = doc(buildsRef, title); // Use title as the document ID for easy lookup
+  const buildDoc = doc(buildsRef, encodedTitle);
 
-  setDoc(buildDoc, newBuild)
+  await setDoc(buildDoc, newBuild)
     .then(() => {
-      //showToast("Build saved to database successfully!", "success");
+      showToast("✅ Build saved successfully!", "success");
+      console.log("✅ Build saved with title:", title);
+      checkPublishButtonVisibility();
     })
     .catch((error) => {
-      console.error("Error saving build to Firestore:", error);
-      showToast("Failed to save build to the database.", "error");
+      console.error("Error saving to Firestore:", error);
+      showToast("Failed to save build.", "error");
     });
 
-  showToast("Build saved successfully!", "success");
   filterBuilds("all");
 }
 
-// maybe remove, is not used anywhere
 export async function loadBuildAnnotations(buildId) {
   const db = getFirestore();
   const auth = getAuth();
@@ -194,10 +196,7 @@ export async function loadBuildAnnotations(buildId) {
 
     if (interactiveMap) {
       mapAnnotations.circles = (interactiveMap.circles || []).map(
-        ({ x, y }) => ({
-          x,
-          y,
-        })
+        ({ x, y }) => ({ x, y })
       );
       mapAnnotations.arrows = (interactiveMap.arrows || []).map(
         ({ startX, startY, endX, endY }) => ({
@@ -208,7 +207,6 @@ export async function loadBuildAnnotations(buildId) {
         })
       );
 
-      // Render circles and arrows on the map
       mapAnnotations.circles.forEach(({ x, y }) =>
         mapAnnotations.createCircle(x, y)
       );
@@ -220,32 +218,30 @@ export async function loadBuildAnnotations(buildId) {
     console.error("Build not found!");
   }
 }
-// ........................
+
 export function deleteBuild(index) {
   const deleteModal = document.getElementById("deleteConfirmationModal");
   const confirmButton = document.getElementById("confirmDeleteButton");
   const cancelButton = document.getElementById("cancelDeleteButton");
 
-  // Show the confirmation modal
   deleteModal.style.display = "flex";
   confirmButton.focus();
 
   confirmButton.onclick = () => {
     const savedBuilds = getSavedBuilds();
     if (index >= 0 && index < savedBuilds.length) {
-      savedBuilds.splice(index, 1); // Remove build
-      saveBuilds(savedBuilds); // Save changes
-      showBuildsModal(); // Refresh modal content
+      savedBuilds.splice(index, 1);
+      setSavedBuilds(savedBuilds);
+      showToast("Build deleted.", "success");
     }
-    deleteModal.style.display = "none"; // Close modal
+    deleteModal.style.display = "none";
   };
 
   cancelButton.onclick = () => {
-    deleteModal.style.display = "none"; // Close modal
+    deleteModal.style.display = "none";
   };
 }
 
-// Ensure the function is globally accessible for inline onclick handlers
 window.deleteBuild = deleteBuild;
 
 function getYouTubeVideoID(url) {
@@ -253,4 +249,36 @@ function getYouTubeVideoID(url) {
     /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
   const match = url.match(regex);
   return match ? match[1] : null;
+}
+
+export async function populateBuildsModal() {
+  const auth = getAuth();
+  if (!auth.currentUser) return;
+
+  const userId = auth.currentUser.uid;
+  const buildsRef = collection(getFirestore(), `users/${userId}/builds`);
+  const snapshot = await getDocs(buildsRef);
+
+  const tableBody = document.getElementById("buildList");
+  if (!tableBody) return;
+
+  tableBody.innerHTML = ""; // Clear existing builds
+
+  snapshot.docs.forEach((doc) => {
+    const build = doc.data();
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${build.title}</td>
+      <td>${build.category}</td>
+      <td>${
+        build.timestamp ? new Date(build.timestamp).toLocaleString() : "Unknown"
+      }</td>
+      <td>
+        <button class="view-build-button" data-id="${doc.id}">🔍 View</button>
+      </td>
+    `;
+    tableBody.appendChild(row);
+  });
+
+  console.log("✅ User's builds updated in modal.");
 }

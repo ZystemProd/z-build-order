@@ -39,12 +39,14 @@ export function toggleSection(header) {
   const section = document.getElementById(sectionId);
   const arrow = header.querySelector(".arrow");
 
-  if (section.style.display === "none" || !section.style.display) {
-    section.style.display = "block";
-    arrow.classList.add("open"); // Rotate arrow down
+  if (section.classList.contains("hidden")) {
+    section.classList.remove("hidden");
+    section.classList.add("visible");
+    arrow.classList.add("open");
   } else {
-    section.style.display = "none";
-    arrow.classList.remove("open"); // Rotate arrow right
+    section.classList.remove("visible");
+    section.classList.add("hidden");
+    arrow.classList.remove("open");
   }
 }
 
@@ -125,15 +127,20 @@ export function displayBuildOrder(buildOrder) {
   buildOrder.forEach((step) => {
     const row = table.insertRow();
 
-    // Apply formatting logic to workersOrTimestamp
-    row.insertCell(0).innerHTML = DOMPurify.sanitize(
-      formatActionText(step.workersOrTimestamp)
-    );
+    // Validate step data before formatting
+    const workersOrTimestamp = step.workersOrTimestamp
+      ? DOMPurify.sanitize(
+          formatWorkersOrTimestampText(step.workersOrTimestamp)
+        )
+      : "-";
 
-    // Apply formatting logic to action
-    row.insertCell(1).innerHTML = DOMPurify.sanitize(
-      formatActionText(step.action)
-    );
+    const actionText = step.action
+      ? DOMPurify.sanitize(formatActionText(step.action))
+      : "Unknown Action"; // Prevents errors
+
+    // Insert formatted data into table
+    row.insertCell(0).innerHTML = workersOrTimestamp;
+    row.insertCell(1).innerHTML = actionText;
   });
 }
 
@@ -162,40 +169,39 @@ export function formatWorkersOrTimestamp(
 
 // Function to analyze and update the build order table automatically
 export function analyzeBuildOrder(inputText) {
-  const lines = inputText.split("\n");
-  const table = document.getElementById("buildOrderTable");
+  requestAnimationFrame(() => {
+    // Ensures real-time UI update
+    const lines = inputText.split("\n");
+    const table = document.getElementById("buildOrderTable");
 
-  // Clear existing rows (except the header)
-  while (table.rows.length > 1) {
-    table.deleteRow(1);
-  }
-
-  lines.forEach((line) => {
-    const match = line.match(/\[(.*?)\]\s*(.*)/);
-
-    let workersOrTimestamp = "";
-    let actionText = "";
-
-    if (match) {
-      workersOrTimestamp = match[1];
-      actionText = match[2];
-    } else {
-      actionText = line;
+    while (table.rows.length > 1) {
+      table.deleteRow(1);
     }
 
-    // Replace `->` and `<-` with arrows
-    actionText = actionText.replace(/->/g, "→").replace(/<-/g, "←");
+    lines.forEach((line) => {
+      const match = line.match(/\[(.*?)\]\s*(.*)/);
 
-    // Format using Trie-based formatting
-    actionText = formatActionText(actionText);
+      let workersOrTimestamp = "";
+      let actionText = "";
 
-    // Insert row into the table
-    const row = table.insertRow();
-    row.insertCell(0).innerHTML = DOMPurify.sanitize(workersOrTimestamp);
-    row.insertCell(1).innerHTML = DOMPurify.sanitize(actionText);
+      if (match) {
+        workersOrTimestamp = match[1];
+        actionText = match[2];
+      } else {
+        actionText = line;
+      }
+
+      actionText = actionText.replace(/->/g, "→").replace(/<-/g, "←");
+
+      // Format using Trie-based formatting
+      actionText = formatActionText(actionText);
+
+      const row = table.insertRow();
+      row.insertCell(0).innerHTML = DOMPurify.sanitize(workersOrTimestamp);
+      row.insertCell(1).innerHTML = DOMPurify.sanitize(actionText);
+    });
   });
 }
-
 function highlightActiveTab(category) {
   document
     .querySelectorAll("#buildCategoryTabs button, #buildSubCategoryTabs button")
@@ -262,4 +268,32 @@ export function initializeTextareaClickHandler() {
     } else {
     }
   });
+}
+
+window.addEventListener("popstate", () => {
+  const lastViewedBuild = sessionStorage.getItem("lastViewedBuild");
+  if (lastViewedBuild) {
+    refreshBuildList(lastViewedBuild);
+  }
+});
+
+function refreshBuildList(lastViewedBuild) {
+  const savedBuilds = getSavedBuilds();
+  const updatedBuild = savedBuilds.find(
+    (build) => build.id === lastViewedBuild
+  );
+
+  if (updatedBuild) {
+    console.log("Updating build list after navigation:", updatedBuild);
+
+    // Find and update the correct build in the UI
+    document.querySelectorAll(".build-card").forEach((card) => {
+      if (card.dataset.buildId === lastViewedBuild) {
+        card.querySelector(".build-card-title").innerText = updatedBuild.title;
+      }
+    });
+
+    // Optionally, reload the entire build list if needed
+    populateBuildList(savedBuilds);
+  }
 }

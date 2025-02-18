@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>View Build</title>
+    <link rel="icon" type="image/x-icon" href="/img/favicon.ico" />
+    <link rel="stylesheet" type="text/css" href="./css/style.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.3/purify.min.js"></script>
+    <script type="module" src="./js/modules/viewBuild.js" defer></script>
+  </head>
+  <body>
+    <div class="view-build-container">
+      <h1 id="buildTitle">Loading...</h1>
+      <div class="build-info">
+        <p><strong>Category:</strong> <span id="buildCategory"></span></p>
+        <p><strong>Matchup:</strong> <span id="buildMatchup"></span></p>
+        <p><strong>Publisher:</strong> <span id="buildPublisher"></span></p>
+        <p><strong>Date Published:</strong> <span id="buildDate"></span></p>
+      </div>
+      <div class="build-order-container">
+        <h3>Build Order</h3>
+        <div id="buildOrder" class="build-output"></div>
+      </div>
+      <button class="back-button" onclick="window.history.back()">
+        ⬅ Go Back
+      </button>
+    </div>
+  </body>
+</html>

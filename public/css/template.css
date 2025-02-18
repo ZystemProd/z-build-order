@@ -50,12 +50,11 @@
 .template-list {
   flex: 1;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   gap: 10px;
-  overflow-y: auto; /* Enable vertical scrolling */
+  overflow-y: auto; /* ✅ Enables scrolling */
+  max-height: 60vh; /* ✅ Limits height to fit screen */
   padding: 15px;
-  max-height: 100%; /* Ensure it respects the parent's height */
-  height: 700px; /* Allow grid container to calculate height flexibly */
 }
 
 .template-preview {
@@ -191,8 +190,8 @@
 
 .template-content-container {
   display: flex;
-  height: calc(100vh - 100px); /* Full height minus header and padding */
-  overflow: hidden; /* Prevent scrolling for the entire modal */
+  height: 100%; /* Full height to ensure proper scrolling */
+  overflow: hidden; /* Prevents the entire modal from scrolling */
 }
 
 .close-modal {
@@ -349,11 +348,13 @@
 
   #templatePreview,
   #buildPreview {
-    display: none;
+    display: none; /* Ensure it's visible */
+    visibility: hidden;
+    opacity: 0;
   }
 
   .template-list {
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   }
   .template-card {
     width: 150px;
@@ -384,26 +385,9 @@
   overflow: hidden;
 }
 
-#buildPreview {
-  flex: 1;
-  min-width: 300px;
-  max-width: 400px;
-  padding: 20px;
-  border-right: 6px solid #2a2a2a;
-  overflow-y: auto;
-}
-
-#buildPreview h4 {
-  margin: 0;
-  font-size: 18px;
-  text-align: center;
-  color: #ffcc00;
-}
-
-#buildPreview p {
-  margin-top: 10px;
-  font-size: 14px;
-  color: #ddd;
+.preview-header {
+  text-align: left;
+  font-size: 1.2rem;
 }
 
 .build-list {
@@ -419,8 +403,8 @@
 .template-list .build-card {
   position: relative;
   z-index: 1;
-  width: 250px;
-  height: 250px;
+  width: 210px;
+  height: 210px;
   background-size: contain; /* Ensure the image covers the entire card */
   background-repeat: no-repeat; /* Prevent repeating the image */
   background-position: center; /* Center the image */
@@ -443,9 +427,41 @@
 }
 
 #buildPreview {
-  flex: 1;
-  padding: 20px;
-  border-right: 1px solid #888;
+  flex: 1; /* Make it take available space */
+  min-width: 300px; /* Ensure it has a reasonable minimum size */
+  max-width: 400px; /* Keep it similar to the build modal */
+  padding: 15px;
+  background-color: #2c2c2c;
+  color: #e0e0e0;
+  border: 1px solid #444;
+  border-radius: 8px;
+  overflow-x: hidden;
+  min-height: 250px;
+  height: 90%;
+  white-space: pre-wrap; /* Ensures long text wraps */
+  word-wrap: break-word; /* Breaks long words */
+  overflow-wrap: break-word; /* Ensures text wraps in all cases */
+}
+
+#buildPreview h4 {
+  font-size: 1.2rem; /* Make title slightly smaller */
+  margin: 5px 0; /* Reduce top and bottom margin */
+  text-align: center; /* Center the title */
+  padding: 5px;
+  white-space: pre-wrap; /* Ensures long text wraps */
+  word-wrap: break-word; /* Breaks long words */
+  overflow-wrap: break-word; /* Ensures text wraps in all cases */
+}
+
+#buildPreview pre {
+  font-size: 1rem; /* Ensure text is readable */
+  margin: 0; /* Remove unnecessary spacing */
+  flex-grow: 1; /* Allow build order to take up remaining space */
+  overflow-y: auto; /* Ensure scrolling inside the build order */
+  overflow-x: hidden;
+  white-space: pre-wrap; /* Ensures long text wraps */
+  word-wrap: break-word; /* Breaks long words */
+  overflow-wrap: break-word; /* Ensures text wraps in all cases */
 }
 
 .filters-container {
@@ -510,6 +526,7 @@
   z-index: 2; /* Place above the background */
   padding: 0px;
   margin: auto;
+  line-height: 0.7;
 }
 
 .delete-bg {

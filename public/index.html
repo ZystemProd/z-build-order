@@ -5,47 +5,79 @@
     <meta name="description" content="Plan and save your StarCraft 2 build orders with Z-Build Order. Supports custom builds, categories, and templates.">
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="
+    <!--<meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
     script-src 'self' https://cdnjs.cloudflare.com https://www.gstatic.com;
     style-src 'self' 'unsafe-inline';
     img-src 'self' data:;
     frame-src https://www.youtube.com;
-  ">    
+  ">  --> 
     <link rel="icon" type="image/x-icon" href="/img/favicon.ico" />
     <link rel="stylesheet" type="text/css" href="css/style.css" />
     <link rel="stylesheet" type="text/css" href="css/template.css" />
     <link rel="stylesheet" type="text/css" href="css/showToast.css" />
     <link rel="stylesheet" type="text/css" href="css/alertNotification.css" />  
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.3/purify.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.3/purify.min.js"></script>  
     <script type="module" src="app.js" defer></script>
     <script type="module" src="js/modules/eventHandlers.js" defer></script>
     
   </head>
   <body>
     <div id="toast-container"></div>
-    <div id="game-selector" class="menu">
-      <p id="authLoading">Checking authentication status...</p>
-    
-      <section id="whenSignedOut">
-        <button id="signInBtn">Sign in with Google</button>
-      </section>
-    
-      <section id="whenSignedIn" hidden="true">
-        <div id="userDetails"></div>
-        <button id="signOutBtn">Sign Out</button>
-      </section>
+
+    <!-- Auth Container -->
+    <div id="auth-container">
+      <div class="auth-info">
+        <img
+          id="userPhoto"
+          class="user-avatar"
+          src="img/default-avatar.webp"
+          alt="User Avatar"
+          style="width: 50px; height: 50px;"
+        />
+        <div class="user-details">
+          <!-- We only show the user’s username, not the email -->
+          <p id="userName" class="user-name">Guest</p>
+        </div>
+      </div>
+
+      <!-- Auth Buttons -->
+      <button id="signInBtn" class="auth-button">Sign In</button>
+      <button id="switchAccountBtn" class="auth-button" style="display: none;">Switch Account</button>
+      <button id="signOutBtn" class="auth-button" style="display: none;">Sign Out</button>
+    </div>
+
+    <!-- Optional Loading Status -->
+    <p id="authLoading" style="color: #555;"></p>
+
+    <!-- Username Modal -->
+    <div id="usernameModal" class="modal" style="display: none;">
+      <div class="modal-content">
+        <h3>Choose a Username</h3>
+        <input type="text" id="usernameInput" placeholder="Enter your username">
+        <br /><br />
+        <button id="confirmUsernameButton">Confirm</button>
+      </div>
     </div>
   
     <div id="content">
       <div class="upperInput">
         <div class="template-controls">
-          <button id="openTemplatesButton" class="btn">Open Templates</button>
-          <button id="saveTemplateButton" class="btn">Save Template</button>
+          <div class="dropdown">
+            <button id="templateMenuButton" class="dropdown-btn">
+              <img src="img/SVG/template.svg" alt="Template Icon" class="svg-icon" >
+              Templates ▼ 
+            </button>
+            <div id="templateDropdown" class="dropdown-content">
+              <button id="openTemplatesButton">Open Templates</button>
+              <button id="saveTemplateButton">Save Template</button>
+            </div>
+          </div>
+          
         </div>
         <!-- Build Order Input Section with Toggle -->
         <h3 data-section="buildOrderInputField" class="toggle-title">
-          <span id="buildOrderInputArrow" class="arrow"></span> Build Order
+          <span id="buildOrderInputArrow" class="arrow open"></span> Build Order
           Input
         </h3>
         <div
@@ -120,44 +152,52 @@
       <!-- First Row: Buttons -->
       <div class="row first-row">
         <div class="saveLoadContainer">
-          <button id="saveBuildButton">Save Current Build</button>
-          <button id="showBuildsButton" onclick="showBuildsModal()">Show All Builds</button>
+          <button id="saveBuildButton" data-tooltip="Save Current Build">
+            <img src="img/SVG/save.svg" alt="Save Icon" class="svg-icon" >
+            Save Build
+          </button>
+          <button id="showBuildsButton" onclick="showBuildsModal()" disabled>
+            <img src="img/SVG/library.svg" alt="Library Icon" class="svg-icon" >My Builds</button>
+          <button id="publishBuildButton" class="btn publish-btn" style="display: none;">Publish Build</button>
         </div>
+        <button id="showCommunityModalButton" class="btn" disabled>
+          <img src="img/SVG/community.svg" alt="Comunnity Icon" class="svg-icon" >
+          Community Builds
+        </button>
       </div>  
 
 
 
       <div class="main-layout">      
         <!-- Second Row: Map and Comment/Video -->
-        <div class="row second-row">
-          <div id="map-container">
-          <!-- New Row for Map Controls -->
-          <div id="map-controls-row">
-            <span id="selected-map-text">No map selected</span>
-            <button id="openMapModalButton" class="menu-button" data-tooltip="Map Selection">
-              <img src="img/SVG/map-solid.svg" alt="Map Icon" style="width:20px; height:20px;" class="svg-icon">
-            </button>
 
-            <button class="clear-annotations-button" data-tooltip="Erase All">
-              <img src="img/SVG/eraser-solid.svg" alt="Eraser Icon" style="width:20px; height:20px;" class="svg-icon">
-            </button>
-          </div>
-          
-          
+        <h3 data-section="secondRow" class="toggle-title">
+          <span class="arrow"></span> Additional Settings
+        </h3>
+        <div class="hideable-section hidden" id="secondRow">
+          <div id="map-container">
+            <!-- Map preview and controls -->
+            <div id="map-controls-row">
+              <span id="selected-map-text">No map selected</span>
+              <button id="openMapModalButton" class="menu-button" data-tooltip="Map Selection">
+                <img src="img/SVG/map-solid.svg" alt="Map Icon" style="width:20px; height:20px;" class="svg-icon">
+              </button>
+              <button class="clear-annotations-button" data-tooltip="Erase All">
+                <img src="img/SVG/eraser-solid.svg" alt="Eraser Icon" style="width:20px; height:20px;" class="svg-icon">
+              </button>
+            </div>
+            
             <div id="map-preview-container" class="map-preview">
               <img id="map-preview-image" class="map-image" src="" alt="Map Preview" />
               <div id="map-annotations" class="annotations"></div>
             </div>
-      
-            <!-- Map Controls under the Map -->
-            <div id="map-controls">
-            </div>
           </div>
-      
+        
+          <!-- RIGHT COLUMN: Comment & Video Container -->
           <div class="comment-video-container">
             <h3 class="toggle-title">Comment</h3>
             <textarea id="commentInput" placeholder="Add a comment..."></textarea>
-      
+        
             <h3 class="toggle-title">Video</h3>
             <input type="text" id="videoInput" placeholder="Paste YouTube link here..." />
             <iframe
@@ -171,6 +211,8 @@
             ></iframe>
           </div>
         </div>
+        
+        
       </div>
       
       
@@ -228,15 +270,15 @@
             <div class="race-selection">
               <label>
                 <input type="radio" name="templateRace" value="zerg" />
-                <img src="img/race/zerg.png" alt="Zerg" />
+                <img src="img/race/zerg.webp" alt="Zerg" />
               </label>
               <label>
                 <input type="radio" name="templateRace" value="terran" />
-                <img src="img/race/terran.png" alt="Terran" />
+                <img src="img/race/terran.webp" alt="Terran" />
               </label>
               <label>
                 <input type="radio" name="templateRace" value="protoss" />
-                <img src="img/race/protoss.png" alt="Protoss" />
+                <img src="img/race/protoss.webp" alt="Protoss" />
               </label>
             </div>
           </div>
@@ -308,6 +350,52 @@
         </div>
       </div>
 
+      <!-- Community Modal -->
+      <div id="communityModal" class="modal">
+        <div class="modal-content-template">
+          <div class="template-header">
+            <span class="close-modal" id="closeCommunityModal">&times;</span>
+            <h3>Community Builds</h3>
+            <div id="communityHeaderControls" class="header-controls">
+              <input
+                id="communitySearchBar"
+                type="text"
+                placeholder="Search community builds..."
+                class="search-bar"
+              />
+            </div>
+          </div>
+          <div class="template-content-container">
+            <div class="community-layout">
+              <!-- Build Preview Panel -->
+              <div id="communityBuildPreview" class="build-preview">
+                <h4>Build Preview</h4>
+                <p>Hover over a build to preview details.</p>
+              </div>
+
+              <!-- Community Builds Table -->
+              <table id="communityBuildsTable">
+                <thead>
+                  <tr>
+                    <th>Preview</th>
+                    <th>Title</th>
+                    <th>Matchup</th>
+                    <th>Publisher</th>
+                    <th>Published</th>
+                    <th>Score</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="communityBuildsTableBody">
+                  <!-- Dynamic rows added here -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
       <!-- Modal for delete notification -->
       <div id="deleteConfirmationModal" class="modal">
         <div class="modal-content">
@@ -321,21 +409,38 @@
       </div>
 
 
+
+
       </div>
       </div>
+
+      <div id="notification" class="notification">
+        <p>
+          Some image assets are owned by Blizzard Entertainment and are used according to
+          <a href="http://blizzard.com/company/about/legal-faq.html" target="_blank">
+            Blizzard's Legal FAQ
+          </a>.
+        </p>
+        <button id="closeNotification">✖</button>
+      </div>
+
     </div>
     <!-- Footer Section -->
     <div class="footer">
-      <p>Made by Zystem</p>
-      <a href="https://www.twitch.tv/zystem" target="_blank">
-        <img
-          src="img/zystem_logo_tr.png"
-          alt="Zystem Logo"
-          class="footer-logo"
-        />
-      </a>
-      <p>︱Version 0.2.20</p>
-      <!-- Version number here -->
+      <div class="footer-left">
+        <a href="#" id="legalNoticeLink">Legal Notice</a>
+        <span class="divider">︱</span>
+        <a href="https://discord.com/channels/801938615730307092/1340017869118902292" id="discordLink" target="_blank">Discord</a>
+      </div>
+      <div class="footer-center" id="site-info">
+        <p>Made by Zystem</p>
+        <p>Version 0.5.0</p>
+      </div>
+      <div class="footer-right" id="site-logo">
+        <a href="https://www.twitch.tv/zystem" target="_blank">
+          <img src="img/zystem_logo_tr.png" alt="Zystem Logo" class="footer-logo" />
+        </a>
+      </div>
     </div>
   </body>
 </html>

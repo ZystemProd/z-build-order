@@ -115,11 +115,11 @@ function matchActorsWithTrie(actionText, actorTrie) {
       } else if (category === "resource") {
         imageSrc =
           term === "minerals"
-            ? "img/resources/minerals.png"
-            : "img/resources/gas.png";
+            ? "img/resources/minerals.webp"
+            : "img/resources/gas.webp";
         cssClass = term === "minerals" ? "blue-text" : "green-text";
       } else if (category === "pos") {
-        imageSrc = `img/pos/${key}.png`;
+        imageSrc = `img/pos/${key}.webp`;
         cssClass = "pos-image";
       }
 
@@ -159,10 +159,13 @@ function determineUnitClass(unitName) {
 
 // Preprocess abbreviations before matching actors
 function preprocessAbbreviations(actionText) {
+  if (!actionText || typeof actionText !== "string") return ""; // Ensure input is valid
+
   Object.entries(abbreviationMap).forEach(([abbr, full]) => {
     const regex = new RegExp(`\\b${abbr}\\b`, "gi");
     actionText = actionText.replace(regex, full);
   });
+
   return actionText;
 }
 

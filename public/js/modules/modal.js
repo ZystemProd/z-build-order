@@ -6,6 +6,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
 //import * as DOMPurify from "./dompurify/dist/purify.min.js";
+//import * as DOMPurify from "./dompurify/dist/purify.min.js";
 import { displayBuildOrder, showToast } from "./uiHandlers.js";
 import { updateYouTubeEmbed, clearYouTubeEmbed } from "./youtube.js";
 import {
@@ -15,6 +16,7 @@ import {
 } from "./buildStorage.js";
 import { fetchUserBuilds } from "./buildManagement.js";
 import { mapAnnotations } from "./interactive_map.js";
+import { formatActionText } from "./textFormatters.js";
 
 function formatMatchup(matchup) {
   if (!matchup) return "Unknown Match-Up";
@@ -68,6 +70,9 @@ export function viewBuild(buildId) {
         const selectedMapText = document.getElementById("selected-map-text");
         const titleInput = document.getElementById("buildOrderTitleInput");
         const titleText = document.getElementById("buildOrderTitleText");
+        const matchUpDropdown = document.getElementById(
+          "buildCategoryDropdown"
+        );
 
         console.log("Loaded build:", build);
 
@@ -81,9 +86,7 @@ export function viewBuild(buildId) {
 
         // Check for mandatory fields
         if (!build.title || !build.subcategory) {
-          console.error(
-            "Mandatory fields (Title or Match-Up) are missing in the build data."
-          );
+          console.error("Mandatory fields (Title or Match-Up) are missing.");
           showToast(
             "This build cannot be viewed due to missing mandatory fields.",
             "error"
@@ -91,23 +94,52 @@ export function viewBuild(buildId) {
           return;
         }
 
-        // Update the map preview and selected map text
+        // ✅ **Update Match-Up Dropdown & Set Color**
+        if (matchUpDropdown) {
+          const subcategoryValue = build.subcategory.toLowerCase();
+          let matchFound = false;
+
+          for (const option of matchUpDropdown.options) {
+            if (option.value.toLowerCase() === subcategoryValue) {
+              matchUpDropdown.value = option.value;
+              matchFound = true;
+              break;
+            }
+          }
+
+          if (!matchFound) {
+            console.warn(
+              `No match found for subcategory: ${build.subcategory}`
+            );
+          }
+
+          // ✅ **Update the Dropdown Color**
+          if (subcategoryValue.startsWith("zv")) {
+            matchUpDropdown.style.color = "#c07aeb"; // Purple (Zerg)
+          } else if (subcategoryValue.startsWith("pv")) {
+            matchUpDropdown.style.color = "#5fe5ff"; // Blue (Protoss)
+          } else if (subcategoryValue.startsWith("tv")) {
+            matchUpDropdown.style.color = "#ff3a30"; // Red (Terran)
+          } else {
+            matchUpDropdown.style.color = ""; // Default color if unmatched
+          }
+        }
+
+        // ✅ **Update the map preview and selected map text**
         if (build.map) {
-          const mapName = build.map; // The map field contains the name, e.g., "abyssal reef"
+          const mapName = build.map;
           const formattedMapName = capitalizeWords(mapName);
           const mapUrl = `https://z-build-order.web.app/img/maps/${mapName
             .replace(/ /g, "_")
-            .toLowerCase()}.jpg`; // Construct the full URL dynamically
+            .toLowerCase()}.webp`;
 
-          mapImage.src = mapUrl; // Set the map image
-          if (selectedMapText) {
-            selectedMapText.innerText = `${formattedMapName}`;
-          }
+          if (mapImage) mapImage.src = mapUrl;
+          if (selectedMapText) selectedMapText.innerText = formattedMapName;
         } else if (selectedMapText) {
-          selectedMapText.innerText = "No map selected"; // Fallback text for no map
+          selectedMapText.innerText = "No map selected";
         }
 
-        // Load annotations (circles and arrows)
+        // ✅ **Load annotations (circles and arrows)**
         if (build.interactiveMap) {
           mapAnnotations.circles = [];
           mapAnnotations.annotationsContainer.innerHTML = "";
@@ -125,7 +157,7 @@ export function viewBuild(buildId) {
           mapAnnotations.updateCircleNumbers();
         }
 
-        // Update titleText and titleInput
+        // ✅ **Update titleText and titleInput**
         if (titleText) {
           titleText.textContent =
             DOMPurify.sanitize(build.title) ||
@@ -137,11 +169,7 @@ export function viewBuild(buildId) {
           titleInput.value = build.title || "";
         }
 
-        // Format and display match-up
-        const categoryDropdown = document.getElementById("categoryDropdown");
-        if (categoryDropdown) {
-          categoryDropdown.value = build.subcategory || "";
-        }
+        // ✅ **Format and display match-up**
         const matchUpElement = document.getElementById("matchUpDisplay");
         if (matchUpElement) {
           const formattedMatchUp = build.subcategory
@@ -150,21 +178,32 @@ export function viewBuild(buildId) {
           matchUpElement.textContent = `Match-Up: ${formattedMatchUp}`;
         }
 
-        // Populate comment
+        // ✅ **Populate comment**
         const commentInput = document.getElementById("commentInput");
         if (commentInput) {
           commentInput.value = DOMPurify.sanitize(build.comment) || "";
+          commentInput.value = DOMPurify.sanitize(build.comment) || "";
         }
 
-        // Populate build order
+        // ✅ **Validate build order**
+        const validBuildOrder = Array.isArray(build.buildOrder)
+          ? build.buildOrder.filter(
+              (step) => step && step.workersOrTimestamp && step.action
+            ) // Remove invalid steps
+          : [];
+
+        // ✅ **Prevent undefined values in build order input**
         const buildOrderInput = document.getElementById("buildOrderInput");
         if (buildOrderInput) {
-          buildOrderInput.value = build.buildOrder
-            .map((step) => `[${step.workersOrTimestamp}] ${step.action}`)
-            .join("\n");
+          buildOrderInput.value = validBuildOrder.length
+            ? validBuildOrder
+                .map((step) => `[${step.workersOrTimestamp}] ${step.action}`)
+                .join("\n")
+            : "No build order available."; // Default message if empty
         }
 
-        displayBuildOrder(build.buildOrder);
+        // ✅ **Pass only valid build steps to `displayBuildOrder()`**
+        displayBuildOrder(validBuildOrder);
 
         closeModal();
       } else {
@@ -240,25 +279,54 @@ export function hideSubcategories(event) {
 
 window.hideSubcategories = hideSubcategories;
 
-export function showBuildsModal() {
+export async function showBuildsModal() {
   const buildModal = document.getElementById("buildsModal");
+  const showBuildsButton = document.getElementById("showBuildsButton");
+  const buildList = document.getElementById("buildList");
 
   if (!buildModal) {
     console.error("Build modal not found!");
     return;
   }
 
-  // Clear and populate the build list
-  populateBuildList();
+  // Disable the button to prevent multiple clicks
+  showBuildsButton.disabled = true;
 
-  // Open the modal
+  // Find or create the loader element
+  let loader = buildList.querySelector(".lds-roller");
+  if (!loader) {
+    loader = document.createElement("div");
+    loader.className = "lds-roller";
+    loader.innerHTML =
+      "<div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>";
+    buildList.appendChild(loader);
+  }
+  // Show the loader
+  loader.style.display = "block";
+
+  // Optionally, clear any existing build cards but keep the loader
+  Array.from(buildList.children).forEach((child) => {
+    if (!child.classList.contains("lds-roller")) {
+      buildList.removeChild(child);
+    }
+  });
+
+  // Populate the build list and wait for it to finish
+  await populateBuildList();
+
+  // Hide the loader once the build list is populated
+  loader.style.display = "none";
+
+  // Open the modal once the build list is fully loaded
   buildModal.style.display = "block";
 
-  // Close modal logic
+  // Re-enable the button
+  showBuildsButton.disabled = false;
+
+  // Set up closing behavior for the modal
   document.getElementById("closeBuildsModal").onclick = () => {
     buildModal.style.display = "none";
   };
-
   window.onclick = (event) => {
     if (event.target === buildModal) {
       buildModal.style.display = "none";
@@ -269,6 +337,8 @@ export function showBuildsModal() {
 // Attach to the global window object
 window.showBuildsModal = showBuildsModal;
 
+let isPopulatingBuildList = false;
+
 export async function populateBuildList(filteredBuilds = null) {
   const buildList = document.getElementById("buildList");
   const buildPreview = document.getElementById("buildPreview");
@@ -278,6 +348,10 @@ export async function populateBuildList(filteredBuilds = null) {
     return;
   }
 
+  // Prevent multiple simultaneous population calls.
+  if (isPopulatingBuildList) return;
+  isPopulatingBuildList = true;
+
   // Clear the current list
   buildList.innerHTML = "";
 
@@ -286,9 +360,11 @@ export async function populateBuildList(filteredBuilds = null) {
 
   if (!builds.length) {
     buildList.innerHTML = "<p>No builds available.</p>";
+    isPopulatingBuildList = false;
     return;
   }
 
+  let lastHoveredBuild = null; // Track the last hovered build
   const fragment = document.createDocumentFragment();
 
   builds.forEach((build) => {
@@ -297,20 +373,25 @@ export async function populateBuildList(filteredBuilds = null) {
 
     // Determine the background image based on the match-up
     const matchup = build.subcategory || "unknown";
-    const backgroundImageUrl = `../img/frames/${matchup.toLowerCase()}.png`;
+    const backgroundImageUrl = `../img/frames/${matchup.toLowerCase()}.webp`;
     buildCard.style.backgroundImage = `url("${backgroundImageUrl}")`;
 
     buildCard.innerHTML = `
       <div class="card-header">
         <h4>${DOMPurify.sanitize(build.title)}</h4>
-        <button class="delete-build-btn" data-tooltip="Delete Build" title="Delete Build">&times;</button>        <div class="delete-bg"></div>
+        <button class="delete-build-btn" data-tooltip="Delete Build" title="Delete Build">&times;</button>
+        <div class="delete-bg"></div>
       </div>
       <p class="matchup-text">${DOMPurify.sanitize(formatMatchup(matchup))}</p>
     `;
 
     // Add hover functionality for preview
-    buildCard.addEventListener("mouseover", () => updateBuildPreview(build));
-    buildCard.addEventListener("mouseleave", () => clearBuildPreview());
+    buildCard.addEventListener("mouseover", () => {
+      if (lastHoveredBuild !== build) {
+        updateBuildPreview(build);
+        lastHoveredBuild = build;
+      }
+    });
 
     // Add view build functionality
     buildCard.addEventListener("click", () => viewBuild(build.id));
@@ -333,34 +414,30 @@ export async function populateBuildList(filteredBuilds = null) {
   });
 
   buildList.appendChild(fragment);
+  isPopulatingBuildList = false;
 }
 
 function updateBuildPreview(build) {
   const buildPreview = document.getElementById("buildPreview");
+  if (!buildPreview) return;
 
-  if (!buildPreview) {
-    console.error("Build preview element not found.");
-    return;
-  }
+  // ✅ Ensure `publisher` field is properly referenced
+  const publisherName = build.publisher || build.username || "Unknown";
 
-  const formattedMatchup = formatMatchup(build.subcategory);
-
+  // Format the build order using formatActionText
   const formattedBuildOrder = build.buildOrder
     .map(
-      (step) =>
-        `[${DOMPurify.sanitize(step.workersOrTimestamp)}] ${DOMPurify.sanitize(
-          step.action
-        )}`
+      (step) => `[${step.workersOrTimestamp}] ${formatActionText(step.action)}`
     )
-    .join("\n");
+    .join("<br>"); // Use <br> for line breaks in HTML output
 
+  // Apply the formatted text, including publisher (without video link)
   buildPreview.innerHTML = `
     <h4>${DOMPurify.sanitize(build.title)}</h4>
-    <p><strong>Comment:</strong> ${DOMPurify.sanitize(
-      build.comment || "No comments provided."
-    )}</p>
-    <p><strong>Match-Up:</strong> ${DOMPurify.sanitize(formattedMatchup)}</p>
-    <pre>${DOMPurify.sanitize(formattedBuildOrder)}</pre>
+    <p><strong>Publisher:</strong> ${DOMPurify.sanitize(
+      publisherName
+    )}</p> <!-- ✅ Publisher correctly assigned -->
+    <pre>${formattedBuildOrder}</pre>
   `;
 }
 
@@ -447,17 +524,14 @@ export async function filterBuilds(
 
 export async function searchBuilds(query) {
   const lowerCaseQuery = query.toLowerCase();
-
-  // Fetch all builds
-  const builds = await fetchUserBuilds();
+  const builds = await fetchUserBuilds(); // Fetch all builds
 
   // Filter builds based on the query
   const filteredBuilds = builds.filter((build) =>
     build.title.toLowerCase().includes(lowerCaseQuery)
   );
 
-  // Populate the build list with filtered results
-  populateBuildList(filteredBuilds);
+  populateBuildList(filteredBuilds); // Update UI with filtered results
 }
 
 export async function populateMapModal(maps) {

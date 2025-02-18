@@ -1,1 +1,3 @@
 Fix inline style in index.html
+
+Need to loads build after everything is loaded before showing. Build modal, maybe template. 

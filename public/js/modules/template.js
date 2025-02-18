@@ -1,54 +1,53 @@
-//import * as DOMPurify from "./dompurify/dist/purify.min.js";
 import { analyzeBuildOrder } from "./uiHandlers.js";
 
 const predefinedTemplates = [
   {
     title: "15/15/15 no gas",
     category: "zerg",
-    image: "img/race/zerg.png",
+    image: "img/race/zerg.webp",
     data: "[12] Overlord\n[14] Spawning Pool\n[16] Zergling Rush",
   },
   {
     title: "2-1-1",
     category: "terran",
-    image: "img/race/terran.png",
+    image: "img/race/terran.webp",
     data: "[12] Supply Depot\n[13] Barracks\n[16] Marine Push",
   },
   {
     title: "fast expand",
     category: "protoss",
-    image: "img/race/protoss.png",
+    image: "img/race/protoss.webp",
     data: "[13] Pylon\n[14] Gateway\n[16] Zealot Push",
   },
   {
     title: "14gas 14pool",
     category: "zerg",
-    image: "img/race/zerg.png",
+    image: "img/race/zerg.webp",
     data: "[12] Overlord\n[14] Spawning Pool\n[16] Zergling Rush",
   },
 
   {
     title: "2 gate opener",
     category: "protoss",
-    image: "img/race/protoss.png",
+    image: "img/race/protoss.webp",
     data: "[13] Pylon\n[14] Gateway\n[16] Zealot Push",
   },
   {
     title: "16 hatch",
     category: "zerg",
-    image: "img/race/zerg.png",
+    image: "img/race/zerg.webp",
     data: "[12] Overlord\n[14] Spawning Pool\n[16] Zergling Rush",
   },
   {
     title: "7",
     category: "terran",
-    image: "img/race/terran.png",
+    image: "img/race/terran.webp",
     data: "[12] Supply Depot\n[13] Barracks\n[16] Marine Push",
   },
   {
     title: "Cannon rush into void rays",
     category: "protoss",
-    image: "img/race/protoss.png",
+    image: "img/race/protoss.webp",
     data: "[13] Pylon\n[14] Gateway\n[16] Zealot Push",
   },
 ];
@@ -162,7 +161,7 @@ export function showSaveTemplateModal() {
       return;
     }
 
-    const raceImage = `img/race/${selectedRace}.png`;
+    const raceImage = `img/race/${selectedRace}.webp`;
 
     // Save the new template
     templates.push({
@@ -231,7 +230,7 @@ export function searchTemplates(query) {
   const filteredTemplates = templates.filter((template) =>
     template.title.toLowerCase().includes(lowerCaseQuery)
   );
-  populateTemplateList(filteredTemplates);
+  populateTemplateList(filteredTemplates); // Update template UI
 }
 
 // Call this function during initialization

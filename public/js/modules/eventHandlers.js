@@ -1,3 +1,4 @@
+import { auth } from "../../app.js";
 import { saveCurrentBuild } from "./buildManagement.js";
 import { initializeAutoCorrect } from "./autoCorrect.js";
 import { populateBuildDetails, analyzeBuildOrder } from "./uiHandlers.js";
@@ -5,7 +6,6 @@ import { updateYouTubeEmbed } from "./youtube.js";
 import {
   closeModal,
   showSubcategories,
-  hideSubcategories,
   filterBuilds,
   searchBuilds,
 } from "./modal.js";
@@ -20,13 +20,18 @@ import {
   initializeTextareaClickHandler,
 } from "./uiHandlers.js";
 import {
-  saveTemplate,
   showTemplatesModal,
   setupTemplateModal,
-  searchTemplates,
   showSaveTemplateModal,
+  searchTemplates,
 } from "./template.js";
 import { initializeTooltips } from "./tooltip.js";
+import {
+  populateCommunityBuilds,
+  checkPublishButtonVisibility,
+  searchCommunityBuilds,
+} from "./community.js";
+import { populateBuildsModal } from "./buildManagement.js"; // ✅ Corrected import
 
 setupTemplateModal();
 
@@ -34,21 +39,12 @@ document.addEventListener("DOMContentLoaded", initializeAutoCorrect);
 
 // Initialize event listeners
 export function initializeEventListeners() {
+  console.log("Initializing event listeners..."); // Debugging
   document
     .getElementById("templateSearchBar")
     .addEventListener("input", (event) => {
       const query = event.target.value;
       searchTemplates(query);
-    });
-
-  document
-    .getElementById("openTemplatesButton")
-    .addEventListener("click", showTemplatesModal);
-
-  document
-    .getElementById("saveTemplateButton")
-    .addEventListener("click", () => {
-      showSaveTemplateModal();
     });
 
   document
@@ -70,31 +66,86 @@ export function initializeEventListeners() {
   window.showSubcategories = showSubcategories;
 
   document.addEventListener("DOMContentLoaded", () => {
-    document.querySelectorAll(".filter-category").forEach((category) => {
-      category.addEventListener("mouseover", () => {
-        const submenu = category.querySelector(".submenu");
-        if (submenu) {
-          submenu.style.display = "block";
-        }
-      });
+    document.querySelectorAll(".toggle-title").forEach((header) => {
+      header.addEventListener("click", () => {
+        const sectionId = header.getAttribute("data-section");
+        const section = document.getElementById(sectionId);
+        const arrow = header.querySelector(".arrow");
 
-      category.addEventListener("mouseout", () => {
-        const submenu = category.querySelector(".submenu");
-        if (submenu) {
-          submenu.style.display = "none";
+        if (!section) {
+          console.error(`❌ Error: Section with ID "${sectionId}" not found.`);
+          return;
         }
+
+        console.log(`🔄 Toggling section: ${sectionId}`);
+        console.log(
+          "Before toggle - Style:",
+          window.getComputedStyle(section).display
+        );
+
+        // Toggle visibility and height
+        if (section.classList.contains("hidden")) {
+          section.classList.remove("hidden");
+          section.classList.add("visible");
+          arrow.classList.add("open"); // Rotate arrow down
+        } else {
+          section.classList.remove("visible");
+          section.classList.add("hidden");
+          arrow.classList.remove("open"); // Rotate arrow right
+        }
+
+        console.log(
+          "After toggle - Style:",
+          window.getComputedStyle(section).display
+        );
       });
     });
   });
 
+  document
+    .getElementById("openTemplatesButton")
+    .addEventListener("click", showTemplatesModal);
+
+  document
+    .getElementById("saveTemplateButton")
+    .addEventListener("click", () => {
+      showSaveTemplateModal();
+    });
+
+  const buildSearchBar = document.getElementById("buildSearchBar");
+  if (buildSearchBar) {
+    buildSearchBar.addEventListener("input", (event) => {
+      const query = DOMPurify.sanitize(event.target.value.trim());
+      searchBuilds(query);
+    });
+  }
+
+  // Template Search Bar
+  const templateSearchBar = document.getElementById("templateSearchBar");
+  if (templateSearchBar) {
+    templateSearchBar.addEventListener("input", (event) => {
+      const query = DOMPurify.sanitize(event.target.value.trim());
+      searchTemplates(query);
+    });
+  }
+
+  // Community Search Bar
+  const communitySearchBar = document.getElementById("communitySearchBar");
+  if (communitySearchBar) {
+    communitySearchBar.addEventListener("input", (event) => {
+      const query = DOMPurify.sanitize(event.target.value.trim());
+      searchCommunityBuilds(query);
+    });
+  }
+
+  // Handle Category Click
   document.querySelectorAll(".filter-category").forEach((element) => {
     element.addEventListener("click", () => {
-      const category = element.getAttribute("data-category");
+      const category = DOMPurify.sanitize(
+        element.getAttribute("data-category")
+      );
       if (category) {
-        // Clear the search bar
-        const searchBar = document.getElementById("buildSearchBar");
-        if (searchBar) searchBar.value = "";
-
+        if (buildSearchBar) buildSearchBar.value = ""; // Clear search bar
         filterBuilds(category);
 
         // Highlight active category
@@ -106,15 +157,15 @@ export function initializeEventListeners() {
     });
   });
 
+  // Handle Subcategory Click
   document.querySelectorAll(".subcategory").forEach((element) => {
     element.addEventListener("click", (event) => {
       event.stopPropagation(); // Prevent triggering parent category click
-      const subcategory = element.getAttribute("data-subcategory");
+      const subcategory = DOMPurify.sanitize(
+        element.getAttribute("data-subcategory")
+      );
       if (subcategory) {
-        // Clear the search bar
-        const searchBar = document.getElementById("buildSearchBar");
-        if (searchBar) searchBar.value = "";
-
+        if (buildSearchBar) buildSearchBar.value = ""; // Clear search bar
         filterBuilds(subcategory);
 
         // Highlight active subcategory
@@ -141,19 +192,17 @@ export function initializeEventListeners() {
     closeBuildsModal();
   });
 
-  // Automatically trigger analysis when the user types in the buildOrderInput field
-  document
-    .getElementById("buildOrderInput")
-    .addEventListener("input", (event) => {
-      analyzeBuildOrder(event.target.value);
-    });
-
   // Save Build
   document.getElementById("saveBuildButton").addEventListener("click", () => {
+    console.log("Save button clicked!"); // Debugging
     saveCurrentBuild();
   });
 
   // Update YouTube Embed
+  document.getElementById("videoInput").addEventListener("input", (event) => {
+    const videoLink = event.target.value.trim(); // Extract the input value
+    updateYouTubeEmbed(videoLink); // Pass the extracted value
+  });
   document.getElementById("videoInput").addEventListener("input", (event) => {
     const videoLink = event.target.value.trim(); // Extract the input value
     updateYouTubeEmbed(videoLink); // Pass the extracted value
@@ -172,25 +221,6 @@ export function initializeEventListeners() {
         dropdown.style.color = optgroup.style.color;
       }
     });
-
-  // Section toggle logic
-  document.addEventListener("DOMContentLoaded", () => {
-    document.querySelectorAll(".toggle-title").forEach((header) => {
-      header.addEventListener("click", () => {
-        const sectionId = header.getAttribute("data-section");
-        const section = document.getElementById(sectionId);
-        const arrow = header.querySelector(".arrow");
-
-        if (section.style.display === "none" || !section.style.display) {
-          section.style.display = "block";
-          arrow.classList.add("open"); // Rotate arrow down
-        } else {
-          section.style.display = "none";
-          arrow.classList.remove("open"); // Rotate arrow right
-        }
-      });
-    });
-  });
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -247,6 +277,12 @@ document.addEventListener("DOMContentLoaded", () => {
           const mapName = DOMPurify.sanitize(
             mapCard.querySelector(".map-card-title").innerText
           );
+          const mapImageSrc = DOMPurify.sanitize(
+            mapCard.getAttribute("data-map")
+          );
+          const mapName = DOMPurify.sanitize(
+            mapCard.querySelector(".map-card-title").innerText
+          );
 
           // Update the map preview
           mapPreviewImage.src = mapImageSrc;
@@ -297,4 +333,117 @@ document.addEventListener("DOMContentLoaded", () => {
 document.addEventListener("DOMContentLoaded", () => {
   // Initialize tooltips
   initializeTooltips();
+});
+
+document.addEventListener("DOMContentLoaded", async () => {
+  console.log("🔥 Loading community and user builds...");
+  await populateCommunityBuilds();
+  await populateBuildsModal(); // ✅ Ensure builds are loaded after importing
+});
+
+document
+  .getElementById("showCommunityModalButton")
+  .addEventListener("click", () => {
+    document.getElementById("communityModal").style.display = "block";
+    populateCommunityBuilds();
+  });
+
+document.getElementById("closeCommunityModal").addEventListener("click", () => {
+  document.getElementById("communityModal").style.display = "none";
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  checkPublishButtonVisibility(); // Ensure button is checked on page load
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  document
+    .getElementById("buildOrderInput")
+    .addEventListener("input", (event) => {
+      analyzeBuildOrder(event.target.value);
+    });
+});
+
+// Then enable it when DOM is fully loaded and auth is resolved
+document.addEventListener("DOMContentLoaded", () => {
+  // Check if auth is ready or wait for onAuthStateChanged
+  auth.onAuthStateChanged((user) => {
+    if (user) {
+      document.getElementById("showCommunityModalButton").disabled = false;
+      document.getElementById("showBuildsButton").disabled = false;
+    }
+  });
+});
+
+document.addEventListener("DOMContentLoaded", function () {
+  const legalNoticeLink = document.getElementById("legalNoticeLink");
+  const notification = document.getElementById("notification");
+  const closeNotification = document.getElementById("closeNotification");
+
+  // Show notification when clicking the footer link
+  legalNoticeLink.addEventListener("click", function (event) {
+    event.preventDefault(); // Prevent the link from navigating
+    notification.style.display = "block";
+  });
+
+  // Hide notification when clicking the close button
+  closeNotification.addEventListener("click", function () {
+    notification.style.display = "none";
+  });
+
+  // Hide notification when clicking outside of it
+  window.addEventListener("click", function (event) {
+    if (
+      event.target !== notification &&
+      !notification.contains(event.target) &&
+      event.target !== legalNoticeLink
+    ) {
+      notification.style.display = "none";
+    }
+  });
+});
+
+document.addEventListener("DOMContentLoaded", function () {
+  const templateMenuButton = document.getElementById("templateMenuButton");
+  const templateDropdown = document.getElementById("templateDropdown");
+
+  if (!templateMenuButton || !templateDropdown) {
+    console.error("❌ Error: Missing template menu elements.");
+    return;
+  }
+
+  console.log("✅ Template menu initialized.");
+
+  // Toggle dropdown menu on click
+  templateMenuButton.addEventListener("click", function (event) {
+    event.stopPropagation(); // Prevents window click from closing it immediately
+    console.log("📌 Template menu button clicked.");
+
+    // Only toggle if it's not already active
+    if (!templateDropdown.classList.contains("active")) {
+      templateDropdown.classList.add("active");
+    } else {
+      templateDropdown.classList.remove("active");
+    }
+  });
+
+  // Stop click inside the dropdown from closing it
+  templateDropdown.addEventListener("click", function (event) {
+    event.stopPropagation(); // Prevents the window click listener from triggering
+  });
+
+  // Close dropdown when clicking outside
+  window.addEventListener("click", function (event) {
+    // If the menu is already inactive, no need to check anything
+    if (!templateDropdown.classList.contains("active")) return;
+
+    // If the click is outside both the button and dropdown, close it
+    if (
+      event.target !== templateMenuButton &&
+      !templateDropdown.contains(event.target)
+    ) {
+      templateDropdown.classList.remove("active");
+      console.log("📌 Template menu closed.");
+    }
+  });
 });

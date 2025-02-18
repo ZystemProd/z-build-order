@@ -6,12 +6,18 @@ import {
   signOut,
   onAuthStateChanged,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
-import { getFirestore } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+import {
+  getFirestore,
+  doc,
+  getDoc,
+  setDoc,
+} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import {
   initializeEventListeners,
   initializeModalEventListeners,
 } from "./js/modules/eventHandlers.js";
-import { populateBuildList } from "./js/modules/modal.js";
+import { resetBuildInputs } from "./js/modules/utils.js";
+import { getPerformance } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-performance.js";
 
 // Firebase configuration
 const firebaseConfig = {
@@ -24,91 +30,218 @@ const firebaseConfig = {
   measurementId: "G-LBDMKMG1W9",
 };
 
-// Initialize Firebase
+// Initialize Firebase App
 const app = initializeApp(firebaseConfig);
+// Initialize Services
 const auth = getAuth(app);
 const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
+const perf = getPerformance(app);
 
-// Grab references to DOM elements
-const elements = {
-  signInBtn: document.getElementById("signInBtn"),
-  signOutBtn: document.getElementById("signOutBtn"),
-  userDetails: document.getElementById("userDetails"),
-  authLoading: document.getElementById("authLoading"),
-  whenSignedIn: document.getElementById("whenSignedIn"),
-  whenSignedOut: document.getElementById("whenSignedOut"),
-};
+/*********************************************************************
+ * 2. CHECK & SET USERNAME
+ *********************************************************************/
+async function checkAndSetUsername(user) {
+  const userRef = doc(db, "users", user.uid);
+  const userSnapshot = await getDoc(userRef);
 
-// Utility function to update UI based on auth state
-function updateAuthUI(user) {
-  if (elements.authLoading) elements.authLoading.hidden = true;
+  // If no username in Firestore, prompt for one
+  if (!userSnapshot.exists() || !userSnapshot.data().username) {
+    // Show modal
+    document.getElementById("usernameModal").style.display = "block";
+
+    // Handle "Confirm" button
+    document.getElementById("confirmUsernameButton").onclick = async () => {
+      const usernameInput = document.getElementById("usernameInput");
+      const username = usernameInput.value.trim();
+
+      if (!username) {
+        alert("Username cannot be empty!");
+        return;
+      }
+
+      // Check if username already exists
+      const usernameDoc = doc(db, "usernames", username);
+      const usernameSnap = await getDoc(usernameDoc);
+
+      if (usernameSnap.exists()) {
+        alert("That username is taken. Try another.");
+      } else {
+        // Store username in "users" collection
+        await setDoc(userRef, { username, userId: user.uid }, { merge: true });
+        // Also mark it as taken in "usernames" collection
+        await setDoc(usernameDoc, { userId: user.uid });
+
+        alert(`Username set as: ${username}`);
+        document.getElementById("usernameModal").style.display = "none";
+      }
+    };
+  }
+}
+
+/*********************************************************************
+ * 3. UPDATE UI BASED ON AUTH STATE
+ *********************************************************************/
+async function updateAuthUI(user) {
+  const authLoading = document.getElementById("authLoading");
+  if (authLoading) authLoading.innerText = "";
 
   if (user) {
-    console.log("User is signed in:", user);
+    console.log("User signed in:", user);
 
-    if (elements.userDetails) {
-      const sanitizedDisplayName = user.displayName
-        ? DOMPurify.sanitize(user.displayName)
-        : null;
-      const sanitizedEmail = user.email ? DOMPurify.sanitize(user.email) : null;
+    // Fetch username from Firestore
+    const userRef = doc(db, "users", user.uid);
+    const userSnapshot = await getDoc(userRef);
+    let username = userSnapshot.exists() ? userSnapshot.data().username : null;
 
-      elements.userDetails.innerText = `Welcome, ${
-        sanitizedDisplayName || sanitizedEmail
-      }`;
+    if (!username) {
+      // Prompt for username
+      await checkAndSetUsername(user);
+      const updatedSnapshot = await getDoc(userRef);
+      username = updatedSnapshot.exists()
+        ? updatedSnapshot.data().username
+        : "Unknown";
     }
-    if (elements.whenSignedIn) elements.whenSignedIn.hidden = false;
-    if (elements.whenSignedOut) elements.whenSignedOut.hidden = true;
+
+    // Show username (not email)
+    document.getElementById("userName").innerText = username || "Guest";
+
+    // Show user photo
+    const userPhoto = user.photoURL || "img/default-avatar.webp";
+    document.getElementById("userPhoto").src = userPhoto;
+
+    // Show Switch & Sign Out buttons, hide Sign In
+    document.getElementById("signInBtn").style.display = "none";
+    document.getElementById("switchAccountBtn").style.display = "inline-block";
+    document.getElementById("signOutBtn").style.display = "inline-block";
   } else {
     console.log("No user signed in.");
 
-    if (elements.userDetails) elements.userDetails.innerText = "";
-    if (elements.whenSignedIn) elements.whenSignedIn.hidden = true;
-    if (elements.whenSignedOut) elements.whenSignedOut.hidden = false;
+    // Reset display
+    document.getElementById("userName").innerText = "Guest";
+    document.getElementById("userPhoto").src = "img/default-avatar.webp";
+
+    // Show Sign In, hide Switch & Sign Out
+    document.getElementById("signInBtn").style.display = "inline-block";
+    document.getElementById("switchAccountBtn").style.display = "none";
+    document.getElementById("signOutBtn").style.display = "none";
   }
 }
 
-// Sign in with Google
+/*********************************************************************
+ * 4. SIGN-IN / SIGN-OUT / SWITCH
+ *********************************************************************/
 function handleSignIn() {
+  const authLoading = document.getElementById("authLoading");
+  if (authLoading) {
+    authLoading.innerText = "Signing in...";
+  }
+
   signInWithPopup(auth, provider)
     .then((result) => {
-      console.log("User signed in:", result.user);
+      console.log("Sign in successful:", result.user);
       updateAuthUI(result.user);
     })
     .catch((error) => {
-      console.error(
-        "Sign-in error:",
-        DOMPurify.sanitize(error.message || error)
-      );
+      console.error("Sign in error:", error);
+      if (authLoading) authLoading.innerText = "Sign in failed!";
     });
 }
 
-// Sign out
-async function handleSignOut() {
+function handleSignOut() {
+  signOut(auth)
+    .then(() => {
+      console.log("✅ User signed out successfully.");
+
+      resetBuildInputs(); // ✅ Reset UI when signing out
+
+      updateAuthUI(null); // Ensure UI updates
+      window.location.reload(); // Optional: Reload to fully refresh the page
+    })
+    .catch((error) => {
+      console.error("❌ Sign out error:", error);
+    });
+}
+
+/**
+ * Signs out the current user, then opens the sign-in popup
+ * for selecting a different Google account.
+ */
+async function handleSwitchAccount() {
   try {
     await signOut(auth);
-    console.log("User signed out successfully.");
-    updateAuthUI(null);
-  } catch (error) {
-    console.error("Error signing out:", error);
+    console.log("🔄 Signed out. Now signing in with another account...");
+
+    resetBuildInputs(); // ✅ Reset all inputs when switching accounts
+
+    const provider = new GoogleAuthProvider();
+    const result = await signInWithPopup(auth, provider);
+
+    console.log("✅ Switched to new account:", result.user);
+
+    updateAuthUI(result.user);
+    window.location.reload(); // Optional: Reload to fully refresh UI
+  } catch (err) {
+    console.error("❌ Error switching accounts:", err);
   }
 }
 
-// Attach event listeners
+/*********************************************************************
+ * 5. EVENT LISTENERS
+ *********************************************************************/
 function attachEventListeners() {
-  if (elements.signInBtn)
-    elements.signInBtn.addEventListener("click", handleSignIn);
-  if (elements.signOutBtn)
-    elements.signOutBtn.addEventListener("click", handleSignOut);
+  document.getElementById("signInBtn")?.addEventListener("click", handleSignIn);
+  document
+    .getElementById("signOutBtn")
+    ?.addEventListener("click", handleSignOut);
+  document
+    .getElementById("switchAccountBtn")
+    ?.addEventListener("click", handleSwitchAccount);
 }
 
-// Listen for authentication state changes
-onAuthStateChanged(auth, updateAuthUI);
+/*********************************************************************
+ * 6. AUTH STATE CHANGE LISTENER
+ *********************************************************************/
 
-// Initialize application on DOM load
+onAuthStateChanged(auth, (user) => {
+  if (!user) {
+    console.log("🚫 No user logged in. Resetting UI...");
+    resetBuildInputs(); // ✅ Reset everything when user logs out
+    updateAuthUI(null);
+  } else {
+    console.log("✅ User logged in:", user.displayName);
+    updateAuthUI(user);
+  }
+});
+
+/*********************************************************************
+ * 7. ON DOM READY
+ *********************************************************************/
 document.addEventListener("DOMContentLoaded", () => {
-  if (elements.authLoading) elements.authLoading.hidden = false; // Show loading indicator
-  initializeEventListeners();
-  initializeModalEventListeners();
+  const authLoading = document.getElementById("authLoading");
+  enableCloseModalOnOutsideClick();
+  if (authLoading) {
+    authLoading.innerText = "Checking authentication status...";
+  }
   attachEventListeners();
 });
+
+function enableCloseModalOnOutsideClick() {
+  const modal = document.getElementById("usernameModal");
+
+  // If the user clicks anywhere outside the .modal-content area, close the modal
+  modal.addEventListener("click", (event) => {
+    // Check if the clicked element is the modal background itself
+    if (event.target === modal) {
+      modal.style.display = "none";
+    }
+  });
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  initializeEventListeners();
+  initializeModalEventListeners();
+});
+
+// Export Firebase utilities
+export { app, auth, db };
