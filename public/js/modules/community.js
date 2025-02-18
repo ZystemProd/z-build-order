@@ -23,22 +23,15 @@ async function fetchCommunityBuilds() {
 
   return snapshot.docs.map((doc) => {
     const data = doc.data();
-
-    if (!doc.id) {
-      console.error("❌ Error: Build is missing an ID", data);
-    }
-
     return {
-      id: doc.id || null, // Ensure ID is assigned
+      id: doc.id,
       title: data.title || "Untitled Build",
       matchup: data.subcategory || "Unknown",
       publisher: data.username || "Anonymous",
-      datePublished: data.datePublished || "Unknown",
-      buildOrder: Array.isArray(data.buildOrder)
-        ? data.buildOrder
-        : typeof data.buildOrder === "string"
-        ? data.buildOrder.split("\n")
-        : ["No build order available"],
+      datePublished: data.datePublished
+        ? new Date(data.datePublished).toLocaleDateString()
+        : "Unknown",
+      views: data.views || 0,
       upvotes: data.upvotes || 0,
       downvotes: data.downvotes || 0,
       userVotes: data.userVotes || {},
@@ -51,109 +44,91 @@ let communityBuilds = []; // Global variable to store builds
 let communityBuildsLoaded = false;
 let isPopulatingCommunityBuilds = false;
 
-export async function populateCommunityBuilds(filteredBuilds = null) {
-  // If a population is already in progress, return immediately.
-  if (isPopulatingCommunityBuilds) return;
-  // If builds have already been loaded and no filtering is requested, no need to reload.
-  if (communityBuildsLoaded && !filteredBuilds) return;
-
-  isPopulatingCommunityBuilds = true;
-
-  const tableBody = document.getElementById("communityBuildsTableBody");
-  tableBody.innerHTML = ""; // Clear existing rows
+export async function populateCommunityBuilds() {
+  const container = document.getElementById("communityBuildsContainer");
+  container.innerHTML = ""; // Clear existing builds
 
   try {
-    if (!filteredBuilds) {
-      communityBuilds = await fetchCommunityBuilds();
-      communityBuildsLoaded = true;
-    }
-
-    const buildsToShow = filteredBuilds || communityBuilds;
-
-    if (buildsToShow.length === 0) {
-      tableBody.innerHTML = "<tr><td colspan='7'>No builds found.</td></tr>";
-      isPopulatingCommunityBuilds = false;
-      return;
-    }
-
+    const builds = await fetchCommunityBuilds();
     const user = auth.currentUser;
     const userId = user ? user.uid : null;
 
-    buildsToShow.forEach((build) => {
-      const row = document.createElement("tr");
-      row.dataset.id = build.id; // Ensure build ID is stored
-
-      const formattedMatchup = build.matchup
-        ? build.matchup.charAt(0).toUpperCase() +
-          build.matchup.slice(1, -1).toLowerCase() +
-          build.matchup.charAt(build.matchup.length - 1).toUpperCase()
-        : "Unknown";
-
-      const upvotes = build.upvotes || 0;
-      const downvotes = build.downvotes || 0;
-      const totalVotes = upvotes + downvotes;
+    builds.forEach((build) => {
+      const userVote = build.userVotes[userId] || null;
+      const totalVotes = build.upvotes + build.downvotes;
       const votePercentage =
-        totalVotes > 0 ? Math.round((upvotes / totalVotes) * 100) : 0;
+        totalVotes > 0 ? Math.round((build.upvotes / totalVotes) * 100) : 0;
 
-      const userVote =
-        build.userVotes && userId ? build.userVotes[userId] : null;
+      const buildEntry = document.createElement("div");
+      buildEntry.classList.add("build-entry");
 
-      row.innerHTML = `
-        <td>
-            <button class="view-preview-button" data-id="${
-              build.id
-            }" data-tooltip="Preview">
-                <img src="./img/SVG/preview.svg" alt="Preview" class="community-icon">
-            </button>
-        </td>
-        <td>${DOMPurify.sanitize(build.title)}</td>
-        <td>${DOMPurify.sanitize(formattedMatchup)}</td>
-        <td>${DOMPurify.sanitize(build.publisher)}</td>
-        <td>${new Date(build.datePublished).toLocaleDateString()}</td>
-        <td>
-            <button class="vote-button vote-up" data-id="${
-              build.id
-            }" data-tooltip="Upvote">
-                <img src="./img/SVG/${
-                  userVote === "up" ? "voted-up" : "vote-up"
-                }.svg" alt="Upvote" class="community-icon">
-            </button>
-            <button class="vote-button vote-down" data-id="${
-              build.id
-            }" data-tooltip="Downvote">
-                <img src="./img/SVG/${
-                  userVote === "down" ? "voted-down" : "vote-down"
-                }.svg" alt="Downvote" class="community-icon">
-            </button>
-            <div class="vote-info" data-id="${build.id}">
-              <span class="vote-percentage">${votePercentage}%</span>
-              <span class="vote-count">${totalVotes} votes</span>
-            </div>
-        </td>
-        <td>
-            <button class="import-button" data-id="${
-              build.id
-            }" data-tooltip="Import">
-                <img src="./img/SVG/import.svg" alt="Import" class="community-icon">
-            </button>
-            <button class="view-build-button" data-id="${
-              build.id
-            }" data-tooltip="View Build">
-                <img src="./img/SVG/view.svg" alt="View" class="community-icon">
-            </button>
-        </td> 
+      buildEntry.innerHTML = `
+        <div class="build-title">${build.title}</div>
+        
+        <div class="build-meta">
+          <span class="meta-chip">
+            <img src="./img/SVG/account.svg" alt="Publisher" class="meta-icon">
+            ${build.publisher}
+          </span>
+          <span class="meta-chip">
+            <img src="./img/SVG/calendar.svg" alt="Date" class="meta-icon">
+            ${build.datePublished}
+          </span>
+          <span class="meta-chip">
+            <img src="./img/SVG/preview.svg" alt="Views" class="meta-icon">
+            ${build.views} Views
+          </span>
+        </div>
+
+        <div class="build-actions">
+          <button class="view-preview-button" data-id="${
+            build.id
+          }" data-tooltip="Preview">
+            <img src="./img/SVG/preview.svg" alt="Preview" class="community-icon">
+          </button>
+        </div>
+        
+        <div class="build-voting">
+          <button class="vote-button vote-up" data-id="${
+            build.id
+          }" data-tooltip="Upvote">
+            <img src="./img/SVG/${
+              userVote === "up" ? "voted-up" : "vote-up"
+            }.svg" alt="Upvote" class="community-icon">
+          </button>
+          <div class="vote-info" data-id="${build.id}">
+            <span class="vote-percentage">${votePercentage}%</span>
+            <span class="vote-count">${totalVotes} votes</span>
+          </div>
+          <button class="vote-button vote-down" data-id="${
+            build.id
+          }" data-tooltip="Downvote">
+            <img src="./img/SVG/${
+              userVote === "down" ? "voted-down" : "vote-down"
+            }.svg" alt="Downvote" class="community-icon">
+          </button>
+        </div>
+        
+        <div class="build-actions">
+          <button class="import-button" data-id="${
+            build.id
+          }" data-tooltip="Import">
+            <img src="./img/SVG/import.svg" alt="Import" class="community-icon">
+          </button>
+          <button class="view-build-button" data-id="${
+            build.id
+          }" data-tooltip="View Build">
+            <img src="./img/SVG/view.svg" alt="View" class="community-icon">
+          </button>
+        </div>
       `;
 
-      tableBody.appendChild(row);
+      container.appendChild(buildEntry);
     });
 
-    initializeCommunityBuildEvents(); // Attach event listeners for all buttons
+    initializeCommunityBuildEvents();
   } catch (error) {
     console.error("Error loading community builds:", error);
-    tableBody.innerHTML =
-      "<tr><td colspan='7'>Failed to load builds.</td></tr>";
-  } finally {
-    isPopulatingCommunityBuilds = false;
   }
 }
 
@@ -482,12 +457,6 @@ function updateVoteUI(buildId, upvotes, downvotes, userVote) {
     voteCount.textContent = `${totalVotes} votes`;
   }
 }
-
-document
-  .getElementById("communityBuildsTableBody")
-  .addEventListener("mouseout", () => {
-    clearBuildPreview();
-  });
 
 // Close modal when clicking outside of modal content
 document.addEventListener("click", (event) => {
