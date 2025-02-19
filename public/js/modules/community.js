@@ -11,6 +11,7 @@ import {
   orderBy,
   limit,
   updateDoc,
+  increment,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { formatActionText } from "./textFormatters.js";
 import { populateBuildsModal } from "./buildManagement.js"; // ✅ Corrected import
@@ -23,10 +24,32 @@ async function fetchCommunityBuilds() {
 
   return snapshot.docs.map((doc) => {
     const data = doc.data();
+
+    // ✅ Use `subcategory` for matchup instead of `matchup`
+    let rawMatchup = data.subcategory
+      ? data.subcategory.trim().toLowerCase()
+      : "unknown";
+
+    // ✅ Ensure the first and last letter are uppercase
+    let formattedMatchup = "Unknown";
+    if (rawMatchup.length === 3) {
+      formattedMatchup =
+        rawMatchup.charAt(0).toUpperCase() +
+        rawMatchup.charAt(1).toLowerCase() +
+        rawMatchup.charAt(2).toUpperCase();
+    }
+
+    console.log(
+      `🔍 Fetching build: ${
+        data.title || "Untitled Build"
+      }, Matchup: ${formattedMatchup}`
+    ); // Debugging log
+
     return {
       id: doc.id,
       title: data.title || "Untitled Build",
       publisher: data.username || "Anonymous",
+      matchup: formattedMatchup, // ✅ Now properly formatted
       datePublished: data.datePublished
         ? new Date(data.datePublished).toLocaleDateString()
         : "Unknown",
@@ -50,52 +73,81 @@ export async function populateCommunityBuilds() {
 
   try {
     const builds = await fetchCommunityBuilds();
-    const user = auth.currentUser;
-    const userId = user ? user.uid : null;
+    const db = getFirestore();
 
     builds.forEach((build) => {
       const totalVotes = build.upvotes + build.downvotes;
       const votePercentage =
         totalVotes > 0 ? Math.round((build.upvotes / totalVotes) * 100) : 0;
 
+      console.log(
+        `🔍 Processing build: ${build.title}, Matchup: ${build.matchup}`
+      );
+
+      // ✅ Determine matchup image based on the matchup
+      let matchupImage = "./img/race/unknown.webp"; // Default image
+      if (
+        build.matchup.includes("ZvZ") ||
+        build.matchup.includes("ZvT") ||
+        build.matchup.includes("ZvP")
+      ) {
+        matchupImage = "./img/race/zerg.webp";
+      } else if (
+        build.matchup.includes("PvP") ||
+        build.matchup.includes("PvZ") ||
+        build.matchup.includes("PvT")
+      ) {
+        matchupImage = "./img/race/protoss.webp";
+      } else if (
+        build.matchup.includes("TvP") ||
+        build.matchup.includes("TvT") ||
+        build.matchup.includes("TvZ")
+      ) {
+        matchupImage = "./img/race/terran.webp";
+      }
+
       const buildEntry = document.createElement("div");
       buildEntry.classList.add("build-entry");
-      buildEntry.dataset.id = build.id; // Store build ID for reference
+      buildEntry.dataset.id = build.id;
 
-      // ✅ Make entire div clickable
-      buildEntry.addEventListener("click", () => {
+      // ✅ Increment view count when clicked
+      buildEntry.addEventListener("click", async () => {
         window.location.href = `viewBuild.html?id=${build.id}`;
+        await incrementBuildViews(db, build.id); // Increase views in Firestore
       });
 
-      // ✅ Show build preview on hover
       buildEntry.addEventListener("mouseover", () => {
         showBuildPreview(build);
       });
 
-      // ✅ Clear preview when mouse leaves
       buildEntry.addEventListener("mouseleave", () => {
         clearBuildPreview();
       });
 
       buildEntry.innerHTML = `
-        <div class="build-title">${build.title}</div>
-
-        <div class="build-meta">
-          <span class="meta-chip">
-            <img src="./img/SVG/user-svgrepo-com.svg" alt="Publisher" class="meta-icon">
-            ${build.publisher}
-          </span>
-          <span class="meta-chip">
-            <img src="./img/SVG/time.svg" alt="Date" class="meta-icon">
-            ${build.datePublished}
-          </span>
-          <span class="meta-chip">
-            <img src="./img/SVG/preview.svg" alt="Views" class="meta-icon">
-            ${build.views} Views
-          </span>
-          <div class="vote-info">
-            <span class="vote-percentage">${votePercentage}%</span>
-            <span class="vote-count">${totalVotes} votes</span>
+        <div class="build-left">
+          <img src="${matchupImage}" alt="${build.matchup}" class="matchup-icon">
+        </div>
+        <div class="build-right">
+          <div class="build-title">${build.title}</div>
+          <div class="build-meta">
+            <span class="meta-chip matchup-chip">${build.matchup}</span>
+            <span class="meta-chip publisher-chip">
+              <img src="./img/SVG/user-svgrepo-com.svg" alt="Publisher" class="meta-icon">
+              ${build.publisher}
+            </span>
+            <span class="meta-chip">
+              <img src="./img/SVG/time.svg" alt="Date" class="meta-icon">
+              ${build.datePublished}
+            </span>
+            <span class="meta-chip view-chip" data-id="${build.id}">
+              <img src="./img/SVG/preview.svg" alt="Views" class="meta-icon">
+              <span class="view-count">${build.views}</span> Views
+            </span>
+            <div class="vote-info">
+              <span class="vote-percentage">${votePercentage}%</span>
+              <span class="vote-count">${totalVotes} votes</span>
+            </div>
           </div>
         </div>
       `;
@@ -103,26 +155,29 @@ export async function populateCommunityBuilds() {
       container.appendChild(buildEntry);
     });
   } catch (error) {
-    console.error("Error loading community builds:", error);
+    console.error("❌ Error loading community builds:", error);
   }
 }
 
-function attachPreviewButtonEvents() {
-  document.querySelectorAll(".view-preview-button").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      const buildId = event.target.getAttribute("data-id");
-      console.log("🔍 Preview Button Clicked - Build ID:", buildId); // ✅ Debugging
+async function incrementBuildViews(db, buildId) {
+  try {
+    const buildRef = doc(db, "communityBuilds", buildId);
 
-      const build = communityBuilds.find((b) => b.id === buildId);
+    // ✅ Increment views directly using Firestore's `increment()` function
+    await updateDoc(buildRef, { views: increment(1) });
 
-      if (build) {
-        console.log("✅ Found Build:", build.title); // ✅ Debugging
-        showBuildPreview(build);
-      } else {
-        console.error("❌ Error: Build not found with ID", buildId);
-      }
-    });
-  });
+    // ✅ Update UI immediately
+    const viewElement = document.querySelector(
+      `.view-chip[data-id="${buildId}"] .view-count`
+    );
+    if (viewElement) {
+      viewElement.textContent = parseInt(viewElement.textContent) + 1;
+    }
+
+    console.log(`👀 View count updated for Build ID: ${buildId}`);
+  } catch (error) {
+    console.error("❌ Error updating view count:", error);
+  }
 }
 
 communityBuilds.forEach((build) => {

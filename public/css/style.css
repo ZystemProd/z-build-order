@@ -2366,7 +2366,7 @@ td {
 /* Each build entry */
 .build-entry {
   display: flex;
-  flex-direction: column;
+  align-items: center; /* ✅ Aligns image and content */
   padding: 12px;
   background-color: #2c2c2c;
   border-bottom: 1px solid #444;
@@ -2374,6 +2374,27 @@ td {
   color: white;
   cursor: pointer; /* ✅ Make div clickable */
   transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+/* ✅ Left section - Matchup image */
+.build-left {
+  flex-shrink: 0; /* Prevents image from shrinking */
+  margin-right: 12px; /* Space between image and text */
+}
+
+/* ✅ Right section - Text content */
+.build-right {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.matchup-icon {
+  width: 40px; /* ✅ Adjust as needed */
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #888; /* ✅ Add border for better visibility */
 }
 
 /* Hover effect */
@@ -2387,6 +2408,7 @@ td {
   font-weight: bold;
   font-size: 18px;
   margin-bottom: 5px;
+  color: #dd5252;
 }
 
 /* Metadata row */
@@ -2407,6 +2429,19 @@ td {
   padding: 4px 10px;
   border-radius: 12px;
   font-size: 14px;
+}
+
+/* Unique style for Publisher meta-chip */
+.meta-chip.publisher-chip {
+  background-color: #543535 !important; /* Unique background color */
+  color: #dd5252 !important; /* Ensuring text stays visible */
+}
+
+/* ✅ Matchup chip (Custom Styling) */
+.meta-chip.matchup-chip {
+  background-color: #444 !important;
+  color: #ffcc00 !important;
+  font-weight: bold;
 }
 
 /* Vote info */
