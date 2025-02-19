@@ -18,10 +18,29 @@
         <p><strong>Publisher:</strong> <span id="buildPublisher"></span></p>
         <p><strong>Date Published:</strong> <span id="buildDate"></span></p>
       </div>
+
+      <!-- ✅ Voting System -->
+      <div class="vote-container">
+        <button class="vote-button" id="voteUp">
+          <img src="./img/SVG/vote-up.svg" alt="Upvote" />
+        </button>
+        <span class="vote-info">
+          <span id="votePercentage">0%</span>
+          <span id="voteCount">0 votes</span>
+        </span>
+        <button class="vote-button" id="voteDown">
+          <img src="./img/SVG/vote-down.svg" alt="Downvote" />
+        </button>
+      </div>
+
+      <!-- ✅ Import Button -->
+      <button id="importButton" class="import-button">📥 Import Build</button>
+
       <div class="build-order-container">
         <h3>Build Order</h3>
         <div id="buildOrder" class="build-output"></div>
       </div>
+
       <button class="back-button" onclick="window.history.back()">
         ⬅ Go Back
       </button>
