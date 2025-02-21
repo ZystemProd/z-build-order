@@ -1,4 +1,11 @@
-import { auth } from "../../app.js";
+import {
+  getFirestore,
+  doc,
+  getDoc,
+  setDoc,
+  collection,
+} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+import { auth, db } from "../../app.js";
 import { saveCurrentBuild } from "./buildManagement.js";
 import { initializeAutoCorrect } from "./autoCorrect.js";
 import { populateBuildDetails, analyzeBuildOrder } from "./uiHandlers.js";
@@ -425,4 +432,67 @@ document.addEventListener("DOMContentLoaded", function () {
       console.log("📌 Template menu closed.");
     }
   });
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  // ✅ Check if we are on the `viewBuild.html` page before adding event listeners
+  if (!window.location.pathname.includes("viewBuild.html")) {
+    return; // Stop execution if not on the correct page
+  }
+
+  const importButton = document.getElementById("importBuildButton");
+  const urlParams = new URLSearchParams(window.location.search);
+  const buildId = urlParams.get("id");
+
+  if (!buildId) {
+    console.error("❌ No build ID found in URL.");
+    return;
+  }
+
+  if (importButton) {
+    // ✅ Remove existing event listeners before adding a new one
+    importButton.replaceWith(importButton.cloneNode(true));
+    const newImportButton = document.getElementById("importBuildButton");
+
+    newImportButton.addEventListener("click", async () => {
+      console.log("📥 Import Button Clicked - Build ID:", buildId);
+
+      if (!auth.currentUser) {
+        alert("You must be signed in to import builds.");
+        return;
+      }
+
+      const userId = auth.currentUser.uid;
+      const communityBuildRef = doc(db, "communityBuilds", buildId);
+      const userBuildsRef = collection(db, `users/${userId}/builds`);
+
+      try {
+        const buildDoc = await getDoc(communityBuildRef);
+        if (!buildDoc.exists()) {
+          console.error("❌ Build not found in community builds.");
+          alert("Build not found.");
+          return;
+        }
+
+        const buildData = buildDoc.data();
+        const userBuildDocRef = doc(userBuildsRef, buildData.title);
+
+        await setDoc(userBuildDocRef, {
+          ...buildData,
+          publisher: buildData.username || buildData.publisher || "Unknown",
+          imported: true,
+          timestamp: Date.now(),
+        });
+
+        console.log("✅ Build imported successfully!", buildData);
+        alert("Build successfully imported!");
+        populateBuildsModal(); // ✅ Refresh user's builds
+      } catch (error) {
+        console.error("❌ Error importing build:", error);
+        alert("Failed to import build. Please try again.");
+      }
+    });
+  } else {
+    console.warn("⚠ Import button not found.");
+  }
 });

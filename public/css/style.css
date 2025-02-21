@@ -2076,6 +2076,28 @@ td {
 }
 
 /* Custom scrollbar styling */
+#buildOrder::-webkit-scrollbar {
+  width: 16px; /* Adjust scrollbar width */
+}
+
+#buildOrder::-webkit-scrollbar-thumb {
+  background: #444; /* Darker color for scrollbar thumb */
+  border-radius: 4px;
+  border: 2px solid #222; /* Border to blend with background */
+}
+
+#buildOrder::-webkit-scrollbar-track {
+  background: #222; /* Background of scrollbar */
+  border-radius: 4px;
+}
+
+/* Optional: Scrollbar hover effect */
+#buildOrder::-webkit-scrollbar-thumb:hover {
+  background: #666; /* Lighter color on hover */
+  cursor: pointer;
+}
+
+/* Custom scrollbar styling */
 #buildPreview::-webkit-scrollbar {
   width: 8px; /* Adjust scrollbar width */
 }

@@ -84,10 +84,13 @@ function matchActorsWithTrie(actionText, actorTrie) {
     let end = i;
     let previousWord = i > 0 ? words[i - 1] : null;
 
+    // Loop through words to find a match, stripping punctuation for lookup
     for (let j = i; j < words.length; j++) {
-      const word = words[j].toLowerCase();
-      if (currentNode.children[word]) {
-        currentNode = currentNode.children[word];
+      const originalWord = words[j];
+      // Remove trailing punctuation for the lookup
+      const cleanWord = originalWord.replace(/[.,;!?]+$/, "").toLowerCase();
+      if (currentNode.children[cleanWord]) {
+        currentNode = currentNode.children[cleanWord];
         if (currentNode.isActor) {
           match = currentNode.actorData;
           end = j;
@@ -105,7 +108,7 @@ function matchActorsWithTrie(actionText, actorTrie) {
 
       if (category === "unit") {
         imageSrc = unitImages[key];
-        cssClass = determineUnitClass(term); // Determine the CSS class based on the race
+        cssClass = determineUnitClass(term);
       } else if (category === "structure") {
         imageSrc = structureImages[key];
         cssClass = "bold-yellow";
@@ -123,7 +126,7 @@ function matchActorsWithTrie(actionText, actorTrie) {
         cssClass = "pos-image";
       }
 
-      // Include previous word for resource category
+      // Format the matched term
       const formattedTerm = formatMatchedTerm(
         term,
         imageSrc,
@@ -132,12 +135,17 @@ function matchActorsWithTrie(actionText, actorTrie) {
         category === "resource" ? previousWord : null
       );
 
-      // Replace the previous word if it's a number and the current match is a resource
+      // Retrieve any punctuation from the last word and append it
+      let lastOriginalWord = words[end];
+      let cleanLastWord = lastOriginalWord.replace(/[.,;!?]+$/, "");
+      let punctuation = lastOriginalWord.slice(cleanLastWord.length);
+
+      // Remove previous word if it's a number for resource category
       if (category === "resource" && !isNaN(previousWord)) {
         result.pop();
       }
 
-      result.push(formattedTerm);
+      result.push(formattedTerm + punctuation);
       i = end + 1;
     } else {
       result.push(words[i]);
