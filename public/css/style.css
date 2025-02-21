@@ -2435,12 +2435,6 @@ td {
 .meta-chip.publisher-chip {
   background-color: #543535 !important; /* Unique background color */
   color: #dd5252 !important; /* Ensuring text stays visible */
-  max-width: 200px; /* Adjust based on your design */
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: inline-block;
-  vertical-align: middle;
 }
 
 /* ✅ Matchup chip (Custom Styling) */
