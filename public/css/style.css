@@ -1288,7 +1288,13 @@ textarea::-webkit-scrollbar-thumb:hover {
   border-right: 3px solid rgb(0, 153, 255);
 }
 
-.pos-image {
+.done-underline {
+  text-decoration: underline;
+  text-decoration-color: #75FB4C;
+  text-underline-offset: 4px;
+}
+
+.pos-image, .inline-icon {
   width: 30px;
   height: 30px;
   vertical-align: middle;
