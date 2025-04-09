@@ -1291,8 +1291,21 @@ textarea::-webkit-scrollbar-thumb:hover {
 .done-underline {
   text-decoration: underline;
   text-decoration-color: #75FB4C;
-  text-underline-offset: 4px;
+  text-underline-offset: 2px;
 }
+
+.producing-underline {
+  text-decoration: underline;
+  text-decoration-color: #F19E39;
+  text-underline-offset: 2px;
+}
+
+.producing-percent {
+  color: #F19E39;
+  font-weight: bold;
+  margin-right: 4px;
+}
+
 
 .pos-image, .inline-icon {
   width: 30px;
