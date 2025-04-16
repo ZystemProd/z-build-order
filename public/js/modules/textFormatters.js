@@ -213,9 +213,11 @@ function determineUnitClass(unitName) {
 function preprocessAbbreviations(actionText) {
   if (!actionText || typeof actionText !== "string") return ""; // Ensure input is valid
 
-  Object.entries(abbreviationMap).forEach(([abbr, full]) => {
-    const regex = new RegExp(`\\b${abbr}\\b`, "gi");
-    actionText = actionText.replace(regex, full);
+  Object.values(abbreviationMap).forEach((category) => {
+    Object.entries(category).forEach(([abbr, full]) => {
+      const regex = new RegExp(`\\b${abbr}\\b`, "gi");
+      actionText = actionText.replace(regex, full);
+    });
   });
 
   return actionText;

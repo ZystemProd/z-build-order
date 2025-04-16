@@ -25,6 +25,7 @@ import {
 import {
   initializeSectionToggles,
   initializeTextareaClickHandler,
+  showBuildOrderHelpModal,
 } from "./uiHandlers.js";
 import {
   showTemplatesModal,
@@ -494,5 +495,25 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   } else {
     console.warn("⚠ Import button not found.");
+  }
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  const helpBtn = document.getElementById("buildOrderHelpBtn");
+  const closeBtn = document.getElementById("closeBuildOrderHelpModal");
+  const helpModal = document.getElementById("buildOrderHelpModal");
+
+  if (helpBtn && closeBtn && helpModal) {
+    helpBtn.addEventListener("click", showBuildOrderHelpModal);
+
+    closeBtn.addEventListener("click", () => {
+      helpModal.style.display = "none";
+    });
+
+    window.addEventListener("click", (e) => {
+      if (e.target === helpModal) {
+        helpModal.style.display = "none";
+      }
+    });
   }
 });

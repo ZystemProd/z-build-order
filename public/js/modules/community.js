@@ -120,10 +120,6 @@ export async function populateCommunityBuilds() {
         showBuildPreview(build);
       });
 
-      buildEntry.addEventListener("mouseleave", () => {
-        clearBuildPreview();
-      });
-
       buildEntry.innerHTML = `
         <div class="build-left">
           <img src="${matchupImage}" alt="${build.matchup}" class="matchup-icon">

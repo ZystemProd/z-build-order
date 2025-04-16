@@ -5,6 +5,7 @@ import {
   formatActionText,
   formatWorkersOrTimestampText,
 } from "./textFormatters.js";
+import { abbreviationMap } from "../data/abbreviationMap.js";
 
 // Function to toggle the title input field
 export function toggleTitleInput(showInput) {
@@ -296,4 +297,160 @@ function refreshBuildList(lastViewedBuild) {
     // Optionally, reload the entire build list if needed
     populateBuildList(savedBuilds);
   }
+}
+
+// Helper text examples
+function createExample(example) {
+  let formattedHTML;
+
+  // Handle the special case for Time/Worker Supply Format
+  if (example.title === "Time/Worker Supply Format") {
+    const timeInput = example.inputTime || ""; // Default to empty string if undefined
+    const supplyInput = example.inputSupply || ""; // Default to empty string if undefined
+
+    // Extract only the time or supply number (remove any additional text)
+    const cleanedTime = timeInput.match(/\[(\d{1,2}:\d{2}|\d+)\]/)?.[1] || ""; // Extracts the time or supply number without the brackets
+    const cleanedSupply = supplyInput.match(/\[(\d+)\]/)?.[1] || ""; // Extracts only the number, not the action name
+
+    // Create the formatted HTML table
+    formattedHTML = `
+      <table class="buildOrderTable">
+        <thead>
+          <tr>
+            <th>Supply/Time</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>${cleanedTime}</td>
+            <td>${formatActionText(example.actionTime)}</td>
+          </tr>
+          <tr>
+            <td>${cleanedSupply}</td>
+            <td>${formatActionText(example.actionSupply)}</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+  } else {
+    // Default handling for other examples
+    formattedHTML = formatActionText(example.input || ""); // Ensure input is always defined
+  }
+
+  // Return the complete example block with subtitle and description
+  return `
+  <div class="example-block">
+    <h4 class="example-subtitle">${example.title}</h4>
+    <div class="example-flex">
+      <div class="example-left">
+        <p><strong>Input:</strong></p>
+        <pre class="example-input">
+${example.input || `${example.inputTime || ""}\n${example.inputSupply || ""}`}
+        </pre>
+        <p><strong>Output:</strong></p>
+        <div class="formatted-preview">${formattedHTML}</div>
+      </div>
+      <div class="example-right">
+        <p class="example-description"><em>${example.description}</em></p>
+      </div>
+    </div>
+  </div>
+  <hr />
+`;
+}
+
+// Function to generate abbreviation sections for structures, units, and upgrades
+function generateAbbrSection(title, abbrObj) {
+  return `
+    <h5>${title}</h5>
+    <div class="abbreviation-list">
+      ${Object.entries(abbrObj)
+        .map(([abbr, full]) => {
+          const formatted = formatActionText(full);
+          return `
+            <div class="abbr-row">
+              <div class="abbr-left"><code>${abbr}</code></div>
+              <div class="arrow"></div>
+              <div class="abbr-right">${formatted}</div>
+            </div>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
+export function showBuildOrderHelpModal() {
+  const modal = document.getElementById("buildOrderHelpModal");
+  const contentDiv = document.getElementById("buildOrderHelpContent");
+
+  const examples = [
+    {
+      title: "Time/Worker Supply Format",
+      inputTime: "[01:10] Overlord",
+      inputSupply: "[24] Hatchery",
+      actionTime: "overlord",
+      actionSupply: "hatchery",
+      description:
+        "This format showcases two types: one for time-based actions (e.g., [01:10] for timestamp) and one for supply-based actions (e.g., [24] for worker supply).",
+    },
+    {
+      title: "Completed Upgrade with Percent",
+      input: "@100% stim push opponent third base",
+      description:
+        "Using <code><u>@100%</u>, <u>@100</u> or <u>100%</u></code> marks the action as fully completed and visually emphasizes the upgrade status.",
+    },
+    {
+      title: "Progress Indicator",
+      input: "75% hatchery",
+      description:
+        "Typing <code>75%</code> before a structure or unit marks it as partially built or in progress.",
+    },
+    {
+      title: "Resource Cost Notation",
+      input: "100 gas, 150 minerals",
+      description:
+        "Typing gas or mineral amounts will format them into icons and place them next to the build action.",
+    },
+    {
+      title: "Map Position Markers",
+      input: "Make hatchery at pos1 then attack at pos2",
+      description: `
+      <code>pos1</code> – <code>pos9</code> markers highlight positions on the map for clarity or expansion order.<br><br>
+      You can place these markers interactively using the map found in the <strong>"Additional Settings"</strong> section.<br><br>
+      • Click once on the map to place a position marker.<br>
+      • Click and hold, then release at a different location to draw an arrow between the two points.<br>
+      • To erase a marker or arrow, simply click on it again.<br><br>
+      <img src="./img/info/minimap-positions (1).webp" alt="Minimap Example" class="example-image">
+    `,
+    },
+  ];
+
+  const manualHTML = ` 
+    <p>You can enter build steps like this:</p>
+    <ul>
+      <li><strong>Supply/Time Column:</strong> Writing inside brackets like <code>[12]</code> or <code>[01:23]</code> will show up in the left column.</li>
+      <li><strong>Quick Typing:</strong> Pressing <kbd>Enter</kbd> while inside brackets automatically moves the cursor outside for faster typing.</li>
+      <li><strong>Abbreviations:</strong> Short forms like <code>RW</code> or <code>cc</code> are automatically expanded to their full terms.</li>
+      <li><strong>Done Formatting:</strong> Writing <code>100%</code>, <code>@100%</code>, or <code>@100</code> will format the next action to show it’s completed.</li>
+      <li><strong>Progress Formatting:</strong> Typing <code>40%</code> (or any percent) will format the next action as being in progress.</li>
+      <li><strong>Map Markers:</strong> Writing <code>pos1</code> to <code>pos9</code> inserts indicators to highlight locations on the map (like expansion order).</li>
+      <li><strong>Resources:</strong> Writing <code>100 gas</code> or <code>150 minerals</code> will format and show icons. The number can be anything.</li>
+    </ul>
+  `;
+
+  const abbreviationGridHTML = ` 
+    <h4>Abbreviations Reference:</h4>
+    ${generateAbbrSection("Structures", abbreviationMap.Structures)}
+    ${generateAbbrSection("Units", abbreviationMap.Units)}
+    ${generateAbbrSection("Upgrades", abbreviationMap.Upgrades)}
+        <hr />
+    <h4>Examples:</h4>
+  `;
+
+  contentDiv.innerHTML =
+    manualHTML + abbreviationGridHTML + examples.map(createExample).join("");
+
+  modal.style.display = "block";
 }

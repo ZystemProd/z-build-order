@@ -75,11 +75,25 @@
           </div>
           
         </div>
+
+        <!-- Modal for Build Order Help -->
+        <div id="buildOrderHelpModal" class="modal">
+          <div class="modal-content">
+            <span class="close-modal" id="closeBuildOrderHelpModal">&times;</span>
+            <h3>Build Order Input Help</h3>
+            <div id="buildOrderHelpContent"></div>
+          </div>
+        </div>
+
+        
+
         <!-- Build Order Input Section with Toggle -->
-        <h3 data-section="buildOrderInputField" class="toggle-title">
-          <span id="buildOrderInputArrow" class="arrow open"></span> Build Order
-          Input
-        </h3>
+        <div class="toggle-header">
+          <h3 data-section="buildOrderInputField" class="toggle-title">
+            <span id="buildOrderInputArrow" class="arrow open"></span> Build Order Input
+          </h3>
+          <button id="buildOrderHelpBtn" class="help-circle animated-help" title="Help">?</button>
+        </div>
         <div
           id="buildOrderInputField"
           class="hideable-section"
