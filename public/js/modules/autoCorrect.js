@@ -135,7 +135,7 @@ export function initializeAutoCorrect() {
     const textAfterCaret = text.substring(cursorPosition);
 
     // 1️⃣ Check if cursor is inside brackets `[13|]` or `[4:00|]`
-    const insideBracketsMatch = textBeforeCaret.match(/\[(\d*:?[\d]*)$/); // ✅ Now detects `[4:00]` too
+    const insideBracketsMatch = textBeforeCaret.match(/\[([\d/:]*)$/);
 
     if (insideBracketsMatch) {
       // ✅ Move cursor **right after `]`**
@@ -146,7 +146,7 @@ export function initializeAutoCorrect() {
     }
 
     // 2️⃣ Check if cursor is **right after** brackets `[13]|` or `[4:00]|`
-    const afterBracketsMatch = textBeforeCaret.match(/\[\d*:?[\d]*\]$/); // ✅ Now detects `[4:00]`
+    const afterBracketsMatch = textBeforeCaret.match(/\[[\d/:]*\]$/);
 
     if (afterBracketsMatch) {
       // ✅ Create a **new row** and move cursor inside `[|]`

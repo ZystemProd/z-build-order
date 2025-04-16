@@ -191,7 +191,22 @@ function matchActorsWithTrie(actionText, actorTrie) {
         orangeUnderlineNextWord = true;
         i++;
       } else {
-        result.push(words[i]);
+        // Check if the word matches supply pattern like [15/14]
+        const supplyMatch = rawWord.match(/^\[(\d{1,3})\/(\d{1,3})\]$/);
+
+        if (supplyMatch) {
+          const current = parseInt(supplyMatch[1], 10);
+          const max = parseInt(supplyMatch[2], 10);
+
+          const supplyClass =
+            current > max ? "supply-overcap" : "supply-normal";
+
+          result.push(
+            `<span class="${supplyClass}">[${current}/${max}]</span>${punctuation}`
+          );
+        } else {
+          result.push(rawWord);
+        }
         i++;
       }
     }
@@ -251,18 +266,35 @@ export function formatActionText(actionText) {
 }
 
 export function formatWorkersOrTimestampText(workersOrTimestamp) {
-  const resourceData = [
+  if (!workersOrTimestamp) return "-";
+
+  // Match optional brackets around the supply like [15/14] or 15/14
+  const supplyMatch = workersOrTimestamp.match(
+    /^(\[)?(\d{1,3})\/(\d{1,3})(\])?$/
+  );
+  if (supplyMatch) {
+    const openBracket = supplyMatch[1] || "";
+    const current = parseInt(supplyMatch[2], 10);
+    const max = parseInt(supplyMatch[3], 10);
+    const closeBracket = supplyMatch[4] || "";
+
+    const currentStyled =
+      current > max
+        ? `<span class="supply-overcap">${current}</span>`
+        : `${current}`;
+
+    return `${openBracket}${currentStyled}/${max}${closeBracket}`;
+  }
+
+  // Handle resources
+  const actorData = [
     { term: "minerals", category: "resource" },
     { term: "gas", category: "resource" },
   ];
+  const actorTrie = buildActorTrie(actorData);
 
-  const resourceTrie = buildActorTrie(resourceData);
-
-  // Preprocess abbreviations if necessary
   workersOrTimestamp = preprocessAbbreviations(workersOrTimestamp);
-
-  // Match resources with the Trie
-  workersOrTimestamp = matchActorsWithTrie(workersOrTimestamp, resourceTrie);
+  workersOrTimestamp = matchActorsWithTrie(workersOrTimestamp, actorTrie);
 
   return workersOrTimestamp;
 }

@@ -5,8 +5,9 @@ const predefinedTemplates = [
     title: "15/15/15 no gas",
     category: "zerg",
     image: "img/race/zerg.webp",
-    data: "[12] Overlord\n[14] Spawning Pool\n[16] Zergling Rush",
+    data: "[15/14] hatchery\n[15/14] overlord\n[15/14] spawning pool\n[20] 2 queen\n[24] zergling\n[27] overlord\n[28] hatchery",
   },
+
   {
     title: "2-1-1",
     category: "terran",
@@ -36,7 +37,7 @@ const predefinedTemplates = [
     title: "16 hatch",
     category: "zerg",
     image: "img/race/zerg.webp",
-    data: "[12] Overlord\n[14] Spawning Pool\n[16] Zergling Rush",
+    data: "[15/14] Overlord\n[16] Hatchery\n[18] extractor\n[17] Spawning Pool",
   },
   {
     title: "7",

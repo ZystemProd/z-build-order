@@ -130,9 +130,7 @@ export function displayBuildOrder(buildOrder) {
 
     // Validate step data before formatting
     const workersOrTimestamp = step.workersOrTimestamp
-      ? DOMPurify.sanitize(
-          formatWorkersOrTimestampText(step.workersOrTimestamp)
-        )
+      ? formatWorkersOrTimestampText(step.workersOrTimestamp)
       : "-";
 
     const actionText = step.action
@@ -140,6 +138,7 @@ export function displayBuildOrder(buildOrder) {
       : "Unknown Action"; // Prevents errors
 
     // Insert formatted data into table
+    console.log(workersOrTimestamp);
     row.insertCell(0).innerHTML = workersOrTimestamp;
     row.insertCell(1).innerHTML = actionText;
   });
@@ -198,7 +197,8 @@ export function analyzeBuildOrder(inputText) {
       actionText = formatActionText(actionText);
 
       const row = table.insertRow();
-      row.insertCell(0).innerHTML = DOMPurify.sanitize(workersOrTimestamp);
+      row.insertCell(0).innerHTML =
+        formatWorkersOrTimestampText(workersOrTimestamp);
       row.insertCell(1).innerHTML = DOMPurify.sanitize(actionText);
     });
   });

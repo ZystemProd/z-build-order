@@ -2727,6 +2727,15 @@ td {
   margin-right: auto;
 }
 
+.supply-overcap {
+  color: red;
+  font-weight: bold;
+}
+
+.supply-normal {
+  color: inherit;
+}
+
 @media screen and (max-width: 768px) {
   html #content {
     width: 100%;
