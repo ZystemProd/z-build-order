@@ -171,7 +171,7 @@
             Save Build
           </button>
           <button id="showBuildsButton" onclick="showBuildsModal()" disabled>
-            <img src="img/SVG/library.svg" alt="Library Icon" class="svg-icon" >My Builds</button>
+            <img src="img/SVG/library.svg" alt="Library Icon" class="svg-icon" > My Builds</button>
           <button id="publishBuildButton" class="btn publish-btn" style="display: none;">Publish Build</button>
         </div>
         <button id="showCommunityModalButton" class="btn" disabled>
@@ -373,37 +373,67 @@
         </div>
       </div>
 
-      <!-- Community Modal -->
-      <div id="communityModal" class="modal">
-        <div class="modal-content-template">
-          <div class="template-header">
-            <span class="close-modal" id="closeCommunityModal">&times;</span>
-            <h3>Community Builds</h3>
-            <div id="communityHeaderControls" class="header-controls">
-              <input
-                id="communitySearchBar"
-                type="text"
-                placeholder="Search community builds..."
-                class="search-bar"
-              />
+
+<!-- Community Modal -->
+<div id="communityModal" class="modal">
+  <div class="modal-content-template">
+    <div class="template-header">
+      <span class="close-modal" id="closeCommunityModal">&times;</span>
+      <h3>Community Builds</h3>
+      <div id="communityHeaderControls" class="header-controls">
+        <input
+          id="communitySearchBar"
+          type="text"
+          placeholder="Search community builds..."
+          class="search-bar"
+        />
+
+        <div class="filters-container">
+          <div class="filter-category" data-category="all">
+            All
+          </div>
+          <div class="filter-category" data-category="Zerg">
+            Zerg
+            <div class="submenu">
+              <div class="subcategory" data-subcategory="ZvZ">ZvZ</div>
+              <div class="subcategory" data-subcategory="ZvP">ZvP</div>
+              <div class="subcategory" data-subcategory="ZvT">ZvT</div>
             </div>
           </div>
-          <div class="template-content-container">
-            <div class="community-layout">
-              <!-- Build Preview Panel -->
-              <div id="communityBuildPreview" class="build-preview">
-                <h4>Build Preview</h4>
-                <p>Hover over a build to preview details.</p>
-              </div>
-
-              <!-- Community Builds List -->
-              <div id="communityBuildsContainer" class="community-list">
-                <!-- Dynamic builds will be added here via JavaScript -->
-              </div>
+          <div class="filter-category" data-category="Protoss">
+            Protoss
+            <div class="submenu">
+              <div class="subcategory" data-subcategory="PvZ">PvZ</div>
+              <div class="subcategory" data-subcategory="PvP">PvP</div>
+              <div class="subcategory" data-subcategory="PvT">PvT</div>
+            </div>
+          </div>
+          <div class="filter-category" data-category="Terran">
+            Terran
+            <div class="submenu">
+              <div class="subcategory" data-subcategory="TvZ">TvZ</div>
+              <div class="subcategory" data-subcategory="TvP">TvP</div>
+              <div class="subcategory" data-subcategory="TvT">TvT</div>
             </div>
           </div>
         </div>
       </div>
+    </div>
+    <div class="template-content-container">
+      <div class="community-layout"> <!-- Re-added community-layout class -->
+        <div id="communityBuildPreview" class="build-preview">
+          <h4>Build Preview</h4>
+          <p>Hover over a build to preview details.</p>
+        </div>
+
+        <div id="communityBuildsContainer" class="community-list">
+          <!-- Dynamic builds will be added here via JavaScript -->
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 
 
       <!-- Modal for delete notification -->

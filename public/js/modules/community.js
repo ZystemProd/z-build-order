@@ -354,6 +354,35 @@ function initializeCommunityBuildEvents() {
   });
 }
 
+function filterCommunityBuilds(query) {
+  const container = document.getElementById("communityBuildsContainer");
+  const allBuilds = container.getElementsByClassName("build-entry");
+
+  // Loop through all build entries and hide those that don't match the search query
+  Array.from(allBuilds).forEach((buildEntry) => {
+    const title = buildEntry
+      .querySelector(".build-title")
+      .textContent.toLowerCase();
+    const matchup = buildEntry
+      .querySelector(".meta-chip.matchup-chip")
+      .textContent.toLowerCase();
+
+    // Show the build if the title or matchup matches the query, else hide it
+    if (title.includes(query) || matchup.includes(query)) {
+      buildEntry.style.display = "flex";
+    } else {
+      buildEntry.style.display = "none";
+    }
+  });
+}
+
+document
+  .getElementById("communitySearchBar")
+  .addEventListener("input", function () {
+    const query = this.value.toLowerCase();
+    filterCommunityBuilds(query);
+  });
+
 // ✅ Update Vote Button Icons After Voting
 function updateVoteButtonIcons(buildId) {
   const upvoteButton = document.querySelector(`.vote-up[data-id="${buildId}"]`);

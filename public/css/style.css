@@ -4,8 +4,10 @@ body {
   color: #e0e0e0; /* Light text color */
   font-family: "Roboto", sans-serif;
   font-size: 16px; /* Increase base font size */
-  line-height: 1.8; /* Better line height for text */
+  line-height: 1.5; /* Better line height for text */
   overflow-y: scroll; /* Show vertical scrollbar */
+  overflow-x: hidden;
+  min-height: 100%;
 }
 html,
 body {
@@ -19,12 +21,17 @@ body {
 }
 
 #content {
-  flex: 1; /* Fills available space, pushing the footer down when content grows */
+  flex: 1;
   margin: 0 auto;
-  width: 60%;
+  width: 90%;
   max-width: 1200px;
-  min-width: 768px;
-  padding-bottom: 60px; /* Adjust to match the footer height */
+  padding-bottom: 60px;
+}
+
+@media (min-width: 768px) {
+  #content {
+    width: 75%;
+  }
 }
 
 *,
@@ -421,6 +428,14 @@ button:hover {
   text-overflow: ellipsis;
 }
 
+@media (max-width: 877px) {
+  #buildOrderTitleText {
+    text-align: center;
+    font-size: 1em;
+    line-height: normal;
+  }
+}
+
 #buildOrderTitleText.dimmed {
   color: #888888; /* Dimmed color */
 }
@@ -578,30 +593,6 @@ button:hover {
   border: none;
   display: none; /* Hidden initially */
   margin-top: 10px;
-}
-
-@media screen and (max-width: 700px) {
-  .upperInput {
-    max-width: 100%;
-    padding-left: 10px;
-    padding-right: 10px;
-  }
-
-  .buildOrderOutput {
-    max-width: 100%;
-    margin-left: 10px;
-    margin-right: 10px;
-  }
-
-  textarea,
-  input {
-    font-size: 1.2em; /* Make text areas and inputs more readable on small screens */
-  }
-
-  button,
-  .custom-file-input {
-    padding: 12px 18px; /* Larger button padding on smaller screens */
-  }
 }
 
 button {
@@ -1638,41 +1629,8 @@ textarea::-webkit-scrollbar-thumb:hover {
   border-radius: 5px;
 }
 
-@media screen and (max-width: 768px) {
-  html #content {
-    width: 100%;
-    padding: 30px;
-    margin: 0;
-  }
-  .footer {
-    font-size: 12px; /* Slightly smaller text for small screens */
-    padding: 8px 0;
-  }
-  .main-layout {
-    display: flex;
-    flex-direction: column; /* Stack elements vertically */
-    gap: 20px; /* Add spacing between sections */
-  }
-  .second-row {
-    flex-direction: column; /* Stack the second row vertically */
-    align-items: stretch; /* Ensure elements take full width */
-    gap: 20px; /* Add spacing between elements */
-  }
-  #map-preview-container {
-    max-width: 100%; /* Full width */
-    width: 100%; /* Ensure it scales with the parent */
-  }
-
-  #buildOrderTitleText span {
-    font-size: 5px;
-  }
-  #map-container {
-    margin: auto;
-  }
-}
-
 @media screen and (max-width: 425px) {
-  .content {
+  #content {
     margin: 0 auto;
     width: 100%;
     padding-left: 5px;
@@ -1682,7 +1640,7 @@ textarea::-webkit-scrollbar-thumb:hover {
 }
 
 @media screen and (max-width: 1024px) {
-  .content {
+  #content {
     margin: 0 auto;
     width: 90%; /* Slightly narrower width for better readability */
     padding-left: 15px;
@@ -2253,24 +2211,33 @@ td {
   transform: scale(1.1); /* Slight animation effect */
 }
 
+.footer {
+  position: relative;
+  bottom: 0px;
+  text-align: center;
+  background-color: #151515;
+  color: #fff;
+  padding: 10px 20px;
+  width: 100vw;
+  left: 0px;
+}
+
+.footer img {
+  position: absolute; /* Position the logo independently */
+  max-width: 50px; /* Adjust the logo size */
+  height: auto;
+}
+
+.footer p {
+  margin: 0;
+}
+
 /* Left side with links */
 .footer-left {
   position: absolute;
   left: 20px; /* matches the horizontal padding */
   top: 50%;
   transform: translateY(-50%);
-}
-
-/* Common link styling */
-#legalNoticeLink,
-#discordLink {
-  color: #ffcc00;
-  text-decoration: none;
-}
-
-#legalNoticeLink:hover,
-#discordLink:hover {
-  text-decoration: underline;
 }
 
 /* Centered site-info */
@@ -2289,6 +2256,18 @@ td {
 .footer-right img {
   max-width: 50px; /* Adjust as needed */
   height: auto;
+}
+
+/* Common link styling */
+#legalNoticeLink,
+#discordLink {
+  color: #ffcc00;
+  text-decoration: none;
+}
+
+#legalNoticeLink:hover,
+#discordLink:hover {
+  text-decoration: underline;
 }
 
 .notification {
@@ -2349,39 +2328,6 @@ td {
   max-width: 50px; /* Adjust as needed */
   height: auto;
   position: static; /* Override any absolute positioning */
-}
-
-/* Optional: responsive stacking on small screens */
-@media (max-width: 600px) {
-  .footer {
-    flex-direction: column;
-    text-align: center;
-  }
-  #site-info {
-    margin: 10px 0;
-  }
-  #site-logo {
-    margin-top: 5px;
-  }
-}
-
-.footer {
-  position: relative;
-  text-align: center;
-  background-color: #151515;
-  color: #fff;
-  padding: 10px 20px;
-  width: 100%;
-}
-
-.footer img {
-  position: absolute; /* Position the logo independently */
-  max-width: 50px; /* Adjust the logo size */
-  height: auto;
-}
-
-.footer p {
-  margin: 0;
 }
 
 .divider {
@@ -2781,6 +2727,75 @@ td {
   margin-right: auto;
 }
 
-.buildOrderHelpContent ul li {
-  line-height: 1.8;
+@media screen and (max-width: 768px) {
+  html #content {
+    width: 100%;
+    padding: 10px;
+    margin: 0;
+  }
+  .footer {
+    font-size: 12px; /* Slightly smaller text for small screens */
+    padding: 16px 10px;
+  }
+
+  #secondRow {
+    display: flex;
+    flex-direction: column; /* Stack elements vertically */
+    gap: 20px; /* Add spacing between sections */
+  }
+  .comment-video-container {
+    max-width: 100%;
+    width: 100%;
+  }
+  .second-row {
+    flex-direction: column; /* Stack the second row vertically */
+    align-items: stretch; /* Ensure elements take full width */
+    gap: 20px; /* Add spacing between elements */
+  }
+  #map-preview-container {
+    max-width: 100%; /* Full width */
+    width: 100%; /* Ensure it scales with the parent */
+  }
+
+  #buildOrderTitleText span {
+    font-size: 5px;
+  }
+  #map-container {
+    margin: auto;
+  }
+
+  .upperInput {
+    margin-top: 50px;
+  }
+
+  .community-layout {
+    grid-template-columns: 1fr; /* Stack the preview and builds list in one column */
+  }
+
+  #communityBuildPreview {
+    display: none !important; /* Hide the build preview on smaller screens */
+  }
+
+  /* Ensure hover does not override the hide on smaller screens */
+  #communityBuildPreview:hover {
+    display: none !important; /* Prevent hover from showing the preview */
+  }
+}
+
+@media screen and (max-width: 500px) {
+  .modal-content {
+    max-width: 100%;
+  }
+
+  #buildOrderHelpContent {
+    font-size: 10px;
+    padding: 10px;
+    max-height: none;
+    overflow-y: auto;
+    width: 100%;
+  }
+
+  .footer-left {
+    max-width: 100px;
+  }
 }
