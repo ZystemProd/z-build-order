@@ -2,23 +2,16 @@ import { analyzeBuildOrder } from "./uiHandlers.js";
 
 const predefinedTemplates = [
   {
-    title: "15/15/15 no gas",
+    title: "16 hatch",
+    category: "zerg",
+    image: "img/race/zerg.webp",
+    data: "[15/14] Overlord\n[16] Hatchery\n[18] extractor\n[17] Spawning Pool",
+  },
+  {
+    title: "15/15/15 gasless",
     category: "zerg",
     image: "img/race/zerg.webp",
     data: "[15/14] hatchery\n[15/14] overlord\n[15/14] spawning pool\n[20] 2 queen\n[24] zergling\n[27] overlord\n[28] hatchery",
-  },
-
-  {
-    title: "2-1-1",
-    category: "terran",
-    image: "img/race/terran.webp",
-    data: "[12] Supply Depot\n[13] Barracks\n[16] Marine Push",
-  },
-  {
-    title: "fast expand",
-    category: "protoss",
-    image: "img/race/protoss.webp",
-    data: "[13] Pylon\n[14] Gateway\n[16] Zealot Push",
   },
   {
     title: "14gas 14pool",
@@ -26,27 +19,26 @@ const predefinedTemplates = [
     image: "img/race/zerg.webp",
     data: "[12] Overlord\n[14] Spawning Pool\n[16] Zergling Rush",
   },
-
   {
-    title: "2 gate opener",
-    category: "protoss",
-    image: "img/race/protoss.webp",
-    data: "[13] Pylon\n[14] Gateway\n[16] Zealot Push",
-  },
-  {
-    title: "16 hatch",
-    category: "zerg",
-    image: "img/race/zerg.webp",
-    data: "[15/14] Overlord\n[16] Hatchery\n[18] extractor\n[17] Spawning Pool",
-  },
-  {
-    title: "7",
+    title: "Reaper Expand",
     category: "terran",
     image: "img/race/terran.webp",
-    data: "[12] Supply Depot\n[13] Barracks\n[16] Marine Push",
+    data: "[14] Supply Depot\n[16] Barracks\n[16] Refinery\n100% rax upgrade orbital command + 1 reaper",
   },
   {
-    title: "Cannon rush into void rays",
+    title: "Gate|Core|Nexus",
+    category: "protoss",
+    image: "img/race/protoss.webp",
+    data: "[14] Pylon\n[16] Gateway\n[17] Assimilator\n[20] Cybernetics Core\n[21] Nexus",
+  },
+  {
+    title: "Gate|Nexus|Core",
+    category: "protoss",
+    image: "img/race/protoss.webp",
+    data: "[14] Pylon\n[16] Gateway\n[17] Assimilator\n[20] Nexus\n[20] cybernetics core\n",
+  },
+  {
+    title: "2 gate opener",
     category: "protoss",
     image: "img/race/protoss.webp",
     data: "[13] Pylon\n[14] Gateway\n[16] Zealot Push",

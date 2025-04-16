@@ -16,6 +16,7 @@ import {
 import { fetchUserBuilds } from "./buildManagement.js";
 import { mapAnnotations } from "./interactive_map.js";
 import { formatActionText } from "./textFormatters.js";
+import { analyzeBuildOrder } from "./uiHandlers.js";
 
 function formatMatchup(matchup) {
   if (!matchup) return "Unknown Match-Up";
@@ -186,22 +187,31 @@ export function viewBuild(buildId) {
         // ✅ **Validate build order**
         const validBuildOrder = Array.isArray(build.buildOrder)
           ? build.buildOrder.filter(
-              (step) => step && step.workersOrTimestamp && step.action
+              (step) => step && (step.workersOrTimestamp || step.action)
             ) // Remove invalid steps
           : [];
 
-        // ✅ **Prevent undefined values in build order input**
+        // ✅ **Convert valid build order to a string format with empty brackets if needed**
+        const buildOrderText = build.buildOrder.length
+          ? build.buildOrder
+              .map((step) => {
+                const workersOrTimestamp = step.workersOrTimestamp
+                  ?.toString()
+                  .trim();
+                const action = step.action || "";
+                return `[${workersOrTimestamp || ""}] ${action}`.trim();
+              })
+              .join("\n")
+          : "No build order available.";
+
+        // ✅ **Populate the build order input field**
         const buildOrderInput = document.getElementById("buildOrderInput");
         if (buildOrderInput) {
-          buildOrderInput.value = validBuildOrder.length
-            ? validBuildOrder
-                .map((step) => `[${step.workersOrTimestamp}] ${step.action}`)
-                .join("\n")
-            : "No build order available."; // Default message if empty
+          buildOrderInput.value = buildOrderText;
         }
 
-        // ✅ **Pass only valid build steps to `displayBuildOrder()`**
-        displayBuildOrder(validBuildOrder);
+        // ✅ **Run the analyzeBuildOrder function to update the table**
+        analyzeBuildOrder(buildOrderInput.value);
 
         closeModal();
       } else {
@@ -211,28 +221,6 @@ export function viewBuild(buildId) {
     .catch((error) => {
       console.error("Error loading build:", error);
     });
-}
-
-// Helper to recreate missing elements
-function recreateInput(id) {
-  const input = document.createElement("input");
-  input.id = id;
-  document.body.appendChild(input); // Adjust this to append to the correct parent
-  return input;
-}
-
-function recreateText(id) {
-  const text = document.createElement("span");
-  text.id = id;
-  document.body.appendChild(text); // Adjust this to append to the correct parent
-  return text;
-}
-
-function recreateDropdown(id) {
-  const dropdown = document.createElement("select");
-  dropdown.id = id;
-  document.body.appendChild(dropdown); // Adjust this to append to the correct parent
-  return dropdown;
 }
 
 window.viewBuild = viewBuild;
@@ -436,33 +424,6 @@ function updateBuildPreview(build) {
       publisherName
     )}</p> <!-- ✅ Publisher correctly assigned -->
     <pre>${formattedBuildOrder}</pre>
-  `;
-}
-
-function clearBuildPreview() {
-  const buildPreview = document.getElementById("buildPreview");
-
-  if (!buildPreview) {
-    console.error("Build preview element not found.");
-    return;
-  }
-
-  buildPreview.innerHTML = "<p>Hover over a build to see its details here.</p>";
-}
-
-// Helper function to update the preview
-function updatePreview(build, buildPreview) {
-  buildPreview.innerHTML = `
-    <h4>${build.title}</h4>
-    <p>${build.comment || "No comments available."}</p>
-    <pre>${build.buildOrder
-      .map((step) => `[${step.workersOrTimestamp}] ${step.action}`)
-      .join("\n")}</pre>
-    ${
-      build.videoLink
-        ? `<iframe src="${build.videoLink}" frameborder="0" allowfullscreen></iframe>`
-        : ""
-    }
   `;
 }
 

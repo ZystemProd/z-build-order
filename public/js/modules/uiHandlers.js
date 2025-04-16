@@ -6,6 +6,7 @@ import {
   formatWorkersOrTimestampText,
 } from "./textFormatters.js";
 import { abbreviationMap } from "../data/abbreviationMap.js";
+import { parseBuildOrder } from "./utils.js";
 
 // Function to toggle the title input field
 export function toggleTitleInput(showInput) {
@@ -117,30 +118,41 @@ export function populateBuildDetails(index) {
 `;
 }
 
-export function displayBuildOrder(buildOrder) {
-  const table = document.getElementById("buildOrderTable");
+// Function to load and display build order
+export function displayBuildOrder(buildOrderText) {
+  const buildOrderInput = document.getElementById("buildOrderInput");
+  const tableBody = document.getElementById("buildOrderTable");
 
-  // Clear existing rows (except the header)
-  while (table.rows.length > 1) {
-    table.deleteRow(1);
+  // Clear the table first
+  tableBody.innerHTML = "";
+
+  // Ensure the text is present in the buildOrderInput
+  if (buildOrderInput) {
+    buildOrderInput.value = buildOrderText; // Put the build order text in the input field
   }
 
-  buildOrder.forEach((step) => {
-    const row = table.insertRow();
+  // Now, format the text from buildOrderInput into a table format
+  const steps = buildOrderText.split("\n").map((step) => {
+    const [timestamp, ...actionParts] = step.split(" ");
+    const action = actionParts.join(" ");
+    return { workersOrTimestamp: timestamp.replace(/[\[\]]/g, ""), action }; // Clean the timestamp
+  });
 
-    // Validate step data before formatting
-    const workersOrTimestamp = step.workersOrTimestamp
-      ? formatWorkersOrTimestampText(step.workersOrTimestamp)
-      : "-";
+  // Iterate over the steps and create table rows
+  steps.forEach((step) => {
+    const row = document.createElement("tr");
 
-    const actionText = step.action
-      ? DOMPurify.sanitize(formatActionText(step.action))
-      : "Unknown Action"; // Prevents errors
+    const workersOrTimestampCell = document.createElement("td");
+    workersOrTimestampCell.textContent = step.workersOrTimestamp || "-";
 
-    // Insert formatted data into table
-    console.log(workersOrTimestamp);
-    row.insertCell(0).innerHTML = workersOrTimestamp;
-    row.insertCell(1).innerHTML = actionText;
+    const actionCell = document.createElement("td");
+    actionCell.textContent = step.action || "-";
+
+    row.appendChild(workersOrTimestampCell);
+    row.appendChild(actionCell);
+
+    // Append the row to the table body
+    tableBody.appendChild(row);
   });
 }
 
@@ -188,6 +200,8 @@ export function analyzeBuildOrder(inputText) {
         workersOrTimestamp = match[1];
         actionText = match[2];
       } else {
+        // If no brackets, consider the entire line as the action text
+        workersOrTimestamp = "";
         actionText = line;
       }
 
@@ -197,12 +211,14 @@ export function analyzeBuildOrder(inputText) {
       actionText = formatActionText(actionText);
 
       const row = table.insertRow();
-      row.insertCell(0).innerHTML =
-        formatWorkersOrTimestampText(workersOrTimestamp);
+      row.insertCell(0).innerHTML = workersOrTimestamp
+        ? formatWorkersOrTimestampText(workersOrTimestamp)
+        : "-"; // Display '-' if no timestamp/worker info
       row.insertCell(1).innerHTML = DOMPurify.sanitize(actionText);
     });
   });
 }
+
 function highlightActiveTab(category) {
   document
     .querySelectorAll("#buildCategoryTabs button, #buildSubCategoryTabs button")

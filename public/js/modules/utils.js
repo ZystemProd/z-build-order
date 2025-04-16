@@ -1,13 +1,26 @@
 export function parseBuildOrder(buildOrderText) {
+  if (typeof buildOrderText !== "string") {
+    console.error(
+      "Expected buildOrderText to be a string, but got:",
+      typeof buildOrderText
+    );
+    return [];
+  }
+
+  // Proceed with parsing if it's a valid string
   return buildOrderText
     .split("\n")
     .map((line) => {
-      const match = line.match(/\[(.*?)\]\s*(.*)/);
-      return match
-        ? { workersOrTimestamp: match[1], action: match[2] }
-        : { workersOrTimestamp: "", action: line };
+      const match = line.match(/\[(\S+)\]\s*(.*)/); // Example: [01:00] Build structure
+      if (match) {
+        return {
+          workersOrTimestamp: match[1],
+          action: match[2],
+        };
+      }
+      return null; // Return null if no valid match
     })
-    .filter((step) => step.action.trim() !== ""); // Filter out empty lines
+    .filter((step) => step !== null); // Filter out invalid steps
 }
 
 export function resetBuildInputs() {

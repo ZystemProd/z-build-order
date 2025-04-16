@@ -212,19 +212,27 @@ function showBuildPreview(build) {
     return;
   }
 
-  // ✅ Format each build action properly using `formatActionText()`
   const formattedBuildOrder = Array.isArray(build.buildOrder)
     ? build.buildOrder
-        .map((step) => {
-          if (!step || !step.action || !step.workersOrTimestamp) return "";
-          return `<p><strong>[${
-            step.workersOrTimestamp
-          }]</strong> ${formatActionText(step.action)}</p>`;
+        .map((step, index) => {
+          if (!step || typeof step !== "object") {
+            console.warn("❗ Bad step format at index", index, step);
+            return `<p style="color:red;"><em>Malformed step at index ${index}</em></p>`;
+          }
+
+          const bracket = step.workersOrTimestamp || "";
+          const action = step.action || "";
+
+          // Skip completely empty lines
+          if (!bracket && !action) return "";
+
+          return `<p><strong>${
+            bracket ? `[${bracket}]` : ""
+          }</strong> ${formatActionText(action)}</p>`;
         })
         .join("")
     : "<p>No build order available.</p>";
 
-  // ✅ Inject formatted content
   communityBuildPreview.innerHTML = `
     <div class="preview-header">
       <h3>${build.title}</h3>
@@ -234,19 +242,7 @@ function showBuildPreview(build) {
     </div>
   `;
 
-  // ✅ Ensure the preview container is visible
   communityBuildPreview.style.display = "block";
-}
-
-// ✅ Clear Build Preview
-function clearBuildPreview() {
-  const communityBuildPreview = document.getElementById(
-    "communityBuildPreview"
-  );
-  if (communityBuildPreview) {
-    communityBuildPreview.innerHTML =
-      "<p>Hover over a build to preview details.</p>";
-  }
 }
 
 function initializeCommunityBuildEvents() {

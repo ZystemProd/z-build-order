@@ -54,21 +54,38 @@ async function loadBuild() {
 
     // ✅ Fixing Build Order Display
     const buildOrderContainer = document.getElementById("buildOrder");
+
+    // Check if buildOrderContainer is being selected correctly
+    if (!buildOrderContainer) {
+      console.error("❌ Error: 'buildOrder' container not found!");
+      return;
+    }
+
     buildOrderContainer.innerHTML = ""; // Clear previous content
 
     if (Array.isArray(build.buildOrder) && build.buildOrder.length > 0) {
       // ✅ Ensure each action is formatted properly
       build.buildOrder.forEach((step) => {
         if (typeof step === "string") {
+          // If it's a string (like a single action without brackets), just format it
           buildOrderContainer.innerHTML += `<p>${formatActionText(step)}</p>`;
         } else if (
           typeof step === "object" &&
-          step.workersOrTimestamp &&
-          step.action
+          step.action &&
+          step.action.trim() !== "" // Ensure action is not empty
         ) {
-          buildOrderContainer.innerHTML += `<p><strong>[${
-            step.workersOrTimestamp
-          }]</strong> ${formatActionText(step.action)}</p>`;
+          // Handle steps with workersOrTimestamp (with optional bracket)
+          const bracket =
+            step.workersOrTimestamp && step.workersOrTimestamp.trim() !== ""
+              ? `<strong>[${step.workersOrTimestamp}]</strong> `
+              : "";
+
+          // Only show action if it's not empty
+          if (step.action.trim() !== "") {
+            buildOrderContainer.innerHTML += `<p>${bracket}${formatActionText(
+              step.action
+            )}</p>`;
+          }
         }
       });
     } else {
@@ -81,10 +98,6 @@ async function loadBuild() {
 }
 
 document.addEventListener("DOMContentLoaded", loadBuild);
-
-document.addEventListener("DOMContentLoaded", () => {
-  loadBuild();
-});
 
 window.addEventListener("popstate", () => {
   loadBuild();
