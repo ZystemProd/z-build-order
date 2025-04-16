@@ -74,7 +74,6 @@ export function initializeAutoCorrect() {
     ...units.zerg.map((name) => ({ category: "Units", name, type: "unit" })),
     ...units.protoss.map((name) => ({ category: "Units", name, type: "unit" })),
     ...units.terran.map((name) => ({ category: "Units", name, type: "unit" })),
-    ...units.terran.map((name) => ({ category: "Units", name, type: "unit" })),
     ...structures.map((name) => ({
       category: "Structures",
       name,
@@ -134,8 +133,10 @@ export function initializeAutoCorrect() {
     const textBeforeCaret = text.substring(0, cursorPosition);
     const textAfterCaret = text.substring(cursorPosition);
 
-    // 1️⃣ Check if cursor is inside brackets `[13|]` or `[4:00|]`
-    const insideBracketsMatch = textBeforeCaret.match(/\[([\d/:]*)$/);
+    // 1️⃣ Check if cursor is inside brackets like `[13|]`, `[4:00|]`, `[100 gas|]`, or `[100 minerals|]`
+    const insideBracketsMatch = textBeforeCaret.match(
+      /\[([\d/:]*\s*(gas|minerals)?)$/
+    );
 
     if (insideBracketsMatch) {
       // ✅ Move cursor **right after `]`**
@@ -145,8 +146,10 @@ export function initializeAutoCorrect() {
       return;
     }
 
-    // 2️⃣ Check if cursor is **right after** brackets `[13]|` or `[4:00]|`
-    const afterBracketsMatch = textBeforeCaret.match(/\[[\d/:]*\]$/);
+    // 2️⃣ Check if cursor is **right after** brackets like `[13]|`, `[4:00]|`, `[100 gas]|`, or `[100 minerals]|`
+    const afterBracketsMatch = textBeforeCaret.match(
+      /\[[\d/:]*\s*(gas|minerals)?\]$/
+    );
 
     if (afterBracketsMatch) {
       // ✅ Create a **new row** and move cursor inside `[|]`
