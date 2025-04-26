@@ -164,6 +164,7 @@ export function initializeViewBuildPage() {
   safeAdd("switchAccountBtn", "click", window.handleSwitchAccount);
 
   safeAdd("importBuildButton", "click", importBuildHandler);
+  initializeSectionToggles();
 }
 
 /** ----------------

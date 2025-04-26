@@ -6,70 +6,133 @@
     <title>View Build</title>
     <link rel="icon" type="image/x-icon" href="/img/favicon.ico" />
     <link rel="stylesheet" type="text/css" href="./css/style.css" />
+    <link rel="stylesheet" type="text/css" href="./css/viewBuild.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.3/purify.min.js"></script>
     <script type="module" src="app.js" defer></script>
     <script type="module" src="js/modules/eventHandlers.js" defer></script>
     <script type="module" src="js/modules/viewBuild.js" defer></script>
   </head>
-
-  <!-- Auth Container -->
-  <div id="auth-container">
-    <div class="auth-info">
-      <img
-        id="userPhoto"
-        class="user-avatar"
-        src="img/default-avatar.webp"
-        alt="User Avatar"
-        style="width: 50px; height: 50px"
-      />
-      <div class="user-details">
-        <!-- We only show the user’s username, not the email -->
-        <p id="userName" class="user-name">Guest</p>
-      </div>
-    </div>
-
-    <!-- Auth Buttons -->
-    <button id="signInBtn" class="auth-button">Sign In</button>
-    <button id="switchAccountBtn" class="auth-button" style="display: none">
-      Switch Account
-    </button>
-    <button id="signOutBtn" class="auth-button" style="display: none">
-      Sign Out
-    </button>
-  </div>
-
-  <!-- Optional Loading Status -->
-  <p id="authLoading" style="color: #555"></p>
-
-  <!-- Username Modal -->
-  <div id="usernameModal" class="modal" style="display: none">
-    <div class="modal-content">
-      <h3>Choose a Username</h3>
-      <input type="text" id="usernameInput" placeholder="Enter your username" />
-      <br /><br />
-      <button id="confirmUsernameButton">Confirm</button>
-    </div>
-  </div>
-
   <body>
+    <!-- Auth Container -->
+    <div id="auth-container">
+      <div class="auth-info">
+        <img
+          id="userPhoto"
+          class="user-avatar"
+          src="img/default-avatar.webp"
+          alt="User Avatar"
+          style="width: 50px; height: 50px"
+        />
+        <div class="user-details">
+          <!-- We only show the user’s username, not the email -->
+          <p id="userName" class="user-name">Guest</p>
+        </div>
+      </div>
+
+      <!-- Auth Buttons -->
+      <button id="signInBtn" class="auth-button">Sign In</button>
+      <button id="switchAccountBtn" class="auth-button" style="display: none">
+        Switch Account
+      </button>
+      <button id="signOutBtn" class="auth-button" style="display: none">
+        Sign Out
+      </button>
+    </div>
+
+    <!-- Optional Loading Status -->
+    <p id="authLoading" style="color: #555"></p>
+
+    <!-- Username Modal -->
+    <div id="usernameModal" class="modal" style="display: none">
+      <div class="modal-content">
+        <h3>Choose a Username</h3>
+        <input
+          type="text"
+          id="usernameInput"
+          placeholder="Enter your username"
+        />
+        <br /><br />
+        <button id="confirmUsernameButton">Confirm</button>
+      </div>
+    </div>
+
     <div class="view-build-container">
-      <h1 id="buildTitle">Loading...</h1>
-      <div class="build-info">
-        <p><strong>Category:</strong> <span id="buildCategory"></span></p>
-        <p><strong>Matchup:</strong> <span id="buildMatchup"></span></p>
-        <p><strong>Publisher:</strong> <span id="buildPublisher"></span></p>
-        <p><strong>Date Published:</strong> <span id="buildDate"></span></p>
+      <div class="build-header-row">
+        <a href="index.html" id="backButton">⬅ Back to Builds</a>
+        <h1 id="buildTitle">Loading...</h1>
       </div>
-      <div class="build-order-container">
-        <h3>Build Order</h3>
-        <div id="buildOrder" class="build-output"></div>
+
+      <!-- Build Info Grid -->
+      <div class="build-info-grid">
+        <div class="build-info-item">
+          <label>Category</label>
+          <span id="buildCategory">Loading...</span>
+        </div>
+        <div class="build-info-item">
+          <label>Matchup</label>
+          <span id="buildMatchup">Loading...</span>
+        </div>
+        <div class="build-info-item">
+          <label>Publisher</label>
+          <span id="buildPublisher">Loading...</span>
+        </div>
+        <div class="build-info-item">
+          <label>Date Published</label>
+          <span id="buildDate">Loading...</span>
+        </div>
       </div>
-      <button class="back-button" onclick="window.history.back()">
-        ⬅ Go Back
-      </button>
-      <button id="importBuildButton" style="display: none">
-        📥 Import to My Builds
-      </button>
+
+      <!-- Build Order -->
+      <div id="buildOrder" class="build-order-container">
+        <!-- Build steps are dynamically inserted here -->
+      </div>
+
+      <!-- Second Row Layout -->
+      <div class="main-layout">      
+        <!-- Second Row: Map and Comment/Video -->
+
+        <h3 data-section="secondRow" class="toggle-title">
+          <span class="arrow"></span> Additional Settings
+        </h3>
+        <div class="hideable-section hidden" id="secondRow">
+          <div id="map-container">
+            <!-- Map preview and controls -->
+            <div id="map-controls-row">
+              <span id="selected-map-text">No map selected</span>
+              <button class="clear-annotations-button" data-tooltip="Erase All">
+                <img src="img/SVG/eraser-solid.svg" alt="Eraser Icon" style="width:20px; height:20px;" class="svg-icon">
+              </button>
+            </div>
+            
+            <div id="map-preview-container" class="map-preview">
+              <img id="map-preview-image" class="map-image" src="" alt="Map Preview" />
+              <div id="map-annotations" class="annotations"></div>
+            </div>
+          </div>
+        
+          <!-- RIGHT COLUMN: Comment & Video Container -->
+          <div class="comment-video-container">
+            <h3 class="toggle-title">Comment</h3>
+            <textarea id="commentInput" placeholder="Add a comment..."></textarea>
+        
+            <h3 class="toggle-title">Video</h3>
+            <input type="text" id="videoInput" placeholder="Paste YouTube link here..." />
+            <iframe
+              id="videoIframe"
+              style="display: none;"
+              width="560"
+              height="315"
+              frameborder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowfullscreen
+            ></iframe>
+          </div>
+        </div>
+      </div>
+      <button id="importBuildButton" style="display: none">Import</button>
+
+      </div>
+
     </div>
     <script type="module">
       import { initializeViewBuildPage } from "./js/modules/eventHandlers.js";

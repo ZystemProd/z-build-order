@@ -1,0 +1,240 @@
+/* General page styles */
+body {
+  background-color: #121212;
+  color: #e0e0e0;
+  font-family: "Inter", "Roboto", Arial, sans-serif;
+}
+
+.view-build-container {
+  max-width: 1200px;
+  margin-top: 80px;
+  padding: 20px;
+  background: #1e1e1e;
+  border-radius: 12px;
+}
+
+/* Back Button */
+#backButton {
+  margin: 10px 0 20px 0;
+  padding: 10px 20px;
+  background: transparent;
+  color: #00bcd4;
+  border: 1px solid #00bcd4;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: 500;
+  transition: 0.2s;
+  z-index: 2; /* Keep back button clickable */
+}
+
+#backButton:hover {
+  background: #00bcd4;
+  color: #121212;
+}
+.main-layout {
+  margin: 20px 20px;
+}
+
+/* Title */
+#buildTitle {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  font-size: 2rem;
+  color: #ffffff;
+}
+
+/* Build Info Grid */
+.build-info-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.build-info-item {
+  background: #1a1a1a;
+  padding: 10px 16px;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.build-info-item label {
+  color: #888888;
+  font-size: 0.85rem;
+  margin-bottom: 5px;
+}
+
+.build-info-item span {
+  font-size: 1.1rem;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+/* Build Order */
+.build-order-container {
+  background: #1a1a1a;
+  padding: 20px;
+  border-radius: 8px;
+  overflow-y: auto;
+  min-height: 700px;
+  max-height: 70vh;
+}
+
+.build-order-container p {
+  background: #222222;
+  margin: 8px 0;
+  padding: 8px 12px;
+  border-radius: 6px;
+  text-align: left;
+}
+
+/* Scrollbar for Build Order */
+.build-order-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.build-order-container::-webkit-scrollbar-thumb {
+  background: rgba(0, 188, 212, 0.4);
+  border-radius: 8px;
+}
+
+.build-order-container::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.build-header-row {
+  position: relative; /* 🔥 Important */
+  display: flex;
+  align-items: center;
+  height: 60px; /* or whatever you want for row height */
+  margin-bottom: 30px;
+}
+
+/* Map Section, YouTube Section, Comment Section Common */
+.map-section,
+.youtube-section,
+.comment-section {
+  margin-top: 40px;
+}
+
+#openMapModalButton {
+  font-size: 20px;
+}
+
+/* Second Row Layout (new two-column system) */
+.second-row {
+  display: flex;
+  gap: 40px;
+  margin-top: 40px;
+  flex-wrap: wrap;
+}
+
+.left-column,
+.right-column {
+  flex: 1;
+  min-width: 300px;
+}
+
+.map-container {
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+}
+
+/* Map Preview Container exactly like index.html */
+#map-preview-container {
+  position: relative;
+  width: 100%; /* Takes up available width */
+  max-width: 600px; /* Optional: Adjust the maximum size */
+  aspect-ratio: 9 / 9; /* Set the ratio (e.g., 16:9) */
+  margin: 0 auto; /* Center the container */
+  border: 2px dashed #333; /* Dashed border */
+  border-radius: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden; /* Prevent overflow of child elements */
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Older browser support if aspect-ratio fails */
+#map-preview-container::before {
+  content: "";
+  display: block;
+  padding-top: 56.25%; /* 9/16 = 0.5625 * 100 = 56.25% */
+}
+
+/* Map Image */
+#map-preview-image {
+  width: 100%;
+  height: auto;
+  max-width: 600px;
+  border-radius: 20px;
+  display: block;
+}
+
+/* Map Annotations */
+#map-annotations {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* YouTube Section iframe */
+#youtubeEmbed {
+  width: 100%;
+  max-width: 600px;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  background: #1a1a1a;
+  display: block;
+  margin: 20px auto 0 auto;
+}
+
+/* Comments Section */
+.comment-display {
+  background: #1a1a1a;
+  padding: 20px;
+  border-radius: 8px;
+  font-size: 1rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  color: #e0e0e0;
+  margin-top: 20px;
+}
+
+/* Responsive for Mobile */
+@media (max-width: 768px) {
+  .second-row {
+    flex-direction: column;
+  }
+
+  #map-preview-container,
+  #youtubeEmbed {
+    max-width: 100%;
+  }
+}
+
+/* Optional: Responsive adjustment */
+@media (max-width: 600px) {
+  .build-header-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  #backButton,
+  #buildTitle {
+    width: 100%;
+    text-align: center;
+  }
+}
