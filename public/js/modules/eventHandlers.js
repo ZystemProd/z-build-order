@@ -92,6 +92,7 @@ export function initializeIndexPage() {
   safeInput("communitySearchBar", (val) => searchCommunityBuilds(val));
   safeInput("templateSearchBar", (val) => searchTemplates(val));
   safeInput("videoInput", (val) => updateYouTubeEmbed(val));
+  safeAdd("buildOrderTitleText", "click", () => toggleTitleInput(true));
 
   // --- Dropdown Color Change
   safeChange("buildCategoryDropdown", updateDropdownColor);

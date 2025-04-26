@@ -13,10 +13,16 @@
     frame-src https://www.youtube.com;
   ">  --> 
     <link rel="icon" type="image/x-icon" href="/img/favicon.ico" />
-    <link rel="stylesheet" type="text/css" href="css/style.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+
+    <link rel="preload" href="/css/style.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="/css/style.css"></noscript>
+    <link rel="preload" href="/css/alertNotification.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="/css/alertNotification.css"></noscript>     
     <link rel="stylesheet" type="text/css" href="css/template.css" />
     <link rel="stylesheet" type="text/css" href="css/showToast.css" />
-    <link rel="stylesheet" type="text/css" href="css/alertNotification.css" />  
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.3/purify.min.js"></script>  
     <script type="module" src="app.js" defer></script>
     <script type="module" src="js/modules/eventHandlers.js" defer></script>
@@ -145,13 +151,10 @@
           </div>
         
           <!-- Center Column: Title -->
-          <span
-          id="buildOrderTitleText"
-          class="dimmed"
-          onclick="toggleTitleInput(true)"
-          >
-          Enter build order title here...
+          <span id="buildOrderTitleText" class="dimmed">
+            Build Title Here
           </span>
+          
           <input
           type="text"
           id="buildOrderTitleInput"
