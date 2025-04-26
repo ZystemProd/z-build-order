@@ -1,51 +1,49 @@
 export function updateYouTubeEmbed(videoLink) {
   const iframe = document.getElementById("videoIframe");
-  if (iframe) {
-    console.log("videoLink input:", videoLink); // Debug input for verification
+  if (!iframe) {
+    console.error("YouTube iframe not found!");
+    return;
+  }
 
-    if (
-      !videoLink ||
-      typeof videoLink !== "string" ||
-      videoLink.trim() === ""
-    ) {
-      console.warn("Empty or invalid video link. Clearing YouTube embed.");
-      clearYouTubeEmbed();
-      return;
-    }
-
-    const videoId = extractYouTubeVideoId(videoLink); // Helper function to get video ID
-    if (videoId) {
-      const sanitizedVideoId = DOMPurify.sanitize(videoId);
-      iframe.src = `https://www.youtube.com/embed/${sanitizedVideoId}`;
-      iframe.style.display = "block"; // Show the iframe
-    } else {
-      console.warn("Failed to extract video ID from the provided link.");
-      clearYouTubeEmbed(); // Hide the iframe if the link is invalid
-    }
+  const videoId = extractYouTubeVideoId(videoLink);
+  if (videoId) {
+    iframe.src = `https://www.youtube.com/embed/${videoId}`;
+    iframe.style.display = "block"; // 🔥 Make iframe visible
   } else {
-    console.warn("videoIframe element not found. Cannot update YouTube embed.");
+    console.warn("Empty or invalid video link. Clearing YouTube embed.");
+    iframe.src = "";
+    iframe.style.display = "none"; // 🔥 Hide if invalid
   }
 }
 
 // Helper function to extract YouTube video ID from a link
-function extractYouTubeVideoId(link) {
-  if (typeof link !== "string") {
-    console.error("Invalid video link provided. Expected a string.");
+export function extractYouTubeVideoId(link) {
+  if (!link) return null;
+
+  try {
+    const url = new URL(link);
+
+    // Handle standard YouTube watch URLs
+    if (url.hostname.includes("youtube.com") && url.searchParams.has("v")) {
+      return url.searchParams.get("v");
+    }
+
+    // Handle youtu.be short links
+    if (url.hostname.includes("youtu.be")) {
+      return url.pathname.slice(1); // Remove leading "/"
+    }
+
+    // Handle embed links
+    if (url.pathname.includes("/embed/")) {
+      return url.pathname.split("/embed/")[1];
+    }
+
+    // Default fallback
+    return null;
+  } catch (err) {
+    console.error("Invalid URL passed to extractYouTubeVideoId:", link);
     return null;
   }
-
-  console.log("Extracting video ID from link:", link); // Debug input
-  const regex =
-    /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
-  const match = link.match(regex);
-
-  if (match) {
-    console.log("Extracted video ID:", match[1]); // Debug extracted ID
-  } else {
-    console.warn("No video ID found in link.");
-  }
-
-  return match ? match[1] : null;
 }
 
 export function clearYouTubeEmbed() {

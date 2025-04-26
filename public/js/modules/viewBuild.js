@@ -77,7 +77,7 @@ async function loadBuild() {
     }
 
     // Set YouTube link
-    const youtubeEmbed = document.getElementById("youtubeEmbed");
+    const youtubeEmbed = document.getElementById("videoIframe");
     if (youtubeEmbed && build.youtube) {
       youtubeEmbed.src = build.youtube;
     }

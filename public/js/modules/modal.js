@@ -184,6 +184,23 @@ export function viewBuild(buildId) {
           commentInput.value = DOMPurify.sanitize(build.comment) || "";
         }
 
+        // ✅ Populate YouTube input field
+        const videoInput = document.getElementById("videoInput");
+
+        if (videoInput) {
+          console.log("✅ videoInput found:", videoInput); // Debug log
+          console.log("✅ Loaded build.youtube value:", build.youtube);
+          // Set value into input
+          videoInput.value = build.youtube || build.videoLink || "";
+
+          console.log("✅ Set videoInput value to:", videoInput.value); // Debug log
+
+          // ✅ Then update the iframe based on the input value
+          updateYouTubeEmbed(videoInput.value);
+        } else {
+          console.error("❌ videoInput not found in DOM when loading build.");
+        }
+
         // ✅ **Validate build order**
         const validBuildOrder = Array.isArray(build.buildOrder)
           ? build.buildOrder.filter(
@@ -334,14 +351,11 @@ export async function populateBuildList(filteredBuilds = null) {
     return;
   }
 
-  // Prevent multiple simultaneous population calls.
   if (isPopulatingBuildList) return;
   isPopulatingBuildList = true;
 
-  // Clear the current list
   buildList.innerHTML = "";
 
-  // If no filtered builds are provided, fetch all builds
   const builds = filteredBuilds || (await fetchUserBuilds());
 
   if (!builds.length) {
@@ -350,53 +364,49 @@ export async function populateBuildList(filteredBuilds = null) {
     return;
   }
 
-  let lastHoveredBuild = null; // Track the last hovered build
+  let lastHoveredBuild = null;
   const fragment = document.createDocumentFragment();
 
   builds.forEach((build) => {
-    const buildCard = document.createElement("div");
-    buildCard.classList.add("build-card");
+    const buildRow = document.createElement("div");
+    buildRow.classList.add("build-row");
 
-    // Determine the background image based on the match-up
-    const matchup = build.subcategory || "unknown";
-    const backgroundImageUrl = `../img/frames/${matchup.toLowerCase()}.webp`;
-    buildCard.style.backgroundImage = `url("${backgroundImageUrl}")`;
-
-    buildCard.innerHTML = `
-      <div class="card-header">
-        <h4>${DOMPurify.sanitize(build.title)}</h4>
-        <button class="delete-build-btn" data-tooltip="Delete Build" title="Delete Build">&times;</button>
-        <div class="delete-bg"></div>
+    buildRow.innerHTML = `
+      <div class="build-info">
+        <div class="build-title">${DOMPurify.sanitize(build.title)}</div>
+        <div class="build-meta">${DOMPurify.sanitize(
+          formatMatchup(build.subcategory || "Unknown")
+        )}</div>
       </div>
-      <p class="matchup-text">${DOMPurify.sanitize(formatMatchup(matchup))}</p>
+      <button class="delete-build-btn" title="Delete Build">&times;</button>
     `;
 
-    // Add hover functionality for preview
-    buildCard.addEventListener("mouseover", () => {
+    // Hover to preview
+    buildRow.addEventListener("mouseover", () => {
       if (lastHoveredBuild !== build) {
         updateBuildPreview(build);
         lastHoveredBuild = build;
       }
     });
 
-    // Add view build functionality
-    buildCard.addEventListener("click", () => viewBuild(build.id));
+    // Click to view
+    buildRow.addEventListener("click", () => viewBuild(build.id));
 
-    // Add delete functionality
-    const deleteButton = buildCard.querySelector(".delete-build-btn");
+    // Delete button
+    const deleteButton = buildRow.querySelector(".delete-build-btn");
     deleteButton.addEventListener("click", async (event) => {
-      event.stopPropagation(); // Prevent card click from firing
+      event.stopPropagation();
       const confirmation = confirm(
         `Are you sure you want to delete the build "${build.title}"?`
       );
       if (confirmation) {
-        await deleteBuildFromFirestore(build.id); // Delete from Firestore
-        const updatedBuilds = await fetchUserBuilds(); // Fetch updated build list
-        populateBuildList(updatedBuilds); // Refresh the list
+        await deleteBuildFromFirestore(build.id);
+        const updatedBuilds = await fetchUserBuilds();
+        populateBuildList(updatedBuilds);
       }
     });
 
-    fragment.appendChild(buildCard);
+    fragment.appendChild(buildRow);
   });
 
   buildList.appendChild(fragment);
