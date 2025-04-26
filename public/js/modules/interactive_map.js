@@ -1,23 +1,32 @@
+// interactive_map.js (FINAL VERSION ✅)
+
+console.log("🗺️ Loading interactive map...");
+
+// Lazy-load maps when interacting with map preview
 document.addEventListener("DOMContentLoaded", () => {
   const mapPreviewContainer = document.getElementById("map-preview-container");
+  if (!mapPreviewContainer) {
+    console.warn(
+      "🛑 No map preview container found. Skipping map lazy load setup."
+    );
+    return;
+  }
+
   let mapsLoaded = false;
 
   function loadMaps() {
     if (!mapsLoaded) {
       console.log("🔄 Loading maps...");
       loadMapsOnDemand();
-      mapsLoaded = true; // Prevent multiple loads
+      mapsLoaded = true;
     }
   }
 
-  // ✅ Detect if the user is on a mobile device
   const isMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent);
 
   if (isMobile) {
-    // 🛠 For mobile: Load maps on the first tap
     mapPreviewContainer.addEventListener("click", loadMaps, { once: true });
   } else {
-    // 🖥 For desktops: Load maps on hover
     mapPreviewContainer.addEventListener("mouseenter", loadMaps, {
       once: true,
     });
@@ -25,16 +34,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function loadMapsOnDemand() {
     const mapCards = document.querySelectorAll(".map-card");
-
     mapCards.forEach((card) => {
       const img = card.querySelector(".map-image");
-      const mapSrc = img.getAttribute("data-src"); // Get stored lazy source
+      const mapSrc = img.getAttribute("data-src");
       if (mapSrc && !img.src) {
-        img.src = mapSrc; // Load actual image
-        img.removeAttribute("data-src"); // Prevent duplicate loads
+        img.src = mapSrc;
+        img.removeAttribute("data-src");
       }
     });
-
     console.log("✅ All maps loaded!");
   }
 });
@@ -43,6 +50,12 @@ export class MapAnnotations {
   constructor(mapContainerId, annotationsContainerId) {
     this.mapContainer = document.getElementById(mapContainerId);
     this.annotationsContainer = document.getElementById(annotationsContainerId);
+
+    if (!this.mapContainer || !this.annotationsContainer) {
+      console.warn("🛑 MapAnnotations initialized but elements missing.");
+      return;
+    }
+
     this.circles = [];
     this.arrows = [];
     this.isDrawingArrow = false;
@@ -56,16 +69,12 @@ export class MapAnnotations {
 
   calculateCoordinates(event) {
     const rect = this.mapContainer.getBoundingClientRect();
-
-    // Calculate coordinates as percentages relative to the image dimensions
-    const x = ((event.clientX - rect.left - 6) / rect.width) * 100;
-    const y = ((event.clientY - rect.top - 2) / rect.height) * 100;
-
+    const x = ((event.clientX - rect.left) / rect.width) * 100;
+    const y = ((event.clientY - rect.top) / rect.height) * 100;
     return { x, y };
   }
 
   createCircle(x, y) {
-    console.log("createCircle");
     const container = document.createElement("div");
     container.classList.add("annotation-circle-container");
     container.style.left = `${x}%`;
@@ -73,39 +82,31 @@ export class MapAnnotations {
 
     const number = document.createElement("span");
     number.classList.add("annotation-number");
-
-    // Assign the number based on the current count of circles
     number.textContent = this.circles.length + 1;
 
     const circle = document.createElement("div");
     circle.classList.add("annotation-circle");
 
-    container.addEventListener("click", (e) => {
-      e.stopPropagation();
-      this.annotationsContainer.removeChild(container);
-      const index = this.circles.findIndex(
-        (circleData) => circleData.element === container
-      );
-      if (index !== -1) this.circles.splice(index, 1);
-      this.updateCircleNumbers(); // Recalculate numbers
-    });
-
     container.appendChild(number);
     container.appendChild(circle);
     this.annotationsContainer.appendChild(container);
 
-    // Add to circles array with the correct element reference
+    container.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.annotationsContainer.removeChild(container);
+      const index = this.circles.findIndex((c) => c.element === container);
+      if (index !== -1) this.circles.splice(index, 1);
+      this.updateCircleNumbers();
+    });
+
     this.circles.push({ x, y, element: container });
   }
 
   updateCircleNumbers() {
     this.circles.forEach((circleData, index) => {
       if (circleData.element) {
-        // Ensure the element exists
         const number = circleData.element.querySelector(".annotation-number");
-        if (number) {
-          number.textContent = index + 1; // Reassign correct number
-        }
+        if (number) number.textContent = index + 1;
       }
     });
   }
@@ -118,9 +119,7 @@ export class MapAnnotations {
     arrow.addEventListener("click", (e) => {
       e.stopPropagation();
       this.annotationsContainer.removeChild(arrow);
-      const index = this.arrows.findIndex(
-        (arrowData) => arrowData.element === arrow
-      );
+      const index = this.arrows.findIndex((a) => a.element === arrow);
       if (index !== -1) this.arrows.splice(index, 1);
     });
 
@@ -130,8 +129,6 @@ export class MapAnnotations {
 
   updateArrow(arrow, startX, startY, endX, endY) {
     const rect = this.mapContainer.getBoundingClientRect();
-
-    // Ensure coordinates are calculated as percentages of the map container
     const mapWidth = rect.width;
     const mapHeight = rect.height;
 
@@ -142,26 +139,24 @@ export class MapAnnotations {
 
     const deltaX = endXPixels - startXPixels;
     const deltaY = endYPixels - startYPixels;
+    const angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
+    const length = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 
-    const angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI); // Calculate angle in degrees
-    const length = Math.sqrt(deltaX * deltaX + deltaY * deltaY); // Calculate length
-
-    // Apply styles to position and transform the arrow
     arrow.style.left = `${startXPixels}px`;
     arrow.style.top = `${startYPixels}px`;
     arrow.style.width = `${length}px`;
     arrow.style.transform = `rotate(${angle}deg)`;
-    arrow.style.transformOrigin = "0 0"; // Ensure arrow anchors from start point
+    arrow.style.transformOrigin = "0 0";
   }
 
   initializeEventListeners() {
-    // Remove existing listeners to avoid duplicates
+    if (!this.mapContainer) return;
+
     this.mapContainer.removeEventListener("mousedown", this.handleMouseDown);
     this.mapContainer.removeEventListener("mouseup", this.handleMouseUp);
     this.mapContainer.removeEventListener("mousemove", this.handleMouseMove);
     this.mapContainer.removeEventListener("mouseleave", this.handleMouseLeave);
 
-    // Define handlers as class properties to ensure they are only bound once
     this.handleMouseDown = (event) => {
       const { x, y } = this.calculateCoordinates(event);
       this.mousedownTimer = setTimeout(() => {
@@ -205,7 +200,6 @@ export class MapAnnotations {
       clearTimeout(this.mousedownTimer);
     };
 
-    // Add listeners
     this.mapContainer.addEventListener("mousedown", this.handleMouseDown);
     this.mapContainer.addEventListener("mouseup", this.handleMouseUp);
     this.mapContainer.addEventListener("mousemove", this.handleMouseMove);
@@ -218,17 +212,17 @@ export function initializeMapControls(mapAnnotations) {
   const clearAnnotationsButton = document.querySelector(
     ".clear-annotations-button"
   );
-
-  // Clear annotations
-  clearAnnotationsButton.addEventListener("click", () => {
-    while (mapAnnotations.annotationsContainer.firstChild) {
-      mapAnnotations.annotationsContainer.removeChild(
-        mapAnnotations.annotationsContainer.firstChild
-      );
-    }
-    mapAnnotations.circles = [];
-    mapAnnotations.arrows = [];
-  });
+  if (clearAnnotationsButton) {
+    clearAnnotationsButton.addEventListener("click", () => {
+      while (mapAnnotations.annotationsContainer.firstChild) {
+        mapAnnotations.annotationsContainer.removeChild(
+          mapAnnotations.annotationsContainer.firstChild
+        );
+      }
+      mapAnnotations.circles = [];
+      mapAnnotations.arrows = [];
+    });
+  }
 }
 
 export function initializeInteractiveMap() {
@@ -236,8 +230,6 @@ export function initializeInteractiveMap() {
     "map-preview-image",
     "map-annotations"
   );
-
-  // Remove floating container logic
   initializeMapControls(mapAnnotations);
   return mapAnnotations;
 }
@@ -245,16 +237,13 @@ export function initializeInteractiveMap() {
 export function initializeMapSelection(mapAnnotations) {
   const modal = document.getElementById("mapSelectionModal");
   const closeModal = document.getElementById("closeMapModal");
-  const buildsContainer = modal.querySelector(".builds-container");
+  const buildsContainer = modal?.querySelector(".builds-container");
 
-  if (!buildsContainer) {
-    console.error(
-      "Error: .builds-container not found inside #mapSelectionModal"
-    );
+  if (!modal || !closeModal || !buildsContainer) {
+    console.warn("⚠️ Skipping map selection setup — missing elements.");
     return;
   }
 
-  // List of maps with paths
   const maps = [
     { name: "Abyssal Reef", imagePath: "img/maps/abyssal_reef.webp" },
     { name: "Amygdala", imagePath: "img/maps/amygdala.webp" },
@@ -270,7 +259,7 @@ export function initializeMapSelection(mapAnnotations) {
     { name: "Whispers of Gold", imagePath: "img/maps/whispers_of_gold.webp" },
   ];
 
-  // Populate modal with map cards
+  // Populate modal
   buildsContainer.innerHTML = maps
     .map(
       (map) => `
@@ -279,61 +268,56 @@ export function initializeMapSelection(mapAnnotations) {
       <img data-src="${DOMPurify.sanitize(
         map.imagePath
       )}" alt="${DOMPurify.sanitize(map.name)}" class="map-image">
-    </div>`
+    </div>
+  `
     )
     .join("");
 
-  // Open the modal
+  // Map card clicks
+  buildsContainer.addEventListener("click", (event) => {
+    const card = event.target.closest(".map-card");
+    if (card) {
+      const selectedMapPath = card.getAttribute("data-map");
+      const selectedMapName = card.querySelector(".map-card-title")?.innerText;
+      const mapImage = document.getElementById("map-preview-image");
+      const selectedMapText = document.getElementById("selected-map-text");
+
+      if (mapImage && selectedMapText) {
+        selectedMapText.innerText = selectedMapName || "";
+        mapImage.src = selectedMapPath;
+      }
+
+      mapAnnotations.circles = [];
+      mapAnnotations.arrows = [];
+      mapAnnotations.annotationsContainer.innerHTML = "";
+
+      const clearBtn = document.querySelector(".clear-annotations-button");
+      if (clearBtn) clearBtn.style.display = "inline-block";
+
+      modal.style.display = "none";
+    }
+  });
+
   document
     .getElementById("openMapModalButton")
-    .addEventListener("click", () => {
+    ?.addEventListener("click", () => {
       modal.style.display = "block";
     });
 
-  // Close the modal
   closeModal.addEventListener("click", () => {
     modal.style.display = "none";
   });
 
-  // Close modal when clicking outside the modal content
   window.addEventListener("click", (event) => {
     if (event.target === modal) {
       modal.style.display = "none";
     }
   });
-
-  // Update map on card click
-  buildsContainer.addEventListener("click", (event) => {
-    const card = event.target.closest(".map-card");
-    if (card) {
-      const selectedMapPath = card.getAttribute("data-map");
-      const selectedMapName = card.querySelector(".map-card-title").innerText;
-      const mapImage = document.getElementById("map-preview-image");
-      const selectedMapText = document.getElementById("selected-map-text");
-      const clearAnnotationsButton = document.querySelector(
-        ".clear-annotations-button"
-      );
-
-      // Update map image and selected map text
-      selectedMapText.innerText = DOMPurify.sanitize(selectedMapName);
-      mapImage.src = DOMPurify.sanitize(selectedMapPath);
-
-      // Clear existing annotations
-      mapAnnotations.circles = [];
-      mapAnnotations.arrows = [];
-      mapAnnotations.annotationsContainer.innerHTML = "";
-
-      // Show the Clear Annotations button
-      clearAnnotationsButton.style.display = "inline-block";
-
-      // Close the modal
-      modal.style.display = "none";
-    }
-  });
 }
 
-// Export the instantiated `MapAnnotations` object
-export const mapAnnotations = new MapAnnotations(
-  "map-preview-image",
-  "map-annotations"
-);
+// Safe export default mapAnnotations
+export const mapAnnotations =
+  document.getElementById("map-preview-image") &&
+  document.getElementById("map-annotations")
+    ? new MapAnnotations("map-preview-image", "map-annotations")
+    : null;

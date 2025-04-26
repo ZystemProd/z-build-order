@@ -25,30 +25,40 @@
   <body>
     <div id="toast-container"></div>
 
-    <!-- Auth Container -->
-    <div id="auth-container">
-      <div class="auth-info">
-        <img
-          id="userPhoto"
-          class="user-avatar"
-          src="img/default-avatar.webp"
-          alt="User Avatar"
-          style="width: 50px; height: 50px;"
-        />
-        <div class="user-details">
-          <!-- We only show the user’s username, not the email -->
-          <p id="userName" class="user-name">Guest</p>
-        </div>
-      </div>
-
-      <!-- Auth Buttons -->
-      <button id="signInBtn" class="auth-button">Sign In</button>
-      <button id="switchAccountBtn" class="auth-button" style="display: none;">Switch Account</button>
-      <button id="signOutBtn" class="auth-button" style="display: none;">Sign Out</button>
+<!-- Auth Container -->
+<div id="auth-container">
+  <div class="auth-info" style="display: flex; align-items: center; gap: 10px;">
+    
+    <div id="authLoadingWrapper" style="display: flex; align-items: center; gap: 8px;">
+      <div id="authLoading" class="spinner"></div>
+      <span id="authLoadingText" style="color: #555;">Loading user...</span>
     </div>
+    
 
-    <!-- Optional Loading Status -->
-    <p id="authLoading" style="color: #555;"></p>
+    <img
+      id="userPhoto"
+      class="user-avatar fade-in"
+      src="img/default-avatar.webp"
+      alt="User Avatar"
+      style="width: 40px; height: 40px; display: none;"
+    />
+    
+    <div class="user-details">
+      <p id="userName" class="user-name fade-in" style="display: none;">Guest</p>
+    </div>
+  </div>
+
+  <!-- Auth Buttons -->
+  <button id="signInBtn" class="auth-button">Sign In</button>
+  <button id="switchAccountBtn" class="auth-button" style="display: none;">Switch Account</button>
+  <button id="signOutBtn" class="auth-button" style="display: none;">Sign Out</button>
+</div>
+
+
+
+
+
+
 
     <!-- Username Modal -->
     <div id="usernameModal" class="modal" style="display: none;">
@@ -466,5 +476,17 @@
         </a>
       </div>
     </div>
+
+    <script type="module">
+      import { initializeIndexPage } from './js/modules/eventHandlers.js';
+      import { initializeAuthUI } from './app.js';
+    
+      document.addEventListener('DOMContentLoaded', () => {
+        initializeAuthUI();
+        initializeIndexPage();
+      });
+    </script>
+    
+
   </body>
 </html>

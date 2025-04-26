@@ -372,12 +372,13 @@ function filterCommunityBuilds(query) {
   });
 }
 
-document
-  .getElementById("communitySearchBar")
-  .addEventListener("input", function () {
+const communitySearchInput = document.getElementById("communitySearchBar");
+if (communitySearchInput) {
+  communitySearchInput.addEventListener("input", function () {
     const query = this.value.toLowerCase();
     filterCommunityBuilds(query);
   });
+}
 
 // ✅ Update Vote Button Icons After Voting
 function updateVoteButtonIcons(buildId) {
@@ -553,10 +554,9 @@ export async function checkPublishButtonVisibility() {
   }
 }
 
-// Publish build function
-document
-  .getElementById("publishBuildButton")
-  .addEventListener("click", async () => {
+const publishButton = document.getElementById("publishBuildButton");
+if (publishButton) {
+  publishButton.addEventListener("click", async () => {
     const user = auth.currentUser;
 
     if (!user) {
@@ -584,37 +584,31 @@ document
     }
 
     const buildToPublish = snapshot.docs[0].data();
-    const communityBuildsRef = collection(db, "communityBuilds"); // ✅ Collection reference
+    const communityBuildsRef = collection(db, "communityBuilds");
 
     try {
-      // ✅ Correct Usage of addDoc - Adds to the collection with an auto-generated ID
       const docRef = await addDoc(communityBuildsRef, {
         ...buildToPublish,
-        publisherId: user.uid, // ✅ Ensure publisher ID is included
-        username: username, // ✅ Ensure username is included
-        isPublished: true, // ✅ Mark as published
+        publisherId: user.uid,
+        username: username,
+        isPublished: true,
         datePublished: new Date().toISOString(),
       });
 
       console.log(`✅ Build published with ID: ${docRef.id}`);
-
       alert("Build successfully published to the community!");
 
-      // ✅ Update Local Firestore Build
       const buildDocRef = snapshot.docs[0].ref;
       await setDoc(buildDocRef, { ...buildToPublish, isPublished: true });
 
-      // ✅ Update the Publish Button UI
-      const publishButton = document.getElementById("publishBuildButton");
-      if (publishButton) {
-        publishButton.innerText = "✅ Published";
-        publishButton.disabled = true; // Disable button after publishing
-      }
+      publishButton.innerText = "✅ Published";
+      publishButton.disabled = true;
     } catch (error) {
       console.error("❌ Error publishing build:", error);
       alert("Failed to publish build. Please check your permissions.");
     }
   });
+}
 
 export function searchCommunityBuilds(query) {
   const lowerCaseQuery = DOMPurify.sanitize(query.toLowerCase());

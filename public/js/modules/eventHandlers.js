@@ -1,12 +1,7 @@
-import {
-  getFirestore,
-  doc,
-  getDoc,
-  setDoc,
-  collection,
-} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+// eventHandlers.js (FINAL version)
+
 import { auth, db } from "../../app.js";
-import { saveCurrentBuild } from "./buildManagement.js";
+import { saveCurrentBuild, populateBuildsModal } from "./buildManagement.js";
 import { initializeAutoCorrect } from "./autoCorrect.js";
 import { populateBuildDetails, analyzeBuildOrder } from "./uiHandlers.js";
 import { updateYouTubeEmbed } from "./youtube.js";
@@ -32,6 +27,7 @@ import {
   setupTemplateModal,
   showSaveTemplateModal,
   searchTemplates,
+  previewTemplate,
 } from "./template.js";
 import { initializeTooltips } from "./tooltip.js";
 import {
@@ -39,481 +35,285 @@ import {
   checkPublishButtonVisibility,
   searchCommunityBuilds,
 } from "./community.js";
-import { populateBuildsModal } from "./buildManagement.js"; // ✅ Corrected import
 
-setupTemplateModal();
+setupTemplateModal(); // Always call early
 
-document.addEventListener("DOMContentLoaded", initializeAutoCorrect);
-
-// Initialize event listeners
-export function initializeEventListeners() {
-  console.log("Initializing event listeners..."); // Debugging
-  document
-    .getElementById("templateSearchBar")
-    .addEventListener("input", (event) => {
-      const query = event.target.value;
-      searchTemplates(query);
-    });
-
-  document
-    .getElementById("buildCategoryDropdown")
-    .addEventListener("change", function () {
-      const dropdown = this;
-      const selectedValue = dropdown.value;
-
-      if (!selectedValue) {
-        // Handle cases where no match-up is selected
-        console.warn("No match-up selected.");
-        return;
-      }
-
-      // Proceed with normal logic for selected match-up
-      console.log(`Selected match-up: ${selectedValue}`);
-    });
-
-  window.showSubcategories = showSubcategories;
-
-  document.addEventListener("DOMContentLoaded", () => {
-    document.querySelectorAll(".toggle-title").forEach((header) => {
-      header.addEventListener("click", () => {
-        const sectionId = header.getAttribute("data-section");
-        const section = document.getElementById(sectionId);
-        const arrow = header.querySelector(".arrow");
-
-        if (!section) {
-          console.error(`❌ Error: Section with ID "${sectionId}" not found.`);
-          return;
-        }
-
-        console.log(`🔄 Toggling section: ${sectionId}`);
-        console.log(
-          "Before toggle - Style:",
-          window.getComputedStyle(section).display
-        );
-
-        // Toggle visibility and height
-        if (section.classList.contains("hidden")) {
-          section.classList.remove("hidden");
-          section.classList.add("visible");
-          arrow.classList.add("open"); // Rotate arrow down
-        } else {
-          section.classList.remove("visible");
-          section.classList.add("hidden");
-          arrow.classList.remove("open"); // Rotate arrow right
-        }
-
-        console.log(
-          "After toggle - Style:",
-          window.getComputedStyle(section).display
-        );
-      });
-    });
-  });
-
-  document
-    .getElementById("openTemplatesButton")
-    .addEventListener("click", showTemplatesModal);
-
-  document
-    .getElementById("saveTemplateButton")
-    .addEventListener("click", () => {
-      showSaveTemplateModal();
-    });
-
-  const buildSearchBar = document.getElementById("buildSearchBar");
-  if (buildSearchBar) {
-    buildSearchBar.addEventListener("input", (event) => {
-      const query = DOMPurify.sanitize(event.target.value.trim());
-      searchBuilds(query);
-    });
-  }
-
-  // Template Search Bar
-  const templateSearchBar = document.getElementById("templateSearchBar");
-  if (templateSearchBar) {
-    templateSearchBar.addEventListener("input", (event) => {
-      const query = DOMPurify.sanitize(event.target.value.trim());
-      searchTemplates(query);
-    });
-  }
-
-  // Community Search Bar
-  const communitySearchBar = document.getElementById("communitySearchBar");
-  if (communitySearchBar) {
-    communitySearchBar.addEventListener("input", (event) => {
-      const query = DOMPurify.sanitize(event.target.value.trim());
-      searchCommunityBuilds(query);
-    });
-  }
-
-  // Handle Category Click
-  document.querySelectorAll(".filter-category").forEach((element) => {
-    element.addEventListener("click", () => {
-      const category = DOMPurify.sanitize(
-        element.getAttribute("data-category")
-      );
-      if (category) {
-        if (buildSearchBar) buildSearchBar.value = ""; // Clear search bar
-        filterBuilds(category);
-
-        // Highlight active category
-        document
-          .querySelectorAll(".filter-category")
-          .forEach((el) => el.classList.remove("active"));
-        element.classList.add("active");
-      }
-    });
-  });
-
-  // Handle Subcategory Click
-  document.querySelectorAll(".subcategory").forEach((element) => {
-    element.addEventListener("click", (event) => {
-      event.stopPropagation(); // Prevent triggering parent category click
-      const subcategory = DOMPurify.sanitize(
-        element.getAttribute("data-subcategory")
-      );
-      if (subcategory) {
-        if (buildSearchBar) buildSearchBar.value = ""; // Clear search bar
-        filterBuilds(subcategory);
-
-        // Highlight active subcategory
-        document
-          .querySelectorAll(".subcategory")
-          .forEach((el) => el.classList.remove("active"));
-        element.classList.add("active");
-      }
-    });
-  });
-
-  document.getElementById("closeBuildsModal").addEventListener("click", () => {
-    closeBuildsModal();
-  });
-
-  // Save Build
-  document.getElementById("saveBuildButton").addEventListener("click", () => {
-    console.log("Save button clicked!"); // Debugging
-    saveCurrentBuild();
-  });
-
-  // Update YouTube Embed
-  document.getElementById("videoInput").addEventListener("input", (event) => {
-    const videoLink = event.target.value.trim(); // Extract the input value
-    updateYouTubeEmbed(videoLink); // Pass the extracted value
-  });
-
-  // Dropdown styling
-  document
-    .getElementById("buildCategoryDropdown")
-    .addEventListener("change", function () {
-      const dropdown = this;
-      const selectedOption = dropdown.options[dropdown.selectedIndex];
-      const optgroup = selectedOption.parentElement;
-
-      // Apply the color of the optgroup to the dropdown
-      if (optgroup && optgroup.style.color) {
-        dropdown.style.color = optgroup.style.color;
-      }
-    });
+/** ----------------
+ *  Helpers
+ ----------------- */
+function safeAdd(id, event, handler) {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener(event, handler);
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  initializeTextareaClickHandler();
-});
+function safeInput(id, callback) {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener("input", (e) => callback(e.target.value.trim()));
+}
 
-export function initializeModalEventListeners() {
-  // Close modal when clicking outside of it
+function safeChange(id, callback) {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener("change", callback);
+}
+
+/** ----------------
+ *  Initialize index.html
+ ----------------- */
+export function initializeIndexPage() {
+  console.log("🛠 Initializing Index Page");
+
+  // --- Auth Buttons
+  safeAdd("signInBtn", "click", window.handleSignIn);
+  safeAdd("signOutBtn", "click", window.handleSignOut);
+  safeAdd("switchAccountBtn", "click", window.handleSwitchAccount);
+
+  // --- Main Build Buttons
+  safeAdd("saveBuildButton", "click", saveCurrentBuild);
+  safeAdd("showBuildsButton", "click", window.showBuildsModal);
+  safeAdd("showCommunityModalButton", "click", async () => {
+    const modal = document.getElementById("communityModal");
+    if (modal) {
+      modal.style.display = "block";
+      await populateCommunityBuilds();
+    }
+  });
+  safeAdd("closeCommunityModal", "click", () => {
+    const modal = document.getElementById("communityModal");
+    if (modal) modal.style.display = "none";
+  });
+
+  // --- Templates
+  safeAdd("openTemplatesButton", "click", showTemplatesModal);
+  safeAdd("saveTemplateButton", "click", showSaveTemplateModal);
+
+  // --- Text Inputs
+  safeInput("buildOrderInput", (val) => analyzeBuildOrder(val));
+  safeInput("buildSearchBar", (val) => searchBuilds(val));
+  safeInput("communitySearchBar", (val) => searchCommunityBuilds(val));
+  safeInput("templateSearchBar", (val) => searchTemplates(val));
+  safeInput("videoInput", (val) => updateYouTubeEmbed(val));
+
+  // --- Dropdown Color Change
+  safeChange("buildCategoryDropdown", updateDropdownColor);
+
+  // --- Help Modal
+  safeAdd("buildOrderHelpBtn", "click", showBuildOrderHelpModal);
+
   window.addEventListener("click", (event) => {
-    const modal = document.getElementById("buildsModal");
-    if (event.target === modal) {
-      closeModal();
+    const helpModal = document.getElementById("buildOrderHelpModal");
+    if (helpModal && event.target === helpModal) {
+      helpModal.style.display = "none";
     }
   });
 
-  // Close modal when clicking the close button
-  document
-    .getElementById("closeModalButton")
-    ?.addEventListener("click", closeModal);
-
-  document.querySelectorAll(".category").forEach((element) => {
-    element.addEventListener("mouseover", (event) => {
-      const categoryId = event.currentTarget.dataset.categoryId; // Adjust to your HTML structure
-      showSubcategories(categoryId);
-    });
+  // --- Template Preview Hover (NEW! ✅)
+  safeAdd("templateList", "mouseover", (event) => {
+    const templateCard = event.target.closest(".template-card");
+    if (templateCard) {
+      const templateData = JSON.parse(
+        templateCard.getAttribute("data-template")
+      );
+      previewTemplate(templateData);
+    }
   });
-}
 
-document.addEventListener("DOMContentLoaded", () => {
-  const mapPreviewContainer = document.getElementById("map-preview-container");
-  const mapSelectionModal = document.getElementById("mapSelectionModal");
-  const mapPreviewImage = document.getElementById("map-preview-image");
-
-  // Track whether a map is selected
-  let isMapSelected = false;
-
-  if (mapPreviewContainer && mapSelectionModal) {
-    mapPreviewContainer.addEventListener("click", () => {
-      // Open modal only if no map is selected
-      if (!isMapSelected) {
-        mapSelectionModal.style.display = "block";
-      }
-    });
-
-    // Example: Set the state when a map is selected
-    document
-      .querySelector(".builds-container")
-      .addEventListener("click", (event) => {
-        const mapCard = event.target.closest(".map-card");
-        if (mapCard) {
-          const mapImageSrc = DOMPurify.sanitize(
-            mapCard.getAttribute("data-map")
-          );
-          const mapName = DOMPurify.sanitize(
-            mapCard.querySelector(".map-card-title").innerText
-          );
-
-          // Update the map preview
-          mapPreviewImage.src = mapImageSrc;
-          mapPreviewImage.style.display = "block";
-          document.getElementById("selected-map-text").innerText = `${mapName}`;
-
-          // Set the map as selected
-          isMapSelected = true;
-
-          // Close the modal
-          mapSelectionModal.style.display = "none";
-        }
-      });
-
-    // Optional: Close modal when clicking outside
-    window.addEventListener("click", (event) => {
-      if (event.target === mapSelectionModal) {
-        mapSelectionModal.style.display = "none";
-      }
-    });
-  } else {
-    console.error("Map Preview Container or Map Selection Modal not found!");
-  }
-});
-
-document
-  .getElementById("closeBuildsModal")
-  .addEventListener("click", closeBuildsModal);
-
-document.addEventListener("DOMContentLoaded", () => {
-  populateBuildDetails();
-});
-
-document.addEventListener("DOMContentLoaded", () => {
-  initializeSectionToggles(); // Ensure toggles are attached globally
-
-  document
-    .getElementById("videoInput")
-    .addEventListener("input", updateYouTubeEmbed);
-});
-
-document.addEventListener("DOMContentLoaded", () => {
-  // Initialize map controls and selection only once
-  initializeMapControls(mapAnnotations);
-  initializeMapSelection(mapAnnotations);
-});
-
-document.addEventListener("DOMContentLoaded", () => {
-  // Initialize tooltips
+  // --- Other Initializations
+  initializeSectionToggles();
+  initializeTextareaClickHandler();
+  initializeAutoCorrect();
   initializeTooltips();
-});
+  checkPublishButtonVisibility();
+  populateBuildDetails();
 
-document.addEventListener("DOMContentLoaded", async () => {
-  console.log("🔥 Loading community and user builds...");
-  await populateCommunityBuilds();
-  await populateBuildsModal(); // ✅ Ensure builds are loaded after importing
-});
+  attachCategoryClicks();
+  attachSubcategoryClicks();
 
-document
-  .getElementById("showCommunityModalButton")
-  .addEventListener("click", () => {
-    document.getElementById("communityModal").style.display = "block";
-    populateCommunityBuilds();
+  // --- Map Setup (only if map container exists)
+  if (document.getElementById("map-preview-container")) {
+    initializeMapControls(mapAnnotations);
+    initializeMapSelection(mapAnnotations);
+    setupMapModalListeners();
+  }
+
+  // --- Load Community Builds
+  document.addEventListener("DOMContentLoaded", async () => {
+    await populateCommunityBuilds();
+    await populateBuildsModal();
   });
 
-document.getElementById("closeCommunityModal").addEventListener("click", () => {
-  document.getElementById("communityModal").style.display = "none";
-});
-
-document.addEventListener("DOMContentLoaded", () => {
-  checkPublishButtonVisibility(); // Ensure button is checked on page load
-});
-
-document.addEventListener("DOMContentLoaded", () => {
-  document
-    .getElementById("buildOrderInput")
-    .addEventListener("input", (event) => {
-      analyzeBuildOrder(event.target.value);
-    });
-});
-
-// Then enable it when DOM is fully loaded and auth is resolved
-document.addEventListener("DOMContentLoaded", () => {
-  // Check if auth is ready or wait for onAuthStateChanged
+  // --- Enable build buttons after auth ready
   auth.onAuthStateChanged((user) => {
     if (user) {
-      document.getElementById("showCommunityModalButton").disabled = false;
-      document.getElementById("showBuildsButton").disabled = false;
+      const buildsBtn = document.getElementById("showBuildsButton");
+      const communityBtn = document.getElementById("showCommunityModalButton");
+      if (buildsBtn) buildsBtn.disabled = false;
+      if (communityBtn) communityBtn.disabled = false;
     }
   });
-});
+}
 
-document.addEventListener("DOMContentLoaded", function () {
-  const legalNoticeLink = document.getElementById("legalNoticeLink");
-  const notification = document.getElementById("notification");
-  const closeNotification = document.getElementById("closeNotification");
+/** ----------------
+ * Initialize viewBuild.html
+ ----------------- */
+export function initializeViewBuildPage() {
+  console.log("🛠 Initializing ViewBuild Page");
 
-  // Show notification when clicking the footer link
-  legalNoticeLink.addEventListener("click", function (event) {
-    event.preventDefault(); // Prevent the link from navigating
-    notification.style.display = "block";
+  safeAdd("signInBtn", "click", window.handleSignIn);
+  safeAdd("signOutBtn", "click", window.handleSignOut);
+  safeAdd("switchAccountBtn", "click", window.handleSwitchAccount);
+
+  safeAdd("importBuildButton", "click", importBuildHandler);
+}
+
+/** ----------------
+ * Support Functions
+ ----------------- */
+function attachCategoryClicks() {
+  document.querySelectorAll(".filter-category").forEach((el) => {
+    el.addEventListener("click", () => {
+      const category = el.getAttribute("data-category");
+      if (category) {
+        const buildSearch = document.getElementById("buildSearchBar");
+        if (buildSearch) buildSearch.value = "";
+        filterBuilds(category);
+      }
+    });
   });
+}
 
-  // Hide notification when clicking the close button
-  closeNotification.addEventListener("click", function () {
-    notification.style.display = "none";
+function attachSubcategoryClicks() {
+  document.querySelectorAll(".subcategory").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const subcategory = el.getAttribute("data-subcategory");
+      if (subcategory) {
+        const buildSearch = document.getElementById("buildSearchBar");
+        if (buildSearch) buildSearch.value = "";
+        filterBuilds(subcategory);
+      }
+    });
   });
+}
 
-  // Hide notification when clicking outside of it
-  window.addEventListener("click", function (event) {
-    if (
-      event.target !== notification &&
-      !notification.contains(event.target) &&
-      event.target !== legalNoticeLink
-    ) {
-      notification.style.display = "none";
-    }
-  });
-});
-
-document.addEventListener("DOMContentLoaded", function () {
-  const templateMenuButton = document.getElementById("templateMenuButton");
-  const templateDropdown = document.getElementById("templateDropdown");
-
-  if (!templateMenuButton || !templateDropdown) {
-    console.error("❌ Error: Missing template menu elements.");
-    return;
+// Open/close dropdown when clicking the button
+safeAdd("templateMenuButton", "click", (event) => {
+  event.stopPropagation(); // 🛡 prevent window click from closing immediately
+  const dropdown = document.getElementById("templateDropdown");
+  if (dropdown) {
+    dropdown.classList.toggle("active");
   }
-
-  console.log("✅ Template menu initialized.");
-
-  // Toggle dropdown menu on click
-  templateMenuButton.addEventListener("click", function (event) {
-    event.stopPropagation(); // Prevents window click from closing it immediately
-    console.log("📌 Template menu button clicked.");
-
-    // Only toggle if it's not already active
-    if (!templateDropdown.classList.contains("active")) {
-      templateDropdown.classList.add("active");
-    } else {
-      templateDropdown.classList.remove("active");
-    }
-  });
-
-  // Stop click inside the dropdown from closing it
-  templateDropdown.addEventListener("click", function (event) {
-    event.stopPropagation(); // Prevents the window click listener from triggering
-  });
-
-  // Close dropdown when clicking outside
-  window.addEventListener("click", function (event) {
-    // If the menu is already inactive, no need to check anything
-    if (!templateDropdown.classList.contains("active")) return;
-
-    // If the click is outside both the button and dropdown, close it
-    if (
-      event.target !== templateMenuButton &&
-      !templateDropdown.contains(event.target)
-    ) {
-      templateDropdown.classList.remove("active");
-      console.log("📌 Template menu closed.");
-    }
-  });
 });
 
-document.addEventListener("DOMContentLoaded", () => {
-  // ✅ Check if we are on the `viewBuild.html` page before adding event listeners
-  if (!window.location.pathname.includes("viewBuild.html")) {
-    return; // Stop execution if not on the correct page
-  }
+// Close dropdown when clicking outside
+window.addEventListener("click", (event) => {
+  const dropdown = document.getElementById("templateDropdown");
+  const button = document.getElementById("templateMenuButton");
 
-  const importButton = document.getElementById("importBuildButton");
+  if (dropdown && button) {
+    if (!dropdown.contains(event.target) && !button.contains(event.target)) {
+      dropdown.classList.remove("active"); // 🔥 Close dropdown
+    }
+  }
+});
+
+function setupMapModalListeners() {
+  const mapPreview = document.getElementById("map-preview-container");
+  const mapModal = document.getElementById("mapSelectionModal");
+
+  if (!mapPreview || !mapModal) return;
+
+  let isMapSelected = false;
+
+  mapPreview.addEventListener("click", () => {
+    if (!isMapSelected) {
+      mapModal.style.display = "block";
+    }
+  });
+
+  document
+    .querySelector(".builds-container")
+    ?.addEventListener("click", (e) => {
+      const mapCard = e.target.closest(".map-card");
+      if (mapCard) {
+        const mapImageSrc = DOMPurify.sanitize(
+          mapCard.getAttribute("data-map")
+        );
+        const mapName = DOMPurify.sanitize(
+          mapCard.querySelector(".map-card-title").innerText
+        );
+
+        const mapPreviewImage = document.getElementById("map-preview-image");
+        const selectedMapText = document.getElementById("selected-map-text");
+
+        if (mapPreviewImage) mapPreviewImage.src = mapImageSrc;
+        if (selectedMapText) selectedMapText.innerText = mapName;
+
+        isMapSelected = true;
+        mapModal.style.display = "none";
+      }
+    });
+
+  window.addEventListener("click", (event) => {
+    if (event.target === mapModal) {
+      mapModal.style.display = "none";
+    }
+  });
+}
+
+function updateDropdownColor() {
+  const dropdown = document.getElementById("buildCategoryDropdown");
+  if (dropdown) {
+    const selectedOption = dropdown.options[dropdown.selectedIndex];
+    const optgroup = selectedOption.parentElement;
+    if (optgroup && optgroup.style.color) {
+      dropdown.style.color = optgroup.style.color;
+    }
+  }
+}
+
+async function importBuildHandler() {
   const urlParams = new URLSearchParams(window.location.search);
   const buildId = urlParams.get("id");
 
   if (!buildId) {
-    console.error("❌ No build ID found in URL.");
+    alert("Build ID not found.");
     return;
   }
 
-  if (importButton) {
-    // ✅ Remove existing event listeners before adding a new one
-    importButton.replaceWith(importButton.cloneNode(true));
-    const newImportButton = document.getElementById("importBuildButton");
-
-    newImportButton.addEventListener("click", async () => {
-      console.log("📥 Import Button Clicked - Build ID:", buildId);
-
-      if (!auth.currentUser) {
-        alert("You must be signed in to import builds.");
-        return;
-      }
-
-      const userId = auth.currentUser.uid;
-      const communityBuildRef = doc(db, "communityBuilds", buildId);
-      const userBuildsRef = collection(db, `users/${userId}/builds`);
-
-      try {
-        const buildDoc = await getDoc(communityBuildRef);
-        if (!buildDoc.exists()) {
-          console.error("❌ Build not found in community builds.");
-          alert("Build not found.");
-          return;
-        }
-
-        const buildData = buildDoc.data();
-        const userBuildDocRef = doc(userBuildsRef, buildData.title);
-
-        await setDoc(userBuildDocRef, {
-          ...buildData,
-          publisher: buildData.username || buildData.publisher || "Unknown",
-          imported: true,
-          timestamp: Date.now(),
-        });
-
-        console.log("✅ Build imported successfully!", buildData);
-        alert("Build successfully imported!");
-        populateBuildsModal(); // ✅ Refresh user's builds
-      } catch (error) {
-        console.error("❌ Error importing build:", error);
-        alert("Failed to import build. Please try again.");
-      }
-    });
-  } else {
-    console.warn("⚠ Import button not found.");
+  if (!auth.currentUser) {
+    alert("Please sign in first to import builds.");
+    return;
   }
-});
 
-document.addEventListener("DOMContentLoaded", () => {
-  const helpBtn = document.getElementById("buildOrderHelpBtn");
-  const closeBtn = document.getElementById("closeBuildOrderHelpModal");
-  const helpModal = document.getElementById("buildOrderHelpModal");
+  const { doc, getDoc, setDoc, collection } = await import(
+    "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js"
+  );
 
-  if (helpBtn && closeBtn && helpModal) {
-    helpBtn.addEventListener("click", showBuildOrderHelpModal);
+  const userId = auth.currentUser.uid;
+  const communityBuildRef = doc(db, "communityBuilds", buildId);
+  const userBuildsRef = collection(db, `users/${userId}/builds`);
 
-    closeBtn.addEventListener("click", () => {
-      helpModal.style.display = "none";
+  try {
+    const buildDoc = await getDoc(communityBuildRef);
+    if (!buildDoc.exists()) {
+      alert("Build not found.");
+      return;
+    }
+
+    const buildData = buildDoc.data();
+    const userBuildDocRef = doc(userBuildsRef, buildData.title);
+
+    await setDoc(userBuildDocRef, {
+      ...buildData,
+      publisher: buildData.username || buildData.publisher || "Unknown",
+      imported: true,
+      timestamp: Date.now(),
     });
 
-    window.addEventListener("click", (e) => {
-      if (e.target === helpModal) {
-        helpModal.style.display = "none";
-      }
-    });
+    alert("Build imported successfully!");
+    populateBuildsModal();
+  } catch (error) {
+    console.error(error);
+    alert("Failed to import build.");
   }
-});
+}

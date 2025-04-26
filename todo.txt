@@ -3,6 +3,9 @@ Fix inline style in index.html
 Need to loads build after everything is loaded before showing. Build modal, maybe template. 
 Fix Template saveing
 Fix Community shareable url
-Sorting function on: community
 
+check if your build has been changed from you "my build". shoule say
+"Saved" if not -> Save Build.
+- Check if the build is published
 
+- fix so that no supply get saved in "my Builds"

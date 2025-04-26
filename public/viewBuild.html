@@ -7,8 +7,50 @@
     <link rel="icon" type="image/x-icon" href="/img/favicon.ico" />
     <link rel="stylesheet" type="text/css" href="./css/style.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.3/purify.min.js"></script>
-    <script type="module" src="./js/modules/viewBuild.js" defer></script>
+    <script type="module" src="app.js" defer></script>
+    <script type="module" src="js/modules/eventHandlers.js" defer></script>
+    <script type="module" src="js/modules/viewBuild.js" defer></script>
   </head>
+
+  <!-- Auth Container -->
+  <div id="auth-container">
+    <div class="auth-info">
+      <img
+        id="userPhoto"
+        class="user-avatar"
+        src="img/default-avatar.webp"
+        alt="User Avatar"
+        style="width: 50px; height: 50px"
+      />
+      <div class="user-details">
+        <!-- We only show the user’s username, not the email -->
+        <p id="userName" class="user-name">Guest</p>
+      </div>
+    </div>
+
+    <!-- Auth Buttons -->
+    <button id="signInBtn" class="auth-button">Sign In</button>
+    <button id="switchAccountBtn" class="auth-button" style="display: none">
+      Switch Account
+    </button>
+    <button id="signOutBtn" class="auth-button" style="display: none">
+      Sign Out
+    </button>
+  </div>
+
+  <!-- Optional Loading Status -->
+  <p id="authLoading" style="color: #555"></p>
+
+  <!-- Username Modal -->
+  <div id="usernameModal" class="modal" style="display: none">
+    <div class="modal-content">
+      <h3>Choose a Username</h3>
+      <input type="text" id="usernameInput" placeholder="Enter your username" />
+      <br /><br />
+      <button id="confirmUsernameButton">Confirm</button>
+    </div>
+  </div>
+
   <body>
     <div class="view-build-container">
       <h1 id="buildTitle">Loading...</h1>
@@ -25,6 +67,18 @@
       <button class="back-button" onclick="window.history.back()">
         ⬅ Go Back
       </button>
+      <button id="importBuildButton" style="display: none">
+        📥 Import to My Builds
+      </button>
     </div>
+    <script type="module">
+      import { initializeViewBuildPage } from "./js/modules/eventHandlers.js";
+      import { initializeAuthUI } from "./app.js";
+
+      document.addEventListener("DOMContentLoaded", () => {
+        initializeAuthUI();
+        initializeViewBuildPage();
+      });
+    </script>
   </body>
 </html>

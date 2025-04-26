@@ -90,18 +90,6 @@ export function previewTemplate(template) {
     `;
 }
 
-document
-  .getElementById("templateList")
-  .addEventListener("mouseover", (event) => {
-    const templateCard = event.target.closest(".template-card");
-    if (templateCard) {
-      const templateData = JSON.parse(
-        templateCard.getAttribute("data-template")
-      );
-      previewTemplate(templateData);
-    }
-  });
-
 function updateTemplatePreview(templateData) {
   const previewContainer = document.getElementById("templatePreview");
   previewContainer.innerHTML = `
@@ -205,14 +193,14 @@ export function setupTemplateModal() {
   const templateModal = document.getElementById("templateModal");
   const closeBtn = document.getElementById("closeTemplateModal");
 
-  // Close modal when clicking the close button
-  closeBtn.addEventListener("click", () => {
-    templateModal.style.display = "none";
-  });
+  if (closeBtn) {
+    closeBtn.addEventListener("click", () => {
+      if (templateModal) templateModal.style.display = "none";
+    });
+  }
 
-  // Close modal when clicking outside the modal content
   window.addEventListener("click", (event) => {
-    if (event.target === templateModal) {
+    if (templateModal && event.target === templateModal) {
       templateModal.style.display = "none";
     }
   });
