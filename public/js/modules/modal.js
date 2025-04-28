@@ -2,9 +2,16 @@ import {
   getDoc,
   doc,
   getFirestore,
+  updateDoc,
   deleteDoc,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+import {
+  getStorage,
+  ref,
+  uploadBytes,
+  getDownloadURL,
+} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-storage.js";
 //import * as DOMPurify from "./dompurify/dist/purify.min.js";
 import { displayBuildOrder, showToast } from "./uiHandlers.js";
 import { updateYouTubeEmbed, clearYouTubeEmbed } from "./youtube.js";
@@ -25,6 +32,16 @@ function formatMatchup(matchup) {
     matchup.slice(1, -1).toLowerCase() +
     matchup.charAt(matchup.length - 1).toUpperCase()
   );
+}
+
+async function uploadReplayFile(file) {
+  const storage = getStorage();
+  const timestamp = Date.now();
+  const uniqueFileName = `replays/${timestamp}_${file.name}`; // Avoid overwriting files
+  const storageRef = ref(storage, uniqueFileName);
+  await uploadBytes(storageRef, file);
+  const downloadURL = await getDownloadURL(storageRef);
+  return downloadURL;
 }
 
 export async function deleteBuildFromFirestore(buildId) {
@@ -368,49 +385,178 @@ export async function populateBuildList(filteredBuilds = null) {
   const fragment = document.createDocumentFragment();
 
   builds.forEach((build) => {
-    const buildRow = document.createElement("div");
-    buildRow.classList.add("build-row");
+    const buildCard = document.createElement("div");
+    buildCard.classList.add("build-card");
+    buildCard.dataset.id = build.id;
 
-    buildRow.innerHTML = `
-      <div class="build-info">
-        <div class="build-title">${DOMPurify.sanitize(build.title)}</div>
-        <div class="build-meta">${DOMPurify.sanitize(
-          formatMatchup(build.subcategory || "Unknown")
-        )}</div>
+    // ✅ Determine races based on matchup
+    const [playerRace, opponentRace] = getRaceIcons(
+      build.subcategory || "Unknown"
+    );
+
+    // ✅ Only create icons if both playerRace and opponentRace exist
+    const matchupIconsHTML =
+      playerRace && opponentRace
+        ? `
+      <div class="matchup-icons">
+        <img src="./img/race/${playerRace}.webp" alt="${playerRace}" class="race-icon">
+        <span class="versus-text">vs</span>
+        <img src="./img/race/${opponentRace}.webp" alt="${opponentRace}" class="race-icon">
       </div>
-      <button class="delete-build-btn" title="Delete Build">&times;</button>
+    `
+        : `<div class="matchup-icons">Invalid Matchup</div>`;
+
+    const publishedText = build.isPublished
+      ? "Published to: Community ✅"
+      : "Not published 🔒";
+
+    // ✅ Build the card inner HTML
+    buildCard.innerHTML = `
+      <div class="build-card-header">
+        ${matchupIconsHTML}
+        <button class="delete-build-btn" title="Delete Build">×</button>
+      </div>
+      <h3 class="build-title">${DOMPurify.sanitize(build.title)}</h3>
+      <div class="build-meta">
+        <p>Publisher: You</p>
+        <p>Date: ${new Date(build.timestamp).toLocaleDateString()}</p>
+      </div>
+      <div class="build-publish-info clickable">
+        ${publishedText}
+      </div>
     `;
 
-    // Hover to preview
-    buildRow.addEventListener("mouseover", () => {
+    // ✅ Set dynamic gradient colors based on matchup
+    if (build.subcategory?.toUpperCase().startsWith("ZV")) {
+      buildCard.style.setProperty("--gradient-color1", "#8e2de2"); // Zerg purple
+      buildCard.style.setProperty("--gradient-color2", "#4a00e0");
+    } else if (build.subcategory?.toUpperCase().startsWith("PV")) {
+      buildCard.style.setProperty("--gradient-color1", "#5fe5ff"); // Protoss blue
+      buildCard.style.setProperty("--gradient-color2", "#007cf0");
+    } else if (build.subcategory?.toUpperCase().startsWith("TV")) {
+      buildCard.style.setProperty("--gradient-color1", "#ff3a30"); // Terran red
+      buildCard.style.setProperty("--gradient-color2", "#ff7b00");
+    } else {
+      buildCard.style.setProperty("--gradient-color1", "#555");
+      buildCard.style.setProperty("--gradient-color2", "#333");
+    }
+
+    // ✅ Hover to preview
+    buildCard.addEventListener("mouseover", () => {
       if (lastHoveredBuild !== build) {
         updateBuildPreview(build);
         lastHoveredBuild = build;
       }
     });
 
-    // Click to view
-    buildRow.addEventListener("click", () => viewBuild(build.id));
+    // ✅ Click to view build
+    buildCard.addEventListener("click", () => viewBuild(build.id));
 
-    // Delete button
-    const deleteButton = buildRow.querySelector(".delete-build-btn");
-    deleteButton.addEventListener("click", async (event) => {
-      event.stopPropagation();
-      const confirmation = confirm(
-        `Are you sure you want to delete the build "${build.title}"?`
-      );
-      if (confirmation) {
-        await deleteBuildFromFirestore(build.id);
-        const updatedBuilds = await fetchUserBuilds();
-        populateBuildList(updatedBuilds);
-      }
-    });
+    // ✅ Delete button click
+    const deleteButton = buildCard.querySelector(".delete-build-btn");
+    if (deleteButton) {
+      deleteButton.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        const confirmation = confirm(
+          `Are you sure you want to delete "${build.title}"?`
+        );
+        if (confirmation) {
+          await deleteBuildFromFirestore(build.id);
+          const updatedBuilds = await fetchUserBuilds();
+          populateBuildList(updatedBuilds);
+        }
+      });
+    }
 
-    fragment.appendChild(buildRow);
+    // ✅ Publish/Unpublish click
+    const publishInfo = buildCard.querySelector(".build-publish-info");
+    if (publishInfo) {
+      publishInfo.addEventListener("click", async (event) => {
+        event.stopPropagation();
+
+        if (build.isPublished) {
+          const confirmation = confirm(
+            `Are you sure you want to unpublish "${build.title}" from the Community?`
+          );
+          if (confirmation) {
+            await unpublishBuild(build.id);
+            const updatedBuilds = await fetchUserBuilds();
+            populateBuildList(updatedBuilds);
+          }
+        } else {
+          alert("This build is not published yet!");
+        }
+      });
+    }
+
+    fragment.appendChild(buildCard);
   });
 
   buildList.appendChild(fragment);
   isPopulatingBuildList = false;
+}
+
+// ✅ Helper function to parse matchup races correctly
+function getRaceIcons(subcategory) {
+  const raceMap = {
+    Z: "zerg",
+    P: "protoss",
+    T: "terran",
+  };
+
+  if (!subcategory) {
+    return [null, null];
+  }
+
+  const cleanedSubcategory = subcategory.trim().toUpperCase();
+
+  if (cleanedSubcategory.length !== 3 || cleanedSubcategory.charAt(1) !== "V") {
+    console.warn("⚠️ Unexpected matchup format:", subcategory);
+    return [null, null];
+  }
+
+  const playerRace = raceMap[cleanedSubcategory.charAt(0)] || null;
+  const opponentRace = raceMap[cleanedSubcategory.charAt(2)] || null;
+
+  return [playerRace, opponentRace];
+}
+/*
+// ✅ Helper to set border color based on race
+function getRaceBorderColor(subcategory) {
+  if (!subcategory) return "#555555";
+
+  if (subcategory.startsWith("Zv")) {
+    return "#7e57c2"; // Zerg purple
+  } else if (subcategory.startsWith("Pv")) {
+    return "#5fe5ff"; // Protoss blue
+  } else if (subcategory.startsWith("Tv")) {
+    return "#ff5252"; // Terran red
+  }
+  return "#555555"; // Default gray
+}
+*/
+async function unpublishBuild(buildId) {
+  const db = getFirestore();
+  const user = getAuth().currentUser;
+
+  if (!user) {
+    console.error("No user logged in. Cannot unpublish.");
+    return;
+  }
+
+  const buildRef = doc(db, `users/${user.uid}/builds/${buildId}`);
+
+  try {
+    await updateDoc(buildRef, {
+      isPublished: false,
+      datePublished: null,
+    });
+    console.log(`✅ Build "${buildId}" unpublished successfully.`);
+    showToast("✅ Build unpublished!", "success");
+  } catch (error) {
+    console.error("❌ Error unpublishing build:", error);
+    showToast("❌ Failed to unpublish build.", "error");
+  }
 }
 
 function updateBuildPreview(build) {

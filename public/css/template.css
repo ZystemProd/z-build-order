@@ -404,11 +404,10 @@
   position: relative;
   z-index: 1;
   width: 210px;
-  height: 210px;
+  height: auto;
   background-size: contain; /* Ensure the image covers the entire card */
   background-repeat: no-repeat; /* Prevent repeating the image */
   background-position: center; /* Center the image */
-  border: 1px solid #444;
   border-radius: 8px;
   padding: 10px;
   margin: 10px;
@@ -438,7 +437,6 @@
   overflow-x: hidden;
   min-height: 250px;
   height: 90%;
-  white-space: pre-wrap; /* Ensures long text wraps */
   word-wrap: break-word; /* Breaks long words */
   overflow-wrap: break-word; /* Ensures text wraps in all cases */
 }
