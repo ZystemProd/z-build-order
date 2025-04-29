@@ -14,6 +14,7 @@ import {
   increment,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { formatActionText } from "./textFormatters.js";
+import { showToast } from "./uiHandlers.js";
 import { populateBuildsModal } from "./buildManagement.js"; // ✅ Corrected import
 import { auth, db } from "../../app.js"; // ✅ Ensure auth and db are imported correctly
 
@@ -608,6 +609,82 @@ if (publishButton) {
       alert("Failed to publish build. Please check your permissions.");
     }
   });
+}
+
+export async function publishBuildToCommunity(buildId) {
+  try {
+    const user = auth.currentUser;
+
+    if (!user) {
+      alert("You must be signed in to publish builds.");
+      return;
+    }
+
+    const userRef = doc(db, "users", user.uid);
+    const userSnapshot = await getDoc(userRef);
+
+    if (!userSnapshot.exists() || !userSnapshot.data().username) {
+      alert("You must set a username before publishing.");
+      return;
+    }
+
+    const username = userSnapshot.data().username;
+
+    const buildRef = doc(db, `users/${user.uid}/builds/${buildId}`);
+    const buildSnapshot = await getDoc(buildRef);
+
+    if (!buildSnapshot.exists()) {
+      alert("Build not found.");
+      return;
+    }
+
+    const buildData = buildSnapshot.data();
+
+    const communityBuildsRef = collection(db, "communityBuilds");
+
+    const newBuildData = {
+      ...buildData,
+      publisherId: user.uid,
+      username: username,
+      isPublished: true,
+      datePublished: new Date().toISOString(),
+    };
+
+    await addDoc(communityBuildsRef, newBuildData);
+    console.log(`✅ Published build ID ${buildId} to community`);
+
+    // ✅ Mark user build as published
+    await setDoc(
+      buildRef,
+      { ...buildData, isPublished: true },
+      { merge: true }
+    );
+
+    // ✅ Toast
+    showToast("✅ Build published to Community!", "success");
+
+    // ✅ Update UI immediately
+    const buildCard = document.querySelector(
+      `.build-card[data-id="${buildId}"]`
+    );
+    if (buildCard) {
+      const publishInfo = buildCard.querySelector(".build-publish-info");
+      if (publishInfo) {
+        publishInfo.innerHTML = `<img src="./img/SVG/checkmark2.svg" alt="Published" class="publish-icon">`;
+        publishInfo.classList.remove("publish-unpublished");
+        publishInfo.classList.add("publish-published");
+        publishInfo.onclick = (event) => {
+          event.stopPropagation();
+          openPublishSettingsModal(buildId);
+        };
+      }
+    }
+
+    showToast("✅ Build published to Community!", "success");
+  } catch (error) {
+    console.error("❌ Error publishing build:", error.message, error.stack);
+    alert("Failed to publish build. Please check your permissions.");
+  }
 }
 
 export function searchCommunityBuilds(query) {

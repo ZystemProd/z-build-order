@@ -773,7 +773,7 @@ textarea::-webkit-scrollbar-thumb:hover {
   height: 250px !important;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: start;
   box-shadow: 0 0 8px rgba(0, 0, 0, 0.6);
   background-clip: padding-box;
   border: 3px solid transparent;
@@ -858,22 +858,49 @@ textarea::-webkit-scrollbar-thumb:hover {
 }
 
 .build-publish-info {
-  font-size: 0.85rem;
-  color: #00c853;
-  background: rgba(0, 200, 83, 0.1);
-  border: 1px solid #00c853;
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  padding: 4px 8px;
   border-radius: 8px;
-  text-align: center;
-  padding: 6px 10px;
-  margin-top: auto;
   cursor: pointer;
-  transition: background 0.3s, color 0.3s, border-color 0.3s;
+  transition: background 0.3s, color 0.3s, transform 0.3s;
+  color: var(--race-color, #5fe5ff);
+  background: rgba(95, 229, 255, 0.08); /* Softer background */
+  border: 1px solid var(--race-color, #5fe5ff);
 }
 
 .build-publish-info:hover {
-  background: #00c853;
-  color: #121212;
+  background: rgba(95, 229, 255, 0.2); /* Just a little brighter, not solid */
+  color: #ffffff; /* Keep text white */
+  transform: scale(1.05); /* Slight grow effect */
+}
+
+.publish-unpublished {
+  color: #5fe5ff; /* Soft blue */
+  background: rgba(95, 229, 255, 0.15);
+  border-color: #5fe5ff;
+}
+
+.publish-published {
+  color: #00c853; /* Green */
+  background: rgba(0, 200, 83, 0.15);
   border-color: #00c853;
+}
+
+.publish-imported {
+  color: #ff9800; /* Orange */
+  background: rgba(255, 152, 0, 0.15);
+  border-color: #ff9800;
+}
+
+.publish-icon {
+  width: 16px;
+  height: 16px;
 }
 
 .build-card .map-image {
@@ -1793,7 +1820,7 @@ textarea::-webkit-scrollbar-thumb:hover {
   color: #e0e0e0;
   width: 90%;
   max-width: 1670px;
-  height: 80%;
+  height: 85%;
   margin: 5% auto;
   padding: 20px;
   border-radius: 10px;
@@ -2881,6 +2908,133 @@ td {
 
 .supply-normal {
   color: inherit;
+}
+
+/* Publish Modal Styles */
+.small-modal {
+  max-width: 400px;
+  background: #1e1e1e;
+  padding: 20px;
+  border-radius: 10px;
+  color: white;
+  text-align: center;
+}
+
+.publish-options {
+  margin: 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+
+.modal-buttons {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 20px;
+}
+
+.confirm-button,
+.cancel-button {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background 0.3s, color 0.3s;
+}
+
+.confirm-button {
+  background-color: #00c853;
+  color: white;
+}
+
+.confirm-button:hover {
+  background-color: #00e676;
+}
+
+.cancel-button {
+  background-color: #555;
+  color: white;
+}
+
+.cancel-button:hover {
+  background-color: #777;
+}
+
+.publish-status-list {
+  margin: 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+
+/* Username input default */
+#usernameInput {
+  border: 2px solid #555;
+  padding: 8px;
+  border-radius: 6px;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+/* Valid username */
+.username-valid {
+  border-color: #00e676;
+  box-shadow: 0 0 8px #00e676;
+}
+
+/* Invalid username */
+.username-invalid {
+  border-color: #ff5252;
+  box-shadow: 0 0 8px #ff5252;
+}
+
+.spinner-small {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  margin-top: -9px; /* center vertically */
+  border: 2px solid #ccc;
+  border-top: 2px solid #00e676;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  z-index: 2;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.user-menu {
+  position: absolute;
+  top: 60px; /* Adjust based on your header height */
+  right: 20px;
+  background-color: #1e1e1e;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 10px;
+  z-index: 10;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.user-menu button {
+  background: none;
+  border: none;
+  color: #ff5252;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.user-menu button:hover {
+  text-decoration: underline;
 }
 
 @media screen and (max-width: 768px) {

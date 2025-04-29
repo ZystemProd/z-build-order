@@ -53,7 +53,7 @@
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   gap: 10px;
   overflow-y: auto; /* ✅ Enables scrolling */
-  max-height: 60vh; /* ✅ Limits height to fit screen */
+  max-height: 76vh; /* ✅ Limits height to fit screen */
   padding: 15px;
 }
 
@@ -165,10 +165,10 @@
   ); /* Semi-transparent modal background */
   backdrop-filter: blur(10px); /* Apply blur effect */
   color: white; /* Text color */
-  margin: 10% auto; /* 10% from the top and centered */
+  margin: 5% auto; /* 10% from the top and centered */
   border: 1px solid #888;
   max-width: 70%; /* Width of the modal */
-  height: 70%;
+  height: 85%;
   border-radius: 8px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
   overflow-y: hidden;

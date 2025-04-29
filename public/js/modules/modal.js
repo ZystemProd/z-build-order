@@ -4,6 +4,10 @@ import {
   getFirestore,
   updateDoc,
   deleteDoc,
+  collection,
+  query,
+  where,
+  getDocs,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
 import {
@@ -13,6 +17,7 @@ import {
   getDownloadURL,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-storage.js";
 //import * as DOMPurify from "./dompurify/dist/purify.min.js";
+import { auth } from "../../app.js";
 import { displayBuildOrder, showToast } from "./uiHandlers.js";
 import { updateYouTubeEmbed, clearYouTubeEmbed } from "./youtube.js";
 import {
@@ -24,6 +29,7 @@ import { fetchUserBuilds } from "./buildManagement.js";
 import { mapAnnotations } from "./interactive_map.js";
 import { formatActionText } from "./textFormatters.js";
 import { analyzeBuildOrder } from "./uiHandlers.js";
+import { publishBuildToCommunity } from "./community.js";
 
 function formatMatchup(matchup) {
   if (!matchup) return "Unknown Match-Up";
@@ -281,6 +287,41 @@ export function openModal(modalId) {
 window.openModal = openModal;
 //window.showAllBuilds = showAllBuilds;
 
+let currentBuildIdToPublish = null;
+
+export function openPublishModal(buildId) {
+  currentBuildIdToPublish = buildId;
+  const modal = document.getElementById("publishModal");
+  modal.style.display = "block";
+}
+
+document
+  .getElementById("closePublishModalButton")
+  .addEventListener("click", () => {
+    document.getElementById("publishModal").style.display = "none";
+  });
+
+document
+  .getElementById("confirmPublishButton")
+  .addEventListener("click", async () => {
+    const selectedDestination = document.querySelector(
+      'input[name="publishDestination"]:checked'
+    ).value;
+
+    if (!currentBuildIdToPublish) {
+      console.error("❌ No build selected for publishing.");
+      return;
+    }
+
+    if (selectedDestination === "community") {
+      await publishBuildToCommunity(currentBuildIdToPublish); // ✅ Use currentBuildIdToPublish here
+    } else {
+      showToast("Clan publishing is coming soon!", "info");
+    }
+
+    document.getElementById("publishModal").style.display = "none";
+  });
+
 export function showSubcategories(event) {
   const subcategoriesMenu = event.target.querySelector(".subcategories-menu");
   if (subcategoriesMenu) {
@@ -388,13 +429,18 @@ export async function populateBuildList(filteredBuilds = null) {
     const buildCard = document.createElement("div");
     buildCard.classList.add("build-card");
     buildCard.dataset.id = build.id;
+    buildCard.style.position = "relative";
+
+    // ✅ Add .published class if published
+    if (build.isPublished) {
+      buildCard.classList.add("published");
+    }
 
     // ✅ Determine races based on matchup
     const [playerRace, opponentRace] = getRaceIcons(
       build.subcategory || "Unknown"
     );
 
-    // ✅ Only create icons if both playerRace and opponentRace exist
     const matchupIconsHTML =
       playerRace && opponentRace
         ? `
@@ -406,11 +452,6 @@ export async function populateBuildList(filteredBuilds = null) {
     `
         : `<div class="matchup-icons">Invalid Matchup</div>`;
 
-    const publishedText = build.isPublished
-      ? "Published to: Community ✅"
-      : "Not published 🔒";
-
-    // ✅ Build the card inner HTML
     buildCard.innerHTML = `
       <div class="build-card-header">
         ${matchupIconsHTML}
@@ -421,27 +462,29 @@ export async function populateBuildList(filteredBuilds = null) {
         <p>Publisher: You</p>
         <p>Date: ${new Date(build.timestamp).toLocaleDateString()}</p>
       </div>
-      <div class="build-publish-info clickable">
-        ${publishedText}
-      </div>
+      <div class="build-publish-info"></div> <!-- Placeholder -->
     `;
 
-    // ✅ Set dynamic gradient colors based on matchup
+    // ✅ Set dynamic colors
     if (build.subcategory?.toUpperCase().startsWith("ZV")) {
-      buildCard.style.setProperty("--gradient-color1", "#8e2de2"); // Zerg purple
+      buildCard.style.setProperty("--gradient-color1", "#8e2de2");
       buildCard.style.setProperty("--gradient-color2", "#4a00e0");
+      buildCard.style.setProperty("--race-color", "#8e2de2");
     } else if (build.subcategory?.toUpperCase().startsWith("PV")) {
-      buildCard.style.setProperty("--gradient-color1", "#5fe5ff"); // Protoss blue
+      buildCard.style.setProperty("--gradient-color1", "#5fe5ff");
       buildCard.style.setProperty("--gradient-color2", "#007cf0");
+      buildCard.style.setProperty("--race-color", "#5fe5ff");
     } else if (build.subcategory?.toUpperCase().startsWith("TV")) {
-      buildCard.style.setProperty("--gradient-color1", "#ff3a30"); // Terran red
+      buildCard.style.setProperty("--gradient-color1", "#ff3a30");
       buildCard.style.setProperty("--gradient-color2", "#ff7b00");
+      buildCard.style.setProperty("--race-color", "#ff3a30");
     } else {
       buildCard.style.setProperty("--gradient-color1", "#555");
       buildCard.style.setProperty("--gradient-color2", "#333");
+      buildCard.style.setProperty("--race-color", "#888");
     }
 
-    // ✅ Hover to preview
+    // ✅ Hover preview
     buildCard.addEventListener("mouseover", () => {
       if (lastHoveredBuild !== build) {
         updateBuildPreview(build);
@@ -452,7 +495,7 @@ export async function populateBuildList(filteredBuilds = null) {
     // ✅ Click to view build
     buildCard.addEventListener("click", () => viewBuild(build.id));
 
-    // ✅ Delete button click
+    // ✅ Delete build
     const deleteButton = buildCard.querySelector(".delete-build-btn");
     if (deleteButton) {
       deleteButton.addEventListener("click", async (event) => {
@@ -468,25 +511,32 @@ export async function populateBuildList(filteredBuilds = null) {
       });
     }
 
-    // ✅ Publish/Unpublish click
+    // ✅ Setup publish-info button
     const publishInfo = buildCard.querySelector(".build-publish-info");
     if (publishInfo) {
-      publishInfo.addEventListener("click", async (event) => {
-        event.stopPropagation();
-
-        if (build.isPublished) {
-          const confirmation = confirm(
-            `Are you sure you want to unpublish "${build.title}" from the Community?`
-          );
-          if (confirmation) {
-            await unpublishBuild(build.id);
-            const updatedBuilds = await fetchUserBuilds();
-            populateBuildList(updatedBuilds);
-          }
-        } else {
-          alert("This build is not published yet!");
-        }
-      });
+      if (build.imported) {
+        // Imported build (non-clickable)
+        publishInfo.classList.add("publish-imported");
+        publishInfo.innerHTML = `<span>Imported</span>`;
+        publishInfo.style.pointerEvents = "none";
+        publishInfo.style.cursor = "default";
+      } else if (build.isPublished) {
+        // Published build
+        publishInfo.classList.add("publish-published");
+        publishInfo.innerHTML = `<span>Published </span><img src="./img/SVG/checkmark2.svg" alt="Published" class="publish-icon">`;
+        publishInfo.addEventListener("click", (event) => {
+          event.stopPropagation();
+          openPublishSettingsModal(build.id);
+        });
+      } else {
+        // Not published build
+        publishInfo.classList.add("publish-unpublished");
+        publishInfo.innerHTML = `<img src="./img/SVG/publish2.svg" alt="Publish" class="publish-icon"><span>Publish</span>`;
+        publishInfo.addEventListener("click", (event) => {
+          event.stopPropagation();
+          openPublishModal(build.id);
+        });
+      }
     }
 
     fragment.appendChild(buildCard);
@@ -495,6 +545,41 @@ export async function populateBuildList(filteredBuilds = null) {
   buildList.appendChild(fragment);
   isPopulatingBuildList = false;
 }
+
+export function openPublishSettingsModal(buildId) {
+  console.log(`⚙️ Open manage publish settings for build: ${buildId}`);
+  currentBuildIdToPublish = buildId;
+
+  const modal = document.getElementById("managePublishModal");
+  modal.style.display = "block";
+
+  // Load current publish state
+  const buildCard = document.querySelector(`.build-card[data-id="${buildId}"]`);
+  if (buildCard) {
+    const isPublished = buildCard.classList.contains("published"); // or based on your state
+    document.getElementById("publishToCommunity").checked = isPublished;
+  }
+}
+
+document
+  .getElementById("savePublishSettingsButton")
+  .addEventListener("click", async () => {
+    const publishToCommunity =
+      document.getElementById("publishToCommunity").checked;
+
+    if (!currentBuildIdToPublish) {
+      console.error("❌ No build selected to update.");
+      return;
+    }
+
+    if (publishToCommunity) {
+      await publishBuildToCommunity(currentBuildIdToPublish);
+    } else {
+      await unpublishBuild(currentBuildIdToPublish);
+    }
+
+    document.getElementById("managePublishModal").style.display = "none";
+  });
 
 // ✅ Helper function to parse matchup races correctly
 function getRaceIcons(subcategory) {
@@ -535,27 +620,59 @@ function getRaceBorderColor(subcategory) {
   return "#555555"; // Default gray
 }
 */
-async function unpublishBuild(buildId) {
-  const db = getFirestore();
-  const user = getAuth().currentUser;
-
-  if (!user) {
-    console.error("No user logged in. Cannot unpublish.");
-    return;
-  }
-
-  const buildRef = doc(db, `users/${user.uid}/builds/${buildId}`);
-
+export async function unpublishBuild(buildId) {
   try {
+    const db = getFirestore();
+    const user = auth.currentUser;
+
+    if (!user) {
+      alert("You must be signed in to unpublish builds.");
+      return;
+    }
+
+    // ✅ Update your own saved build
+    const buildRef = doc(db, `users/${user.uid}/builds/${buildId}`);
     await updateDoc(buildRef, {
       isPublished: false,
-      datePublished: null,
     });
-    console.log(`✅ Build "${buildId}" unpublished successfully.`);
+
+    // ✅ Now search communityBuilds where publisherId == user.uid
+    const communityRef = collection(db, "communityBuilds");
+    const q = query(communityRef, where("publisherId", "==", user.uid));
+
+    const querySnapshot = await getDocs(q);
+    querySnapshot.forEach(async (docSnap) => {
+      const buildData = docSnap.data();
+      if (buildData.title) {
+        // Optional more matching checks
+        // ✅ Delete this community build
+        await deleteDoc(doc(db, "communityBuilds", docSnap.id));
+        console.log(`✅ Deleted from communityBuilds: ${docSnap.id}`);
+      }
+    });
+
     showToast("✅ Build unpublished!", "success");
+
+    // ✅ Update card UI live
+    const buildCard = document.querySelector(
+      `.build-card[data-id="${buildId}"]`
+    );
+    if (buildCard) {
+      const publishInfo = buildCard.querySelector(".build-publish-info");
+      if (publishInfo) {
+        publishInfo.innerHTML = `<img src="./img/SVG/publish2.svg" alt="Publish" class="publish-icon"><span>Publish</span>`;
+        publishInfo.classList.remove("publish-published");
+        publishInfo.classList.add("publish-unpublished");
+        publishInfo.onclick = (event) => {
+          event.stopPropagation();
+          openPublishModal(buildId);
+        };
+      }
+      buildCard.classList.remove("published");
+    }
   } catch (error) {
-    console.error("❌ Error unpublishing build:", error);
-    showToast("❌ Failed to unpublish build.", "error");
+    console.error("❌ Error unpublishing build:", error.message);
+    showToast("Failed to unpublish build.", "error");
   }
 }
 

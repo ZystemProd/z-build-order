@@ -1,4 +1,4 @@
-// app.js (corrected and final)
+// app.js (final, polished)
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
 import {
@@ -6,6 +6,7 @@ import {
   GoogleAuthProvider,
   signInWithPopup,
   signOut,
+  deleteUser,
   onAuthStateChanged,
   setPersistence,
   browserLocalPersistence,
@@ -15,8 +16,11 @@ import {
   doc,
   getDoc,
   setDoc,
+  deleteDoc,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { getPerformance } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-performance.js";
+import { bannedWords } from "./js/data/bannedWords.js";
+import { showToast } from "./js/modules/uiHandlers.js";
 import { resetBuildInputs } from "./js/modules/utils.js";
 
 // Firebase config
@@ -29,6 +33,17 @@ const firebaseConfig = {
   appId: "1:22023941178:web:ba417e9a52332a8e055903",
   measurementId: "G-LBDMKMG1W9",
 };
+
+// --- DOM Reset --- //
+document.addEventListener("DOMContentLoaded", () => {
+  const userPhoto = document.getElementById("userPhoto");
+  const userName = document.getElementById("userName");
+  const userMenu = document.getElementById("userMenu");
+
+  if (userPhoto) userPhoto.style.display = "none";
+  if (userName) userName.style.display = "none";
+  if (userMenu) userMenu.style.display = "none";
+});
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
@@ -48,14 +63,28 @@ async function checkAndSetUsername(user) {
   const userSnapshot = await getDoc(userRef);
 
   if (!userSnapshot.exists() || !userSnapshot.data().username) {
-    document.getElementById("usernameModal").style.display = "block";
+    const usernameModal = document.getElementById("usernameModal");
+    const usernameInput = document.getElementById("usernameInput");
 
-    document.getElementById("confirmUsernameButton").onclick = async () => {
-      const usernameInput = document.getElementById("usernameInput");
+    usernameModal.style.display = "block";
+
+    usernameInput.addEventListener("input", async () => {
       const username = usernameInput.value.trim();
-
       if (!username) {
-        alert("Username cannot be empty!");
+        usernameInput.classList.remove("username-valid", "username-invalid");
+        return;
+      }
+
+      if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
+        usernameInput.classList.remove("username-valid");
+        usernameInput.classList.add("username-invalid");
+        return;
+      }
+
+      const lowerUsername = username.toLowerCase();
+      if (bannedWords.some((badWord) => lowerUsername.includes(badWord))) {
+        usernameInput.classList.remove("username-valid");
+        usernameInput.classList.add("username-invalid");
         return;
       }
 
@@ -63,13 +92,52 @@ async function checkAndSetUsername(user) {
       const usernameSnap = await getDoc(usernameDoc);
 
       if (usernameSnap.exists()) {
-        alert("That username is already taken. Please choose another.");
+        usernameInput.classList.remove("username-valid");
+        usernameInput.classList.add("username-invalid");
+      } else {
+        usernameInput.classList.remove("username-invalid");
+        usernameInput.classList.add("username-valid");
+      }
+    });
+
+    document.getElementById("confirmUsernameButton").onclick = async () => {
+      const username = usernameInput.value.trim();
+      if (!username) {
+        showToast("Username cannot be empty!", "error");
+        return;
+      }
+      if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
+        showToast(
+          "Username must be 3-20 characters, only letters, numbers, or _",
+          "error"
+        );
+        return;
+      }
+
+      const lowerUsername = username.toLowerCase();
+      if (bannedWords.some((badWord) => lowerUsername.includes(badWord))) {
+        showToast(
+          "🚫 Username contains inappropriate words or reserved terms.",
+          "error"
+        );
+        return;
+      }
+
+      const usernameDoc = doc(db, "usernames", username);
+      const usernameSnap = await getDoc(usernameDoc);
+
+      if (usernameSnap.exists()) {
+        showToast("❌ That username is already taken.", "error");
       } else {
         await setDoc(userRef, { username, userId: user.uid }, { merge: true });
         await setDoc(usernameDoc, { userId: user.uid });
 
-        alert(`Username set as: ${username}`);
-        document.getElementById("usernameModal").style.display = "none";
+        showToast(`✅ Username set as: ${username}`, "success");
+
+        document.getElementById("userName").innerText = username;
+        document.getElementById("userName").style.display = "inline-block";
+        document.getElementById("userPhoto").style.display = "inline-block";
+        usernameModal.style.display = "none";
       }
     };
   }
@@ -83,21 +151,12 @@ export function initializeAuthUI() {
   const userName = document.getElementById("userName");
   const userPhoto = document.getElementById("userPhoto");
 
-  // ✅ When page loads: show spinner + "Loading user...", hide user info
   if (authLoadingWrapper) authLoadingWrapper.style.display = "flex";
-  if (userName) {
-    userName.style.display = "none";
-    userName.classList.remove("visible");
-  }
-  if (userPhoto) {
-    userPhoto.style.display = "none";
-    userPhoto.classList.remove("visible");
-  }
+  if (userName) userName.style.display = "none";
+  if (userPhoto) userPhoto.style.display = "none";
 
   onAuthStateChanged(auth, async (user) => {
     if (user) {
-      console.log("✅ User logged in:", user.displayName || user.email);
-
       const userRef = doc(db, "users", user.uid);
       const userSnapshot = await getDoc(userRef);
 
@@ -119,25 +178,15 @@ export function initializeAuthUI() {
 
       toggleAuthButtons(true);
     } else {
-      console.log("🚫 No user logged in.");
-
       document.getElementById("userName").innerText = "Guest";
       document.getElementById("userPhoto").src = "img/default-avatar.webp";
-
       toggleAuthButtons(false);
       resetBuildInputs();
     }
 
-    // ✅ After Firebase confirms login state:
-    if (authLoadingWrapper) authLoadingWrapper.style.display = "none"; // Hide spinner + loading text
-    if (userName) {
-      userName.style.display = "inline";
-      userName.classList.add("visible"); // fade-in effect
-    }
-    if (userPhoto) {
-      userPhoto.style.display = "inline";
-      userPhoto.classList.add("visible"); // fade-in effect
-    }
+    if (authLoadingWrapper) authLoadingWrapper.style.display = "none";
+    if (userName) userName.style.display = "inline";
+    if (userPhoto) userPhoto.style.display = "inline";
   });
 }
 
@@ -157,27 +206,21 @@ function toggleAuthButtons(isLoggedIn) {
 }
 
 export function handleSignIn() {
-  const authLoading = document.getElementById("authLoading");
-  if (authLoading) authLoading.innerText = "Signing in...";
-
   signInWithPopup(auth, provider)
-    .then((result) => {
-      console.log("✅ Signed in as:", result.user.displayName);
+    .then(() => {
       initializeAuthUI();
     })
     .catch((error) => {
       console.error("❌ Sign in error:", error);
-      if (authLoading) authLoading.innerText = "Sign in failed!";
     });
 }
 
 export function handleSignOut() {
   signOut(auth)
     .then(() => {
-      console.log("✅ Signed out.");
       resetBuildInputs();
       initializeAuthUI();
-      window.location.reload(); // Refresh to clean UI
+      window.location.reload();
     })
     .catch((error) => {
       console.error("❌ Sign out error:", error);
@@ -187,11 +230,7 @@ export function handleSignOut() {
 export async function handleSwitchAccount() {
   try {
     await signOut(auth);
-    console.log("🔄 Signed out. Switching accounts...");
-    resetBuildInputs();
-
     const result = await signInWithPopup(auth, provider);
-    console.log("✅ Switched to account:", result.user.displayName);
     initializeAuthUI();
     window.location.reload();
   } catch (err) {
@@ -200,13 +239,113 @@ export async function handleSwitchAccount() {
 }
 
 /*********************************************************************
- * Exports
+ * Account Deletion (User Menu)
  *********************************************************************/
+const deleteAccountBtn = document.getElementById("deleteAccountBtn");
 
-// Export to modules
+if (deleteAccountBtn) {
+  deleteAccountBtn.addEventListener("click", async () => {
+    const confirmation = confirm(
+      "⚠️ Are you sure you want to permanently delete your account?"
+    );
+    if (!confirmation) return;
+
+    const user = auth.currentUser;
+    const userId = user.uid;
+
+    try {
+      const db = getFirestore();
+
+      // 1. Get the username first
+      const userRef = doc(db, "users", userId);
+      const userSnapshot = await getDoc(userRef);
+
+      let usernameToDelete = null;
+      if (userSnapshot.exists()) {
+        usernameToDelete = userSnapshot.data().username || null;
+      }
+
+      // 2. Delete user document
+      await deleteDoc(userRef);
+
+      // 3. Delete username mapping if exists
+      if (usernameToDelete) {
+        const usernameDoc = doc(db, "usernames", usernameToDelete);
+        await deleteDoc(usernameDoc);
+        console.log(`✅ Deleted username mapping: ${usernameToDelete}`);
+      }
+
+      // 4. Delete the user auth account
+      await deleteUser(user);
+
+      // 5. Show success
+      showToast("✅ Account deleted successfully.", "success");
+      setTimeout(() => (window.location.href = "/"), 2000);
+    } catch (error) {
+      console.error("❌ Error deleting account:", error);
+      showToast(
+        "❌ Failed to delete account. Try re-logging in first.",
+        "error"
+      );
+    }
+  });
+}
+
+/*********************************************************************
+ * User Photo Click Menu
+ *********************************************************************/
+const userPhoto = document.getElementById("userPhoto");
+const userMenu = document.getElementById("userMenu");
+
+if (userPhoto) {
+  userPhoto.addEventListener("click", () => {
+    if (userMenu.style.display === "none") {
+      userMenu.style.display = "block";
+    } else {
+      userMenu.style.display = "none";
+    }
+  });
+}
+
+// Close user menu if clicking outside
+window.addEventListener("click", (e) => {
+  if (userMenu && !userMenu.contains(e.target) && e.target !== userPhoto) {
+    userMenu.style.display = "none";
+  }
+});
+
+/*********************************************************************
+ * Username Modal Closing Behavior
+ *********************************************************************/
+const usernameModal = document.getElementById("usernameModal");
+const closeUsernameModal = document.getElementById("closeUsernameModal");
+
+if (closeUsernameModal) {
+  closeUsernameModal.addEventListener("click", async () => {
+    await handleCancelUsername();
+  });
+}
+
+window.addEventListener("click", async (e) => {
+  if (e.target === usernameModal) {
+    await handleCancelUsername();
+  }
+});
+
+async function handleCancelUsername() {
+  document.getElementById("usernameModal").style.display = "none";
+
+  // Reset to guest and sign out
+  const userName = document.getElementById("userName");
+  const userPhoto = document.getElementById("userPhoto");
+
+  if (userPhoto) userPhoto.src = "img/default-avatar.webp";
+  if (userName) userName.innerText = "Guest";
+
+  await signOut(auth);
+}
+
 export { auth, db };
-
-// Attach to window for UI buttons
 window.handleSignIn = handleSignIn;
 window.handleSignOut = handleSignOut;
 window.handleSwitchAccount = handleSwitchAccount;
