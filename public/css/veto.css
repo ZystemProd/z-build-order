@@ -1,0 +1,511 @@
+@font-face {
+  font-family: "MyCustomFont"; /* Use any name you want */
+  src: url("../fonts/EuroStyleNormal.ttf") format("truetype"); /* Adjust path based on your structure */
+  font-weight: normal;
+  font-style: normal;
+}
+
+:root {
+  --dark-blue: #0a0d23;
+  --darker-blue: #0a3b6c;
+  --vetoed-red: #8b0000;
+  --hover-blue: #00ffff;
+  --hover-red: #ff3333;
+  --settings-purple: #322f4f;
+}
+
+/* Apply the font to the map list */
+.map-list {
+  font-family: "MyCustomFont", sans-serif; /* Use your custom font and fall back to a default sans-serif font */
+  font-size: 19px;
+
+  max-height: 100px; /* Set a fixed height for the map list */
+  overflow: hidden; /* Prevent overflow */
+}
+
+body,
+html {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden; /* Prevent horizontal scrolling */
+}
+
+body {
+  display: absolute;
+  font-family: Arial, sans-serif;
+  background-color: black; /* Set the background to black */
+  color: white; /* Set the text color to white */
+  flex-direction: column;
+  justify-content: center; /* Center the container horizontally */
+  align-items: center; /* Center the container vertically */
+  height: 100vh; /* Make the body fill the viewport height */
+  margin: 0; /* Remove default margin */
+}
+
+.container {
+  display: flex;
+  justify-content: center; /* Center the container */
+  align-items: flex-start;
+  max-width: 1200px; /* or any value suitable for your design */
+  width: 100%;
+  gap: 10px; /* Add gap between map list and map preview */
+  margin: 0 auto; /* Center the container */
+}
+
+.map-list {
+  display: initial;
+  width: 30%;
+  max-height: 100%;
+  overflow-y: auto;
+  position: relative; /* Required for positioning the order indicator */
+  padding: 20px;
+  vertical-align: middle;
+  letter-spacing: 0.1rem;
+}
+
+.map-preview {
+  width: 45%; /* Adjust the width to make the preview wider */
+  text-align: center;
+  height: 500px; /* Set a fixed height for the map preview container */
+  -webkit-user-select: none; /* Safari */
+  -ms-user-select: none; /* IE 10 and IE 11 */
+  user-select: none; /* Standard syntax */
+}
+
+#previewImage {
+  width: 100%;
+  max-width: 400px; /* Max width for preview image */
+  max-height: 500px; /* Max height for preview image */
+  object-fit: contain; /* Scale the image while maintaining aspect ratio */
+  border: 2px solid var(--darker-blue); /* White border for better visibility */
+  border-radius: 30px;
+  margin-top: 25px;
+  -webkit-user-select: none; /* Safari */
+  -ms-user-select: none; /* IE 10 and IE 11 */
+  user-select: none; /* Standard syntax */
+}
+
+/* Other styles remain unchanged */
+.map-list ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+.map-list li {
+  margin: 10px 0;
+  padding: 10px;
+  padding-top: 12px;
+  background-color: var(--dark-blue); /* Very dark blue background */
+  max-height: 16px;
+  border: 2px solid var(--darker-blue); /* Dark blue border */
+  border-radius: 10px; /* Slightly rounded corners */
+  transition: all 0.3s ease;
+  display: flex; /* Use flexbox for layout */
+  justify-content: space-between; /* Space out the content */
+  align-items: center; /* Center vertically */
+  cursor: pointer; /* Change cursor to pointer for better UX */
+  -webkit-user-select: none; /* Safari */
+  -ms-user-select: none; /* IE 10 and IE 11 */
+  user-select: none; /* Standard syntax */
+}
+
+.map-list li span:not(.order-indicator) {
+  display: inline-block;
+
+  vertical-align: middle; /* Ensures alignment */
+  font-size: inherit; /* Maintain the font size */
+}
+
+/* Styling for the order indicator */
+.order-indicator {
+  font-family: Arial, Helvetica, sans-serif;
+  display: flex;
+  justify-content: center; /* Centers content horizontally */
+  align-items: center; /* Centers content vertically */
+  font-size: 16px; /* Adjust text size as needed */
+  height: 15px;
+  width: 10%; /* Give it 10% width */
+  text-align: center; /* Center the text */
+  color: white; /* White text color */
+  border-radius: 5px; /* Slightly rounded corners */
+  padding: 5px; /* Padding for the indicator */
+  transition: background 0.3s; /* Smooth background transition */
+  cursor: pointer; /* Change cursor to pointer for better UX */
+  visibility: visible; /* Ensure it's visible initially */
+}
+
+.order-indicator span {
+  background: #f50000; /* Darker background on hover */
+}
+
+.order-indicator:hover {
+  background: #555; /* Darker background on hover */
+}
+/* Normal hover effect */
+.map-list li:hover {
+  border-color: var(--hover-blue); /* Neon blue border on hover */
+  background: #03040f; /* background on hover */
+}
+
+/* Vetoed maps (checked maps) */
+.map-list li.vetoed-map {
+  border-color: var(--vetoed-red); /* Dark red border when vetoed */
+  background-color: #330000; /* Darker red background */
+}
+
+/* Hover effect for vetoed maps */
+.map-list li.vetoed-map:hover {
+  border-color: var(--hover-red); /* Neon red border on hover when vetoed */
+  background: #330000; /* background for vetoed maps */
+}
+
+/* Hide the indicator for vetoed maps */
+.map-list li.vetoed-map .order-indicator {
+  visibility: hidden; /* Hide indicator for vetoed maps */
+}
+
+label span {
+  color: white; /* Ensure labels and spans are white */
+}
+
+h2 {
+  color: white;
+}
+
+.control-area {
+  display: flex;
+  flex-direction: column;
+  gap: 10px; /* Add spacing between dropdowns */
+}
+
+select,
+input[type="text"],
+button {
+  margin: 10px;
+  padding: 5px;
+  font-size: 16px;
+}
+
+.footer {
+  position: fixed;
+  bottom: 0; /* Align to the bottom of the page */
+  left: 0;
+  width: 100%; /* Full width of the page */
+  height: 50px; /* Fixed height for the footer */
+  display: flex;
+  justify-content: center; /* Center the text horizontally */
+  align-items: center; /* Center the text vertically within the footer */
+  color: white;
+  font-family: Arial, sans-serif;
+}
+
+.footer-logo {
+  position: absolute; /* Position the logo independently */
+  right: 20px; /* Distance from the right edge */
+  bottom: 10px; /* Distance from the bottom edge */
+  max-width: 50px; /* Adjust the logo size */
+  height: auto;
+}
+
+.footer p {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* Container for control area */
+.control-container {
+  display: flex;
+  justify-content: center; /* Center the container */
+  align-items: flex-start;
+  max-width: 1200px; /* or any value suitable for your design */
+  width: 100%;
+  gap: 10px; /* Add gap between map list and map preview */
+  margin: 0 auto; /* Center the container */
+}
+
+/* Left side of the control area */
+.control-left {
+  flex: 1; /* Take up remaining space */
+  display: flex;
+  flex-direction: column;
+  background-color: black;
+  border: 2px solid var(--settings-purple); /* purple border for better visibility */
+  border-radius: 10px;
+  gap: 5px; /* Add space between elements */
+  padding: 0 10px 0 10px;
+  z-index: 1;
+}
+
+/* Right side container for Best of Dropdown */
+.control-right {
+  flex: 1; /* Take up remaining space */
+  display: flex;
+  flex-direction: column;
+  background-color: black;
+  border: 2px solid var(--settings-purple); /* purple border for better visibility */
+  border-radius: 10px;
+  gap: 5px; /* Add space between elements */
+  padding: 0 10px 0 10px;
+  z-index: 1;
+}
+
+.option-display {
+  margin: 0 15px; /* Add horizontal space around the selected map text */
+  color: #eee; /* Match text color */
+  font-size: 16px; /* Font size for the selected map text */
+}
+
+.button-container {
+  display: flex;
+  align-items: center; /* Center the text vertically with buttons */
+  justify-content: space-between; /* Space between buttons and text */
+}
+
+button {
+  padding: 10px 20px; /* Padding for buttons */
+  background-color: #444; /* Dark background for buttons */
+  color: #eee; /* Light text color */
+  border: none; /* No border */
+  border-radius: 5px; /* Rounded corners */
+  cursor: pointer; /* Pointer cursor */
+  transition: background 0.3s; /* Smooth background transition */
+}
+
+button:hover {
+  background-color: #555; /* Change background on hover */
+}
+
+.toggle-content {
+  transition: max-height 0.5s ease, opacity 0.5s ease; /* Transition for max-height and opacity */
+  max-height: 500px; /* Adjust as needed */
+  opacity: 1; /* Initially visible */
+  overflow: hidden; /* Hide overflow */
+}
+
+.toggle-content.hidden {
+  max-height: 0; /* Set to 0 when hidden */
+  opacity: 0; /* Make it invisible */
+  pointer-events: none; /* Disable pointer events */
+}
+
+.control-left h5 {
+  margin-bottom: 0px; /* Space between the heading and controls */
+  color: #eee; /* Text color to match the design */
+  font-size: 18px; /* Font size for the headings */
+  text-align: center;
+  margin-top: 10px;
+}
+
+.control-right h5 {
+  padding-top: 20px;
+  padding-bottom: 5px;
+  margin-bottom: 10px; /* Space between the heading and controls */
+  color: #eee; /* Text color to match the design */
+  font-size: 18px; /* Font size for the headings */
+  text-align: center;
+  margin-top: 10px;
+}
+button {
+  margin-top: 10px;
+  background-color: var(--settings-purple);
+  color: white;
+}
+
+/* Dropdown Container */
+.custom-dropdown {
+  position: relative;
+  display: inline-block;
+  width: 300px;
+}
+
+.dropdown-btn {
+  width: 100%;
+  padding: 10px;
+  background-color: #333;
+  color: #eee;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  text-align: left;
+  position: relative;
+}
+
+/* The dropdown arrow */
+.dropdown-btn::after {
+  content: "▼";
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: #eee;
+}
+
+/* The dropdown list, hidden by default */
+.dropdown-list {
+  display: none;
+  position: absolute;
+  background-color: #333;
+  color: #eee;
+  border: 1px solid #444;
+  border-radius: 5px;
+  margin-top: 5px;
+  width: 100%;
+  z-index: 1;
+}
+
+/* List items */
+.dropdown-list li {
+  padding: 10px;
+  cursor: pointer;
+}
+
+.dropdown-list li:hover {
+  background-color: #555;
+}
+
+/* Show the dropdown list when active */
+.custom-dropdown.active .dropdown-list {
+  display: block;
+}
+
+select {
+  appearance: none; /* Removes default arrow */
+  width: 100%;
+  padding: 10px 40px 10px 15px; /* Space for text and arrow: left, right, and top */
+  font-size: 16px;
+  border: 2px solid #444;
+  border-radius: 8px;
+  background-color: #333;
+  color: #eee;
+  cursor: pointer;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2); /* Soft shadow */
+  position: relative; /* Ensure the custom arrow appears within the select */
+}
+
+select:hover {
+  border-color: #555;
+}
+
+select:focus {
+  border-color: #00ffff;
+  outline: none;
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.5); /* Glowing effect */
+}
+
+/* Custom Arrow */
+.custom-dropdown::after {
+  content: "▼"; /* Custom down arrow */
+  font-size: 14px;
+  position: absolute;
+  right: 15px; /* Aligns the arrow to the right within the select */
+  top: 50%;
+  transform: translateY(-50%); /* Center the arrow vertically */
+  pointer-events: none; /* Prevent the arrow from blocking clicks */
+  color: #eee; /* Same color as the text */
+}
+
+/* Label Styling */
+label {
+  font-size: 14px;
+  color: #eee; /* Match the dropdown text color */
+  margin-bottom: 5px;
+  display: block;
+  font-weight: bold;
+}
+
+/* Pulsing border animation */
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 14px 2px rgba(0, 255, 255, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 14px 4px rgba(0, 255, 255, 0.99);
+  }
+  100% {
+    box-shadow: 0 0 14px 2px rgba(0, 255, 255, 0.2);
+  }
+}
+
+/* Class to apply the pulsing border */
+.pulsing-border {
+  animation: pulse 3s infinite ease-in-out;
+}
+
+/* Style the checkbox container */
+.custom-checkbox {
+  display: flex;
+  align-items: center;
+  margin: 10px;
+}
+
+/* Hide the default checkbox */
+.custom-checkbox input[type="checkbox"] {
+  display: none;
+}
+
+/* Custom checkbox label style */
+.custom-checkbox label {
+  position: relative;
+  padding-left: 30px; /* Space for the custom checkbox */
+  padding-top: 5px;
+  cursor: pointer;
+  color: #eee; /* Match the theme */
+  font-size: 16px;
+  user-select: none;
+}
+
+/* Custom checkbox design */
+.custom-checkbox label:before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--settings-purple); /* Neon blue border */
+  border-radius: 4px;
+  background-color: #333; /* Dark background */
+  transition: all 0.3s ease;
+  transform: translateY(10%); /* Center the arrow vertically */
+}
+
+/* Checked state - Neon glow effect */
+.custom-checkbox input[type="checkbox"]:checked + label:before {
+  background-color: #625b9d; /* Neon blue background when checked */
+}
+
+/* Checkmark - shown when checked */
+.custom-checkbox input[type="checkbox"]:checked + label:after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 2px;
+  width: 8px;
+  height: 16px;
+  border: solid black;
+  border-width: 0 3px 3px 0;
+  transform: rotate(45deg);
+  background: none;
+}
+
+/* Label hover effect */
+.custom-checkbox label:hover:before {
+  border-color: #555; /* Darker border on hover */
+}
+
+.hidden {
+  display: none; /* Hides the element */
+}
+
+#mapFileInput {
+  display: block;
+}
+
+.map-preview.hidden {
+  display: none;
+}

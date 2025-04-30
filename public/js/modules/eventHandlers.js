@@ -232,6 +232,10 @@ export async function initializeIndexPage() {
       if (communityBtn) communityBtn.disabled = false;
     }
   });
+
+  document.getElementById("mapVetoBtn")?.addEventListener("click", () => {
+    window.location.href = "/veto.html";
+  });
 }
 
 /** ----------------
