@@ -18,6 +18,9 @@ import { showToast } from "./uiHandlers.js";
 import { populateBuildsModal } from "./buildManagement.js"; // ✅ Corrected import
 import { auth, db } from "../../app.js"; // ✅ Ensure auth and db are imported correctly
 
+let allCommunityBuilds = []; // master dataset
+let communityBuilds = []; // filtered or active dataset
+
 async function fetchCommunityBuilds() {
   const db = getFirestore();
   const buildsRef = collection(db, "communityBuilds");
@@ -25,32 +28,22 @@ async function fetchCommunityBuilds() {
 
   return snapshot.docs.map((doc) => {
     const data = doc.data();
+    const rawMatchup = data.subcategory?.trim().toLowerCase() || "unknown";
 
-    // ✅ Use `subcategory` for matchup instead of `matchup`
-    let rawMatchup = data.subcategory
-      ? data.subcategory.trim().toLowerCase()
-      : "unknown";
-
-    // ✅ Ensure the first and last letter are uppercase
-    let formattedMatchup = "Unknown";
-    if (rawMatchup.length === 3) {
-      formattedMatchup =
-        rawMatchup.charAt(0).toUpperCase() +
-        rawMatchup.charAt(1).toLowerCase() +
-        rawMatchup.charAt(2).toUpperCase();
-    }
-
-    console.log(
-      `🔍 Fetching build: ${
-        data.title || "Untitled Build"
-      }, Matchup: ${formattedMatchup}`
-    ); // Debugging log
+    const formattedMatchup =
+      rawMatchup.length === 3
+        ? rawMatchup.charAt(0).toUpperCase() +
+          rawMatchup.charAt(1).toLowerCase() +
+          rawMatchup.charAt(2).toUpperCase()
+        : "Unknown";
 
     return {
       id: doc.id,
       title: data.title || "Untitled Build",
       publisher: data.username || "Anonymous",
-      matchup: formattedMatchup, // ✅ Now properly formatted
+      matchup: formattedMatchup,
+      category: data.category || "Unknown",
+      subcategory: data.subcategory || "Unknown",
       datePublished: data.datePublished
         ? new Date(data.datePublished).toLocaleDateString()
         : "Unknown",
@@ -63,17 +56,15 @@ async function fetchCommunityBuilds() {
   });
 }
 
-// Function to populate the community builds table
-let communityBuilds = []; // Global variable to store builds
-let communityBuildsLoaded = false;
-let isPopulatingCommunityBuilds = false;
-
-export async function populateCommunityBuilds() {
+export async function populateCommunityBuilds(buildList = null) {
   const container = document.getElementById("communityBuildsContainer");
-  container.innerHTML = ""; // Clear existing builds
+  container.innerHTML = "";
 
   try {
-    const builds = await fetchCommunityBuilds();
+    const builds = buildList || (await fetchCommunityBuilds());
+    if (!buildList) allCommunityBuilds = builds;
+    communityBuilds = builds;
+
     const db = getFirestore();
 
     builds.forEach((build) => {
@@ -81,48 +72,33 @@ export async function populateCommunityBuilds() {
       const votePercentage =
         totalVotes > 0 ? Math.round((build.upvotes / totalVotes) * 100) : 0;
 
-      console.log(
-        `🔍 Processing build: ${build.title}, Matchup: ${build.matchup}`
-      );
+      let matchupImage = "./img/race/unknown.webp";
+      let matchupClass = "matchup-unknown";
 
-      // ✅ Determine matchup image based on the matchup
-      let matchupImage = "./img/race/unknown.webp"; // Default image
-      if (
-        build.matchup.includes("ZvZ") ||
-        build.matchup.includes("ZvT") ||
-        build.matchup.includes("ZvP")
-      ) {
-        matchupImage = "./img/race/zerg.webp";
-      } else if (
-        build.matchup.includes("PvP") ||
-        build.matchup.includes("PvZ") ||
-        build.matchup.includes("PvT")
-      ) {
-        matchupImage = "./img/race/protoss.webp";
-      } else if (
-        build.matchup.includes("TvP") ||
-        build.matchup.includes("TvT") ||
-        build.matchup.includes("TvZ")
-      ) {
-        matchupImage = "./img/race/terran.webp";
+      if (["ZvZ", "ZvT", "ZvP"].includes(build.matchup)) {
+        matchupImage = "./img/race/zerg2.webp";
+        matchupClass = "matchup-zerg";
+      } else if (["PvP", "PvZ", "PvT"].includes(build.matchup)) {
+        matchupImage = "./img/race/protoss2.webp";
+        matchupClass = "matchup-protoss";
+      } else if (["TvP", "TvT", "TvZ"].includes(build.matchup)) {
+        matchupImage = "./img/race/terran2.webp";
+        matchupClass = "matchup-terran";
       }
 
       const buildEntry = document.createElement("div");
       buildEntry.classList.add("build-entry");
       buildEntry.dataset.id = build.id;
 
-      // ✅ Increment view count when clicked
       buildEntry.addEventListener("click", async () => {
         window.location.href = `viewBuild.html?id=${build.id}`;
-        await incrementBuildViews(db, build.id); // Increase views in Firestore
+        await incrementBuildViews(db, build.id);
       });
 
-      buildEntry.addEventListener("mouseover", () => {
-        showBuildPreview(build);
-      });
+      buildEntry.addEventListener("mouseover", () => showBuildPreview(build));
 
       buildEntry.innerHTML = `
-        <div class="build-left">
+        <div class="build-left ${matchupClass}">
           <img src="${matchupImage}" alt="${build.matchup}" class="matchup-icon">
         </div>
         <div class="build-right">
@@ -141,10 +117,10 @@ export async function populateCommunityBuilds() {
               <img src="./img/SVG/preview.svg" alt="Views" class="meta-icon">
               <span class="view-count">${build.views}</span> Views
             </span>
-            <div class="vote-info">
+            <span class="meta-chip vote-info">
               <span class="vote-percentage">${votePercentage}%</span>
               <span class="vote-count">${totalVotes} votes</span>
-            </div>
+            </span>
           </div>
         </div>
       `;
@@ -176,31 +152,6 @@ async function incrementBuildViews(db, buildId) {
     console.error("❌ Error updating view count:", error);
   }
 }
-
-communityBuilds.forEach((build) => {
-  const row = document.createElement("tr");
-  row.dataset.id = build.id; // Store build ID for reference
-
-  row.innerHTML = `
-    <td>${build.title}</td>
-    <td>${build.matchup}</td>
-    <td>${build.publisher}</td>
-    <td>${new Date(build.datePublished).toLocaleDateString()}</td>
-    <td>
-        <button class="vote-button thumbs-up" data-id="${build.id}">👍</button>
-        <button class="vote-button thumbs-down" data-id="${
-          build.id
-        }">👎</button>
-        <span class="vote-percentage" data-id="${build.id}">0%</span>
-    </td>
-    <td>
-      <button class="import-button" data-id="${build.id}">Import</button>
-      <button class="view-build-button" data-id="${build.id}">🔍 View</button>
-    </td> 
-  `;
-
-  tableBody.appendChild(row);
-});
 
 // ✅ Update Build Preview
 function showBuildPreview(build) {
@@ -246,225 +197,12 @@ function showBuildPreview(build) {
   communityBuildPreview.style.display = "block";
 }
 
-function initializeCommunityBuildEvents() {
-  console.log("✅ Initializing event listeners for community builds...");
-
-  // ✅ Attach event listeners for "View Preview" buttons
-  document.querySelectorAll(".view-preview-button").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      const buildId = event.currentTarget.getAttribute("data-id");
-
-      if (!buildId) {
-        console.error("❌ Error: No Build ID found for preview.");
-        return;
-      }
-
-      console.log("🔍 Preview Button Clicked - Build ID:", buildId);
-      const build = communityBuilds.find((b) => b.id === buildId);
-
-      if (build) {
-        console.log("✅ Found Build:", build.title);
-        showBuildPreview(build);
-      } else {
-        console.error("❌ Error: Build not found with ID", buildId);
-      }
-    });
-  });
-
-  // ✅ Attach event listeners for "View Build" buttons
-  document.querySelectorAll(".view-build-button").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      const buildId = event.currentTarget.getAttribute("data-id");
-
-      if (!buildId) {
-        console.error("❌ Error: No Build ID found for view-build-button");
-        return;
-      }
-
-      console.log("✅ Redirecting to viewBuild.html for build ID:", buildId);
-      window.location.href = `viewBuild.html?id=${buildId}`;
-    });
-  });
-
-  // ✅ Attach event listeners for "Import" buttons
-  document.querySelectorAll(".import-button").forEach((button) => {
-    button.addEventListener("click", async (event) => {
-      const buildId = event.currentTarget.getAttribute("data-id");
-      console.log("📥 Import Button Clicked - Build ID:", buildId);
-
-      if (!auth.currentUser) {
-        alert("You must be signed in to import builds.");
-        return;
-      }
-
-      const userId = auth.currentUser.uid;
-      const communityBuildRef = doc(db, "communityBuilds", buildId);
-      const userBuildsRef = collection(db, `users/${userId}/builds`);
-
-      try {
-        const buildDoc = await getDoc(communityBuildRef);
-        if (!buildDoc.exists()) {
-          console.error("❌ Build not found in community builds.");
-          alert("Build not found.");
-          return;
-        }
-
-        const buildData = buildDoc.data();
-        const userBuildDocRef = doc(userBuildsRef, buildData.title);
-
-        await setDoc(userBuildDocRef, {
-          ...buildData,
-          publisher: buildData.username || buildData.publisher || "Unknown",
-          imported: true,
-          timestamp: Date.now(),
-        });
-
-        console.log("✅ Build imported successfully!", buildData);
-        alert("Build successfully imported!");
-        populateBuildsModal(); // ✅ Refresh user's builds
-      } catch (error) {
-        console.error("❌ Error importing build:", error);
-        alert("Failed to import build. Please try again.");
-      }
-    });
-  });
-
-  // ✅ Attach event listeners for voting buttons (with SVG update)
-  document.querySelectorAll(".vote-button").forEach((button) => {
-    button.addEventListener("click", async (event) => {
-      const buildId = event.currentTarget.getAttribute("data-id");
-      const isUpvote = event.currentTarget.classList.contains("vote-up");
-      console.log(
-        `${isUpvote ? "👍 Upvote" : "👎 Downvote"} clicked - Build ID:`,
-        buildId
-      );
-
-      try {
-        await handleVote(buildId, isUpvote ? "up" : "down");
-
-        // ✅ After voting, update the SVG icon immediately
-        updateVoteButtonIcons(buildId);
-      } catch (error) {
-        console.error("❌ Error voting:", error);
-      }
-    });
-  });
-}
-
-function filterCommunityBuilds(query) {
-  const container = document.getElementById("communityBuildsContainer");
-  const allBuilds = container.getElementsByClassName("build-entry");
-
-  // Loop through all build entries and hide those that don't match the search query
-  Array.from(allBuilds).forEach((buildEntry) => {
-    const title = buildEntry
-      .querySelector(".build-title")
-      .textContent.toLowerCase();
-    const matchup = buildEntry
-      .querySelector(".meta-chip.matchup-chip")
-      .textContent.toLowerCase();
-
-    // Show the build if the title or matchup matches the query, else hide it
-    if (title.includes(query) || matchup.includes(query)) {
-      buildEntry.style.display = "flex";
-    } else {
-      buildEntry.style.display = "none";
-    }
-  });
-}
-
 const communitySearchInput = document.getElementById("communitySearchBar");
 if (communitySearchInput) {
   communitySearchInput.addEventListener("input", function () {
     const query = this.value.toLowerCase();
     filterCommunityBuilds(query);
   });
-}
-
-// ✅ Update Vote Button Icons After Voting
-function updateVoteButtonIcons(buildId) {
-  const upvoteButton = document.querySelector(`.vote-up[data-id="${buildId}"]`);
-  const downvoteButton = document.querySelector(
-    `.vote-down[data-id="${buildId}"]`
-  );
-
-  if (!upvoteButton || !downvoteButton) return;
-
-  // ✅ Fetch the user's vote from Firestore
-  getDoc(doc(db, "communityBuilds", buildId)).then((buildDoc) => {
-    if (buildDoc.exists()) {
-      const user = auth.currentUser;
-      if (!user) return;
-
-      const buildData = buildDoc.data();
-      const userVote = buildData.userVotes?.[user.uid];
-
-      // ✅ Change icons based on user vote
-      upvoteButton.querySelector("img").src =
-        userVote === "up" ? "./img/SVG/voted-up.svg" : "./img/SVG/vote-up.svg";
-
-      downvoteButton.querySelector("img").src =
-        userVote === "down"
-          ? "./img/SVG/voted-down.svg"
-          : "./img/SVG/vote-down.svg";
-    }
-  });
-}
-
-async function handleVote(buildId, voteType) {
-  const user = auth.currentUser;
-  if (!user) {
-    alert("You must be signed in to vote.");
-    return;
-  }
-
-  const userId = user.uid;
-  const buildRef = doc(db, "communityBuilds", buildId);
-
-  try {
-    const buildDoc = await getDoc(buildRef);
-    if (!buildDoc.exists()) {
-      console.error("❌ Error: Build not found.");
-      return;
-    }
-
-    const buildData = buildDoc.data();
-    const userVotes = buildData.userVotes || {};
-    let upvotes = buildData.upvotes || 0;
-    let downvotes = buildData.downvotes || 0;
-
-    const previousVote = userVotes[userId];
-
-    if (previousVote === voteType) {
-      // Toggle off: remove vote if user clicks the same button again
-      if (voteType === "up") upvotes--;
-      else if (voteType === "down") downvotes--;
-      delete userVotes[userId];
-    } else {
-      // If switching vote, first remove the previous vote if any
-      if (previousVote === "up") {
-        upvotes--;
-      } else if (previousVote === "down") {
-        downvotes--;
-      }
-
-      // Now add the new vote
-      if (voteType === "up") {
-        upvotes++;
-      } else if (voteType === "down") {
-        downvotes++;
-      }
-      userVotes[userId] = voteType;
-    }
-
-    // Update Firestore with the new vote counts and userVotes
-    await updateDoc(buildRef, { upvotes, downvotes, userVotes });
-
-    // Update UI accordingly
-    updateVoteUI(buildId, upvotes, downvotes, userVotes[userId] || null);
-  } catch (error) {
-    console.error("❌ Error updating vote:", error);
-  }
 }
 
 function updateVoteUI(buildId, upvotes, downvotes, userVote) {
@@ -688,23 +426,42 @@ export async function publishBuildToCommunity(buildId) {
 }
 
 export function searchCommunityBuilds(query) {
-  const lowerCaseQuery = DOMPurify.sanitize(query.toLowerCase());
+  const lowerQuery = DOMPurify.sanitize(query.toLowerCase());
 
-  // Ensure we have community builds loaded
-  if (!communityBuilds || communityBuilds.length === 0) {
+  if (!allCommunityBuilds || allCommunityBuilds.length === 0) {
     console.error("No community builds available.");
     return;
   }
 
-  // Filter builds based on title
-  const filteredBuilds = communityBuilds.filter((build) =>
-    build.title.toLowerCase().includes(lowerCaseQuery)
+  const filtered = allCommunityBuilds.filter((build) =>
+    build.title.toLowerCase().includes(lowerQuery)
   );
 
-  console.log("🔍 Filtered Builds:", filteredBuilds.length); // Debugging
+  populateCommunityBuilds(filtered);
+}
 
-  // Update UI
-  populateCommunityBuilds(filteredBuilds);
+export function filterCommunityBuilds(categoryOrSubcat = "all") {
+  const lowerFilter = categoryOrSubcat.toLowerCase();
+
+  if (!allCommunityBuilds || allCommunityBuilds.length === 0) {
+    console.error("No community builds available.");
+    return;
+  }
+
+  const filtered = allCommunityBuilds.filter((build) => {
+    const categoryMatch =
+      ["zerg", "protoss", "terran"].includes(lowerFilter) &&
+      build.category?.toLowerCase() === lowerFilter;
+
+    const subcategoryMatch =
+      ["zvp", "zvt", "zvz", "pvp", "pvt", "pvz", "tvt", "tvp", "tvz"].includes(
+        lowerFilter
+      ) && build.subcategory?.toLowerCase() === lowerFilter;
+
+    return lowerFilter === "all" || categoryMatch || subcategoryMatch;
+  });
+
+  populateCommunityBuilds(filtered);
 }
 
 // Call check function on page load

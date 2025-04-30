@@ -198,10 +198,13 @@ function toggleAuthButtons(isLoggedIn) {
     ? "none"
     : "inline-block";
   document.getElementById("switchAccountBtn").style.display = isLoggedIn
-    ? "inline-block"
+    ? "block"
     : "none";
   document.getElementById("signOutBtn").style.display = isLoggedIn
-    ? "inline-block"
+    ? "block"
+    : "none";
+  document.getElementById("deleteAccountBtn").style.display = isLoggedIn
+    ? "block"
     : "none";
 }
 
@@ -297,15 +300,24 @@ if (deleteAccountBtn) {
 const userPhoto = document.getElementById("userPhoto");
 const userMenu = document.getElementById("userMenu");
 
-if (userPhoto) {
-  userPhoto.addEventListener("click", () => {
-    if (userMenu.style.display === "none") {
-      userMenu.style.display = "block";
-    } else {
-      userMenu.style.display = "none";
-    }
+if (userPhoto && userMenu) {
+  userPhoto.addEventListener("click", (event) => {
+    event.stopPropagation(); // Don't immediately close
+    userMenu.style.display =
+      userMenu.style.display === "block" ? "none" : "block";
   });
 }
+
+// Also fix closing the menu if clicking outside
+window.addEventListener("click", (event) => {
+  if (
+    userMenu &&
+    !userMenu.contains(event.target) &&
+    event.target !== userPhoto
+  ) {
+    userMenu.style.display = "none";
+  }
+});
 
 // Close user menu if clicking outside
 window.addEventListener("click", (e) => {

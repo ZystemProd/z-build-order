@@ -1,147 +1,171 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>View Build</title>
-    <link rel="icon" type="image/x-icon" href="/img/favicon.ico" />
-    <link rel="stylesheet" type="text/css" href="./css/style.css" />
-    <link rel="stylesheet" type="text/css" href="./css/viewBuild.css" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.3/purify.min.js"></script>
-    <script type="module" src="app.js" defer></script>
-    <script type="module" src="js/modules/eventHandlers.js" defer></script>
-    <script type="module" src="js/modules/viewBuild.js" defer></script>
-  </head>
-  <body>
-    <!-- Auth Container -->
-    <div id="auth-container">
-      <div class="auth-info">
-        <img
-          id="userPhoto"
-          class="user-avatar"
-          src="img/default-avatar.webp"
-          alt="User Avatar"
-          style="width: 50px; height: 50px"
-        />
-        <div class="user-details">
-          <!-- We only show the user’s username, not the email -->
-          <p id="userName" class="user-name">Guest</p>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>View Build</title>
+  <link rel="icon" type="image/x-icon" href="/img/favicon.ico" />
+  <link rel="stylesheet" type="text/css" href="./css/style.css" />
+  <link rel="stylesheet" type="text/css" href="./css/viewBuild.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.3/purify.min.js"></script>
+  <script type="module" src="app.js" defer></script>
+  <script type="module" src="js/modules/eventHandlers.js" defer></script>
+  <script type="module" src="js/modules/viewBuild.js" defer></script>
+</head>
+
+<body>
+  <!-- Auth Container -->
+  <div id="auth-container">
+    <div class="auth-info" style="display: flex; align-items: center; gap: 10px;">
+
+      <div id="authLoadingWrapper" style="display: flex; align-items: center; gap: 8px;">
+        <div id="authLoading" class="spinner"></div>
+        <span id="authLoadingText" style="color: #555;">Loading user...</span>
+      </div>
+
+      <div class="user-details">
+        <p id="userName" class="user-name fade-in" style="display: none;">Guest</p>
+      </div>
+
+      <img id="userPhoto" class="user-avatar fade-in" src="img/default-avatar.webp" alt="User Avatar"
+        style="width: 40px; height: 40px; display: none;" />
+
+
+      <div id="userMenu" class="user-menu" style="display: none;">
+        <div class="menu-section">
+          <hr class="menu-divider" />
+          <button class="menu-item" id="switchAccountBtn">
+            <img src="img/SVG/switch.svg" class="menu-icon" /> Switch Account
+          </button>
+          <button class="menu-item" id="signOutBtn">
+            <img src="img/SVG/logout.svg" class="menu-icon" /> Sign Out
+          </button>
+          <button class="menu-item danger" id="deleteAccountBtn">
+            <img src="img/SVG/trash.svg" class="menu-icon" /> Delete Account
+          </button>
         </div>
       </div>
 
-      <!-- Auth Buttons -->
-      <button id="signInBtn" class="auth-button">Sign In</button>
-      <button id="switchAccountBtn" class="auth-button" style="display: none">
-        Switch Account
-      </button>
-      <button id="signOutBtn" class="auth-button" style="display: none">
-        Sign Out
-      </button>
     </div>
 
-    <!-- Optional Loading Status -->
-    <p id="authLoading" style="color: #555"></p>
+    <!-- Auth Buttons -->
+    <button id="signInBtn" class="auth-button">Sign In</button>
+  </div>
 
-    <!-- Username Modal -->
-    <div id="usernameModal" class="modal" style="display: none">
-      <div class="modal-content">
-        <h3>Choose a Username</h3>
-        <input
-          type="text"
-          id="usernameInput"
-          placeholder="Enter your username"
-        />
-        <br /><br />
-        <button id="confirmUsernameButton">Confirm</button>
-      </div>
+  <!-- Optional Loading Status -->
+  <p id="authLoading" style="color: #555"></p>
+
+  <!-- Username Modal -->
+  <div id="usernameModal" class="modal" style="display: none">
+    <div class="modal-content">
+      <h3>Choose a Username</h3>
+      <input type="text" id="usernameInput" placeholder="Enter your username" />
+      <br /><br />
+      <button id="confirmUsernameButton">Confirm</button>
+    </div>
+  </div>
+
+  <div class="view-build-container">
+    <div class="build-header-row">
+      <a href="index.html" id="backButton" data-return-community="true" class="back-button">
+        <img src="./img/SVG/back.svg" alt="Back" />
+      </a>
+      <h1 id="buildTitle">Loading...</h1>
     </div>
 
-    <div class="view-build-container">
-      <div class="build-header-row">
-        <a href="index.html" id="backButton">⬅ Back to Builds</a>
-        <h1 id="buildTitle">Loading...</h1>
+    <!-- Build Info Grid -->
+    <div class="build-info-grid">
+      <div class="build-info-item">
+        <label>Category</label>
+        <span id="buildCategory">Loading...</span>
       </div>
-
-      <!-- Build Info Grid -->
-      <div class="build-info-grid">
-        <div class="build-info-item">
-          <label>Category</label>
-          <span id="buildCategory">Loading...</span>
-        </div>
-        <div class="build-info-item">
-          <label>Matchup</label>
-          <span id="buildMatchup">Loading...</span>
-        </div>
-        <div class="build-info-item">
-          <label>Publisher</label>
-          <span id="buildPublisher">Loading...</span>
-        </div>
-        <div class="build-info-item">
-          <label>Date Published</label>
-          <span id="buildDate">Loading...</span>
-        </div>
+      <div class="build-info-item">
+        <label>Matchup</label>
+        <span id="buildMatchup">Loading...</span>
       </div>
-
-      <!-- Build Order -->
-      <div id="buildOrder" class="build-order-container">
-        <!-- Build steps are dynamically inserted here -->
+      <div class="build-info-item">
+        <label>Publisher</label>
+        <span id="buildPublisher">Loading...</span>
       </div>
-
-      <!-- Second Row Layout -->
-      <div class="main-layout">      
-        <!-- Second Row: Map and Comment/Video -->
-
-        <h3 data-section="secondRow" class="toggle-title">
-          <span class="arrow"></span> Additional Settings
-        </h3>
-        <div class="hideable-section hidden" id="secondRow">
-          <div id="map-container">
-            <!-- Map preview and controls -->
-            <div id="map-controls-row">
-              <span id="selected-map-text">No map selected</span>
-              <button class="clear-annotations-button" data-tooltip="Erase All">
-                <img src="img/SVG/eraser-solid.svg" alt="Eraser Icon" style="width:20px; height:20px;" class="svg-icon">
-              </button>
-            </div>
-            
-            <div id="map-preview-container" class="map-preview">
-              <img id="map-preview-image" class="map-image" src="" alt="Map Preview" />
-              <div id="map-annotations" class="annotations"></div>
-            </div>
+      <div class="build-info-item">
+        <label>Date Published</label>
+        <span id="buildDate">Loading...</span>
+      </div>
+      <div class="build-info-item">
+        <label>Rating</label>
+        <div id="votingSection" class="vote-section">
+          <div class="vote-buttons">
+            <button class="vote-button vote-up" data-id="">
+              <img src="./img/SVG/vote-up.svg" alt="Upvote" />
+            </button>
+            <button class="vote-button vote-down" data-id="">
+              <img src="./img/SVG/vote-down.svg" alt="Downvote" />
+            </button>
           </div>
-        
-          <!-- RIGHT COLUMN: Comment & Video Container -->
-          <div class="comment-video-container">
-            <h3 class="toggle-title">Comment</h3>
-            <textarea id="commentInput" placeholder="Add a comment..."></textarea>
-        
-            <h3 class="toggle-title">Video</h3>
-            <input type="text" id="videoInput" placeholder="Paste YouTube link here..." />
-            <iframe
-              id="videoIframe"
-              style="display: none;"
-              width="560"
-              height="315"
-              frameborder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowfullscreen
-            ></iframe>
+          <div class="vote-results-row">
+            <span class="vote-percentage" id="vote-percentage-text">0%</span>
+            <span class="vote-count" id="vote-count-text">0 votes</span>
           </div>
         </div>
       </div>
-      <button id="importBuildButton" style="display: none">Import</button>
-
-      </div>
-
     </div>
-    <script type="module">
-      import { initializeViewBuildPage } from "./js/modules/eventHandlers.js";
-      import { initializeAuthUI } from "./app.js";
 
-      document.addEventListener("DOMContentLoaded", () => {
-        initializeAuthUI();
-        initializeViewBuildPage();
-      });
-    </script>
-  </body>
+    <!-- Build Order -->
+    <div id="buildOrder" class="build-order-container">
+      <!-- Build steps are dynamically inserted here -->
+    </div>
+
+    <!-- Second Row Layout -->
+    <div class="main-layout">
+      <!-- Second Row: Map and Comment/Video -->
+
+      <h3 data-section="secondRow" class="toggle-title">
+        <span class="arrow"></span> Additional Settings
+      </h3>
+      <div class="hideable-section hidden" id="secondRow">
+        <div id="map-container">
+          <!-- Map preview and controls -->
+          <div id="map-controls-row">
+            <span id="selected-map-text">No map selected</span>
+            <button class="clear-annotations-button" data-tooltip="Erase All">
+              <img src="img/SVG/eraser-solid.svg" alt="Eraser Icon" style="width:20px; height:20px;" class="svg-icon">
+            </button>
+          </div>
+
+          <div id="map-preview-container" class="map-preview">
+            <img id="map-preview-image" class="map-image" src="" alt="Map Preview" />
+            <div id="map-annotations" class="annotations"></div>
+          </div>
+        </div>
+
+        <!-- RIGHT COLUMN: Comment & Video Container -->
+        <div class="comment-video-container">
+          <h3 class="toggle-title">Comment</h3>
+          <textarea id="commentInput" placeholder="Add a comment..."></textarea>
+
+          <h3 class="toggle-title">Video</h3>
+          <input type="text" id="videoInput" placeholder="Paste YouTube link here..." />
+          <iframe id="videoIframe" style="display: none;" width="560" height="315" frameborder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen></iframe>
+        </div>
+      </div>
+    </div>
+    <button id="importBuildButton" style="display: none">Import</button>
+
+  </div>
+
+  </div>
+  <script type="module">
+    import { initializeViewBuildPage } from "./js/modules/eventHandlers.js";
+    import { initializeAuthUI } from "./app.js";
+
+    document.addEventListener("DOMContentLoaded", () => {
+      initializeAuthUI();
+      initializeViewBuildPage();
+    });
+  </script>
+</body>
+
 </html>

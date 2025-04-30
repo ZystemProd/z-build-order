@@ -40,23 +40,33 @@
         <span id="authLoadingText" style="color: #555;">Loading user...</span>
       </div>
 
+      <div class="user-details">
+        <p id="userName" class="user-name fade-in" style="display: none;">Guest</p>
+      </div>
 
       <img id="userPhoto" class="user-avatar fade-in" src="img/default-avatar.webp" alt="User Avatar"
         style="width: 40px; height: 40px; display: none;" />
 
-      <div class="user-details">
-        <p id="userName" class="user-name fade-in" style="display: none;">Guest</p>
-      </div>
+
       <div id="userMenu" class="user-menu" style="display: none;">
-        <button id="deleteAccountBtn">🗑️ Delete My Account</button>
+        <div class="menu-section">
+          <hr class="menu-divider" />
+          <button class="menu-item" id="switchAccountBtn">
+            <img src="img/SVG/switch.svg" class="menu-icon" /> Switch Account
+          </button>
+          <button class="menu-item" id="signOutBtn">
+            <img src="img/SVG/logout.svg" class="menu-icon" /> Sign Out
+          </button>
+          <button class="menu-item danger" id="deleteAccountBtn">
+            <img src="img/SVG/trash.svg" class="menu-icon" /> Delete Account
+          </button>
+        </div>
       </div>
 
     </div>
 
     <!-- Auth Buttons -->
     <button id="signInBtn" class="auth-button">Sign In</button>
-    <button id="switchAccountBtn" class="auth-button" style="display: none;">Switch Account</button>
-    <button id="signOutBtn" class="auth-button" style="display: none;">Sign Out</button>
   </div>
 
   <!-- Username Modal -->
@@ -122,6 +132,7 @@
       <div class="form-container">
         <!-- Left Column: Matchup Dropdown -->
         <div class="form-left">
+          <label for="buildCategoryDropdown" class="visually-hidden">Select Match-Up</label>
           <select id="buildCategoryDropdown" class="styled-dropdown">
             <option value="" disabled selected>Match-Up</option>
             <optgroup label="Zerg" style="color: #c07aeb;">
@@ -215,7 +226,8 @@
 
           <h3 class="toggle-title">Video</h3>
           <input type="text" id="videoInput" placeholder="Paste YouTube link here..." />
-          <iframe id="videoIframe" style="display: block;" width="560" height="315" frameborder="0"
+          <iframe id="videoIframe" title="YouTube video player" style="display: block;" width="560" height="315"
+            frameborder="0"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowfullscreen></iframe>
           <h3 class="toggle-title">Replay</h3>

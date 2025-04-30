@@ -1,12 +1,53 @@
 import { auth, db } from "../../app.js"; // ✅ Reuse Firebase app
 import {
+  collection,
   doc,
   getDoc,
-  collection,
   setDoc,
+  updateDoc,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { formatActionText } from "../modules/textFormatters.js"; // ✅ Format build steps
 import { MapAnnotations } from "./interactive_map.js"; // ✅ Map support
+
+const backButton = document.getElementById("backButton");
+
+if (backButton) {
+  backButton.addEventListener("click", (e) => {
+    e.preventDefault();
+
+    localStorage.setItem("restoreCommunityModal", "true");
+
+    // Save search input
+    const searchInput = document.getElementById("communitySearchBar");
+    if (searchInput && searchInput.value.trim()) {
+      localStorage.setItem("communitySearchQuery", searchInput.value.trim());
+    } else {
+      localStorage.removeItem("communitySearchQuery");
+    }
+
+    // Save active filter
+    const activeCategory = document
+      .querySelector("#communityModal .filter-category.active")
+      ?.getAttribute("data-category");
+
+    const activeSubcategory = document
+      .querySelector("#communityModal .subcategory.active")
+      ?.getAttribute("data-subcategory");
+
+    if (activeSubcategory) {
+      localStorage.setItem("communityFilterType", "subcategory");
+      localStorage.setItem("communityFilterValue", activeSubcategory);
+    } else if (activeCategory && activeCategory !== "all") {
+      localStorage.setItem("communityFilterType", "category");
+      localStorage.setItem("communityFilterValue", activeCategory);
+    } else {
+      localStorage.removeItem("communityFilterType");
+      localStorage.removeItem("communityFilterValue");
+    }
+
+    window.location.href = "index.html";
+  });
+}
 
 async function loadBuild() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -199,6 +240,150 @@ async function loadBuild() {
   } else {
     console.error("❌ Build not found in Firestore:", buildId);
     document.getElementById("buildTitle").innerText = "Build not found.";
+  }
+
+  // ✅ Setup voting system (inject data-id and update icons)
+  const votingButtons = document.querySelectorAll(".vote-button");
+  votingButtons.forEach((btn) => {
+    btn.setAttribute("data-id", buildId);
+    btn.addEventListener("click", async () => {
+      const isUpvote = btn.classList.contains("vote-up");
+      try {
+        await handleVote(buildId, isUpvote ? "up" : "down");
+        updateVoteButtonIcons(buildId);
+      } catch (err) {
+        console.error("❌ Vote error:", err);
+      }
+    });
+  });
+
+  // ✅ Initial icon + count state
+  updateVoteButtonIcons(buildId);
+}
+
+async function handleVote(buildId, voteType) {
+  const user = auth.currentUser;
+  if (!user) {
+    alert("You must be signed in to vote.");
+    return;
+  }
+
+  const userId = user.uid;
+  const buildRef = doc(db, "communityBuilds", buildId);
+
+  try {
+    const buildDoc = await getDoc(buildRef);
+    if (!buildDoc.exists()) {
+      console.error("❌ Error: Build not found.");
+      return;
+    }
+
+    const buildData = buildDoc.data();
+    const userVotes = buildData.userVotes || {};
+    let upvotes = buildData.upvotes || 0;
+    let downvotes = buildData.downvotes || 0;
+
+    const previousVote = userVotes[userId];
+
+    if (previousVote === voteType) {
+      // Toggle off: remove vote if user clicks the same button again
+      if (voteType === "up") upvotes--;
+      else if (voteType === "down") downvotes--;
+      delete userVotes[userId];
+    } else {
+      // If switching vote, first remove the previous vote if any
+      if (previousVote === "up") {
+        upvotes--;
+      } else if (previousVote === "down") {
+        downvotes--;
+      }
+
+      // Now add the new vote
+      if (voteType === "up") {
+        upvotes++;
+      } else if (voteType === "down") {
+        downvotes++;
+      }
+      userVotes[userId] = voteType;
+    }
+
+    // Update Firestore with the new vote counts and userVotes
+    await updateDoc(buildRef, { upvotes, downvotes, userVotes });
+
+    // Update UI accordingly
+    updateVoteUI(buildId, upvotes, downvotes, userVotes[userId] || null);
+  } catch (error) {
+    console.error("❌ Error updating vote:", error);
+  }
+}
+
+// ✅ Update Vote Button Icons After Voting
+function updateVoteButtonIcons(buildId) {
+  const upvoteButton = document.querySelector(`.vote-up[data-id="${buildId}"]`);
+  const downvoteButton = document.querySelector(
+    `.vote-down[data-id="${buildId}"]`
+  );
+
+  if (!upvoteButton || !downvoteButton) return;
+
+  getDoc(doc(db, "communityBuilds", buildId)).then((buildDoc) => {
+    if (buildDoc.exists()) {
+      const user = auth.currentUser;
+      if (!user) return;
+
+      const buildData = buildDoc.data();
+      const userVote = buildData.userVotes?.[user.uid];
+
+      // ✅ This must exist to update the percentage & vote count
+      updateVoteUI(
+        buildId,
+        buildData.upvotes || 0,
+        buildData.downvotes || 0,
+        userVote
+      );
+
+      // ✅ Set the icons
+      upvoteButton.querySelector("img").src =
+        userVote === "up" ? "./img/SVG/voted-up.svg" : "./img/SVG/vote-up.svg";
+      downvoteButton.querySelector("img").src =
+        userVote === "down"
+          ? "./img/SVG/voted-down.svg"
+          : "./img/SVG/vote-down.svg";
+    }
+  });
+}
+
+function updateVoteUI(buildId, upvotes, downvotes, userVote) {
+  const upvoteButton = document.querySelector(`.vote-up[data-id="${buildId}"]`);
+  const downvoteButton = document.querySelector(
+    `.vote-down[data-id="${buildId}"]`
+  );
+  const votePercentage = document.getElementById("vote-percentage-text");
+  const voteCount = document.getElementById("vote-count-text");
+
+  if (!upvoteButton || !downvoteButton || !votePercentage) return;
+
+  // Update SVG icons
+  upvoteButton.querySelector("img").src =
+    userVote === "up" ? "./img/SVG/voted-up.svg" : "./img/SVG/vote-up.svg";
+  downvoteButton.querySelector("img").src =
+    userVote === "down"
+      ? "./img/SVG/voted-down.svg"
+      : "./img/SVG/vote-down.svg";
+
+  // Highlight selected vote
+  upvoteButton.classList.toggle("voted-up", userVote === "up");
+  downvoteButton.classList.toggle("voted-down", userVote === "down");
+
+  // Calculate vote percentage
+  const totalVotes = upvotes + downvotes;
+  const percentage =
+    totalVotes > 0 ? Math.round((upvotes / totalVotes) * 100) : 0;
+  votePercentage.textContent = `${percentage}%`;
+
+  // Update vote count text
+  if (voteCount) {
+    voteCount.textContent = `${totalVotes} votes`;
   }
 }
 

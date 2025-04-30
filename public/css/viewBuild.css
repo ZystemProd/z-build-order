@@ -15,6 +15,7 @@ body {
 
 /* Back Button */
 #backButton {
+  width: 65px;
   margin: 10px 0 20px 0;
   padding: 10px 20px;
   background: transparent;
@@ -25,6 +26,10 @@ body {
   font-weight: 500;
   transition: 0.2s;
   z-index: 2; /* Keep back button clickable */
+}
+
+.back-button:hover img {
+  filter: brightness(0) saturate(100%);
 }
 
 #backButton:hover {
@@ -48,7 +53,7 @@ body {
 /* Build Info Grid */
 .build-info-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 20px;
   margin-bottom: 30px;
 }
@@ -211,6 +216,32 @@ body {
   white-space: pre-wrap;
   color: #e0e0e0;
   margin-top: 20px;
+}
+
+.vote-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.vote-buttons {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+.vote-results-row {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  font-size: 14px;
+  color: #ccc;
+}
+
+.back-button img {
+  width: 24px;
+  height: 24px;
+  vertical-align: middle;
 }
 
 /* Responsive for Mobile */

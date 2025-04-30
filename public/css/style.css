@@ -99,18 +99,28 @@ body {
   background: rgba(44, 44, 44, 0.9);
   padding: 8px 15px;
   border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
   display: flex;
   align-items: center;
   gap: 12px;
   z-index: 1000;
-  min-width: 250px;
-  justify-content: space-between;
+  justify-content: end;
   backdrop-filter: blur(10px);
 }
 
 #userInfo {
   display: none;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .dropdown {
@@ -2568,6 +2578,19 @@ td {
   border: 2px solid #888; /* ✅ Add border for better visibility */
 }
 
+/* Race-specific dark border tones */
+.matchup-terran .matchup-icon {
+  border-color: #b52a21; /* dark terran red */
+}
+
+.matchup-zerg .matchup-icon {
+  border-color: #7b3ea1; /* dark zerg purple */
+}
+
+.matchup-protoss .matchup-icon {
+  border-color: #006a91; /* dark protoss blue */
+}
+
 /* Hover effect */
 .build-entry:hover {
   background-color: #3a3a3a;
@@ -3015,26 +3038,90 @@ td {
 
 .user-menu {
   position: absolute;
-  top: 60px; /* Adjust based on your header height */
-  right: 20px;
+  top: 55px;
+  right: 10px;
+  width: 220px;
   background-color: #1e1e1e;
   border: 1px solid #333;
-  border-radius: 8px;
-  padding: 10px;
-  z-index: 10;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  border-radius: 10px;
+  padding: 10px 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  display: none;
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 16px;
+  font-size: 14px;
+  color: #e0e0e0;
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.menu-item:hover {
+  background-color: #2a2a2a;
+}
+
+.menu-icon {
+  width: 18px;
+  height: 18px;
+  margin-right: 12px;
+  filter: brightness(0) invert(1);
+}
+
+.menu-item.danger {
+  color: #ff5252;
+}
+
+.menu-item.danger:hover {
+  background-color: #3a1f1f;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.menu-divider {
+  border: none;
+  border-top: 1px solid #333;
+  margin: 5px 0;
 }
 
 .user-menu button {
   background: none;
   border: none;
-  color: #ff5252;
-  font-weight: bold;
-  cursor: pointer;
+  color: #e0e0e0; /* Neutral text for default */
+  font-weight: 500;
+  text-align: left;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 5px;
+  transition: background-color 0.2s ease;
 }
 
 .user-menu button:hover {
-  text-decoration: underline;
+  background-color: #333;
+}
+
+.user-menu #deleteAccountBtn {
+  color: #ff4c4c; /* Danger red */
+}
+
+.user-menu #deleteAccountBtn:hover {
+  background-color: #3a0000;
 }
 
 @media screen and (max-width: 768px) {

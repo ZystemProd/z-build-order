@@ -295,33 +295,6 @@ export function openPublishModal(buildId) {
   modal.style.display = "block";
 }
 
-document
-  .getElementById("closePublishModalButton")
-  .addEventListener("click", () => {
-    document.getElementById("publishModal").style.display = "none";
-  });
-
-document
-  .getElementById("confirmPublishButton")
-  .addEventListener("click", async () => {
-    const selectedDestination = document.querySelector(
-      'input[name="publishDestination"]:checked'
-    ).value;
-
-    if (!currentBuildIdToPublish) {
-      console.error("❌ No build selected for publishing.");
-      return;
-    }
-
-    if (selectedDestination === "community") {
-      await publishBuildToCommunity(currentBuildIdToPublish); // ✅ Use currentBuildIdToPublish here
-    } else {
-      showToast("Clan publishing is coming soon!", "info");
-    }
-
-    document.getElementById("publishModal").style.display = "none";
-  });
-
 export function showSubcategories(event) {
   const subcategoriesMenu = event.target.querySelector(".subcategories-menu");
   if (subcategoriesMenu) {
@@ -560,26 +533,6 @@ export function openPublishSettingsModal(buildId) {
     document.getElementById("publishToCommunity").checked = isPublished;
   }
 }
-
-document
-  .getElementById("savePublishSettingsButton")
-  .addEventListener("click", async () => {
-    const publishToCommunity =
-      document.getElementById("publishToCommunity").checked;
-
-    if (!currentBuildIdToPublish) {
-      console.error("❌ No build selected to update.");
-      return;
-    }
-
-    if (publishToCommunity) {
-      await publishBuildToCommunity(currentBuildIdToPublish);
-    } else {
-      await unpublishBuild(currentBuildIdToPublish);
-    }
-
-    document.getElementById("managePublishModal").style.display = "none";
-  });
 
 // ✅ Helper function to parse matchup races correctly
 function getRaceIcons(subcategory) {

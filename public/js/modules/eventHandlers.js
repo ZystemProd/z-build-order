@@ -34,6 +34,7 @@ import {
   populateCommunityBuilds,
   checkPublishButtonVisibility,
   searchCommunityBuilds,
+  filterCommunityBuilds,
 } from "./community.js";
 
 setupTemplateModal(); // Always call early
@@ -59,8 +60,39 @@ function safeChange(id, callback) {
 /** ----------------
  *  Initialize index.html
  ----------------- */
-export function initializeIndexPage() {
+export async function initializeIndexPage() {
   console.log("🛠 Initializing Index Page");
+
+  const restoreCommunity = localStorage.getItem("restoreCommunityModal");
+  const filterType = localStorage.getItem("communityFilterType");
+  const filterValue = localStorage.getItem("communityFilterValue");
+  const searchQuery = localStorage.getItem("communitySearchQuery");
+
+  if (restoreCommunity === "true") {
+    const modal = document.getElementById("communityModal");
+    if (modal) {
+      modal.style.display = "block";
+      await populateCommunityBuilds();
+
+      // Step 1: Apply category/subcategory filter first (if any)
+      if (filterType && filterValue) {
+        filterCommunityBuilds(filterValue);
+      }
+
+      // Step 2: Apply search text filter afterward (if any)
+      if (searchQuery) {
+        searchCommunityBuilds(searchQuery);
+        const input = document.getElementById("communitySearchBar");
+        if (input) input.value = searchQuery;
+      }
+    }
+
+    // Cleanup
+    localStorage.removeItem("restoreCommunityModal");
+    localStorage.removeItem("communityFilterType");
+    localStorage.removeItem("communityFilterValue");
+    localStorage.removeItem("communitySearchQuery");
+  }
 
   // --- Auth Buttons
   safeAdd("signInBtn", "click", window.handleSignIn);
@@ -99,6 +131,10 @@ export function initializeIndexPage() {
 
   // --- Help Modal
   safeAdd("buildOrderHelpBtn", "click", showBuildOrderHelpModal);
+  safeAdd("closeBuildOrderHelpModal", "click", () => {
+    const modal = document.getElementById("buildOrderHelpModal");
+    if (modal) modal.style.display = "none";
+  });
 
   window.addEventListener("click", (event) => {
     const helpModal = document.getElementById("buildOrderHelpModal");
@@ -118,6 +154,50 @@ export function initializeIndexPage() {
     }
   });
 
+  safeAdd("closePublishModalButton", "click", () => {
+    const publishModal = document.getElementById("publishModal");
+    if (publishModal) publishModal.style.display = "none";
+  });
+
+  safeAdd("confirmPublishButton", "click", async () => {
+    const selectedDestination = document.querySelector(
+      'input[name="publishDestination"]:checked'
+    )?.value;
+
+    if (!window.currentBuildIdToPublish) {
+      console.error("❌ No build selected for publishing.");
+      return;
+    }
+
+    if (selectedDestination === "community") {
+      await window.publishBuildToCommunity(window.currentBuildIdToPublish);
+    } else {
+      window.showToast("Clan publishing is coming soon!", "info");
+    }
+
+    const publishModal = document.getElementById("publishModal");
+    if (publishModal) publishModal.style.display = "none";
+  });
+
+  safeAdd("savePublishSettingsButton", "click", async () => {
+    const publishToCommunity =
+      document.getElementById("publishToCommunity")?.checked;
+
+    if (!window.currentBuildIdToPublish) {
+      console.error("❌ No build selected to update.");
+      return;
+    }
+
+    if (publishToCommunity) {
+      await window.publishBuildToCommunity(window.currentBuildIdToPublish);
+    } else {
+      await window.unpublishBuild(window.currentBuildIdToPublish);
+    }
+
+    const modal = document.getElementById("managePublishModal");
+    if (modal) modal.style.display = "none";
+  });
+
   // --- Other Initializations
   initializeSectionToggles();
   initializeTextareaClickHandler();
@@ -128,6 +208,7 @@ export function initializeIndexPage() {
 
   attachCategoryClicks();
   attachSubcategoryClicks();
+  attachCommunityCategoryClicks();
 
   // --- Map Setup (only if map container exists)
   if (document.getElementById("map-preview-container")) {
@@ -192,6 +273,57 @@ function attachSubcategoryClicks() {
         const buildSearch = document.getElementById("buildSearchBar");
         if (buildSearch) buildSearch.value = "";
         filterBuilds(subcategory);
+      }
+    });
+  });
+}
+
+function attachCommunityCategoryClicks() {
+  document
+    .querySelectorAll("#communityModal .filter-category")
+    .forEach((el) => {
+      el.addEventListener("click", () => {
+        const category = el.getAttribute("data-category");
+        if (category) {
+          filterCommunityBuilds(category);
+          localStorage.setItem("communityFilter", category);
+
+          // 🔄 Set active state
+          document
+            .querySelectorAll("#communityModal .filter-category")
+            .forEach((btn) => btn.classList.remove("active"));
+          el.classList.add("active");
+
+          // 🔄 Clear any active subcategories (since a category was selected directly)
+          document
+            .querySelectorAll("#communityModal .subcategory")
+            .forEach((btn) => btn.classList.remove("active"));
+        }
+      });
+    });
+
+  document.querySelectorAll("#communityModal .subcategory").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const subcat = el.getAttribute("data-subcategory");
+      if (subcat) {
+        filterCommunityBuilds(subcat);
+        localStorage.setItem("communityFilter", subcat);
+
+        // 🔄 Set active subcategory
+        document
+          .querySelectorAll("#communityModal .subcategory")
+          .forEach((btn) => btn.classList.remove("active"));
+        el.classList.add("active");
+
+        // 🔄 Ensure parent category is also marked active
+        const parentCategory = el.closest(".filter-category");
+        if (parentCategory) {
+          document
+            .querySelectorAll("#communityModal .filter-category")
+            .forEach((btn) => btn.classList.remove("active"));
+          parentCategory.classList.add("active");
+        }
       }
     });
   });
