@@ -9,7 +9,7 @@ export const units = {
     "hydralisk",
     "swarm host",
     "roach",
-    "ravenger",
+    "ravager",
     "baneling",
     "corruptor",
     "infestor",

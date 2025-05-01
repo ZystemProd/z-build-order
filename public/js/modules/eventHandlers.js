@@ -44,7 +44,11 @@ setupTemplateModal(); // Always call early
  ----------------- */
 function safeAdd(id, event, handler) {
   const el = document.getElementById(id);
-  if (el) el.addEventListener(event, handler);
+  if (!el) return;
+
+  // prevent duplicate listeners by removing first
+  el.removeEventListener(event, handler);
+  el.addEventListener(event, handler);
 }
 
 function safeInput(id, callback) {
@@ -159,26 +163,6 @@ export async function initializeIndexPage() {
     if (publishModal) publishModal.style.display = "none";
   });
 
-  safeAdd("confirmPublishButton", "click", async () => {
-    const selectedDestination = document.querySelector(
-      'input[name="publishDestination"]:checked'
-    )?.value;
-
-    if (!window.currentBuildIdToPublish) {
-      console.error("❌ No build selected for publishing.");
-      return;
-    }
-
-    if (selectedDestination === "community") {
-      await window.publishBuildToCommunity(window.currentBuildIdToPublish);
-    } else {
-      window.showToast("Clan publishing is coming soon!", "info");
-    }
-
-    const publishModal = document.getElementById("publishModal");
-    if (publishModal) publishModal.style.display = "none";
-  });
-
   safeAdd("savePublishSettingsButton", "click", async () => {
     const publishToCommunity =
       document.getElementById("publishToCommunity")?.checked;
@@ -194,8 +178,22 @@ export async function initializeIndexPage() {
       await window.unpublishBuild(window.currentBuildIdToPublish);
     }
 
-    const modal = document.getElementById("managePublishModal");
+    const modal = document.getElementById("publishModal");
     if (modal) modal.style.display = "none";
+  });
+
+  window.addEventListener("click", (event) => {
+    const modal = document.getElementById("publishModal");
+    const content = modal?.querySelector(".modal-content.small-modal");
+
+    if (
+      modal &&
+      content &&
+      modal.style.display === "block" &&
+      !content.contains(event.target)
+    ) {
+      modal.style.display = "none";
+    }
   });
 
   // --- Other Initializations
@@ -439,7 +437,14 @@ async function importBuildHandler() {
     }
 
     const buildData = buildDoc.data();
-    const userBuildDocRef = doc(userBuildsRef, buildData.title);
+    const encodedTitle = buildData.title.replace(/\//g, "__SLASH__");
+    const userBuildDocRef = doc(userBuildsRef, encodedTitle);
+    const existingDoc = await getDoc(userBuildDocRef);
+
+    if (existingDoc.exists()) {
+      alert("⚠️ This build is already in your library.");
+      return;
+    }
 
     await setDoc(userBuildDocRef, {
       ...buildData,
@@ -448,10 +453,13 @@ async function importBuildHandler() {
       timestamp: Date.now(),
     });
 
-    alert("Build imported successfully!");
+    document.getElementById("importBuildButton").disabled = true;
+    document.getElementById("importBuildButton").textContent = "Imported";
+
+    alert("✅ Build imported successfully!");
     populateBuildsModal();
   } catch (error) {
     console.error(error);
-    alert("Failed to import build.");
+    alert("❌ Failed to import build.");
   }
 }

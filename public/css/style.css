@@ -2935,12 +2935,31 @@ td {
 
 /* Publish Modal Styles */
 .small-modal {
-  max-width: 400px;
-  background: #1e1e1e;
-  padding: 20px;
-  border-radius: 10px;
-  color: white;
-  text-align: center;
+  max-width: 420px;
+  background: #2b2b2b;
+  padding: 30px 24px;
+  border-radius: 14px;
+  color: #e0e0e0;
+  text-align: left;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid #444;
+  transition: transform 0.3s ease;
+  animation: fadeInUp 0.4s ease-out;
+}
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.small-modal > * + * {
+  margin-top: 16px;
 }
 
 .publish-options {
@@ -2986,11 +3005,36 @@ td {
 }
 
 .publish-status-list {
-  margin: 20px 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  text-align: left;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.publish-status-list label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #e0e0e0;
+}
+
+.publish-checkbox-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  font-size: 14px;
+  color: #e0e0e0;
+  line-height: 1.5;
+}
+
+.publish-checkbox-row input[type="checkbox"] {
+  margin-left: 20px;
+  transform: scale(1.2);
+  vertical-align: middle; /* Aligns with label text baseline */
+  position: relative;
+  top: 1px; /* Fine-tune vertical position */
 }
 
 /* Username input default */
@@ -3122,6 +3166,12 @@ td {
 
 .user-menu #deleteAccountBtn:hover {
   background-color: #3a0000;
+}
+
+.sort-label {
+  margin-right: 8px;
+  font-size: 14px;
+  color: #e0e0e0;
 }
 
 @media screen and (max-width: 768px) {

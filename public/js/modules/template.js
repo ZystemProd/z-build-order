@@ -20,10 +20,16 @@ const predefinedTemplates = [
     data: "[12] Overlord\n[14] Spawning Pool\n[16] Zergling Rush",
   },
   {
+    title: "Double Gas",
+    category: "terran",
+    image: "img/race/terran.webp",
+    data: "[14] Supply Depot\n[15] Barracks\n[16] Refinery\n[17] refinery\n100% rax upgrade orbital command + 1 reaper\n[20] factory",
+  },
+  {
     title: "Reaper Expand",
     category: "terran",
     image: "img/race/terran.webp",
-    data: "[14] Supply Depot\n[16] Barracks\n[16] Refinery\n100% rax upgrade orbital command + 1 reaper",
+    data: "[14] Supply Depot\n[16] Barracks\n[16] Refinery\n100% rax upgrade orbital command + 1 reaper\n[20] command center",
   },
   {
     title: "Gate|Core|Nexus",

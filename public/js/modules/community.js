@@ -15,43 +15,49 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { formatActionText } from "./textFormatters.js";
 import { showToast } from "./uiHandlers.js";
+import { formatMatchup } from "./modal.js";
 import { populateBuildsModal } from "./buildManagement.js"; // ✅ Corrected import
 import { auth, db } from "../../app.js"; // ✅ Ensure auth and db are imported correctly
 
 let allCommunityBuilds = []; // master dataset
 let communityBuilds = []; // filtered or active dataset
+let communitySortMode = "hot"; // default sort mode
 
 async function fetchCommunityBuilds() {
   const db = getFirestore();
   const buildsRef = collection(db, "communityBuilds");
   const snapshot = await getDocs(buildsRef);
 
+  const now = Date.now();
+
   return snapshot.docs.map((doc) => {
     const data = doc.data();
-    const rawMatchup = data.subcategory?.trim().toLowerCase() || "unknown";
+    const upvotes = data.upvotes || 0;
+    const downvotes = data.downvotes || 0;
+    const datePublishedRaw = new Date(data.datePublished).getTime() || now;
+    const datePublished =
+      new Date(data.datePublished).toLocaleDateString() || "Unknown";
+    const ageInHours = (now - datePublishedRaw) / (1000 * 60 * 60);
+    const gravity = 1.5;
 
-    const formattedMatchup =
-      rawMatchup.length === 3
-        ? rawMatchup.charAt(0).toUpperCase() +
-          rawMatchup.charAt(1).toLowerCase() +
-          rawMatchup.charAt(2).toUpperCase()
-        : "Unknown";
+    const hotnessScore =
+      (upvotes - downvotes) / Math.pow(ageInHours + 2, gravity);
 
     return {
       id: doc.id,
       title: data.title || "Untitled Build",
       publisher: data.username || "Anonymous",
-      matchup: formattedMatchup,
+      matchup: formatMatchup(data.subcategory),
       category: data.category || "Unknown",
       subcategory: data.subcategory || "Unknown",
-      datePublished: data.datePublished
-        ? new Date(data.datePublished).toLocaleDateString()
-        : "Unknown",
+      datePublishedRaw,
+      datePublished,
       views: data.views || 0,
-      upvotes: data.upvotes || 0,
-      downvotes: data.downvotes || 0,
+      upvotes,
+      downvotes,
       userVotes: data.userVotes || {},
       buildOrder: data.buildOrder || [],
+      hotnessScore,
     };
   });
 }
@@ -62,8 +68,24 @@ export async function populateCommunityBuilds(buildList = null) {
 
   try {
     const builds = buildList || (await fetchCommunityBuilds());
+
     if (!buildList) allCommunityBuilds = builds;
     communityBuilds = builds;
+
+    // 🔁 Sort based on selected mode
+    if (communitySortMode === "hot") {
+      builds.sort((a, b) => {
+        const scoreDiff = b.hotnessScore - a.hotnessScore;
+        if (scoreDiff !== 0) return scoreDiff;
+        return b.datePublishedRaw - a.datePublishedRaw; // fallback to newest first
+      });
+    } else if (communitySortMode === "new") {
+      builds.sort((a, b) => b.datePublishedRaw - a.datePublishedRaw);
+    } else if (communitySortMode === "top") {
+      builds.sort(
+        (a, b) => b.upvotes - b.downvotes - (a.upvotes - a.downvotes)
+      );
+    }
 
     const db = getFirestore();
 
@@ -408,7 +430,10 @@ export async function publishBuildToCommunity(buildId) {
     if (buildCard) {
       const publishInfo = buildCard.querySelector(".build-publish-info");
       if (publishInfo) {
-        publishInfo.innerHTML = `<img src="./img/SVG/checkmark2.svg" alt="Published" class="publish-icon">`;
+        publishInfo.innerHTML = `
+        <span class="publish-label">Published</span>
+        <img src="./img/SVG/checkmark2.svg" alt="Published" class="publish-icon">
+      `;
         publishInfo.classList.remove("publish-unpublished");
         publishInfo.classList.add("publish-published");
         publishInfo.onclick = (event) => {
@@ -424,6 +449,98 @@ export async function publishBuildToCommunity(buildId) {
     alert("Failed to publish build. Please check your permissions.");
   }
 }
+
+window.publishBuildToCommunity = async function (buildId) {
+  const { getFirestore, doc, getDoc, collection, addDoc, setDoc } =
+    await import(
+      "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js"
+    );
+  const { getAuth } = await import(
+    "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js"
+  );
+
+  const db = getFirestore();
+  const auth = getAuth();
+  const user = auth.currentUser;
+
+  if (!user) {
+    alert("You must be signed in to publish.");
+    return;
+  }
+
+  const userBuildRef = doc(db, `users/${user.uid}/builds/${buildId}`);
+  const userBuildSnap = await getDoc(userBuildRef);
+
+  if (!userBuildSnap.exists()) {
+    alert("❌ Build not found.");
+    return;
+  }
+
+  const build = userBuildSnap.data();
+
+  const { encodedTitle, isPublished, timestamp, imported, ...buildToPublish } =
+    build;
+
+  // Required for Firestore rule compliance
+  buildToPublish.title = build.title || "Untitled Build";
+  buildToPublish.category = build.category || "Zerg";
+  buildToPublish.subcategory = build.subcategory || "ZvP";
+  buildToPublish.publisherId = user.uid;
+  buildToPublish.username = build.publisher || "Anonymous";
+  buildToPublish.isPublished = true;
+  buildToPublish.datePublished = new Date().toISOString();
+
+  // Analytics fields
+  buildToPublish.views = 0;
+  buildToPublish.upvotes = 0;
+  buildToPublish.downvotes = 0;
+  buildToPublish.userVotes = {};
+
+  try {
+    await addDoc(collection(db, "communityBuilds"), buildToPublish);
+
+    // ✅ Mark original build as published
+    await setDoc(
+      userBuildRef,
+      { ...build, isPublished: true },
+      { merge: true }
+    );
+
+    // ✅ Update publish icon in build card
+    const buildCard = document.querySelector(
+      `.build-card[data-id="${buildId}"]`
+    );
+    if (buildCard) {
+      const publishInfo = buildCard.querySelector(".build-publish-info");
+      if (publishInfo) {
+        publishInfo.innerHTML = `
+        <span class="publish-label">Published</span>
+        <img src="./img/SVG/checkmark2.svg" alt="Published" class="publish-icon">
+      `;
+        publishInfo.classList.remove("publish-unpublished");
+        publishInfo.classList.add("publish-published");
+        publishInfo.onclick = (event) => {
+          event.stopPropagation();
+          openPublishSettingsModal(buildId); // Optional: if you support publish settings
+        };
+      }
+    }
+
+    // ✅ Close modal if open
+    const modal = document.querySelector(
+      ".modal-content.small-modal"
+    )?.parentElement;
+    if (modal) modal.style.display = "none";
+
+    // ✅ Show toast
+    import("./uiHandlers.js").then(({ showToast }) => {
+      showToast("✅ Build published to community!", "success");
+    });
+  } catch (err) {
+    console.error("❌ Failed to publish:", err);
+    alert("❌ Failed to publish build. Check your connection or permissions.");
+  }
+};
 
 export function searchCommunityBuilds(query) {
   const lowerQuery = DOMPurify.sanitize(query.toLowerCase());
@@ -462,6 +579,22 @@ export function filterCommunityBuilds(categoryOrSubcat = "all") {
   });
 
   populateCommunityBuilds(filtered);
+}
+
+document
+  .getElementById("communitySortDropdown")
+  ?.addEventListener("change", (e) => {
+    const mode = e.target.value;
+    setCommunitySortMode(mode);
+  });
+
+function setCommunitySortMode(mode) {
+  communitySortMode = mode;
+  populateCommunityBuilds([...allCommunityBuilds]);
+}
+
+function capitalize(str) {
+  return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
 // Call check function on page load

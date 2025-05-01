@@ -31,7 +31,7 @@ import { formatActionText } from "./textFormatters.js";
 import { analyzeBuildOrder } from "./uiHandlers.js";
 import { publishBuildToCommunity } from "./community.js";
 
-function formatMatchup(matchup) {
+export function formatMatchup(matchup) {
   if (!matchup) return "Unknown Match-Up";
   return (
     matchup.charAt(0).toUpperCase() +
@@ -484,6 +484,17 @@ export async function populateBuildList(filteredBuilds = null) {
       });
     }
 
+    const publishButton = buildCard.querySelector(".build-publish-info");
+    if (publishButton) {
+      publishButton.addEventListener("click", (event) => {
+        event.stopPropagation();
+        window.currentBuildIdToPublish = build.id;
+
+        const publishModal = document.getElementById("publishModal");
+        if (publishModal) publishModal.style.display = "block";
+      });
+    }
+
     // ✅ Setup publish-info button
     const publishInfo = buildCard.querySelector(".build-publish-info");
     if (publishInfo) {
@@ -523,14 +534,17 @@ export function openPublishSettingsModal(buildId) {
   console.log(`⚙️ Open manage publish settings for build: ${buildId}`);
   currentBuildIdToPublish = buildId;
 
-  const modal = document.getElementById("managePublishModal");
+  const modal = document.getElementById("publishModal");
   modal.style.display = "block";
 
   // Load current publish state
   const buildCard = document.querySelector(`.build-card[data-id="${buildId}"]`);
   if (buildCard) {
     const isPublished = buildCard.classList.contains("published"); // or based on your state
-    document.getElementById("publishToCommunity").checked = isPublished;
+    const checkbox = document.getElementById("publishToCommunity");
+    if (checkbox) {
+      checkbox.checked = isPublished;
+    }
   }
 }
 
@@ -591,7 +605,15 @@ export async function unpublishBuild(buildId) {
 
     // ✅ Now search communityBuilds where publisherId == user.uid
     const communityRef = collection(db, "communityBuilds");
-    const q = query(communityRef, where("publisherId", "==", user.uid));
+    const buildSnapshot = await getDoc(buildRef);
+    const buildData = buildSnapshot.data();
+    const title = buildData?.title;
+
+    const q = query(
+      communityRef,
+      where("publisherId", "==", user.uid),
+      where("title", "==", title)
+    );
 
     const querySnapshot = await getDocs(q);
     querySnapshot.forEach(async (docSnap) => {
@@ -628,6 +650,7 @@ export async function unpublishBuild(buildId) {
     showToast("Failed to unpublish build.", "error");
   }
 }
+window.unpublishBuild = unpublishBuild;
 
 function updateBuildPreview(build) {
   const buildPreview = document.getElementById("buildPreview");

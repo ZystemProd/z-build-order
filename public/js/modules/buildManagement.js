@@ -5,7 +5,10 @@ import {
   setDoc,
   getDocs,
   getDoc,
+  query,
+  where,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+
 import { getAuth } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
 import {
   getStorage,
@@ -33,18 +36,34 @@ export async function fetchUserBuilds() {
   const buildsRef = collection(db, `users/${user.uid}/builds`);
   const snapshot = await getDocs(buildsRef);
 
-  return snapshot.docs.map((doc) => {
+  const builds = snapshot.docs.map((doc) => {
     const data = doc.data();
-
-    // ✅ Decode "__SLASH__" back to "/"
     const decodedTitle = doc.id.replace(/__SLASH__/g, "/");
 
     return {
       id: doc.id,
-      title: decodedTitle, // ✅ Show the original title
+      title: decodedTitle,
       ...data,
+      isPublished: false, // default
     };
   });
+
+  // 🔍 Now fetch community builds by this user
+  const communityRef = collection(db, "communityBuilds");
+  const q = query(communityRef, where("publisherId", "==", user.uid));
+  const communitySnapshot = await getDocs(q);
+  const publishedTitles = new Set(
+    communitySnapshot.docs.map((doc) => doc.data().title)
+  );
+
+  // ✅ Update each build with actual publish status
+  builds.forEach((build) => {
+    if (publishedTitles.has(build.title)) {
+      build.isPublished = true;
+    }
+  });
+
+  return builds;
 }
 
 export async function saveCurrentBuild() {

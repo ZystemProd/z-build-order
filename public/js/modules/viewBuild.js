@@ -391,38 +391,44 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (!window.location.pathname.includes("viewBuild.html")) return;
 
   const importBtn = document.getElementById("importBuildButton");
-  const buildId = new URLSearchParams(window.location.search).get("id");
 
   if (importBtn) {
-    auth.onAuthStateChanged((user) => {
-      if (user) {
-        importBtn.style.display = "inline-block";
-      } else {
+    auth.onAuthStateChanged(async (user) => {
+      const importBtn = document.getElementById("importBuildButton");
+      if (!importBtn) return;
+
+      if (!user) {
         importBtn.style.display = "none";
+        return;
       }
-    });
 
-    importBtn.addEventListener("click", async () => {
-      try {
-        const communitySnap = await getDoc(doc(db, "communityBuilds", buildId));
-        if (!communitySnap.exists()) throw new Error("Build not found");
+      // Don't show the button until we know the status
+      importBtn.style.display = "none";
 
-        const data = communitySnap.data();
-        const userBuildRef = doc(
-          collection(db, `users/${auth.currentUser.uid}/builds`),
-          buildId
-        );
-        await setDoc(userBuildRef, {
-          ...data,
-          imported: true,
-          timestamp: Date.now(),
-        });
+      const urlParams = new URLSearchParams(window.location.search);
+      const buildId = urlParams.get("id");
+      if (!buildId) return;
 
-        alert("✅ Build imported to your library!");
-      } catch (e) {
-        console.error(e);
-        alert("❌ Failed to import build.");
+      const buildRef = doc(db, "communityBuilds", buildId);
+      const buildSnap = await getDoc(buildRef);
+      if (!buildSnap.exists()) return;
+
+      const buildData = buildSnap.data();
+      const encodedTitle = buildData.title.replace(/\//g, "__SLASH__");
+      const userBuildRef = doc(db, `users/${user.uid}/builds/${encodedTitle}`);
+      const userBuildSnap = await getDoc(userBuildRef);
+
+      if (userBuildSnap.exists()) {
+        importBtn.disabled = true;
+        importBtn.textContent = "Imported";
+        importBtn.classList.add("imported");
+      } else {
+        importBtn.disabled = false;
+        importBtn.textContent = "Import";
       }
+
+      // ✅ Show the button only after the above logic
+      importBtn.style.display = "inline-block";
     });
   } else {
     console.warn("⚠️ Import button not found.");

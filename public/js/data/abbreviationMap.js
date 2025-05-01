@@ -41,5 +41,7 @@ export const abbreviationMap = {
     "blue flame": "Infernal pre-igniter",
     "phoenix range": "anion pulse-crystals",
     "colossus range": "extended thermal lance",
+    "lib range": "advanced ballistics",
+    "liberator range": "advanced ballistics",
   },
 };

@@ -379,9 +379,19 @@
           <span class="close-modal" id="closeCommunityModal">&times;</span>
           <h3>Community Builds</h3>
           <div id="communityHeaderControls" class="header-controls">
+            <label for="communitySortDropdown" class="sort-label">Sort by:</label>
+            <select id="communitySortDropdown" class="styled-dropdown">
+              <option value="hot">Hot</option>
+              <option value="top">Top</option>
+              <option value="new">New</option>
+            </select>
+
+
             <input id="communitySearchBar" type="text" placeholder="Search community builds..." class="search-bar" />
 
             <div class="filters-container">
+
+
               <div class="filter-category" data-category="all">
                 All
               </div>
@@ -427,55 +437,31 @@
       </div>
     </div>
 
-    <!-- Publish Modal -->
+    <!-- Manage Publish Modal -->
     <div id="publishModal" class="modal" style="display: none;">
       <div class="modal-content small-modal">
         <h2>Publish Build</h2>
         <p>Where would you like to publish this build?</p>
 
-        <div class="publish-options">
-          <label>
-            <input type="radio" name="publishDestination" value="community" checked>
+        <div class="publish-status-list">
+          <label class="publish-checkbox-row">
             Publish to Community
+            <input type="checkbox" id="publishToCommunity" />
           </label>
 
-          <label>
-            <input type="radio" name="publishDestination" value="clan">
+          <label class="publish-checkbox-row">
             Publish to Clan (Coming Soon)
+            <input type="checkbox" id="publishToClan" disabled />
           </label>
         </div>
 
         <div class="modal-buttons">
-          <button id="confirmPublishButton" class="confirm-button">Publish</button>
+          <button id="savePublishSettingsButton" class="confirm-button">Save Settings</button>
           <button id="closePublishModalButton" class="cancel-button">Cancel</button>
         </div>
       </div>
     </div>
 
-    <!-- Manage Publish Modal -->
-    <div id="managePublishModal" class="modal" style="display: none;">
-      <div class="modal-content small-modal">
-        <h2>Manage Publishing</h2>
-        <p>Adjust where this build is published:</p>
-
-        <div class="publish-status-list">
-          <label>
-            <input type="checkbox" id="publishToCommunity">
-            Publish to Community
-          </label>
-
-          <label>
-            <input type="checkbox" id="publishToClan" disabled>
-            Publish to Clan (Coming Soon)
-          </label>
-        </div>
-
-        <div class="modal-buttons">
-          <button id="savePublishSettingsButton" class="confirm-button">Save Changes</button>
-          <button id="closeManagePublishModalButton" class="cancel-button">Cancel</button>
-        </div>
-      </div>
-    </div>
 
 
     <!-- Modal for delete notification -->

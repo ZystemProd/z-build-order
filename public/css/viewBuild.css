@@ -244,6 +244,12 @@ body {
   vertical-align: middle;
 }
 
+#importBuildButton.imported {
+  background-color: #444;
+  color: #ccc;
+  cursor: default;
+}
+
 /* Responsive for Mobile */
 @media (max-width: 768px) {
   .second-row {
