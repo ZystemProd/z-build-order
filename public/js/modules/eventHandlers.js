@@ -76,28 +76,69 @@ export async function initializeIndexPage() {
     const modal = document.getElementById("communityModal");
     if (modal) {
       modal.style.display = "block";
+
+      // 🧹 Clear all active classes
+      document
+        .querySelectorAll("#communityModal .filter-category, .subcategory")
+        .forEach((btn) => btn.classList.remove("active"));
+
+      // ✅ Apply correct active filter
+      if (filterValue && filterValue !== "all") {
+        const matchBtn = document.querySelector(
+          `#communityModal .filter-category[data-category="${filterValue}"],
+           #communityModal .subcategory[data-subcategory="${filterValue}"]`
+        );
+        if (matchBtn) matchBtn.classList.add("active");
+      } else {
+        const allBtn = document.querySelector(
+          '#communityModal .filter-category[data-category="all"]'
+        );
+        if (allBtn) allBtn.classList.add("active");
+      }
+
+      // ✅ Apply filter + search after build list loads
       await populateCommunityBuilds();
 
-      // Step 1: Apply category/subcategory filter first (if any)
       if (filterType && filterValue) {
         filterCommunityBuilds(filterValue);
       }
 
-      // Step 2: Apply search text filter afterward (if any)
       if (searchQuery) {
         searchCommunityBuilds(searchQuery);
         const input = document.getElementById("communitySearchBar");
         if (input) input.value = searchQuery;
       }
+
+      // ✅ Update heading
+      const heading = document.querySelector("#communityModal h3");
+      if (heading) {
+        let title = "Community Builds";
+        if (filterValue && filterValue !== "all") {
+          title += ` - ${capitalize(filterValue)}`;
+        }
+        if (searchQuery) {
+          title += ` - ${searchQuery}`;
+        }
+        heading.textContent = title;
+      }
+
+      // ✅ Set sort button active (hot, top, new)
+      const allSortButtons = document.querySelectorAll(".sort-button");
+      const currentSort = localStorage.getItem("communitySortMode") || "hot";
+      allSortButtons.forEach((btn) => {
+        btn.classList.remove("active");
+        if (btn.id === "sort" + capitalize(currentSort)) {
+          btn.classList.add("active");
+        }
+      });
     }
 
-    // Cleanup
+    // 🧼 Cleanup
     localStorage.removeItem("restoreCommunityModal");
     localStorage.removeItem("communityFilterType");
     localStorage.removeItem("communityFilterValue");
     localStorage.removeItem("communitySearchQuery");
   }
-
   // --- Auth Buttons
   safeAdd("signInBtn", "click", window.handleSignIn);
   safeAdd("signOutBtn", "click", window.handleSignOut);
@@ -108,11 +149,34 @@ export async function initializeIndexPage() {
   safeAdd("showBuildsButton", "click", window.showBuildsModal);
   safeAdd("showCommunityModalButton", "click", async () => {
     const modal = document.getElementById("communityModal");
-    if (modal) {
-      modal.style.display = "block";
-      await populateCommunityBuilds();
-    }
+    if (!modal) return;
+
+    modal.style.display = "block";
+
+    // 🧹 Clear all active filters
+    document
+      .querySelectorAll("#communityModal .filter-category, .subcategory")
+      .forEach((btn) => btn.classList.remove("active"));
+
+    // ✅ Set only 'All' active
+    const allBtn = document.querySelector(
+      '#communityModal .filter-category[data-category="all"]'
+    );
+    if (allBtn) allBtn.classList.add("active");
+
+    // ✅ Clear search input
+    const input = document.getElementById("communitySearchBar");
+    if (input) input.value = "";
+
+    // ✅ Load builds and attach filter click handlers
+    await populateCommunityBuilds();
+    attachCommunityCategoryClicks();
+
+    // ✅ Reset heading
+    const heading = document.querySelector("#communityModal h3");
+    if (heading) heading.textContent = "Community Builds";
   });
+
   safeAdd("closeCommunityModal", "click", () => {
     const modal = document.getElementById("communityModal");
     if (modal) modal.style.display = "none";
@@ -254,79 +318,131 @@ export function initializeViewBuildPage() {
  * Support Functions
  ----------------- */
 function attachCategoryClicks() {
-  document.querySelectorAll(".filter-category").forEach((el) => {
+  const heading = document.querySelector("#buildsModal .template-header h3");
+  const allCategories = document.querySelectorAll(
+    "#buildsModal .filter-category"
+  );
+  const allSubcategories = document.querySelectorAll(
+    "#buildsModal .subcategory"
+  );
+
+  allCategories.forEach((el) => {
     el.addEventListener("click", () => {
       const category = el.getAttribute("data-category");
-      if (category) {
-        const buildSearch = document.getElementById("buildSearchBar");
-        if (buildSearch) buildSearch.value = "";
-        filterBuilds(category);
+      if (!category) return;
+
+      // Clear actives
+      allCategories.forEach((btn) => btn.classList.remove("active"));
+      allSubcategories.forEach((btn) => btn.classList.remove("active"));
+
+      // Mark this as active
+      el.classList.add("active");
+
+      // Clear search bar
+      const buildSearch = document.getElementById("buildSearchBar");
+      if (buildSearch) buildSearch.value = "";
+
+      // Update heading
+      if (heading) {
+        heading.textContent =
+          category.toLowerCase() === "all"
+            ? "Build Orders"
+            : `Build Orders - ${capitalize(category)}`;
       }
+
+      // Filter builds
+      filterBuilds(category);
     });
   });
 }
 
 function attachSubcategoryClicks() {
-  document.querySelectorAll(".subcategory").forEach((el) => {
+  const heading = document.querySelector("#buildsModal .template-header h3");
+  const allCategories = document.querySelectorAll(
+    "#buildsModal .filter-category"
+  );
+  const allSubcategories = document.querySelectorAll(
+    "#buildsModal .subcategory"
+  );
+
+  allSubcategories.forEach((el) => {
     el.addEventListener("click", (e) => {
       e.stopPropagation();
-      const subcategory = el.getAttribute("data-subcategory");
-      if (subcategory) {
-        const buildSearch = document.getElementById("buildSearchBar");
-        if (buildSearch) buildSearch.value = "";
-        filterBuilds(subcategory);
+      const subcat = el.getAttribute("data-subcategory");
+      if (!subcat) return;
+
+      // Clear actives
+      allCategories.forEach((btn) => btn.classList.remove("active"));
+      allSubcategories.forEach((btn) => btn.classList.remove("active"));
+
+      // Set current subcategory and parent as active
+      el.classList.add("active");
+      const parent = el.closest(".filter-category");
+      if (parent) parent.classList.add("active");
+
+      // Clear search bar
+      const buildSearch = document.getElementById("buildSearchBar");
+      if (buildSearch) buildSearch.value = "";
+
+      // Update heading
+      if (heading) {
+        heading.textContent = `Build Orders - ${capitalize(subcat)}`;
       }
+
+      // Filter builds
+      filterBuilds(subcat);
     });
   });
 }
 
 function attachCommunityCategoryClicks() {
-  document
-    .querySelectorAll("#communityModal .filter-category")
-    .forEach((el) => {
-      el.addEventListener("click", () => {
-        const category = el.getAttribute("data-category");
-        if (category) {
-          filterCommunityBuilds(category);
-          localStorage.setItem("communityFilter", category);
+  const categoryButtons = document.querySelectorAll(
+    "#communityModal .filter-category"
+  );
+  const subcategoryButtons = document.querySelectorAll(
+    "#communityModal .subcategory"
+  );
 
-          // 🔄 Set active state
-          document
-            .querySelectorAll("#communityModal .filter-category")
-            .forEach((btn) => btn.classList.remove("active"));
-          el.classList.add("active");
+  categoryButtons.forEach((el) => {
+    el.addEventListener("click", () => {
+      const category = el.getAttribute("data-category");
+      if (!category) return;
 
-          // 🔄 Clear any active subcategories (since a category was selected directly)
-          document
-            .querySelectorAll("#communityModal .subcategory")
-            .forEach((btn) => btn.classList.remove("active"));
-        }
-      });
+      categoryButtons.forEach((btn) => btn.classList.remove("active"));
+      subcategoryButtons.forEach((btn) => btn.classList.remove("active"));
+
+      el.classList.add("active");
+
+      filterCommunityBuilds(category);
+      localStorage.setItem("communityFilter", category);
+
+      const heading = document.querySelector("#communityModal h3");
+      heading.textContent =
+        category.toLowerCase() === "all"
+          ? "Community Builds"
+          : `Community Builds - ${capitalize(category)}`;
     });
+  });
 
-  document.querySelectorAll("#communityModal .subcategory").forEach((el) => {
+  subcategoryButtons.forEach((el) => {
     el.addEventListener("click", (e) => {
       e.stopPropagation();
       const subcat = el.getAttribute("data-subcategory");
-      if (subcat) {
-        filterCommunityBuilds(subcat);
-        localStorage.setItem("communityFilter", subcat);
+      if (!subcat) return;
 
-        // 🔄 Set active subcategory
-        document
-          .querySelectorAll("#communityModal .subcategory")
-          .forEach((btn) => btn.classList.remove("active"));
-        el.classList.add("active");
+      subcategoryButtons.forEach((btn) => btn.classList.remove("active"));
+      categoryButtons.forEach((btn) => btn.classList.remove("active"));
 
-        // 🔄 Ensure parent category is also marked active
-        const parentCategory = el.closest(".filter-category");
-        if (parentCategory) {
-          document
-            .querySelectorAll("#communityModal .filter-category")
-            .forEach((btn) => btn.classList.remove("active"));
-          parentCategory.classList.add("active");
-        }
-      }
+      el.classList.add("active");
+
+      const parent = el.closest(".filter-category");
+      if (parent) parent.classList.add("active");
+
+      filterCommunityBuilds(subcat);
+      localStorage.setItem("communityFilter", subcat);
+
+      const heading = document.querySelector("#communityModal h3");
+      heading.textContent = `Community Builds - ${capitalize(subcat)}`;
     });
   });
 }
@@ -462,4 +578,7 @@ async function importBuildHandler() {
     console.error(error);
     alert("❌ Failed to import build.");
   }
+}
+function capitalize(str) {
+  return str.charAt(0).toUpperCase() + str.slice(1);
 }

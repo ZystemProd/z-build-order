@@ -3,7 +3,7 @@
   --bg-color-category: #444;
   --bg-color-subcategory: #2a2a2a;
   --hover-color: #504f4f;
-  --active-color: #444;
+  --active-color: #963325;
 }
 
 /* Template Header */
@@ -157,6 +157,8 @@
 }
 
 .modal-content-template {
+  display: flex;
+  flex-direction: column;
   background-color: rgba(
     30,
     30,
@@ -436,7 +438,7 @@
   border-radius: 8px;
   overflow-x: hidden;
   min-height: 250px;
-  height: 90%;
+  height: 100%;
   word-wrap: break-word; /* Breaks long words */
   overflow-wrap: break-word; /* Ensures text wraps in all cases */
 }
@@ -565,6 +567,17 @@
 .filter-category.active,
 .subcategory.active {
   background-color: var(--active-color);
-  font-weight: bold;
   cursor: pointer;
+}
+
+.filter-category.active {
+  font-weight: bold;
+}
+
+.filter-category .subcategory {
+  font-weight: normal;
+}
+
+.subcategory.active {
+  font-weight: bold;
 }

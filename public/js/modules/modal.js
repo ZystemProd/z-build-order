@@ -268,9 +268,36 @@ window.viewBuild = viewBuild;
 // Close the modal
 export function closeModal() {
   const modal = document.getElementById("buildsModal");
-  if (modal) {
-    modal.style.display = "none"; // Only hide the modal
-  }
+  if (!modal) return;
+
+  modal.style.display = "none";
+
+  // 🔄 Reset filters
+  const allCategories = document.querySelectorAll(
+    "#buildsModal .filter-category"
+  );
+  const allSubcategories = document.querySelectorAll(
+    "#buildsModal .subcategory"
+  );
+
+  allCategories.forEach((btn) => btn.classList.remove("active"));
+  allSubcategories.forEach((btn) => btn.classList.remove("active"));
+
+  const allBtn = document.querySelector(
+    '#buildsModal .filter-category[data-category="all"]'
+  );
+  if (allBtn) allBtn.classList.add("active");
+
+  // 🔄 Reset heading
+  const heading = document.querySelector("#buildsModal .template-header h3");
+  if (heading) heading.textContent = "Build Orders";
+
+  // 🔄 Reset list
+  filterBuilds("all");
+
+  // 🔄 Optional: clear search input
+  const search = document.getElementById("buildSearchBar");
+  if (search) search.value = "";
 }
 
 // Function to open the modal
@@ -358,12 +385,11 @@ export async function showBuildsModal() {
   showBuildsButton.disabled = false;
 
   // Set up closing behavior for the modal
-  document.getElementById("closeBuildsModal").onclick = () => {
-    buildModal.style.display = "none";
-  };
+  document.getElementById("closeBuildsModal").onclick = closeModal;
+
   window.onclick = (event) => {
     if (event.target === buildModal) {
-      buildModal.style.display = "none";
+      closeModal();
     }
   };
 }

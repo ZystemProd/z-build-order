@@ -72,6 +72,26 @@ export async function populateCommunityBuilds(buildList = null) {
     if (!buildList) allCommunityBuilds = builds;
     communityBuilds = builds;
 
+    const heading = document.querySelector("#communityModal h3");
+    if (heading) {
+      let title = "Community Builds";
+
+      const filterValue = localStorage.getItem("communityFilterValue");
+      const searchQuery = document
+        .getElementById("communitySearchBar")
+        ?.value.trim();
+
+      if (filterValue && filterValue !== "all") {
+        title += ` - ${capitalize(filterValue)}`;
+      }
+
+      if (searchQuery) {
+        title += ` - ${searchQuery}`;
+      }
+
+      heading.textContent = title;
+    }
+
     // 🔁 Sort based on selected mode
     if (communitySortMode === "hot") {
       builds.sort((a, b) => {
@@ -550,9 +570,11 @@ export function searchCommunityBuilds(query) {
     return;
   }
 
-  const filtered = allCommunityBuilds.filter((build) =>
-    build.title.toLowerCase().includes(lowerQuery)
-  );
+  const filtered = allCommunityBuilds.filter((build) => {
+    const titleMatch = build.title?.toLowerCase().includes(lowerQuery);
+    const publisherMatch = build.publisher?.toLowerCase().includes(lowerQuery);
+    return titleMatch || publisherMatch;
+  });
 
   populateCommunityBuilds(filtered);
 }
