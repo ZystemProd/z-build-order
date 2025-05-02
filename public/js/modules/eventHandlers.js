@@ -36,7 +36,11 @@ import {
   searchCommunityBuilds,
   filterCommunityBuilds,
 } from "./community.js";
-
+import {
+  renderCreateClanUI,
+  renderManageClanUI,
+  renderFindClanUI,
+} from "./clan.js";
 setupTemplateModal(); // Always call early
 
 /** ----------------
@@ -297,6 +301,32 @@ export async function initializeIndexPage() {
 
   document.getElementById("mapVetoBtn")?.addEventListener("click", () => {
     window.location.href = "/veto.html";
+  });
+
+  const clanModal = document.getElementById("clanModal");
+  const clanBody = document.getElementById("clanModalBody");
+
+  document
+    .getElementById("showClanModalButton")
+    ?.addEventListener("click", () => {
+      clanModal.style.display = "block";
+      renderFindClanUI(clanBody);
+    });
+
+  document.getElementById("closeClanModal")?.addEventListener("click", () => {
+    clanModal.style.display = "none";
+  });
+
+  document.getElementById("createClanBtn")?.addEventListener("click", () => {
+    renderCreateClanUI(clanBody);
+  });
+
+  document.getElementById("manageClanBtn")?.addEventListener("click", () => {
+    renderManageClanUI(clanBody);
+  });
+
+  document.getElementById("findClanBtn")?.addEventListener("click", () => {
+    renderFindClanUI(clanBody);
   });
 }
 

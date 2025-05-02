@@ -374,6 +374,10 @@
         <div class="template-header">
           <span class="close-modal" id="closeCommunityModal">&times;</span>
           <h3>Community Builds</h3>
+          <button id="showClanModalButton" class="btn" disabled>
+            <img src="img/SVG/clan.svg" class="svg-icon" alt="Clan Icon">
+            Clans
+          </button>
           <div id="communityHeaderControls" class="header-controls">
             <label for="communitySortDropdown" class="sort-label">Sort by:</label>
             <select id="communitySortDropdown" class="styled-dropdown">
@@ -431,6 +435,26 @@
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- Clan Modal -->
+    <div id="clanModal" class="modal">
+      <div class="modal-content-template">
+        <div class="template-header">
+          <span class="close-modal" id="closeClanModal">&times;</span>
+          <h3>Clan</h3>
+          <div class="clan-menu">
+            <button id="createClanBtn">Create Clan</button>
+            <button id="manageClanBtn">Manage Clan</button>
+            <button id="findClanBtn">Find a Clan</button>
+          </div>
+        </div>
+
+        <div class="template-content-container" id="clanModalBody">
+          <!-- dynamic content -->
+        </div>
+      </div>
+
     </div>
 
     <!-- Manage Publish Modal -->

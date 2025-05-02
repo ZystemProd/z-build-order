@@ -177,6 +177,7 @@ export function initializeAuthUI() {
         user.photoURL || "img/default-avatar.webp";
 
       toggleAuthButtons(true);
+      document.getElementById("showClanModalButton").disabled = false;
     } else {
       document.getElementById("userName").innerText = "Guest";
       document.getElementById("userPhoto").src = "img/default-avatar.webp";
