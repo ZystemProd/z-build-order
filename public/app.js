@@ -176,12 +176,15 @@ export function initializeAuthUI() {
       document.getElementById("userPhoto").src =
         user.photoURL || "img/default-avatar.webp";
 
-      toggleAuthButtons(true);
+      document.getElementById("userMenu").style.display = "block";
+      document.getElementById("signInBtn").style.display = "none";
+      
       document.getElementById("showClanModalButton").disabled = false;
     } else {
       document.getElementById("userName").innerText = "Guest";
       document.getElementById("userPhoto").src = "img/default-avatar.webp";
-      toggleAuthButtons(false);
+      document.getElementById("userMenu").style.display = "none";
+      document.getElementById("signInBtn").style.display = "inline-block";
       resetBuildInputs();
     }
 
@@ -194,20 +197,15 @@ export function initializeAuthUI() {
 /*********************************************************************
  * Auth Button Functions
  *********************************************************************/
-function toggleAuthButtons(isLoggedIn) {
-  document.getElementById("signInBtn").style.display = isLoggedIn
-    ? "none"
-    : "inline-block";
-  document.getElementById("switchAccountBtn").style.display = isLoggedIn
-    ? "block"
-    : "none";
-  document.getElementById("signOutBtn").style.display = isLoggedIn
-    ? "block"
-    : "none";
-  document.getElementById("deleteAccountBtn").style.display = isLoggedIn
-    ? "block"
-    : "none";
+function closeUserMenu() {
+  const menu = document.getElementById("userMenu");
+  if (menu) {
+    menu.style.display = "none";
+    setTimeout(() => (menu.style.display = ""), 100); // Reset visibility for next toggle
+  }
 }
+
+
 
 export function handleSignIn() {
   signInWithPopup(auth, provider)
@@ -224,6 +222,7 @@ export function handleSignOut() {
     .then(() => {
       resetBuildInputs();
       initializeAuthUI();
+      closeUserMenu();
       window.location.reload();
     })
     .catch((error) => {
@@ -231,28 +230,43 @@ export function handleSignOut() {
     });
 }
 
+
 export async function handleSwitchAccount() {
   try {
     await signOut(auth);
     const result = await signInWithPopup(auth, provider);
     initializeAuthUI();
+    closeUserMenu(); 
     window.location.reload();
   } catch (err) {
     console.error("❌ Error switching accounts:", err);
   }
 }
 
+
 /*********************************************************************
  * Account Deletion (User Menu)
  *********************************************************************/
 const deleteAccountBtn = document.getElementById("deleteAccountBtn");
+const deleteAccountModal = document.getElementById("deleteAccountModal");
+const confirmDeleteAccountButton = document.getElementById("confirmDeleteAccountButton");
+const cancelDeleteAccountButton = document.getElementById("cancelDeleteAccountButton");
 
 if (deleteAccountBtn) {
-  deleteAccountBtn.addEventListener("click", async () => {
-    const confirmation = confirm(
-      "⚠️ Are you sure you want to permanently delete your account?"
-    );
-    if (!confirmation) return;
+  deleteAccountBtn.addEventListener("click", () => {
+    deleteAccountModal.style.display = "block";
+  });
+}
+
+if (cancelDeleteAccountButton) {
+  cancelDeleteAccountButton.addEventListener("click", () => {
+    deleteAccountModal.style.display = "none";
+  });
+}
+
+if (confirmDeleteAccountButton) {
+  confirmDeleteAccountButton.addEventListener("click", async () => {
+    const deleteCommunityBuilds = document.getElementById("deleteCommunityBuildsCheckbox").checked;
 
     const user = auth.currentUser;
     const userId = user.uid;
@@ -272,28 +286,46 @@ if (deleteAccountBtn) {
       // 2. Delete user document
       await deleteDoc(userRef);
 
-      // 3. Delete username mapping if exists
+      // 3. Delete username mapping
       if (usernameToDelete) {
         const usernameDoc = doc(db, "usernames", usernameToDelete);
         await deleteDoc(usernameDoc);
         console.log(`✅ Deleted username mapping: ${usernameToDelete}`);
       }
 
-      // 4. Delete the user auth account
-      await deleteUser(user);
+      // 4. Delete all user's personal builds
+      const buildsRef = collection(db, `users/${userId}/builds`);
+      const buildSnapshots = await getDocs(buildsRef);
+      const deletePersonalBuilds = buildSnapshots.docs.map((doc) => deleteDoc(doc.ref));
+      await Promise.all(deletePersonalBuilds);
+      console.log("✅ Deleted all personal builds");
 
-      // 5. Show success
+      // 5. Optionally delete community builds by this user
+      if (deleteCommunityBuilds && usernameToDelete) {
+        const communityRef = collection(db, "communityBuilds");
+        const querySnapshot = await getDocs(communityRef);
+        const toDelete = querySnapshot.docs.filter(
+          (doc) => doc.data().username === usernameToDelete || doc.data().publisher === usernameToDelete
+        );
+        const deleteCommunity = toDelete.map((doc) => deleteDoc(doc.ref));
+        await Promise.all(deleteCommunity);
+        console.log(`✅ Deleted ${toDelete.length} community builds`);
+      }
+
+      // 6. Delete Firebase Auth account
+      await deleteUser(user);
+      closeUserMenu();
       showToast("✅ Account deleted successfully.", "success");
+
+      deleteAccountModal.style.display = "none";
       setTimeout(() => (window.location.href = "/"), 2000);
     } catch (error) {
       console.error("❌ Error deleting account:", error);
-      showToast(
-        "❌ Failed to delete account. Try re-logging in first.",
-        "error"
-      );
+      showToast("❌ Failed to delete account. Try re-logging in first.", "error");
     }
   });
 }
+
 
 /*********************************************************************
  * User Photo Click Menu

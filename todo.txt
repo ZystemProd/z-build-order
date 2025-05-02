@@ -7,7 +7,9 @@ check if your build has been changed from you "my build". shoule say
 - fix so that no supply get saved in "my Builds" Fixed?
 
 - Be able to edit publieshed builds from your "myBuilds"
-- sort community builds by date, then be able to change to by votes/views etc
-- Unpublish date from mybuild
 - by deleting account it removes all published builds
 - ToS for database storage?
+
+- Border Custom - Founder, Admin, achievement  
+- Animated cat
+- 

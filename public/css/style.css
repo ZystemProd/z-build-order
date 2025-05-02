@@ -3208,6 +3208,46 @@ td {
   background-color: #3a0000;
 }
 
+#deleteAccountModal .modal-content {
+  background-color: rgba(30, 30, 30, 0.95);
+  backdrop-filter: blur(10px);
+  color: white;
+  margin: 10% auto;
+  padding: 30px;
+  border: 1px solid #888;
+  max-width: 400px;
+  border-radius: 10px;
+  text-align: center;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
+}
+
+#deleteAccountModal label {
+  font-size: 1rem;
+  color: #ccc;
+}
+
+#deleteAccountModal input[type="checkbox"] {
+  margin-right: 8px;
+  transform: scale(1.2);
+  vertical-align: middle;
+}
+
+#deleteAccountModal button {
+  margin: 10px 5px 0;
+  padding: 10px 20px;
+  border-radius: 5px;
+  font-weight: bold;
+}
+
+#deleteAccountModal button.auth-button {
+  background: linear-gradient(135deg, #d32f2f 0%, #b71c1c 100%);
+}
+
+#deleteAccountModal button.auth-button:hover {
+  background: linear-gradient(135deg, #b71c1c 0%, #900000 100%);
+}
+
+
 .sort-label {
   margin-right: 8px;
   font-size: 14px;
