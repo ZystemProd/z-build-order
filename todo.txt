@@ -12,5 +12,6 @@ check if your build has been changed from you "my build". shoule say
 - Border Custom - Founder, Admin, achievement  
 - Animated cat
 - 
+- App Check - recasha
 
 - Clan notification on usermenu

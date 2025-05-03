@@ -169,7 +169,7 @@
   backdrop-filter: blur(10px); /* Apply blur effect */
   color: white; /* Text color */
   margin: 5% auto; /* 10% from the top and centered */
-  border: 1px solid #888;
+  border: 1px solid #3a3a3a;
   max-width: 70%; /* Width of the modal */
   height: 85%;
   border-radius: 8px;

@@ -6,10 +6,13 @@
     "responseHeader": [
       "Content-Type",
       "Authorization",
+      "x-goog-meta-*",
       "x-goog-upload-protocol",
       "x-goog-upload-command",
       "x-goog-upload-header-content-length",
-      "x-goog-upload-offset"
+      "x-goog-upload-offset",
+      "x-goog-upload-url",
+      "x-goog-resumable"
     ]
   }
 ]

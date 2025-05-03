@@ -3290,21 +3290,39 @@ td {
   background-color: rgba(30, 30, 30, 1); /* Solid dark background */
 }
 
-/* Clan logo banner */
+.clan-card {
+  width: 180px;
+  border: 1px solid #444;
+  border-radius: 8px;
+  background-color: #1a1a1a;
+  overflow: hidden;
+  margin: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 0.9rem;
+}
+
 .clan-card-banner {
-  height: 120px;
+  width: 100%;
+  height: 100px;
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center;
   background-color: #111;
   border-bottom: 1px solid #333;
-  border-radius: 8px 8px 0 0;
 }
 
-/* Inner card content */
 .clan-card-content {
+  padding: 10px;
   text-align: center;
-  padding: 12px;
+  width: 100%;
+}
+
+.clan-card-content button {
+  margin-top: 6px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
 }
 
 /* Top-level tab switcher (Create, Manage, Find) */
@@ -3436,16 +3454,46 @@ td {
   margin: 16px 10px;
 }
 
+.clan-info-card p {
+  padding-left: 10px;
+}
+
 .clan-banner-wrapper {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 16px;
   margin-bottom: 16px;
 }
 
+.clan-banner-logo {
+  width: 200px;
+  height: 200px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.clan-banner-text {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.clan-banner-title {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: bold;
+  color: #fff;
+}
+
+.clan-banner-description {
+  margin: 4px 0 0 0;
+  color: #aaa;
+  font-size: 0.95rem;
+}
+
 .clan-banner-wrapper img {
-  width: 120px;
-  height: 120px;
+  width: 200px;
+  height: 200px;
   object-fit: cover;
   border-radius: 8px;
 }
@@ -3518,8 +3566,66 @@ td {
   background-color: #27ae60;
 }
 
+.btn-accept:hover:enabled {
+  background-color: #45a045;
+}
+
 .btn-deny:hover {
   background-color: #c0392b;
+}
+
+.btn-disabled {
+  background-color: #555;
+  color: #ccc;
+  cursor: not-allowed;
+  pointer-events: none;
+  transition: none !important;
+}
+
+.btn-disabled:hover {
+  background-color: #555 !important;
+  color: #ccc !important;
+}
+
+.clan-breadcrumb {
+  font-size: 0.9rem;
+  margin-bottom: 12px;
+  color: #aaa;
+  padding-left: 8px;
+}
+
+.clan-breadcrumb {
+  font-size: 1.2rem;
+  color: #999;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 16px;
+  margin-top: 16px;
+  padding-left: 8px;
+}
+
+.breadcrumb-link {
+  color: #ccc;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.breadcrumb-link:hover {
+  color: #fff;
+}
+
+.breadcrumb-divider::before {
+  content: "›";
+  color: #888;
+  font-size: 1.2rem; /* bigger */
+  font-weight: 600; /* bolder */
+  margin: 0 4px;
+}
+
+.breadcrumb-current {
+  color: #fff;
+  font-weight: bold;
 }
 
 @media screen and (max-width: 768px) {
