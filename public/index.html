@@ -52,9 +52,14 @@
 
 
       <div id="userMenu" class="user-menu" style="display: none;">
+
         <div class="menu-section">
           <button class="menu-item" id="mapVetoBtn">
             <img src="img/SVG/map-solid.svg" class="menu-icon" /> Map Veto
+          </button>
+          <hr class="menu-divider" />
+          <button class="menu-item" id="showClanModalButton">
+            <img src="img/SVG/clan.svg" class="menu-icon" /> Clans
           </button>
           <hr class="menu-divider" />
           <button class="menu-item" id="switchAccountBtn">
@@ -63,6 +68,7 @@
           <button class="menu-item" id="signOutBtn">
             <img src="img/SVG/logout.svg" class="menu-icon" /> Sign Out
           </button>
+          <hr class="menu-divider" />
           <button class="menu-item danger" id="deleteAccountBtn">
             <img src="img/SVG/trash.svg" class="menu-icon" /> Delete Account
           </button>
@@ -442,20 +448,40 @@
       <div class="modal-content-template">
         <div class="template-header">
           <span class="close-modal" id="closeClanModal">&times;</span>
-          <h3>Clan</h3>
-          <div class="clan-menu">
-            <button id="createClanBtn">Create Clan</button>
-            <button id="manageClanBtn">Manage Clan</button>
-            <button id="findClanBtn">Find a Clan</button>
+          <h3>Clans</h3>
+
+          <!-- Top tabs: Create / Manage / Find -->
+          <div class="clan-main-tabs">
+            <button id="createClanBtn" class="clan-main-tab-button" data-view="create">Create Clan</button>
+            <button id="manageClanBtn" class="clan-main-tab-button" data-view="manage">Manage Clan</button>
+            <button id="findClanBtn" class="clan-main-tab-button" data-view="find">Find a Clan</button>
           </div>
         </div>
 
-        <div class="template-content-container" id="clanModalBody">
-          <!-- dynamic content -->
+        <div class="clan-views">
+
+
+          <!-- Create Clan View -->
+          <div id="createClanView" class="clan-subview" style="display: none;"></div>
+
+          <!-- Manage Clan View -->
+          <div id="manageClanView" class="clan-subview" style="display: none;">
+            <div class="clan-tabs">
+              <button class="clan-tab-button" data-tab="members">Members</button>
+              <button class="clan-tab-button" data-tab="requests">Requests</button>
+              <button class="clan-tab-button" data-tab="settings">Settings</button>
+            </div>
+            <div class="clan-tab-content" id="clan-members-tab"></div>
+            <div class="clan-tab-content" id="clan-requests-tab" style="display: none;"></div>
+            <div class="clan-tab-content" id="clan-settings-tab" style="display: none;"></div>
+          </div>
+
+          <!-- Find Clan View -->
+          <div id="findClanView" class="clan-subview" style="display: none;"></div>
         </div>
       </div>
-
     </div>
+
 
     <!-- Manage Publish Modal -->
     <div id="publishModal" class="modal" style="display: none;">

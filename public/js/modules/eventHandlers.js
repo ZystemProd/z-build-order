@@ -42,7 +42,7 @@ import {
   renderFindClanUI,
 } from "./clan.js";
 setupTemplateModal(); // Always call early
-
+let currentClanView = null;
 /** ----------------
  *  Helpers
  ----------------- */
@@ -304,30 +304,77 @@ export async function initializeIndexPage() {
   });
 
   const clanModal = document.getElementById("clanModal");
-  const clanBody = document.getElementById("clanModalBody");
 
   document
     .getElementById("showClanModalButton")
     ?.addEventListener("click", () => {
       clanModal.style.display = "block";
-      renderFindClanUI(clanBody);
+
+      // Default to 'Find' tab when opening
+      activateClanMainTab("find");
+
+      // Attach handlers once
+      ["create", "manage", "find"].forEach((view) => {
+        const btn = document.getElementById(`${view}ClanBtn`);
+        if (btn) {
+          btn.addEventListener("click", () => {
+            if (currentClanView === view) return;
+
+            currentClanView = view;
+
+            // Hide all views
+            document.querySelectorAll(".clan-subview").forEach((v) => {
+              v.style.display = "none";
+            });
+
+            // Update top-level active button
+            document
+              .querySelectorAll(".clan-main-tab-button")
+              .forEach((b) => b.classList.remove("active"));
+            btn.classList.add("active");
+
+            // Show selected view
+            const activeView = document.getElementById(`${view}ClanView`);
+            if (activeView) activeView.style.display = "block";
+
+            // Render view
+            if (view === "create") renderCreateClanUI();
+            if (view === "manage") renderManageClanUI();
+            if (view === "find") renderFindClanUI();
+          });
+        }
+      });
     });
+  document.getElementById("closeClanModal")?.addEventListener("click", () => {
+    document.getElementById("clanModal").style.display = "none";
+    currentClanView = null;
+  });
 
   document.getElementById("closeClanModal")?.addEventListener("click", () => {
     clanModal.style.display = "none";
   });
 
-  document.getElementById("createClanBtn")?.addEventListener("click", () => {
-    renderCreateClanUI(clanBody);
-  });
+  function activateClanMainTab(view) {
+    // Hide all subviews
+    document.querySelectorAll(".clan-subview").forEach((v) => {
+      v.style.display = "none";
+    });
 
-  document.getElementById("manageClanBtn")?.addEventListener("click", () => {
-    renderManageClanUI(clanBody);
-  });
+    // Show selected view
+    const activeView = document.getElementById(`${view}ClanView`);
+    if (activeView) activeView.style.display = "block";
 
-  document.getElementById("findClanBtn")?.addEventListener("click", () => {
-    renderFindClanUI(clanBody);
-  });
+    // Trigger matching render
+    if (view === "create") renderCreateClanUI();
+    if (view === "manage") renderManageClanUI();
+    if (view === "find") renderFindClanUI();
+
+    // Update visual state (optional)
+    document
+      .querySelectorAll(".clan-main-tab-button")
+      .forEach((btn) => btn.classList.remove("active"));
+    document.getElementById(`${view}ClanBtn`)?.classList.add("active");
+  }
 }
 
 /** ----------------

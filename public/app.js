@@ -150,6 +150,12 @@ export function initializeAuthUI() {
   const authLoadingWrapper = document.getElementById("authLoadingWrapper");
   const userName = document.getElementById("userName");
   const userPhoto = document.getElementById("userPhoto");
+  const userMenu = document.getElementById("userMenu");
+  const signInBtn = document.getElementById("signInBtn");
+  const showClanBtn = document.getElementById("showClanModalButton");
+
+  // ✅ IMMEDIATE HIDE to prevent any flashing before Firebase loads
+  if (userMenu) userMenu.style.display = "none";
 
   if (authLoadingWrapper) authLoadingWrapper.style.display = "flex";
   if (userName) userName.style.display = "none";
@@ -172,19 +178,16 @@ export function initializeAuthUI() {
           : "Guest";
       }
 
-      document.getElementById("userName").innerText = username || "Guest";
-      document.getElementById("userPhoto").src =
-        user.photoURL || "img/default-avatar.webp";
-
-      document.getElementById("userMenu").style.display = "block";
-      document.getElementById("signInBtn").style.display = "none";
-      
-      document.getElementById("showClanModalButton").disabled = false;
+      if (userName) userName.innerText = username || "Guest";
+      if (userPhoto) userPhoto.src = user.photoURL || "img/default-avatar.webp";
+      if (signInBtn) signInBtn.style.display = "none";
+      if (showClanBtn) showClanBtn.disabled = false;
     } else {
-      document.getElementById("userName").innerText = "Guest";
-      document.getElementById("userPhoto").src = "img/default-avatar.webp";
-      document.getElementById("userMenu").style.display = "none";
-      document.getElementById("signInBtn").style.display = "inline-block";
+      if (userName) userName.innerText = "Guest";
+      if (userPhoto) userPhoto.src = "img/default-avatar.webp";
+      if (userMenu) userMenu.style.display = "none";
+      if (signInBtn) signInBtn.style.display = "inline-block";
+      if (showClanBtn) showClanBtn.disabled = true;
       resetBuildInputs();
     }
 
@@ -204,8 +207,6 @@ function closeUserMenu() {
     setTimeout(() => (menu.style.display = ""), 100); // Reset visibility for next toggle
   }
 }
-
-
 
 export function handleSignIn() {
   signInWithPopup(auth, provider)
@@ -230,27 +231,29 @@ export function handleSignOut() {
     });
 }
 
-
 export async function handleSwitchAccount() {
   try {
     await signOut(auth);
     const result = await signInWithPopup(auth, provider);
     initializeAuthUI();
-    closeUserMenu(); 
+    closeUserMenu();
     window.location.reload();
   } catch (err) {
     console.error("❌ Error switching accounts:", err);
   }
 }
 
-
 /*********************************************************************
  * Account Deletion (User Menu)
  *********************************************************************/
 const deleteAccountBtn = document.getElementById("deleteAccountBtn");
 const deleteAccountModal = document.getElementById("deleteAccountModal");
-const confirmDeleteAccountButton = document.getElementById("confirmDeleteAccountButton");
-const cancelDeleteAccountButton = document.getElementById("cancelDeleteAccountButton");
+const confirmDeleteAccountButton = document.getElementById(
+  "confirmDeleteAccountButton"
+);
+const cancelDeleteAccountButton = document.getElementById(
+  "cancelDeleteAccountButton"
+);
 
 if (deleteAccountBtn) {
   deleteAccountBtn.addEventListener("click", () => {
@@ -266,7 +269,9 @@ if (cancelDeleteAccountButton) {
 
 if (confirmDeleteAccountButton) {
   confirmDeleteAccountButton.addEventListener("click", async () => {
-    const deleteCommunityBuilds = document.getElementById("deleteCommunityBuildsCheckbox").checked;
+    const deleteCommunityBuilds = document.getElementById(
+      "deleteCommunityBuildsCheckbox"
+    ).checked;
 
     const user = auth.currentUser;
     const userId = user.uid;
@@ -296,7 +301,9 @@ if (confirmDeleteAccountButton) {
       // 4. Delete all user's personal builds
       const buildsRef = collection(db, `users/${userId}/builds`);
       const buildSnapshots = await getDocs(buildsRef);
-      const deletePersonalBuilds = buildSnapshots.docs.map((doc) => deleteDoc(doc.ref));
+      const deletePersonalBuilds = buildSnapshots.docs.map((doc) =>
+        deleteDoc(doc.ref)
+      );
       await Promise.all(deletePersonalBuilds);
       console.log("✅ Deleted all personal builds");
 
@@ -305,7 +312,9 @@ if (confirmDeleteAccountButton) {
         const communityRef = collection(db, "communityBuilds");
         const querySnapshot = await getDocs(communityRef);
         const toDelete = querySnapshot.docs.filter(
-          (doc) => doc.data().username === usernameToDelete || doc.data().publisher === usernameToDelete
+          (doc) =>
+            doc.data().username === usernameToDelete ||
+            doc.data().publisher === usernameToDelete
         );
         const deleteCommunity = toDelete.map((doc) => deleteDoc(doc.ref));
         await Promise.all(deleteCommunity);
@@ -321,11 +330,13 @@ if (confirmDeleteAccountButton) {
       setTimeout(() => (window.location.href = "/"), 2000);
     } catch (error) {
       console.error("❌ Error deleting account:", error);
-      showToast("❌ Failed to delete account. Try re-logging in first.", "error");
+      showToast(
+        "❌ Failed to delete account. Try re-logging in first.",
+        "error"
+      );
     }
   });
 }
-
 
 /*********************************************************************
  * User Photo Click Menu
@@ -334,10 +345,18 @@ const userPhoto = document.getElementById("userPhoto");
 const userMenu = document.getElementById("userMenu");
 
 if (userPhoto && userMenu) {
+  // Toggle menu on avatar click
   userPhoto.addEventListener("click", (event) => {
-    event.stopPropagation(); // Don't immediately close
+    event.stopPropagation();
     userMenu.style.display =
       userMenu.style.display === "block" ? "none" : "block";
+  });
+
+  // Close menu if clicking outside
+  window.addEventListener("click", (e) => {
+    if (!userMenu.contains(e.target) && e.target !== userPhoto) {
+      userMenu.style.display = "none";
+    }
   });
 }
 
