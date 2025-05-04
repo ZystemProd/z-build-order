@@ -38,7 +38,7 @@ import {
 } from "./community.js";
 import {
   renderCreateClanUI,
-  renderManageClanUI,
+  renderChooseManageClanUI,
   renderFindClanUI,
 } from "./clan.js";
 setupTemplateModal(); // Always call early
@@ -339,7 +339,7 @@ export async function initializeIndexPage() {
 
             // Render view
             if (view === "create") renderCreateClanUI();
-            if (view === "manage") renderManageClanUI();
+            if (view === "manage") renderChooseManageClanUI();
             if (view === "find") renderFindClanUI();
           });
         }
@@ -366,7 +366,7 @@ export async function initializeIndexPage() {
 
     // Trigger matching render
     if (view === "create") renderCreateClanUI();
-    if (view === "manage") renderManageClanUI();
+    if (view === "manage") renderChooseManageClanUI();
     if (view === "find") renderFindClanUI();
 
     // Update visual state (optional)

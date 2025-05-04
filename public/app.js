@@ -55,20 +55,6 @@ const perf = getPerformance(app);
 // Set persistence
 setPersistence(auth, browserLocalPersistence);
 
-const statusEl = document.getElementById("authStatusDebug");
-
-onAuthStateChanged(auth, (user) => {
-  if (user) {
-    statusEl.textContent = `✅ Logged in as ${
-      user.displayName || user.email || user.uid
-    }`;
-    statusEl.style.backgroundColor = "#2d662d";
-  } else {
-    statusEl.textContent = "🚫 Not signed in";
-    statusEl.style.backgroundColor = "#662d2d";
-  }
-});
-
 /*********************************************************************
  * Username Management
  *********************************************************************/

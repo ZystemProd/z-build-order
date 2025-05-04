@@ -9,6 +9,7 @@ import {
   updateDoc,
   arrayUnion,
   arrayRemove,
+  deleteDoc,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
 import {
@@ -74,7 +75,7 @@ export async function createClan({ name, logoFile }) {
   // Step 1: Create initial doc without logo
   const payload = {
     name,
-    logoUrl: "", // Placeholder until upload
+    logoUrl: "https://zbuildorder.com/img/clan/logo.webp",
     adminUid: user.uid,
     members: [user.uid],
     joinRequests: [],
@@ -157,7 +158,7 @@ export function setupClanViewSwitching() {
       if (activeView) activeView.style.display = "block";
 
       if (view === "create") renderCreateClanUI();
-      if (view === "manage") renderManageClanUI();
+      if (view === "manage") renderChooseManageClanUI();
       if (view === "find") renderFindClanUI();
     });
   });
@@ -337,72 +338,142 @@ export async function renderFindClanUI() {
   container.appendChild(list);
 }
 
-export async function renderManageClanUI() {
+export async function renderManageClanUI(clanId) {
   const container = document.getElementById("manageClanView");
+  container.replaceChildren();
 
-  // Get current user's clan to determine their role
-  const clans = await listPublicClans();
-  const clan = clans.find(
-    (c) =>
-      c.adminUid === auth.currentUser?.uid ||
-      c.members.includes(auth.currentUser?.uid)
-  );
-
+  const docSnap = await getDoc(doc(db, "clans", clanId));
+  const clan = docSnap.exists() ? docSnap.data() : null;
   if (!clan) {
-    container.innerHTML = "<p>You don't have a clan.</p>";
+    container.textContent = "Clan not found.";
     return;
   }
+  clan.id = clanId; // manually attach the id
 
   const userId = auth.currentUser?.uid;
   const myRole =
     clan.memberInfo?.[userId]?.role ||
     (userId === clan.adminUid ? "Captain" : "Player");
 
-  // Hide Settings tab if user is not the Captain
-  const settingsBtn = container.querySelector(
-    '.clan-tab-button[data-tab="settings"]'
-  );
-  if (myRole !== "Captain" && settingsBtn) {
-    settingsBtn.style.display = "none";
+  // --- Breadcrumb navigation ---
+  const breadcrumb = document.createElement("div");
+  breadcrumb.className = "clan-breadcrumb";
+
+  const backLink = document.createElement("span");
+  backLink.textContent = "Choose a Clan";
+  backLink.className = "breadcrumb-link";
+  backLink.onclick = () => renderChooseManageClanUI();
+
+  const divider = document.createElement("span");
+  divider.className = "breadcrumb-divider";
+  divider.textContent = "";
+
+  const current = document.createElement("span");
+  current.textContent = "Manage";
+  current.className = "breadcrumb-current";
+
+  breadcrumb.append(backLink, divider, current);
+  container.appendChild(breadcrumb);
+
+  // --- Tabs ---
+  const tabs = document.createElement("div");
+  tabs.className = "clan-tabs";
+
+  const membersBtn = document.createElement("button");
+  membersBtn.className = "clan-tab-button";
+  membersBtn.dataset.tab = "members";
+  membersBtn.textContent = "Members";
+  tabs.appendChild(membersBtn);
+
+  const requestsBtn = document.createElement("button");
+  requestsBtn.className = "clan-tab-button";
+  requestsBtn.dataset.tab = "requests";
+  requestsBtn.textContent = "Requests";
+  tabs.appendChild(requestsBtn);
+
+  if (myRole === "Captain") {
+    const settingsBtn = document.createElement("button");
+    settingsBtn.className = "clan-tab-button";
+    settingsBtn.dataset.tab = "settings";
+    settingsBtn.textContent = "Settings";
+    tabs.appendChild(settingsBtn);
   }
 
-  // Only bind once
-  if (!container.dataset.initialized) {
-    container.querySelectorAll(".clan-tab-button").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const target = btn.dataset.tab;
+  container.appendChild(tabs);
 
-        if (btn.classList.contains("active")) return;
+  // --- Tab content holders ---
+  const membersTab = document.createElement("div");
+  membersTab.id = "clan-members-tab";
+  membersTab.className = "clan-tab-content";
+  container.appendChild(membersTab);
 
-        container
-          .querySelectorAll(".clan-tab-button")
-          .forEach((b) => b.classList.remove("active"));
-        btn.classList.add("active");
+  const requestsTab = document.createElement("div");
+  requestsTab.id = "clan-requests-tab";
+  requestsTab.className = "clan-tab-content";
+  requestsTab.style.display = "none";
+  container.appendChild(requestsTab);
 
-        container
-          .querySelectorAll(".clan-tab-content")
-          .forEach((c) => (c.style.display = "none"));
-        const activeTab = container.querySelector(`#clan-${target}-tab`);
-        if (activeTab) {
-          activeTab.style.display = "block";
-          activeTab.replaceChildren(); // 🧹 clear content immediately
-        }
+  const settingsTab = document.createElement("div");
+  settingsTab.id = "clan-settings-tab";
+  settingsTab.className = "clan-tab-content";
+  settingsTab.style.display = "none";
+  container.appendChild(settingsTab);
 
-        renderManageTab(target);
-      });
+  container.querySelectorAll(".clan-tab-button").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const target = btn.dataset.tab;
+
+      container
+        .querySelectorAll(".clan-tab-button")
+        .forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+
+      container
+        .querySelectorAll(".clan-tab-content")
+        .forEach((c) => (c.style.display = "none"));
+      const activeTab = container.querySelector(`#clan-${target}-tab`);
+      if (activeTab) {
+        activeTab.style.display = "block";
+        activeTab.replaceChildren();
+        renderManageTab(target, clan);
+      }
     });
+  });
 
-    container.dataset.initialized = "true";
-  }
-
-  // Show default tab (members)
-  const defaultBtn = container.querySelector(
-    '.clan-tab-button[data-tab="members"]'
-  );
-  if (defaultBtn) defaultBtn.click();
+  membersBtn.click();
 }
 
-async function renderManageTab(tab) {
+export async function renderChooseManageClanUI() {
+  const container = document.getElementById("manageClanView");
+  container.replaceChildren();
+
+  const clans = await listPublicClans();
+  const myClans = clans.filter(
+    (c) =>
+      c.adminUid === auth.currentUser?.uid ||
+      c.members.includes(auth.currentUser?.uid)
+  );
+
+  const heading = document.createElement("h3");
+  heading.textContent = "Select a Clan to Manage";
+  heading.style.marginBottom = "16px";
+  container.appendChild(heading);
+
+  const list = document.createElement("div");
+  list.className = "clan-select-list";
+
+  myClans.forEach((clan) => {
+    const card = document.createElement("div");
+    card.className = "clan-select-card";
+    card.textContent = clan.name;
+    card.onclick = () => renderManageClanUI(clan.id);
+    list.appendChild(card);
+  });
+
+  container.appendChild(list);
+}
+
+async function renderManageTab(tab, clan) {
   const membersTab = document.getElementById("clan-members-tab");
   const requestsTab = document.getElementById("clan-requests-tab");
   const settingsTab = document.getElementById("clan-settings-tab");
@@ -412,9 +483,16 @@ async function renderManageTab(tab) {
   if (tab === "requests" && requestsTab) requestsTab.textContent = "Loading...";
   if (tab === "settings" && settingsTab) settingsTab.textContent = "Loading...";
 
-  const clans = await listPublicClans();
-  const clan = clans.find((c) => c.members.includes(auth.currentUser?.uid));
-  if (!clan) return;
+  // ✅ Use passed-in clan directly, or fallback to global if needed
+  if (!clan && window.currentManagedClanId) {
+    const docRef = doc(db, "clans", window.currentManagedClanId);
+    const docSnap = await getDoc(docRef);
+    clan = docSnap.exists() ? docSnap.data() : null;
+    if (!clan) return;
+    clan.id = window.currentManagedClanId;
+  } else if (!clan) {
+    return;
+  }
 
   const myUid = auth.currentUser?.uid;
   const myRole =
@@ -680,7 +758,9 @@ async function renderManageTab(tab) {
     deleteBtn.style.alignSelf = "flex-start";
 
     deleteBtn.onclick = async () => {
-      const myRole = clan.memberInfo?.[auth.currentUser?.uid]?.role || "Player";
+      const myRole =
+        clan.memberInfo?.[auth.currentUser?.uid]?.role ||
+        (auth.currentUser?.uid === clan.adminUid ? "Captain" : "Player");
       if (myRole !== "Captain") {
         showToast("Only Captains can delete the clan.", "error");
         return;
@@ -705,7 +785,7 @@ async function renderManageTab(tab) {
         }
 
         showToast("Clan deleted.", "success");
-        renderFindClanUI(); // or close modal / redirect
+        renderChooseManageClanUI(); // or close modal / redirect
       } catch (err) {
         showToast("Error deleting clan: " + err.message, "error");
         console.error(err);

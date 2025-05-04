@@ -3542,6 +3542,28 @@ td {
   border-right: none;
 }
 
+.clan-select-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.clan-select-card {
+  background-color: #1a1a1a;
+  border: 1px solid #333;
+  color: #eee;
+  padding: 16px;
+  margin: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.2s;
+}
+
+.clan-select-card:hover {
+  background-color: #2a2a2a;
+}
+
 /* Green accept button */
 .modal .clan-tab-content .btn-accept {
   background-color: #28a745; /* Green */

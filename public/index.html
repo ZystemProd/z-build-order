@@ -97,11 +97,6 @@
   </div>
 
 
-  <div id="authStatusDebug"
-    style="position: fixed; bottom: 8px; right: 8px; background: #222; color: #fff; padding: 6px 10px; border-radius: 6px; font-size: 13px; opacity: 0.8; z-index: 9999;">
-    Checking auth...
-  </div>
-
   <div id="content">
     <div class="upperInput">
       <div class="template-controls">
@@ -475,10 +470,14 @@
               <button class="clan-tab-button" data-tab="requests">Requests</button>
               <button class="clan-tab-button" data-tab="settings">Settings</button>
             </div>
+            <div id="chooseManageClanView" class="clan-subview" style="display: none;"></div>
+
             <div class="clan-tab-content" id="clan-members-tab"></div>
             <div class="clan-tab-content" id="clan-requests-tab" style="display: none;"></div>
             <div class="clan-tab-content" id="clan-settings-tab" style="display: none;"></div>
           </div>
+
+
 
           <!-- Find Clan View -->
           <div id="findClanView" class="clan-subview" style="display: none;"></div>

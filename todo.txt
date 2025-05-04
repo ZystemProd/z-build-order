@@ -9,9 +9,27 @@ check if your build has been changed from you "my build". shoule say
 - Be able to edit publieshed builds from your "myBuilds"
 - ToS for database storage?
 
+
+
+
+
+
+
+
+
+
+----------- Fun ----------
 - Border Custom - Founder, Admin, achievement  
 - Animated cat
-- 
+----------- Security ----------
 - App Check - recasha
-
+----------- Clan ----------
 - Clan notification on usermenu
+- "Clan" Manage - Breadcrumps and tabs need seperation.
+- Make "Create Clan better looking
+- Make "ChooseManageClan better looking
+- "Find a Clan" make the cards better looking
+- "Settings" looking bad.
+- Click outside modal should close it
+- All behind Clan modal is not visable.
+- After Create clan go to "Manage Clan"
