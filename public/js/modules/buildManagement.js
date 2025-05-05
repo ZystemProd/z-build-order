@@ -147,50 +147,6 @@ export async function saveCurrentBuild() {
   const userRef = doc(db, "users", user.uid);
   let username = "Unknown"; // Default if username is not found
 
-  // 🔥 Check and upload replay file if selected
-  const replayFileInput = document.getElementById("replayFileInput");
-  const replayStatus = document.getElementById("replayStatus"); // 🔥
-
-  let replayUrl = "";
-
-  if (replayFileInput && replayFileInput.files.length > 0) {
-    const replayFile = replayFileInput.files[0];
-
-    // 🔥 Validate file size (max 10 MB = 10 * 1024 * 1024 bytes)
-    const maxSizeInBytes = 10 * 1024 * 1024; // 10 MB
-
-    if (replayFile.size > maxSizeInBytes) {
-      showToast(
-        "⚠ Replay file too large! Maximum allowed size is 10MB.",
-        "error"
-      );
-      console.error("Replay upload blocked due to file size.");
-      return; // 🔥 Stop saving
-    }
-
-    try {
-      if (replayStatus) {
-        replayStatus.innerHTML = `Uploading Replay <span class="spinner"></span>`;
-      }
-      const storage = getStorage();
-      const uniqueFileName = `replays/${Date.now()}_${replayFile.name}`;
-      const storageRef = ref(storage, uniqueFileName);
-      await uploadBytes(storageRef, replayFile);
-      replayUrl = await getDownloadURL(storageRef);
-
-      console.log("✅ Replay uploaded:", replayUrl);
-
-      if (replayStatus) replayStatus.innerText = "Replay Uploaded! ✅";
-    } catch (error) {
-      console.error("Error uploading replay file:", error);
-      if (replayStatus) replayStatus.innerText = "Replay Upload Failed ❌";
-      showToast(
-        "⚠ Failed to upload replay. Saving build without replay.",
-        "warning"
-      );
-    }
-  }
-
   try {
     const userSnapshot = await getDoc(userRef);
     if (userSnapshot.exists() && userSnapshot.data().username) {
@@ -198,6 +154,18 @@ export async function saveCurrentBuild() {
     }
   } catch (error) {
     console.error("Error fetching username:", error);
+  }
+
+  const replayLinkInput = document.getElementById("replayLinkInput");
+  const replayUrl = DOMPurify.sanitize(replayLinkInput?.value.trim() || "");
+
+  // ✅ Validate Drop.sc link format
+  const validReplayPattern = /^https:\/\/drop\.sc\/replay\/\d+$/;
+  if (replayUrl && !validReplayPattern.test(replayUrl)) {
+    showToast("Please enter a valid Drop.sc replay link.", "error");
+    replayLinkInput.classList.add("highlight");
+    setTimeout(() => replayLinkInput.classList.remove("highlight"), 5000);
+    return;
   }
 
   const newBuild = {
@@ -214,7 +182,7 @@ export async function saveCurrentBuild() {
     timestamp: Date.now(),
     comment: DOMPurify.sanitize(commentInput?.value.trim() || ""),
     videoLink: DOMPurify.sanitize(videoInput?.value.trim() || ""),
-    replayUrl: replayUrl,
+    replayUrl: replayUrl, // ✅ Now this will be correctly set
     buildOrder,
     map: mapName,
     interactiveMap: {
@@ -229,7 +197,6 @@ export async function saveCurrentBuild() {
     isPublished: false,
     publisher: username,
   };
-
   const buildsRef = collection(db, `users/${user.uid}/builds`);
   const buildDoc = doc(buildsRef, encodedTitle);
 
@@ -238,6 +205,15 @@ export async function saveCurrentBuild() {
       showToast("✅ Build saved successfully!", "success");
       console.log("✅ Build saved with title:", title);
       checkPublishButtonVisibility();
+
+      // ✅ Move this UI toggle here (after successful save)
+      document.getElementById("replayInputWrapper").style.display = "none";
+      const viewWrapper = document.getElementById("replayViewWrapper");
+      const viewBtn = document.getElementById("replayDownloadBtn");
+      if (viewWrapper && viewBtn && replayUrl) {
+        viewWrapper.style.display = "block";
+        viewBtn.href = replayUrl;
+      }
     })
     .catch((error) => {
       console.error("Error saving to Firestore:", error);

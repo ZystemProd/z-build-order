@@ -232,6 +232,27 @@
 
         <!-- RIGHT COLUMN: Comment & Video Container -->
         <div class="comment-video-container">
+
+          <h3 class="toggle-title">Replay</h3>
+
+          <!-- Replay Input Row (visible if no replayUrl) -->
+          <div id="replayInputWrapper" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+            <a href="https://drop.sc/upload" target="_blank" class="drop-sc-upload-btn" style="white-space: nowrap;">
+              ⬆ Upload Replay to Drop.sc
+            </a>
+            <p>then →</p>
+            <input type="url" id="replayLinkInput" placeholder="Paste Drop.sc replay link here..." style="flex: 1;" />
+
+          </div>
+
+          <!-- Replay Link View Button (visible if replayUrl exists) -->
+          <div id="replayViewWrapper" style="display: none;">
+            <a id="replayDownloadBtn" href="#" target="_blank" class="download-replay-link">
+              Download Replay on Drop.sc
+            </a>
+          </div>
+
+
           <h3 class="toggle-title">Comment</h3>
           <textarea id="commentInput" placeholder="Add a comment..."></textarea>
 
@@ -241,9 +262,12 @@
             frameborder="0"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowfullscreen></iframe>
-          <h3 class="toggle-title">Replay</h3>
-          <input type="file" id="replayFileInput" accept=".SC2Replay" />
-          <p id="replayStatus" style="font-size: 0.9rem; color: #aaaaaa; margin-top: 5px;">No replay uploaded.</p>
+
+
+
+
+
+
 
         </div>
       </div>

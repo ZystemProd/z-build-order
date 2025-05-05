@@ -278,6 +278,17 @@ export async function initializeIndexPage() {
   attachSubcategoryClicks();
   attachCommunityCategoryClicks();
 
+  const replayUrl = document.getElementById("replayLinkInput")?.value.trim();
+  const replayWrapper = document.getElementById("replayInputWrapper");
+  const replayView = document.getElementById("replayViewWrapper");
+  const replayBtn = document.getElementById("replayDownloadBtn");
+
+  if (replayUrl && replayWrapper && replayView && replayBtn) {
+    replayWrapper.style.display = "none";
+    replayView.style.display = "block";
+    replayBtn.href = replayUrl;
+  }
+
   // --- Map Setup (only if map container exists)
   if (document.getElementById("map-preview-container")) {
     initializeMapControls(mapAnnotations);

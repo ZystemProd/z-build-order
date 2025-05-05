@@ -13,11 +13,6 @@ check if your build has been changed from you "my build". shoule say
 
 
 
-
-
-
-
-
 ----------- Fun ----------
 - Border Custom - Founder, Admin, achievement  
 - Animated cat
@@ -27,9 +22,13 @@ check if your build has been changed from you "my build". shoule say
 
 ----------- Clan ----------
 
-- "Clan" Manage - Breadcrumps and tabs need seperation.
-- Make "Create Clan better looking
-- Make "ChooseManageClan better looking
-- "Find a Clan" make the cards better looking
 - "Settings" looking bad.
 
+----------- Build Order ----------
+
+- upload replay through https://drop.sc/upload
+check https://api.sc2replaystats.com/docs/index.html
+
+----------- View Build ----------
+ - disable the comment and video
+Maybe remove them if it doess not contain anything
