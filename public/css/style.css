@@ -3833,6 +3833,24 @@ td {
   align-self: baseline;
 }
 
+.wide-privacy-modal {
+  width: 80%;
+  max-width: 900px;
+}
+
+#privacyModal a {
+  color: #ffcc00;
+  text-decoration: underline;
+}
+
+#privacyModal a:hover {
+  color: #ffd84d;
+  text-decoration: none;
+}
+
+#closePrivacyModal {
+}
+
 @media screen and (max-width: 768px) {
   html #content {
     width: 100%;

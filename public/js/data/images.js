@@ -156,7 +156,7 @@ export const unitImages = {
   probe: "img/unit/probe.webp",
   queen: "img/unit/queen.webp",
   raven: "img/unit/raven.webp",
-  raveger: "img/unit/ravenger.webp",
+  ravager: "img/unit/ravager.webp",
   reaper: "img/unit/reaper.webp",
   roach: "img/unit/roach.webp",
   scv: "img/unit/scv.webp",

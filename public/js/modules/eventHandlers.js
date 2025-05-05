@@ -228,6 +228,34 @@ export async function initializeIndexPage() {
     }
   });
 
+  safeAdd("legalNoticeLink", "click", () => {
+    const modal = document.getElementById("privacyModal");
+    if (modal) modal.style.display = "block";
+  });
+
+  safeAdd("closePrivacyModal", "click", () => {
+    const modal = document.getElementById("privacyModal");
+    if (modal) modal.style.display = "none";
+  });
+
+  window.addEventListener("click", (event) => {
+    const modal = document.getElementById("privacyModal");
+    if (modal && event.target === modal) {
+      modal.style.display = "none";
+    }
+  });
+
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      const openModals = document.querySelectorAll(".modal");
+      openModals.forEach((modal) => {
+        if (modal.style.display === "block" || modal.style.display === "flex") {
+          modal.style.display = "none";
+        }
+      });
+    }
+  });
+
   safeAdd("closePublishModalButton", "click", () => {
     const publishModal = document.getElementById("publishModal");
     if (publishModal) publishModal.style.display = "none";
