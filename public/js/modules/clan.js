@@ -20,7 +20,7 @@ import {
   deleteObject,
   ref as storageRef,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-storage.js";
-import { showToast } from "./uiHandlers.js";
+import { showToast, createNotificationDot } from "./uiHandlers.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
 
 const firebaseConfig = {
@@ -65,7 +65,12 @@ export async function uploadClanLogo(file, clanId) {
   return getDownloadURL(storageRef);
 }
 
-export async function createClan({ name, logoFile }) {
+export async function createClan({
+  name,
+  logoFile,
+  abbreviation,
+  description,
+}) {
   const user = auth.currentUser;
   if (!user) throw new Error("Not signed in");
 
@@ -75,6 +80,8 @@ export async function createClan({ name, logoFile }) {
   // Step 1: Create initial doc without logo
   const payload = {
     name,
+    abbreviation: abbreviation || "",
+    description: description || "",
     logoUrl: "https://zbuildorder.com/img/clan/logo.webp",
     adminUid: user.uid,
     members: [user.uid],
@@ -198,15 +205,17 @@ export async function renderClanPageView(clanId) {
   const wrapper = document.createElement("div");
   wrapper.className = "clan-info-card";
 
-  // -- Banner with logo, name, description (side-by-side) --
+  // -- Banner with 3 columns: logo, text, info --
   const banner = document.createElement("div");
   banner.className = "clan-banner-wrapper";
 
+  // Column 1: Logo
   const logo = document.createElement("img");
-  logo.src = clan.logoUrl || "img/default-clan.webp";
+  logo.src = clan.logoUrl || "img/logo.webp";
   logo.alt = `${clan.name} logo`;
   logo.className = "clan-banner-logo";
 
+  // Column 2: Title + Description
   const textWrap = document.createElement("div");
   textWrap.className = "clan-banner-text";
 
@@ -219,13 +228,58 @@ export async function renderClanPageView(clanId) {
   desc.className = "clan-banner-description";
 
   textWrap.append(title, desc);
-  banner.append(logo, textWrap);
 
-  // -- Member count --
+  // Column 3: Info (Created + Members)
+  const infoWrap = document.createElement("div");
+  infoWrap.className = "clan-banner-info";
+
+  const created = document.createElement("p");
+  const dateStr = clan.created
+    ? new Date(clan.created).toLocaleDateString()
+    : "Unknown";
+  created.innerHTML = `<strong>Clan Created:</strong> ${dateStr}`;
+
   const memberCount = document.createElement("p");
-  memberCount.textContent = `Members: ${clan.members.length}`;
-  memberCount.style.color = "#aaa";
-  memberCount.style.marginBottom = "12px";
+  memberCount.innerHTML = `<strong>Members:</strong> ${clan.members.length}`;
+
+  infoWrap.append(created, memberCount);
+
+  // Join button
+  const joinBtn = document.createElement("button");
+  joinBtn.className = "clan-join-button";
+  joinBtn.style.position = "absolute";
+  joinBtn.style.top = "12px";
+  joinBtn.style.right = "12px";
+
+  const user = auth.currentUser;
+  const isMember = clan.members?.includes(user?.uid);
+  const isRequested = clan.joinRequests?.includes(user?.uid);
+
+  if (isMember) {
+    joinBtn.textContent = "Joined";
+    joinBtn.disabled = true;
+    joinBtn.classList.add("btn-disabled");
+  } else if (isRequested) {
+    joinBtn.textContent = "Requested";
+    joinBtn.disabled = true;
+    joinBtn.classList.add("btn-disabled");
+  } else {
+    joinBtn.textContent = "Join";
+    joinBtn.onclick = async () => {
+      try {
+        await requestToJoin(clanId);
+        showToast("Join request sent!", "success");
+        joinBtn.textContent = "Requested";
+        joinBtn.disabled = true;
+        joinBtn.classList.add("btn-disabled");
+      } catch (err) {
+        showToast(err.message, "error");
+      }
+    };
+  }
+
+  banner.append(logo, textWrap, infoWrap, joinBtn);
+  wrapper.appendChild(banner);
 
   // -- Member table --
   const table = document.createElement("table");
@@ -242,100 +296,195 @@ export async function renderClanPageView(clanId) {
     table.appendChild(row);
   }
 
-  // -- Compose final layout --
-  wrapper.append(banner, memberCount, table);
+  wrapper.appendChild(table);
   container.appendChild(wrapper);
 }
 
 export async function renderCreateClanUI() {
   const container = document.getElementById("createClanView");
   container.replaceChildren();
-  const input = document.createElement("input");
-  input.placeholder = "Clan Name";
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "clan-info-card"; // Same outer style as other sections
+
+  const title = document.createElement("h3");
+  title.textContent = "Create a Clan";
+  title.style.marginBottom = "16px";
+  wrapper.appendChild(title);
+
+  const form = document.createElement("div");
+  form.className = "clan-settings-form";
+
+  const createField = (labelText, inputElement) => {
+    const group = document.createElement("div");
+    group.className = "clan-settings-field";
+
+    const label = document.createElement("label");
+    label.textContent = labelText;
+
+    group.appendChild(label);
+    group.appendChild(inputElement);
+    return group;
+  };
+
+  const nameInput = document.createElement("input");
+  nameInput.placeholder = "Clan Name";
+
+  const abbrInput = document.createElement("input");
+  abbrInput.placeholder = "Abbreviation";
+
+  const descInput = document.createElement("textarea");
+  descInput.placeholder = "Description";
+
   const fileInput = document.createElement("input");
   fileInput.type = "file";
   fileInput.accept = "image/*";
+
+  const previewWrapper = document.createElement("div");
+  previewWrapper.style.display = "flex";
+  previewWrapper.style.alignItems = "center";
+  previewWrapper.style.gap = "12px";
+  previewWrapper.style.marginTop = "6px";
+
+  const currentLogoLabel = document.createElement("span");
+  currentLogoLabel.textContent = "Preview:";
+
+  const logoPreview = document.createElement("img");
+  logoPreview.src = "img/clan/logo.webp";
+  logoPreview.alt = "Logo preview";
+  logoPreview.style.width = "200px";
+  logoPreview.style.height = "200px";
+  logoPreview.style.objectFit = "cover";
+  logoPreview.style.border = "1px solid #333";
+  logoPreview.style.borderRadius = "8px";
+
+  previewWrapper.append(currentLogoLabel, logoPreview);
+
+  fileInput.addEventListener("change", () => {
+    const file = fileInput.files[0];
+    if (file) {
+      logoPreview.src = URL.createObjectURL(file);
+    } else {
+      logoPreview.src = "img/clan/logo.webp";
+    }
+  });
+
   const saveBtn = document.createElement("button");
   saveBtn.textContent = "Create Clan";
   saveBtn.onclick = async () => {
     try {
-      const name = input.value.trim();
+      saveBtn.disabled = true;
+      const name = nameInput.value.trim();
+      const abbr = abbrInput.value.trim();
+      const desc = descInput.value.trim();
       const file = fileInput.files[0];
-      await createClan({ name, logoFile: file });
+
+      if (!name) {
+        showToast("Clan name is required.", "error");
+        saveBtn.disabled = false;
+        return;
+      }
+
+      const clanId = await createClan({
+        name,
+        logoFile: file,
+        abbreviation: abbr,
+        description: desc,
+      });
+
       showToast("Clan created!", "success");
+      document.querySelector('[data-view="manage"]')?.click();
     } catch (e) {
       showToast(e.message, "error");
+      saveBtn.disabled = false;
     }
   };
-  container.append(input, fileInput, saveBtn);
+
+  form.append(
+    createField("Clan Name", nameInput),
+    createField("Abbreviation", abbrInput),
+    createField("Description", descInput),
+    createField("Clan Logo", fileInput),
+    previewWrapper,
+    saveBtn
+  );
+
+  wrapper.appendChild(form);
+  container.appendChild(wrapper);
 }
 
 export async function renderFindClanUI() {
   const container = document.getElementById("findClanView");
   container.replaceChildren();
-  const clans = await listPublicClans();
-  const user = auth.currentUser;
-  const list = document.createElement("div");
-  list.className = "template-list";
 
+  // --- Header with search bar ---
+  const header = document.createElement("div");
+  header.className = "template-header";
+
+  const title = document.createElement("h3");
+  title.textContent = "Find a Clan";
+
+  const searchInput = document.createElement("input");
+  searchInput.type = "text";
+  searchInput.placeholder = "Search clans...";
+  searchInput.className = "clan-search-input";
+
+  header.append(title, searchInput);
+  container.appendChild(header);
+
+  // --- Grid container for clan cards ---
+  const list = document.createElement("div");
+  list.className = "clan-grid-manage";
+
+  // --- No results message ---
+  const noResults = document.createElement("p");
+  noResults.textContent = "No clans found.";
+  noResults.style.display = "none";
+  noResults.style.color = "#aaa";
+  noResults.style.textAlign = "center";
+  noResults.style.marginTop = "20px";
+
+  // --- Load and render all clans ---
+  const clans = await listPublicClans();
   clans.forEach((clan) => {
     const card = document.createElement("div");
-    card.className = "template-card";
-    card.style.cursor = "pointer";
+    card.className = "clan-card-manage"; // ✅ fixed: no leading period
+    card.dataset.name = clan.name.toLowerCase();
+    card.dataset.abbr = (clan.abbreviation || "").toLowerCase();
 
-    const banner = document.createElement("div");
-    banner.className = "clan-card-banner";
-    banner.style.backgroundImage = `url('${DOMPurify.sanitize(
-      clan.logoUrl || "img/default-clan.webp"
-    )}')`;
+    card.onclick = () => renderClanPageView(clan.id);
 
-    const content = document.createElement("div");
-    content.className = "clan-card-content";
+    const logo = document.createElement("img");
+    logo.src = clan.logoUrl || "img/clan/logo.webp";
+    logo.alt = `${clan.name} Logo`;
+    logo.className = "clan-card-logo";
 
-    const name = document.createElement("div");
-    name.textContent = clan.name;
+    const title = document.createElement("div");
+    title.className = "clan-card-title";
+    title.textContent = clan.name;
 
-    const joinBtn = document.createElement("button");
-    joinBtn.className = "clan-join-button";
-
-    const isMember = clan.members?.includes(user?.uid);
-    const isRequested = clan.joinRequests?.includes(user?.uid);
-
-    if (isMember) {
-      joinBtn.textContent = "Joined";
-      joinBtn.disabled = true;
-      joinBtn.classList.add("btn-disabled");
-    } else if (isRequested) {
-      joinBtn.textContent = "Requested";
-      joinBtn.disabled = true;
-      joinBtn.classList.add("btn-disabled");
-    } else {
-      joinBtn.textContent = "Join";
-      joinBtn.onclick = async (e) => {
-        e.stopPropagation();
-        try {
-          await requestToJoin(clan.id);
-          showToast("Join request sent!", "success");
-          joinBtn.textContent = "Requested";
-          joinBtn.disabled = true;
-          joinBtn.classList.add("btn-disabled");
-        } catch (err) {
-          showToast(err.message, "error");
-        }
-      };
-    }
-
-    // Clicking the card opens full clan view
-    card.addEventListener("click", () => {
-      renderClanPageView(clan.id);
-    });
-
-    content.append(name, joinBtn);
-    card.append(banner, content);
+    card.append(logo, title);
     list.appendChild(card);
   });
 
   container.appendChild(list);
+  container.appendChild(noResults);
+
+  // --- Filter logic ---
+  searchInput.addEventListener("input", () => {
+    const query = searchInput.value.trim().toLowerCase();
+    let matchCount = 0;
+
+    list.querySelectorAll(".clan-card-manage").forEach((card) => {
+      const name = card.dataset.name || "";
+      const abbr = card.dataset.abbr || "";
+      const matches = name.includes(query) || abbr.includes(query);
+      card.style.display = matches ? "block" : "none";
+      if (matches) matchCount++;
+    });
+
+    noResults.style.display = matchCount === 0 ? "block" : "none";
+  });
 }
 
 export async function renderManageClanUI(clanId) {
@@ -390,6 +539,14 @@ export async function renderManageClanUI(clanId) {
   requestsBtn.dataset.tab = "requests";
   requestsBtn.textContent = "Requests";
   tabs.appendChild(requestsBtn);
+
+  if (
+    clan.joinRequests?.length > 0 &&
+    (myRole === "Captain" || myRole === "Co-Captain")
+  ) {
+    requestsBtn.style.position = "relative";
+    requestsBtn.appendChild(createNotificationDot());
+  }
 
   if (myRole === "Captain") {
     const settingsBtn = document.createElement("button");
@@ -459,18 +616,41 @@ export async function renderChooseManageClanUI() {
   heading.style.marginBottom = "16px";
   container.appendChild(heading);
 
-  const list = document.createElement("div");
-  list.className = "clan-select-list";
+  const grid = document.createElement("div");
+  grid.className = "clan-grid-manage"; // new class for card layout
 
   myClans.forEach((clan) => {
     const card = document.createElement("div");
-    card.className = "clan-select-card";
-    card.textContent = clan.name;
-    card.onclick = () => renderManageClanUI(clan.id);
-    list.appendChild(card);
+    card.className = "clan-card-manage";
+    card.addEventListener("click", () => renderManageClanUI(clan.id));
+
+    const logo = document.createElement("img");
+    logo.src = clan.logoUrl || "img/logo.webp";
+    logo.alt = `${clan.name} Logo`;
+    logo.className = "clan-card-logo";
+
+    const title = document.createElement("div");
+    title.className = "clan-card-title";
+    title.textContent = clan.name;
+
+    const isCaptain =
+      clan.adminUid === auth.currentUser?.uid ||
+      clan.memberInfo?.[auth.currentUser?.uid]?.role === "Co-Captain";
+
+    if (clan.joinRequests?.length > 0 && isCaptain) {
+      const dot = createNotificationDot();
+      dot.style.position = "absolute";
+      dot.style.top = "6px";
+      dot.style.right = "6px";
+      card.appendChild(dot);
+    }
+
+    card.appendChild(logo);
+    card.appendChild(title);
+    grid.appendChild(card);
   });
 
-  container.appendChild(list);
+  container.appendChild(grid);
 }
 
 async function renderManageTab(tab, clan) {
@@ -614,7 +794,19 @@ async function renderManageTab(tab, clan) {
       acceptBtn.onclick = async () => {
         await acceptRequest(clan.id, uid);
         showToast("Accepted", "success");
-        renderManageTab("requests");
+
+        await renderManageClanUI(clan.id);
+
+        // Stay on "requests" tab after re-render
+        const requestsBtn = document.querySelector(
+          '.clan-tab-button[data-tab="requests"]'
+        );
+        requestsBtn?.click();
+
+        import("./eventHandlers.js").then(
+          ({ checkForJoinRequestNotifications }) =>
+            checkForJoinRequestNotifications()
+        );
       };
 
       denyBtn.onclick = async () => {
@@ -622,7 +814,16 @@ async function renderManageTab(tab, clan) {
           joinRequests: arrayRemove(uid),
         });
         showToast("Denied", "info");
-        renderManageTab("requests");
+
+        await renderManageClanUI(clan.id);
+        document
+          .querySelector('.clan-tab-button[data-tab="requests"]')
+          ?.click();
+
+        import("./eventHandlers.js").then(
+          ({ checkForJoinRequestNotifications }) =>
+            checkForJoinRequestNotifications()
+        );
       };
 
       actionCell.append(acceptBtn, denyBtn);
@@ -639,7 +840,7 @@ async function renderManageTab(tab, clan) {
     banner.className = "clan-banner-wrapper";
 
     const logo = document.createElement("img");
-    logo.src = clan.logoUrl || "img/default-clan.webp";
+    logo.src = clan.logoUrl || "img/clan/logo.webp";
     logo.alt = `${clan.name} logo`;
     logo.className = "clan-banner-logo";
 
@@ -691,7 +892,7 @@ async function renderManageTab(tab, clan) {
     currentLogoLabel.textContent = "Preview:";
 
     const logoPreview = document.createElement("img");
-    logoPreview.src = clan.logoUrl || "img/default-clan.webp";
+    logoPreview.src = clan.logoUrl || "img/clan/logo.webp";
     logoPreview.alt = "Logo preview";
     logoPreview.style.width = "200px";
     logoPreview.style.height = "200px";
@@ -706,7 +907,7 @@ async function renderManageTab(tab, clan) {
       if (file) {
         logoPreview.src = URL.createObjectURL(file);
       } else {
-        logoPreview.src = clan.logoUrl || "img/default-clan.webp";
+        logoPreview.src = clan.logoUrl || "img/clan/logo.webp";
       }
     });
 
@@ -810,7 +1011,7 @@ function createClanBanner(clan) {
   bannerWrapper.className = "clan-banner-wrapper";
 
   const logo = document.createElement("img");
-  logo.src = clan.logoUrl || "img/default-clan.webp";
+  logo.src = clan.logoUrl || "img/clan/logo.webp";
   logo.alt = `${clan.name} logo`;
   logo.className = "clan-banner-logo";
 

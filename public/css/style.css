@@ -224,6 +224,10 @@ body {
   display: block;
 }
 
+#showClanModalButton {
+  position: relative;
+}
+
 /* Style each button inside the dropdown menu */
 .dropdown-content button {
   display: block;
@@ -3277,17 +3281,12 @@ td {
   color: #e0e0e0;
 }
 
-/* General clan card style */
-.template-card {
-  border: 1px solid #444;
-  border-radius: 8px;
-  background-color: #1a1a1a;
-  overflow: hidden;
-}
-
 #clanModal {
   backdrop-filter: none;
-  background-color: rgba(30, 30, 30, 1); /* Solid dark background */
+}
+
+.modal .modal-content-template {
+  background-color: rgba(30, 30, 30, 1);
 }
 
 .clan-card {
@@ -3354,7 +3353,15 @@ td {
   gap: 16px;
   background: #111;
   border-radius: 8px;
+  max-width: 600px;
 }
+
+.clan-settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .clan-settings-field label {
   display: block;
   font-weight: bold;
@@ -3448,7 +3455,6 @@ td {
 
 .clan-info-card {
   background: #2c2c2c;
-  border: 1px solid #333;
   border-radius: 10px;
   padding-top: 10px;
   margin: 16px 10px;
@@ -3458,11 +3464,36 @@ td {
   padding-left: 10px;
 }
 
+.clan-info-card h3 {
+  padding-left: 10px;
+}
+
+.clan-search-input {
+  padding: 8px 12px;
+  font-size: 1rem;
+  border-radius: 6px;
+  border: 1px solid #444;
+  background-color: #222;
+  color: #eee;
+  margin-left: auto;
+  width: 220px;
+}
+
+.template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
 .clan-banner-wrapper {
   display: flex;
-  align-items: flex-start;
-  gap: 16px;
-  margin-bottom: 16px;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  justify-content: start;
+  gap: 20px;
+  position: relative; /* ✅ allows join button positioning */
+  background-color: #1e1e1e;
+  border-radius: 12px;
 }
 
 .clan-banner-logo {
@@ -3473,9 +3504,10 @@ td {
 }
 
 .clan-banner-text {
+  max-width: 400px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  gap: 10px;
 }
 
 .clan-banner-title {
@@ -3486,9 +3518,18 @@ td {
 }
 
 .clan-banner-description {
-  margin: 4px 0 0 0;
   color: #aaa;
   font-size: 0.95rem;
+}
+
+.clan-banner-info {
+  color: #ccc;
+  font-size: 0.9rem;
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: initial;
 }
 
 .clan-banner-wrapper img {
@@ -3562,6 +3603,24 @@ td {
 
 .clan-select-card:hover {
   background-color: #2a2a2a;
+}
+
+.clan-grid-manage {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.clan-grid-manage::-webkit-scrollbar {
+  width: 10px;
+}
+
+.clan-grid-manage::-webkit-scrollbar-thumb {
+  background: #666; /* Darker color for scroll thumb */
+  border-radius: 5px; /* Rounded edges */
+}
+
+.clan-grid-manage::-webkit-scrollbar-thumb:hover {
+  background: #333; /* Background of scrollbar */
 }
 
 /* Green accept button */
@@ -3648,6 +3707,91 @@ td {
 .breadcrumb-current {
   color: #fff;
   font-weight: bold;
+}
+
+#showClanModalButton .notification-dot {
+  top: 0px;
+  right: 4px;
+}
+
+.notification-dot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 10px;
+  height: 10px;
+  background-color: red;
+  border-radius: 50%;
+  z-index: 10;
+}
+
+.notification-dot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 10px;
+  height: 10px;
+  background-color: red;
+  border-radius: 50%;
+  z-index: 10;
+  opacity: 0;
+  animation: fadeInDot 0.3s forwards;
+}
+
+@keyframes fadeInDot {
+  to {
+    opacity: 1;
+  }
+}
+
+.notification-dot.removing {
+  animation: fadeOutDot 0.3s forwards;
+}
+
+@keyframes fadeOutDot {
+  to {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+}
+
+.clan-grid-manage {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  padding: 10px 0;
+  justify-content: center;
+}
+
+.clan-card-manage {
+  background-color: #1d1d1d;
+  border: 1px solid #333;
+  border-radius: 12px;
+  padding: 15px;
+  width: 180px;
+  height: 160px;
+  position: relative;
+  cursor: pointer;
+  text-align: center;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.clan-card-manage:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+}
+
+.clan-card-logo {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  margin-bottom: 10px;
+}
+
+.clan-card-title {
+  font-weight: bold;
+  color: #ddd;
+  font-size: 16px;
 }
 
 @media screen and (max-width: 768px) {

@@ -21,6 +21,7 @@ import {
   initializeSectionToggles,
   initializeTextareaClickHandler,
   showBuildOrderHelpModal,
+  createNotificationDot,
 } from "./uiHandlers.js";
 import {
   showTemplatesModal,
@@ -40,6 +41,7 @@ import {
   renderCreateClanUI,
   renderChooseManageClanUI,
   renderFindClanUI,
+  listPublicClans,
 } from "./clan.js";
 setupTemplateModal(); // Always call early
 let currentClanView = null;
@@ -290,12 +292,15 @@ export async function initializeIndexPage() {
   });
 
   // --- Enable build buttons after auth ready
-  auth.onAuthStateChanged((user) => {
+  auth.onAuthStateChanged(async (user) => {
     if (user) {
       const buildsBtn = document.getElementById("showBuildsButton");
       const communityBtn = document.getElementById("showCommunityModalButton");
       if (buildsBtn) buildsBtn.disabled = false;
       if (communityBtn) communityBtn.disabled = false;
+
+      // ✅ Trigger notification check after login
+      await checkForJoinRequestNotifications();
     }
   });
 
@@ -308,6 +313,12 @@ export async function initializeIndexPage() {
   document
     .getElementById("showClanModalButton")
     ?.addEventListener("click", () => {
+      // 👉 Close the user menu when any item is clicked (like this one)
+      const userMenu = document.getElementById("userMenu");
+      if (userMenu) userMenu.style.display = "none";
+
+      // Show the Clan modal
+      const clanModal = document.getElementById("clanModal");
       clanModal.style.display = "block";
 
       // Default to 'Find' tab when opening
@@ -345,13 +356,21 @@ export async function initializeIndexPage() {
         }
       });
     });
+
   document.getElementById("closeClanModal")?.addEventListener("click", () => {
     document.getElementById("clanModal").style.display = "none";
     currentClanView = null;
   });
 
-  document.getElementById("closeClanModal")?.addEventListener("click", () => {
-    clanModal.style.display = "none";
+  window.addEventListener("click", (event) => {
+    const modal = document.getElementById("clanModal");
+    if (!modal || modal.style.display !== "block") return;
+
+    // Only close if the click was directly on the overlay background
+    if (event.target === modal) {
+      modal.style.display = "none";
+      currentClanView = null;
+    }
   });
 
   function activateClanMainTab(view) {
@@ -394,6 +413,37 @@ export function initializeViewBuildPage() {
 /** ----------------
  * Support Functions
  ----------------- */
+
+export async function checkForJoinRequestNotifications() {
+  const clans = await listPublicClans();
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const hasPending = clans.some((c) => {
+    const isCaptain =
+      c.adminUid === user.uid ||
+      c.memberInfo?.[user.uid]?.role === "Co-Captain";
+    return isCaptain && c.joinRequests?.length > 0;
+  });
+
+  const btn = document.getElementById("showClanModalButton");
+  if (!btn) return;
+
+  // Remove existing dot if present
+  const existingDot = btn.querySelector(".notification-dot");
+  if (existingDot) {
+    existingDot.classList.add("removing");
+    setTimeout(() => existingDot.remove(), 300);
+  }
+
+  if (hasPending) {
+    const dot = createNotificationDot();
+    dot.classList.add("notification-dot");
+    btn.style.position = "relative";
+    btn.appendChild(dot);
+  }
+}
+
 function attachCategoryClicks() {
   const heading = document.querySelector("#buildsModal .template-header h3");
   const allCategories = document.querySelectorAll(
