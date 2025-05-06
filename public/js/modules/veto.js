@@ -13,15 +13,15 @@ const mapData = [
 
 // Map Images (using .webp format)
 let mapImages = {
-  1: "img/vetomaps/incorporeal.webp",
-  2: "img/vetomaps/last_fantasy.webp",
-  3: "img/vetomaps/ley_lines.webp",
-  4: "img/vetomaps/magannatha.webp",
-  5: "img/vetomaps/persephone.webp",
-  6: "img/vetomaps/pylon.webp",
-  7: "img/vetomaps/tokamak.webp",
-  8: "img/vetomaps/torches.webp",
-  9: "img/vetomaps/ultralove.webp",
+  1: "img/maps/incorporeal.webp",
+  2: "img/maps/last_fantasy.webp",
+  3: "img/maps/ley_lines.webp",
+  4: "img/maps/magannatha.webp",
+  5: "img/maps/persephone.webp",
+  6: "img/maps/pylon.webp",
+  7: "img/maps/tokamak.webp",
+  8: "img/maps/torches.webp",
+  9: "img/maps/ultralove.webp",
 };
 
 // Best of Settings

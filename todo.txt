@@ -20,6 +20,9 @@ check if your build has been changed from you "my build". shoule say
 ----------- Security ----------
 - App Check - recasha
 
+----------- comunnity ----------
+Load 25builds load more if scrolled after
+
 ----------- Clan ----------
 
 - "Settings" looking bad.

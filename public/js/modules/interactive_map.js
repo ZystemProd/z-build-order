@@ -245,18 +245,18 @@ export function initializeMapSelection(mapAnnotations) {
   }
 
   const maps = [
-    { name: "Abyssal Reef", imagePath: "img/maps/abyssal_reef.webp" },
-    { name: "Amygdala", imagePath: "img/maps/amygdala.webp" },
-    { name: "El Dorado", imagePath: "img/maps/el_dorado.webp" },
-    { name: "Frostline", imagePath: "img/maps/frostline.webp" },
-    { name: "King's Cove", imagePath: "img/maps/king's_cove.webp" },
+    { name: "Incorporeal", imagePath: "img/maps/incorporeal.webp" },
+    { name: "Last Fantasy", imagePath: "img/maps/last_fantasy.webp" },
     { name: "Ley Lines", imagePath: "img/maps/ley_lines.webp" },
+    { name: "Magannatha", imagePath: "img/maps/magannatha.webp" },
+    { name: "Persephone", imagePath: "img/maps/persephone.webp" },
+    { name: "Pylon", imagePath: "img/maps/pylon.webp" },
     {
-      name: "Neon Violet Square",
-      imagePath: "img/maps/neon_violet_square.webp",
+      name: "Tokamak",
+      imagePath: "img/maps/tokamak.webp",
     },
+    { name: "Torches", imagePath: "img/maps/torches.webp" },
     { name: "Ultralove", imagePath: "img/maps/ultralove.webp" },
-    { name: "Whispers of Gold", imagePath: "img/maps/whispers_of_gold.webp" },
   ];
 
   // Populate modal
