@@ -30,6 +30,7 @@ import { mapAnnotations } from "./interactive_map.js";
 import { formatActionText } from "./textFormatters.js";
 import { analyzeBuildOrder } from "./uiHandlers.js";
 import { publishBuildToCommunity } from "./community.js";
+import { setCurrentBuildId } from "./eventHandlers.js";
 
 export function formatMatchup(matchup) {
   if (!matchup) return "Unknown Match-Up";
@@ -257,6 +258,13 @@ export function viewBuild(buildId) {
       } else {
         console.error("No such build found.");
       }
+      setCurrentBuildId(buildId);
+
+      const saveBtn = document.getElementById("saveBuildButton");
+      const newBtn = document.getElementById("newBuildButton");
+
+      if (saveBtn) saveBtn.innerText = "Update Build";
+      if (newBtn) newBtn.style.display = "inline-block";
     })
     .catch((error) => {
       console.error("Error loading build:", error);

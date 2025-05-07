@@ -562,8 +562,16 @@ button:hover {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
   margin-bottom: 5px;
   gap: 10px;
+}
+
+.toggle-header-right {
+  display: flex;
+  gap: 10px;
+  margin-left: auto; /* Push to right */
+  align-items: center;
 }
 
 .toggle-title {
@@ -1842,7 +1850,7 @@ textarea::-webkit-scrollbar-thumb:hover {
   max-width: 20px;
   max-height: 20px;
   filter: brightness(0) invert(1); /* Make icon white */
-  vertical-align: middle; /* Middle looks better than top */
+  vertical-align: top; /* Middle looks better than top */
   object-fit: contain; /* Ensure fitting inside the box */
 }
 

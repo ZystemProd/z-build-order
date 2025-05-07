@@ -28,11 +28,20 @@ export function resetBuildInputs() {
 
   // ✅ Reset Title
   const titleInput = document.getElementById("buildOrderTitleInput");
-  if (titleInput) titleInput.value = "";
+  const titleText = document.getElementById("buildOrderTitleText");
 
-  // ✅ Reset Match-Up Selection
+  if (titleInput) titleInput.value = "";
+  if (titleText) {
+    titleText.textContent = "Enter build order title here...";
+    titleText.classList.add("dimmed");
+  }
+
+  // ✅ Reset Match-Up Selection + Dropdown Color
   const categoryDropdown = document.getElementById("buildCategoryDropdown");
-  if (categoryDropdown) categoryDropdown.value = "";
+  if (categoryDropdown) {
+    categoryDropdown.value = "";
+    categoryDropdown.style.color = ""; // 🔁 Reset custom color
+  }
 
   // ✅ Reset Comment and Video Inputs
   const commentInput = document.getElementById("commentInput");
@@ -55,6 +64,7 @@ export function resetBuildInputs() {
   // ✅ Reset Selected Map Preview
   const mapImage = document.getElementById("map-preview-image");
   const selectedMapText = document.getElementById("selected-map-text");
+  if (mapImage) mapImage.src = "";
   if (selectedMapText) selectedMapText.innerText = "No map selected";
 
   // ✅ Reset Annotations (Circles & Arrows)
@@ -71,6 +81,13 @@ export function resetBuildInputs() {
     publishButton.innerText = "📢 Publish Build";
     publishButton.disabled = false;
     publishButton.style.display = "none";
+  }
+
+  // ✅ Disable Save/Update Button + reset color
+  const saveBtn = document.getElementById("saveBuildButton");
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.style.backgroundColor = "";
   }
 
   console.log("✅ All inputs reset.");

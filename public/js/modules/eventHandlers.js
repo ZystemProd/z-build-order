@@ -1,9 +1,18 @@
 // eventHandlers.js (FINAL version)
 
 import { auth, db } from "../../app.js";
-import { saveCurrentBuild, populateBuildsModal } from "./buildManagement.js";
+import {
+  saveCurrentBuild,
+  populateBuildsModal,
+  updateCurrentBuild,
+  loadBuildAnnotations,
+} from "./buildManagement.js";
 import { initializeAutoCorrect } from "./autoCorrect.js";
-import { populateBuildDetails, analyzeBuildOrder } from "./uiHandlers.js";
+import {
+  populateBuildDetails,
+  analyzeBuildOrder,
+  showToast,
+} from "./uiHandlers.js";
 import { updateYouTubeEmbed } from "./youtube.js";
 import {
   closeModal,
@@ -37,14 +46,24 @@ import {
   searchCommunityBuilds,
   filterCommunityBuilds,
 } from "./community.js";
+import { resetBuildInputs } from "./utils.js";
 import {
   renderCreateClanUI,
   renderChooseManageClanUI,
   renderFindClanUI,
   listPublicClans,
 } from "./clan.js";
+
 setupTemplateModal(); // Always call early
+
 let currentClanView = null;
+
+// keep track of whether we're editing an existing build
+let currentBuildId = null;
+export function setCurrentBuildId(id) {
+  currentBuildId = id;
+}
+
 /** ----------------
  *  Helpers
  ----------------- */
@@ -151,7 +170,52 @@ export async function initializeIndexPage() {
   safeAdd("switchAccountBtn", "click", window.handleSwitchAccount);
 
   // --- Main Build Buttons
-  safeAdd("saveBuildButton", "click", saveCurrentBuild);
+  const saveBuildButton = document.getElementById("saveBuildButton");
+  const newBuildButton = document.getElementById("newBuildButton");
+
+  // Save or update build depending on context
+  safeAdd("saveBuildButton", "click", async () => {
+    if (currentBuildId) {
+      try {
+        console.log("🔄 Updating build:", currentBuildId);
+        await updateCurrentBuild(currentBuildId);
+        showToast("✅ Build updated!", "success");
+
+        // ✅ Reset button after update
+        saveBuildButton.disabled = true;
+        saveBuildButton.style.backgroundColor = "";
+      } catch (err) {
+        console.error("Update failed:", err);
+        showToast("❌ Failed to update build", "error");
+      }
+    } else {
+      try {
+        const savedId = await saveCurrentBuild(); // should return the title (encoded)
+        currentBuildId = savedId;
+        saveBuildButton.innerText = "Update Build";
+        newBuildButton.style.display = "inline-block";
+        showToast("✅ Build saved!", "success");
+
+        // ✅ Reset button after save
+        saveBuildButton.disabled = true;
+        saveBuildButton.style.backgroundColor = "";
+      } catch (err) {
+        console.error("Save failed:", err);
+        showToast("❌ Failed to save build", "error");
+      }
+    }
+  });
+
+  // Start a new build
+  safeAdd("newBuildButton", "click", () => {
+    currentBuildId = null;
+    resetBuildInputs();
+    saveBuildButton.innerText = "Save Build";
+    newBuildButton.style.display = "none";
+  });
+
+  monitorBuildChanges();
+
   safeAdd("showBuildsButton", "click", window.showBuildsModal);
   safeAdd("showCommunityModalButton", "click", async () => {
     const modal = document.getElementById("communityModal");
@@ -686,6 +750,35 @@ function updateDropdownColor() {
     if (optgroup && optgroup.style.color) {
       dropdown.style.color = optgroup.style.color;
     }
+  }
+}
+
+function monitorBuildChanges() {
+  const fields = [
+    "buildOrderInput",
+    "commentInput",
+    "videoInput",
+    "replayLinkInput",
+  ];
+
+  fields.forEach((id) => {
+    const el = document.getElementById(id);
+    if (el && !el.dataset.monitorAttached) {
+      el.addEventListener("input", () => {
+        saveBuildButton.disabled = false;
+        saveBuildButton.style.backgroundColor = "#963325";
+      });
+      el.dataset.monitorAttached = "true"; // prevent duplicate
+    }
+  });
+
+  const categoryDropdown = document.getElementById("buildCategoryDropdown");
+  if (categoryDropdown && !categoryDropdown.dataset.monitorAttached) {
+    categoryDropdown.addEventListener("change", () => {
+      saveBuildButton.disabled = false;
+      saveBuildButton.style.backgroundColor = "#963325";
+    });
+    categoryDropdown.dataset.monitorAttached = "true";
   }
 }
 

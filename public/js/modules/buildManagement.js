@@ -290,6 +290,66 @@ export function deleteBuild(index) {
 
 window.deleteBuild = deleteBuild;
 
+export async function updateCurrentBuild(buildId) {
+  const auth = getAuth();
+  const user = auth.currentUser;
+
+  if (!user) {
+    console.error("User not logged in.");
+    showToast("⚠ You must be signed in to update your build!", "error");
+    return;
+  }
+
+  const db = getFirestore();
+  const buildDocRef = doc(db, `users/${user.uid}/builds/${buildId}`);
+  const commentInput = document.getElementById("commentInput");
+  const videoInput = document.getElementById("videoInput");
+  const categoryDropdown = document.getElementById("buildCategoryDropdown");
+  const buildOrderInput = document.getElementById("buildOrderInput");
+  const replayInput = document.getElementById("replayLinkInput");
+  const mapImage = document.getElementById("map-preview-image");
+
+  const updatedData = {
+    comment: DOMPurify.sanitize(commentInput?.value.trim() || ""),
+    videoLink: DOMPurify.sanitize(videoInput?.value.trim() || ""),
+    replayUrl: DOMPurify.sanitize(replayInput?.value.trim() || ""),
+    buildOrder: parseBuildOrder(buildOrderInput.value),
+    subcategory: DOMPurify.sanitize(categoryDropdown.value || ""),
+    interactiveMap: {
+      circles: mapAnnotations.circles.map(({ x, y }) => ({ x, y })),
+      arrows: mapAnnotations.arrows.map(({ startX, startY, endX, endY }) => ({
+        startX,
+        startY,
+        endX,
+        endY,
+      })),
+    },
+    timestamp: Date.now(),
+  };
+
+  // 🗺 Map name update (if selected)
+  if (mapImage?.src) {
+    const match = mapImage.src.match(/\/img\/maps\/(.+)\.webp/);
+    if (match) {
+      updatedData.map = match[1].replace(/_/g, " ");
+    }
+  }
+
+  await setDoc(buildDocRef, updatedData, { merge: true });
+
+  // 🔄 Also update community version if published
+  const communityRef = doc(db, "communityBuilds", buildId);
+  const communitySnap = await getDoc(communityRef);
+
+  if (communitySnap.exists()) {
+    await setDoc(communityRef, updatedData, { merge: true });
+    console.log("🌍 Community build updated as well.");
+  }
+
+  checkPublishButtonVisibility();
+  return true;
+}
+
 function getYouTubeVideoID(url) {
   const regex =
     /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
