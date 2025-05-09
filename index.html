@@ -17,15 +17,15 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
 
   <!-- CSS Files (no preload trick) -->
-  <link rel="stylesheet" href="/css/style.css">
-  <link rel="stylesheet" href="/css/alertNotification.css">
-  <link rel="stylesheet" href="/css/template.css">
-  <link rel="stylesheet" href="/css/showToast.css">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/alertNotification.css">
+  <link rel="stylesheet" href="css/template.css">
+  <link rel="stylesheet" href="css/showToast.css">
 
   <!-- JS Files -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.3/purify.min.js"></script>
-  <script type="module" src="app.js" defer></script>
-  <script type="module" src="js/modules/eventHandlers.js" defer></script>
+  <script type="module" src="/src/app.js" defer></script>
+  <script type="module" src="/src/js/modules/eventHandlers.js" defer></script>
 </head>
 
 <body>
@@ -678,8 +678,8 @@
 
 
   <script type="module">
-    import { initializeIndexPage } from './js/modules/eventHandlers.js';
-    import { initializeAuthUI } from './app.js';
+    import { initializeIndexPage } from '/src/js/modules/eventHandlers.js';
+    import { initializeAuthUI } from '/src/app.js';
 
     document.addEventListener('DOMContentLoaded', () => {
       initializeAuthUI();

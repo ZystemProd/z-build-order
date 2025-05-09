@@ -1,6 +1,4 @@
-// app.js (final, polished)
-
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
+import { initializeApp } from "firebase/app";
 import {
   getAuth,
   GoogleAuthProvider,
@@ -10,18 +8,20 @@ import {
   onAuthStateChanged,
   setPersistence,
   browserLocalPersistence,
-} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+} from "firebase/auth";
 import {
   getFirestore,
   doc,
   getDoc,
   setDoc,
   deleteDoc,
-} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
-import { getPerformance } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-performance.js";
+} from "firebase/firestore";
+import { getPerformance } from "firebase/performance";
 import { bannedWords } from "./js/data/bannedWords.js";
 import { showToast } from "./js/modules/uiHandlers.js";
 import { resetBuildInputs } from "./js/modules/utils.js";
+import { connectAuthEmulator } from "firebase/auth";
+import { connectFirestoreEmulator } from "firebase/firestore";
 
 // Firebase config
 const firebaseConfig = {
@@ -51,7 +51,13 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
 const perf = getPerformance(app);
-
+/*
+// Only use emulators during local development
+if (location.hostname === "localhost") {
+  connectAuthEmulator(auth, "http://localhost:9099");
+  connectFirestoreEmulator(db, "localhost", 8181);
+}
+*/
 // Set persistence
 setPersistence(auth, browserLocalPersistence);
 
