@@ -7,21 +7,16 @@ import {
   getDoc,
   query,
   where,
-} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+} from "firebase/firestore";
 
-import { getAuth } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
-import {
-  getStorage,
-  ref,
-  uploadBytes,
-  getDownloadURL,
-} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-storage.js";
+import { getAuth } from "firebase/auth";
 import { getSavedBuilds, setSavedBuilds } from "./buildStorage.js";
-import { showToast } from "./uiHandlers.js";
+import { showToast } from "./toastHandler.js";
 import { filterBuilds } from "./modal.js";
 import { parseBuildOrder } from "./utils.js";
 import { mapAnnotations } from "./interactive_map.js";
 import { checkPublishButtonVisibility } from "./community.js";
+import DOMPurify from "dompurify";
 
 export async function fetchUserBuilds() {
   const auth = getAuth();
@@ -133,6 +128,14 @@ export async function saveCurrentBuild() {
     }
   }
 
+  let mapFolder = "current"; // default
+  if (mapImage?.src) {
+    const folderMatch = mapImage.src.match(/\/img\/maps\/([^/]+)\//);
+    if (folderMatch) {
+      mapFolder = folderMatch[1]; // "current" or "archive"
+    }
+  }
+
   const auth = getAuth();
   const user = auth.currentUser;
 
@@ -185,6 +188,7 @@ export async function saveCurrentBuild() {
     replayUrl: replayUrl, // ✅ Now this will be correctly set
     buildOrder,
     map: mapName,
+    mapFolder: mapFolder,
     interactiveMap: {
       circles: mapAnnotations.circles.map(({ x, y }) => ({ x, y })),
       arrows: mapAnnotations.arrows.map(({ startX, startY, endX, endY }) => ({

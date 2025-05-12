@@ -8,17 +8,13 @@ import {
   query,
   where,
   getDocs,
-} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
-import { getAuth } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
-import {
-  getStorage,
-  ref,
-  uploadBytes,
-  getDownloadURL,
-} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-storage.js";
+} from "firebase/firestore";
+import { getAuth } from "firebase/auth";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+
 //import * as DOMPurify from "./dompurify/dist/purify.min.js";
 import { auth } from "../../app.js";
-import { displayBuildOrder, showToast } from "./uiHandlers.js";
+import { showToast } from "./toastHandler.js";
 import { updateYouTubeEmbed, clearYouTubeEmbed } from "./youtube.js";
 import {
   getSavedBuilds,
@@ -30,7 +26,8 @@ import { mapAnnotations } from "./interactive_map.js";
 import { formatActionText } from "./textFormatters.js";
 import { analyzeBuildOrder } from "./uiHandlers.js";
 import { publishBuildToCommunity } from "./community.js";
-import { setCurrentBuildId } from "./eventHandlers.js";
+import { setCurrentBuildId } from "./states/buildState.js";
+import DOMPurify from "dompurify";
 
 export function formatMatchup(matchup) {
   if (!matchup) return "Unknown Match-Up";
@@ -75,7 +72,7 @@ export async function deleteBuildFromFirestore(buildId) {
   }
 }
 
-export function viewBuild(buildId) {
+export async function viewBuild(buildId) {
   const db = getFirestore();
   const auth = getAuth();
   const user = auth.currentUser;
@@ -85,190 +82,172 @@ export function viewBuild(buildId) {
     return;
   }
 
-  const buildRef = doc(db, `users/${user.uid}/builds/${buildId}`);
-  getDoc(buildRef)
-    .then((docSnap) => {
-      if (docSnap.exists()) {
-        const build = docSnap.data();
-        const mapImage = document.getElementById("map-preview-image");
-        const selectedMapText = document.getElementById("selected-map-text");
-        const titleInput = document.getElementById("buildOrderTitleInput");
-        const titleText = document.getElementById("buildOrderTitleText");
-        const matchUpDropdown = document.getElementById(
-          "buildCategoryDropdown"
-        );
+  try {
+    const buildRef = doc(db, `users/${user.uid}/builds/${buildId}`);
+    const docSnap = await getDoc(buildRef);
 
-        console.log("Loaded build:", build);
+    if (!docSnap.exists()) {
+      console.error("No such build found.");
+      return;
+    }
 
-        // Helper function to capitalize each word
-        const capitalizeWords = (str) => {
-          return str
-            .split(" ")
-            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-            .join(" ");
-        };
+    const build = docSnap.data();
+    const mapImage = document.getElementById("map-preview-image");
+    const selectedMapText = document.getElementById("selected-map-text");
+    const titleInput = document.getElementById("buildOrderTitleInput");
+    const titleText = document.getElementById("buildOrderTitleText");
+    const matchUpDropdown = document.getElementById("buildCategoryDropdown");
 
-        // Check for mandatory fields
-        if (!build.title || !build.subcategory) {
-          console.error("Mandatory fields (Title or Match-Up) are missing.");
-          showToast(
-            "This build cannot be viewed due to missing mandatory fields.",
-            "error"
-          );
-          return;
+    const capitalizeWords = (str) =>
+      str
+        .split(" ")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ");
+
+    if (!build.title || !build.subcategory) {
+      showToast(
+        "This build cannot be viewed due to missing mandatory fields.",
+        "error"
+      );
+      return;
+    }
+
+    // Match-up dropdown logic
+    const subcategoryValue = build.subcategory.toLowerCase();
+    if (matchUpDropdown) {
+      let matchFound = false;
+      for (const option of matchUpDropdown.options) {
+        if (option.value.toLowerCase() === subcategoryValue) {
+          matchUpDropdown.value = option.value;
+          matchFound = true;
+          break;
         }
-
-        // ✅ **Update Match-Up Dropdown & Set Color**
-        if (matchUpDropdown) {
-          const subcategoryValue = build.subcategory.toLowerCase();
-          let matchFound = false;
-
-          for (const option of matchUpDropdown.options) {
-            if (option.value.toLowerCase() === subcategoryValue) {
-              matchUpDropdown.value = option.value;
-              matchFound = true;
-              break;
-            }
-          }
-
-          if (!matchFound) {
-            console.warn(
-              `No match found for subcategory: ${build.subcategory}`
-            );
-          }
-
-          // ✅ **Update the Dropdown Color**
-          if (subcategoryValue.startsWith("zv")) {
-            matchUpDropdown.style.color = "#c07aeb"; // Purple (Zerg)
-          } else if (subcategoryValue.startsWith("pv")) {
-            matchUpDropdown.style.color = "#5fe5ff"; // Blue (Protoss)
-          } else if (subcategoryValue.startsWith("tv")) {
-            matchUpDropdown.style.color = "#ff3a30"; // Red (Terran)
-          } else {
-            matchUpDropdown.style.color = ""; // Default color if unmatched
-          }
-        }
-
-        // ✅ **Update the map preview and selected map text**
-        if (build.map) {
-          const mapName = build.map;
-          const formattedMapName = capitalizeWords(mapName);
-          const mapUrl = `https://z-build-order.web.app/img/maps/${mapName
-            .replace(/ /g, "_")
-            .toLowerCase()}.webp`;
-
-          if (mapImage) mapImage.src = mapUrl;
-          if (selectedMapText) selectedMapText.innerText = formattedMapName;
-        } else if (selectedMapText) {
-          selectedMapText.innerText = "No map selected";
-        }
-
-        // ✅ **Load annotations (circles and arrows)**
-        if (build.interactiveMap) {
-          mapAnnotations.circles = [];
-          mapAnnotations.annotationsContainer.innerHTML = "";
-
-          build.interactiveMap.circles?.forEach(({ x, y }) => {
-            mapAnnotations.createCircle(x, y);
-          });
-
-          build.interactiveMap.arrows?.forEach(
-            ({ startX, startY, endX, endY }) => {
-              mapAnnotations.createArrow(startX, startY, endX, endY);
-            }
-          );
-
-          mapAnnotations.updateCircleNumbers();
-        }
-
-        // ✅ **Update titleText and titleInput**
-        if (titleText) {
-          titleText.textContent =
-            DOMPurify.sanitize(build.title) ||
-            "Enter build order title here...";
-          titleText.classList.remove("dimmed");
-        }
-
-        if (titleInput) {
-          titleInput.value = build.title || "";
-        }
-
-        // ✅ **Format and display match-up**
-        const matchUpElement = document.getElementById("matchUpDisplay");
-        if (matchUpElement) {
-          const formattedMatchUp = build.subcategory
-            ? capitalizeWords(build.subcategory)
-            : "Unknown";
-          matchUpElement.textContent = `Match-Up: ${formattedMatchUp}`;
-        }
-
-        // ✅ **Populate comment**
-        const commentInput = document.getElementById("commentInput");
-        if (commentInput) {
-          commentInput.value = DOMPurify.sanitize(build.comment) || "";
-        }
-
-        // ✅ Populate YouTube input field
-        const videoInput = document.getElementById("videoInput");
-
-        if (videoInput) {
-          console.log("✅ videoInput found:", videoInput); // Debug log
-          console.log("✅ Loaded build.youtube value:", build.youtube);
-          // Set value into input
-          videoInput.value = build.youtube || build.videoLink || "";
-
-          console.log("✅ Set videoInput value to:", videoInput.value); // Debug log
-
-          // ✅ Then update the iframe based on the input value
-          updateYouTubeEmbed(videoInput.value);
-        } else {
-          console.error("❌ videoInput not found in DOM when loading build.");
-        }
-
-        // ✅ **Validate build order**
-        const validBuildOrder = Array.isArray(build.buildOrder)
-          ? build.buildOrder.filter(
-              (step) => step && (step.workersOrTimestamp || step.action)
-            ) // Remove invalid steps
-          : [];
-
-        // ✅ **Convert valid build order to a string format with empty brackets if needed**
-        const buildOrderText = build.buildOrder.length
-          ? build.buildOrder
-              .map((step) => {
-                const workersOrTimestamp = step.workersOrTimestamp
-                  ?.toString()
-                  .trim();
-                const action = step.action || "";
-                return `[${workersOrTimestamp || ""}] ${action}`.trim();
-              })
-              .join("\n")
-          : "No build order available.";
-
-        // ✅ **Populate the build order input field**
-        const buildOrderInput = document.getElementById("buildOrderInput");
-        if (buildOrderInput) {
-          buildOrderInput.value = buildOrderText;
-        }
-
-        // ✅ **Run the analyzeBuildOrder function to update the table**
-        analyzeBuildOrder(buildOrderInput.value);
-
-        closeModal();
-      } else {
-        console.error("No such build found.");
       }
-      setCurrentBuildId(buildId);
+      matchUpDropdown.style.color = subcategoryValue.startsWith("zv")
+        ? "#c07aeb"
+        : subcategoryValue.startsWith("pv")
+        ? "#5fe5ff"
+        : subcategoryValue.startsWith("tv")
+        ? "#ff3a30"
+        : "";
+    }
 
-      const saveBtn = document.getElementById("saveBuildButton");
-      const newBtn = document.getElementById("newBuildButton");
+    // ✅ Map Preview Logic (async fetch of maps.json)
+    if (build.map) {
+      const mapName = build.map;
+      const formattedMapName = capitalizeWords(mapName);
+      let mapUrl = "";
 
-      if (saveBtn) saveBtn.innerText = "Update Build";
-      if (newBtn) newBtn.style.display = "inline-block";
-    })
-    .catch((error) => {
-      console.error("Error loading build:", error);
-    });
+      try {
+        const response = await fetch("/data/maps.json");
+        const maps = await response.json();
+        const mapEntry = maps.find(
+          (m) => m.name.toLowerCase() === mapName.toLowerCase()
+        );
+        const folder = mapEntry?.folder || "";
+        const fileName =
+          mapEntry?.file || mapName.replace(/ /g, "_").toLowerCase() + ".webp";
+        mapUrl = folder
+          ? `/img/maps/${folder}/${fileName}`
+          : `/img/maps/${fileName}`;
+      } catch (err) {
+        console.warn("Could not load maps.json, falling back.");
+        mapUrl = `/img/maps/${mapName.replace(/ /g, "_").toLowerCase()}.webp`;
+      }
+
+      if (mapImage) mapImage.src = mapUrl;
+      if (selectedMapText) selectedMapText.innerText = formattedMapName;
+    } else if (selectedMapText) {
+      selectedMapText.innerText = "No map selected";
+    }
+
+    // Annotations
+    if (build.interactiveMap) {
+      mapAnnotations.circles = [];
+      mapAnnotations.annotationsContainer.innerHTML = "";
+      build.interactiveMap.circles?.forEach(({ x, y }) =>
+        mapAnnotations.createCircle(x, y)
+      );
+      build.interactiveMap.arrows?.forEach(({ startX, startY, endX, endY }) =>
+        mapAnnotations.createArrow(startX, startY, endX, endY)
+      );
+      mapAnnotations.updateCircleNumbers();
+    }
+
+    // Title
+    if (titleText) {
+      titleText.textContent =
+        DOMPurify.sanitize(build.title) || "Enter build order title here...";
+      titleText.classList.remove("dimmed");
+    }
+    if (titleInput) titleInput.value = build.title || "";
+
+    // Match-Up display
+    const matchUpElement = document.getElementById("matchUpDisplay");
+    if (matchUpElement) {
+      matchUpElement.textContent = `Match-Up: ${
+        build.subcategory ? capitalizeWords(build.subcategory) : "Unknown"
+      }`;
+    }
+
+    // Comment
+    const commentInput = document.getElementById("commentInput");
+    if (commentInput)
+      commentInput.value = DOMPurify.sanitize(build.comment) || "";
+
+    // YouTube
+    const videoInput = document.getElementById("videoInput");
+    if (videoInput) {
+      videoInput.value = build.youtube || build.videoLink || "";
+      updateYouTubeEmbed(videoInput.value);
+    }
+
+    // Build Order
+    const validBuildOrder = Array.isArray(build.buildOrder)
+      ? build.buildOrder.filter(
+          (step) => step && (step.workersOrTimestamp || step.action)
+        )
+      : [];
+
+    const buildOrderText = validBuildOrder.length
+      ? validBuildOrder
+          .map((step) =>
+            `[${step.workersOrTimestamp || ""}] ${step.action || ""}`.trim()
+          )
+          .join("\n")
+      : "No build order available.";
+
+    const buildOrderInput = document.getElementById("buildOrderInput");
+    if (buildOrderInput) buildOrderInput.value = buildOrderText;
+
+    // Replay
+    const replayUrl = build.replayUrl?.trim();
+    const replayWrapper = document.getElementById("replayInputWrapper");
+    const replayView = document.getElementById("replayViewWrapper");
+    const replayBtn = document.getElementById("replayDownloadBtn");
+
+    if (replayUrl && replayWrapper && replayView && replayBtn) {
+      replayWrapper.style.display = "none";
+      replayView.style.display = "block";
+      replayBtn.href = replayUrl;
+      replayBtn.innerText = "Download Replay on Drop.sc";
+    } else if (replayWrapper && replayView) {
+      replayWrapper.style.display = "flex";
+      replayView.style.display = "none";
+    }
+
+    analyzeBuildOrder(buildOrderInput?.value || "");
+    setCurrentBuildId(buildId);
+
+    const saveBtn = document.getElementById("saveBuildButton");
+    const newBtn = document.getElementById("newBuildButton");
+    if (saveBtn) saveBtn.innerText = "Update Build";
+    if (newBtn) newBtn.style.display = "inline-block";
+
+    closeModal();
+  } catch (error) {
+    console.error("❌ Error loading build:", error);
+  }
 }
 
 window.viewBuild = viewBuild;

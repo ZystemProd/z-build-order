@@ -1,3 +1,5 @@
+import DOMPurify from "dompurify";
+
 export function initializeTooltips() {
   document.querySelectorAll(".tooltip").forEach((tooltip) => tooltip.remove()); // Remove existing tooltips to prevent duplication
 

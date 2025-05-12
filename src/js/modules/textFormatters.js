@@ -4,6 +4,7 @@ import { structures } from "../data/structures.js";
 import { upgrades } from "../data/upgrades.js";
 import { unitImages, structureImages, upgradeImages } from "../data/images.js";
 import { abbreviationMap } from "../data/abbreviationMap.js";
+import DOMPurify from "dompurify";
 
 // Utility: Capitalize the first letter of a string
 export function capitalizeFirstLetter(text) {

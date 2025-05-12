@@ -1,3 +1,19 @@
+@font-face {
+  font-family: "Inter";
+  src: url("../fonts/Inter-Regular.woff2") format("woff2");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Inter";
+  src: url("../fonts/Inter-Italic.woff2") format("woff2");
+  font-weight: normal;
+  font-style: italic;
+  font-display: swap;
+}
+
 :root {
   --border-color: #444;
   --bg-color-category: #444;
@@ -1256,6 +1272,18 @@ textarea::-webkit-scrollbar-thumb:hover {
   background-color: #007bff;
 }
 
+.map-folder-toggle {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.toggle-folder.active {
+  background-color: var(--active-color);
+  color: white;
+  font-weight: bold;
+}
+
 .close-map-button {
   background: none;
   border: none;
@@ -1664,8 +1692,13 @@ textarea::-webkit-scrollbar-thumb:hover {
   color: #ff9800; /* Highlight color for resources */
 }
 
-.resource::before {
-  content: url("path/to/resource-icon.webp"); /* Replace with an icon path */
+.resource.gas::before {
+  content: url("/img/resources/gas.webp");
+  margin-right: 4px;
+}
+
+.resource.minerals::before {
+  content: url("/img/resources/minerals.webp");
   margin-right: 4px;
 }
 /* General Layout for Main Sections */
@@ -2548,7 +2581,7 @@ td {
   top: 32px;
   left: 50%;
   transform: translateX(-50%);
-  width: 15%;
+  width: 400px;
   /* height: 300px; */
   background-size: contain;
   /* opacity: 0.06; */
@@ -2563,8 +2596,8 @@ td {
 }
 
 #site-logo img {
-  max-width: 50px; /* Adjust as needed */
-  height: auto;
+  width: 50px; /* Adjust as needed */
+  height: 50px;
   position: static; /* Override any absolute positioning */
 }
 
@@ -3466,7 +3499,6 @@ td {
 .clan-info-card {
   background: #2c2c2c;
   border-radius: 10px;
-  padding-top: 10px;
   margin: 16px 10px;
 }
 
@@ -3503,7 +3535,7 @@ td {
   gap: 20px;
   position: relative; /* ✅ allows join button positioning */
   background-color: #1e1e1e;
-  border-radius: 12px;
+  border-bottom: solid #353535;
 }
 
 .clan-banner-logo {
@@ -3650,6 +3682,40 @@ td {
   padding: 6px 12px;
   border-radius: 4px;
   cursor: pointer;
+}
+
+.settings-scroll-wrapper {
+  max-height: 728px; /* Adjust as needed */
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+/* Custom scrollbar styling */
+.settings-scroll-wrapper::-webkit-scrollbar {
+  width: 6px;
+}
+
+.settings-scroll-wrapper::-webkit-scrollbar-thumb {
+  background: #444;
+  border-radius: 3px;
+}
+
+.settings-scroll-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #666;
+}
+
+.highlight-captain {
+  background-color: #222830;
+  border-left: 4px solid gold;
+  font-weight: bold;
+  color: gold;
+}
+
+.highlight-co-captain {
+  background-color: #1c2732;
+  border-left: 4px solid #5fe5ff;
+  font-weight: bold;
+  color: #5fe5ff;
 }
 
 /* Optional: darker on hover */

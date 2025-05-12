@@ -1,8 +1,9 @@
 @font-face {
   font-family: "MyCustomFont"; /* Use any name you want */
-  src: url("../fonts/EuroStyleNormal.ttf") format("truetype"); /* Adjust path based on your structure */
+  src: url("../fonts/EuroStyleNormal.woff2") format("woff2"); /* Adjust path based on your structure */
   font-weight: normal;
   font-style: normal;
+  font-display: swap;
 }
 
 :root {

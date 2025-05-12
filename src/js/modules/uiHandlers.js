@@ -1,3 +1,5 @@
+import DOMPurify from "dompurify";
+
 import { getSavedBuilds } from "./buildStorage.js";
 import { closeModal, populateBuildList } from "./modal.js";
 import { updateYouTubeEmbed } from "./youtube.js";
@@ -83,6 +85,25 @@ export function populateBuildDetails(index) {
   } else {
     console.warn("videoInput not found!");
   }
+
+  // 🔄 Setup replay view toggle
+  const replayUrl = build.replayUrl?.trim();
+  const replayWrapper = document.getElementById("replayInputWrapper");
+  const replayView = document.getElementById("replayViewWrapper");
+  const replayBtn = document.getElementById("replayDownloadBtn");
+
+  if (replayUrl && replayWrapper && replayView && replayBtn) {
+    replayWrapper.style.display = "none";
+    replayView.style.display = "block";
+    replayBtn.href = replayUrl;
+    replayBtn.innerText = "Download Replay on Drop.sc";
+  } else if (replayWrapper && replayView) {
+    replayWrapper.style.display = "flex";
+    replayView.style.display = "none";
+  }
+
+  console.log("🔍 Loaded build object:", build);
+  console.log("🎮 Replay URL:", build.replayUrl);
 
   // Update video embed
   updateYouTubeEmbed();
@@ -228,44 +249,6 @@ function highlightActiveTab(category) {
   document
     .querySelector(`[onclick="filterBuilds('${category}')"]`)
     .classList.add("active-tab");
-}
-
-export function showToast(message, type = "success", duration = 3000) {
-  let container = document.getElementById("toast-container");
-  if (!container) {
-    container = document.createElement("div");
-    container.id = "toast-container";
-    document.body.appendChild(container);
-  }
-
-  while (container.firstChild) {
-    container.removeChild(container.firstChild);
-  }
-
-  const toast = document.createElement("div");
-  toast.className = `toast toast-${type}`;
-  toast.innerHTML = `
-  ${type === "error" || type === "warning" ? "⚠ " : ""} ${DOMPurify.sanitize(
-    message
-  )}
-`;
-
-  container.appendChild(toast);
-
-  setTimeout(() => {
-    toast.style.opacity = "1";
-    toast.style.transform = "translateY(0)";
-  }, 10);
-
-  setTimeout(() => {
-    toast.style.opacity = "0";
-    toast.style.transform = "translateY(-20px)";
-    setTimeout(() => {
-      if (toast.parentElement === container) {
-        container.removeChild(toast);
-      }
-    }, 300);
-  }, duration);
 }
 
 export function initializeTextareaClickHandler() {

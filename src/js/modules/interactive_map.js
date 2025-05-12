@@ -1,3 +1,5 @@
+import DOMPurify from "dompurify";
+
 // interactive_map.js (FINAL VERSION ✅)
 
 console.log("🗺️ Loading interactive map...");
@@ -32,19 +34,21 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  function loadMapsOnDemand() {
-    const mapCards = document.querySelectorAll(".map-card");
-    mapCards.forEach((card) => {
-      const img = card.querySelector(".map-image");
-      const mapSrc = img.getAttribute("data-src");
-      if (mapSrc && !img.src) {
-        img.src = mapSrc;
-        img.removeAttribute("data-src");
-      }
-    });
-    console.log("✅ All maps loaded!");
-  }
+  loadMapsOnDemand();
 });
+
+export function loadMapsOnDemand() {
+  const mapCards = document.querySelectorAll(".map-card");
+  mapCards.forEach((card) => {
+    const img = card.querySelector(".map-image");
+    const mapSrc = img.getAttribute("data-src");
+    if (mapSrc && !img.src) {
+      img.src = mapSrc;
+      img.removeAttribute("data-src");
+    }
+  });
+  console.log("✅ All maps loaded!");
+}
 
 export class MapAnnotations {
   constructor(mapContainerId, annotationsContainerId) {
@@ -244,34 +248,7 @@ export function initializeMapSelection(mapAnnotations) {
     return;
   }
 
-  const maps = [
-    { name: "Incorporeal", imagePath: "img/maps/incorporeal.webp" },
-    { name: "Last Fantasy", imagePath: "img/maps/last_fantasy.webp" },
-    { name: "Ley Lines", imagePath: "img/maps/ley_lines.webp" },
-    { name: "Magannatha", imagePath: "img/maps/magannatha.webp" },
-    { name: "Persephone", imagePath: "img/maps/persephone.webp" },
-    { name: "Pylon", imagePath: "img/maps/pylon.webp" },
-    {
-      name: "Tokamak",
-      imagePath: "img/maps/tokamak.webp",
-    },
-    { name: "Torches", imagePath: "img/maps/torches.webp" },
-    { name: "Ultralove", imagePath: "img/maps/ultralove.webp" },
-  ];
-
-  // Populate modal
-  buildsContainer.innerHTML = maps
-    .map(
-      (map) => `
-    <div class="map-card" data-map="${DOMPurify.sanitize(map.imagePath)}">
-      <div class="map-card-title">${DOMPurify.sanitize(map.name)}</div>
-      <img data-src="${DOMPurify.sanitize(
-        map.imagePath
-      )}" alt="${DOMPurify.sanitize(map.name)}" class="map-image">
-    </div>
-  `
-    )
-    .join("");
+  renderMapCards();
 
   // Map card clicks
   buildsContainer.addEventListener("click", (event) => {
@@ -314,6 +291,52 @@ export function initializeMapSelection(mapAnnotations) {
     }
   });
 }
+
+export async function renderMapCards(folder = "current") {
+  const buildsContainer = document.querySelector(".builds-container");
+  if (!buildsContainer) return;
+
+  try {
+    const response = await fetch("/data/maps.json");
+    const maps = await response.json();
+
+    buildsContainer.innerHTML = "";
+
+    maps
+      .filter((map) => map.folder === folder)
+      .forEach((map) => {
+        const mapCard = document.createElement("div");
+        mapCard.className = "map-card";
+        mapCard.setAttribute("data-map", `img/maps/${map.folder}/${map.file}`);
+
+        mapCard.innerHTML = `
+          <div class="map-card-title">${map.name}</div>
+          <img class="map-image" data-src="img/maps/${map.folder}/${map.file}" alt="${map.name}">
+        `;
+
+        buildsContainer.appendChild(mapCard);
+      });
+  } catch (err) {
+    console.error("❌ Failed to load maps.json", err);
+  }
+}
+
+const toggleButtons = document.querySelectorAll(".toggle-folder");
+
+toggleButtons.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const folder = btn.dataset.folder;
+
+    // Toggle active class
+    toggleButtons.forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+
+    // Render maps from selected folder
+    renderMapCards(folder).then(() => {
+      loadMapsOnDemand();
+    });
+  });
+});
 
 // Safe export default mapAnnotations
 export const mapAnnotations =

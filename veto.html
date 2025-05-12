@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Z-Map Veto</title>
   <link rel="icon" type="image/x-icon" href="/img/favicon.ico" />
-  <link rel="stylesheet" href="css/veto.css" />
+  <link rel="stylesheet" href="public/css/veto.css" />
 </head>
 
 <body>
@@ -21,7 +21,7 @@
     </div>
 
     <div class="map-preview">
-      <img id="previewImage" src="img/vetomaps/incorporeal.webp" alt="Map Preview" />
+      <img id="previewImage" src="img/maps/current/incorporeal.webp" alt="Map Preview" />
     </div>
   </div>
 
@@ -45,7 +45,7 @@
       </div>
 
       <!-- Button for changing map name -->
-      <input type="file" id="mapFileInput" accept="image/*" style="display: none" onchange="updateMapPreview(event)" />
+      <input type="file" id="mapFileInput" accept="image/*" style="display: none" />
       <div id="ChangeMapPreview">
         <button onclick="document.getElementById('mapFileInput').click()">
           Change Map
@@ -83,13 +83,13 @@
   <div class="footer">
     <p>Made by Zystem</p>
     <a href="https://www.twitch.tv/zystem" target="_blank">
-      <img src="img/zystem_logo_tr.png" alt="Zystem Logo" class="footer-logo" />
+      <img src="img/logo_footer.webp" alt="Zystem Logo" class="footer-logo" />
     </a>
     <p>︱Version 1.0.5</p>
     <!-- Version number here -->
   </div>
 
-  <script src="js/modules/veto.js"></script>
+  <script type="module" src="./src/js/modules/veto.js"></script>
 </body>
 
 </html>

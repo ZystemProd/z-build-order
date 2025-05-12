@@ -9,23 +9,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/x-icon" href="/img/favicon.ico" />
 
-  <!-- Preconnects for Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-
-  <!-- Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
 
   <!-- CSS Files (no preload trick) -->
-  <link rel="stylesheet" href="css/style.css">
-  <link rel="stylesheet" href="css/alertNotification.css">
-  <link rel="stylesheet" href="css/template.css">
-  <link rel="stylesheet" href="css/showToast.css">
+  <link rel="stylesheet" href="public/css/style.css">
+  <link rel="stylesheet" href="public/css/alertNotification.css">
+  <link rel="stylesheet" href="public/css/template.css">
+  <link rel="stylesheet" href="public/css/showToast.css">
 
   <!-- JS Files -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.3/purify.min.js"></script>
-  <script type="module" src="/src/app.js" defer></script>
-  <script type="module" src="/src/js/modules/eventHandlers.js" defer></script>
+  <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.3/purify.min.js"></script>-->
 </head>
 
 <body>
@@ -254,7 +246,7 @@
               ⬆ Upload Replay to Drop.sc
             </a>
             <p>then →</p>
-            <input type="url" id="replayLinkInput" placeholder="Paste Drop.sc replay link here..." style="flex: 1;" />
+            <input type="url" id="replayLinkInput" placeholder="Paste Drop.sc replay URL here..." style="flex: 1;" />
 
           </div>
 
@@ -348,8 +340,15 @@
       <div class="modal-content">
         <span class="close-modal" id="closeMapModal">&times;</span>
         <h3>Select a Map</h3>
-        <div class="builds-container"></div> <!-- Must exist -->
+
+        <div id="mapFolderToggle" class="map-folder-toggle">
+          <button data-folder="current" class="toggle-folder active">Current</button>
+          <button data-folder="archive" class="toggle-folder">Archive</button>
+        </div>
+
+        <div class="builds-container"></div>
       </div>
+
     </div>
 
     <!-- Modal for showing all builds -->
@@ -605,7 +604,7 @@
     </div>
     <div class="footer-right" id="site-logo">
       <a href="https://www.twitch.tv/zystem" target="_blank">
-        <img src="img/zystem_logo_tr.png" alt="Zystem Logo" class="footer-logo" />
+        <img src="img/logo_footer.webp" alt="Zystem Logo" class="footer-logo" />
       </a>
     </div>
   </div>
@@ -678,12 +677,13 @@
 
 
   <script type="module">
-    import { initializeIndexPage } from '/src/js/modules/eventHandlers.js';
-    import { initializeAuthUI } from '/src/app.js';
+    import { initializeAuthUI } from './src/app.js'; // Import auth UI logic
+    import { initializeIndexPage } from './src/js/modules/init/indexPageInit.js'; // Import page logic
 
-    document.addEventListener('DOMContentLoaded', () => {
-      initializeAuthUI();
-      initializeIndexPage();
+    // Wait for the DOM to load before initializing auth and page content
+    document.addEventListener("DOMContentLoaded", () => {
+      initializeAuthUI();  // First, initialize Firebase authentication
+      initializeIndexPage();  // Then, initialize the rest of the page
     });
   </script>
 

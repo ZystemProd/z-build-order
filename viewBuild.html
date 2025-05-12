@@ -6,12 +6,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>View Build</title>
   <link rel="icon" type="image/x-icon" href="/img/favicon.ico" />
-  <link rel="stylesheet" type="text/css" href="./css/style.css" />
-  <link rel="stylesheet" type="text/css" href="./css/viewBuild.css" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.3/purify.min.js"></script>
-  <script type="module" src="/src/app.js"></script>
-  <script type="module" src="/src/js/modules/eventHandlers.js"></script>
-  <script type="module" src="/src/js/modules/viewBuild.js"></script>
+  <link rel="stylesheet" type="text/css" href="public/css/style.css" />
+  <link rel="stylesheet" type="text/css" href="public/css/viewBuild.css" />
+  <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.3/purify.min.js"></script>-->
+  <script type="module" src="./src/app.js"></script>
+  <script type="module" src="./src/js/modules/viewBuild.js"></script>
+  <script type="module" src="./src/js/modules/init/viewBuildPageInit.js"></script>
+
 </head>
 
 <body>
@@ -157,15 +158,19 @@
   </div>
 
   </div>
+
+
   <script type="module">
-    import { initializeViewBuildPage } from "./js/modules/eventHandlers.js";
-    import { initializeAuthUI } from "./app.js";
+    import { initializeAuthUI } from './src/app.js';
+    import { initializeViewBuildPage } from './src/js/modules/init/viewBuildPageInit.js';
 
     document.addEventListener("DOMContentLoaded", () => {
-      initializeAuthUI();
-      initializeViewBuildPage();
+      initializeAuthUI();  // Make sure Firebase Auth is ready first
+      initializeViewBuildPage();  // Then initialize the page
     });
   </script>
+
+
 </body>
 
 </html>

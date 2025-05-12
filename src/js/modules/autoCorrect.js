@@ -2,6 +2,7 @@ import { units } from "../data/units.js";
 import { structures } from "../data/structures.js";
 import { upgrades } from "../data/upgrades.js";
 import { analyzeBuildOrder } from "./uiHandlers.js";
+import DOMPurify from "dompurify";
 
 // Function to position the autocomplete popup below the caret
 function positionPopupAtCaret(inputField, popup) {

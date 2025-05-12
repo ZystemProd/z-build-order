@@ -18,7 +18,7 @@ import {
 } from "firebase/firestore";
 import { getPerformance } from "firebase/performance";
 import { bannedWords } from "./js/data/bannedWords.js";
-import { showToast } from "./js/modules/uiHandlers.js";
+import { showToast } from "./js/modules/toastHandler.js";
 import { resetBuildInputs } from "./js/modules/utils.js";
 import { connectAuthEmulator } from "firebase/auth";
 import { connectFirestoreEmulator } from "firebase/firestore";

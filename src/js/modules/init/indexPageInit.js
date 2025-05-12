@@ -1,91 +1,73 @@
-// eventHandlers.js (FINAL version)
-
-import { auth, db } from "../../app.js";
+import { getDoc, doc } from "firebase/firestore"; // Import Firestore methods
+import { auth, db } from "../../../app.js";
+import DOMPurify from "dompurify";
 import {
   saveCurrentBuild,
   populateBuildsModal,
   updateCurrentBuild,
-  loadBuildAnnotations,
-} from "./buildManagement.js";
-import { initializeAutoCorrect } from "./autoCorrect.js";
-import {
-  populateBuildDetails,
-  analyzeBuildOrder,
-  showToast,
-} from "./uiHandlers.js";
-import { updateYouTubeEmbed } from "./youtube.js";
+} from "../buildManagement.js";
+import { initializeAutoCorrect } from "../autoCorrect.js";
+import { populateBuildDetails, analyzeBuildOrder } from "../uiHandlers.js";
+import { showToast } from "../toastHandler.js";
+import { updateYouTubeEmbed } from "../youtube.js";
 import {
   closeModal,
   showSubcategories,
   filterBuilds,
   searchBuilds,
-} from "./modal.js";
-import {
-  MapAnnotations,
-  initializeMapControls,
-  initializeMapSelection,
-  mapAnnotations,
-} from "./interactive_map.js";
+} from "../modal.js";
 import {
   initializeSectionToggles,
   initializeTextareaClickHandler,
   showBuildOrderHelpModal,
   createNotificationDot,
-} from "./uiHandlers.js";
+} from "../uiHandlers.js";
 import {
   showTemplatesModal,
   setupTemplateModal,
   showSaveTemplateModal,
   searchTemplates,
   previewTemplate,
-} from "./template.js";
-import { initializeTooltips } from "./tooltip.js";
+} from "../template.js";
+import { initializeTooltips } from "../tooltip.js";
 import {
   populateCommunityBuilds,
   checkPublishButtonVisibility,
   searchCommunityBuilds,
   filterCommunityBuilds,
-} from "./community.js";
-import { resetBuildInputs } from "./utils.js";
+} from "../community.js";
+import { resetBuildInputs } from "../utils.js";
 import {
   renderCreateClanUI,
   renderChooseManageClanUI,
   renderFindClanUI,
-  listPublicClans,
-} from "./clan.js";
+} from "../clan.js";
+import {
+  MapAnnotations,
+  initializeMapControls,
+  initializeMapSelection,
+  mapAnnotations,
+} from "../interactive_map.js";
+import { getSavedBuilds } from "../buildStorage.js";
+// import {
+//   attachCategoryClicks,
+//   attachSubcategoryClicks,
+//   attachCommunityCategoryClicks,
+//   updateDropdownColor,
+//   monitorBuildChanges,
+// } from "./clickHandlers.js";
+
+import {
+  safeAdd,
+  safeInput,
+  safeChange,
+  capitalize,
+} from "../helpers/sharedEventUtils.js";
+import { checkForJoinRequestNotifications } from "../utils/notificationHelpers.js";
 
 setupTemplateModal(); // Always call early
-
-let currentClanView = null;
-
-// keep track of whether we're editing an existing build
 let currentBuildId = null;
-export function setCurrentBuildId(id) {
-  currentBuildId = id;
-}
-
-/** ----------------
- *  Helpers
- ----------------- */
-function safeAdd(id, event, handler) {
-  const el = document.getElementById(id);
-  if (!el) return;
-
-  // prevent duplicate listeners by removing first
-  el.removeEventListener(event, handler);
-  el.addEventListener(event, handler);
-}
-
-function safeInput(id, callback) {
-  const el = document.getElementById(id);
-  if (el) el.addEventListener("input", (e) => callback(e.target.value.trim()));
-}
-
-function safeChange(id, callback) {
-  const el = document.getElementById(id);
-  if (el) el.addEventListener("change", callback);
-}
-
+let currentClanView = null;
 /** ----------------
  *  Initialize index.html
  ----------------- */
@@ -181,6 +163,20 @@ export async function initializeIndexPage() {
         await updateCurrentBuild(currentBuildId);
         showToast("✅ Build updated!", "success");
 
+        const replayUrl = document
+          .getElementById("replayLinkInput")
+          ?.value.trim();
+        const replayWrapper = document.getElementById("replayInputWrapper");
+        const replayView = document.getElementById("replayViewWrapper");
+        const replayBtn = document.getElementById("replayDownloadBtn");
+
+        if (replayUrl && replayWrapper && replayView && replayBtn) {
+          replayWrapper.style.display = "none";
+          replayView.style.display = "block";
+          replayBtn.href = replayUrl;
+          replayBtn.innerText = "Download Replay on Drop.sc";
+        }
+
         // ✅ Reset button after update
         saveBuildButton.disabled = true;
         saveBuildButton.style.backgroundColor = "";
@@ -195,6 +191,20 @@ export async function initializeIndexPage() {
         saveBuildButton.innerText = "Update Build";
         newBuildButton.style.display = "inline-block";
         showToast("✅ Build saved!", "success");
+
+        const replayUrl = document
+          .getElementById("replayLinkInput")
+          ?.value.trim();
+        const replayWrapper = document.getElementById("replayInputWrapper");
+        const replayView = document.getElementById("replayViewWrapper");
+        const replayBtn = document.getElementById("replayDownloadBtn");
+
+        if (replayUrl && replayWrapper && replayView && replayBtn) {
+          replayWrapper.style.display = "none";
+          replayView.style.display = "block";
+          replayBtn.href = replayUrl;
+          replayBtn.innerText = "Download Replay on Drop.sc";
+        }
 
         // ✅ Reset button after save
         saveBuildButton.disabled = true;
@@ -214,7 +224,7 @@ export async function initializeIndexPage() {
     newBuildButton.style.display = "none";
   });
 
-  monitorBuildChanges();
+  // monitorBuildChanges();
 
   safeAdd("showBuildsButton", "click", window.showBuildsModal);
   safeAdd("showCommunityModalButton", "click", async () => {
@@ -364,9 +374,12 @@ export async function initializeIndexPage() {
   initializeAutoCorrect();
   initializeTooltips();
   checkPublishButtonVisibility();
-  populateBuildDetails();
+  const savedBuilds = getSavedBuilds();
+  const buildId = sessionStorage.getItem("lastViewedBuild");
+  const index = savedBuilds.findIndex((b) => b.id === buildId);
+  if (index !== -1) populateBuildDetails(index);
 
-  attachCategoryClicks();
+  // attachCategoryClicks();
   attachSubcategoryClicks();
   attachCommunityCategoryClicks();
 
@@ -399,13 +412,41 @@ export async function initializeIndexPage() {
     if (user) {
       const buildsBtn = document.getElementById("showBuildsButton");
       const communityBtn = document.getElementById("showCommunityModalButton");
+
       if (buildsBtn) buildsBtn.disabled = false;
       if (communityBtn) communityBtn.disabled = false;
 
       // ✅ Trigger notification check after login
       await checkForJoinRequestNotifications();
+
+      // Only call this after Firebase confirms the user is logged in
+      // You can add additional logic here to load user-specific content, like "My Builds"
+      initializeUserData(user);
+    } else {
+      // If the user is not logged in, disable the buttons
+      const buildsBtn = document.getElementById("showBuildsButton");
+      const communityBtn = document.getElementById("showCommunityModalButton");
+
+      if (buildsBtn) buildsBtn.disabled = true;
+      if (communityBtn) communityBtn.disabled = true;
     }
   });
+
+  // This will load the necessary user data after successful authentication
+  async function initializeUserData(user) {
+    const userRef = doc(db, "users", user.uid);
+    const userSnapshot = await getDoc(userRef);
+
+    if (userSnapshot.exists()) {
+      const username = userSnapshot.data().username || "Guest";
+      document.getElementById("userName").innerText = username;
+      document.getElementById("userPhoto").src =
+        user.photoURL || "img/default-avatar.webp";
+    } else {
+      // Handle case when user data doesn't exist
+      console.log("No user data found!");
+    }
+  }
 
   document.getElementById("mapVetoBtn")?.addEventListener("click", () => {
     window.location.href = "/veto.html";
@@ -425,9 +466,10 @@ export async function initializeIndexPage() {
       clanModal.style.display = "block";
 
       // Default to 'Find' tab when opening
+      // Default to 'Find' tab when opening
       activateClanMainTab("find");
 
-      // Attach handlers once
+      // Attach handlers for clan tabs
       ["create", "manage", "find"].forEach((view) => {
         const btn = document.getElementById(`${view}ClanBtn`);
         if (btn) {
@@ -436,7 +478,7 @@ export async function initializeIndexPage() {
 
             currentClanView = view;
 
-            // Hide all views
+            // Hide all subviews
             document.querySelectorAll(".clan-subview").forEach((v) => {
               v.style.display = "none";
             });
@@ -497,347 +539,170 @@ export async function initializeIndexPage() {
       .forEach((btn) => btn.classList.remove("active"));
     document.getElementById(`${view}ClanBtn`)?.classList.add("active");
   }
-}
 
-/** ----------------
- * Initialize viewBuild.html
- ----------------- */
-export function initializeViewBuildPage() {
-  console.log("🛠 Initializing ViewBuild Page");
+  function updateDropdownColor() {
+    const dropdown = document.getElementById("buildCategoryDropdown");
+    if (dropdown) {
+      const selectedOption = dropdown.options[dropdown.selectedIndex];
+      const optgroup = selectedOption.parentElement;
+      if (optgroup && optgroup.style.color) {
+        dropdown.style.color = optgroup.style.color;
+      }
+    }
+  }
+  function attachSubcategoryClicks() {
+    const heading = document.querySelector("#buildsModal .template-header h3");
+    const allCategories = document.querySelectorAll(
+      "#buildsModal .filter-category"
+    );
+    const allSubcategories = document.querySelectorAll(
+      "#buildsModal .subcategory"
+    );
 
-  safeAdd("signInBtn", "click", window.handleSignIn);
-  safeAdd("signOutBtn", "click", window.handleSignOut);
-  safeAdd("switchAccountBtn", "click", window.handleSwitchAccount);
+    allSubcategories.forEach((el) => {
+      el.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const subcat = el.getAttribute("data-subcategory");
+        if (!subcat) return;
 
-  safeAdd("importBuildButton", "click", importBuildHandler);
-  initializeSectionToggles();
-}
+        // Clear actives
+        allCategories.forEach((btn) => btn.classList.remove("active"));
+        allSubcategories.forEach((btn) => btn.classList.remove("active"));
 
-/** ----------------
- * Support Functions
- ----------------- */
+        // Set current subcategory and parent as active
+        el.classList.add("active");
+        const parent = el.closest(".filter-category");
+        if (parent) parent.classList.add("active");
 
-export async function checkForJoinRequestNotifications() {
-  const clans = await listPublicClans();
-  const user = auth.currentUser;
-  if (!user) return;
+        // Clear search bar
+        const buildSearch = document.getElementById("buildSearchBar");
+        if (buildSearch) buildSearch.value = "";
 
-  const hasPending = clans.some((c) => {
-    const isCaptain =
-      c.adminUid === user.uid ||
-      c.memberInfo?.[user.uid]?.role === "Co-Captain";
-    return isCaptain && c.joinRequests?.length > 0;
+        // Update heading
+        if (heading) {
+          heading.textContent = `Build Orders - ${capitalize(subcat)}`;
+        }
+
+        // Filter builds
+        filterBuilds(subcat);
+      });
+    });
+  }
+
+  // Open/close dropdown when clicking the button
+  safeAdd("templateMenuButton", "click", (event) => {
+    event.stopPropagation(); // 🛡 prevent window click from closing immediately
+    const dropdown = document.getElementById("templateDropdown");
+    if (dropdown) {
+      dropdown.classList.toggle("active");
+    }
   });
 
-  const btn = document.getElementById("showClanModalButton");
-  if (!btn) return;
+  // Close dropdown when clicking outside
+  window.addEventListener("click", (event) => {
+    const dropdown = document.getElementById("templateDropdown");
+    const button = document.getElementById("templateMenuButton");
 
-  // Remove existing dot if present
-  const existingDot = btn.querySelector(".notification-dot");
-  if (existingDot) {
-    existingDot.classList.add("removing");
-    setTimeout(() => existingDot.remove(), 300);
-  }
+    if (dropdown && button) {
+      if (!dropdown.contains(event.target) && !button.contains(event.target)) {
+        dropdown.classList.remove("active"); // 🔥 Close dropdown
+      }
+    }
+  });
 
-  if (hasPending) {
-    const dot = createNotificationDot();
-    dot.classList.add("notification-dot");
-    btn.style.position = "relative";
-    btn.appendChild(dot);
-  }
-}
+  function attachCommunityCategoryClicks() {
+    const categoryButtons = document.querySelectorAll(
+      "#communityModal .filter-category"
+    );
+    const subcategoryButtons = document.querySelectorAll(
+      "#communityModal .subcategory"
+    );
 
-function attachCategoryClicks() {
-  const heading = document.querySelector("#buildsModal .template-header h3");
-  const allCategories = document.querySelectorAll(
-    "#buildsModal .filter-category"
-  );
-  const allSubcategories = document.querySelectorAll(
-    "#buildsModal .subcategory"
-  );
+    categoryButtons.forEach((el) => {
+      el.addEventListener("click", () => {
+        const category = el.getAttribute("data-category");
+        if (!category) return;
 
-  allCategories.forEach((el) => {
-    el.addEventListener("click", () => {
-      const category = el.getAttribute("data-category");
-      if (!category) return;
+        categoryButtons.forEach((btn) => btn.classList.remove("active"));
+        subcategoryButtons.forEach((btn) => btn.classList.remove("active"));
 
-      // Clear actives
-      allCategories.forEach((btn) => btn.classList.remove("active"));
-      allSubcategories.forEach((btn) => btn.classList.remove("active"));
+        el.classList.add("active");
 
-      // Mark this as active
-      el.classList.add("active");
+        filterCommunityBuilds(category);
+        localStorage.setItem("communityFilter", category);
 
-      // Clear search bar
-      const buildSearch = document.getElementById("buildSearchBar");
-      if (buildSearch) buildSearch.value = "";
-
-      // Update heading
-      if (heading) {
+        const heading = document.querySelector("#communityModal h3");
         heading.textContent =
           category.toLowerCase() === "all"
-            ? "Build Orders"
-            : `Build Orders - ${capitalize(category)}`;
-      }
-
-      // Filter builds
-      filterBuilds(category);
+            ? "Community Builds"
+            : `Community Builds - ${capitalize(category)}`;
+      });
     });
-  });
-}
 
-function attachSubcategoryClicks() {
-  const heading = document.querySelector("#buildsModal .template-header h3");
-  const allCategories = document.querySelectorAll(
-    "#buildsModal .filter-category"
-  );
-  const allSubcategories = document.querySelectorAll(
-    "#buildsModal .subcategory"
-  );
+    subcategoryButtons.forEach((el) => {
+      el.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const subcat = el.getAttribute("data-subcategory");
+        if (!subcat) return;
 
-  allSubcategories.forEach((el) => {
-    el.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const subcat = el.getAttribute("data-subcategory");
-      if (!subcat) return;
+        subcategoryButtons.forEach((btn) => btn.classList.remove("active"));
+        categoryButtons.forEach((btn) => btn.classList.remove("active"));
 
-      // Clear actives
-      allCategories.forEach((btn) => btn.classList.remove("active"));
-      allSubcategories.forEach((btn) => btn.classList.remove("active"));
+        el.classList.add("active");
 
-      // Set current subcategory and parent as active
-      el.classList.add("active");
-      const parent = el.closest(".filter-category");
-      if (parent) parent.classList.add("active");
+        const parent = el.closest(".filter-category");
+        if (parent) parent.classList.add("active");
 
-      // Clear search bar
-      const buildSearch = document.getElementById("buildSearchBar");
-      if (buildSearch) buildSearch.value = "";
+        filterCommunityBuilds(subcat);
+        localStorage.setItem("communityFilter", subcat);
 
-      // Update heading
-      if (heading) {
-        heading.textContent = `Build Orders - ${capitalize(subcat)}`;
-      }
-
-      // Filter builds
-      filterBuilds(subcat);
+        const heading = document.querySelector("#communityModal h3");
+        heading.textContent = `Community Builds - ${capitalize(subcat)}`;
+      });
     });
-  });
-}
-
-function attachCommunityCategoryClicks() {
-  const categoryButtons = document.querySelectorAll(
-    "#communityModal .filter-category"
-  );
-  const subcategoryButtons = document.querySelectorAll(
-    "#communityModal .subcategory"
-  );
-
-  categoryButtons.forEach((el) => {
-    el.addEventListener("click", () => {
-      const category = el.getAttribute("data-category");
-      if (!category) return;
-
-      categoryButtons.forEach((btn) => btn.classList.remove("active"));
-      subcategoryButtons.forEach((btn) => btn.classList.remove("active"));
-
-      el.classList.add("active");
-
-      filterCommunityBuilds(category);
-      localStorage.setItem("communityFilter", category);
-
-      const heading = document.querySelector("#communityModal h3");
-      heading.textContent =
-        category.toLowerCase() === "all"
-          ? "Community Builds"
-          : `Community Builds - ${capitalize(category)}`;
-    });
-  });
-
-  subcategoryButtons.forEach((el) => {
-    el.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const subcat = el.getAttribute("data-subcategory");
-      if (!subcat) return;
-
-      subcategoryButtons.forEach((btn) => btn.classList.remove("active"));
-      categoryButtons.forEach((btn) => btn.classList.remove("active"));
-
-      el.classList.add("active");
-
-      const parent = el.closest(".filter-category");
-      if (parent) parent.classList.add("active");
-
-      filterCommunityBuilds(subcat);
-      localStorage.setItem("communityFilter", subcat);
-
-      const heading = document.querySelector("#communityModal h3");
-      heading.textContent = `Community Builds - ${capitalize(subcat)}`;
-    });
-  });
-}
-
-// Open/close dropdown when clicking the button
-safeAdd("templateMenuButton", "click", (event) => {
-  event.stopPropagation(); // 🛡 prevent window click from closing immediately
-  const dropdown = document.getElementById("templateDropdown");
-  if (dropdown) {
-    dropdown.classList.toggle("active");
   }
-});
 
-// Close dropdown when clicking outside
-window.addEventListener("click", (event) => {
-  const dropdown = document.getElementById("templateDropdown");
-  const button = document.getElementById("templateMenuButton");
+  function setupMapModalListeners() {
+    const mapPreview = document.getElementById("map-preview-container");
+    const mapModal = document.getElementById("mapSelectionModal");
 
-  if (dropdown && button) {
-    if (!dropdown.contains(event.target) && !button.contains(event.target)) {
-      dropdown.classList.remove("active"); // 🔥 Close dropdown
-    }
-  }
-});
+    if (!mapPreview || !mapModal) return;
 
-function setupMapModalListeners() {
-  const mapPreview = document.getElementById("map-preview-container");
-  const mapModal = document.getElementById("mapSelectionModal");
+    let isMapSelected = false;
 
-  if (!mapPreview || !mapModal) return;
+    mapPreview.addEventListener("click", () => {
+      if (!isMapSelected) {
+        mapModal.style.display = "block";
+      }
+    });
 
-  let isMapSelected = false;
+    document
+      .querySelector(".builds-container")
+      ?.addEventListener("click", (e) => {
+        const mapCard = e.target.closest(".map-card");
+        if (mapCard) {
+          const mapImageSrc = DOMPurify.sanitize(
+            mapCard.getAttribute("data-map")
+          );
+          const mapName = DOMPurify.sanitize(
+            mapCard.querySelector(".map-card-title").innerText
+          );
 
-  mapPreview.addEventListener("click", () => {
-    if (!isMapSelected) {
-      mapModal.style.display = "block";
-    }
-  });
+          const mapPreviewImage = document.getElementById("map-preview-image");
+          const selectedMapText = document.getElementById("selected-map-text");
 
-  document
-    .querySelector(".builds-container")
-    ?.addEventListener("click", (e) => {
-      const mapCard = e.target.closest(".map-card");
-      if (mapCard) {
-        const mapImageSrc = DOMPurify.sanitize(
-          mapCard.getAttribute("data-map")
-        );
-        const mapName = DOMPurify.sanitize(
-          mapCard.querySelector(".map-card-title").innerText
-        );
+          if (mapPreviewImage) mapPreviewImage.src = mapImageSrc;
+          if (selectedMapText) selectedMapText.innerText = mapName;
 
-        const mapPreviewImage = document.getElementById("map-preview-image");
-        const selectedMapText = document.getElementById("selected-map-text");
+          isMapSelected = true;
+          mapModal.style.display = "none";
+        }
+      });
 
-        if (mapPreviewImage) mapPreviewImage.src = mapImageSrc;
-        if (selectedMapText) selectedMapText.innerText = mapName;
-
-        isMapSelected = true;
+    window.addEventListener("click", (event) => {
+      if (event.target === mapModal) {
         mapModal.style.display = "none";
       }
     });
-
-  window.addEventListener("click", (event) => {
-    if (event.target === mapModal) {
-      mapModal.style.display = "none";
-    }
-  });
-}
-
-function updateDropdownColor() {
-  const dropdown = document.getElementById("buildCategoryDropdown");
-  if (dropdown) {
-    const selectedOption = dropdown.options[dropdown.selectedIndex];
-    const optgroup = selectedOption.parentElement;
-    if (optgroup && optgroup.style.color) {
-      dropdown.style.color = optgroup.style.color;
-    }
   }
-}
-
-function monitorBuildChanges() {
-  const fields = [
-    "buildOrderInput",
-    "commentInput",
-    "videoInput",
-    "replayLinkInput",
-  ];
-
-  fields.forEach((id) => {
-    const el = document.getElementById(id);
-    if (el && !el.dataset.monitorAttached) {
-      el.addEventListener("input", () => {
-        saveBuildButton.disabled = false;
-        saveBuildButton.style.backgroundColor = "#963325";
-      });
-      el.dataset.monitorAttached = "true"; // prevent duplicate
-    }
-  });
-
-  const categoryDropdown = document.getElementById("buildCategoryDropdown");
-  if (categoryDropdown && !categoryDropdown.dataset.monitorAttached) {
-    categoryDropdown.addEventListener("change", () => {
-      saveBuildButton.disabled = false;
-      saveBuildButton.style.backgroundColor = "#963325";
-    });
-    categoryDropdown.dataset.monitorAttached = "true";
-  }
-}
-
-async function importBuildHandler() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const buildId = urlParams.get("id");
-
-  if (!buildId) {
-    alert("Build ID not found.");
-    return;
-  }
-
-  if (!auth.currentUser) {
-    alert("Please sign in first to import builds.");
-    return;
-  }
-
-  const { doc, getDoc, setDoc, collection } = await import(
-    "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js"
-  );
-
-  const userId = auth.currentUser.uid;
-  const communityBuildRef = doc(db, "communityBuilds", buildId);
-  const userBuildsRef = collection(db, `users/${userId}/builds`);
-
-  try {
-    const buildDoc = await getDoc(communityBuildRef);
-    if (!buildDoc.exists()) {
-      alert("Build not found.");
-      return;
-    }
-
-    const buildData = buildDoc.data();
-    const encodedTitle = buildData.title.replace(/\//g, "__SLASH__");
-    const userBuildDocRef = doc(userBuildsRef, encodedTitle);
-    const existingDoc = await getDoc(userBuildDocRef);
-
-    if (existingDoc.exists()) {
-      alert("⚠️ This build is already in your library.");
-      return;
-    }
-
-    await setDoc(userBuildDocRef, {
-      ...buildData,
-      publisher: buildData.username || buildData.publisher || "Unknown",
-      imported: true,
-      timestamp: Date.now(),
-    });
-
-    document.getElementById("importBuildButton").disabled = true;
-    document.getElementById("importBuildButton").textContent = "Imported";
-
-    alert("✅ Build imported successfully!");
-    populateBuildsModal();
-  } catch (error) {
-    console.error(error);
-    alert("❌ Failed to import build.");
-  }
-}
-function capitalize(str) {
-  return str.charAt(0).toUpperCase() + str.slice(1);
 }

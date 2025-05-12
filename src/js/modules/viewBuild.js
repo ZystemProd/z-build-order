@@ -1,13 +1,13 @@
-import { auth, db } from "../../app.js"; // ✅ Reuse Firebase app
-import {
-  collection,
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+import { auth, db, initializeAuthUI } from "../../app.js"; // ✅ Reuse Firebase app
+import { collection, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { formatActionText } from "../modules/textFormatters.js"; // ✅ Format build steps
-import { MapAnnotations } from "./interactive_map.js"; // ✅ Map support
+import {
+  MapAnnotations,
+  renderMapCards,
+  loadMapsOnDemand,
+} from "./interactive_map.js"; // ✅ Map support
+
+initializeAuthUI();
 
 const backButton = document.getElementById("backButton");
 
@@ -123,18 +123,48 @@ async function loadBuild() {
       youtubeEmbed.src = build.youtube;
     }
 
+    // 🔒 Disable comment and video input fields for read-only
+    const commentInput = document.getElementById("commentInput");
+    if (commentInput) {
+      commentInput.disabled = true;
+    }
+
+    const videoInput = document.getElementById("videoInput");
+    if (videoInput) {
+      videoInput.disabled = true;
+    }
+
     // Set map image
     const mapImage = document.getElementById("map-preview-image");
     const selectedMapText = document.getElementById("selected-map-text");
 
+    // Map display for view-only
     if (build.map && mapImage) {
-      const formattedMapName = build.map
-        .toLowerCase()
+      const mapName = build.map;
+      const formattedMapName = mapName
         .replace(/\s+/g, "_")
-        .replace(/[^\w\-]+/g, ""); // Clean filename
-      const mapPath = `img/maps/${formattedMapName}.webp`;
+        .replace(/[^\w\-]+/g, "")
+        .toLowerCase();
 
-      mapImage.src = mapPath;
+      let mapPath = `img/maps/current/${formattedMapName}.webp`; // fallback default
+
+      try {
+        const response = await fetch("/data/maps.json");
+        const maps = await response.json();
+
+        const entry = maps.find(
+          (m) => m.name.toLowerCase() === mapName.toLowerCase()
+        );
+
+        if (entry) {
+          mapPath = `img/maps/${entry.folder}/${entry.file}`;
+        }
+      } catch (err) {
+        console.warn("⚠️ Could not load maps.json, using default path.");
+      }
+
+      mapImage.setAttribute("src", mapPath); // load immediately
+      mapImage.removeAttribute("data-src"); // optional cleanup
     }
 
     if (build.map && selectedMapText) {

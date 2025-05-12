@@ -1,28 +1,6 @@
 // Map Data (New Map Pool)
-const mapData = [
-  { id: 1, name: "Incorporeal" },
-  { id: 2, name: "Last Fantasy" },
-  { id: 3, name: "Ley Lines" },
-  { id: 4, name: "Magannatha" },
-  { id: 5, name: "Persephone" },
-  { id: 6, name: "Pylon" },
-  { id: 7, name: "Tokamak" },
-  { id: 8, name: "Torches" },
-  { id: 9, name: "Ultralove" },
-];
-
-// Map Images (using .webp format)
-let mapImages = {
-  1: "img/maps/incorporeal.webp",
-  2: "img/maps/last_fantasy.webp",
-  3: "img/maps/ley_lines.webp",
-  4: "img/maps/magannatha.webp",
-  5: "img/maps/persephone.webp",
-  6: "img/maps/pylon.webp",
-  7: "img/maps/tokamak.webp",
-  8: "img/maps/torches.webp",
-  9: "img/maps/ultralove.webp",
-};
+let mapData = [];
+let mapImages = {};
 
 // Best of Settings
 const BEST_OF_SETTINGS = {
@@ -73,6 +51,10 @@ window.addEventListener("DOMContentLoaded", () => {
   document
     .getElementById("toggleVisibilityButton")
     .addEventListener("click", toggleElementsVisibility);
+
+  document
+    .getElementById("mapFileInput")
+    .addEventListener("change", updateMapPreview);
 });
 
 // Map Rendering
@@ -81,10 +63,25 @@ function renderMapList() {
   mapData.forEach((map) => {
     const li = document.createElement("li");
     li.id = `map${map.id}`;
-    li.innerHTML = `<span id="label${map.id}">${map.name}</span><span class="order-indicator" onclick="cycleOrder(${map.id}, event)"></span>`;
-    li.setAttribute("onclick", `toggleVeto(${map.id})`);
-    li.setAttribute("onmouseover", `showPreview(${map.id})`);
-    li.setAttribute("onmouseout", `keepHoveredMap()`);
+
+    const labelSpan = document.createElement("span");
+    labelSpan.id = `label${map.id}`;
+    labelSpan.textContent = map.name;
+
+    const indicatorSpan = document.createElement("span");
+    indicatorSpan.classList.add("order-indicator");
+
+    li.appendChild(labelSpan);
+    li.appendChild(indicatorSpan);
+
+    // Event listeners instead of inline attributes
+    li.addEventListener("click", () => toggleVeto(map.id));
+    li.addEventListener("mouseover", () => showPreview(map.id));
+    li.addEventListener("mouseout", () => keepHoveredMap());
+    indicatorSpan.addEventListener("click", (event) =>
+      cycleOrder(map.id, event)
+    );
+
     mapList.appendChild(li);
   });
 }
@@ -167,9 +164,14 @@ function cycleOrder(mapNumber, event) {
 let currentIndex = 0;
 
 function updateDisplayedMap() {
-  document.getElementById(
-    "selectedMapText"
-  ).textContent = `Selected Map: ${mapData[currentIndex].name}`;
+  const mapTextEl = document.getElementById("selectedMapText");
+  const currentMap = mapData[currentIndex];
+
+  if (mapTextEl && currentMap) {
+    mapTextEl.textContent = `Selected Map: ${currentMap.name}`;
+  } else if (mapTextEl) {
+    mapTextEl.textContent = "No map selected";
+  }
 }
 
 function updateDisplayedBestOf() {
@@ -194,7 +196,7 @@ function resetAll() {
 
 function resetPreview() {
   const previewImage = document.getElementById("previewImage");
-  previewImage.src = "maps/incorporeal.webp";
+  previewImage.src = mapImages[1];
   previewImage.alt = "Map Preview";
 }
 
@@ -270,7 +272,31 @@ function toggleMapPreviewVisibility() {
   }
 }
 
-window.addEventListener("DOMContentLoaded", () => {
+window.addEventListener("DOMContentLoaded", async () => {
+  // Load current maps from maps.json
+  try {
+    const response = await fetch("/data/maps.json");
+    const allMaps = await response.json();
+    const currentMaps = allMaps.filter((map) => map.folder === "current");
+
+    mapData = currentMaps.map((map, index) => ({
+      id: index + 1,
+      name: map.name,
+      file: map.file,
+    }));
+
+    mapImages = {};
+    mapData.forEach((map) => {
+      mapImages[map.id] = `img/maps/current/${map.file}`;
+    });
+
+    renderMapList();
+    updateDisplayedMap();
+    updateDisplayedBestOf();
+  } catch (err) {
+    console.error("❌ Failed to load maps.json or process maps:", err);
+  }
+
   // Attach hide preview checkbox listener
   const checkbox = document.getElementById("hidePreviewCheckbox");
   if (checkbox) {

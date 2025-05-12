@@ -12,16 +12,21 @@ import {
   limit,
   updateDoc,
   increment,
-} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+} from "firebase/firestore";
 import { formatActionText } from "./textFormatters.js";
-import { showToast } from "./uiHandlers.js";
+import { showToast } from "./toastHandler.js";
 import { formatMatchup } from "./modal.js";
 import { populateBuildsModal } from "./buildManagement.js"; // ✅ Corrected import
 import { auth, db } from "../../app.js"; // ✅ Ensure auth and db are imported correctly
+import DOMPurify from "dompurify";
 
 let allCommunityBuilds = []; // master dataset
 let communityBuilds = []; // filtered or active dataset
 let communitySortMode = "hot"; // default sort mode
+
+let currentBuildIndex = 0;
+const batchSize = 20;
+let isLoadingMoreBuilds = false;
 
 async function fetchCommunityBuilds() {
   const db = getFirestore();
@@ -109,68 +114,32 @@ export async function populateCommunityBuilds(buildList = null) {
 
     const db = getFirestore();
 
-    builds.forEach((build) => {
-      const totalVotes = build.upvotes + build.downvotes;
-      const votePercentage =
-        totalVotes > 0 ? Math.round((build.upvotes / totalVotes) * 100) : 0;
+    currentBuildIndex = 0;
+    renderCommunityBuildBatch(builds);
 
-      let matchupImage = "./img/race/unknown.webp";
-      let matchupClass = "matchup-unknown";
-
-      if (["ZvZ", "ZvT", "ZvP"].includes(build.matchup)) {
-        matchupImage = "./img/race/zerg2.webp";
-        matchupClass = "matchup-zerg";
-      } else if (["PvP", "PvZ", "PvT"].includes(build.matchup)) {
-        matchupImage = "./img/race/protoss2.webp";
-        matchupClass = "matchup-protoss";
-      } else if (["TvP", "TvT", "TvZ"].includes(build.matchup)) {
-        matchupImage = "./img/race/terran2.webp";
-        matchupClass = "matchup-terran";
-      }
-
-      const buildEntry = document.createElement("div");
-      buildEntry.classList.add("build-entry");
-      buildEntry.dataset.id = build.id;
-
-      buildEntry.addEventListener("click", async () => {
-        window.location.href = `viewBuild.html?id=${build.id}`;
-        await incrementBuildViews(db, build.id);
-      });
-
-      buildEntry.addEventListener("mouseover", () => showBuildPreview(build));
-
-      buildEntry.innerHTML = `
-        <div class="build-left ${matchupClass}">
-          <img src="${matchupImage}" alt="${build.matchup}" class="matchup-icon">
-        </div>
-        <div class="build-right">
-          <div class="build-title">${build.title}</div>
-          <div class="build-meta">
-            <span class="meta-chip matchup-chip">${build.matchup}</span>
-            <span class="meta-chip publisher-chip">
-              <img src="./img/SVG/user-svgrepo-com.svg" alt="Publisher" class="meta-icon">
-              ${build.publisher}
-            </span>
-            <span class="meta-chip">
-              <img src="./img/SVG/time.svg" alt="Date" class="meta-icon">
-              ${build.datePublished}
-            </span>
-            <span class="meta-chip view-chip" data-id="${build.id}">
-              <img src="./img/SVG/preview.svg" alt="Views" class="meta-icon">
-              <span class="view-count">${build.views}</span> Views
-            </span>
-            <span class="meta-chip vote-info">
-              <span class="vote-percentage">${votePercentage}%</span>
-              <span class="vote-count">${totalVotes} votes</span>
-            </span>
-          </div>
-        </div>
-      `;
-
-      container.appendChild(buildEntry);
-    });
+    window.removeEventListener("scroll", handleCommunityScroll);
+    const modalContent = document.querySelector(".modal-content-template");
+    if (modalContent) {
+      modalContent.removeEventListener("scroll", handleCommunityScroll);
+      modalContent.addEventListener("scroll", handleCommunityScroll);
+    }
   } catch (error) {
     console.error("❌ Error loading community builds:", error);
+  }
+}
+
+function handleCommunityScroll(e) {
+  const el = e.target;
+  const nearBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 100;
+
+  if (
+    nearBottom &&
+    currentBuildIndex < communityBuilds.length &&
+    !isLoadingMoreBuilds
+  ) {
+    isLoadingMoreBuilds = true;
+    renderCommunityBuildBatch(communityBuilds);
+    isLoadingMoreBuilds = false;
   }
 }
 
@@ -472,12 +441,8 @@ export async function publishBuildToCommunity(buildId) {
 
 window.publishBuildToCommunity = async function (buildId) {
   const { getFirestore, doc, getDoc, collection, addDoc, setDoc } =
-    await import(
-      "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js"
-    );
-  const { getAuth } = await import(
-    "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js"
-  );
+    await import("firebase/firestore");
+  const { getAuth } = await import("firebase/auth");
 
   const db = getFirestore();
   const auth = getAuth();
@@ -553,9 +518,7 @@ window.publishBuildToCommunity = async function (buildId) {
     if (modal) modal.style.display = "none";
 
     // ✅ Show toast
-    import("./uiHandlers.js").then(({ showToast }) => {
-      showToast("✅ Build published to community!", "success");
-    });
+    showToast("✅ Build published to community!", "success");
   } catch (err) {
     console.error("❌ Failed to publish:", err);
     alert("❌ Failed to publish build. Check your connection or permissions.");
@@ -601,6 +564,77 @@ export function filterCommunityBuilds(categoryOrSubcat = "all") {
   });
 
   populateCommunityBuilds(filtered);
+}
+
+function renderCommunityBuildBatch(builds) {
+  const container = document.getElementById("communityBuildsContainer");
+  const nextBatch = builds.slice(
+    currentBuildIndex,
+    currentBuildIndex + batchSize
+  );
+
+  nextBatch.forEach((build) => {
+    const totalVotes = build.upvotes + build.downvotes;
+    const votePercentage =
+      totalVotes > 0 ? Math.round((build.upvotes / totalVotes) * 100) : 0;
+
+    let matchupImage = "./img/race/unknown.webp";
+    let matchupClass = "matchup-unknown";
+
+    if (["ZvZ", "ZvT", "ZvP"].includes(build.matchup)) {
+      matchupImage = "./img/race/zerg2.webp";
+      matchupClass = "matchup-zerg";
+    } else if (["PvP", "PvZ", "PvT"].includes(build.matchup)) {
+      matchupImage = "./img/race/protoss2.webp";
+      matchupClass = "matchup-protoss";
+    } else if (["TvP", "TvT", "TvZ"].includes(build.matchup)) {
+      matchupImage = "./img/race/terran2.webp";
+      matchupClass = "matchup-terran";
+    }
+
+    const buildEntry = document.createElement("div");
+    buildEntry.classList.add("build-entry");
+    buildEntry.dataset.id = build.id;
+
+    buildEntry.addEventListener("click", async () => {
+      window.location.href = `viewBuild.html?id=${build.id}`;
+      await incrementBuildViews(db, build.id);
+    });
+
+    buildEntry.addEventListener("mouseover", () => showBuildPreview(build));
+
+    buildEntry.innerHTML = `
+      <div class="build-left ${matchupClass}">
+        <img src="${matchupImage}" alt="${build.matchup}" class="matchup-icon">
+      </div>
+      <div class="build-right">
+        <div class="build-title">${build.title}</div>
+        <div class="build-meta">
+          <span class="meta-chip matchup-chip">${build.matchup}</span>
+          <span class="meta-chip publisher-chip">
+            <img src="./img/SVG/user-svgrepo-com.svg" alt="Publisher" class="meta-icon">
+            ${build.publisher}
+          </span>
+          <span class="meta-chip">
+            <img src="./img/SVG/time.svg" alt="Date" class="meta-icon">
+            ${build.datePublished}
+          </span>
+          <span class="meta-chip view-chip" data-id="${build.id}">
+            <img src="./img/SVG/preview.svg" alt="Views" class="meta-icon">
+            <span class="view-count">${build.views}</span> Views
+          </span>
+          <span class="meta-chip vote-info">
+            <span class="vote-percentage">${votePercentage}%</span>
+            <span class="vote-count">${totalVotes} votes</span>
+          </span>
+        </div>
+      </div>
+    `;
+
+    container.appendChild(buildEntry);
+  });
+
+  currentBuildIndex += batchSize;
 }
 
 document
