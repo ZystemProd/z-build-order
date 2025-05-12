@@ -12,6 +12,7 @@ import {
   limit,
   updateDoc,
   increment,
+  startAfter,
 } from "firebase/firestore";
 import { formatActionText } from "./textFormatters.js";
 import { showToast } from "./toastHandler.js";
@@ -20,28 +21,63 @@ import { populateBuildsModal } from "./buildManagement.js"; // ✅ Corrected imp
 import { auth, db } from "../../app.js"; // ✅ Ensure auth and db are imported correctly
 import DOMPurify from "dompurify";
 
-let allCommunityBuilds = []; // master dataset
-let communityBuilds = []; // filtered or active dataset
 let communitySortMode = "hot"; // default sort mode
 
-let currentBuildIndex = 0;
-const batchSize = 20;
-let isLoadingMoreBuilds = false;
+const batchSize = 13;
 
-async function fetchCommunityBuilds() {
+let lastVisibleDoc = null;
+let isLoadingMoreBuilds = false;
+let hasMoreBuilds = true;
+
+async function fetchNextCommunityBuilds(batchSize = 20) {
+  if (isLoadingMoreBuilds || !hasMoreBuilds) return [];
+
+  isLoadingMoreBuilds = true;
   const db = getFirestore();
-  const buildsRef = collection(db, "communityBuilds");
-  const snapshot = await getDocs(buildsRef);
+
+  // ✅ Always use a real field for Firestore sort
+  const sortMode = communitySortMode || "hot";
+  const firestoreSortField = "datePublished"; // must exist in every doc
+
+  let q = query(
+    collection(db, "communityBuilds"),
+    orderBy(firestoreSortField, "desc"),
+    limit(batchSize)
+  );
+
+  if (lastVisibleDoc) {
+    q = query(
+      collection(db, "communityBuilds"),
+      orderBy(firestoreSortField, "desc"),
+      startAfter(lastVisibleDoc),
+      limit(batchSize)
+    );
+  }
+
+  const snap = await getDocs(q);
+  const docs = snap.docs;
+
+  if (docs.length < batchSize) hasMoreBuilds = false;
+  lastVisibleDoc = docs[docs.length - 1];
 
   const now = Date.now();
 
-  return snapshot.docs.map((doc) => {
+  const builds = docs.map((doc) => {
     const data = doc.data();
     const upvotes = data.upvotes || 0;
     const downvotes = data.downvotes || 0;
-    const datePublishedRaw = new Date(data.datePublished).getTime() || now;
-    const datePublished =
-      new Date(data.datePublished).toLocaleDateString() || "Unknown";
+
+    let datePublishedRaw = now;
+    let datePublished = "Unknown";
+
+    if (data.datePublished) {
+      const parsed = new Date(data.datePublished);
+      if (!isNaN(parsed.getTime())) {
+        datePublishedRaw = parsed.getTime();
+        datePublished = parsed.toLocaleDateString();
+      }
+    }
+
     const ageInHours = (now - datePublishedRaw) / (1000 * 60 * 60);
     const gravity = 1.5;
 
@@ -65,18 +101,26 @@ async function fetchCommunityBuilds() {
       hotnessScore,
     };
   });
+
+  // ✅ Sort after fetch (client-side sort only)
+  if (sortMode === "top") {
+    builds.sort((a, b) => b.upvotes - b.downvotes - (a.upvotes - a.downvotes));
+  } else if (sortMode === "hot") {
+    builds.sort((a, b) => b.hotnessScore - a.hotnessScore);
+  }
+
+  isLoadingMoreBuilds = false;
+  return builds;
 }
 
-export async function populateCommunityBuilds(buildList = null) {
+export async function populateCommunityBuilds() {
   const container = document.getElementById("communityBuildsContainer");
   container.innerHTML = "";
 
+  lastVisibleDoc = null;
+  hasMoreBuilds = true;
+
   try {
-    const builds = buildList || (await fetchCommunityBuilds());
-
-    if (!buildList) allCommunityBuilds = builds;
-    communityBuilds = builds;
-
     const heading = document.querySelector("#communityModal h3");
     if (heading) {
       let title = "Community Builds";
@@ -97,49 +141,25 @@ export async function populateCommunityBuilds(buildList = null) {
       heading.textContent = title;
     }
 
-    // 🔁 Sort based on selected mode
-    if (communitySortMode === "hot") {
-      builds.sort((a, b) => {
-        const scoreDiff = b.hotnessScore - a.hotnessScore;
-        if (scoreDiff !== 0) return scoreDiff;
-        return b.datePublishedRaw - a.datePublishedRaw; // fallback to newest first
-      });
-    } else if (communitySortMode === "new") {
-      builds.sort((a, b) => b.datePublishedRaw - a.datePublishedRaw);
-    } else if (communitySortMode === "top") {
-      builds.sort(
-        (a, b) => b.upvotes - b.downvotes - (a.upvotes - a.downvotes)
-      );
-    }
+    const firstBatch = await fetchNextCommunityBuilds(batchSize);
+    renderCommunityBuildBatch(firstBatch);
 
-    const db = getFirestore();
-
-    currentBuildIndex = 0;
-    renderCommunityBuildBatch(builds);
-
-    window.removeEventListener("scroll", handleCommunityScroll);
-    const modalContent = document.querySelector(".modal-content-template");
-    if (modalContent) {
-      modalContent.removeEventListener("scroll", handleCommunityScroll);
-      modalContent.addEventListener("scroll", handleCommunityScroll);
+    const scrollContainer = document.getElementById("communityBuildsContainer");
+    if (scrollContainer) {
+      scrollContainer.removeEventListener("scroll", handlePaginatedScroll);
+      scrollContainer.addEventListener("scroll", handlePaginatedScroll);
     }
   } catch (error) {
     console.error("❌ Error loading community builds:", error);
   }
 }
 
-function handleCommunityScroll(e) {
+function handlePaginatedScroll(e) {
   const el = e.target;
   const nearBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 100;
 
-  if (
-    nearBottom &&
-    currentBuildIndex < communityBuilds.length &&
-    !isLoadingMoreBuilds
-  ) {
-    isLoadingMoreBuilds = true;
-    renderCommunityBuildBatch(communityBuilds);
-    isLoadingMoreBuilds = false;
+  if (nearBottom && hasMoreBuilds && !isLoadingMoreBuilds) {
+    fetchNextCommunityBuilds(batchSize).then(renderCommunityBuildBatch);
   }
 }
 
@@ -568,10 +588,7 @@ export function filterCommunityBuilds(categoryOrSubcat = "all") {
 
 function renderCommunityBuildBatch(builds) {
   const container = document.getElementById("communityBuildsContainer");
-  const nextBatch = builds.slice(
-    currentBuildIndex,
-    currentBuildIndex + batchSize
-  );
+  const nextBatch = builds;
 
   nextBatch.forEach((build) => {
     const totalVotes = build.upvotes + build.downvotes;
@@ -633,8 +650,6 @@ function renderCommunityBuildBatch(builds) {
 
     container.appendChild(buildEntry);
   });
-
-  currentBuildIndex += batchSize;
 }
 
 document
@@ -646,7 +661,7 @@ document
 
 function setCommunitySortMode(mode) {
   communitySortMode = mode;
-  populateCommunityBuilds([...allCommunityBuilds]);
+  populateCommunityBuilds(); // re-fetch from Firestore using new sort mode
 }
 
 function capitalize(str) {

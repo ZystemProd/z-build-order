@@ -232,6 +232,8 @@ export async function initializeIndexPage() {
     if (!modal) return;
 
     modal.style.display = "block";
+    populateCommunityBuilds();
+    document.getElementById("communityBuildsContainer").scrollTop = 0;
 
     // 🧹 Clear all active filters
     document

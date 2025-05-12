@@ -10,8 +10,8 @@ check if your build has been changed from you "my build". shoule say
 - ToS for database storage?
 
 
-
-
+----------- User ----------
+Sc2Pulse on username- mmr/ at login reg
 
 ----------- Fun ----------
 - Border Custom - Founder, Admin, achievement  
@@ -24,7 +24,6 @@ check if your build has been changed from you "my build". shoule say
 Load 25builds load more if scrolled after
 
 ----------- Clan ----------
-
 - "Settings" looking bad.
 
 ----------- Build Order ----------
