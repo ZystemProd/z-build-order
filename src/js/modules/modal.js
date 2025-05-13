@@ -711,36 +711,34 @@ export function loadBuild(index) {
   closeBuildsModal();
 }
 
-export async function filterBuilds(
-  categoryOrSubcategory = "all",
-  searchQuery = ""
-) {
-  const builds = await fetchUserBuilds(); // Fetch all builds from Firestore
-  const lowerCaseQuery = searchQuery.toLowerCase();
+export function filterBuilds(categoryOrSubcategory = "all") {
+  const heading = document.querySelector("#buildsModal .template-header h3");
 
-  // Filter builds based on category or subcategory
-  const filteredBuilds = builds.filter((build) => {
-    const matchesCategory =
-      categoryOrSubcategory === "all" ||
-      (["zvz", "zvp", "zvt", "pvp", "pvz", "pvt", "tvt", "tvz", "tvp"].includes(
-        categoryOrSubcategory.toLowerCase()
-      ) &&
-        build.subcategory.toLowerCase() ===
-          categoryOrSubcategory.toLowerCase()) ||
-      (["zerg", "protoss", "terran"].includes(
-        categoryOrSubcategory.toLowerCase()
-      ) &&
-        build.category.toLowerCase() === categoryOrSubcategory.toLowerCase());
+  // 🟡 If "all" → show all builds
+  if (categoryOrSubcategory.toLowerCase() === "all") {
+    if (heading) heading.textContent = "Build Orders";
+    populateBuildsModal();
+    return;
+  }
 
-    const matchesSearch =
-      build.title.toLowerCase().includes(lowerCaseQuery) ||
-      (build.comment && build.comment.toLowerCase().includes(lowerCaseQuery));
+  // 🧠 Normalize for comparison
+  const lowerFilter = categoryOrSubcategory.toLowerCase();
 
-    return matchesCategory && matchesSearch;
+  const filtered = allBuilds.filter((build) => {
+    const subcatMatch =
+      build.subcategory && build.subcategory.toLowerCase() === lowerFilter;
+
+    const catMatch =
+      build.category && build.category.toLowerCase() === lowerFilter;
+
+    return subcatMatch || catMatch;
   });
 
-  // Populate the filtered list
-  populateBuildList(filteredBuilds);
+  // 📝 Update header
+  if (heading)
+    heading.textContent = `Build Orders - ${capitalize(categoryOrSubcategory)}`;
+
+  populateCommunityBuilds(filtered);
 }
 
 export async function searchBuilds(query) {

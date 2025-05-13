@@ -410,6 +410,9 @@ export async function publishBuildToCommunity(buildId) {
     const buildData = buildSnapshot.data();
 
     const communityBuildsRef = collection(db, "communityBuilds");
+    const subcategory = buildData.subcategory || "";
+    const formattedSubcategory = formatMatchup(subcategory);
+    const subcategoryLowercase = subcategory.toLowerCase();
 
     const newBuildData = {
       ...buildData,
@@ -417,6 +420,8 @@ export async function publishBuildToCommunity(buildId) {
       username: username,
       isPublished: true,
       datePublished: new Date().toISOString(),
+      subcategory: formattedSubcategory, // for display ("ZvP")
+      subcategoryLowercase: subcategoryLowercase, // for query ("zvp")
     };
 
     await addDoc(communityBuildsRef, newBuildData);
@@ -428,7 +433,7 @@ export async function publishBuildToCommunity(buildId) {
       { ...buildData, isPublished: true },
       { merge: true }
     );
-    //test
+
     // ✅ Toast
     showToast("✅ Build published to Community!", "success");
 
@@ -545,23 +550,23 @@ window.publishBuildToCommunity = async function (buildId) {
   }
 };
 
-export function searchCommunityBuilds(query) {
-  const lowerQuery = DOMPurify.sanitize(query.toLowerCase());
+export async function searchCommunityBuilds(searchTerm) {
+  const db = getFirestore();
+  const trimmed = searchTerm.trim().toLowerCase();
+  if (!trimmed) return [];
 
-  if (!allCommunityBuilds || allCommunityBuilds.length === 0) {
-    console.error("No community builds available.");
-    return;
-  }
+  const q = query(
+    collection(db, "communityBuilds"),
+    where("titleLowercase", ">=", trimmed),
+    where("titleLowercase", "<=", trimmed + "\uf8ff"),
+    orderBy("titleLowercase"),
+    limit(20)
+  );
 
-  const filtered = allCommunityBuilds.filter((build) => {
-    const titleMatch = build.title?.toLowerCase().includes(lowerQuery);
-    const publisherMatch = build.publisher?.toLowerCase().includes(lowerQuery);
-    return titleMatch || publisherMatch;
-  });
-
-  populateCommunityBuilds(filtered);
+  const snap = await getDocs(q);
+  return snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 }
-
+/*
 export function filterCommunityBuilds(categoryOrSubcat = "all") {
   const lowerFilter = categoryOrSubcat.toLowerCase();
 
@@ -585,7 +590,7 @@ export function filterCommunityBuilds(categoryOrSubcat = "all") {
 
   populateCommunityBuilds(filtered);
 }
-
+*/
 function renderCommunityBuildBatch(builds) {
   const container = document.getElementById("communityBuildsContainer");
   const nextBatch = builds;
@@ -595,16 +600,20 @@ function renderCommunityBuildBatch(builds) {
     const votePercentage =
       totalVotes > 0 ? Math.round((build.upvotes / totalVotes) * 100) : 0;
 
+    // 🧠 Normalize matchup for image + meta display
+    const matchup = build.matchup || build.subcategory || "Unknown";
+    console.log("🧪 Build:", build.title, "| Matchup:", matchup);
+
     let matchupImage = "./img/race/unknown.webp";
     let matchupClass = "matchup-unknown";
 
-    if (["ZvZ", "ZvT", "ZvP"].includes(build.matchup)) {
+    if (["ZvZ", "ZvT", "ZvP"].includes(matchup)) {
       matchupImage = "./img/race/zerg2.webp";
       matchupClass = "matchup-zerg";
-    } else if (["PvP", "PvZ", "PvT"].includes(build.matchup)) {
+    } else if (["PvP", "PvZ", "PvT"].includes(matchup)) {
       matchupImage = "./img/race/protoss2.webp";
       matchupClass = "matchup-protoss";
-    } else if (["TvP", "TvT", "TvZ"].includes(build.matchup)) {
+    } else if (["TvP", "TvT", "TvZ"].includes(matchup)) {
       matchupImage = "./img/race/terran2.webp";
       matchupClass = "matchup-terran";
     }
@@ -622,12 +631,12 @@ function renderCommunityBuildBatch(builds) {
 
     buildEntry.innerHTML = `
       <div class="build-left ${matchupClass}">
-        <img src="${matchupImage}" alt="${build.matchup}" class="matchup-icon">
+        <img src="${matchupImage}" alt="${matchup}" class="matchup-icon">
       </div>
       <div class="build-right">
         <div class="build-title">${build.title}</div>
         <div class="build-meta">
-          <span class="meta-chip matchup-chip">${build.matchup}</span>
+          <span class="meta-chip matchup-chip">${matchup}</span>
           <span class="meta-chip publisher-chip">
             <img src="./img/SVG/user-svgrepo-com.svg" alt="Publisher" class="meta-icon">
             ${build.publisher}
@@ -666,6 +675,77 @@ function setCommunitySortMode(mode) {
 
 function capitalize(str) {
   return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+export async function filterCommunityBuilds(filter = "all") {
+  const db = getFirestore();
+  const container = document.getElementById("communityBuildsContainer");
+  container.innerHTML = "";
+
+  let q = collection(db, "communityBuilds");
+  const lowerFilter = filter.toLowerCase();
+
+  // ✅ Subcategory filter
+  if (
+    ["zvp", "zvt", "zvz", "pvp", "pvt", "pvz", "tvp", "tvt", "tvz"].includes(
+      lowerFilter
+    )
+  ) {
+    q = query(
+      q,
+      where("subcategoryLowercase", "==", lowerFilter),
+      orderBy("datePublished", "desc"),
+      limit(20)
+    );
+  }
+
+  // ✅ Category filter
+  else if (["zerg", "protoss", "terran"].includes(lowerFilter)) {
+    q = query(
+      q,
+      where("category", "==", capitalize(lowerFilter)),
+      orderBy("datePublished", "desc"),
+      limit(20)
+    );
+  }
+
+  // ✅ Default to all if no filter
+  else if (lowerFilter === "all") {
+    q = query(q, orderBy("datePublished", "desc"), limit(20));
+  }
+
+  try {
+    const snap = await getDocs(q);
+
+    const builds = snap.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        matchup: formatMatchup(
+          data.subcategoryLowercase || data.subcategory || ""
+        ),
+      };
+    });
+
+    renderCommunityBuildBatch(builds);
+
+    const heading = document.querySelector("#communityModal h3");
+    let displayLabel = "All";
+    if (
+      ["zvp", "zvt", "zvz", "pvp", "pvt", "pvz", "tvp", "tvt", "tvz"].includes(
+        lowerFilter
+      )
+    ) {
+      displayLabel = formatMatchup(lowerFilter);
+    } else if (["zerg", "protoss", "terran"].includes(lowerFilter)) {
+      displayLabel = capitalize(lowerFilter);
+    }
+
+    heading.textContent = `Community Builds - ${displayLabel}`;
+  } catch (err) {
+    console.error("Error filtering community builds:", err);
+  }
 }
 
 // Call check function on page load

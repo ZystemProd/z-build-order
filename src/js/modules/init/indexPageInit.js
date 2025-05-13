@@ -68,6 +68,8 @@ import { checkForJoinRequestNotifications } from "../utils/notificationHelpers.j
 setupTemplateModal(); // Always call early
 let currentBuildId = null;
 let currentClanView = null;
+let allBuilds = [];
+
 /** ----------------
  *  Initialize index.html
  ----------------- */
@@ -271,7 +273,10 @@ export async function initializeIndexPage() {
   // --- Text Inputs
   safeInput("buildOrderInput", (val) => analyzeBuildOrder(val));
   safeInput("buildSearchBar", (val) => searchBuilds(val));
-  safeInput("communitySearchBar", (val) => searchCommunityBuilds(val));
+  safeInput("communitySearchBar", async (val) => {
+    await searchCommunityBuilds(val);
+  });
+
   safeInput("templateSearchBar", (val) => searchTemplates(val));
   safeInput("videoInput", (val) => updateYouTubeEmbed(val));
   safeAdd("buildOrderTitleText", "click", () => toggleTitleInput(true));
@@ -382,6 +387,7 @@ export async function initializeIndexPage() {
   if (index !== -1) populateBuildDetails(index);
 
   // attachCategoryClicks();
+  attachMyBuildsCategoryClicks();
   attachSubcategoryClicks();
   attachCommunityCategoryClicks();
 
@@ -552,6 +558,44 @@ export async function initializeIndexPage() {
       }
     }
   }
+
+  function attachMyBuildsCategoryClicks() {
+    const heading = document.querySelector("#buildsModal .template-header h3");
+    const categoryButtons = document.querySelectorAll(
+      "#buildsModal .filter-category"
+    );
+    const subcategoryButtons = document.querySelectorAll(
+      "#buildsModal .subcategory"
+    );
+
+    categoryButtons.forEach((el) => {
+      el.addEventListener("click", () => {
+        const category = el.getAttribute("data-category");
+        if (!category) return;
+
+        // UI state
+        categoryButtons.forEach((btn) => btn.classList.remove("active"));
+        subcategoryButtons.forEach((btn) => btn.classList.remove("active"));
+        el.classList.add("active");
+
+        // Clear search
+        const search = document.getElementById("buildSearchBar");
+        if (search) search.value = "";
+
+        // Filter builds (modal.js)
+        filterBuilds(category);
+
+        // Heading
+        if (heading) {
+          heading.textContent =
+            category.toLowerCase() === "all"
+              ? "Build Orders"
+              : `Build Orders - ${capitalize(category)}`;
+        }
+      });
+    });
+  }
+
   function attachSubcategoryClicks() {
     const heading = document.querySelector("#buildsModal .template-header h3");
     const allCategories = document.querySelectorAll(
@@ -621,18 +665,22 @@ export async function initializeIndexPage() {
     );
 
     categoryButtons.forEach((el) => {
-      el.addEventListener("click", () => {
+      el.addEventListener("click", async () => {
         const category = el.getAttribute("data-category");
         if (!category) return;
 
+        // 🔄 UI active states
         categoryButtons.forEach((btn) => btn.classList.remove("active"));
         subcategoryButtons.forEach((btn) => btn.classList.remove("active"));
-
         el.classList.add("active");
 
-        filterCommunityBuilds(category);
-        localStorage.setItem("communityFilter", category);
+        // 🔄 Clear search input
+        document.getElementById("communitySearchBar").value = "";
 
+        // 🔎 Firestore-based filter
+        await filterCommunityBuilds(category);
+
+        // 📝 Update heading
         const heading = document.querySelector("#communityModal h3");
         heading.textContent =
           category.toLowerCase() === "all"
@@ -642,22 +690,25 @@ export async function initializeIndexPage() {
     });
 
     subcategoryButtons.forEach((el) => {
-      el.addEventListener("click", (e) => {
+      el.addEventListener("click", async (e) => {
         e.stopPropagation();
         const subcat = el.getAttribute("data-subcategory");
         if (!subcat) return;
 
+        // 🔄 UI active states
         subcategoryButtons.forEach((btn) => btn.classList.remove("active"));
         categoryButtons.forEach((btn) => btn.classList.remove("active"));
-
         el.classList.add("active");
-
         const parent = el.closest(".filter-category");
         if (parent) parent.classList.add("active");
 
-        filterCommunityBuilds(subcat);
-        localStorage.setItem("communityFilter", subcat);
+        // 🔄 Clear search input
+        document.getElementById("communitySearchBar").value = "";
 
+        // 🔎 Firestore-based filter
+        await filterCommunityBuilds(subcat);
+
+        // 📝 Update heading
         const heading = document.querySelector("#communityModal h3");
         heading.textContent = `Community Builds - ${capitalize(subcat)}`;
       });
