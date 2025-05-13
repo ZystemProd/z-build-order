@@ -8,26 +8,27 @@ import {
   query,
   where,
   getDocs,
+  orderBy,
+  limit,
+  startAfter,
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
-
-//import * as DOMPurify from "./dompurify/dist/purify.min.js";
 import { auth } from "../../app.js";
 import { showToast } from "./toastHandler.js";
 import { updateYouTubeEmbed, clearYouTubeEmbed } from "./youtube.js";
-import {
-  getSavedBuilds,
-  saveBuilds,
-  deleteBuildFromStorage,
-} from "./buildStorage.js";
-import { fetchUserBuilds } from "./buildManagement.js";
 import { mapAnnotations } from "./interactive_map.js";
 import { formatActionText } from "./textFormatters.js";
+import { capitalize } from "./helpers/sharedEventUtils.js";
 import { analyzeBuildOrder } from "./uiHandlers.js";
 import { publishBuildToCommunity } from "./community.js";
 import { setCurrentBuildId } from "./states/buildState.js";
 import DOMPurify from "dompurify";
+
+// --- Firestore Pagination State
+let lastVisibleBuild = null;
+let isLoadingMoreBuilds = false;
+let currentBuildFilter = "all";
 
 export function formatMatchup(matchup) {
   if (!matchup) return "Unknown Match-Up";
@@ -36,6 +37,109 @@ export function formatMatchup(matchup) {
     matchup.slice(1, -1).toLowerCase() +
     matchup.charAt(matchup.length - 1).toUpperCase()
   );
+}
+
+export async function filterBuilds(categoryOrSubcategory = "all") {
+  const heading = document.querySelector("#buildsModal .template-header h3");
+  const db = getFirestore();
+  const user = getAuth().currentUser;
+  if (!user) return;
+
+  currentBuildFilter = categoryOrSubcategory.toLowerCase();
+  lastVisibleBuild = null;
+  document.getElementById("buildList").innerHTML = "";
+
+  const builds = await fetchFilteredBuilds();
+
+  const label =
+    currentBuildFilter === "all"
+      ? "Build Orders"
+      : `Build Orders - ${
+          [
+            "zvp",
+            "zvt",
+            "zvz",
+            "pvp",
+            "pvt",
+            "pvz",
+            "tvp",
+            "tvt",
+            "tvz",
+          ].includes(currentBuildFilter)
+            ? formatMatchup(currentBuildFilter)
+            : capitalize(currentBuildFilter)
+        }`;
+
+  if (heading) heading.textContent = label;
+
+  populateBuildList(builds);
+  attachBuildScrollListener();
+}
+
+async function fetchFilteredBuilds(batchSize = 20) {
+  const db = getFirestore();
+  const user = getAuth().currentUser;
+  if (!user) return [];
+
+  let q = collection(db, `users/${user.uid}/builds`);
+  const lowerFilter = currentBuildFilter;
+
+  if (lowerFilter === "all") {
+    q = query(q, orderBy("timestamp", "desc"), limit(batchSize));
+  } else if (
+    ["zvp", "zvt", "zvz", "pvp", "pvt", "pvz", "tvp", "tvt", "tvz"].includes(
+      lowerFilter
+    )
+  ) {
+    q = query(
+      q,
+      where("subcategoryLowercase", "==", lowerFilter),
+      orderBy("timestamp", "desc"),
+      limit(batchSize)
+    );
+  } else if (["zerg", "protoss", "terran"].includes(lowerFilter)) {
+    q = query(
+      q,
+      where("category", "==", capitalize(lowerFilter)),
+      orderBy("timestamp", "desc"),
+      limit(batchSize)
+    );
+  }
+
+  if (lastVisibleBuild) {
+    q = query(q, startAfter(lastVisibleBuild));
+  }
+
+  const snap = await getDocs(q);
+  if (!snap.empty) {
+    lastVisibleBuild = snap.docs[snap.docs.length - 1];
+  }
+
+  return snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+}
+
+function attachBuildScrollListener() {
+  const container = document.querySelector("#buildsModal .modal-content");
+  if (!container) return;
+
+  container.removeEventListener("scroll", handleBuildScroll);
+  container.addEventListener("scroll", handleBuildScroll);
+}
+
+async function handleBuildScroll() {
+  const container = document.querySelector("#buildsModal .modal-content");
+  if (
+    isLoadingMoreBuilds ||
+    !container ||
+    container.scrollTop + container.clientHeight < container.scrollHeight - 200
+  ) {
+    return;
+  }
+
+  isLoadingMoreBuilds = true;
+  const builds = await fetchFilteredBuilds();
+  populateBuildList(builds, true);
+  isLoadingMoreBuilds = false;
 }
 
 async function uploadReplayFile(file) {
@@ -400,7 +504,7 @@ export async function populateBuildList(filteredBuilds = null) {
 
   buildList.innerHTML = "";
 
-  const builds = filteredBuilds || (await fetchUserBuilds());
+  const builds = filteredBuilds || [];
 
   if (!builds.length) {
     buildList.innerHTML = "<p>No builds available.</p>";
@@ -709,36 +813,6 @@ export function loadBuild(index) {
 
   // Close the modal
   closeBuildsModal();
-}
-
-export function filterBuilds(categoryOrSubcategory = "all") {
-  const heading = document.querySelector("#buildsModal .template-header h3");
-
-  // 🟡 If "all" → show all builds
-  if (categoryOrSubcategory.toLowerCase() === "all") {
-    if (heading) heading.textContent = "Build Orders";
-    populateBuildsModal();
-    return;
-  }
-
-  // 🧠 Normalize for comparison
-  const lowerFilter = categoryOrSubcategory.toLowerCase();
-
-  const filtered = allBuilds.filter((build) => {
-    const subcatMatch =
-      build.subcategory && build.subcategory.toLowerCase() === lowerFilter;
-
-    const catMatch =
-      build.category && build.category.toLowerCase() === lowerFilter;
-
-    return subcatMatch || catMatch;
-  });
-
-  // 📝 Update header
-  if (heading)
-    heading.textContent = `Build Orders - ${capitalize(categoryOrSubcategory)}`;
-
-  populateCommunityBuilds(filtered);
 }
 
 export async function searchBuilds(query) {

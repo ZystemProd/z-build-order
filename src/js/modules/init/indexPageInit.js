@@ -228,7 +228,18 @@ export async function initializeIndexPage() {
 
   // monitorBuildChanges();
 
-  safeAdd("showBuildsButton", "click", window.showBuildsModal);
+  safeAdd("showBuildsButton", "click", async () => {
+    const modal = document.getElementById("buildsModal");
+    if (!modal) return;
+
+    modal.style.display = "block";
+
+    // ✅ Use Firestore filtering
+    await filterBuilds("all");
+
+    // Reset scroll position
+    document.querySelector("#buildsModal .modal-content")?.scrollTo(0, 0);
+  });
   safeAdd("showCommunityModalButton", "click", async () => {
     const modal = document.getElementById("communityModal");
     if (!modal) return;

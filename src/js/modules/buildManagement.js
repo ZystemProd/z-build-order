@@ -182,6 +182,7 @@ export async function saveCurrentBuild() {
       ? "Terran"
       : "Unknown",
     subcategory: formattedMatchup,
+    subcategoryLowercase: formattedMatchup.toLowerCase(),
     timestamp: Date.now(),
     comment: DOMPurify.sanitize(commentInput?.value.trim() || ""),
     videoLink: DOMPurify.sanitize(videoInput?.value.trim() || ""),
