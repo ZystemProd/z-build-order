@@ -1,0 +1,154 @@
+#box {
+    position: absolute;
+    top: 163px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 999;
+    pointer-events: none;
+  }
+  
+  
+  .cat * {
+    text-align: center;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .cat, .ears, .eyes, .muzzle, .body, .paw, .tail, .tail-segment {
+    position: relative;
+  }
+  .head, .body, .paw, .tail-segment {
+    background-color: #000000;
+  }
+  .left { float: left; }
+  .right { float: right; }
+  
+  .cat {
+    margin-top: 50px;
+    animation: purr 5s infinite cubic-bezier(0,.75,1,.25);
+    transform: scale(0.5);
+    transform-origin: top right;
+  }
+  
+  .head {
+    width: 100px;
+    height: 90px;
+    border-radius: 50%;
+    z-index: 100;
+    animation: head-bob 5s infinite ease-in-out;
+  }
+  .ears {
+    top: -20px;
+    z-index: -100;
+  }
+  .ear {
+    width: 0;
+    height: 0;
+    border-left: 25px solid transparent;
+    border-right: 25px solid transparent;
+    border-bottom: 50px solid #000000;
+  }
+  .ear.left {
+    transform: rotate(-20deg) translateX(-10px);
+  }
+  .ear.right {
+    transform: rotate(20deg) translateX(10px);
+  }
+  .eyes {
+    top: -18px;
+    width: 60%;
+  }
+  .eye {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background-color: #FFD700;
+    animation: eye-blink 5s infinite;
+  }
+  .muzzle {
+    top: 50px;
+  }
+  .nose {
+    width: 0;
+    height: 0;
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-top: 10px solid #666666;
+  }
+  .body {
+    width: 200px;
+    height: 120px;
+    border-top-left-radius: 200px;
+    border-top-right-radius: 200px;
+    top: -75px;
+    left: 90px;
+    z-index: -10;
+  }
+  .paw {
+    height: 30px;
+    width: 50px;
+    border-radius: 25px;
+    left: -100px;
+    top: 90px;
+  }
+  .tail {
+    left: 180px;
+    top: -100px;
+    transform: rotate(90deg);
+  }
+  .tail-segment {
+    height: 20px;
+    width: 30px;
+    border-radius: 25px;
+    top: 0px;
+    left: 10px;
+    animation: tail-swish 5s infinite cubic-bezier(.8,0,.2,1);
+  }
+  
+  /* Animations */
+  @keyframes tail-swish {
+    0% {transform: rotate(12deg);}
+    10% {transform: rotate(12deg);}
+    40% {transform: rotate(-5deg);}
+    50% {transform: rotate(5deg);}
+    60% {transform: rotate(-5deg);}
+    100% {transform: rotate(12deg);}
+  }
+  @keyframes head-bob {
+    0%, 10% {transform: translateX(-15px) translateY(45px);}
+    30%, 75% {transform: translateX(0) translateY(0);}
+    90%, 100% {transform: translateX(-15px) translateY(45px);}
+  }
+  @keyframes eye-blink {
+    0%, 10%, 95%, 100% {transform: scaleY(0);}
+    15%, 48%, 52%, 90% {transform: scaleY(1);}
+    50% {transform: scaleY(0);}
+  }
+  @keyframes purr {
+    0%, 2%, 4%, 6%, 8%, 10%, 12%, 14%, 16%, 18%, 20%,
+    95%, 97%, 99% {left: -1px;}
+    1%, 3%, 5%, 7%, 9%, 11%, 13%, 15%, 17%, 19%, 21%,
+    94%, 96%, 98%, 100% {left: 0px;}
+  }
+  
+  /* Tip bubble */
+  .cat-tip-bubble {
+    position: absolute;
+    right: 120px;
+    top: 20px;
+    background: rgba(30, 30, 30, 0.95);
+    color: white;
+    padding: 10px;
+    border-radius: 10px;
+    width: 200px;
+    font-size: 13px;
+    border: 1px solid #555;
+    box-shadow: 0 0 10px rgba(0,0,0,0.5);
+    pointer-events: auto;
+  }
+  
+  @media (max-width: 600px) {
+    #box {
+      display: none;
+    }
+  }
+  

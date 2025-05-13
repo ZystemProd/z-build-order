@@ -21,6 +21,7 @@ import {
   initializeTextareaClickHandler,
   showBuildOrderHelpModal,
   createNotificationDot,
+  initializeCatTips
 } from "../uiHandlers.js";
 import {
   showTemplatesModal,
@@ -391,6 +392,7 @@ export async function initializeIndexPage() {
   initializeTextareaClickHandler();
   initializeAutoCorrect();
   initializeTooltips();
+  initializeCatTips();
   checkPublishButtonVisibility();
   const savedBuilds = getSavedBuilds();
   const buildId = sessionStorage.getItem("lastViewedBuild");
@@ -769,4 +771,6 @@ export async function initializeIndexPage() {
       }
     });
   }
+
+  
 }

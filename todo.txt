@@ -32,8 +32,7 @@ Load 25builds load more if scrolled after
 check https://api.sc2replaystats.com/docs/index.html
 
 - add sc2reader from ggtracker. needs to use a server to run python (Render) backend
-- auto complete when press enter should not next row.
-- "cc)" does not work
+
 
 ----------- View Build ----------
  - disable the comment and video
