@@ -577,7 +577,7 @@ button:hover {
 .toggle-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: self-end;
   flex-wrap: wrap;
   margin-bottom: 5px;
   gap: 10px;

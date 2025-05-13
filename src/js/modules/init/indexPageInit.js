@@ -21,7 +21,6 @@ import {
   initializeTextareaClickHandler,
   showBuildOrderHelpModal,
   createNotificationDot,
-  initializeCatTips
 } from "../uiHandlers.js";
 import {
   showTemplatesModal,
@@ -50,6 +49,7 @@ import {
   mapAnnotations,
 } from "../interactive_map.js";
 import { getSavedBuilds } from "../buildStorage.js";
+import { setupCatActivationOnInput } from "../helpers/companion.js";
 // import {
 //   attachCategoryClicks,
 //   attachSubcategoryClicks,
@@ -392,7 +392,7 @@ export async function initializeIndexPage() {
   initializeTextareaClickHandler();
   initializeAutoCorrect();
   initializeTooltips();
-  initializeCatTips();
+  setupCatActivationOnInput();
   checkPublishButtonVisibility();
   const savedBuilds = getSavedBuilds();
   const buildId = sessionStorage.getItem("lastViewedBuild");
@@ -771,6 +771,4 @@ export async function initializeIndexPage() {
       }
     });
   }
-
-  
 }

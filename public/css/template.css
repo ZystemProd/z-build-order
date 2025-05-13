@@ -23,7 +23,6 @@
 .template-controls {
   display: flex;
   gap: 10px;
-  margin: 10px 0;
 }
 
 .template-controls .btn {

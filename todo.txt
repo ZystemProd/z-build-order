@@ -21,7 +21,7 @@ Sc2Pulse on username- mmr/ at login reg
 - App Check - recasha
 
 ----------- comunnity ----------
-Load 25builds load more if scrolled after
+
 
 ----------- Clan ----------
 - "Settings" looking bad.

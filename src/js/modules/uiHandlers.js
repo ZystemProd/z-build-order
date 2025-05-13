@@ -459,22 +459,3 @@ export function createNotificationDot() {
   dot.className = "notification-dot";
   return dot;
 }
-
-export function initializeCatTips() {
-  const tips = [
-    "Tip: Press Enter inside [brackets] to start a new row!",
-    "Use @100% to mark completed actions ✅",
-    "Zerg units like zergling will turn purple!",
-    "Use [4:00] to timestamp your build"
-  ];
-
-  const bubble = document.getElementById("catTipBubble");
-  let index = 0;
-
-  if (!bubble) return;
-
-  setInterval(() => {
-    bubble.textContent = tips[index];
-    index = (index + 1) % tips.length;
-  }, 7000);
-}
