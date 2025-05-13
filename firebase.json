@@ -1,17 +1,22 @@
 {
   "hosting": {
-    "public": "public",
+    "public": "dist",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"]
   },
   "emulators": {
-    "hosting": {
-      "port": 5000
+    "auth": {
+      "port": 9099
+    },
+    "firestore": {
+      "port": 8181
     },
     "ui": {
       "enabled": true,
       "port": 4000
     },
-    "singleProjectMode": true
+    "hosting": {
+      "port": 5000
+    }
   },
-  "projectId": "z-build-order"
+  "singleProjectMode": true
 }

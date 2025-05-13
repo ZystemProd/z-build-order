@@ -1,3 +1,39 @@
 Fix inline style in index.html
 
-Need to loads build after everything is loaded before showing. Build modal, maybe template. 
+check if your build has been changed from you "my build". shoule say
+"Saved" if not -> Save Build.
+- Check if the build is published
+
+- fix so that no supply get saved in "my Builds" Fixed?
+
+- Be able to edit publieshed builds from your "myBuilds"
+- ToS for database storage?
+
+
+----------- User ----------
+Sc2Pulse on username- mmr/ at login reg
+
+----------- Fun ----------
+- Border Custom - Founder, Admin, achievement  
+- Animated cat
+
+----------- Security ----------
+- App Check - recasha
+
+----------- comunnity ----------
+
+
+----------- Clan ----------
+- "Settings" looking bad.
+
+----------- Build Order ----------
+
+- upload replay through https://drop.sc/upload
+check https://api.sc2replaystats.com/docs/index.html
+
+- add sc2reader from ggtracker. needs to use a server to run python (Render) backend
+
+
+----------- View Build ----------
+ - disable the comment and video
+Maybe remove them if it doess not contain anything

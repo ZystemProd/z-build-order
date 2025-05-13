@@ -1,5 +1,7 @@
 {
   "projects": {
     "default": "z-build-order"
-  }
+  },
+  "targets": {},
+  "etags": {}
 }
