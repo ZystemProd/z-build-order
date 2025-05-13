@@ -134,18 +134,32 @@ export function initializeAutoCorrect() {
     const textBeforeCaret = text.substring(0, cursorPosition);
     const textAfterCaret = text.substring(cursorPosition);
 
-    // 1️⃣ Check if cursor is inside brackets like `[13|]`, `[4:00|]`, `[100 gas|]`, or `[100 minerals|]`
-    const insideBracketsMatch = textBeforeCaret.match(
-      /\[([\d/:]*\s*(gas|minerals)?)$/
-    );
+    // ✅ Fix: Move cursor outside bracket if inside [anything|]
+    const bracketStart = textBeforeCaret.lastIndexOf("[");
+    const bracketEnd = textBeforeCaret.length + textAfterCaret.indexOf("]");
 
-    if (insideBracketsMatch) {
-      // ✅ Move cursor **right after `]`**
+    if (
+      bracketStart !== -1 &&
+      bracketEnd !== -1 &&
+      cursorPosition > bracketStart &&
+      cursorPosition <= bracketEnd
+    ) {
       event.preventDefault();
-      inputField.value = textBeforeCaret + textAfterCaret + " "; // Add space after `]`
-      inputField.selectionStart = inputField.selectionEnd = cursorPosition + 2; // Move cursor after `]`
+    
+      // If there's no space after ], insert one
+      if (inputField.value[bracketEnd + 1] !== " ") {
+        inputField.value =
+          inputField.value.slice(0, bracketEnd + 1) +
+          " " +
+          inputField.value.slice(bracketEnd + 1);
+      }
+    
+      inputField.selectionStart = inputField.selectionEnd = bracketEnd + 2; // after bracket + space
       return;
     }
+    
+
+
 
     // 2️⃣ Check if cursor is **right after** brackets like `[13]|`, `[4:00]|`, `[100 gas]|`, or `[100 minerals]|`
     const afterBracketsMatch = textBeforeCaret.match(
@@ -185,66 +199,79 @@ export function initializeAutoCorrect() {
   inputField.addEventListener("input", () => {
     const text = inputField.value;
     const cursorPosition = inputField.selectionStart;
+  
+    // 🚫 Disable autocomplete if inside brackets like [|]
+    const bracketStart = text.lastIndexOf("[", cursorPosition);
+    const bracketEnd = text.indexOf("]", cursorPosition);
+    if (
+      bracketStart !== -1 &&
+      bracketEnd !== -1 &&
+      bracketStart < cursorPosition &&
+      cursorPosition <= bracketEnd
+    ) {
+      popup.style.visibility = "hidden";
+      return;
+    }
+  
     const wordBoundaryRegex = /\b(\w+)$/; // Match the last word before the cursor
-
+  
     // Get the current word being typed
     const match = text.substring(0, cursorPosition).match(wordBoundaryRegex);
     if (!match) {
       popup.style.visibility = "hidden";
       return;
     }
-
+  
     const currentWord = match[1].toLowerCase();
-    const matches = suggestions.filter(
-      (item) => item.name.toLowerCase().includes(currentWord) // Check if the suggestion contains the word
+    const matches = suggestions.filter((item) =>
+      item.name.toLowerCase().includes(currentWord)
     );
-
+  
     if (matches.length === 0) {
       popup.style.visibility = "hidden";
       return;
     }
-
+  
     // Populate popup with matches
     popup.innerHTML = "";
     matches.forEach((match, index) => {
       const suggestion = document.createElement("div");
       suggestion.classList.add("suggestion");
-
-      if (index === 0) suggestion.classList.add("active"); // Mark first suggestion as active
-
+  
+      if (index === 0) suggestion.classList.add("active");
+  
       const img = document.createElement("img");
       img.src = `img/${DOMPurify.sanitize(match.type)}/${DOMPurify.sanitize(
         match.name.toLowerCase().replace(/ /g, "_")
       )}.webp`;
       img.alt = DOMPurify.sanitize(match.name);
-
-      const text = document.createElement("span");
-      text.textContent = DOMPurify.sanitize(match.name);
-
+  
+      const textEl = document.createElement("span");
+      textEl.textContent = DOMPurify.sanitize(match.name);
+  
       suggestion.appendChild(img);
-      suggestion.appendChild(text);
-
+      suggestion.appendChild(textEl);
+  
       suggestion.addEventListener("click", () => {
         const start = inputField.value
           .substring(0, cursorPosition)
           .replace(wordBoundaryRegex, match.name);
         const end = inputField.value.substring(cursorPosition);
         inputField.value = start + end;
-
+  
         popup.style.visibility = "hidden";
-        inputField.focus(); // Refocus the input field
-
-        // Call analyzeBuildOrder to update the buildOrderTable
+        inputField.focus();
         analyzeBuildOrder(inputField.value);
       });
-
+  
       popup.appendChild(suggestion);
     });
-
-    activeIndex = 0; // Reset active index
+  
+    activeIndex = 0;
     positionPopupAtCaret(inputField, popup);
     popup.style.visibility = "visible";
   });
+  
 
   inputField.addEventListener("keydown", (event) => {
     const allSuggestions = popup.querySelectorAll(".suggestion");
