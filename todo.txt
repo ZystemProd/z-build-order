@@ -37,3 +37,6 @@ check https://api.sc2replaystats.com/docs/index.html
 ----------- View Build ----------
  - disable the comment and video
 Maybe remove them if it doess not contain anything
+
+----------- veto ----------
+- Animation for the choosen maps

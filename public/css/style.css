@@ -130,6 +130,7 @@ body {
   z-index: 1000;
   justify-content: end;
   backdrop-filter: blur(10px);
+  border: 2px solid transparent;
 }
 
 #userInfo {
@@ -339,15 +340,18 @@ body {
 @keyframes highlight {
   0% {
     border-color: red;
-    box-shadow: 0 0 5px red;
+    box-shadow: 0 0 10px red;
+    transform: scale(1);
   }
   50% {
     border-color: orange;
-    box-shadow: 0 0 10px orange;
+    box-shadow: 0 0 20px orange;
+    transform: scale(1.02);
   }
   100% {
     border-color: red;
-    box-shadow: 0 0 5px red;
+    box-shadow: 0 0 10px red;
+    transform: scale(1);
   }
 }
 

@@ -230,51 +230,68 @@ export async function initializeIndexPage() {
     newBuildButton.style.display = "none";
   });
 
+  auth.onAuthStateChanged(async (user) => {
+    const buildsBtn = document.getElementById("showBuildsButton");
+    const communityBtn = document.getElementById("showCommunityModalButton");
+  
+    // ✅ Always enable buttons
+    if (buildsBtn) buildsBtn.disabled = false;
+    if (communityBtn) communityBtn.disabled = false;
+  
+    // ✅ If logged in, do user setup
+    if (user) {
+      await checkForJoinRequestNotifications();
+      initializeUserData(user);
+    }
+  });
+
   // monitorBuildChanges();
 
-  safeAdd("showBuildsButton", "click", async () => {
-    const modal = document.getElementById("buildsModal");
-    if (!modal) return;
-
-    modal.style.display = "block";
-
-    // ✅ Use Firestore filtering
-    await filterBuilds("all");
-
-    // Reset scroll position
-    document.querySelector("#buildsModal .modal-content")?.scrollTo(0, 0);
+  safeAdd("showBuildsButton", "click", () => {
+    if (!auth.currentUser) {
+      const authBox = document.getElementById("auth-container");
+      authBox.classList.add("highlight");
+      authBox.scrollIntoView({ behavior: "smooth", block: "center" });
+      setTimeout(() => authBox.classList.remove("highlight"), 1500);
+      return;
+    }
+    showBuildsModal(); // ✅ when logged in
   });
+  
   safeAdd("showCommunityModalButton", "click", async () => {
+    if (!auth.currentUser) {
+      const authBox = document.getElementById("auth-container");
+      authBox.classList.add("highlight");
+      authBox.scrollIntoView({ behavior: "smooth", block: "center" });
+      setTimeout(() => authBox.classList.remove("highlight"), 1500);
+      return;
+    }
+  
     const modal = document.getElementById("communityModal");
     if (!modal) return;
-
     modal.style.display = "block";
-    populateCommunityBuilds();
     document.getElementById("communityBuildsContainer").scrollTop = 0;
-
-    // 🧹 Clear all active filters
+  
     document
       .querySelectorAll("#communityModal .filter-category, .subcategory")
       .forEach((btn) => btn.classList.remove("active"));
-
-    // ✅ Set only 'All' active
+  
     const allBtn = document.querySelector(
       '#communityModal .filter-category[data-category="all"]'
     );
     if (allBtn) allBtn.classList.add("active");
-
-    // ✅ Clear search input
+  
     const input = document.getElementById("communitySearchBar");
     if (input) input.value = "";
-
-    // ✅ Load builds and attach filter click handlers
+  
     await populateCommunityBuilds();
     attachCommunityCategoryClicks();
-
-    // ✅ Reset heading
+  
     const heading = document.querySelector("#communityModal h3");
     if (heading) heading.textContent = "Community Builds";
   });
+  
+  
 
   safeAdd("closeCommunityModal", "click", () => {
     const modal = document.getElementById("communityModal");
@@ -464,30 +481,8 @@ export async function initializeIndexPage() {
     await populateBuildsModal();
   });
 
-  // --- Enable build buttons after auth ready
-  auth.onAuthStateChanged(async (user) => {
-    if (user) {
-      const buildsBtn = document.getElementById("showBuildsButton");
-      const communityBtn = document.getElementById("showCommunityModalButton");
 
-      if (buildsBtn) buildsBtn.disabled = false;
-      if (communityBtn) communityBtn.disabled = false;
-
-      // ✅ Trigger notification check after login
-      await checkForJoinRequestNotifications();
-
-      // Only call this after Firebase confirms the user is logged in
-      // You can add additional logic here to load user-specific content, like "My Builds"
-      initializeUserData(user);
-    } else {
-      // If the user is not logged in, disable the buttons
-      const buildsBtn = document.getElementById("showBuildsButton");
-      const communityBtn = document.getElementById("showCommunityModalButton");
-
-      if (buildsBtn) buildsBtn.disabled = true;
-      if (communityBtn) communityBtn.disabled = true;
-    }
-  });
+  
 
   // This will load the necessary user data after successful authentication
   async function initializeUserData(user) {

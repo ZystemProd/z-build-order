@@ -183,8 +183,16 @@ export async function viewBuild(buildId) {
 
   if (!user) {
     console.error("User not logged in.");
+    const authContainer = document.getElementById("auth-container");
+    if (authContainer) {
+      authContainer.classList.add("highlight");
+      setTimeout(() => {
+        authContainer.classList.remove("highlight");
+      }, 5000);
+    }
     return;
   }
+  
 
   try {
     const buildRef = doc(db, `users/${user.uid}/builds/${buildId}`);
@@ -460,6 +468,7 @@ export async function showBuildsModal() {
   const buildModal = document.getElementById("buildsModal");
   const showBuildsButton = document.getElementById("showBuildsButton");
   const buildList = document.getElementById("buildList");
+  const heading = buildModal.querySelector("h3");
 
   if (!buildModal) {
     console.error("Build modal not found!");
@@ -478,29 +487,33 @@ export async function showBuildsModal() {
       "<div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>";
     buildList.appendChild(loader);
   }
-  // Show the loader
   loader.style.display = "block";
 
-  // Optionally, clear any existing build cards but keep the loader
+  // Clear existing build cards (but keep the loader)
   Array.from(buildList.children).forEach((child) => {
     if (!child.classList.contains("lds-roller")) {
       buildList.removeChild(child);
     }
   });
 
-  // Populate the build list and wait for it to finish
-  await populateBuildList();
+  // ✅ Visually activate the "All" filter tab
+  const allTab = document.querySelector(
+    '#buildsModal .filter-category[data-category="all"]'
+  );
+  const allTabs = document.querySelectorAll('#buildsModal .filter-category');
+  allTabs.forEach((tab) => tab.classList.remove("active"));
+  if (allTab) allTab.classList.add("active");
 
-  // Hide the loader once the build list is populated
+  // ✅ Update heading
+  if (heading) heading.textContent = "Build Orders - All";
+
+  // ✅ Run new Firestore-indexed fetch
+  await filterBuilds("all");
+
   loader.style.display = "none";
-
-  // Open the modal once the build list is fully loaded
   buildModal.style.display = "block";
-
-  // Re-enable the button
   showBuildsButton.disabled = false;
 
-  // Set up closing behavior for the modal
   document.getElementById("closeBuildsModal").onclick = closeModal;
 
   window.onclick = (event) => {
@@ -509,6 +522,7 @@ export async function showBuildsModal() {
     }
   };
 }
+
 
 // Attach to the global window object
 window.showBuildsModal = showBuildsModal;
