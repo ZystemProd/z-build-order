@@ -10,12 +10,14 @@ import {
 } from "firebase/firestore";
 
 import { getAuth } from "firebase/auth";
+import { db, auth } from "../../app.js";
 import { getSavedBuilds, setSavedBuilds } from "./buildStorage.js";
 import { showToast } from "./toastHandler.js";
 import { filterBuilds } from "./modal.js";
 import { parseBuildOrder } from "./utils.js";
 import { mapAnnotations } from "./interactive_map.js";
 import { checkPublishButtonVisibility } from "./community.js";
+import { saveBuildToClan } from "./clan.js";
 import DOMPurify from "dompurify";
 
 export async function fetchUserBuilds() {
@@ -392,4 +394,30 @@ export async function populateBuildsModal() {
   });
 
   console.log("✅ User's builds updated in modal.");
+}
+
+/**
+ * Load builds shared to the user's clan
+ */
+export async function loadClanBuilds() {
+  const user = auth.currentUser;
+  if (!user) return [];
+
+  // 🔍 Find user's clan
+  const clansSnap = await getDocs(collection(db, "clans"));
+  let clanId = null;
+  clansSnap.forEach((docSnap) => {
+    const clan = docSnap.data();
+    if (clan.members?.includes(user.uid)) {
+      clanId = docSnap.id;
+    }
+  });
+  if (!clanId) return [];
+
+  const buildsSnap = await getDocs(collection(db, `clans/${clanId}/builds`));
+  return buildsSnap.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+    isClan: true,
+  }));
 }

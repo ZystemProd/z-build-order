@@ -1,10 +1,11 @@
-import { getDoc, doc } from "firebase/firestore"; // Import Firestore methods
+import { getDoc, getDocs, doc, collection } from "firebase/firestore";
 import { auth, db } from "../../../app.js";
 import DOMPurify from "dompurify";
 import {
   saveCurrentBuild,
   populateBuildsModal,
   updateCurrentBuild,
+  loadClanBuilds,
 } from "../buildManagement.js";
 import { initializeAutoCorrect } from "../autoCorrect.js";
 import { populateBuildDetails, analyzeBuildOrder } from "../uiHandlers.js";
@@ -15,6 +16,7 @@ import {
   showSubcategories,
   filterBuilds,
   searchBuilds,
+  populateBuildList,
 } from "../modal.js";
 import {
   initializeSectionToggles,
@@ -41,6 +43,7 @@ import {
   renderCreateClanUI,
   renderChooseManageClanUI,
   renderFindClanUI,
+  saveBuildToClan,
 } from "../clan.js";
 import {
   MapAnnotations,
@@ -363,12 +366,45 @@ export async function initializeIndexPage() {
       return;
     }
 
+    // ✅ Handle community publishing
     if (publishToCommunity) {
       await window.publishBuildToCommunity(window.currentBuildIdToPublish);
     } else {
       await window.unpublishBuild(window.currentBuildIdToPublish);
     }
 
+    // ✅ Handle clan publishing via checked checkboxes
+    const checkedClans = Array.from(
+      document.querySelectorAll(".clanPublishCheckbox:checked")
+    ).map((cb) => cb.value);
+
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const usernameSnap = await getDoc(doc(db, "usernames", user.displayName));
+    const username = usernameSnap.exists() ? usernameSnap.id : "Unknown";
+
+    const buildId = window.currentBuildIdToPublish;
+    const userBuildRef = doc(db, `users/${user.uid}/builds/${buildId}`);
+    const buildSnap = await getDoc(userBuildRef);
+    if (!buildSnap.exists()) return;
+
+    const buildData = buildSnap.data();
+
+    for (const clanId of checkedClans) {
+      await saveBuildToClan(clanId, buildId, {
+        ...buildData,
+        ownerUid: user.uid,
+        username,
+        timestamp: Date.now(),
+      });
+    }
+
+    if (checkedClans.length > 0) {
+      showToast("✅ Shared with selected clans!", "success");
+    }
+
+    // ✅ Close the publish modal
     const modal = document.getElementById("publishModal");
     if (modal) modal.style.display = "none";
   });
@@ -582,23 +618,31 @@ export async function initializeIndexPage() {
     );
 
     categoryButtons.forEach((el) => {
-      el.addEventListener("click", () => {
+      el.addEventListener("click", async () => {
         const category = el.getAttribute("data-category");
         if (!category) return;
 
-        // UI state
+        // 🔄 UI state
         categoryButtons.forEach((btn) => btn.classList.remove("active"));
         subcategoryButtons.forEach((btn) => btn.classList.remove("active"));
         el.classList.add("active");
 
-        // Clear search
+        // 🔄 Clear search bar
         const search = document.getElementById("buildSearchBar");
         if (search) search.value = "";
 
-        // Filter builds (modal.js)
+        // 🧠 Special case: Clan Builds
+        if (category === "clan") {
+          const builds = await loadClanBuilds(); // <- your new function
+          populateBuildList(builds); // <- reuse your card renderer
+          if (heading) heading.textContent = "Clan Builds";
+          return;
+        }
+
+        // 🔎 Normal filtering
         filterBuilds(category);
 
-        // Heading
+        // 📝 Heading
         if (heading) {
           heading.textContent =
             category.toLowerCase() === "all"

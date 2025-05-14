@@ -14,7 +14,7 @@ import {
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { auth } from "../../app.js";
+import { auth, db } from "../../app.js";
 import { showToast } from "./toastHandler.js";
 import { updateYouTubeEmbed, clearYouTubeEmbed } from "./youtube.js";
 import { mapAnnotations } from "./interactive_map.js";
@@ -407,10 +407,35 @@ window.openModal = openModal;
 
 let currentBuildIdToPublish = null;
 
-export function openPublishModal(buildId) {
+export async function openPublishModal(buildId) {
   currentBuildIdToPublish = buildId;
   const modal = document.getElementById("publishModal");
   modal.style.display = "block";
+
+  // 🧠 Populate list of clans user is a member of
+  const clanContainer = document.getElementById("clanPublishList");
+  if (clanContainer) {
+    clanContainer.innerHTML = ""; // Clear previous list
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const clansSnap = await getDocs(collection(db, "clans"));
+
+    clansSnap.forEach((docSnap) => {
+      const clan = docSnap.data();
+      const clanId = docSnap.id;
+
+      if (clan.members?.includes(user.uid)) {
+        const label = document.createElement("label");
+        label.className = "publish-checkbox-row";
+        label.innerHTML = `
+          <input type="checkbox" class="clanPublishCheckbox" value="${clanId}" />
+          Share with ${clan.name}
+        `;
+        clanContainer.appendChild(label);
+      }
+    });
+  }
 }
 
 export function showSubcategories(event) {

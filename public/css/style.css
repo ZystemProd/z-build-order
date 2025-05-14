@@ -968,6 +968,16 @@ textarea::-webkit-scrollbar-thumb:hover {
   height: 16px;
 }
 
+.publish-checkbox-list {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.publish-checkbox-row label {
+  font-weight: normal;
+}
+
 .build-card .map-image {
   height: 135px;
 }

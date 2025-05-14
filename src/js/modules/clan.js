@@ -20,28 +20,17 @@ import {
   deleteObject,
   ref as storageRef,
 } from "firebase/storage";
+import { initializeApp } from "firebase/app";
 import { createNotificationDot } from "./uiHandlers.js";
 import { showToast } from "./toastHandler.js";
-import { initializeApp } from "firebase/app";
+import { db } from "../../app.js";
 import { checkForJoinRequestNotifications } from "./utils/notificationHelpers.js";
 import DOMPurify from "dompurify";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyBBLnneYwLDfIp-Oep2MvExGnVk_EvDQoo",
-  authDomain: "z-build-order.firebaseapp.com",
-  projectId: "z-build-order",
-  storageBucket: "z-build-order.firebasestorage.app",
-  messagingSenderId: "22023941178",
-  appId: "1:22023941178:web:ba417e9a52332a8e055903",
-  measurementId: "G-LBDMKMG1W9",
-};
-
-const app = initializeApp(firebaseConfig);
-const storage = getStorage(app);
+const storage = getStorage();
 
 let currentClanView = null;
 
-export const db = getFirestore();
 export const auth = getAuth();
 
 export async function listPublicClans() {
@@ -60,7 +49,7 @@ export async function getUsernameFromUid(uid) {
 }
 
 export async function uploadClanLogo(file, clanId) {
-  const storage = getStorage(app);
+  const storage = getStorage();
   const filePath = `clanLogos/${clanId}/logo.webp`;
   const storageRef = ref(storage, filePath);
 
@@ -1160,4 +1149,10 @@ function createClanBanner(clan) {
 
   bannerWrapper.append(logo, name);
   return bannerWrapper;
+}
+
+export async function saveBuildToClan(clanId, buildId, buildData) {
+  if (!clanId || !buildId) throw new Error("Missing clanId or buildId");
+  const ref = doc(db, `clans/${clanId}/builds/${buildId}`);
+  await setDoc(ref, buildData);
 }
