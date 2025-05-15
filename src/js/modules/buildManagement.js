@@ -64,9 +64,11 @@ export async function fetchUserBuilds() {
 }
 
 export async function saveCurrentBuild() {
-  console.log("Saving build..."); // Debugging
+  let encodedTitle = "";
+  console.log("Saving build...");
+
   const titleInput = document.getElementById("buildOrderTitleInput");
-  const titleText = document.getElementById("buildOrderTitleText"); // Title Text
+  const titleText = document.getElementById("buildOrderTitleText");
   const categoryDropdown = document.getElementById("buildCategoryDropdown");
   const commentInput = document.getElementById("commentInput");
   const videoInput = document.getElementById("videoInput");
@@ -76,45 +78,40 @@ export async function saveCurrentBuild() {
   if (!titleInput || !categoryDropdown || !titleText) {
     console.error("Title or match-up dropdown is missing.");
     showToast("Failed to save. Title or match-up missing.", "error");
-    return;
+    return null;
   }
 
   let title = DOMPurify.sanitize(titleInput.value.trim());
   const selectedMatchup = DOMPurify.sanitize(categoryDropdown.value);
 
-  // ✅ ADD BORDER ANIMATION FOR EMPTY FIELDS
+  // Highlight helpers
   function highlightField(field) {
-    field.classList.add("highlight"); // Add highlight class
-    setTimeout(() => field.classList.remove("highlight"), 5000); // Remove after 5s
+    field.classList.add("highlight");
+    setTimeout(() => field.classList.remove("highlight"), 5000);
   }
-
   function removeHighlightOnFocus(field) {
     field.addEventListener("focus", () => field.classList.remove("highlight"));
-    field.addEventListener("change", () => field.classList.remove("highlight")); // For dropdowns
+    field.addEventListener("change", () => field.classList.remove("highlight"));
   }
-
-  // Apply remove highlight on focus
   removeHighlightOnFocus(titleInput);
   removeHighlightOnFocus(categoryDropdown);
 
+  // ✅ Validate title & matchup
   if (!title) {
     showToast("Please provide a title.", "error");
     highlightField(titleInput);
-    highlightField(titleText); // Highlight `buildOrderTitleText`
-    return;
+    highlightField(titleText);
+    return null;
   }
-
   if (!selectedMatchup) {
     showToast("Please select a valid match-up.", "error");
     highlightField(categoryDropdown);
-    return;
+    return null;
   }
-
-  // ✅ Fix: Remove highlight when user selects a category
   titleText.classList.remove("highlight");
 
-  // ✅ Encode "/" as "__SLASH__" for Firestore document ID
-  const encodedTitle = title.replace(/\//g, "__SLASH__");
+  // ✅ Encode title
+  encodedTitle = title.replace(/\//g, "__SLASH__");
 
   const formattedMatchup = selectedMatchup
     .toLowerCase()
@@ -122,36 +119,32 @@ export async function saveCurrentBuild() {
 
   const buildOrder = parseBuildOrder(buildOrderInput.value);
 
+  // Map info
   let mapName = "No map selected";
   if (mapImage?.src) {
     const match = mapImage.src.match(/\/img\/maps\/(.+)\.webp/);
-    if (match) {
-      mapName = match[1].replace(/_/g, " "); // Convert underscores to spaces
-    }
+    if (match) mapName = match[1].replace(/_/g, " ");
   }
 
-  let mapFolder = "current"; // default
+  let mapFolder = "current";
   if (mapImage?.src) {
     const folderMatch = mapImage.src.match(/\/img\/maps\/([^/]+)\//);
-    if (folderMatch) {
-      mapFolder = folderMatch[1]; // "current" or "archive"
-    }
+    if (folderMatch) mapFolder = folderMatch[1];
   }
 
+  // ✅ Auth check
   const auth = getAuth();
   const user = auth.currentUser;
-
-  // 🔴 If user is not signed in, show toast warning and prevent save
   if (!user) {
     console.error("⚠ Attempted to save without signing in.");
     showToast("⚠ You must sign in to save your build!", "error");
-    return;
+    return null;
   }
 
   const db = getFirestore();
   const userRef = doc(db, "users", user.uid);
-  let username = "Unknown"; // Default if username is not found
 
+  let username = "Unknown";
   try {
     const userSnapshot = await getDoc(userRef);
     if (userSnapshot.exists() && userSnapshot.data().username) {
@@ -161,18 +154,19 @@ export async function saveCurrentBuild() {
     console.error("Error fetching username:", error);
   }
 
+  // ✅ Replay link validation
   const replayLinkInput = document.getElementById("replayLinkInput");
   const replayUrl = DOMPurify.sanitize(replayLinkInput?.value.trim() || "");
-
-  // ✅ Validate Drop.sc link format
   const validReplayPattern = /^https:\/\/drop\.sc\/replay\/\d+$/;
+
   if (replayUrl && !validReplayPattern.test(replayUrl)) {
     showToast("Please enter a valid Drop.sc replay link.", "error");
     replayLinkInput.classList.add("highlight");
     setTimeout(() => replayLinkInput.classList.remove("highlight"), 5000);
-    return;
+    return null;
   }
 
+  // ✅ Build object
   const newBuild = {
     title: title,
     encodedTitle: encodedTitle,
@@ -188,10 +182,10 @@ export async function saveCurrentBuild() {
     timestamp: Date.now(),
     comment: DOMPurify.sanitize(commentInput?.value.trim() || ""),
     videoLink: DOMPurify.sanitize(videoInput?.value.trim() || ""),
-    replayUrl: replayUrl, // ✅ Now this will be correctly set
+    replayUrl,
     buildOrder,
     map: mapName,
-    mapFolder: mapFolder,
+    mapFolder,
     interactiveMap: {
       circles: mapAnnotations.circles.map(({ x, y }) => ({ x, y })),
       arrows: mapAnnotations.arrows.map(({ startX, startY, endX, endY }) => ({
@@ -204,30 +198,31 @@ export async function saveCurrentBuild() {
     isPublished: false,
     publisher: username,
   };
+
   const buildsRef = collection(db, `users/${user.uid}/builds`);
   const buildDoc = doc(buildsRef, encodedTitle);
 
-  await setDoc(buildDoc, newBuild)
-    .then(() => {
-      showToast("✅ Build saved successfully!", "success");
-      console.log("✅ Build saved with title:", title);
-      checkPublishButtonVisibility();
+  try {
+    await setDoc(buildDoc, newBuild);
+    showToast("✅ Build saved successfully!", "success");
+    console.log("✅ Build saved with title:", title);
+    checkPublishButtonVisibility();
 
-      // ✅ Move this UI toggle here (after successful save)
-      document.getElementById("replayInputWrapper").style.display = "none";
-      const viewWrapper = document.getElementById("replayViewWrapper");
-      const viewBtn = document.getElementById("replayDownloadBtn");
-      if (viewWrapper && viewBtn && replayUrl) {
-        viewWrapper.style.display = "block";
-        viewBtn.href = replayUrl;
-      }
-    })
-    .catch((error) => {
-      console.error("Error saving to Firestore:", error);
-      showToast("Failed to save build.", "error");
-    });
+    document.getElementById("replayInputWrapper").style.display = "none";
+    const viewWrapper = document.getElementById("replayViewWrapper");
+    const viewBtn = document.getElementById("replayDownloadBtn");
+    if (viewWrapper && viewBtn && replayUrl) {
+      viewWrapper.style.display = "block";
+      viewBtn.href = replayUrl;
+    }
 
-  filterBuilds("all");
+    filterBuilds("all");
+    return encodedTitle;
+  } catch (error) {
+    console.error("Error saving to Firestore:", error);
+    showToast("❌ Failed to save build.", "error");
+    return null;
+  }
 }
 
 export async function loadBuildAnnotations(buildId) {

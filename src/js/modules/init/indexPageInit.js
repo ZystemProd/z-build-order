@@ -192,7 +192,10 @@ export async function initializeIndexPage() {
       }
     } else {
       try {
-        const savedId = await saveCurrentBuild(); // should return the title (encoded)
+        const savedId = await saveCurrentBuild(); // should return encodedTitle or null
+
+        if (!savedId) return; // 🛑 Stop if validation failed inside saveCurrentBuild
+
         currentBuildId = savedId;
         saveBuildButton.innerText = "Update Build";
         newBuildButton.style.display = "inline-block";
@@ -233,11 +236,11 @@ export async function initializeIndexPage() {
   auth.onAuthStateChanged(async (user) => {
     const buildsBtn = document.getElementById("showBuildsButton");
     const communityBtn = document.getElementById("showCommunityModalButton");
-  
+
     // ✅ Always enable buttons
     if (buildsBtn) buildsBtn.disabled = false;
     if (communityBtn) communityBtn.disabled = false;
-  
+
     // ✅ If logged in, do user setup
     if (user) {
       await checkForJoinRequestNotifications();
@@ -257,7 +260,7 @@ export async function initializeIndexPage() {
     }
     showBuildsModal(); // ✅ when logged in
   });
-  
+
   safeAdd("showCommunityModalButton", "click", async () => {
     if (!auth.currentUser) {
       const authBox = document.getElementById("auth-container");
@@ -266,32 +269,30 @@ export async function initializeIndexPage() {
       setTimeout(() => authBox.classList.remove("highlight"), 1500);
       return;
     }
-  
+
     const modal = document.getElementById("communityModal");
     if (!modal) return;
     modal.style.display = "block";
     document.getElementById("communityBuildsContainer").scrollTop = 0;
-  
+
     document
       .querySelectorAll("#communityModal .filter-category, .subcategory")
       .forEach((btn) => btn.classList.remove("active"));
-  
+
     const allBtn = document.querySelector(
       '#communityModal .filter-category[data-category="all"]'
     );
     if (allBtn) allBtn.classList.add("active");
-  
+
     const input = document.getElementById("communitySearchBar");
     if (input) input.value = "";
-  
+
     await populateCommunityBuilds();
     attachCommunityCategoryClicks();
-  
+
     const heading = document.querySelector("#communityModal h3");
     if (heading) heading.textContent = "Community Builds";
   });
-  
-  
 
   safeAdd("closeCommunityModal", "click", () => {
     const modal = document.getElementById("communityModal");
@@ -480,9 +481,6 @@ export async function initializeIndexPage() {
     await populateCommunityBuilds();
     await populateBuildsModal();
   });
-
-
-  
 
   // This will load the necessary user data after successful authentication
   async function initializeUserData(user) {
