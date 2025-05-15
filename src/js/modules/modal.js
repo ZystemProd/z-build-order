@@ -192,7 +192,6 @@ export async function viewBuild(buildId) {
     }
     return;
   }
-  
 
   try {
     const buildRef = doc(db, `users/${user.uid}/builds/${buildId}`);
@@ -500,7 +499,7 @@ export async function showBuildsModal() {
   const allTab = document.querySelector(
     '#buildsModal .filter-category[data-category="all"]'
   );
-  const allTabs = document.querySelectorAll('#buildsModal .filter-category');
+  const allTabs = document.querySelectorAll("#buildsModal .filter-category");
   allTabs.forEach((tab) => tab.classList.remove("active"));
   if (allTab) allTab.classList.add("active");
 
@@ -522,7 +521,6 @@ export async function showBuildsModal() {
     }
   };
 }
-
 
 // Attach to the global window object
 window.showBuildsModal = showBuildsModal;
@@ -624,21 +622,55 @@ export async function populateBuildList(filteredBuilds = null) {
     // ✅ Click to view build
     buildCard.addEventListener("click", () => viewBuild(build.id));
 
-    // ✅ Delete build
-    const deleteButton = buildCard.querySelector(".delete-build-btn");
-    if (deleteButton) {
-      deleteButton.addEventListener("click", async (event) => {
-        event.stopPropagation();
-        const confirmation = confirm(
-          `Are you sure you want to delete "${build.title}"?`
-        );
-        if (confirmation) {
-          await deleteBuildFromFirestore(build.id);
-          const updatedBuilds = await fetchUserBuilds();
-          populateBuildList(updatedBuilds);
-        }
-      });
-    }
+    deleteButton.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      const confirmation = confirm(
+        `Are you sure you want to delete "${build.title}"?`
+      );
+      if (!confirmation) return;
+
+      await deleteBuildFromFirestore(build.id);
+
+      // 🔄 Remove from localStorage
+      const savedBuilds = getSavedBuilds();
+      const index = savedBuilds.findIndex((b) => b.id === build.id);
+      if (index !== -1) {
+        savedBuilds.splice(index, 1);
+        setSavedBuilds(savedBuilds);
+      }
+
+      const updatedBuilds = await fetchUserBuilds();
+      setSavedBuilds(updatedBuilds); // keep memory sync
+
+      let activeFilter =
+        document
+          .querySelector(
+            "#buildsModal .filter-category.active, #buildsModal .subcategory.active"
+          )
+          ?.getAttribute("data-category") ||
+        document
+          .querySelector("#buildsModal .subcategory.active")
+          ?.getAttribute("data-subcategory") ||
+        "all";
+
+      filterBuilds(activeFilter);
+
+      const preview = document.getElementById("buildPreview");
+      if (preview && preview.dataset.buildId === build.id) {
+        preview.innerHTML = `<h4>Build Preview</h4><p>Select a build to view details here.</p>`;
+        delete preview.dataset.buildId;
+      }
+
+      const heading = document.querySelector(
+        "#buildsModal .template-header h3"
+      );
+      if (heading) {
+        heading.textContent =
+          activeFilter === "all"
+            ? "Build Orders"
+            : `Build Orders - ${activeFilter}`;
+      }
+    });
 
     const publishButton = buildCard.querySelector(".build-publish-info");
     if (publishButton) {

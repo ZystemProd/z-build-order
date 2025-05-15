@@ -96,7 +96,6 @@ export async function saveCurrentBuild() {
   removeHighlightOnFocus(titleInput);
   removeHighlightOnFocus(categoryDropdown);
 
-  // ✅ Validate title & matchup
   if (!title) {
     showToast("Please provide a title.", "error");
     highlightField(titleInput);
@@ -110,7 +109,6 @@ export async function saveCurrentBuild() {
   }
   titleText.classList.remove("highlight");
 
-  // ✅ Encode title
   encodedTitle = title.replace(/\//g, "__SLASH__");
 
   const formattedMatchup = selectedMatchup
@@ -119,20 +117,42 @@ export async function saveCurrentBuild() {
 
   const buildOrder = parseBuildOrder(buildOrderInput.value);
 
-  // Map info
+  // ✅ Robust map name parsing
   let mapName = "No map selected";
   if (mapImage?.src) {
-    const match = mapImage.src.match(/\/img\/maps\/(.+)\.webp/);
-    if (match) mapName = match[1].replace(/_/g, " ");
+    try {
+      const url = new URL(mapImage.src);
+      const parts = url.pathname.split("/");
+      const filename = parts.at(-1); // "map_name.webp"
+      if (filename) {
+        const base = filename.replace(/\.[a-z]+$/i, "");
+        mapName = base.replace(/_/g, " ");
+      }
+    } catch (err) {
+      console.warn("🛑 Failed to parse map image:", mapImage.src, err);
+    }
+  }
+
+  // ✅ Guard against invalid map parsing
+  if (mapImage?.src && mapName === "No map selected") {
+    showToast(
+      "❌ Failed to detect map name. Try re-selecting the map.",
+      "error"
+    );
+    return null;
   }
 
   let mapFolder = "current";
   if (mapImage?.src) {
-    const folderMatch = mapImage.src.match(/\/img\/maps\/([^/]+)\//);
-    if (folderMatch) mapFolder = folderMatch[1];
+    try {
+      const url = new URL(mapImage.src);
+      const folderMatch = url.pathname.match(/\/maps\/([^/]+)\//);
+      if (folderMatch) mapFolder = folderMatch[1];
+    } catch (err) {
+      console.warn("🛑 Failed to parse map folder:", mapImage.src, err);
+    }
   }
 
-  // ✅ Auth check
   const auth = getAuth();
   const user = auth.currentUser;
   if (!user) {
@@ -154,7 +174,6 @@ export async function saveCurrentBuild() {
     console.error("Error fetching username:", error);
   }
 
-  // ✅ Replay link validation
   const replayLinkInput = document.getElementById("replayLinkInput");
   const replayUrl = DOMPurify.sanitize(replayLinkInput?.value.trim() || "");
   const validReplayPattern = /^https:\/\/drop\.sc\/replay\/\d+$/;
@@ -166,7 +185,6 @@ export async function saveCurrentBuild() {
     return null;
   }
 
-  // ✅ Build object
   const newBuild = {
     title: title,
     encodedTitle: encodedTitle,
@@ -266,31 +284,6 @@ export async function loadBuildAnnotations(buildId) {
     console.error("Build not found!");
   }
 }
-
-export function deleteBuild(index) {
-  const deleteModal = document.getElementById("deleteConfirmationModal");
-  const confirmButton = document.getElementById("confirmDeleteButton");
-  const cancelButton = document.getElementById("cancelDeleteButton");
-
-  deleteModal.style.display = "flex";
-  confirmButton.focus();
-
-  confirmButton.onclick = () => {
-    const savedBuilds = getSavedBuilds();
-    if (index >= 0 && index < savedBuilds.length) {
-      savedBuilds.splice(index, 1);
-      setSavedBuilds(savedBuilds);
-      showToast("Build deleted.", "success");
-    }
-    deleteModal.style.display = "none";
-  };
-
-  cancelButton.onclick = () => {
-    deleteModal.style.display = "none";
-  };
-}
-
-window.deleteBuild = deleteBuild;
 
 export async function updateCurrentBuild(buildId) {
   const auth = getAuth();
