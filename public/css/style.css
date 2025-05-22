@@ -88,14 +88,22 @@ body {
   font-size: 1rem;
 }
 
+#buildsLoadingWrapper {
+  display: none;
+  justify-content: center;
+  align-items: center;
+  min-height: 100px;
+  width: 100%;
+}
+
 .spinner {
-  flex-shrink: 0; /* 🔥 Important: Spinner will not shrink or stretch */
-  width: 32px;
-  height: 32px;
-  border: 3px solid rgba(200, 200, 200, 0.6);
-  border-top: 3px solid #555;
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(255, 255, 255, 0.2);
+  border-top: 4px solid #ffffff;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
+  margin: 40px auto;
 }
 
 @keyframes spin {
@@ -3935,6 +3943,24 @@ td {
 #privacyModal a:hover {
   color: #ffd84d;
   text-decoration: none;
+}
+
+.tag {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 6px;
+  margin-left: 6px;
+  color: white;
+}
+
+.tag.public {
+  background-color: #2e7d32; /* green */
+}
+
+.tag.clan {
+  background-color: #3949ab; /* blue */
 }
 
 @media screen and (max-width: 768px) {

@@ -1,4 +1,11 @@
-import { getDoc, getDocs, doc, collection } from "firebase/firestore";
+import {
+  getDoc,
+  getDocs,
+  doc,
+  collection,
+  updateDoc,
+  deleteDoc,
+} from "firebase/firestore";
 import { auth, db } from "../../../app.js";
 import DOMPurify from "dompurify";
 import {
@@ -6,6 +13,8 @@ import {
   populateBuildsModal,
   updateCurrentBuild,
   loadClanBuilds,
+  fetchUserBuilds,
+  fetchPublishedUserBuilds,
 } from "../buildManagement.js";
 import { initializeAutoCorrect } from "../autoCorrect.js";
 import { populateBuildDetails, analyzeBuildOrder } from "../uiHandlers.js";
@@ -229,8 +238,20 @@ export async function initializeIndexPage() {
   safeAdd("newBuildButton", "click", () => {
     currentBuildId = null;
     resetBuildInputs();
-    saveBuildButton.innerText = "Save Build";
-    newBuildButton.style.display = "none";
+    clearEditingPublishedBuild();
+
+    const editBanner = document.getElementById("editModeBanner");
+    if (editBanner) editBanner.style.display = "none";
+
+    const saveBtn = document.getElementById("saveBuildButton");
+    const updateBtn = document.getElementById("updateBuildButton");
+    const newBtn = document.getElementById("newBuildButton");
+
+    if (saveBtn) saveBtn.style.display = "inline-block";
+    if (updateBtn) updateBtn.style.display = "none";
+    if (newBtn) newBtn.style.display = "none";
+
+    if (saveBtn) saveBtn.innerText = "Save Build";
   });
 
   auth.onAuthStateChanged(async (user) => {
@@ -331,6 +352,40 @@ export async function initializeIndexPage() {
     }
   });
 
+  safeAdd("myBuildsTab", "click", async () => {
+    const spinnerWrapper = document.getElementById("buildsLoadingWrapper");
+    const buildList = document.getElementById("buildList");
+
+    buildList.innerHTML = ""; // ✅ Safe now — does NOT remove the loader
+    spinnerWrapper.style.display = "flex";
+
+    try {
+      const builds = await fetchUserBuilds();
+      populateBuildList(builds);
+    } catch (err) {
+      console.error("Error loading My Builds:", err);
+    } finally {
+      spinnerWrapper.style.display = "none";
+    }
+  });
+
+  safeAdd("publishedBuildsTab", "click", async () => {
+    const spinnerWrapper = document.getElementById("buildsLoadingWrapper");
+    const buildList = document.getElementById("buildList");
+
+    buildList.innerHTML = "";
+    spinnerWrapper.style.display = "flex";
+
+    try {
+      const builds = await fetchPublishedUserBuilds();
+      populateBuildList(builds);
+    } catch (err) {
+      console.error("Error loading Published Builds:", err);
+    } finally {
+      spinnerWrapper.style.display = "none";
+    }
+  });
+
   // --- Template Preview Hover (NEW! ✅)
   safeAdd("templateList", "mouseover", (event) => {
     const templateCard = event.target.closest(".template-card");
@@ -384,47 +439,82 @@ export async function initializeIndexPage() {
       return;
     }
 
-    // ✅ Handle community publishing
-    if (publishToCommunity) {
-      await window.publishBuildToCommunity(window.currentBuildIdToPublish);
-    } else {
-      await window.unpublishBuild(window.currentBuildIdToPublish);
-    }
+    const buildId = window.currentBuildIdToPublish;
+    const user = auth.currentUser;
+    if (!user) return;
 
-    // ✅ Handle clan publishing via checked checkboxes
+    const userBuildRef = doc(db, `users/${user.uid}/builds/${buildId}`);
+    const buildSnap = await getDoc(userBuildRef);
+    if (!buildSnap.exists()) return;
+    const buildData = buildSnap.data();
+
+    // ✅ Fetch display name
+    const usernameSnap = await getDoc(doc(db, "usernames", user.displayName));
+    const username = usernameSnap.exists() ? usernameSnap.id : "Unknown";
+
+    // ✅ Get checked clans
     const checkedClans = Array.from(
       document.querySelectorAll(".clanPublishCheckbox:checked")
     ).map((cb) => cb.value);
 
-    const user = auth.currentUser;
-    if (!user) return;
+    // ✅ Save to user build for future reference (for checkbox state)
+    await updateDoc(userBuildRef, {
+      sharedToClans: checkedClans,
+      isPublished: publishToCommunity,
+    });
 
-    const usernameSnap = await getDoc(doc(db, "usernames", user.displayName));
-    const username = usernameSnap.exists() ? usernameSnap.id : "Unknown";
+    // ✅ Handle community publishing
+    if (publishToCommunity) {
+      await window.publishBuildToCommunity(buildId);
+    } else {
+      await window.unpublishBuild(buildId);
+    }
 
-    const buildId = window.currentBuildIdToPublish;
-    const userBuildRef = doc(db, `users/${user.uid}/builds/${buildId}`);
-    const buildSnap = await getDoc(userBuildRef);
-    if (!buildSnap.exists()) return;
-
-    const buildData = buildSnap.data();
-
+    // ✅ Publish to selected clans
     for (const clanId of checkedClans) {
       await saveBuildToClan(clanId, buildId, {
         ...buildData,
         ownerUid: user.uid,
+        publisherId: user.uid, // Needed for fetchPublishedUserBuilds
         username,
         timestamp: Date.now(),
       });
     }
 
-    if (checkedClans.length > 0) {
-      showToast("✅ Shared with selected clans!", "success");
+    // ✅ Delete from clans that were unchecked
+    const previouslyShared = buildData.sharedToClans || [];
+    const nowUnshared = previouslyShared.filter(
+      (clanId) => !checkedClans.includes(clanId)
+    );
+
+    for (const clanId of nowUnshared) {
+      const ref = doc(db, `clans/${clanId}/builds/${buildId}`);
+      await deleteDoc(ref);
     }
 
-    // ✅ Close the publish modal
+    // ✅ Show toast and close modal
+    if (checkedClans.length > 0) {
+      showToast("✅ Shared with selected clans!", "success");
+    } else {
+      showToast("✅ Updated publish settings.", "success");
+    }
+
     const modal = document.getElementById("publishModal");
     if (modal) modal.style.display = "none";
+
+    // ✅ Refresh the build list UI
+    let activeFilter =
+      document
+        .querySelector(
+          "#buildsModal .filter-category.active, #buildsModal .subcategory.active"
+        )
+        ?.getAttribute("data-category") ||
+      document
+        .querySelector("#buildsModal .subcategory.active")
+        ?.getAttribute("data-subcategory") ||
+      "all";
+
+    filterBuilds(activeFilter);
   });
 
   window.addEventListener("click", (event) => {

@@ -135,11 +135,10 @@ export async function saveCurrentBuild() {
 
   // ✅ Guard against invalid map parsing
   if (mapImage?.src && mapName === "No map selected") {
-    showToast(
-      "❌ Failed to detect map name. Try re-selecting the map.",
-      "error"
+    console.warn(
+      "⚠ Failed to parse map name, proceeding without a valid name."
     );
-    return null;
+    // optionally keep the default "No map selected"
   }
 
   let mapFolder = "current";
@@ -391,21 +390,81 @@ export async function loadClanBuilds() {
   const user = auth.currentUser;
   if (!user) return [];
 
-  // 🔍 Find user's clan
+  const results = [];
   const clansSnap = await getDocs(collection(db, "clans"));
-  let clanId = null;
-  clansSnap.forEach((docSnap) => {
-    const clan = docSnap.data();
-    if (clan.members?.includes(user.uid)) {
-      clanId = docSnap.id;
-    }
-  });
-  if (!clanId) return [];
 
-  const buildsSnap = await getDocs(collection(db, `clans/${clanId}/builds`));
-  return buildsSnap.docs.map((doc) => ({
+  for (const clanDoc of clansSnap.docs) {
+    const clanData = clanDoc.data();
+    const clanId = clanDoc.id;
+
+    if (clanData.members?.includes(user.uid)) {
+      const buildsSnap = await getDocs(
+        collection(db, `clans/${clanId}/builds`)
+      );
+      buildsSnap.forEach((doc) => {
+        results.push({
+          id: doc.id,
+          ...doc.data(),
+          source: "clan",
+          clanId,
+          clanName: clanData.name || "Unnamed Clan",
+        });
+      });
+    }
+  }
+
+  return results;
+}
+
+export async function fetchPublishedUserBuilds() {
+  const auth = getAuth();
+  const user = auth.currentUser;
+  if (!user) return [];
+
+  const db = getFirestore();
+  const allPublishedBuilds = [];
+
+  // ✅ 1. Fetch from communityBuilds where publisherId == current user
+  const communityRef = collection(db, "communityBuilds");
+  const communityQ = query(communityRef, where("publisherId", "==", user.uid));
+  const communitySnap = await getDocs(communityQ);
+  const communityBuilds = communitySnap.docs.map((doc) => ({
     id: doc.id,
     ...doc.data(),
-    isClan: true,
+    source: "community",
   }));
+  allPublishedBuilds.push(...communityBuilds);
+
+  // ✅ 2. Fetch from all clans where user is member
+  const clansSnap = await getDocs(collection(db, "clans"));
+  const clanIds = [];
+  clansSnap.forEach((doc) => {
+    const data = doc.data();
+    if (data.members?.includes(user.uid)) {
+      clanIds.push(doc.id);
+    }
+  });
+
+  for (const clanId of clanIds) {
+    const clanDoc = await getDoc(doc(db, "clans", clanId));
+    const clanName = clanDoc.exists() ? clanDoc.data().name : "Unnamed Clan";
+
+    const clanBuildsRef = collection(db, `clans/${clanId}/builds`);
+    const clanSnap = await getDocs(clanBuildsRef);
+
+    clanSnap.forEach((doc) => {
+      const data = doc.data();
+      if (data.publisherId === user.uid) {
+        allPublishedBuilds.push({
+          id: doc.id,
+          ...data,
+          source: "clan",
+          clanId,
+          clanName,
+        });
+      }
+    });
+  }
+
+  return allPublishedBuilds;
 }

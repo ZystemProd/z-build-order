@@ -17,3 +17,15 @@ export function setCurrentBuildId(id) {
 export function getCurrentBuildId() {
   return currentBuildId;
 }
+
+let editingPublishedBuild = null;
+
+export function setEditingPublishedBuild(build) {
+  editingPublishedBuild = build;
+}
+export function getEditingPublishedBuild() {
+  return editingPublishedBuild;
+}
+export function clearEditingPublishedBuild() {
+  editingPublishedBuild = null;
+}
