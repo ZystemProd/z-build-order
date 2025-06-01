@@ -53,6 +53,6 @@ Let me know if you'd like a toast warning before exiting edit mode if unsaved ch
 
 **Urgent** the build is published in clan but shown as publish tag and on a different user it don't show up. shows only yourself.
 
-Maybe just remove "published builds" and just have "my builds"
+Fix timestamp on community builds
 
-- disable braacket (only action typying)
+- disable bracket (only action typying)

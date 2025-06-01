@@ -487,10 +487,10 @@
         <div class="template-header">
           <span class="close-modal" id="closeCommunityModal">&times;</span>
           <h3>Community Builds</h3>
-          <button id="showClanModalButton" class="btn" disabled>
-            <img src="img/SVG/clan.svg" class="svg-icon" alt="Clan Icon">
-            Clans
-          </button>
+          <div class="community-type-toggle">
+            <button id="filterPublicBtn" class="community-type-btn active" data-type="public">Public</button>
+            <button id="filterClanBtn" class="community-type-btn" data-type="clan">Clan</button>
+          </div>
           <div id="communityHeaderControls" class="header-controls">
             <label for="communitySortDropdown" class="sort-label">Sort by:</label>
             <select id="communitySortDropdown" class="styled-dropdown">

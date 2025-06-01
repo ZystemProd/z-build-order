@@ -61,7 +61,7 @@ async function loadBuild() {
 
   console.log("🔍 Loading build with ID:", buildId);
 
-  const buildRef = doc(db, "communityBuilds", buildId);
+  const buildRef = doc(db, "publishedBuilds", buildId);
   const buildSnapshot = await getDoc(buildRef);
 
   if (buildSnapshot.exists()) {
@@ -299,7 +299,7 @@ async function handleVote(buildId, voteType) {
   }
 
   const userId = user.uid;
-  const buildRef = doc(db, "communityBuilds", buildId);
+  const buildRef = doc(db, "publishedBuilds", buildId);
 
   try {
     const buildDoc = await getDoc(buildRef);
@@ -356,7 +356,7 @@ function updateVoteButtonIcons(buildId) {
 
   if (!upvoteButton || !downvoteButton) return;
 
-  getDoc(doc(db, "communityBuilds", buildId)).then((buildDoc) => {
+  getDoc(doc(db, "publishedBuilds", buildId)).then((buildDoc) => {
     if (buildDoc.exists()) {
       const user = auth.currentUser;
       if (!user) return;
@@ -439,7 +439,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const buildId = urlParams.get("id");
       if (!buildId) return;
 
-      const buildRef = doc(db, "communityBuilds", buildId);
+      const buildRef = doc(db, "publishedBuilds", buildId);
       const buildSnap = await getDoc(buildRef);
       if (!buildSnap.exists()) return;
 

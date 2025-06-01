@@ -420,27 +420,25 @@ export async function openPublishModal(buildId) {
   const user = auth.currentUser;
   if (!user) return;
 
-  const buildCard = document.querySelector(`.build-card[data-id="${buildId}"]`);
-  const source = buildCard?.dataset.source;
-  const clanId = buildCard?.dataset.clanid;
+  // 🧠 Check if this build has already been published
+  const publishedRef = doc(db, `publishedBuilds/${buildId}`);
+  const publishedSnap = await getDoc(publishedRef);
+  const publishedData = publishedSnap.exists() ? publishedSnap.data() : null;
 
-  let buildRef;
+  // 🧠 Default to user's build if unpublished
+  const sourceData = publishedData
+    ? publishedData
+    : (await getDoc(doc(db, `users/${user.uid}/builds/${buildId}`)))?.data();
 
-  if (source === "community") {
-    buildRef = doc(db, `communityBuilds/${buildId}`);
-  } else if (source === "clan" && clanId) {
-    buildRef = doc(db, `clans/${clanId}/builds/${buildId}`);
-  } else {
-    buildRef = doc(db, `users/${user.uid}/builds/${buildId}`);
+  if (!sourceData) {
+    console.warn("❌ Could not find the build to open in publish modal.");
+    return;
   }
-
-  const buildSnap = await getDoc(buildRef);
-  const build = buildSnap.exists() ? buildSnap.data() : null;
 
   // ✅ Update publishToCommunity checkbox
   const communityCheckbox = document.getElementById("publishToCommunity");
   if (communityCheckbox) {
-    communityCheckbox.checked = !!build?.isPublished;
+    communityCheckbox.checked = !!sourceData.isPublic;
   }
 
   // ✅ Update clan checkboxes
@@ -456,7 +454,7 @@ export async function openPublishModal(buildId) {
       const label = document.createElement("label");
       label.classList.add("clan-checkbox-label");
 
-      const isShared = build?.sharedToClans?.includes(cid);
+      const isShared = sourceData?.sharedToClans?.includes(cid);
 
       label.innerHTML = `
         <input type="checkbox" class="clanPublishCheckbox" value="${cid}" ${
@@ -751,7 +749,7 @@ export async function populateBuildList(filteredBuilds = null) {
         publishInfo.style.pointerEvents = "none";
         publishInfo.style.cursor = "default";
       } else if (
-        build.isPublished ||
+        build.isPublic ||
         (Array.isArray(build.sharedToClans) && build.sharedToClans.length > 0)
       ) {
         // Published build (to community or clan)
@@ -759,7 +757,7 @@ export async function populateBuildList(filteredBuilds = null) {
         publishInfo.innerHTML = `<span>Published </span><img src="./img/SVG/checkmark2.svg" alt="Published" class="publish-icon">`;
 
         // Show "Public" tag if published to community
-        if (build.isPublished) {
+        if (build.isPublic) {
           publishInfo.innerHTML += `<span class="tag public">Public</span>`;
         }
 
@@ -867,8 +865,8 @@ export async function unpublishBuild(buildId) {
       isPublished: false,
     });
 
-    // ✅ Now search communityBuilds where publisherId == user.uid
-    const communityRef = collection(db, "communityBuilds");
+    // ✅ Now search publishedBuilds where publisherId == user.uid
+    const publishedRef = collection(db, "publishedBuilds");
     const buildSnapshot = await getDoc(buildRef);
     const buildData = buildSnapshot.data();
     const title = buildData?.title;
@@ -885,8 +883,8 @@ export async function unpublishBuild(buildId) {
       if (buildData.title) {
         // Optional more matching checks
         // ✅ Delete this community build
-        await deleteDoc(doc(db, "communityBuilds", docSnap.id));
-        console.log(`✅ Deleted from communityBuilds: ${docSnap.id}`);
+        await deleteDoc(doc(db, "publishedBuilds", docSnap.id));
+        console.log(`✅ Deleted from publishedBuilds: ${docSnap.id}`);
       }
     });
 

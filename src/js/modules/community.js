@@ -40,14 +40,14 @@ async function fetchNextCommunityBuilds(batchSize = 20) {
   const firestoreSortField = "datePublished"; // must exist in every doc
 
   let q = query(
-    collection(db, "communityBuilds"),
+    collection(db, "publishedBuilds"),
     orderBy(firestoreSortField, "desc"),
     limit(batchSize)
   );
 
   if (lastVisibleDoc) {
     q = query(
-      collection(db, "communityBuilds"),
+      collection(db, "publishedBuilds"),
       orderBy(firestoreSortField, "desc"),
       startAfter(lastVisibleDoc),
       limit(batchSize)
@@ -70,12 +70,24 @@ async function fetchNextCommunityBuilds(batchSize = 20) {
     let datePublishedRaw = now;
     let datePublished = "Unknown";
 
-    if (data.datePublished) {
-      const parsed = new Date(data.datePublished);
-      if (!isNaN(parsed.getTime())) {
-        datePublishedRaw = parsed.getTime();
-        datePublished = parsed.toLocaleDateString();
+    try {
+      let timestampValue = data.datePublished;
+
+      // Handle Firestore Timestamp object
+      if (timestampValue && typeof timestampValue.toMillis === "function") {
+        timestampValue = timestampValue.toMillis();
       }
+
+      // Handle numeric timestamp
+      if (typeof timestampValue === "number") {
+        const parsedDate = new Date(timestampValue);
+        if (!isNaN(parsedDate.getTime())) {
+          datePublishedRaw = timestampValue;
+          datePublished = parsedDate.toLocaleDateString("en-GB"); // e.g., 23/05/2025
+        }
+      }
+    } catch (err) {
+      console.warn("❌ Failed to parse datePublished:", data.datePublished);
     }
 
     const ageInHours = (now - datePublishedRaw) / (1000 * 60 * 60);
@@ -165,7 +177,7 @@ function handlePaginatedScroll(e) {
 
 async function incrementBuildViews(db, buildId) {
   try {
-    const buildRef = doc(db, "communityBuilds", buildId);
+    const buildRef = doc(db, "publishedBuilds", buildId);
 
     // ✅ Increment views directly using Firestore's `increment()` function
     await updateDoc(buildRef, { views: increment(1) });
@@ -302,11 +314,11 @@ export async function checkPublishButtonVisibility() {
   }
 
   const latestBuild = snapshot.docs[0].data();
-  const communityBuildsRef = collection(db, "communityBuilds");
+  const publishedBuildsRef = collection(db, "publishedBuilds");
 
   // ✅ Query the community builds collection for this specific user's build
   const userCommunityBuildQuery = query(
-    communityBuildsRef,
+    publishedBuildsRef,
     where("publisherId", "==", user.uid),
     where("title", "==", latestBuild.title) // Only check if this specific title exists
   );
@@ -354,10 +366,10 @@ if (publishButton) {
     }
 
     const buildToPublish = snapshot.docs[0].data();
-    const communityBuildsRef = collection(db, "communityBuilds");
+    const publishedBuildsRef = collection(db, "publishedBuilds");
 
     try {
-      const docRef = await addDoc(communityBuildsRef, {
+      const docRef = await addDoc(publishedBuildsRef, {
         ...buildToPublish,
         publisherId: user.uid,
         username: username,
@@ -409,7 +421,7 @@ export async function publishBuildToCommunity(buildId) {
 
     const buildData = buildSnapshot.data();
 
-    const communityBuildsRef = collection(db, "communityBuilds");
+    const publishedBuildsRef = collection(db, "publishedBuilds");
     const subcategory = buildData.subcategory || "";
     const formattedSubcategory = formatMatchup(subcategory);
     const subcategoryLowercase = subcategory.toLowerCase();
@@ -424,7 +436,7 @@ export async function publishBuildToCommunity(buildId) {
       subcategoryLowercase: subcategoryLowercase, // for query ("zvp")
     };
 
-    await addDoc(communityBuildsRef, newBuildData);
+    await addDoc(publishedBuildsRef, newBuildData);
     console.log(`✅ Published build ID ${buildId} to community`);
 
     // ✅ Mark user build as published
@@ -507,7 +519,7 @@ window.publishBuildToCommunity = async function (buildId) {
   buildToPublish.userVotes = {};
 
   try {
-    await addDoc(collection(db, "communityBuilds"), buildToPublish);
+    await addDoc(collection(db, "publishedBuilds"), buildToPublish);
 
     // ✅ Mark original build as published
     await setDoc(
@@ -556,7 +568,7 @@ export async function searchCommunityBuilds(searchTerm) {
   if (!trimmed) return [];
 
   const q = query(
-    collection(db, "communityBuilds"),
+    collection(db, "publishedBuilds"),
     where("titleLowercase", ">=", trimmed),
     where("titleLowercase", "<=", trimmed + "\uf8ff"),
     orderBy("titleLowercase"),
@@ -643,7 +655,7 @@ function renderCommunityBuildBatch(builds) {
           </span>
           <span class="meta-chip">
             <img src="./img/SVG/time.svg" alt="Date" class="meta-icon">
-            ${build.datePublished}
+            ${new Date(build.datePublished).toLocaleDateString("sv-SE")}
           </span>
           <span class="meta-chip view-chip" data-id="${build.id}">
             <img src="./img/SVG/preview.svg" alt="Views" class="meta-icon">
@@ -682,64 +694,111 @@ export async function filterCommunityBuilds(filter = "all") {
   const container = document.getElementById("communityBuildsContainer");
   container.innerHTML = "";
 
-  let q = collection(db, "communityBuilds");
   const lowerFilter = filter.toLowerCase();
+  const type = localStorage.getItem("communityBuildType") || "public";
 
-  // ✅ Subcategory filter
+  let baseQuery = collection(db, "publishedBuilds");
+  const constraints = [];
+
+  // ✅ Public builds
+  if (type === "public") {
+    constraints.push(where("isPublic", "==", true));
+  }
+
+  // ✅ Clan builds
+  else if (type === "clan") {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const clansSnap = await getDocs(collection(db, "clans"));
+    const userClanIds = [];
+
+    clansSnap.forEach((doc) => {
+      const clan = doc.data();
+      if (clan.members?.includes(user.uid)) {
+        userClanIds.push(doc.id);
+      }
+    });
+
+    if (userClanIds.length === 0) {
+      renderCommunityBuildBatch([]); // No clan access = no builds
+      return;
+    }
+
+    constraints.push(where("sharedToClans", "array-contains-any", userClanIds));
+  }
+
+  // ✅ Subcategory filter (e.g., ZvP, TvT)
   if (
     ["zvp", "zvt", "zvz", "pvp", "pvt", "pvz", "tvp", "tvt", "tvz"].includes(
       lowerFilter
     )
   ) {
-    q = query(
-      q,
-      where("subcategoryLowercase", "==", lowerFilter),
-      orderBy("datePublished", "desc"),
-      limit(20)
-    );
+    constraints.push(where("subcategoryLowercase", "==", lowerFilter));
   }
 
-  // ✅ Category filter
+  // ✅ Race category filter (Zerg, Protoss, Terran)
   else if (["zerg", "protoss", "terran"].includes(lowerFilter)) {
-    q = query(
-      q,
-      where("category", "==", capitalize(lowerFilter)),
-      orderBy("datePublished", "desc"),
-      limit(20)
-    );
+    constraints.push(where("category", "==", capitalize(lowerFilter)));
   }
 
-  // ✅ Default to all if no filter
-  else if (lowerFilter === "all") {
-    q = query(q, orderBy("datePublished", "desc"), limit(20));
-  }
+  constraints.push(orderBy("datePublished", "desc"), limit(20));
+
+  const q = query(baseQuery, ...constraints);
 
   try {
     const snap = await getDocs(q);
 
     const builds = snap.docs.map((doc) => {
       const data = doc.data();
+
+      let datePublishedRaw = Date.now();
+      let datePublished = "Unknown";
+
+      try {
+        let timestampValue = data.datePublished;
+
+        if (timestampValue && typeof timestampValue.toMillis === "function") {
+          timestampValue = timestampValue.toMillis();
+        }
+
+        if (typeof timestampValue === "number") {
+          const parsed = new Date(timestampValue);
+          if (!isNaN(parsed.getTime())) {
+            datePublishedRaw = timestampValue;
+            datePublished = parsed.toLocaleDateString("en-GB"); // ✅ Format: DD/MM/YYYY
+          }
+        }
+      } catch (err) {
+        console.warn("❌ Failed to parse datePublished:", data.datePublished);
+      }
+
       return {
         id: doc.id,
         ...data,
         matchup: formatMatchup(
           data.subcategoryLowercase || data.subcategory || ""
         ),
+        datePublished,
+        views: data.views || 0,
+        upvotes: data.upvotes || 0,
+        downvotes: data.downvotes || 0,
       };
     });
 
     renderCommunityBuildBatch(builds);
 
+    // 📝 Update heading
     const heading = document.querySelector("#communityModal h3");
-    let displayLabel = "All";
+    let displayLabel = capitalize(type); // Public or Clan
     if (
       ["zvp", "zvt", "zvz", "pvp", "pvt", "pvz", "tvp", "tvt", "tvz"].includes(
         lowerFilter
       )
     ) {
-      displayLabel = formatMatchup(lowerFilter);
+      displayLabel += " - " + formatMatchup(lowerFilter);
     } else if (["zerg", "protoss", "terran"].includes(lowerFilter)) {
-      displayLabel = capitalize(lowerFilter);
+      displayLabel += " - " + capitalize(lowerFilter);
     }
 
     heading.textContent = `Community Builds - ${displayLabel}`;

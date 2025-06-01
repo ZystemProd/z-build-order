@@ -11,6 +11,8 @@ import {
 } from "firebase/auth";
 import {
   getFirestore,
+  getDocs,
+  collection,
   doc,
   getDoc,
   setDoc,
@@ -315,8 +317,8 @@ if (confirmDeleteAccountButton) {
 
       // 5. Optionally delete community builds by this user
       if (deleteCommunityBuilds && usernameToDelete) {
-        const communityRef = collection(db, "communityBuilds");
-        const querySnapshot = await getDocs(communityRef);
+        const publishedRef = collection(db, "publishedBuilds");
+        const querySnapshot = await getDocs(publishedRef);
         const toDelete = querySnapshot.docs.filter(
           (doc) =>
             doc.data().username === usernameToDelete ||

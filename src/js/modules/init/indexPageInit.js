@@ -5,6 +5,10 @@ import {
   collection,
   updateDoc,
   deleteDoc,
+  setDoc,
+  query,
+  where,
+  Timestamp,
 } from "firebase/firestore";
 import { auth, db } from "../../../app.js";
 import DOMPurify from "dompurify";
@@ -282,6 +286,24 @@ export async function initializeIndexPage() {
     showBuildsModal(); // ✅ when logged in
   });
 
+  safeAdd("filterPublicBtn", "click", () => {
+    document.getElementById("filterPublicBtn").classList.add("active");
+    document.getElementById("filterClanBtn").classList.remove("active");
+    localStorage.setItem("communityBuildType", "public");
+    filterCommunityBuilds(
+      localStorage.getItem("communityFilterValue") || "all"
+    );
+  });
+
+  safeAdd("filterClanBtn", "click", () => {
+    document.getElementById("filterClanBtn").classList.add("active");
+    document.getElementById("filterPublicBtn").classList.remove("active");
+    localStorage.setItem("communityBuildType", "clan");
+    filterCommunityBuilds(
+      localStorage.getItem("communityFilterValue") || "all"
+    );
+  });
+
   safeAdd("showCommunityModalButton", "click", async () => {
     if (!auth.currentUser) {
       const authBox = document.getElementById("auth-container");
@@ -296,18 +318,27 @@ export async function initializeIndexPage() {
     modal.style.display = "block";
     document.getElementById("communityBuildsContainer").scrollTop = 0;
 
+    // ✅ Set default to Public filter
+    localStorage.setItem("communityBuildType", "public");
+    document.getElementById("filterPublicBtn")?.classList.add("active");
+    document.getElementById("filterClanBtn")?.classList.remove("active");
+
+    // ✅ Clear other filter buttons
     document
       .querySelectorAll("#communityModal .filter-category, .subcategory")
       .forEach((btn) => btn.classList.remove("active"));
 
+    // ✅ Set "All" category active
     const allBtn = document.querySelector(
       '#communityModal .filter-category[data-category="all"]'
     );
     if (allBtn) allBtn.classList.add("active");
 
+    // ✅ Clear search input
     const input = document.getElementById("communitySearchBar");
     if (input) input.value = "";
 
+    // ✅ Load builds and setup filters
     await populateCommunityBuilds();
     attachCommunityCategoryClicks();
 
@@ -431,90 +462,67 @@ export async function initializeIndexPage() {
   });
 
   safeAdd("savePublishSettingsButton", "click", async () => {
-    const publishToCommunity =
-      document.getElementById("publishToCommunity")?.checked;
+    const user = auth.currentUser;
+    if (!user) return;
 
-    if (!window.currentBuildIdToPublish) {
+    const buildId = window.currentBuildIdToPublish;
+    if (!buildId) {
       console.error("❌ No build selected to update.");
       return;
     }
 
-    const buildId = window.currentBuildIdToPublish;
-    const user = auth.currentUser;
-    if (!user) return;
-
-    const userBuildRef = doc(db, `users/${user.uid}/builds/${buildId}`);
-    const buildSnap = await getDoc(userBuildRef);
-    if (!buildSnap.exists()) return;
-    const buildData = buildSnap.data();
-
-    // ✅ Fetch display name
-    const usernameSnap = await getDoc(doc(db, "usernames", user.displayName));
-    const username = usernameSnap.exists() ? usernameSnap.id : "Unknown";
+    const publishToCommunity =
+      document.getElementById("publishToCommunity")?.checked;
 
     // ✅ Get checked clans
     const checkedClans = Array.from(
       document.querySelectorAll(".clanPublishCheckbox:checked")
     ).map((cb) => cb.value);
 
-    // ✅ Save to user build for future reference (for checkbox state)
-    await updateDoc(userBuildRef, {
-      sharedToClans: checkedClans,
-      isPublished: publishToCommunity,
-    });
+    // ✅ Fetch user's personal build
+    const userBuildRef = doc(db, `users/${user.uid}/builds/${buildId}`);
+    const buildSnap = await getDoc(userBuildRef);
+    if (!buildSnap.exists()) return;
 
-    // ✅ Handle community publishing
-    if (publishToCommunity) {
-      await window.publishBuildToCommunity(buildId);
-    } else {
-      await window.unpublishBuild(buildId);
-    }
+    const buildData = buildSnap.data();
 
-    // ✅ Publish to selected clans
-    for (const clanId of checkedClans) {
-      await saveBuildToClan(clanId, buildId, {
-        ...buildData,
-        ownerUid: user.uid,
-        publisherId: user.uid, // Needed for fetchPublishedUserBuilds
-        username,
-        timestamp: Date.now(),
-      });
-    }
-
-    // ✅ Delete from clans that were unchecked
-    const previouslyShared = buildData.sharedToClans || [];
-    const nowUnshared = previouslyShared.filter(
-      (clanId) => !checkedClans.includes(clanId)
+    // ✅ Fetch display name
+    const usernameQuery = query(
+      collection(db, "usernames"),
+      where("userId", "==", user.uid)
     );
+    const usernameSnap = await getDocs(usernameQuery);
+    const username = !usernameSnap.empty ? usernameSnap.docs[0].id : "Unknown";
 
-    for (const clanId of nowUnshared) {
-      const ref = doc(db, `clans/${clanId}/builds/${buildId}`);
-      await deleteDoc(ref);
+    // ✅ Create/Update the published version
+    const publishedBuildRef = doc(db, "publishedBuilds", buildId);
+    const publishedData = {
+      ...buildData,
+      publisherId: user.uid,
+      username,
+      isPublic: publishToCommunity,
+      sharedToClans: checkedClans,
+      datePublished: Timestamp.now(), // ✅ Firestore-native timestamp
+      views: 0,
+      upvotes: 0,
+      downvotes: 0,
+    };
+
+    await setDoc(publishedBuildRef, publishedData);
+
+    // ✅ Delete if fully unpublished (optional)
+    if (!publishToCommunity && checkedClans.length === 0) {
+      await deleteDoc(publishedBuildRef);
     }
 
-    // ✅ Show toast and close modal
-    if (checkedClans.length > 0) {
-      showToast("✅ Shared with selected clans!", "success");
-    } else {
-      showToast("✅ Updated publish settings.", "success");
-    }
+    showToast("✅ Publish settings updated!", "success");
 
+    // ✅ Close modal
     const modal = document.getElementById("publishModal");
     if (modal) modal.style.display = "none";
 
-    // ✅ Refresh the build list UI
-    let activeFilter =
-      document
-        .querySelector(
-          "#buildsModal .filter-category.active, #buildsModal .subcategory.active"
-        )
-        ?.getAttribute("data-category") ||
-      document
-        .querySelector("#buildsModal .subcategory.active")
-        ?.getAttribute("data-subcategory") ||
-      "all";
-
-    filterBuilds(activeFilter);
+    // ✅ Trigger the "Published Builds" tab to refresh view
+    document.getElementById("publishedBuildsTab")?.click();
   });
 
   window.addEventListener("click", (event) => {
