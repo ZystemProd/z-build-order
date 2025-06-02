@@ -1137,6 +1137,124 @@ textarea::-webkit-scrollbar-thumb:hover {
   background-color: #666; /* Darker background when active */
 }
 
+.filters-wrapper {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: auto auto;
+  width: 110px;
+  margin: 0 auto;
+}
+
+/* Base style for all buttons */
+.filter-category {
+  position: relative;
+  background-color: #3a3a3a;
+  color: white;
+  font-weight: bold;
+  text-align: center;
+  padding: 5px 0;
+  font-size: 14px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s ease;
+  border-radius: 0;
+  position: relative;
+  border: 1px solid #444;
+}
+
+.filter-category:hover {
+  background-color: #555;
+}
+
+.filter-category.active {
+  background-color: #963325;
+}
+
+/* Top "All" button (span across 3 columns) */
+.filter-category[data-category="all"] {
+  grid-column: 1 / span 3;
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+}
+
+/* Bottom Z (left) */
+.filter-category[data-category="Zerg"] {
+  border-bottom-left-radius: 12px;
+}
+
+/* Bottom P (middle) — square */
+.filter-category[data-category="Protoss"] {
+  border-radius: 0;
+}
+
+/* Bottom T (right) */
+.filter-category[data-category="Terran"] {
+  border-bottom-right-radius: 12px;
+}
+
+/* Anchor T submenu to right */
+.filter-category[data-category="Terran"] .submenu {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+
+/* Submenu below each race button */
+.submenu {
+  position: absolute;
+  top: calc(100% + 2px);
+  background-color: #222;
+  border: 1px solid #444;
+  border-radius: 6px;
+  z-index: 9999;
+  white-space: nowrap;
+  display: none;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
+}
+
+/* Show submenu when hovering over the parent or submenu itself */
+.filter-category:hover .submenu,
+.filter-category:has(.submenu:hover) .submenu {
+  display: block;
+}
+
+.filter-category:hover .submenu {
+  display: block;
+}
+
+/* Anchor Z submenu to left */
+.filter-category[data-category="Zerg"] .submenu {
+  left: 0;
+}
+
+/* Anchor P submenu to center */
+.filter-category[data-category="Protoss"] .submenu {
+  left: 50%;
+  transform: translateX(-45%);
+}
+
+/* Anchor T submenu to right */
+.filter-category[data-category="Terran"] .submenu {
+  right: -12px;
+}
+
+/* Subcategory items */
+.subcategory {
+  padding: 6px 14px;
+  color: white;
+  font-weight: normal;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.subcategory:hover {
+  background-color: #444;
+}
+
+.subcategory.active {
+  background-color: #963325;
+}
+
 .dropdown-container {
   display: flex;
   flex-direction: column;

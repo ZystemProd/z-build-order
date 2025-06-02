@@ -17,7 +17,6 @@ import { filterBuilds } from "./modal.js";
 import { parseBuildOrder } from "./utils.js";
 import { mapAnnotations } from "./interactive_map.js";
 import { checkPublishButtonVisibility } from "./community.js";
-import { saveBuildToClan } from "./clan.js";
 import DOMPurify from "dompurify";
 
 export async function fetchUserBuilds() {

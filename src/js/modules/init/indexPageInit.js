@@ -56,7 +56,6 @@ import {
   renderCreateClanUI,
   renderChooseManageClanUI,
   renderFindClanUI,
-  saveBuildToClan,
 } from "../clan.js";
 import {
   MapAnnotations,
