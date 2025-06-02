@@ -7,6 +7,8 @@ import {
   getDoc,
   query,
   where,
+  orderBy,
+  limit,
 } from "firebase/firestore";
 
 import { getAuth } from "firebase/auth";
@@ -422,19 +424,15 @@ export async function loadClanBuilds() {
 }
 
 export async function fetchPublishedUserBuilds() {
-  const auth = getAuth();
-  const user = auth.currentUser;
+  const db = getFirestore();
+  const user = getAuth().currentUser;
   if (!user) return [];
 
-  const db = getFirestore();
-  const publishedRef = collection(db, "publishedBuilds");
+  const q = query(
+    collection(db, "publishedBuilds"),
+    where("publisherId", "==", user.uid)
+  );
 
-  const q = query(publishedRef, where("publisherId", "==", user.uid));
   const snapshot = await getDocs(q);
-
-  return snapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-    source: "published",
-  }));
+  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 }

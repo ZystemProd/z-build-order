@@ -386,12 +386,13 @@ export async function initializeIndexPage() {
     const spinnerWrapper = document.getElementById("buildsLoadingWrapper");
     const buildList = document.getElementById("buildList");
 
-    buildList.innerHTML = ""; // ✅ Safe now — does NOT remove the loader
+    buildList.innerHTML = "";
     spinnerWrapper.style.display = "flex";
 
     try {
       const builds = await fetchUserBuilds();
       populateBuildList(builds);
+      updateBuildsTabUI("myBuildsTab", "Build Orders - My Builds");
     } catch (err) {
       console.error("Error loading My Builds:", err);
     } finally {
@@ -409,6 +410,10 @@ export async function initializeIndexPage() {
     try {
       const builds = await fetchPublishedUserBuilds();
       populateBuildList(builds);
+      updateBuildsTabUI(
+        "publishedBuildsTab",
+        "Build Orders - Published Builds"
+      );
     } catch (err) {
       console.error("Error loading Published Builds:", err);
     } finally {
@@ -701,10 +706,10 @@ export async function initializeIndexPage() {
   function attachMyBuildsCategoryClicks() {
     const heading = document.querySelector("#buildsModal .template-header h3");
     const categoryButtons = document.querySelectorAll(
-      "#buildsModal .filter-category"
+      "#buildsModal .filter-category, #communityModal .filter-category"
     );
     const subcategoryButtons = document.querySelectorAll(
-      "#buildsModal .subcategory"
+      "#buildsModal .subcategory, #communityModal .subcategory"
     );
 
     categoryButtons.forEach((el) => {
@@ -712,72 +717,98 @@ export async function initializeIndexPage() {
         const category = el.getAttribute("data-category");
         if (!category) return;
 
-        // 🔄 UI state
+        // 🔄 UI
         categoryButtons.forEach((btn) => btn.classList.remove("active"));
         subcategoryButtons.forEach((btn) => btn.classList.remove("active"));
         el.classList.add("active");
 
-        // 🔄 Clear search bar
-        const search = document.getElementById("buildSearchBar");
-        if (search) search.value = "";
+        // 🔄 Clear search
+        document.getElementById("buildSearchBar").value = "";
+        document.getElementById("communitySearchBar").value = "";
 
-        // 🧠 Special case: Clan Builds
-        if (category === "clan") {
-          const builds = await loadClanBuilds(); // <- your new function
-          populateBuildList(builds); // <- reuse your card renderer
-          if (heading) heading.textContent = "Clan Builds";
-          return;
+        // 🔎 Apply filter
+        const isPublishedTabActive = document
+          .getElementById("publishedBuildsTab")
+          ?.classList.contains("active");
+
+        if (isPublishedTabActive) {
+          const publishedBuilds = await fetchPublishedUserBuilds(category);
+          populateBuildList(publishedBuilds);
+        } else {
+          filterBuilds(category); // My Builds
         }
+        await filterCommunityBuilds(category); // Community
 
-        // 🔎 Normal filtering
-        filterBuilds(category);
+        // 📝 Headings
+        const buildsHeading = document.querySelector(
+          "#buildsModal .template-header h3"
+        );
+        const communityHeading = document.querySelector("#communityModal h3");
 
-        // 📝 Heading
-        if (heading) {
-          heading.textContent =
+        if (buildsHeading) {
+          buildsHeading.textContent =
             category.toLowerCase() === "all"
               ? "Build Orders"
               : `Build Orders - ${capitalize(category)}`;
+        }
+
+        if (communityHeading) {
+          communityHeading.textContent =
+            category.toLowerCase() === "all"
+              ? "Community Builds"
+              : `Community Builds - ${capitalize(category)}`;
         }
       });
     });
   }
 
   function attachSubcategoryClicks() {
-    const heading = document.querySelector("#buildsModal .template-header h3");
     const allCategories = document.querySelectorAll(
-      "#buildsModal .filter-category"
+      "#buildsModal .filter-category, #communityModal .filter-category"
     );
     const allSubcategories = document.querySelectorAll(
-      "#buildsModal .subcategory"
+      "#buildsModal .subcategory, #communityModal .subcategory"
     );
 
     allSubcategories.forEach((el) => {
-      el.addEventListener("click", (e) => {
+      el.addEventListener("click", async (e) => {
         e.stopPropagation();
         const subcat = el.getAttribute("data-subcategory");
         if (!subcat) return;
 
-        // Clear actives
         allCategories.forEach((btn) => btn.classList.remove("active"));
         allSubcategories.forEach((btn) => btn.classList.remove("active"));
-
-        // Set current subcategory and parent as active
         el.classList.add("active");
+
         const parent = el.closest(".filter-category");
         if (parent) parent.classList.add("active");
 
-        // Clear search bar
-        const buildSearch = document.getElementById("buildSearchBar");
-        if (buildSearch) buildSearch.value = "";
+        document.getElementById("buildSearchBar").value = "";
+        document.getElementById("communitySearchBar").value = "";
 
-        // Update heading
-        if (heading) {
-          heading.textContent = `Build Orders - ${capitalize(subcat)}`;
+        const isPublishedTabActive = document
+          .getElementById("publishedBuildsTab")
+          ?.classList.contains("active");
+
+        if (isPublishedTabActive) {
+          const publishedBuilds = await fetchPublishedUserBuilds(subcat);
+          populateBuildList(publishedBuilds);
+        } else {
+          filterBuilds(subcat);
         }
+        await filterCommunityBuilds(subcat);
 
-        // Filter builds
-        filterBuilds(subcat);
+        const buildsHeading = document.querySelector(
+          "#buildsModal .template-header h3"
+        );
+        const communityHeading = document.querySelector("#communityModal h3");
+
+        if (buildsHeading)
+          buildsHeading.textContent = `Build Orders - ${capitalize(subcat)}`;
+        if (communityHeading)
+          communityHeading.textContent = `Community Builds - ${capitalize(
+            subcat
+          )}`;
       });
     });
   }
@@ -860,6 +891,22 @@ export async function initializeIndexPage() {
         heading.textContent = `Community Builds - ${capitalize(subcat)}`;
       });
     });
+  }
+
+  function updateBuildsTabUI(activeTabId, headingText) {
+    const myTab = document.getElementById("myBuildsTab");
+    const pubTab = document.getElementById("publishedBuildsTab");
+
+    if (myTab && pubTab) {
+      myTab.classList.remove("active");
+      pubTab.classList.remove("active");
+
+      const activeTab = document.getElementById(activeTabId);
+      if (activeTab) activeTab.classList.add("active");
+    }
+
+    const heading = document.querySelector("#buildsModal .template-header h3");
+    if (heading) heading.textContent = headingText;
   }
 
   function setupMapModalListeners() {

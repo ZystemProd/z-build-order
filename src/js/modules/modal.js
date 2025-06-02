@@ -24,6 +24,7 @@ import { analyzeBuildOrder } from "./uiHandlers.js";
 import { publishBuildToCommunity } from "./community.js";
 import { setCurrentBuildId } from "./states/buildState.js";
 import { clearEditingPublishedBuild } from "./states/buildState.js";
+import { fetchPublishedUserBuilds } from "./buildManagement.js";
 
 import DOMPurify from "dompurify";
 
@@ -43,7 +44,6 @@ export function formatMatchup(matchup) {
 
 export async function filterBuilds(categoryOrSubcategory = "all") {
   const heading = document.querySelector("#buildsModal .template-header h3");
-  const db = getFirestore();
   const user = getAuth().currentUser;
   if (!user) return;
 
@@ -51,12 +51,31 @@ export async function filterBuilds(categoryOrSubcategory = "all") {
   lastVisibleBuild = null;
   document.getElementById("buildList").innerHTML = "";
 
-  const builds = await fetchFilteredBuilds();
+  const isPublishedTabActive = document
+    .getElementById("publishedBuildsTab")
+    ?.classList.contains("active");
 
+  // ✅ Fetch all builds once (either my builds or published builds)
+  const allBuilds = isPublishedTabActive
+    ? await fetchPublishedUserBuilds()
+    : await fetchFilteredBuilds();
+
+  // ✅ Filter in-memory by category/subcategory
+  const builds = allBuilds.filter((build) => {
+    const cat = currentBuildFilter;
+
+    if (cat === "all") return true;
+
+    const isMatchup = /^[zpt]v[zpt]$/i.test(cat);
+    if (isMatchup) return build.subcategory?.toLowerCase() === cat;
+    return build.category?.toLowerCase() === cat;
+  });
+
+  // ✅ Update heading label
   const label =
     currentBuildFilter === "all"
-      ? "Build Orders"
-      : `Build Orders - ${
+      ? `Build Orders${isPublishedTabActive ? " - Published Builds" : ""}`
+      : `Build Orders${isPublishedTabActive ? " - Published Builds" : ""} - ${
           [
             "zvp",
             "zvt",
@@ -501,10 +520,9 @@ export async function showBuildsModal() {
     return;
   }
 
-  // Disable the button to prevent multiple clicks
   showBuildsButton.disabled = true;
 
-  // Find or create the loader element
+  // Find or create loader
   let loader = buildList.querySelector(".lds-roller");
   if (!loader) {
     loader = document.createElement("div");
@@ -515,14 +533,22 @@ export async function showBuildsModal() {
   }
   loader.style.display = "block";
 
-  // Clear existing build cards (but keep the loader)
+  // Clear all but loader
   Array.from(buildList.children).forEach((child) => {
     if (!child.classList.contains("lds-roller")) {
       buildList.removeChild(child);
     }
   });
 
-  // ✅ Visually activate the "All" filter tab
+  // ✅ Activate the "My Builds" tab
+  const myTab = document.getElementById("myBuildsTab");
+  const pubTab = document.getElementById("publishedBuildsTab");
+  if (myTab && pubTab) {
+    myTab.classList.add("active");
+    pubTab.classList.remove("active");
+  }
+
+  // ✅ Activate "All" category filter
   const allTab = document.querySelector(
     '#buildsModal .filter-category[data-category="all"]'
   );
@@ -531,10 +557,14 @@ export async function showBuildsModal() {
   if (allTab) allTab.classList.add("active");
 
   // ✅ Update heading
-  if (heading) heading.textContent = "Build Orders - All";
+  if (heading) heading.textContent = "Build Orders - My Builds";
 
-  // ✅ Run new Firestore-indexed fetch
-  await filterBuilds("all");
+  // ✅ Load My Builds
+  try {
+    await filterBuilds("all");
+  } catch (err) {
+    console.error("Error loading My Builds:", err);
+  }
 
   loader.style.display = "none";
   buildModal.style.display = "block";
