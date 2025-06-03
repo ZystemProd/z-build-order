@@ -8,7 +8,6 @@ import {
   query,
   where,
   orderBy,
-  limit,
 } from "firebase/firestore";
 
 import { getAuth } from "firebase/auth";
@@ -423,15 +422,29 @@ export async function loadClanBuilds() {
   return clanBuilds;
 }
 
-export async function fetchPublishedUserBuilds() {
+export async function fetchPublishedUserBuilds(filter = "all") {
   const db = getFirestore();
   const user = getAuth().currentUser;
   if (!user) return [];
 
-  const q = query(
-    collection(db, "publishedBuilds"),
-    where("publisherId", "==", user.uid)
-  );
+  const baseRef = collection(db, "publishedBuilds");
+  let q;
+
+  if (filter === "all") {
+    q = query(baseRef, where("publisherId", "==", user.uid));
+  } else if (/^[zpt]v[zpt]$/i.test(filter)) {
+    q = query(
+      baseRef,
+      where("publisherId", "==", user.uid),
+      where("subcategoryLowercase", "==", filter)
+    );
+  } else {
+    q = query(
+      baseRef,
+      where("publisherId", "==", user.uid),
+      where("category", "==", filter)
+    );
+  }
 
   const snapshot = await getDocs(q);
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));

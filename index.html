@@ -346,10 +346,18 @@
           <div id="templateHeaderControls" class="header-controls">
             <input id="templateSearchBar" type="text" placeholder="Search templates..." class="search-bar" />
             <div id="templateFilters">
-              <button onclick="filterTemplates('all')">All</button>
-              <button onclick="filterTemplates('zerg')">Zerg</button>
-              <button onclick="filterTemplates('terran')">Terran</button>
-              <button onclick="filterTemplates('protoss')">Protoss</button>
+              <div class="filters-wrapper">
+                <div class="filter-category" data-category="all">All</div>
+                <div class="filter-category" data-category="Zerg">
+                  Z
+                </div>
+                <div class="filter-category" data-category="Protoss">
+                  P
+                </div>
+                <div class="filter-category" data-category="Terran">
+                  T
+                </div>
+              </div>
             </div>
           </div>
         </div>

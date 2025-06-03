@@ -1,4 +1,5 @@
 import { analyzeBuildOrder } from "./uiHandlers.js";
+import { formatActionText } from "./textFormatters.js";
 import DOMPurify from "dompurify";
 
 const predefinedTemplates = [
@@ -83,7 +84,9 @@ export function populateTemplateList(templateList) {
     `;
 
     // Click to load the template
-    templateCard.addEventListener("click", () => loadTemplate(index));
+    templateCard.addEventListener("click", () =>
+      loadTemplateFromTemplateData(template)
+    );
 
     templateListDiv.appendChild(templateCard);
   });
@@ -91,10 +94,26 @@ export function populateTemplateList(templateList) {
 
 export function previewTemplate(template) {
   const previewDiv = document.getElementById("templatePreview");
+
+  const formattedLines = DOMPurify.sanitize(template.data)
+    .split("\n")
+    .map((line) => {
+      const match = line.match(/^\[(.*?)\]\s*(.*)$/);
+      if (match) {
+        const [, bracket, action] = match;
+        return `<div class="template-line"><span class="template-bracket">[${bracket}]</span> ${formatActionText(
+          action
+        )}</div>`;
+      } else {
+        return `<div class="template-line">${formatActionText(line)}</div>`;
+      }
+    })
+    .join("");
+
   previewDiv.innerHTML = `
-      <h4>${DOMPurify.sanitize(template.title)}</h4>
-      <p>${DOMPurify.sanitize(template.data).replace(/\n/g, "<br>")}</p>
-    `;
+    <h4>${DOMPurify.sanitize(template.title)}</h4>
+    <div class="template-preview-block">${formattedLines}</div>
+  `;
 }
 
 function updateTemplatePreview(templateData) {
@@ -169,20 +188,6 @@ export function saveTemplate() {
   showSaveTemplateModal();
 }
 
-export function loadTemplate(index) {
-  const template = templates[index];
-  const inputField = document.getElementById("buildOrderInput");
-
-  // Set the template data in the input field
-  inputField.value = DOMPurify.sanitize(template.data);
-
-  // Analyze and update the output
-  analyzeBuildOrder(inputField.value);
-
-  // Close the modal
-  closeTemplateModal();
-}
-
 export function deleteTemplate(index) {
   templates.splice(index, 1);
   populateTemplateList(templates);
@@ -221,12 +226,40 @@ export function searchTemplates(query) {
   populateTemplateList(filteredTemplates); // Update template UI
 }
 
+function setupTemplateFiltering() {
+  const buttons = document.querySelectorAll(
+    "#templateFilters .filter-category"
+  );
+
+  buttons.forEach((button) => {
+    button.addEventListener("click", () => {
+      const category = button.getAttribute("data-category");
+
+      // Highlight active
+      buttons.forEach((btn) => btn.classList.remove("active"));
+      button.classList.add("active");
+
+      // Trigger filtering
+      filterTemplates(category.toLowerCase()); // assumes lowercase categories
+    });
+  });
+}
+
+export function loadTemplateFromTemplateData(template) {
+  const inputField = document.getElementById("buildOrderInput");
+  inputField.value = DOMPurify.sanitize(template.data);
+  analyzeBuildOrder(inputField.value);
+  closeTemplateModal();
+}
+
+// Run this on init
+setupTemplateFiltering();
+
 // Call this function during initialization
 setupTemplateModal();
 
 window.showTemplatesModal = showTemplatesModal;
 window.closeTemplateModal = closeTemplateModal;
 window.saveTemplate = saveTemplate;
-window.loadTemplate = loadTemplate;
 window.deleteTemplate = deleteTemplate;
 window.filterTemplates = filterTemplates;

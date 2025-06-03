@@ -30,6 +30,7 @@ import {
   filterBuilds,
   searchBuilds,
   populateBuildList,
+  getCurrentBuildFilter,
 } from "../modal.js";
 import {
   initializeSectionToggles,
@@ -85,6 +86,7 @@ setupTemplateModal(); // Always call early
 let currentBuildId = null;
 let currentClanView = null;
 let allBuilds = [];
+let currentBuildFilter = "all";
 
 /** ----------------
  *  Initialize index.html
@@ -390,9 +392,9 @@ export async function initializeIndexPage() {
     spinnerWrapper.style.display = "flex";
 
     try {
-      const builds = await fetchUserBuilds();
-      populateBuildList(builds);
-      updateBuildsTabUI("myBuildsTab", "Build Orders - My Builds");
+      document.getElementById("myBuildsTab").classList.add("active");
+      document.getElementById("publishedBuildsTab").classList.remove("active");
+      await filterBuilds(getCurrentBuildFilter());
     } catch (err) {
       console.error("Error loading My Builds:", err);
     } finally {
@@ -408,12 +410,9 @@ export async function initializeIndexPage() {
     spinnerWrapper.style.display = "flex";
 
     try {
-      const builds = await fetchPublishedUserBuilds();
-      populateBuildList(builds);
-      updateBuildsTabUI(
-        "publishedBuildsTab",
-        "Build Orders - Published Builds"
-      );
+      document.getElementById("publishedBuildsTab").classList.add("active");
+      document.getElementById("myBuildsTab").classList.remove("active");
+      await filterBuilds(getCurrentBuildFilter());
     } catch (err) {
       console.error("Error loading Published Builds:", err);
     } finally {
@@ -786,18 +785,13 @@ export async function initializeIndexPage() {
         document.getElementById("buildSearchBar").value = "";
         document.getElementById("communitySearchBar").value = "";
 
-        const isPublishedTabActive = document
-          .getElementById("publishedBuildsTab")
-          ?.classList.contains("active");
+        // ✅ Always use the new unified filterBuilds logic
+        await filterBuilds(subcat);
 
-        if (isPublishedTabActive) {
-          const publishedBuilds = await fetchPublishedUserBuilds(subcat);
-          populateBuildList(publishedBuilds);
-        } else {
-          filterBuilds(subcat);
-        }
+        // ✅ Also filter community builds if needed
         await filterCommunityBuilds(subcat);
 
+        // ✅ Update headings
         const buildsHeading = document.querySelector(
           "#buildsModal .template-header h3"
         );

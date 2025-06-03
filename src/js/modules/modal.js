@@ -22,10 +22,11 @@ import { formatActionText } from "./textFormatters.js";
 import { capitalize } from "./helpers/sharedEventUtils.js";
 import { analyzeBuildOrder } from "./uiHandlers.js";
 import { publishBuildToCommunity } from "./community.js";
-import { setCurrentBuildId } from "./states/buildState.js";
-import { clearEditingPublishedBuild } from "./states/buildState.js";
-import { fetchPublishedUserBuilds } from "./buildManagement.js";
-
+import {
+  setCurrentBuildId,
+  clearEditingPublishedBuild,
+} from "./states/buildState.js";
+import { loadBuilds } from "./buildService.js";
 import DOMPurify from "dompurify";
 
 // --- Firestore Pagination State
@@ -49,29 +50,27 @@ export async function filterBuilds(categoryOrSubcategory = "all") {
 
   currentBuildFilter = categoryOrSubcategory.toLowerCase();
   lastVisibleBuild = null;
-  document.getElementById("buildList").innerHTML = "";
+  isLoadingMoreBuilds = false;
+
+  const buildListEl = document.getElementById("buildList");
+  if (buildListEl) buildListEl.innerHTML = "";
 
   const isPublishedTabActive = document
     .getElementById("publishedBuildsTab")
     ?.classList.contains("active");
 
-  // ✅ Fetch all builds once (either my builds or published builds)
-  const allBuilds = isPublishedTabActive
-    ? await fetchPublishedUserBuilds()
-    : await fetchFilteredBuilds();
+  console.log("🧪 Filtering builds...");
+  console.log("➡️ Filter:", currentBuildFilter);
+  console.log("📦 Tab:", isPublishedTabActive ? "Published" : "My Builds");
 
-  // ✅ Filter in-memory by category/subcategory
-  const builds = allBuilds.filter((build) => {
-    const cat = currentBuildFilter;
-
-    if (cat === "all") return true;
-
-    const isMatchup = /^[zpt]v[zpt]$/i.test(cat);
-    if (isMatchup) return build.subcategory?.toLowerCase() === cat;
-    return build.category?.toLowerCase() === cat;
+  const { builds, lastDoc } = await loadBuilds({
+    type: isPublishedTabActive ? "published" : "my",
+    filter: currentBuildFilter,
+    batchSize: 20,
   });
 
-  // ✅ Update heading label
+  lastVisibleBuild = lastDoc;
+
   const label =
     currentBuildFilter === "all"
       ? `Build Orders${isPublishedTabActive ? " - Published Builds" : ""}`
@@ -92,75 +91,71 @@ export async function filterBuilds(categoryOrSubcategory = "all") {
         }`;
 
   if (heading) heading.textContent = label;
+  console.log("🧪 Builds fetched for filter:", currentBuildFilter, builds);
 
   populateBuildList(builds);
   attachBuildScrollListener();
 }
 
-async function fetchFilteredBuilds(batchSize = 20) {
-  const db = getFirestore();
+export async function loadMoreBuilds() {
+  if (isLoadingMoreBuilds) return;
+  isLoadingMoreBuilds = true;
+
+  const container = document.getElementById("buildList");
   const user = getAuth().currentUser;
-  if (!user) return [];
+  if (!user || !lastVisibleBuild) return;
 
-  let q = collection(db, `users/${user.uid}/builds`);
-  const lowerFilter = currentBuildFilter;
+  const newBuilds = await loadBuilds({
+    type: isPublishedTabActive ? "published" : "my",
+    filter: currentBuildFilter,
+    batchSize: 20,
+    after: lastVisibleBuild,
+  });
 
-  if (lowerFilter === "all") {
-    q = query(q, orderBy("timestamp", "desc"), limit(batchSize));
-  } else if (
-    ["zvp", "zvt", "zvz", "pvp", "pvt", "pvz", "tvp", "tvt", "tvz"].includes(
-      lowerFilter
-    )
-  ) {
-    q = query(
-      q,
-      where("subcategoryLowercase", "==", lowerFilter),
-      orderBy("timestamp", "desc"),
-      limit(batchSize)
-    );
-  } else if (["zerg", "protoss", "terran"].includes(lowerFilter)) {
-    q = query(
-      q,
-      where("category", "==", capitalize(lowerFilter)),
-      orderBy("timestamp", "desc"),
-      limit(batchSize)
-    );
+  if (newBuilds.length > 0) {
+    lastVisibleBuild = newBuilds[newBuilds.length - 1];
+    populateBuildList(newBuilds, true);
   }
 
-  if (lastVisibleBuild) {
-    q = query(q, startAfter(lastVisibleBuild));
-  }
+  isLoadingMoreBuilds = false;
+}
 
-  const snap = await getDocs(q);
-  if (!snap.empty) {
-    lastVisibleBuild = snap.docs[snap.docs.length - 1];
-  }
-
-  return snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+export function getCurrentBuildFilter() {
+  return currentBuildFilter;
 }
 
 function attachBuildScrollListener() {
-  const container = document.querySelector("#buildsModal .modal-content");
+  const container = document.getElementById("buildList");
   if (!container) return;
 
-  container.removeEventListener("scroll", handleBuildScroll);
-  container.addEventListener("scroll", handleBuildScroll);
+  container.removeEventListener("scroll", handleScroll); // Prevent duplicates
+  container.addEventListener("scroll", handleScroll);
 }
 
-async function handleBuildScroll() {
-  const container = document.querySelector("#buildsModal .modal-content");
-  if (
-    isLoadingMoreBuilds ||
-    !container ||
-    container.scrollTop + container.clientHeight < container.scrollHeight - 200
-  ) {
-    return;
-  }
+async function handleScroll() {
+  if (isLoadingMoreBuilds || !lastVisibleBuild) return;
 
-  isLoadingMoreBuilds = true;
-  const builds = await fetchFilteredBuilds();
-  populateBuildList(builds, true);
-  isLoadingMoreBuilds = false;
+  const container = document.getElementById("buildList");
+  if (
+    container.scrollTop + container.clientHeight >=
+    container.scrollHeight - 200
+  ) {
+    isLoadingMoreBuilds = true;
+
+    const more = await loadBuilds({
+      type: isPublishedTabActive ? "published" : "my",
+      filter: currentBuildFilter,
+      batchSize: 20,
+      startAfter: lastVisibleBuild,
+    });
+
+    if (more.builds.length) {
+      populateBuildList(more.builds, { append: true });
+      lastVisibleBuild = more.lastDoc;
+    }
+
+    isLoadingMoreBuilds = false;
+  }
 }
 
 async function uploadReplayFile(file) {
@@ -561,7 +556,21 @@ export async function showBuildsModal() {
 
   // ✅ Load My Builds
   try {
-    await filterBuilds("all");
+    // 🔁 Only fetch when My Builds tab is active
+    const myTabActive = document
+      .getElementById("myBuildsTab")
+      ?.classList.contains("active");
+
+    if (myTabActive) {
+      const activeCategory =
+        document.querySelector("#buildsModal .filter-category.active")?.dataset
+          .category ||
+        document.querySelector("#buildsModal .subcategory.active")?.dataset
+          .subcategory ||
+        "all";
+
+      await filterBuilds(activeCategory);
+    }
   } catch (err) {
     console.error("Error loading My Builds:", err);
   }
@@ -584,7 +593,10 @@ window.showBuildsModal = showBuildsModal;
 
 let isPopulatingBuildList = false;
 
-export async function populateBuildList(filteredBuilds = null) {
+export async function populateBuildList(
+  filteredBuilds = null,
+  { append = false } = {}
+) {
   const buildList = document.getElementById("buildList");
   const buildPreview = document.getElementById("buildPreview");
 
@@ -596,11 +608,13 @@ export async function populateBuildList(filteredBuilds = null) {
   if (isPopulatingBuildList) return;
   isPopulatingBuildList = true;
 
-  buildList.innerHTML = "";
+  if (!append) buildList.innerHTML = "";
 
   const builds = filteredBuilds || [];
 
-  if (!builds.length) {
+  console.log("🔍 populateBuildList received builds:", builds); // ✅ Safe to use here
+
+  if (!builds.length && !append) {
     buildList.innerHTML = "<p>No builds available.</p>";
     isPopulatingBuildList = false;
     return;
@@ -609,22 +623,16 @@ export async function populateBuildList(filteredBuilds = null) {
   let lastHoveredBuild = null;
   const fragment = document.createDocumentFragment();
 
-  builds.forEach((build) => {
+  for (const build of builds) {
     const buildCard = document.createElement("div");
     buildCard.classList.add("build-card");
     buildCard.dataset.id = build.id;
     buildCard.style.position = "relative";
-
-    // ✅ Store source and clanId for publish modal logic
     buildCard.dataset.source = build.source || "user";
     buildCard.dataset.clanid = build.clanId || "";
 
-    // ✅ Add .published class if published
-    if (build.isPublished) {
-      buildCard.classList.add("published");
-    }
+    if (build.isPublished) buildCard.classList.add("published");
 
-    // ✅ Determine races based on matchup
     const [playerRace, opponentRace] = getRaceIcons(
       build.subcategory || "Unknown"
     );
@@ -650,19 +658,20 @@ export async function populateBuildList(filteredBuilds = null) {
         <p>Publisher: You</p>
         <p>Date: ${new Date(build.timestamp).toLocaleDateString()}</p>
       </div>
-      <div class="build-publish-info"></div> <!-- Placeholder -->
+      <div class="build-publish-info"></div>
     `;
 
-    // ✅ Set dynamic colors
-    if (build.subcategory?.toUpperCase().startsWith("ZV")) {
+    // Color styles
+    const sub = build.subcategory?.toUpperCase() || "";
+    if (sub.startsWith("ZV")) {
       buildCard.style.setProperty("--gradient-color1", "#8e2de2");
       buildCard.style.setProperty("--gradient-color2", "#4a00e0");
       buildCard.style.setProperty("--race-color", "#8e2de2");
-    } else if (build.subcategory?.toUpperCase().startsWith("PV")) {
+    } else if (sub.startsWith("PV")) {
       buildCard.style.setProperty("--gradient-color1", "#5fe5ff");
       buildCard.style.setProperty("--gradient-color2", "#007cf0");
       buildCard.style.setProperty("--race-color", "#5fe5ff");
-    } else if (build.subcategory?.toUpperCase().startsWith("TV")) {
+    } else if (sub.startsWith("TV")) {
       buildCard.style.setProperty("--gradient-color1", "#ff3a30");
       buildCard.style.setProperty("--gradient-color2", "#ff7b00");
       buildCard.style.setProperty("--race-color", "#ff3a30");
@@ -672,7 +681,7 @@ export async function populateBuildList(filteredBuilds = null) {
       buildCard.style.setProperty("--race-color", "#888");
     }
 
-    // ✅ Hover preview
+    // Hover + click preview
     buildCard.addEventListener("mouseover", () => {
       if (lastHoveredBuild !== build) {
         updateBuildPreview(build);
@@ -680,166 +689,81 @@ export async function populateBuildList(filteredBuilds = null) {
       }
     });
 
-    // ✅ Click to view/edit build
     buildCard.addEventListener("click", () => {
       if (build.source === "community" || build.source === "clan") {
-        // 🔄 Published build: enter edit mode
         setEditingPublishedBuild(build);
-        loadBuildIntoEditor(build); // populate title, notes, etc.
-        showEditorUIForPublishedEdit(); // show [Edit Mode] + correct buttons
-
-        // ✅ Close the modal to focus on editor
-        const buildModal = document.getElementById("buildsModal");
-        if (buildModal) buildModal.style.display = "none";
+        loadBuildIntoEditor(build);
+        showEditorUIForPublishedEdit();
+        document.getElementById("buildsModal").style.display = "none";
       } else {
-        // ✅ My Builds or imported: regular behavior
         clearEditingPublishedBuild();
-        viewBuild(build.id); // load and preview from users/{uid}/builds
+        viewBuild(build.id);
       }
     });
 
-    // ✅ Only allow delete button for personal builds (not published ones)
+    // Handle delete button
     if (build.source !== "community" && build.source !== "clan") {
       const deleteButton = buildCard.querySelector(".delete-build-btn");
       if (deleteButton) {
         deleteButton.addEventListener("click", async (event) => {
           event.stopPropagation();
-          const confirmation = confirm(
-            `Are you sure you want to delete "${build.title}"?`
-          );
-          if (!confirmation) return;
-
+          if (!confirm(`Delete "${build.title}"?`)) return;
           await deleteBuildFromFirestore(build.id);
-
-          // 🔄 Remove from localStorage
-          const savedBuilds = getSavedBuilds();
-          const index = savedBuilds.findIndex((b) => b.id === build.id);
-          if (index !== -1) {
-            savedBuilds.splice(index, 1);
-            setSavedBuilds(savedBuilds);
-          }
-
           const updatedBuilds = await fetchUserBuilds();
-          setSavedBuilds(updatedBuilds); // keep memory sync
-
-          let activeFilter =
-            document
-              .querySelector(
-                "#buildsModal .filter-category.active, #buildsModal .subcategory.active"
-              )
-              ?.getAttribute("data-category") ||
-            document
-              .querySelector("#buildsModal .subcategory.active")
-              ?.getAttribute("data-subcategory") ||
+          setSavedBuilds(updatedBuilds);
+          const activeFilter =
+            document.querySelector("#buildsModal .filter-category.active")
+              ?.dataset.category ||
+            document.querySelector("#buildsModal .subcategory.active")?.dataset
+              .subcategory ||
             "all";
-
           filterBuilds(activeFilter);
-
           const preview = document.getElementById("buildPreview");
-          if (preview && preview.dataset.buildId === build.id) {
+          if (preview?.dataset.buildId === build.id) {
             preview.innerHTML = `<h4>Build Preview</h4><p>Select a build to view details here.</p>`;
             delete preview.dataset.buildId;
-          }
-
-          const heading = document.querySelector(
-            "#buildsModal .template-header h3"
-          );
-          if (heading) {
-            heading.textContent =
-              activeFilter === "all"
-                ? "Build Orders"
-                : `Build Orders - ${activeFilter}`;
           }
         });
       }
     } else {
-      // ❌ Remove the delete button for published builds
       const deleteBtn = buildCard.querySelector(".delete-build-btn");
       if (deleteBtn) deleteBtn.remove();
     }
 
-    const publishButton = buildCard.querySelector(".build-publish-info");
-    if (publishButton) {
-      publishButton.addEventListener("click", (event) => {
-        event.stopPropagation();
-        window.currentBuildIdToPublish = build.id;
-
-        const publishModal = document.getElementById("publishModal");
-        if (publishModal) publishModal.style.display = "block";
-      });
-    }
-
-    // ✅ Setup publish-info button
     const publishInfo = buildCard.querySelector(".build-publish-info");
     if (publishInfo) {
       if (build.imported) {
-        // Imported build (non-clickable)
         publishInfo.classList.add("publish-imported");
         publishInfo.innerHTML = `<span>Imported</span>`;
         publishInfo.style.pointerEvents = "none";
-        publishInfo.style.cursor = "default";
-      } else if (
-        build.isPublic ||
-        (Array.isArray(build.sharedToClans) && build.sharedToClans.length > 0)
-      ) {
-        // Published build (to community or clan)
+      } else if (build.isPublic || (build.sharedToClans?.length ?? 0) > 0) {
         publishInfo.classList.add("publish-published");
-        publishInfo.innerHTML = `<span>Published </span><img src="./img/SVG/checkmark2.svg" alt="Published" class="publish-icon">`;
-
-        // Show "Public" tag if published to community
-        if (build.isPublic) {
+        publishInfo.innerHTML = `<span>Published </span><img src="./img/SVG/checkmark2.svg" class="publish-icon">`;
+        if (build.isPublic)
           publishInfo.innerHTML += `<span class="tag public">Public</span>`;
-        }
-
-        // Show "Clan" tag if shared to clans
-        if (
-          Array.isArray(build.sharedToClans) &&
-          build.sharedToClans.length > 0
-        ) {
+        if (build.sharedToClans?.length > 0)
           publishInfo.innerHTML += `<span class="tag clan">Clan</span>`;
-        }
-
-        publishInfo.addEventListener("click", (event) => {
-          event.stopPropagation();
+        publishInfo.addEventListener("click", (e) => {
+          e.stopPropagation();
           openPublishModal(build.id);
         });
       } else {
-        // Not published build
         publishInfo.classList.add("publish-unpublished");
-        publishInfo.innerHTML = `<img src="./img/SVG/publish2.svg" alt="Publish" class="publish-icon"><span>Publish</span>`;
-        publishInfo.addEventListener("click", (event) => {
-          event.stopPropagation();
+        publishInfo.innerHTML = `<img src="./img/SVG/publish2.svg" class="publish-icon"><span>Publish</span>`;
+        publishInfo.addEventListener("click", (e) => {
+          e.stopPropagation();
           openPublishModal(build.id);
         });
       }
     }
 
     fragment.appendChild(buildCard);
-  });
+  }
 
   buildList.appendChild(fragment);
   isPopulatingBuildList = false;
 }
 
-/*export function openPublishSettingsModal(buildId) {
-  console.log(`⚙️ Open manage publish settings for build: ${buildId}`);
-  currentBuildIdToPublish = buildId;
-
-  const modal = document.getElementById("publishModal");
-  modal.style.display = "block";
-
-  // Load current publish state
-  const buildCard = document.querySelector(`.build-card[data-id="${buildId}"]`);
-
-  if (buildCard) {
-    const isPublished = buildCard.classList.contains("published"); // or based on your state
-    const checkbox = document.getElementById("publishToCommunity");
-    if (checkbox) {
-      checkbox.checked = isPublished;
-    }
-  }
-}
-*/
 // ✅ Helper function to parse matchup races correctly
 function getRaceIcons(subcategory) {
   const raceMap = {
@@ -864,21 +788,7 @@ function getRaceIcons(subcategory) {
 
   return [playerRace, opponentRace];
 }
-/*
-// ✅ Helper to set border color based on race
-function getRaceBorderColor(subcategory) {
-  if (!subcategory) return "#555555";
 
-  if (subcategory.startsWith("Zv")) {
-    return "#7e57c2"; // Zerg purple
-  } else if (subcategory.startsWith("Pv")) {
-    return "#5fe5ff"; // Protoss blue
-  } else if (subcategory.startsWith("Tv")) {
-    return "#ff5252"; // Terran red
-  }
-  return "#555555"; // Default gray
-}
-*/
 export async function unpublishBuild(buildId) {
   try {
     const db = getFirestore();
