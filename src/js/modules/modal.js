@@ -812,7 +812,7 @@ export async function unpublishBuild(buildId) {
     const title = buildData?.title;
 
     const q = query(
-      communityRef,
+      publishedRef,
       where("publisherId", "==", user.uid),
       where("title", "==", title)
     );
