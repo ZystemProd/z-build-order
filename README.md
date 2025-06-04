@@ -7,15 +7,15 @@ Build order program for primary Starcraft 2
    ```bash
    npm install
    ```
-2. Run the dev server:
+2. Start the dev server:
    ```bash
    npm run dev
    ```
-   The application will start on <http://localhost:5173> by default.
+   Visit <http://localhost:5173> in your browser.
 
 ## Building
 
-To create a production build run:
+Create a production build with:
 
 ```bash
 npm run build
@@ -23,18 +23,18 @@ npm run build
 
 ## Preview Deployment
 
-Deploy the latest build to a Firebase preview channel with:
+Deploy the current build to the `dev` preview channel:
 
 ```bash
 npm run preview-deploy
 ```
 
-This command bundles the app and uploads it to the `dev` preview channel.
+Ensure you are authenticated with the Firebase CLI (`firebase login`).
 
 ## Bracket Input Setting
 
-Bracket input inserts `[ ]` automatically for supply or time values. You can
-enable or disable this behaviour from the **Settings** modal:
+The editor can insert `[` `]` automatically around supply and time values. You
+can toggle this in **Settings**:
 
-1. Open the settings modal from the main page.
-2. Toggle **Enable Bracket Input** to turn bracket insertion on or off.
+1. Open the settings modal on the main page.
+2. Enable or disable **Bracket Input**.
