@@ -1,5 +1,4 @@
 
-
 Build order program for primary Starcraft 2
 
 ## Development
@@ -39,8 +38,6 @@ can toggle this in **Settings**:
 
 1. Open the user menu and click **Settings**.
 2. Enable or disable **Bracket Input** in the modal.
-=======
- Build order program for primary Starcraft 2
 
 * Run `npm install` to install dependencies.
 * Install Firebase CLI (`npm install -g firebase-tools` or `npx firebase login`).

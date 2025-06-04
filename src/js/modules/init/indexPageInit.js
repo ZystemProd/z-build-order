@@ -84,6 +84,16 @@ import {
 import { isBracketInputEnabled, setBracketInputEnabled } from "../settings.js";
 import { checkForJoinRequestNotifications } from "../utils/notificationHelpers.js";
 
+function updateSupplyColumnVisibility() {
+  const table = document.getElementById("buildOrderTable");
+  if (!table) return;
+  if (isBracketInputEnabled()) {
+    table.classList.remove("hide-supply");
+  } else {
+    table.classList.add("hide-supply");
+  }
+}
+
 setupTemplateModal(); // Always call early
 
 let currentClanView = null;
@@ -476,6 +486,7 @@ export async function initializeIndexPage() {
     bracketToggle.checked = isBracketInputEnabled();
     bracketToggle.addEventListener("change", () => {
       setBracketInputEnabled(bracketToggle.checked);
+      updateSupplyColumnVisibility();
     });
   }
 
@@ -589,6 +600,7 @@ export async function initializeIndexPage() {
   initializeSectionToggles();
   initializeTextareaClickHandler();
   initializeAutoCorrect();
+  updateSupplyColumnVisibility();
   initializeTooltips();
   setupCatActivationOnInput();
   checkPublishButtonVisibility();

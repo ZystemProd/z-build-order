@@ -486,6 +486,11 @@ button:hover {
   text-overflow: ellipsis; /* Add ellipsis when text overflows */
 }
 
+#buildOrderTable.hide-supply td:first-child,
+#buildOrderTable.hide-supply th:first-child {
+  display: none;
+}
+
 .titleInput {
   max-width: 70%;
   margin: 10px auto;
