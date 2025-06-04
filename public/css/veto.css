@@ -457,8 +457,8 @@ label {
 }
 
 .checkbox-wrapper-59 .switch {
-  width: 60px;
-  height: 30px;
+  width: 45px;
+  height: 20px;
   position: relative;
   display: inline-block;
 }
@@ -480,17 +480,17 @@ label {
 .checkbox-wrapper-59 .slider:before {
   position: absolute;
   content: "";
-  width: 22px;
-  height: 22px;
-  left: 4px;
-  bottom: 4px;
+  width: 12px;
+  height: 12px;
+  left: 0px;
+  bottom: 0px;
   background-color: #777;
   border-radius: 50%;
   transition: 0.2s;
 }
 
 .checkbox-wrapper-59 input:checked + .slider:before {
-  transform: translateX(30px);
+  transform: translateX(24px);
   background-color: limeGreen;
 }
 
