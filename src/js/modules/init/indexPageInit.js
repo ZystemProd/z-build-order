@@ -279,6 +279,8 @@ export async function initializeIndexPage() {
     saveBuildButton.removeAttribute("data-tooltip");
     void saveBuildButton.offsetWidth;
     saveBuildButton.setAttribute("data-tooltip", "Save Current Build");
+
+    monitorBuildChanges();
   });
 
   auth.onAuthStateChanged(async (user) => {
@@ -296,7 +298,7 @@ export async function initializeIndexPage() {
     }
   });
 
-  // monitorBuildChanges();
+  monitorBuildChanges();
 
   safeAdd("showBuildsButton", "click", () => {
     if (!auth.currentUser) {
@@ -908,6 +910,80 @@ export async function initializeIndexPage() {
       });
     });
   }
+
+  function monitorBuildChanges() {
+    const saveBtn = document.getElementById("saveBuildButton");
+    if (!saveBtn) return;
+
+    const fields = [
+      "buildOrderInput",
+      "commentInput",
+      "videoInput",
+      "replayLinkInput",
+      "buildOrderTitleInput",
+    ];
+
+    fields.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el && !el.dataset.monitorAttached) {
+        el.addEventListener("input", () => {
+          saveBtn.disabled = false;
+          saveBtn.style.backgroundColor = "#963325";
+        });
+        el.dataset.monitorAttached = "true";
+      }
+    });
+
+    const categoryDropdown = document.getElementById("buildCategoryDropdown");
+    if (categoryDropdown && !categoryDropdown.dataset.monitorAttached) {
+      categoryDropdown.addEventListener("change", () => {
+        saveBtn.disabled = false;
+        saveBtn.style.backgroundColor = "#963325";
+      });
+      categoryDropdown.dataset.monitorAttached = "true";
+    }
+
+    const annotations = document.getElementById("map-annotations");
+    if (annotations && !annotations.dataset.monitorAttached) {
+      const enable = () => {
+        saveBtn.disabled = false;
+        saveBtn.style.backgroundColor = "#963325";
+      };
+      annotations.addEventListener("click", enable);
+      annotations.dataset.monitorAttached = "true";
+    }
+
+    const mapCards = document.querySelector(
+      "#mapSelectionModal .builds-container"
+    );
+    if (mapCards && !mapCards.dataset.monitorAttached) {
+      mapCards.addEventListener("click", () => {
+        saveBtn.disabled = false;
+        saveBtn.style.backgroundColor = "#963325";
+      });
+      mapCards.dataset.monitorAttached = "true";
+    }
+
+    const clearBtn = document.querySelector(".clear-annotations-button");
+    if (clearBtn && !clearBtn.dataset.monitorAttached) {
+      clearBtn.addEventListener("click", () => {
+        saveBtn.disabled = false;
+        saveBtn.style.backgroundColor = "#963325";
+      });
+      clearBtn.dataset.monitorAttached = "true";
+    }
+
+    const mapImage = document.getElementById("map-preview-image");
+    if (mapImage && !mapImage.dataset.monitorAttached) {
+      mapImage.addEventListener("mouseup", () => {
+        saveBtn.disabled = false;
+        saveBtn.style.backgroundColor = "#963325";
+      });
+      mapImage.dataset.monitorAttached = "true";
+    }
+  }
+
+  window.monitorBuildChanges = monitorBuildChanges;
 
   function updateBuildsTabUI(activeTabId, headingText) {
     const myTab = document.getElementById("myBuildsTab");
