@@ -106,26 +106,27 @@ export function initializeAutoCorrect() {
     }
   }
 
+  function replaceCurrentWordWith(text) {
+    const wordBoundaryRegex = /\b(\w+)$/;
+    const cursorPosition = inputField.selectionStart;
+    const textBeforeCaret = inputField.value.substring(0, cursorPosition);
+    const match = textBeforeCaret.match(wordBoundaryRegex);
+    if (!match) return;
+
+    const start = cursorPosition - match[1].length;
+    inputField.setSelectionRange(start, cursorPosition);
+    inputField.focus();
+    document.execCommand("insertText", false, text);
+
+    popup.style.visibility = "hidden";
+    activeIndex = 0;
+    analyzeBuildOrder(inputField.value);
+  }
+
   function applySuggestion() {
     const activeSuggestion = popup.querySelector(".suggestion.active");
     if (activeSuggestion) {
-      const currentWordRegex = /\b(\w+)$/; // Match the last word before the caret
-      const cursorPosition = inputField.selectionStart;
-      const textBeforeCaret = inputField.value.substring(0, cursorPosition);
-      const textAfterCaret = inputField.value.substring(cursorPosition);
-
-      inputField.value =
-        textBeforeCaret.replace(
-          currentWordRegex,
-          activeSuggestion.textContent
-        ) + textAfterCaret;
-
-      popup.style.visibility = "hidden";
-      inputField.focus();
-      activeIndex = 0; // Reset active index
-
-      // Call analyzeBuildOrder to update the buildOrderTable
-      analyzeBuildOrder(inputField.value);
+      replaceCurrentWordWith(activeSuggestion.textContent);
     }
   }
 
@@ -265,15 +266,8 @@ export function initializeAutoCorrect() {
       suggestion.appendChild(textEl);
   
       suggestion.addEventListener("click", () => {
-        const start = inputField.value
-          .substring(0, cursorPosition)
-          .replace(wordBoundaryRegex, match.name);
-        const end = inputField.value.substring(cursorPosition);
-        inputField.value = start + end;
-  
-        popup.style.visibility = "hidden";
-        inputField.focus();
-        analyzeBuildOrder(inputField.value);
+        inputField.selectionStart = inputField.selectionEnd = cursorPosition;
+        replaceCurrentWordWith(match.name);
       });
   
       popup.appendChild(suggestion);
