@@ -324,9 +324,16 @@ export async function updateCurrentBuild(buildId) {
 
   // 🗺 Map name update (if selected)
   if (mapImage?.src) {
-    const match = mapImage.src.match(/\/img\/maps\/(.+)\.webp/);
-    if (match) {
-      updatedData.map = match[1].replace(/_/g, " ");
+    try {
+      const url = new URL(mapImage.src);
+      const filename = url.pathname.split("/").pop();
+      if (filename) {
+        updatedData.map = filename
+          .replace(/\.webp$/i, "")
+          .replace(/_/g, " ");
+      }
+    } catch (err) {
+      console.warn("🛑 Failed to parse map name:", mapImage.src, err);
     }
   }
 
