@@ -486,6 +486,12 @@ export async function openPublishModal(buildId) {
   modal.style.display = "block";
 }
 
+// Alias for legacy calls
+export function openPublishSettingsModal(buildId) {
+  openPublishModal(buildId);
+}
+window.openPublishSettingsModal = openPublishSettingsModal;
+
 export function showSubcategories(event) {
   const subcategoriesMenu = event.target.querySelector(".subcategories-menu");
   if (subcategoriesMenu) {
