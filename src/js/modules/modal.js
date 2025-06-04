@@ -465,19 +465,24 @@ export async function openPublishModal(buildId) {
     const cid = clanDoc.id;
 
     if (clan.members?.includes(user.uid)) {
-      const label = document.createElement("label");
-      label.classList.add("clan-checkbox-label");
+      const row = document.createElement("div");
+      row.classList.add("clan-checkbox-label", "publish-checkbox-row");
 
       const isShared = sourceData?.sharedToClans?.includes(cid);
 
-      label.innerHTML = `
-        <input type="checkbox" class="clanPublishCheckbox" value="${cid}" ${
-        isShared ? "checked" : ""
-      } />
-        Share with ${DOMPurify.sanitize(clan.name)}
+      row.innerHTML = `
+        <span>Share with ${DOMPurify.sanitize(clan.name)}</span>
+        <div class="checkbox-wrapper-59">
+          <label class="switch">
+            <input type="checkbox" class="clanPublishCheckbox" value="${cid}" ${
+              isShared ? "checked" : ""
+            } />
+            <span class="slider"></span>
+          </label>
+        </div>
       `;
 
-      clanContainer.appendChild(label);
+      clanContainer.appendChild(row);
     }
   });
 

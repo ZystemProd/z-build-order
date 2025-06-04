@@ -605,10 +605,15 @@
         <p>Where would you like to publish this build?</p>
 
         <div class="publish-status-list">
-          <label class="publish-checkbox-row">
-            Publish to Community
-            <input type="checkbox" id="publishToCommunity" />
-          </label>
+          <div class="publish-checkbox-row">
+            <span>Publish to Community</span>
+            <div class="checkbox-wrapper-59">
+              <label class="switch">
+                <input type="checkbox" id="publishToCommunity" />
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
 
           <div id="clanPublishList" class="publish-checkbox-list">
             <!-- Checkboxes will be inserted here dynamically -->
@@ -628,10 +633,15 @@
       <div class="modal-content small-modal">
         <span class="close-modal" id="closeSettingsModal">&times;</span>
         <h3>Settings</h3>
-        <label class="publish-checkbox-row">
-          Enable Bracket Input
-          <input type="checkbox" id="bracketInputToggle" checked />
-        </label>
+        <div class="publish-checkbox-row">
+          <span>Enable Bracket Input</span>
+          <div class="checkbox-wrapper-59">
+            <label class="switch">
+              <input type="checkbox" id="bracketInputToggle" checked />
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -652,10 +662,15 @@
       <div class="modal-content">
         <h3>⚠️ Confirm Account Deletion</h3>
         <p>This will permanently delete your account and personal builds.</p>
-        <label>
-          <input type="checkbox" id="deleteCommunityBuildsCheckbox" />
-          Also delete my published community builds
-        </label>
+        <div class="publish-checkbox-row">
+          <span>Also delete my published community builds</span>
+          <div class="checkbox-wrapper-59">
+            <label class="switch">
+              <input type="checkbox" id="deleteCommunityBuildsCheckbox" />
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
         <br /><br />
         <button id="confirmDeleteAccountButton" class="auth-button">Yes, Delete My Account</button>
         <button id="cancelDeleteAccountButton" class="auth-button">Cancel</button>
@@ -688,7 +703,7 @@
     </div>
     <div class="footer-center" id="site-info">
       <p>Made by Zystem</p>
-      <p>Version 0.5.6008</p>
+      <p>Version 0.5.6015</p>
     </div>
     <div class="footer-right" id="site-logo">
       <a href="https://www.twitch.tv/zystem" target="_blank">

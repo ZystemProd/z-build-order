@@ -161,9 +161,16 @@ export function initializeAuthUI() {
   const userMenu = document.getElementById("userMenu");
   const signInBtn = document.getElementById("signInBtn");
   const showClanBtn = document.getElementById("showClanModalButton");
+  const mapVetoBtn = document.getElementById("mapVetoBtn");
+  const settingsMenuItem = document.getElementById("settingsBtn");
+  const switchAccountMenuItem = document.getElementById("switchAccountBtn");
+  const signOutMenuItem = document.getElementById("signOutBtn");
+  const deleteAccountMenuItem = document.getElementById("deleteAccountBtn");
+  const menuDividers = document.querySelectorAll("#userMenu .menu-divider");
 
   // ✅ IMMEDIATE HIDE to prevent any flashing before Firebase loads
   if (userMenu) userMenu.style.display = "none";
+  menuDividers.forEach((d) => (d.style.display = "none"));
 
   if (authLoadingWrapper) authLoadingWrapper.style.display = "flex";
   if (userName) userName.style.display = "none";
@@ -190,12 +197,26 @@ export function initializeAuthUI() {
       if (userPhoto) userPhoto.src = user.photoURL || "img/default-avatar.webp";
       if (signInBtn) signInBtn.style.display = "none";
       if (showClanBtn) showClanBtn.disabled = false;
+      if (mapVetoBtn) mapVetoBtn.style.display = "block";
+      if (showClanBtn) showClanBtn.style.display = "block";
+      if (settingsMenuItem) settingsMenuItem.style.display = "block";
+      if (switchAccountMenuItem) switchAccountMenuItem.style.display = "block";
+      if (signOutMenuItem) signOutMenuItem.style.display = "block";
+      if (deleteAccountMenuItem) deleteAccountMenuItem.style.display = "block";
+      menuDividers.forEach((d) => (d.style.display = "block"));
     } else {
       if (userName) userName.innerText = "Guest";
       if (userPhoto) userPhoto.src = "img/default-avatar.webp";
       if (userMenu) userMenu.style.display = "none";
       if (signInBtn) signInBtn.style.display = "inline-block";
       if (showClanBtn) showClanBtn.disabled = true;
+      if (mapVetoBtn) mapVetoBtn.style.display = "block";
+      if (showClanBtn) showClanBtn.style.display = "none";
+      if (settingsMenuItem) settingsMenuItem.style.display = "none";
+      if (switchAccountMenuItem) switchAccountMenuItem.style.display = "none";
+      if (signOutMenuItem) signOutMenuItem.style.display = "none";
+      if (deleteAccountMenuItem) deleteAccountMenuItem.style.display = "none";
+      menuDividers.forEach((d) => (d.style.display = "none"));
       resetBuildInputs();
     }
 
