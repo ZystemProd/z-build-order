@@ -1,5 +1,4 @@
 
-
 Build order program for primary Starcraft 2
 
 ## Development
@@ -37,10 +36,8 @@ Ensure you are authenticated with the Firebase CLI (`firebase login`).
 The editor can insert `[` `]` automatically around supply and time values. You
 can toggle this in **Settings**:
 
-1. Open the settings modal on the main page.
-2. Enable or disable **Bracket Input**.
-=======
- Build order program for primary Starcraft 2
+1. Open the user menu and click **Settings**.
+2. Enable or disable **Bracket Input** in the modal.
 
 * Run `npm install` to install dependencies.
 * Install Firebase CLI (`npm install -g firebase-tools` or `npx firebase login`).

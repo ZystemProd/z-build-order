@@ -81,7 +81,18 @@ import {
   safeChange,
   capitalize,
 } from "../helpers/sharedEventUtils.js";
+import { isBracketInputEnabled, setBracketInputEnabled } from "../settings.js";
 import { checkForJoinRequestNotifications } from "../utils/notificationHelpers.js";
+
+function updateSupplyColumnVisibility() {
+  const table = document.getElementById("buildOrderTable");
+  if (!table) return;
+  if (isBracketInputEnabled()) {
+    table.classList.remove("hide-supply");
+  } else {
+    table.classList.add("hide-supply");
+  }
+}
 
 setupTemplateModal(); // Always call early
 
@@ -388,6 +399,7 @@ export async function initializeIndexPage() {
   safeInput("templateSearchBar", (val) => searchTemplates(val));
   safeInput("videoInput", (val) => updateYouTubeEmbed(val));
   safeAdd("buildOrderTitleText", "click", () => toggleTitleInput(true));
+  safeAdd("buildOrderTitleText", "focus", () => toggleTitleInput(true));
 
   // --- Dropdown Color Change
   safeChange("buildCategoryDropdown", updateDropdownColor);
@@ -457,6 +469,27 @@ export async function initializeIndexPage() {
     const modal = document.getElementById("privacyModal");
     if (modal) modal.style.display = "block";
   });
+
+  safeAdd("closeSettingsModal", "click", () => {
+    const modal = document.getElementById("settingsModal");
+    if (modal) modal.style.display = "none";
+  });
+
+  const settingsModal = document.getElementById("settingsModal");
+  window.addEventListener("click", (event) => {
+    if (settingsModal && event.target === settingsModal) {
+      settingsModal.style.display = "none";
+    }
+  });
+
+  const bracketToggle = document.getElementById("bracketInputToggle");
+  if (bracketToggle) {
+    bracketToggle.checked = isBracketInputEnabled();
+    bracketToggle.addEventListener("change", () => {
+      setBracketInputEnabled(bracketToggle.checked);
+      updateSupplyColumnVisibility();
+    });
+  }
 
   safeAdd("closePrivacyModal", "click", () => {
     const modal = document.getElementById("privacyModal");
@@ -568,6 +601,7 @@ export async function initializeIndexPage() {
   initializeSectionToggles();
   initializeTextareaClickHandler();
   initializeAutoCorrect();
+  updateSupplyColumnVisibility();
   initializeTooltips();
   setupCatActivationOnInput();
   checkPublishButtonVisibility();
@@ -623,6 +657,17 @@ export async function initializeIndexPage() {
 
   document.getElementById("mapVetoBtn")?.addEventListener("click", () => {
     window.location.href = "/veto.html";
+  });
+
+  document.getElementById("settingsBtn")?.addEventListener("click", () => {
+    const userMenu = document.getElementById("userMenu");
+    if (userMenu) userMenu.style.display = "none";
+    const modal = document.getElementById("settingsModal");
+    if (modal) {
+      modal.style.display = "block";
+      const toggle = document.getElementById("bracketInputToggle");
+      if (toggle) toggle.checked = isBracketInputEnabled();
+    }
   });
 
   const clanModal = document.getElementById("clanModal");

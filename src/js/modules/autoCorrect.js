@@ -2,6 +2,7 @@ import { units } from "../data/units.js";
 import { structures } from "../data/structures.js";
 import { upgrades } from "../data/upgrades.js";
 import { analyzeBuildOrder } from "./uiHandlers.js";
+import { isBracketInputEnabled } from "./settings.js";
 import DOMPurify from "dompurify";
 
 // Function to position the autocomplete popup below the caret
@@ -105,26 +106,27 @@ export function initializeAutoCorrect() {
     }
   }
 
+  function replaceCurrentWordWith(text) {
+    const wordBoundaryRegex = /\b(\w+)$/;
+    const cursorPosition = inputField.selectionStart;
+    const textBeforeCaret = inputField.value.substring(0, cursorPosition);
+    const match = textBeforeCaret.match(wordBoundaryRegex);
+    if (!match) return;
+
+    const start = cursorPosition - match[1].length;
+    inputField.setSelectionRange(start, cursorPosition);
+    inputField.focus();
+    document.execCommand("insertText", false, text);
+
+    popup.style.visibility = "hidden";
+    activeIndex = 0;
+    analyzeBuildOrder(inputField.value);
+  }
+
   function applySuggestion() {
     const activeSuggestion = popup.querySelector(".suggestion.active");
     if (activeSuggestion) {
-      const currentWordRegex = /\b(\w+)$/; // Match the last word before the caret
-      const cursorPosition = inputField.selectionStart;
-      const textBeforeCaret = inputField.value.substring(0, cursorPosition);
-      const textAfterCaret = inputField.value.substring(cursorPosition);
-
-      inputField.value =
-        textBeforeCaret.replace(
-          currentWordRegex,
-          activeSuggestion.textContent
-        ) + textAfterCaret;
-
-      popup.style.visibility = "hidden";
-      inputField.focus();
-      activeIndex = 0; // Reset active index
-
-      // Call analyzeBuildOrder to update the buildOrderTable
-      analyzeBuildOrder(inputField.value);
+      replaceCurrentWordWith(activeSuggestion.textContent);
     }
   }
 
@@ -133,6 +135,15 @@ export function initializeAutoCorrect() {
     const text = inputField.value;
     const textBeforeCaret = text.substring(0, cursorPosition);
     const textAfterCaret = text.substring(cursorPosition);
+
+    if (!isBracketInputEnabled()) {
+      event.preventDefault();
+      inputField.focus();
+      document.execCommand("insertText", false, "\n");
+      inputField.scrollTop = inputField.scrollHeight;
+      analyzeBuildOrder(inputField.value);
+      return;
+    }
 
     // ✅ Fix: Move cursor outside bracket if inside [anything|]
     const bracketStart = textBeforeCaret.lastIndexOf("[");
@@ -145,16 +156,16 @@ export function initializeAutoCorrect() {
       cursorPosition <= bracketEnd
     ) {
       event.preventDefault();
-    
-      // If there's no space after ], insert one
+
+      // If there's no space after ], insert one and record in undo stack
       if (inputField.value[bracketEnd + 1] !== " ") {
-        inputField.value =
-          inputField.value.slice(0, bracketEnd + 1) +
-          " " +
-          inputField.value.slice(bracketEnd + 1);
+        inputField.setSelectionRange(bracketEnd + 1, bracketEnd + 1);
+        inputField.focus();
+        document.execCommand("insertText", false, " ");
       }
-    
-      inputField.selectionStart = inputField.selectionEnd = bracketEnd + 2; // after bracket + space
+
+      // Move cursor right after the inserted space
+      inputField.selectionStart = inputField.selectionEnd = bracketEnd + 2;
       return;
     }
     
@@ -169,7 +180,8 @@ export function initializeAutoCorrect() {
     if (afterBracketsMatch) {
       // ✅ Create a **new row** and move cursor inside `[|]`
       event.preventDefault();
-      inputField.value = textBeforeCaret + "\n[]" + textAfterCaret; // No extra space inside brackets
+      inputField.focus();
+      document.execCommand("insertText", false, "\n[]");
 
       // Move cursor **inside** the new brackets `[|]`
       inputField.selectionStart = inputField.selectionEnd = cursorPosition + 2;
@@ -184,7 +196,8 @@ export function initializeAutoCorrect() {
 
     // 3️⃣ Default behavior: Create new row and move cursor inside `[|]`
     event.preventDefault();
-    inputField.value = textBeforeCaret + "\n[]" + textAfterCaret; // No extra space inside brackets
+    inputField.focus();
+    document.execCommand("insertText", false, "\n[]");
 
     // Move cursor inside the new brackets `[|]`
     inputField.selectionStart = inputField.selectionEnd = cursorPosition + 2;
@@ -253,15 +266,8 @@ export function initializeAutoCorrect() {
       suggestion.appendChild(textEl);
   
       suggestion.addEventListener("click", () => {
-        const start = inputField.value
-          .substring(0, cursorPosition)
-          .replace(wordBoundaryRegex, match.name);
-        const end = inputField.value.substring(cursorPosition);
-        inputField.value = start + end;
-  
-        popup.style.visibility = "hidden";
-        inputField.focus();
-        analyzeBuildOrder(inputField.value);
+        inputField.selectionStart = inputField.selectionEnd = cursorPosition;
+        replaceCurrentWordWith(match.name);
       });
   
       popup.appendChild(suggestion);
