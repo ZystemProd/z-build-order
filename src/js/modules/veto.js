@@ -1,3 +1,10 @@
+import { auth } from "../../app.js";
+import {
+  isMapPreviewHidden,
+  setMapPreviewHidden,
+  loadUserSettings,
+} from "./settings.js";
+
 // Map Data (New Map Pool)
 let mapData = [];
 let mapImages = {};
@@ -297,15 +304,20 @@ window.addEventListener("DOMContentLoaded", async () => {
     console.error("❌ Failed to load maps.json or process maps:", err);
   }
 
-  // Attach hide preview checkbox listener
+  // Attach hide preview checkbox listener and apply stored setting
   const checkbox = document.getElementById("hidePreviewCheckbox");
   if (checkbox) {
-    checkbox.addEventListener("change", toggleMapPreviewVisibility);
+    auth.onAuthStateChanged(async (user) => {
+      if (user) await loadUserSettings();
+      checkbox.checked = isMapPreviewHidden();
+      toggleMapPreviewVisibility();
+    });
+
+    checkbox.addEventListener("change", () => {
+      toggleMapPreviewVisibility();
+      setMapPreviewHidden(checkbox.checked);
+    });
   }
 
   // Your other listeners...
 });
-
-document
-  .getElementById("hidePreviewCheckbox")
-  .addEventListener("change", toggleMapPreviewVisibility);
