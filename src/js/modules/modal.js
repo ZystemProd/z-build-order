@@ -371,6 +371,8 @@ export async function viewBuild(buildId) {
     if (saveBtn) saveBtn.innerText = "Update Build";
     if (newBtn) newBtn.style.display = "inline-block";
 
+    if (window.monitorBuildChanges) window.monitorBuildChanges();
+
     closeModal();
   } catch (error) {
     console.error("❌ Error loading build:", error);
