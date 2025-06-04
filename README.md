@@ -37,8 +37,8 @@ Ensure you are authenticated with the Firebase CLI (`firebase login`).
 The editor can insert `[` `]` automatically around supply and time values. You
 can toggle this in **Settings**:
 
-1. Open the settings modal on the main page.
-2. Enable or disable **Bracket Input**.
+1. Open the user menu and click **Settings**.
+2. Enable or disable **Bracket Input** in the modal.
 =======
  Build order program for primary Starcraft 2
 

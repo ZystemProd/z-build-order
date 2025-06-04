@@ -56,6 +56,10 @@
             <img src="img/SVG/clan.svg" class="menu-icon" /> Clans
           </button>
           <hr class="menu-divider" />
+          <button class="menu-item" id="settingsBtn">
+            <img src="img/SVG/settings.svg" class="menu-icon" /> Settings
+          </button>
+          <hr class="menu-divider" />
           <button class="menu-item" id="switchAccountBtn">
             <img src="img/SVG/switch.svg" class="menu-icon" /> Switch Account
           </button>
@@ -619,6 +623,17 @@
     </div>
 
 
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal" style="display: none;">
+      <div class="modal-content small-modal">
+        <span class="close-modal" id="closeSettingsModal">&times;</span>
+        <h3>Settings</h3>
+        <label class="publish-checkbox-row">
+          Enable Bracket Input
+          <input type="checkbox" id="bracketInputToggle" checked />
+        </label>
+      </div>
+    </div>
 
     <!-- Modal for delete notification -->
     <div id="deleteConfirmationModal" class="modal">
@@ -673,7 +688,7 @@
     </div>
     <div class="footer-center" id="site-info">
       <p>Made by Zystem</p>
-      <p>Version 0.5.2</p>
+      <p>Version 0.5.3</p>
     </div>
     <div class="footer-right" id="site-logo">
       <a href="https://www.twitch.tv/zystem" target="_blank">

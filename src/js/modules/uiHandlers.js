@@ -10,6 +10,7 @@ import {
 import { abbreviationMap } from "../data/abbreviationMap.js";
 import { setCurrentBuildId } from "./states/buildState.js";
 import { parseBuildOrder } from "./utils.js";
+import { isBracketInputEnabled } from "./settings.js";
 
 // Function to toggle the title input field
 export function toggleTitleInput(showInput) {
@@ -270,6 +271,7 @@ export function initializeTextareaClickHandler() {
   }
 
   textarea.addEventListener("click", function () {
+    if (!isBracketInputEnabled()) return;
     if (textarea.value.trim() === "") {
       // If the textarea is empty, set its value to "[]"
       textarea.value = "[]";

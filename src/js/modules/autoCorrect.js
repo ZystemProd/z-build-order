@@ -2,6 +2,7 @@ import { units } from "../data/units.js";
 import { structures } from "../data/structures.js";
 import { upgrades } from "../data/upgrades.js";
 import { analyzeBuildOrder } from "./uiHandlers.js";
+import { isBracketInputEnabled } from "./settings.js";
 import DOMPurify from "dompurify";
 
 // Function to position the autocomplete popup below the caret
@@ -133,6 +134,15 @@ export function initializeAutoCorrect() {
     const text = inputField.value;
     const textBeforeCaret = text.substring(0, cursorPosition);
     const textAfterCaret = text.substring(cursorPosition);
+
+    if (!isBracketInputEnabled()) {
+      event.preventDefault();
+      inputField.value = textBeforeCaret + "\n" + textAfterCaret;
+      inputField.selectionStart = inputField.selectionEnd = cursorPosition + 1;
+      inputField.scrollTop = inputField.scrollHeight;
+      analyzeBuildOrder(inputField.value);
+      return;
+    }
 
     // ✅ Fix: Move cursor outside bracket if inside [anything|]
     const bracketStart = textBeforeCaret.lastIndexOf("[");

@@ -81,6 +81,7 @@ import {
   safeChange,
   capitalize,
 } from "../helpers/sharedEventUtils.js";
+import { isBracketInputEnabled, setBracketInputEnabled } from "../settings.js";
 import { checkForJoinRequestNotifications } from "../utils/notificationHelpers.js";
 
 setupTemplateModal(); // Always call early
@@ -458,6 +459,26 @@ export async function initializeIndexPage() {
     if (modal) modal.style.display = "block";
   });
 
+  safeAdd("closeSettingsModal", "click", () => {
+    const modal = document.getElementById("settingsModal");
+    if (modal) modal.style.display = "none";
+  });
+
+  const settingsModal = document.getElementById("settingsModal");
+  window.addEventListener("click", (event) => {
+    if (settingsModal && event.target === settingsModal) {
+      settingsModal.style.display = "none";
+    }
+  });
+
+  const bracketToggle = document.getElementById("bracketInputToggle");
+  if (bracketToggle) {
+    bracketToggle.checked = isBracketInputEnabled();
+    bracketToggle.addEventListener("change", () => {
+      setBracketInputEnabled(bracketToggle.checked);
+    });
+  }
+
   safeAdd("closePrivacyModal", "click", () => {
     const modal = document.getElementById("privacyModal");
     if (modal) modal.style.display = "none";
@@ -623,6 +644,17 @@ export async function initializeIndexPage() {
 
   document.getElementById("mapVetoBtn")?.addEventListener("click", () => {
     window.location.href = "/veto.html";
+  });
+
+  document.getElementById("settingsBtn")?.addEventListener("click", () => {
+    const userMenu = document.getElementById("userMenu");
+    if (userMenu) userMenu.style.display = "none";
+    const modal = document.getElementById("settingsModal");
+    if (modal) {
+      modal.style.display = "block";
+      const toggle = document.getElementById("bracketInputToggle");
+      if (toggle) toggle.checked = isBracketInputEnabled();
+    }
   });
 
   const clanModal = document.getElementById("clanModal");
