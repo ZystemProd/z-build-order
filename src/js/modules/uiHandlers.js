@@ -44,15 +44,22 @@ export function toggleSection(header) {
   const sectionId = header.getAttribute("data-section");
   const section = document.getElementById(sectionId);
   const arrow = header.querySelector(".arrow");
+  const catBox = document.getElementById("box");
 
   if (section.classList.contains("hidden")) {
     section.classList.remove("hidden");
     section.classList.add("visible");
     arrow.classList.add("open");
+    if (sectionId === "buildOrderInputField" && catBox) {
+      catBox.style.display = "inline-block";
+    }
   } else {
     section.classList.remove("visible");
     section.classList.add("hidden");
     arrow.classList.remove("open");
+    if (sectionId === "buildOrderInputField" && catBox) {
+      catBox.style.display = "none";
+    }
   }
 }
 

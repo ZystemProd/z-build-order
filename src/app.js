@@ -166,9 +166,11 @@ export function initializeAuthUI() {
   const switchAccountMenuItem = document.getElementById("switchAccountBtn");
   const signOutMenuItem = document.getElementById("signOutBtn");
   const deleteAccountMenuItem = document.getElementById("deleteAccountBtn");
+  const menuDividers = document.querySelectorAll("#userMenu .menu-divider");
 
   // ✅ IMMEDIATE HIDE to prevent any flashing before Firebase loads
   if (userMenu) userMenu.style.display = "none";
+  menuDividers.forEach((d) => (d.style.display = "none"));
 
   if (authLoadingWrapper) authLoadingWrapper.style.display = "flex";
   if (userName) userName.style.display = "none";
@@ -201,6 +203,7 @@ export function initializeAuthUI() {
       if (switchAccountMenuItem) switchAccountMenuItem.style.display = "block";
       if (signOutMenuItem) signOutMenuItem.style.display = "block";
       if (deleteAccountMenuItem) deleteAccountMenuItem.style.display = "block";
+      menuDividers.forEach((d) => (d.style.display = "block"));
     } else {
       if (userName) userName.innerText = "Guest";
       if (userPhoto) userPhoto.src = "img/default-avatar.webp";
@@ -213,6 +216,7 @@ export function initializeAuthUI() {
       if (switchAccountMenuItem) switchAccountMenuItem.style.display = "none";
       if (signOutMenuItem) signOutMenuItem.style.display = "none";
       if (deleteAccountMenuItem) deleteAccountMenuItem.style.display = "none";
+      menuDividers.forEach((d) => (d.style.display = "none"));
       resetBuildInputs();
     }
 
