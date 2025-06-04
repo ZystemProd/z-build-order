@@ -3189,6 +3189,8 @@ td {
 /* Publish Modal Styles */
 .small-modal {
   max-width: 420px;
+  min-height: 400px;
+  height: auto;
   background: #2b2b2b;
   padding: 30px 24px;
   border-radius: 14px;
@@ -3282,9 +3284,7 @@ td {
   line-height: 1.5;
 }
 
-
 /* Checkbox styling replaced by custom toggle component */
-
 
 /* Username input default */
 #usernameInput {
@@ -4195,8 +4195,8 @@ td {
 }
 
 .checkbox-wrapper-59 .switch {
-  width: 60px;
-  height: 30px;
+  width: 45px;
+  height: 20px;
   position: relative;
   display: inline-block;
 }
@@ -4218,17 +4218,17 @@ td {
 .checkbox-wrapper-59 .slider:before {
   position: absolute;
   content: "";
-  width: 22px;
-  height: 22px;
-  left: 4px;
-  bottom: 4px;
+  width: 12px;
+  height: 12px;
+  left: 0px;
+  bottom: 0px;
   background-color: #777;
   border-radius: 50%;
   transition: 0.2s;
 }
 
 .checkbox-wrapper-59 input:checked + .slider:before {
-  transform: translateX(30px);
+  transform: translateX(24px);
   background-color: limeGreen;
 }
 
