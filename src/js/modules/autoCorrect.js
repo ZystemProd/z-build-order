@@ -137,7 +137,8 @@ export function initializeAutoCorrect() {
 
     if (!isBracketInputEnabled()) {
       event.preventDefault();
-      inputField.setRangeText("\n", cursorPosition, cursorPosition, "end");
+      inputField.focus();
+      document.execCommand("insertText", false, "\n");
       inputField.scrollTop = inputField.scrollHeight;
       analyzeBuildOrder(inputField.value);
       return;
@@ -180,7 +181,8 @@ export function initializeAutoCorrect() {
     if (afterBracketsMatch) {
       // ✅ Create a **new row** and move cursor inside `[|]`
       event.preventDefault();
-      inputField.setRangeText("\n[]", cursorPosition, cursorPosition, "end");
+      inputField.focus();
+      document.execCommand("insertText", false, "\n[]");
 
       // Move cursor **inside** the new brackets `[|]`
       inputField.selectionStart = inputField.selectionEnd = cursorPosition + 2;
@@ -195,7 +197,8 @@ export function initializeAutoCorrect() {
 
     // 3️⃣ Default behavior: Create new row and move cursor inside `[|]`
     event.preventDefault();
-    inputField.setRangeText("\n[]", cursorPosition, cursorPosition, "end");
+    inputField.focus();
+    document.execCommand("insertText", false, "\n[]");
 
     // Move cursor inside the new brackets `[|]`
     inputField.selectionStart = inputField.selectionEnd = cursorPosition + 2;
