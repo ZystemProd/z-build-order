@@ -137,8 +137,7 @@ export function initializeAutoCorrect() {
 
     if (!isBracketInputEnabled()) {
       event.preventDefault();
-      inputField.value = textBeforeCaret + "\n" + textAfterCaret;
-      inputField.selectionStart = inputField.selectionEnd = cursorPosition + 1;
+      inputField.setRangeText("\n", cursorPosition, cursorPosition, "end");
       inputField.scrollTop = inputField.scrollHeight;
       analyzeBuildOrder(inputField.value);
       return;
@@ -158,12 +157,14 @@ export function initializeAutoCorrect() {
     
       // If there's no space after ], insert one
       if (inputField.value[bracketEnd + 1] !== " ") {
-        inputField.value =
-          inputField.value.slice(0, bracketEnd + 1) +
-          " " +
-          inputField.value.slice(bracketEnd + 1);
+        inputField.setRangeText(
+          " ",
+          bracketEnd + 1,
+          bracketEnd + 1,
+          "end"
+        );
       }
-    
+
       inputField.selectionStart = inputField.selectionEnd = bracketEnd + 2; // after bracket + space
       return;
     }
@@ -179,7 +180,7 @@ export function initializeAutoCorrect() {
     if (afterBracketsMatch) {
       // ✅ Create a **new row** and move cursor inside `[|]`
       event.preventDefault();
-      inputField.value = textBeforeCaret + "\n[]" + textAfterCaret; // No extra space inside brackets
+      inputField.setRangeText("\n[]", cursorPosition, cursorPosition, "end");
 
       // Move cursor **inside** the new brackets `[|]`
       inputField.selectionStart = inputField.selectionEnd = cursorPosition + 2;
@@ -194,7 +195,7 @@ export function initializeAutoCorrect() {
 
     // 3️⃣ Default behavior: Create new row and move cursor inside `[|]`
     event.preventDefault();
-    inputField.value = textBeforeCaret + "\n[]" + textAfterCaret; // No extra space inside brackets
+    inputField.setRangeText("\n[]", cursorPosition, cursorPosition, "end");
 
     // Move cursor inside the new brackets `[|]`
     inputField.selectionStart = inputField.selectionEnd = cursorPosition + 2;

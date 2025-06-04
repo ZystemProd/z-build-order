@@ -399,6 +399,7 @@ export async function initializeIndexPage() {
   safeInput("templateSearchBar", (val) => searchTemplates(val));
   safeInput("videoInput", (val) => updateYouTubeEmbed(val));
   safeAdd("buildOrderTitleText", "click", () => toggleTitleInput(true));
+  safeAdd("buildOrderTitleText", "focus", () => toggleTitleInput(true));
 
   // --- Dropdown Color Change
   safeChange("buildCategoryDropdown", updateDropdownColor);
