@@ -8,6 +8,7 @@ import {
   formatWorkersOrTimestampText,
 } from "./textFormatters.js";
 import { abbreviationMap } from "../data/abbreviationMap.js";
+import { getBracketSetting } from "./settings.js";
 import { setCurrentBuildId } from "./states/buildState.js";
 import { parseBuildOrder } from "./utils.js";
 
@@ -270,13 +271,12 @@ export function initializeTextareaClickHandler() {
   }
 
   textarea.addEventListener("click", function () {
+    if (!getBracketSetting()) return;
+
     if (textarea.value.trim() === "") {
-      // If the textarea is empty, set its value to "[]"
       textarea.value = "[]";
-      // Position the caret inside the brackets
       textarea.selectionStart = 1;
       textarea.selectionEnd = 1;
-    } else {
     }
   });
 }

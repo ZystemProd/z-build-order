@@ -11,16 +11,15 @@ export function parseBuildOrder(buildOrderText) {
   return buildOrderText
     .split("\n")
     .map((line) => {
-      const match = line.match(/\[(\S+)\]\s*(.*)/); // Example: [01:00] Build structure
+      const match = line.match(/\[(\S+)\]\s*(.*)/);
       if (match) {
-        return {
-          workersOrTimestamp: match[1],
-          action: match[2],
-        };
+        return { workersOrTimestamp: match[1], action: match[2] };
       }
-      return null; // Return null if no valid match
+      const trimmed = line.trim();
+      if (trimmed === "") return null;
+      return { workersOrTimestamp: "", action: trimmed };
     })
-    .filter((step) => step !== null); // Filter out invalid steps
+    .filter((step) => step !== null);
 }
 
 export function resetBuildInputs() {

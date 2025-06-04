@@ -63,6 +63,10 @@
             <img src="img/SVG/logout.svg" class="menu-icon" /> Sign Out
           </button>
           <hr class="menu-divider" />
+          <button class="menu-item" id="settingsBtn">
+            <img src="img/SVG/settings.svg" class="menu-icon" /> Settings
+          </button>
+          <hr class="menu-divider" />
           <button class="menu-item danger" id="deleteAccountBtn">
             <img src="img/SVG/trash.svg" class="menu-icon" /> Delete Account
           </button>
@@ -644,6 +648,20 @@
         <br /><br />
         <button id="confirmDeleteAccountButton" class="auth-button">Yes, Delete My Account</button>
         <button id="cancelDeleteAccountButton" class="auth-button">Cancel</button>
+      </div>
+    </div>
+
+    <div id="settingsModal" class="modal" style="display: none;">
+      <div class="modal-content small-modal">
+        <h3>Settings</h3>
+        <label class="publish-checkbox-row">
+          Enable bracket input
+          <input type="checkbox" id="enableBracketsCheckbox" />
+        </label>
+        <div class="modal-buttons">
+          <button id="saveSettingsButton" class="confirm-button">Save</button>
+          <button id="closeSettingsModalButton" class="cancel-button">Cancel</button>
+        </div>
       </div>
     </div>
 

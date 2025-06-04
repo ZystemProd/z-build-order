@@ -3,6 +3,7 @@ import { structures } from "../data/structures.js";
 import { upgrades } from "../data/upgrades.js";
 import { analyzeBuildOrder } from "./uiHandlers.js";
 import DOMPurify from "dompurify";
+import { getBracketSetting } from "./settings.js";
 
 // Function to position the autocomplete popup below the caret
 function positionPopupAtCaret(inputField, popup) {
@@ -134,28 +135,32 @@ export function initializeAutoCorrect() {
     const textBeforeCaret = text.substring(0, cursorPosition);
     const textAfterCaret = text.substring(cursorPosition);
 
-    // ✅ Fix: Move cursor outside bracket if inside [anything|]
-    const bracketStart = textBeforeCaret.lastIndexOf("[");
-    const bracketEnd = textBeforeCaret.length + textAfterCaret.indexOf("]");
+    const useBrackets = getBracketSetting();
 
-    if (
-      bracketStart !== -1 &&
-      bracketEnd !== -1 &&
-      cursorPosition > bracketStart &&
-      cursorPosition <= bracketEnd
-    ) {
-      event.preventDefault();
-    
-      // If there's no space after ], insert one
-      if (inputField.value[bracketEnd + 1] !== " ") {
-        inputField.value =
-          inputField.value.slice(0, bracketEnd + 1) +
-          " " +
-          inputField.value.slice(bracketEnd + 1);
+    // ✅ Fix: Move cursor outside bracket if inside [anything|]
+    if (useBrackets) {
+      const bracketStart = textBeforeCaret.lastIndexOf("[");
+      const bracketEnd = textBeforeCaret.length + textAfterCaret.indexOf("]");
+
+      if (
+        bracketStart !== -1 &&
+        bracketEnd !== -1 &&
+        cursorPosition > bracketStart &&
+        cursorPosition <= bracketEnd
+      ) {
+        event.preventDefault();
+
+        // If there's no space after ], insert one
+        if (inputField.value[bracketEnd + 1] !== " ") {
+          inputField.value =
+            inputField.value.slice(0, bracketEnd + 1) +
+            " " +
+            inputField.value.slice(bracketEnd + 1);
+        }
+
+        inputField.selectionStart = inputField.selectionEnd = bracketEnd + 2; // after bracket + space
+        return;
       }
-    
-      inputField.selectionStart = inputField.selectionEnd = bracketEnd + 2; // after bracket + space
-      return;
     }
     
 
@@ -167,27 +172,25 @@ export function initializeAutoCorrect() {
     );
 
     if (afterBracketsMatch) {
-      // ✅ Create a **new row** and move cursor inside `[|]`
       event.preventDefault();
-      inputField.value = textBeforeCaret + "\n[]" + textAfterCaret; // No extra space inside brackets
+      const insertText = useBrackets ? "\n[]" : "\n";
+      inputField.value = textBeforeCaret + insertText + textAfterCaret;
 
-      // Move cursor **inside** the new brackets `[|]`
-      inputField.selectionStart = inputField.selectionEnd = cursorPosition + 2;
+      const offset = useBrackets ? 2 : insertText.length;
+      inputField.selectionStart = inputField.selectionEnd = cursorPosition + offset;
 
-      // Scroll to ensure visibility
       inputField.scrollTop = inputField.scrollHeight;
-
-      // Update build order
       analyzeBuildOrder(inputField.value);
       return;
     }
 
     // 3️⃣ Default behavior: Create new row and move cursor inside `[|]`
     event.preventDefault();
-    inputField.value = textBeforeCaret + "\n[]" + textAfterCaret; // No extra space inside brackets
+    const insertText = useBrackets ? "\n[]" : "\n";
+    inputField.value = textBeforeCaret + insertText + textAfterCaret;
 
-    // Move cursor inside the new brackets `[|]`
-    inputField.selectionStart = inputField.selectionEnd = cursorPosition + 2;
+    const offset = useBrackets ? 2 : insertText.length;
+    inputField.selectionStart = inputField.selectionEnd = cursorPosition + offset;
 
     // Scroll to ensure cursor visibility
     inputField.scrollTop = inputField.scrollHeight;
@@ -201,16 +204,18 @@ export function initializeAutoCorrect() {
     const cursorPosition = inputField.selectionStart;
   
     // 🚫 Disable autocomplete if inside brackets like [|]
-    const bracketStart = text.lastIndexOf("[", cursorPosition);
-    const bracketEnd = text.indexOf("]", cursorPosition);
-    if (
-      bracketStart !== -1 &&
-      bracketEnd !== -1 &&
-      bracketStart < cursorPosition &&
-      cursorPosition <= bracketEnd
-    ) {
-      popup.style.visibility = "hidden";
-      return;
+    if (getBracketSetting()) {
+      const bracketStart = text.lastIndexOf("[", cursorPosition);
+      const bracketEnd = text.indexOf("]", cursorPosition);
+      if (
+        bracketStart !== -1 &&
+        bracketEnd !== -1 &&
+        bracketStart < cursorPosition &&
+        cursorPosition <= bracketEnd
+      ) {
+        popup.style.visibility = "hidden";
+        return;
+      }
     }
   
     const wordBoundaryRegex = /\b(\w+)$/; // Match the last word before the cursor

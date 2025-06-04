@@ -22,6 +22,7 @@ import { getPerformance } from "firebase/performance";
 import { bannedWords } from "./js/data/bannedWords.js";
 import { showToast } from "./js/modules/toastHandler.js";
 import { resetBuildInputs } from "./js/modules/utils.js";
+import { getBracketSetting, setBracketSetting } from "./js/modules/settings.js";
 import { connectAuthEmulator } from "firebase/auth";
 import { connectFirestoreEmulator } from "firebase/firestore";
 
@@ -206,6 +207,30 @@ export function initializeAuthUI() {
 }
 
 /*********************************************************************
+ * User Settings Modal
+ *********************************************************************/
+if (settingsBtn && settingsModal && enableBracketsCheckbox) {
+  settingsBtn.addEventListener("click", () => {
+    settingsModal.style.display = "block";
+    enableBracketsCheckbox.checked = getBracketSetting();
+  });
+}
+
+if (closeSettingsModalButton) {
+  closeSettingsModalButton.addEventListener("click", () => {
+    settingsModal.style.display = "none";
+  });
+}
+
+if (saveSettingsButton) {
+  saveSettingsButton.addEventListener("click", () => {
+    setBracketSetting(enableBracketsCheckbox.checked);
+    settingsModal.style.display = "none";
+    showToast("✅ Settings saved", "success");
+  });
+}
+
+/*********************************************************************
  * Auth Button Functions
  *********************************************************************/
 function closeUserMenu() {
@@ -262,6 +287,11 @@ const confirmDeleteAccountButton = document.getElementById(
 const cancelDeleteAccountButton = document.getElementById(
   "cancelDeleteAccountButton"
 );
+const settingsBtn = document.getElementById("settingsBtn");
+const settingsModal = document.getElementById("settingsModal");
+const enableBracketsCheckbox = document.getElementById("enableBracketsCheckbox");
+const saveSettingsButton = document.getElementById("saveSettingsButton");
+const closeSettingsModalButton = document.getElementById("closeSettingsModalButton");
 
 if (deleteAccountBtn) {
   deleteAccountBtn.addEventListener("click", () => {
