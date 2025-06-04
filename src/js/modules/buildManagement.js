@@ -12,12 +12,17 @@ import {
 
 import { getAuth } from "firebase/auth";
 import { db, auth } from "../../app.js";
-import { getSavedBuilds, setSavedBuilds } from "./buildStorage.js";
+import {
+  getSavedBuilds,
+  setSavedBuilds,
+  saveSavedBuildsToLocalStorage,
+} from "./buildStorage.js";
 import { showToast } from "./toastHandler.js";
 import { filterBuilds } from "./modal.js";
 import { parseBuildOrder } from "./utils.js";
 import { mapAnnotations } from "./interactive_map.js";
 import { checkPublishButtonVisibility } from "./community.js";
+
 import DOMPurify from "dompurify";
 
 export async function fetchUserBuilds() {
@@ -330,6 +335,16 @@ export async function updateCurrentBuild(buildId) {
   }
 
   await setDoc(buildDocRef, updatedData, { merge: true });
+
+  const localBuilds = getSavedBuilds();
+  const localIndex = localBuilds.findIndex((b) => b.encodedTitle === buildId);
+  if (localIndex !== -1) {
+    localBuilds[localIndex] = {
+      ...localBuilds[localIndex],
+      ...updatedData,
+    };
+    saveSavedBuildsToLocalStorage();
+  }
 
   // 🔄 Also update community version if published
   const publishedRef = doc(db, "publishedBuilds", buildId);

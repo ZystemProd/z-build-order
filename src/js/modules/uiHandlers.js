@@ -8,6 +8,7 @@ import {
   formatWorkersOrTimestampText,
 } from "./textFormatters.js";
 import { abbreviationMap } from "../data/abbreviationMap.js";
+import { setCurrentBuildId } from "./states/buildState.js";
 import { parseBuildOrder } from "./utils.js";
 
 // Function to toggle the title input field
@@ -64,6 +65,16 @@ export function initializeSectionToggles() {
 export function populateBuildDetails(index) {
   const savedBuilds = getSavedBuilds();
   const build = savedBuilds[index];
+
+  setCurrentBuildId(build.encodedTitle); // or build.id if that's how you're storing it
+
+  const saveBuildButton = document.getElementById("saveBuildButton");
+  if (saveBuildButton) {
+    saveBuildButton.innerText = "Update Build";
+    saveBuildButton.removeAttribute("data-tooltip");
+    void saveBuildButton.offsetWidth; // force reflow
+    saveBuildButton.setAttribute("data-tooltip", "Update Current Build");
+  }
 
   if (!build) {
     console.log("Build not found at index:", index);

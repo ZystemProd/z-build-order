@@ -64,15 +64,16 @@ import {
   initializeMapSelection,
   mapAnnotations,
 } from "../interactive_map.js";
-import { getSavedBuilds } from "../buildStorage.js";
+import {
+  getSavedBuilds,
+  saveSavedBuildsToLocalStorage,
+} from "../buildStorage.js";
 import { setupCatActivationOnInput } from "../helpers/companion.js";
-// import {
-//   attachCategoryClicks,
-//   attachSubcategoryClicks,
-//   attachCommunityCategoryClicks,
-//   updateDropdownColor,
-//   monitorBuildChanges,
-// } from "./clickHandlers.js";
+import {
+  getCurrentBuildId,
+  setCurrentBuildId,
+  clearEditingPublishedBuild,
+} from "../states/buildState.js";
 
 import {
   safeAdd,
@@ -83,7 +84,7 @@ import {
 import { checkForJoinRequestNotifications } from "../utils/notificationHelpers.js";
 
 setupTemplateModal(); // Always call early
-let currentBuildId = null;
+
 let currentClanView = null;
 let allBuilds = [];
 let currentBuildFilter = "all";
@@ -177,10 +178,27 @@ export async function initializeIndexPage() {
 
   // Save or update build depending on context
   safeAdd("saveBuildButton", "click", async () => {
-    if (currentBuildId) {
+    const buildId = getCurrentBuildId();
+
+    if (buildId) {
       try {
-        console.log("🔄 Updating build:", currentBuildId);
-        await updateCurrentBuild(currentBuildId);
+        console.log("🔄 Updating build:", buildId);
+        await updateCurrentBuild(buildId);
+
+        const updatedDoc = await getDoc(
+          doc(db, `users/${auth.currentUser.uid}/builds/${buildId}`)
+        );
+        if (updatedDoc.exists()) {
+          const builds = getSavedBuilds();
+          const idx = builds.findIndex((b) => b.encodedTitle === buildId);
+          if (idx !== -1) {
+            builds[idx] = { ...builds[idx], ...updatedDoc.data() };
+            saveSavedBuildsToLocalStorage();
+            populateBuildDetails(idx);
+          }
+        }
+
+        clearEditingPublishedBuild(); // ✅ this line is required
         showToast("✅ Build updated!", "success");
 
         const replayUrl = document
@@ -197,7 +215,6 @@ export async function initializeIndexPage() {
           replayBtn.innerText = "Download Replay on Drop.sc";
         }
 
-        // ✅ Reset button after update
         saveBuildButton.disabled = true;
         saveBuildButton.style.backgroundColor = "";
       } catch (err) {
@@ -206,12 +223,15 @@ export async function initializeIndexPage() {
       }
     } else {
       try {
-        const savedId = await saveCurrentBuild(); // should return encodedTitle or null
+        const savedId = await saveCurrentBuild();
+        if (!savedId) return;
 
-        if (!savedId) return; // 🛑 Stop if validation failed inside saveCurrentBuild
-
-        currentBuildId = savedId;
+        setCurrentBuildId(savedId);
         saveBuildButton.innerText = "Update Build";
+        saveBuildButton.removeAttribute("data-tooltip");
+        void saveBuildButton.offsetWidth; // force reflow
+        saveBuildButton.setAttribute("data-tooltip", "Update Current Build");
+
         newBuildButton.style.display = "inline-block";
         showToast("✅ Build saved!", "success");
 
@@ -229,7 +249,6 @@ export async function initializeIndexPage() {
           replayBtn.innerText = "Download Replay on Drop.sc";
         }
 
-        // ✅ Reset button after save
         saveBuildButton.disabled = true;
         saveBuildButton.style.backgroundColor = "";
       } catch (err) {
@@ -241,7 +260,7 @@ export async function initializeIndexPage() {
 
   // Start a new build
   safeAdd("newBuildButton", "click", () => {
-    currentBuildId = null;
+    setCurrentBuildId(null); // ✅ Correct
     resetBuildInputs();
     clearEditingPublishedBuild();
 
@@ -256,7 +275,10 @@ export async function initializeIndexPage() {
     if (updateBtn) updateBtn.style.display = "none";
     if (newBtn) newBtn.style.display = "none";
 
-    if (saveBtn) saveBtn.innerText = "Save Build";
+    saveBuildButton.innerText = "Save Build";
+    saveBuildButton.removeAttribute("data-tooltip");
+    void saveBuildButton.offsetWidth;
+    saveBuildButton.setAttribute("data-tooltip", "Save Current Build");
   });
 
   auth.onAuthStateChanged(async (user) => {

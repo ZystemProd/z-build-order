@@ -45,12 +45,6 @@ const predefinedTemplates = [
     image: "img/race/protoss.webp",
     data: "[14] Pylon\n[16] Gateway\n[17] Assimilator\n[20] Nexus\n[20] cybernetics core\n",
   },
-  {
-    title: "2 gate opener",
-    category: "protoss",
-    image: "img/race/protoss.webp",
-    data: "[13] Pylon\n[14] Gateway\n[16] Zealot Push",
-  },
 ];
 
 let templates = [...predefinedTemplates];

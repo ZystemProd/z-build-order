@@ -56,3 +56,5 @@ Let me know if you'd like a toast warning before exiting edit mode if unsaved ch
 Fix timestamp on community builds
 
 - disable bracket (only action typying)
+
+- updateing a build only works once.
