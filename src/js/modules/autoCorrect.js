@@ -155,18 +155,16 @@ export function initializeAutoCorrect() {
       cursorPosition <= bracketEnd
     ) {
       event.preventDefault();
-    
-      // If there's no space after ], insert one
+
+      // If there's no space after ], insert one and record in undo stack
       if (inputField.value[bracketEnd + 1] !== " ") {
-        inputField.setRangeText(
-          " ",
-          bracketEnd + 1,
-          bracketEnd + 1,
-          "end"
-        );
+        inputField.setSelectionRange(bracketEnd + 1, bracketEnd + 1);
+        inputField.focus();
+        document.execCommand("insertText", false, " ");
       }
 
-      inputField.selectionStart = inputField.selectionEnd = bracketEnd + 2; // after bracket + space
+      // Move cursor right after the inserted space
+      inputField.selectionStart = inputField.selectionEnd = bracketEnd + 2;
       return;
     }
     
