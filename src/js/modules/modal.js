@@ -366,6 +366,12 @@ export async function viewBuild(buildId) {
     analyzeBuildOrder(buildOrderInput?.value || "");
     setCurrentBuildId(buildId);
 
+    const editBanner = document.getElementById("editModeBanner");
+    if (editBanner) {
+      editBanner.innerHTML = `[Edit Mode] <strong>${DOMPurify.sanitize(build.title)}</strong>`;
+      editBanner.style.display = "block";
+    }
+
     const saveBtn = document.getElementById("saveBuildButton");
     const newBtn = document.getElementById("newBuildButton");
     if (saveBtn) saveBtn.innerText = "Update Build";
@@ -950,7 +956,8 @@ function showEditorUIForPublishedEdit() {
     build.title
   )}</strong>`;
   titleBanner.style.display = "block";
-  titleBanner.style.color = "#2ecc71";
+  titleBanner.style.backgroundColor = "#165016";
+  titleBanner.style.color = "#fff";
 
   // Button logic
   saveButton.style.display = "none";

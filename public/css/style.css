@@ -2605,6 +2605,16 @@ td {
   transform: scale(1.1); /* Slight animation effect */
 }
 
+#editModeBanner {
+  display: none;
+  background-color: #165016;
+  color: #fff;
+  padding: 6px;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
 .footer {
   position: relative;
   bottom: 0px;
