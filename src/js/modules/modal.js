@@ -752,11 +752,14 @@ export async function populateBuildList(
     const publishInfo = buildCard.querySelector(".build-publish-info");
     if (publishInfo) {
       const publishedTab = isPublishedBuildsTabActive();
+      const isBuildPublished =
+        build.isPublished || build.isPublic || (build.sharedToClans?.length ?? 0) > 0;
+
       if (build.imported) {
         publishInfo.classList.add("publish-imported");
         publishInfo.innerHTML = `<span>Imported</span>`;
         publishInfo.style.pointerEvents = "none";
-      } else if (build.isPublic || (build.sharedToClans?.length ?? 0) > 0) {
+      } else if (isBuildPublished) {
         publishInfo.classList.add("publish-published");
         publishInfo.innerHTML = `
           <span>Published</span>

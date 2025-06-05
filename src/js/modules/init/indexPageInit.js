@@ -590,6 +590,17 @@ export async function initializeIndexPage() {
     // ✅ Delete if fully unpublished (optional)
     if (!publishToCommunity && checkedClans.length === 0) {
       await deleteDoc(publishedBuildRef);
+      await updateDoc(userBuildRef, {
+        isPublished: false,
+        isPublic: false,
+        sharedToClans: [],
+      });
+    } else {
+      await updateDoc(userBuildRef, {
+        isPublished: true,
+        isPublic: publishToCommunity,
+        sharedToClans: checkedClans,
+      });
     }
 
     showToast("✅ Publish settings updated!", "success");
