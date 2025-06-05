@@ -31,6 +31,8 @@ import {
   searchBuilds,
   populateBuildList,
   getCurrentBuildFilter,
+  setBuildViewMode,
+  applyBuildViewMode,
 } from "../modal.js";
 import {
   initializeSectionToggles,
@@ -327,6 +329,7 @@ export async function initializeIndexPage() {
   });
 
   monitorBuildChanges();
+  applyBuildViewMode();
 
   safeAdd("showBuildsButton", "click", () => {
     if (!auth.currentUser) {
@@ -338,6 +341,9 @@ export async function initializeIndexPage() {
     }
     showBuildsModal(); // ✅ when logged in
   });
+
+  safeAdd("gridViewBtn", "click", () => setBuildViewMode("grid"));
+  safeAdd("listViewBtn", "click", () => setBuildViewMode("list"));
 
   safeAdd("filterPublicBtn", "click", () => {
     document.getElementById("filterPublicBtn").classList.add("active");

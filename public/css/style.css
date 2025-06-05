@@ -2864,6 +2864,34 @@ td {
 #communityBuildsContainer::-webkit-scrollbar-track {
   background: #222;
 }
+#buildList.list-view {
+  display: flex;
+  flex-direction: column;
+  gap: 0px;
+  padding: 10px;
+  max-height: 78vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: #444 #222;
+}
+#buildList.list-view::-webkit-scrollbar {
+  width: 10px;
+}
+#buildList.list-view::-webkit-scrollbar-thumb {
+  background-color: #444;
+  border-radius: 4px;
+  border: 2px solid #222;
+}
+#buildList.list-view::-webkit-scrollbar-track {
+  background: #222;
+}
+#buildList.list-view .build-entry .build-publish-info {
+  position: static;
+  margin-left: auto;
+}
+
 
 /* Each build entry */
 .build-entry {
@@ -3045,6 +3073,8 @@ td {
   height: 20px;
   filter: brightness(1.2);
 }
+.view-btn.active img { filter: brightness(1.8); }
+.view-btn:not(.active) { opacity: 0.5; }
 
 .help-circle.animated-help {
   width: 30px;
