@@ -73,8 +73,7 @@ async function loadBuild() {
       build.title || "Untitled Build";
     document.getElementById("buildCategory").innerText =
       build.category || "Unknown";
-    document.getElementById("buildMatchup").innerText =
-      build.subcategory || "Unknown";
+    document.getElementById("buildMatchup").innerText = (build.subcategory && build.subcategory.length === 3 ? build.subcategory.charAt(0).toUpperCase() + build.subcategory.charAt(1) + build.subcategory.charAt(2).toUpperCase() : build.subcategory || "Unknown");
     document.getElementById("buildPublisher").innerText =
       build.username || "Anonymous";
     document.getElementById("buildDate").innerText = new Date(
@@ -113,62 +112,75 @@ async function loadBuild() {
 
     // Set comment
     const commentElement = document.getElementById("buildComment");
-    if (commentElement && build.comment) {
-      commentElement.innerText = build.comment;
+    const commentHeader = document.getElementById("commentHeader");
+    if (commentElement && commentHeader) {
+      if (build.comment && build.comment.trim() !== "") {
+        commentElement.innerText = build.comment;
+        commentElement.style.display = "block";
+        commentHeader.style.display = "block";
+      } else {
+        commentElement.style.display = "none";
+        commentHeader.style.display = "none";
+      }
     }
 
     // Set YouTube link
     const youtubeEmbed = document.getElementById("videoIframe");
-    if (youtubeEmbed && build.youtube) {
-      youtubeEmbed.src = build.youtube;
+    const videoHeader = document.getElementById("videoHeader");
+    if (youtubeEmbed && videoHeader) {
+      if (build.youtube && build.youtube.trim() !== "") {
+        youtubeEmbed.src = build.youtube;
+        youtubeEmbed.style.display = "block";
+        videoHeader.style.display = "block";
+      } else {
+        youtubeEmbed.style.display = "none";
+        videoHeader.style.display = "none";
+      }
     }
-
-    // 🔒 Disable comment and video input fields for read-only
-    const commentInput = document.getElementById("commentInput");
-    if (commentInput) {
-      commentInput.disabled = true;
-    }
-
-    const videoInput = document.getElementById("videoInput");
-    if (videoInput) {
-      videoInput.disabled = true;
-    }
-
     // Set map image
     const mapImage = document.getElementById("map-preview-image");
     const selectedMapText = document.getElementById("selected-map-text");
 
+    let mapExists = false;
     // Map display for view-only
-    if (build.map && mapImage) {
-      const mapName = build.map;
-      const formattedMapName = mapName
-        .replace(/\s+/g, "_")
-        .replace(/[^\w\-]+/g, "")
-        .toLowerCase();
+    if (mapImage) {
+      if (build.map) {
+        const mapName = build.map;
+        let mapPath = "";
+        try {
+          const response = await fetch("/data/maps.json");
+          const maps = await response.json();
 
-      let mapPath = `img/maps/current/${formattedMapName}.webp`; // fallback default
+          const entry = maps.find(
+            (m) => m.name.toLowerCase() === mapName.toLowerCase()
+          );
 
-      try {
-        const response = await fetch("/data/maps.json");
-        const maps = await response.json();
-
-        const entry = maps.find(
-          (m) => m.name.toLowerCase() === mapName.toLowerCase()
-        );
-
-        if (entry) {
-          mapPath = `img/maps/${entry.folder}/${entry.file}`;
+          if (entry) {
+            mapPath = `img/maps/${entry.folder}/${entry.file}`;
+          }
+        } catch (err) {
+          console.warn("⚠️ Could not load maps.json");
         }
-      } catch (err) {
-        console.warn("⚠️ Could not load maps.json, using default path.");
-      }
 
-      mapImage.setAttribute("src", mapPath); // load immediately
-      mapImage.removeAttribute("data-src"); // optional cleanup
+        if (mapPath) {
+          mapImage.setAttribute("src", mapPath);
+          mapExists = true;
+        } else {
+          mapImage.removeAttribute("src");
+        }
+        mapImage.removeAttribute("data-src");
+      } else {
+        mapImage.removeAttribute("src");
+      }
     }
 
-    if (build.map && selectedMapText) {
-      selectedMapText.innerText = build.map; // Display readable map name
+    if (selectedMapText) {
+      selectedMapText.innerText = build.map && mapExists ? build.map : "";
+    }
+
+    const mapContainerWrapper = document.getElementById("map-container");
+    if (mapContainerWrapper) {
+      mapContainerWrapper.style.display = mapExists ? "block" : "none";
     }
 
     // Setup map and annotations
@@ -266,6 +278,22 @@ async function loadBuild() {
 
       // Disable all interaction with annotations
       annotationsContainer.style.pointerEvents = "none"; // block any user interaction over the annotations
+    }
+    const additionalHeader = document.getElementById("additionalSettingsHeader");
+    const mainLayout = document.querySelector(".main-layout");
+    if (additionalHeader || mainLayout) {
+      const commentVisible = commentElement && commentElement.style.display !== "none";
+      const videoVisible = youtubeEmbed && youtubeEmbed.style.display !== "none";
+      const mapVisible = mapContainerWrapper && mapContainerWrapper.style.display !== "none";
+
+      const anyVisible = commentVisible || videoVisible || mapVisible;
+
+      if (additionalHeader) {
+        additionalHeader.style.display = anyVisible ? "block" : "none";
+      }
+      if (mainLayout) {
+        mainLayout.style.display = anyVisible ? "block" : "none";
+      }
     }
   } else {
     console.error("❌ Build not found in Firestore:", buildId);
