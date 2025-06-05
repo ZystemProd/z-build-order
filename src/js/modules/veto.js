@@ -16,6 +16,7 @@ const bestOfOptions = ["None", "BO2", "BO3", "BO5", "BO7", "BO9"];
 let currentBestOfIndex = 0;
 let currentMap = null;
 let lastHoveredMap = null;
+let currentAdvancedPlayer = "player1";
 
 // DOM Content Loaded
 window.addEventListener("DOMContentLoaded", () => {
@@ -207,6 +208,8 @@ function resetAll() {
     p2.innerHTML = "";
     picks.innerHTML = "";
     picks.classList.add("hidden");
+    const startSel = document.getElementById("startingPlayerSelect");
+    if (startSel) currentAdvancedPlayer = startSel.value;
     renderAdvancedMapList();
   }
 }
@@ -293,17 +296,22 @@ function toggleMapPreviewVisibility() {
 function toggleAdvancedView() {
   const adv = document.getElementById("advanced-view");
   const list = document.getElementById("map-list");
+  const preview = document.querySelector(".map-preview");
   if (!adv || !list) return;
 
   if (adv.classList.contains("hidden")) {
+    const startSel = document.getElementById("startingPlayerSelect");
+    if (startSel) currentAdvancedPlayer = startSel.value;
     adv.classList.remove("hidden");
     adv.style.display = "flex";
     list.style.display = "none";
+    if (preview) preview.style.display = "none";
     renderAdvancedMapList();
   } else {
     adv.classList.add("hidden");
     adv.style.display = "none";
     list.style.display = "block";
+    if (preview) preview.style.display = "block";
   }
 }
 
@@ -315,26 +323,17 @@ function renderAdvancedMapList() {
     const li = document.createElement("li");
     li.id = `adv-map${map.id}`;
 
-    const leftBtn = document.createElement("button");
-    leftBtn.textContent = "P1";
-    leftBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      advancedVeto(map.id, "player1-list");
-    });
+    const img = document.createElement("img");
+    img.src = mapImages[map.id];
+    img.alt = map.name;
+    img.addEventListener("click", () => advancedVetoByTurn(map.id));
 
     const span = document.createElement("span");
+    span.className = "adv-map-label";
     span.textContent = map.name;
 
-    const rightBtn = document.createElement("button");
-    rightBtn.textContent = "P2";
-    rightBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      advancedVeto(map.id, "player2-list");
-    });
-
-    li.appendChild(leftBtn);
+    li.appendChild(img);
     li.appendChild(span);
-    li.appendChild(rightBtn);
     advList.appendChild(li);
   });
 }
@@ -349,6 +348,14 @@ function advancedVeto(mapId, playerListId) {
   checkAdvancedCompletion();
 }
 
+function advancedVetoByTurn(mapId) {
+  const playerListId =
+    currentAdvancedPlayer === "player1" ? "player1-list" : "player2-list";
+  advancedVeto(mapId, playerListId);
+  currentAdvancedPlayer =
+    currentAdvancedPlayer === "player1" ? "player2" : "player1";
+}
+
 function checkAdvancedCompletion() {
   const advList = document.getElementById("advanced-map-list");
   const picks = document.getElementById("picked-maps");
@@ -359,10 +366,14 @@ function checkAdvancedCompletion() {
     picks.innerHTML = "";
     remaining.forEach((li, idx) => {
       li.classList.remove("vetoed-map");
-      li.querySelectorAll("button").forEach((b) => b.remove());
+      const img = li.querySelector("img").cloneNode();
       const div = document.createElement("div");
       div.className = "pick-item";
-      div.textContent = `${idx + 1}. ${li.textContent.trim()}`;
+      const num = document.createElement("span");
+      num.className = "pick-number";
+      num.textContent = idx + 1;
+      div.appendChild(img);
+      div.appendChild(num);
       picks.appendChild(div);
     });
     advList.innerHTML = "";
