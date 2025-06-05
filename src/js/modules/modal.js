@@ -754,15 +754,11 @@ export async function populateBuildList(
         publishInfo.style.pointerEvents = "none";
       } else if (build.isPublic || (build.sharedToClans?.length ?? 0) > 0) {
         publishInfo.classList.add("publish-published");
-        publishInfo.innerHTML = `<span>Published </span><img src="./img/SVG/checkmark2.svg" class="publish-icon">`;
-        if (build.isPublic)
-          publishInfo.innerHTML += `<span class="tag public">Public</span>`;
-        if (build.sharedToClans?.length > 0)
-          publishInfo.innerHTML += `<span class="tag clan">Clan</span>`;
-        publishInfo.addEventListener("click", (e) => {
-          e.stopPropagation();
-          openPublishModal(build.id);
-        });
+        publishInfo.innerHTML = `
+          <span>Published</span>
+          <img src="./img/SVG/checkmark2.svg" class="publish-icon">
+        `;
+        publishInfo.style.pointerEvents = "none";
       } else {
         publishInfo.classList.add("publish-unpublished");
         publishInfo.innerHTML = `<img src="./img/SVG/publish2.svg" class="publish-icon"><span>Publish</span>`;
