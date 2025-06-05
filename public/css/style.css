@@ -685,6 +685,25 @@ button:hover {
   height: 150px;
 }
 
+.input-with-template {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+}
+
+.template-icon-button {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 0;
+}
+
+.template-icon-button img {
+  width: 24px;
+  height: 24px;
+}
+
 .buildOrderOutput {
   margin-top: 15px;
 }
