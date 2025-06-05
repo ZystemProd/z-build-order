@@ -731,7 +731,7 @@ export async function populateBuildList(
             <span class="meta-chip matchup-chip">${formatMatchup(build.subcategory || "")}</span>
             <span class="meta-chip publisher-chip">
               <img src="./img/SVG/user-svgrepo-com.svg" alt="Publisher" class="meta-icon">
-              You
+              ${DOMPurify.sanitize(build.publisher || "You")}
             </span>
             <span class="meta-chip">
               <img src="./img/SVG/time.svg" alt="Date" class="meta-icon">
@@ -748,7 +748,7 @@ export async function populateBuildList(
         </div>
         <h3 class="build-title">${DOMPurify.sanitize(build.title)}</h3>
         <div class="build-meta">
-          <p>Publisher: You</p>
+          <p>Publisher: ${DOMPurify.sanitize(build.publisher || "You")}</p>
           <p>Date: ${new Date(build.timestamp).toLocaleDateString()}</p>
         </div>
         <div class="build-publish-info"></div>

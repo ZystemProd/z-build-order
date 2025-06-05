@@ -2428,7 +2428,7 @@ td {
   min-width: 140px;
 }
 
-.meta-chip.publisher-chip {
+.build-info-grid .meta-chip.publisher-chip {
   display: block;
   width: fit-content;
   margin: auto;
