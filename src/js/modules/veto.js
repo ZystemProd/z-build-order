@@ -55,6 +55,10 @@ window.addEventListener("DOMContentLoaded", () => {
   document
     .getElementById("mapFileInput")
     .addEventListener("change", updateMapPreview);
+
+  document
+    .getElementById("advancedToggle")
+    .addEventListener("click", toggleAdvancedView);
 });
 
 // Map Rendering
@@ -192,6 +196,19 @@ function resetAll() {
   resetPreview();
   currentBestOfIndex = 0;
   updateDisplayedBestOf();
+
+  const advList = document.getElementById("advanced-map-list");
+  const p1 = document.getElementById("player1-list");
+  const p2 = document.getElementById("player2-list");
+  const picks = document.getElementById("picked-maps");
+  if (advList && p1 && p2 && picks) {
+    advList.innerHTML = "";
+    p1.innerHTML = "";
+    p2.innerHTML = "";
+    picks.innerHTML = "";
+    picks.classList.add("hidden");
+    renderAdvancedMapList();
+  }
 }
 
 function resetPreview() {
@@ -269,6 +286,87 @@ function toggleMapPreviewVisibility() {
   const checkbox = document.getElementById("hidePreviewCheckbox");
   if (preview && checkbox) {
     preview.style.display = checkbox.checked ? "none" : "block";
+  }
+}
+
+// -------- Advanced View --------
+function toggleAdvancedView() {
+  const adv = document.getElementById("advanced-view");
+  const list = document.getElementById("map-list");
+  if (!adv || !list) return;
+
+  if (adv.classList.contains("hidden")) {
+    adv.classList.remove("hidden");
+    adv.style.display = "flex";
+    list.style.display = "none";
+    renderAdvancedMapList();
+  } else {
+    adv.classList.add("hidden");
+    adv.style.display = "none";
+    list.style.display = "block";
+  }
+}
+
+function renderAdvancedMapList() {
+  const advList = document.getElementById("advanced-map-list");
+  if (!advList) return;
+  advList.innerHTML = "";
+  mapData.forEach((map) => {
+    const li = document.createElement("li");
+    li.id = `adv-map${map.id}`;
+
+    const leftBtn = document.createElement("button");
+    leftBtn.textContent = "P1";
+    leftBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      advancedVeto(map.id, "player1-list");
+    });
+
+    const span = document.createElement("span");
+    span.textContent = map.name;
+
+    const rightBtn = document.createElement("button");
+    rightBtn.textContent = "P2";
+    rightBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      advancedVeto(map.id, "player2-list");
+    });
+
+    li.appendChild(leftBtn);
+    li.appendChild(span);
+    li.appendChild(rightBtn);
+    advList.appendChild(li);
+  });
+}
+
+function advancedVeto(mapId, playerListId) {
+  const li = document.getElementById(`adv-map${mapId}`);
+  const target = document.getElementById(playerListId);
+  if (!li || !target) return;
+
+  li.classList.add("vetoed-map");
+  target.appendChild(li);
+  checkAdvancedCompletion();
+}
+
+function checkAdvancedCompletion() {
+  const advList = document.getElementById("advanced-map-list");
+  const picks = document.getElementById("picked-maps");
+  if (!advList || !picks) return;
+  const remaining = advList.querySelectorAll("li");
+  const limit = BEST_OF_SETTINGS[bestOfOptions[currentBestOfIndex]];
+  if (limit && remaining.length === limit) {
+    picks.innerHTML = "";
+    remaining.forEach((li, idx) => {
+      li.classList.remove("vetoed-map");
+      li.querySelectorAll("button").forEach((b) => b.remove());
+      const div = document.createElement("div");
+      div.className = "pick-item";
+      div.textContent = `${idx + 1}. ${li.textContent.trim()}`;
+      picks.appendChild(div);
+    });
+    advList.innerHTML = "";
+    picks.classList.remove("hidden");
   }
 }
 

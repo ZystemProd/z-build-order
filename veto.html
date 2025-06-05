@@ -15,7 +15,7 @@
       <img src="./img/SVG/back.svg" alt="Back" />
     </a>
 
-    <div class="map-list">
+    <div class="map-list" id="map-list">
       <ul class="map-list"></ul>
       <!-- Empty list to be populated by JS -->
     </div>
@@ -24,6 +24,21 @@
       <img id="previewImage" src="img/maps/current/incorporeal.webp" alt="Map Preview" />
     </div>
   </div>
+
+  <div id="advanced-view" class="advanced-view hidden">
+    <div class="player-column" id="player1-column">
+      <h3>Player 1</h3>
+      <ul id="player1-list" class="player-list"></ul>
+    </div>
+    <div class="center-column">
+      <ul id="advanced-map-list" class="advanced-map-list"></ul>
+    </div>
+    <div class="player-column" id="player2-column">
+      <h3>Player 2</h3>
+      <ul id="player2-list" class="player-list"></ul>
+    </div>
+  </div>
+  <div id="picked-maps" class="picked-maps hidden"></div>
 
   <!-- Control Area -->
   <div class="control-container">
@@ -79,6 +94,8 @@
       <!-- Reset Button -->
       <button id="resetButton">Reset All</button>
       <!-- Reset button -->
+
+      <button id="advancedToggle">Advanced View</button>
     </div>
   </div>
 
