@@ -471,7 +471,7 @@ export async function openPublishModal(buildId) {
       const isShared = sourceData?.sharedToClans?.includes(cid);
 
       row.innerHTML = `
-        <span>Share with ${DOMPurify.sanitize(clan.name)}</span>
+        <span>Share with <span class="label-clan">${DOMPurify.sanitize(clan.name)}</span></span>
         <div class="checkbox-wrapper-59">
           <label class="switch">
             <input type="checkbox" class="clanPublishCheckbox" value="${cid}" ${

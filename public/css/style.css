@@ -985,7 +985,7 @@ textarea::-webkit-scrollbar-thumb:hover {
   margin-top: 12px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
   width: 100%;
 }
 .publish-checkbox-row label {
@@ -3298,6 +3298,17 @@ td {
   color: #e0e0e0;
   margin: 4px 0;
   width: 100%;
+}
+
+.label-community {
+  color: #70b3ff;
+  font-weight: 600;
+}
+
+.label-clans,
+.label-clan {
+  color: #50c878;
+  font-weight: 600;
 }
 
 /* Checkbox styling replaced by custom toggle component */
