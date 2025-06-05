@@ -3281,7 +3281,7 @@ td {
   grid-template-columns: 1fr auto;
   align-items: center;
   width: 100%;
-  font-size: 14px;
+  font-size: 18px;
   color: #e0e0e0;
   line-height: 1.5;
 }
@@ -3296,6 +3296,7 @@ td {
 .modal-section-label {
   font-weight: 600;
   color: #e0e0e0;
+  font-size: 18px;
   margin: 4px 0;
   width: 100%;
 }
