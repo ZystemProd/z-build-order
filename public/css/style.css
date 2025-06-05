@@ -187,7 +187,8 @@ body {
 #templateDropdown {
   display: none;
   position: absolute;
-  right: 0;
+  left: 0;
+  margin-left: 5px;
   background-color: #2a2a2a; /* Darker background */
   min-width: 150px; /* Adjust width */
   border-radius: 5px;
@@ -688,20 +689,29 @@ button:hover {
 .input-with-template {
   display: flex;
   align-items: flex-start;
-  gap: 5px;
+}
+
+.input-with-template textarea {
+  flex: 1;
+  margin-left: 10px;
 }
 
 .template-icon-button {
-  background: none;
-  border: none;
-  padding: 0;
+  background: #2c2c2c;
+  border: 1px solid #444;
+  padding: 4px;
   cursor: pointer;
   border-radius: 0;
-}
-
-.template-icon-button img {
+  color: #fff;
   width: 24px;
   height: 24px;
+  line-height: 24px;
+  text-align: center;
+  margin-right: 0;
+}
+
+.template-icon-button:hover {
+  background: #444;
 }
 
 .buildOrderOutput {
