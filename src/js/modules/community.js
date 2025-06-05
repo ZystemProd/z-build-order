@@ -640,9 +640,12 @@ export async function searchCommunityBuilds(searchTerm) {
       datePublished,
       views: data.views || 0,
       upvotes: data.upvotes || 0,
-      downvotes: data.downvotes || 0,
-    };
+    downvotes: data.downvotes || 0,
+  };
   });
+
+  const container = document.getElementById("communityBuildsContainer");
+  if (container) container.innerHTML = "";
 
   renderCommunityBuildBatch(builds);
 }
