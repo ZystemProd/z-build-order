@@ -751,6 +751,7 @@ export async function populateBuildList(
 
     const publishInfo = buildCard.querySelector(".build-publish-info");
     if (publishInfo) {
+      const publishedTab = isPublishedBuildsTabActive();
       if (build.imported) {
         publishInfo.classList.add("publish-imported");
         publishInfo.innerHTML = `<span>Imported</span>`;
@@ -761,7 +762,19 @@ export async function populateBuildList(
           <span>Published</span>
           <img src="./img/SVG/checkmark2.svg" class="publish-icon">
         `;
-        publishInfo.style.pointerEvents = "none";
+        if (publishedTab) {
+          if (build.isPublic)
+            publishInfo.innerHTML += `<span class="tag public">Public</span>`;
+          if (build.sharedToClans?.length > 0)
+            publishInfo.innerHTML += `<span class="tag clan">Clan</span>`;
+          publishInfo.style.pointerEvents = "auto";
+          publishInfo.addEventListener("click", (e) => {
+            e.stopPropagation();
+            openPublishModal(build.id);
+          });
+        } else {
+          publishInfo.style.pointerEvents = "none";
+        }
       } else {
         publishInfo.classList.add("publish-unpublished");
         publishInfo.innerHTML = `<img src="./img/SVG/publish2.svg" class="publish-icon"><span>Publish</span>`;
