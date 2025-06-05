@@ -7,7 +7,7 @@ import DOMPurify from "dompurify";
 
 // Function to position the autocomplete popup below the caret
 function positionPopupAtCaret(inputField, popup) {
-  const { selectionStart, selectionEnd, scrollTop, scrollLeft } = inputField;
+  const { selectionStart, selectionEnd } = inputField;
 
   // If there's no caret or selection range, don't position the popup
   if (
@@ -32,9 +32,10 @@ function positionPopupAtCaret(inputField, popup) {
   tempDiv.style.position = "absolute";
   tempDiv.style.whiteSpace = "pre-wrap";
   tempDiv.style.visibility = "hidden";
-  tempDiv.style.top = `${inputField.offsetTop}px`;
-  tempDiv.style.left = `${inputField.offsetLeft}px`;
-  tempDiv.style.width = `${inputField.offsetWidth}px`;
+  const rect = inputField.getBoundingClientRect();
+  tempDiv.style.top = `${rect.top}px`;
+  tempDiv.style.left = `${rect.left}px`;
+  tempDiv.style.width = `${rect.width}px`;
 
   // Adjust the content up to the caret position
   const textBeforeCaret = inputField.value.slice(0, selectionStart);
@@ -50,17 +51,10 @@ function positionPopupAtCaret(inputField, popup) {
 
   // Get the marker's position relative to the `textarea`
   const markerRect = markerSpan.getBoundingClientRect();
-  const textareaRect = inputField.getBoundingClientRect();
 
-  // Calculate the position of the popup, including scroll adjustments
-  const popupTop =
-    markerRect.top - textareaRect.top + inputField.offsetTop - scrollTop;
-  const popupLeft =
-    markerRect.left - textareaRect.left + inputField.offsetLeft - scrollLeft;
-
-  // Set the popup position
-  popup.style.top = `${popupTop + markerRect.height + window.scrollY}px`;
-  popup.style.left = `${popupLeft + window.scrollX}px`;
+  // Set the popup position relative to the viewport
+  popup.style.top = `${markerRect.bottom}px`;
+  popup.style.left = `${markerRect.left}px`;
 
   // Remove the temporary div from the document
   document.body.removeChild(tempDiv);
@@ -106,6 +100,16 @@ export function initializeAutoCorrect() {
     }
   }
 
+  function insertTextRange(text, start, end) {
+    inputField.focus();
+    if (typeof inputField.setRangeText === "function") {
+      inputField.setRangeText(text, start, end, "end");
+    } else {
+      inputField.setSelectionRange(start, end);
+      document.execCommand("insertText", false, text);
+    }
+  }
+
   function replaceCurrentWordWith(text) {
     const wordBoundaryRegex = /\b(\w+)$/;
     const cursorPosition = inputField.selectionStart;
@@ -114,9 +118,7 @@ export function initializeAutoCorrect() {
     if (!match) return;
 
     const start = cursorPosition - match[1].length;
-    inputField.setSelectionRange(start, cursorPosition);
-    inputField.focus();
-    document.execCommand("insertText", false, text);
+    insertTextRange(text, start, cursorPosition);
 
     popup.style.visibility = "hidden";
     activeIndex = 0;
@@ -139,7 +141,7 @@ export function initializeAutoCorrect() {
     if (!isBracketInputEnabled()) {
       event.preventDefault();
       inputField.focus();
-      document.execCommand("insertText", false, "\n");
+      insertTextRange("\n", inputField.selectionStart, inputField.selectionEnd);
       inputField.scrollTop = inputField.scrollHeight;
       analyzeBuildOrder(inputField.value);
       return;
@@ -161,7 +163,7 @@ export function initializeAutoCorrect() {
       if (inputField.value[bracketEnd + 1] !== " ") {
         inputField.setSelectionRange(bracketEnd + 1, bracketEnd + 1);
         inputField.focus();
-        document.execCommand("insertText", false, " ");
+        insertTextRange(" ", bracketEnd + 1, bracketEnd + 1);
       }
 
       // Move cursor right after the inserted space
@@ -181,7 +183,7 @@ export function initializeAutoCorrect() {
       // ✅ Create a **new row** and move cursor inside `[|]`
       event.preventDefault();
       inputField.focus();
-      document.execCommand("insertText", false, "\n[]");
+      insertTextRange("\n[]", inputField.selectionStart, inputField.selectionEnd);
 
       // Move cursor **inside** the new brackets `[|]`
       inputField.selectionStart = inputField.selectionEnd = cursorPosition + 2;
@@ -197,7 +199,7 @@ export function initializeAutoCorrect() {
     // 3️⃣ Default behavior: Create new row and move cursor inside `[|]`
     event.preventDefault();
     inputField.focus();
-    document.execCommand("insertText", false, "\n[]");
+    insertTextRange("\n[]", inputField.selectionStart, inputField.selectionEnd);
 
     // Move cursor inside the new brackets `[|]`
     inputField.selectionStart = inputField.selectionEnd = cursorPosition + 2;
@@ -239,6 +241,15 @@ export function initializeAutoCorrect() {
     const matches = suggestions.filter((item) =>
       item.name.toLowerCase().includes(currentWord)
     );
+
+    // Hide the popup if the word exactly matches a suggestion
+    const isExactMatch = suggestions.some(
+      (item) => item.name.toLowerCase() === currentWord
+    );
+    if (isExactMatch) {
+      popup.style.visibility = "hidden";
+      return;
+    }
   
     if (matches.length === 0) {
       popup.style.visibility = "hidden";
