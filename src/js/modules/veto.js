@@ -325,6 +325,18 @@ function moveElementWithAnimation(element, target, afterAppend) {
   );
 }
 
+function animateVetoDirection(element, direction) {
+  const cls = direction === "left" ? "veto-left" : "veto-right";
+  element.classList.add(cls);
+  element.addEventListener(
+    "transitionend",
+    () => {
+      element.style.display = "none";
+    },
+    { once: true }
+  );
+}
+
 function updateStageIndicator() {
   const indicator = document.getElementById("stageIndicator");
   const p1Input = document.getElementById("player1NameInput");
