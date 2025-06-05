@@ -688,7 +688,6 @@ button:hover {
   border-top-left-radius: 0;
 }
 
-
 .template-wrapper {
   position: relative;
   width: 100%;
@@ -1095,6 +1094,11 @@ textarea::-webkit-scrollbar-thumb:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
   padding-bottom: 20px;
+}
+
+#showCommunityModalButton,
+#showBuildsButton {
+  margin-bottom: 0px;
 }
 
 /* Flex container for build cards */

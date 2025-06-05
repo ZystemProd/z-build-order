@@ -242,9 +242,9 @@ function showBuildPreview(build) {
 
 const communitySearchInput = document.getElementById("communitySearchBar");
 if (communitySearchInput) {
-  communitySearchInput.addEventListener("input", function () {
-    const query = this.value.toLowerCase();
-    filterCommunityBuilds(query);
+  communitySearchInput.addEventListener("input", async function () {
+    const query = this.value;
+    await searchCommunityBuilds(query);
   });
 }
 
@@ -585,12 +585,7 @@ export async function searchCommunityBuilds(searchTerm) {
 
   const db = getFirestore();
   const type = localStorage.getItem("communityBuildType") || "public";
-  const constraints = [
-    where("titleLowercase", ">=", lower),
-    where("titleLowercase", "<=", lower + "\uf8ff"),
-    orderBy("titleLowercase"),
-    limit(20),
-  ];
+  const constraints = [orderBy("datePublished", "desc"), limit(50)];
 
   if (type === "public") {
     constraints.push(where("isPublic", "==", true));
@@ -616,35 +611,77 @@ export async function searchCommunityBuilds(searchTerm) {
   const q = query(collection(db, "publishedBuilds"), ...constraints);
   const snap = await getDocs(q);
 
+  const now = Date.now();
+
   const builds = snap.docs.map((doc) => {
     const data = doc.data();
+    const upvotes = data.upvotes || 0;
+    const downvotes = data.downvotes || 0;
 
+    let datePublishedRaw = now;
     let datePublished = "Unknown";
+
     try {
       let ts = data.datePublished;
       if (ts && typeof ts.toMillis === "function") ts = ts.toMillis();
       if (typeof ts === "number") {
         const d = new Date(ts);
-        if (!isNaN(d.getTime())) datePublished = d.toLocaleDateString("en-GB");
+        if (!isNaN(d.getTime())) {
+          datePublishedRaw = ts;
+          datePublished = d.toLocaleDateString("en-GB");
+        }
       }
     } catch (err) {
       console.warn("❌ Failed to parse datePublished:", data.datePublished);
     }
 
+    const ageInHours = (now - datePublishedRaw) / (1000 * 60 * 60);
+    const gravity = 1.5;
+    const hotnessScore =
+      (upvotes - downvotes) / Math.pow(ageInHours + 2, gravity);
+
     return {
       id: doc.id,
-      ...data,
+      title: data.title || "Untitled Build",
+      publisher: data.username || "Anonymous",
       matchup: formatMatchup(
         data.subcategoryLowercase || data.subcategory || ""
       ),
+      category: data.category || "Unknown",
+      subcategory: data.subcategory || "Unknown",
+      datePublishedRaw,
       datePublished,
       views: data.views || 0,
-      upvotes: data.upvotes || 0,
-      downvotes: data.downvotes || 0,
+      upvotes,
+      downvotes,
+      hotnessScore,
     };
   });
 
-  renderCommunityBuildBatch(builds);
+  const filteredBuilds = builds.filter(
+    (b) =>
+      (b.title && b.title.toLowerCase().includes(lower)) ||
+      (b.publisher && b.publisher.toLowerCase().includes(lower))
+  );
+
+  const sortMode = communitySortMode || "new";
+  if (sortMode === "top") {
+    filteredBuilds.sort(
+      (a, b) => b.upvotes - b.downvotes - (a.upvotes - a.downvotes)
+    );
+  } else if (sortMode === "hot") {
+    filteredBuilds.sort((a, b) => b.hotnessScore - a.hotnessScore);
+  } else {
+  filteredBuilds.sort((a, b) => b.datePublishedRaw - a.datePublishedRaw);
+  }
+
+  const heading = document.querySelector("#communityModal h3");
+  if (heading) heading.textContent = `Community Builds - ${searchTerm}`;
+
+  const container = document.getElementById("communityBuildsContainer");
+  if (container) container.innerHTML = "";
+
+  renderCommunityBuildBatch(filteredBuilds);
 }
 /*
 export function filterCommunityBuilds(categoryOrSubcat = "all") {
@@ -750,7 +787,12 @@ document
 
 function setCommunitySortMode(mode) {
   communitySortMode = mode;
-  populateCommunityBuilds(); // re-fetch from Firestore using new sort mode
+  const searchValue = document.getElementById("communitySearchBar")?.value.trim();
+  if (searchValue) {
+    searchCommunityBuilds(searchValue);
+  } else {
+    populateCommunityBuilds(); // re-fetch from Firestore using new sort mode
+  }
 }
 
 function capitalize(str) {
