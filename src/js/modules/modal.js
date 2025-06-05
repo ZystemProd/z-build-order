@@ -771,12 +771,14 @@ export async function populateBuildList(
           if (build.sharedToClans?.length > 0)
             publishInfo.innerHTML += `<span class="tag clan">Clan</span>`;
           publishInfo.style.pointerEvents = "auto";
+          publishInfo.classList.remove("no-border");
           publishInfo.addEventListener("click", (e) => {
             e.stopPropagation();
             openPublishModal(build.id);
           });
         } else {
           publishInfo.style.pointerEvents = "none";
+          publishInfo.classList.add("no-border");
         }
       } else {
         publishInfo.classList.add("publish-unpublished");
@@ -869,8 +871,9 @@ export async function unpublishBuild(buildId) {
       const publishInfo = buildCard.querySelector(".build-publish-info");
       if (publishInfo) {
         publishInfo.innerHTML = `<img src="./img/SVG/publish2.svg" alt="Publish" class="publish-icon"><span>Publish</span>`;
-        publishInfo.classList.remove("publish-published");
+        publishInfo.classList.remove("publish-published", "no-border");
         publishInfo.classList.add("publish-unpublished");
+        publishInfo.style.pointerEvents = "auto";
         publishInfo.onclick = (event) => {
           event.stopPropagation();
           openPublishModal(buildId);
