@@ -589,7 +589,7 @@ label {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(255, 0, 0, 0.3);
+  background: rgba(255, 0, 0, 0.4);
   border-radius: 8px;
   z-index: 1;
 }
@@ -681,6 +681,18 @@ label {
   font-size: 24px;
   font-weight: bold;
   margin-bottom: 10px;
+}
+
+.stage-text.veto {
+  color: red;
+}
+
+.stage-text.pick {
+  color: blue;
+}
+
+.stage-text.done {
+  color: green;
 }
 
 #startPlayerWrapper {

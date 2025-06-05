@@ -303,27 +303,11 @@ function toggleMapPreviewVisibility() {
   }
 }
 
-function moveElementWithAnimation(element, target, afterAppend) {
-  const startRect = element.getBoundingClientRect();
+function moveElementWithAnimation(element, target, direction, afterAppend) {
   target.appendChild(element);
-  const endRect = element.getBoundingClientRect();
-  const deltaX = startRect.left - endRect.left;
-  const deltaY = startRect.top - endRect.top;
-  element.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
-  requestAnimationFrame(() => {
-    element.style.transition = "transform 0.3s ease";
-    element.style.transform = "translate(0, 0)";
-  });
-  element.addEventListener(
-    "transitionend",
-    function handler() {
-      element.style.transition = "";
-      element.style.transform = "";
-      element.removeEventListener("transitionend", handler);
-      if (afterAppend) afterAppend();
-    },
-    { once: true }
-  );
+  element.classList.add(direction);
+  setTimeout(() => element.classList.remove(direction), 300);
+  if (afterAppend) afterAppend();
 }
 
 function updateStageIndicator() {
@@ -340,7 +324,8 @@ function updateStageIndicator() {
       : advancedStage === "pick"
       ? "Pick"
       : "Done";
-  if (indicator) indicator.textContent = `${stageText} - ${currentName}`;
+  if (indicator)
+    indicator.innerHTML = `<span class="stage-text ${stageText.toLowerCase()}">${stageText}</span> - ${currentName}`;
   const h1 = document.querySelector("#player1-column h3");
   const h2 = document.querySelector("#player2-column h3");
   if (h1) h1.textContent = p1Name;
@@ -354,7 +339,7 @@ function toggleAdvancedView() {
   const preview = document.querySelector(".map-preview");
   const toggleBtn = document.getElementById("advancedToggle");
   if (!adv || !list) return;
-
+  
   if (adv.classList.contains("hidden")) {
     const startSel = document.getElementById("startingPlayerSelect");
     if (startSel) currentAdvancedPlayer = startSel.value;
@@ -364,6 +349,8 @@ function toggleAdvancedView() {
     adv.style.display = "flex";
     list.style.display = "none";
     if (preview) preview.style.display = "none";
+    const picks = document.getElementById("picked-maps");
+    if (picks) picks.style.display = picks.classList.contains("hidden") ? "none" : "flex";
     renderAdvancedMapList();
     if (toggleBtn) toggleBtn.textContent = "Basic Mode";
     updateStageIndicator();
@@ -372,6 +359,8 @@ function toggleAdvancedView() {
     adv.style.display = "none";
     list.style.display = "block";
     if (preview) preview.style.display = "block";
+    const picks = document.getElementById("picked-maps");
+    if (picks) picks.style.display = "none";
     if (toggleBtn) toggleBtn.textContent = "Advanced Mode";
   }
 }
@@ -403,7 +392,8 @@ function advancedVeto(mapId, playerListId) {
   const li = document.getElementById(`adv-map${mapId}`);
   const target = document.getElementById(playerListId);
   if (!li || !target) return;
-  moveElementWithAnimation(li, target, () => li.classList.add("vetoed-map"));
+  const direction = playerListId === "player1-list" ? "slide-left" : "slide-right";
+  moveElementWithAnimation(li, target, direction, () => li.classList.add("vetoed-map"));
   checkAdvancedCompletion();
   updateStageIndicator();
 }
