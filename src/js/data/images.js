@@ -123,7 +123,7 @@ export const unitImages = {
   battlecruiser: "img/unit/battlecruiser.webp",
   brood_lord: "img/unit/brood_lord.webp",
   carrier: "img/unit/carrier.webp",
-  changling: "img/unit/changling.webp",
+  changeling: "img/unit/changeling.webp",
   colossus: "img/unit/colossus.webp",
   corruptor: "img/unit/corruptor.webp",
   cyclone: "img/unit/cyclone.webp",
