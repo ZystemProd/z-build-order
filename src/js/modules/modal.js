@@ -35,6 +35,10 @@ let lastVisibleBuild = null;
 let isLoadingMoreBuilds = false;
 let currentBuildFilter = "all";
 
+function isPublishedBuildsTabActive() {
+  return document.getElementById("publishedBuildsTab")?.classList.contains("active");
+}
+
 export function formatMatchup(matchup) {
   if (!matchup) return "Unknown Match-Up";
   return (
@@ -107,7 +111,7 @@ export async function loadMoreBuilds() {
   if (!user || !lastVisibleBuild) return;
 
   const newBuilds = await loadBuilds({
-    type: isPublishedTabActive ? "published" : "my",
+    type: isPublishedBuildsTabActive() ? "published" : "my",
     filter: currentBuildFilter,
     batchSize: 20,
     after: lastVisibleBuild,
@@ -144,7 +148,7 @@ async function handleScroll() {
     isLoadingMoreBuilds = true;
 
     const more = await loadBuilds({
-      type: isPublishedTabActive ? "published" : "my",
+      type: isPublishedBuildsTabActive() ? "published" : "my",
       filter: currentBuildFilter,
       batchSize: 20,
       startAfter: lastVisibleBuild,
