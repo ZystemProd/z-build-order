@@ -440,8 +440,11 @@ window.openModal = openModal;
 //window.showAllBuilds = showAllBuilds;
 
 let currentBuildIdToPublish = null;
+window.currentBuildIdToPublish = null;
 
 export async function openPublishModal(buildId) {
+  currentBuildIdToPublish = buildId;
+  window.currentBuildIdToPublish = buildId;
   const user = auth.currentUser;
   if (!user) return;
 
