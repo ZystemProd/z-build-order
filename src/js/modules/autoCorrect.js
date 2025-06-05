@@ -7,7 +7,7 @@ import DOMPurify from "dompurify";
 
 // Function to position the autocomplete popup below the caret
 function positionPopupAtCaret(inputField, popup) {
-  const { selectionStart, selectionEnd, scrollTop, scrollLeft } = inputField;
+  const { selectionStart, selectionEnd } = inputField;
 
   // If there's no caret or selection range, don't position the popup
   if (
@@ -32,9 +32,10 @@ function positionPopupAtCaret(inputField, popup) {
   tempDiv.style.position = "absolute";
   tempDiv.style.whiteSpace = "pre-wrap";
   tempDiv.style.visibility = "hidden";
-  tempDiv.style.top = `${inputField.offsetTop}px`;
-  tempDiv.style.left = `${inputField.offsetLeft}px`;
-  tempDiv.style.width = `${inputField.offsetWidth}px`;
+  const rect = inputField.getBoundingClientRect();
+  tempDiv.style.top = `${rect.top}px`;
+  tempDiv.style.left = `${rect.left}px`;
+  tempDiv.style.width = `${rect.width}px`;
 
   // Adjust the content up to the caret position
   const textBeforeCaret = inputField.value.slice(0, selectionStart);
@@ -50,17 +51,10 @@ function positionPopupAtCaret(inputField, popup) {
 
   // Get the marker's position relative to the `textarea`
   const markerRect = markerSpan.getBoundingClientRect();
-  const textareaRect = inputField.getBoundingClientRect();
 
-  // Calculate the position of the popup, including scroll adjustments
-  const popupTop =
-    markerRect.top - textareaRect.top + inputField.offsetTop - scrollTop;
-  const popupLeft =
-    markerRect.left - textareaRect.left + inputField.offsetLeft - scrollLeft;
-
-  // Set the popup position
-  popup.style.top = `${popupTop + markerRect.height + window.scrollY}px`;
-  popup.style.left = `${popupLeft + window.scrollX}px`;
+  // Set the popup position relative to the viewport
+  popup.style.top = `${markerRect.bottom}px`;
+  popup.style.left = `${markerRect.left}px`;
 
   // Remove the temporary div from the document
   document.body.removeChild(tempDiv);
