@@ -142,36 +142,38 @@ async function loadBuild() {
     const selectedMapText = document.getElementById("selected-map-text");
 
     // Map display for view-only
-    if (build.map && mapImage) {
-      const mapName = build.map;
-      const formattedMapName = mapName
-        .replace(/\s+/g, "_")
-        .replace(/[^\w\-]+/g, "")
-        .toLowerCase();
+    if (mapImage) {
+      if (build.map) {
+        const mapName = build.map;
+        let mapPath = "";
+        try {
+          const response = await fetch("/data/maps.json");
+          const maps = await response.json();
 
-      let mapPath = `img/maps/current/${formattedMapName}.webp`; // fallback default
+          const entry = maps.find(
+            (m) => m.name.toLowerCase() === mapName.toLowerCase()
+          );
 
-      try {
-        const response = await fetch("/data/maps.json");
-        const maps = await response.json();
-
-        const entry = maps.find(
-          (m) => m.name.toLowerCase() === mapName.toLowerCase()
-        );
-
-        if (entry) {
-          mapPath = `img/maps/${entry.folder}/${entry.file}`;
+          if (entry) {
+            mapPath = `img/maps/${entry.folder}/${entry.file}`;
+          }
+        } catch (err) {
+          console.warn("⚠️ Could not load maps.json");
         }
-      } catch (err) {
-        console.warn("⚠️ Could not load maps.json, using default path.");
-      }
 
-      mapImage.setAttribute("src", mapPath); // load immediately
-      mapImage.removeAttribute("data-src"); // optional cleanup
+        if (mapPath) {
+          mapImage.setAttribute("src", mapPath);
+        } else {
+          mapImage.removeAttribute("src");
+        }
+        mapImage.removeAttribute("data-src");
+      } else {
+        mapImage.removeAttribute("src");
+      }
     }
 
-    if (build.map && selectedMapText) {
-      selectedMapText.innerText = build.map; // Display readable map name
+    if (selectedMapText) {
+      selectedMapText.innerText = build.map || "";
     }
 
     const mapContainerWrapper = document.getElementById("map-container");
