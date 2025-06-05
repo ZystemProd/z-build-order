@@ -35,6 +35,52 @@ let lastVisibleBuild = null;
 let isLoadingMoreBuilds = false;
 let currentBuildFilter = "all";
 
+// --- View Mode State
+const storedViewMode = localStorage.getItem("buildViewMode") || "grid";
+let buildViewMode = storedViewMode;
+
+export function getBuildViewMode() {
+  return buildViewMode;
+}
+
+export function applyBuildViewMode() {
+  const container = document.getElementById("buildList");
+  const gridBtn = document.getElementById("gridViewBtn");
+  const listBtn = document.getElementById("listViewBtn");
+
+  if (container) {
+    if (buildViewMode === "list") {
+      container.classList.add("list-view");
+    } else {
+      container.classList.remove("list-view");
+    }
+  }
+
+  if (gridBtn && listBtn) {
+    if (buildViewMode === "list") {
+      listBtn.classList.add("active");
+      gridBtn.classList.remove("active");
+    } else {
+      gridBtn.classList.add("active");
+      listBtn.classList.remove("active");
+    }
+  }
+}
+
+export async function setBuildViewMode(mode) {
+  buildViewMode = mode === "list" ? "list" : "grid";
+  localStorage.setItem("buildViewMode", buildViewMode);
+  applyBuildViewMode();
+
+  const spinnerWrapper = document.getElementById("buildsLoadingWrapper");
+  if (spinnerWrapper) spinnerWrapper.style.display = "flex";
+  try {
+    await filterBuilds(getCurrentBuildFilter());
+  } finally {
+    if (spinnerWrapper) spinnerWrapper.style.display = "none";
+  }
+}
+
 function isPublishedBuildsTabActive() {
   return document.getElementById("publishedBuildsTab")?.classList.contains("active");
 }
@@ -643,18 +689,25 @@ export async function populateBuildList(
   const fragment = document.createDocumentFragment();
 
   for (const build of builds) {
-    const buildCard = document.createElement("div");
-    buildCard.classList.add("build-card");
-    buildCard.dataset.id = build.id;
-    buildCard.style.position = "relative";
-    buildCard.dataset.source = build.source || "user";
-    buildCard.dataset.clanid = build.clanId || "";
+    const isList = getBuildViewMode() === "list";
+    const buildEl = document.createElement("div");
+    if (isList) {
+      buildEl.classList.add("build-entry");
+    } else {
+      buildEl.classList.add("build-card");
+      buildEl.style.position = "relative";
+    }
+    buildEl.dataset.id = build.id;
+    buildEl.dataset.source = build.source || "user";
+    buildEl.dataset.clanid = build.clanId || "";
 
-    if (build.isPublished) buildCard.classList.add("published");
+    if (build.isPublished) buildEl.classList.add("published");
 
     const [playerRace, opponentRace] = getRaceIcons(
       build.subcategory || "Unknown"
     );
+
+    const matchupClass = getMatchupClass(playerRace) || "matchup-unknown";
 
     const matchupIconsHTML =
       playerRace && opponentRace
@@ -667,48 +720,70 @@ export async function populateBuildList(
     `
         : `<div class="matchup-icons">Invalid Matchup</div>`;
 
-    buildCard.innerHTML = `
-      <div class="build-card-header">
-        ${matchupIconsHTML}
-        <button class="delete-build-btn" title="Delete Build">×</button>
-      </div>
-      <h3 class="build-title">${DOMPurify.sanitize(build.title)}</h3>
-      <div class="build-meta">
-        <p>Publisher: You</p>
-        <p>Date: ${new Date(build.timestamp).toLocaleDateString()}</p>
-      </div>
-      <div class="build-publish-info"></div>
-    `;
+    if (isList) {
+      buildEl.innerHTML = `
+        <div class="build-left ${matchupClass}">
+          <img src="./img/race/${playerRace}2.webp" alt="${playerRace}" class="matchup-icon">
+        </div>
+        <div class="build-right">
+          <div class="build-title">${DOMPurify.sanitize(build.title)}</div>
+          <div class="build-meta">
+            <span class="meta-chip matchup-chip">${formatMatchup(build.subcategory || "")}</span>
+            <span class="meta-chip publisher-chip">
+              <img src="./img/SVG/user-svgrepo-com.svg" alt="Publisher" class="meta-icon">
+              You
+            </span>
+            <span class="meta-chip">
+              <img src="./img/SVG/time.svg" alt="Date" class="meta-icon">
+              ${new Date(build.timestamp).toLocaleDateString()}
+            </span>
+          </div>
+        </div>
+        <div class="build-publish-info"></div>`;
+    } else {
+      buildEl.innerHTML = `
+        <div class="build-card-header">
+          ${matchupIconsHTML}
+          <button class="delete-build-btn" title="Delete Build">×</button>
+        </div>
+        <h3 class="build-title">${DOMPurify.sanitize(build.title)}</h3>
+        <div class="build-meta">
+          <p>Publisher: You</p>
+          <p>Date: ${new Date(build.timestamp).toLocaleDateString()}</p>
+        </div>
+        <div class="build-publish-info"></div>
+      `;
+    }
 
     // Color styles
     const sub = build.subcategory?.toUpperCase() || "";
     if (sub.startsWith("ZV")) {
-      buildCard.style.setProperty("--gradient-color1", "#8e2de2");
-      buildCard.style.setProperty("--gradient-color2", "#4a00e0");
-      buildCard.style.setProperty("--race-color", "#8e2de2");
+      buildEl.style.setProperty("--gradient-color1", "#8e2de2");
+      buildEl.style.setProperty("--gradient-color2", "#4a00e0");
+      buildEl.style.setProperty("--race-color", "#8e2de2");
     } else if (sub.startsWith("PV")) {
-      buildCard.style.setProperty("--gradient-color1", "#5fe5ff");
-      buildCard.style.setProperty("--gradient-color2", "#007cf0");
-      buildCard.style.setProperty("--race-color", "#5fe5ff");
+      buildEl.style.setProperty("--gradient-color1", "#5fe5ff");
+      buildEl.style.setProperty("--gradient-color2", "#007cf0");
+      buildEl.style.setProperty("--race-color", "#5fe5ff");
     } else if (sub.startsWith("TV")) {
-      buildCard.style.setProperty("--gradient-color1", "#ff3a30");
-      buildCard.style.setProperty("--gradient-color2", "#ff7b00");
-      buildCard.style.setProperty("--race-color", "#ff3a30");
+      buildEl.style.setProperty("--gradient-color1", "#ff3a30");
+      buildEl.style.setProperty("--gradient-color2", "#ff7b00");
+      buildEl.style.setProperty("--race-color", "#ff3a30");
     } else {
-      buildCard.style.setProperty("--gradient-color1", "#555");
-      buildCard.style.setProperty("--gradient-color2", "#333");
-      buildCard.style.setProperty("--race-color", "#888");
+      buildEl.style.setProperty("--gradient-color1", "#555");
+      buildEl.style.setProperty("--gradient-color2", "#333");
+      buildEl.style.setProperty("--race-color", "#888");
     }
 
     // Hover + click preview
-    buildCard.addEventListener("mouseover", () => {
+    buildEl.addEventListener("mouseover", () => {
       if (lastHoveredBuild !== build) {
         updateBuildPreview(build);
         lastHoveredBuild = build;
       }
     });
 
-    buildCard.addEventListener("click", () => {
+    buildEl.addEventListener("click", () => {
       if (build.source === "community" || build.source === "clan") {
         setEditingPublishedBuild(build);
         loadBuildIntoEditor(build);
@@ -722,7 +797,7 @@ export async function populateBuildList(
 
     // Handle delete button
     if (build.source !== "community" && build.source !== "clan") {
-      const deleteButton = buildCard.querySelector(".delete-build-btn");
+      const deleteButton = buildEl.querySelector(".delete-build-btn");
       if (deleteButton) {
         deleteButton.addEventListener("click", async (event) => {
           event.stopPropagation();
@@ -745,11 +820,11 @@ export async function populateBuildList(
         });
       }
     } else {
-      const deleteBtn = buildCard.querySelector(".delete-build-btn");
+      const deleteBtn = buildEl.querySelector(".delete-build-btn");
       if (deleteBtn) deleteBtn.remove();
     }
 
-    const publishInfo = buildCard.querySelector(".build-publish-info");
+    const publishInfo = buildEl.querySelector(".build-publish-info");
     if (publishInfo) {
       const publishedTab = isPublishedBuildsTabActive();
       const isBuildPublished =
@@ -790,7 +865,7 @@ export async function populateBuildList(
       }
     }
 
-    fragment.appendChild(buildCard);
+    fragment.appendChild(buildEl);
   }
 
   buildList.appendChild(fragment);
@@ -820,6 +895,16 @@ function getRaceIcons(subcategory) {
   const opponentRace = raceMap[cleanedSubcategory.charAt(2)] || null;
 
   return [playerRace, opponentRace];
+}
+
+// ✅ Determine CSS class based on player's race
+function getMatchupClass(playerRace) {
+  const classes = {
+    zerg: "matchup-zerg",
+    protoss: "matchup-protoss",
+    terran: "matchup-terran",
+  };
+  return classes[playerRace] || "matchup-unknown";
 }
 
 export async function unpublishBuild(buildId) {
@@ -864,11 +949,11 @@ export async function unpublishBuild(buildId) {
     showToast("✅ Build unpublished!", "success");
 
     // ✅ Update card UI live
-    const buildCard = document.querySelector(
-      `.build-card[data-id="${buildId}"]`
+    const buildEl = document.querySelector(
+      `.build-card[data-id="${buildId}"], .build-entry[data-id="${buildId}"]`
     );
-    if (buildCard) {
-      const publishInfo = buildCard.querySelector(".build-publish-info");
+    if (buildEl) {
+      const publishInfo = buildEl.querySelector(".build-publish-info");
       if (publishInfo) {
         publishInfo.innerHTML = `<img src="./img/SVG/publish2.svg" alt="Publish" class="publish-icon"><span>Publish</span>`;
         publishInfo.classList.remove("publish-published", "no-border");
@@ -879,7 +964,7 @@ export async function unpublishBuild(buildId) {
           openPublishModal(buildId);
         };
       }
-      buildCard.classList.remove("published");
+      buildEl.classList.remove("published");
     }
   } catch (error) {
     console.error("❌ Error unpublishing build:", error.message);

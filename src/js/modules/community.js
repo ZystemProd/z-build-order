@@ -753,7 +753,7 @@ function renderCommunityBuildBatch(builds) {
       <div class="build-right">
         <div class="build-title">${build.title}</div>
         <div class="build-meta">
-          <span class="meta-chip matchup-chip">${matchup}</span>
+          <span class="meta-chip matchup-chip">${formatMatchup(matchup)}</span>
           <span class="meta-chip publisher-chip">
             <img src="./img/SVG/user-svgrepo-com.svg" alt="Publisher" class="meta-icon">
             ${build.publisher}
