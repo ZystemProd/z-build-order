@@ -62,6 +62,12 @@ window.addEventListener("DOMContentLoaded", () => {
   document
     .getElementById("advancedToggle")
     .addEventListener("click", toggleAdvancedView);
+
+  const p1Input = document.getElementById("player1NameInput");
+  const p2Input = document.getElementById("player2NameInput");
+  if (p1Input) p1Input.addEventListener("input", updateStageIndicator);
+  if (p2Input) p2Input.addEventListener("input", updateStageIndicator);
+  updateStageIndicator();
 });
 
 // Map Rendering
@@ -215,6 +221,7 @@ function resetAll() {
     advancedStage = "veto";
     pickOrder = 1;
     renderAdvancedMapList();
+    updateStageIndicator();
   }
 }
 
@@ -296,6 +303,50 @@ function toggleMapPreviewVisibility() {
   }
 }
 
+function moveElementWithAnimation(element, target, afterAppend) {
+  const startRect = element.getBoundingClientRect();
+  target.appendChild(element);
+  const endRect = element.getBoundingClientRect();
+  const deltaX = startRect.left - endRect.left;
+  const deltaY = startRect.top - endRect.top;
+  element.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+  requestAnimationFrame(() => {
+    element.style.transition = "transform 0.3s ease";
+    element.style.transform = "translate(0, 0)";
+  });
+  element.addEventListener(
+    "transitionend",
+    function handler() {
+      element.style.transition = "";
+      element.style.transform = "";
+      element.removeEventListener("transitionend", handler);
+      if (afterAppend) afterAppend();
+    },
+    { once: true }
+  );
+}
+
+function updateStageIndicator() {
+  const indicator = document.getElementById("stageIndicator");
+  const p1Input = document.getElementById("player1NameInput");
+  const p2Input = document.getElementById("player2NameInput");
+  const p1Name = p1Input && p1Input.value ? p1Input.value : "Player 1";
+  const p2Name = p2Input && p2Input.value ? p2Input.value : "Player 2";
+  const currentName =
+    currentAdvancedPlayer === "player1" ? p1Name : p2Name;
+  const stageText =
+    advancedStage === "veto"
+      ? "Veto"
+      : advancedStage === "pick"
+      ? "Pick"
+      : "Done";
+  if (indicator) indicator.textContent = `${stageText} - ${currentName}`;
+  const h1 = document.querySelector("#player1-column h3");
+  const h2 = document.querySelector("#player2-column h3");
+  if (h1) h1.textContent = p1Name;
+  if (h2) h2.textContent = p2Name;
+}
+
 // -------- Advanced View --------
 function toggleAdvancedView() {
   const adv = document.getElementById("advanced-view");
@@ -315,6 +366,7 @@ function toggleAdvancedView() {
     if (preview) preview.style.display = "none";
     renderAdvancedMapList();
     if (toggleBtn) toggleBtn.textContent = "Basic Mode";
+    updateStageIndicator();
   } else {
     adv.classList.add("hidden");
     adv.style.display = "none";
@@ -351,16 +403,9 @@ function advancedVeto(mapId, playerListId) {
   const li = document.getElementById(`adv-map${mapId}`);
   const target = document.getElementById(playerListId);
   if (!li || !target) return;
-
-  li.classList.add("vetoed-map");
-  li.classList.add(
-    playerListId === "player1-list" ? "slide-left" : "slide-right"
-  );
-  target.appendChild(li);
-  setTimeout(() => {
-    li.classList.remove("slide-left", "slide-right");
-  }, 300);
+  moveElementWithAnimation(li, target, () => li.classList.add("vetoed-map"));
   checkAdvancedCompletion();
+  updateStageIndicator();
 }
 
 function advancedVetoByTurn(mapId) {
@@ -373,6 +418,7 @@ function advancedVetoByTurn(mapId) {
   }
   currentAdvancedPlayer =
     currentAdvancedPlayer === "player1" ? "player2" : "player1";
+  updateStageIndicator();
 }
 
 function checkAdvancedCompletion() {
@@ -385,9 +431,11 @@ function checkAdvancedCompletion() {
     picks.innerHTML = "";
     picks.classList.remove("hidden");
     advancedStage = "pick";
+    updateStageIndicator();
   }
   if (advancedStage === "pick" && remaining.length === 0) {
     advancedStage = "done";
+    updateStageIndicator();
   }
 }
 
@@ -414,6 +462,7 @@ function pickMap(mapId) {
   setTimeout(() => div.classList.remove("slide-down"), 300);
   li.remove();
   checkAdvancedCompletion();
+  updateStageIndicator();
 }
 
 window.addEventListener("DOMContentLoaded", async () => {
