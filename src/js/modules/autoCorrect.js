@@ -106,6 +106,16 @@ export function initializeAutoCorrect() {
     }
   }
 
+  function insertTextRange(text, start, end) {
+    inputField.focus();
+    if (typeof inputField.setRangeText === "function") {
+      inputField.setRangeText(text, start, end, "end");
+    } else {
+      inputField.setSelectionRange(start, end);
+      document.execCommand("insertText", false, text);
+    }
+  }
+
   function replaceCurrentWordWith(text) {
     const wordBoundaryRegex = /\b(\w+)$/;
     const cursorPosition = inputField.selectionStart;
@@ -114,10 +124,7 @@ export function initializeAutoCorrect() {
     if (!match) return;
 
     const start = cursorPosition - match[1].length;
-    inputField.setSelectionRange(start, cursorPosition);
-    inputField.focus();
-    // Use modern API to insert text
-    inputField.setRangeText(text, start, cursorPosition, "end");
+    insertTextRange(text, start, cursorPosition);
 
     popup.style.visibility = "hidden";
     activeIndex = 0;
@@ -140,7 +147,7 @@ export function initializeAutoCorrect() {
     if (!isBracketInputEnabled()) {
       event.preventDefault();
       inputField.focus();
-      inputField.setRangeText("\n", inputField.selectionStart, inputField.selectionEnd, "end");
+      insertTextRange("\n", inputField.selectionStart, inputField.selectionEnd);
       inputField.scrollTop = inputField.scrollHeight;
       analyzeBuildOrder(inputField.value);
       return;
@@ -162,7 +169,7 @@ export function initializeAutoCorrect() {
       if (inputField.value[bracketEnd + 1] !== " ") {
         inputField.setSelectionRange(bracketEnd + 1, bracketEnd + 1);
         inputField.focus();
-        inputField.setRangeText(" ", bracketEnd + 1, bracketEnd + 1, "end");
+        insertTextRange(" ", bracketEnd + 1, bracketEnd + 1);
       }
 
       // Move cursor right after the inserted space
@@ -182,7 +189,7 @@ export function initializeAutoCorrect() {
       // ✅ Create a **new row** and move cursor inside `[|]`
       event.preventDefault();
       inputField.focus();
-      inputField.setRangeText("\n[]", inputField.selectionStart, inputField.selectionEnd, "end");
+      insertTextRange("\n[]", inputField.selectionStart, inputField.selectionEnd);
 
       // Move cursor **inside** the new brackets `[|]`
       inputField.selectionStart = inputField.selectionEnd = cursorPosition + 2;
@@ -198,7 +205,7 @@ export function initializeAutoCorrect() {
     // 3️⃣ Default behavior: Create new row and move cursor inside `[|]`
     event.preventDefault();
     inputField.focus();
-    inputField.setRangeText("\n[]", inputField.selectionStart, inputField.selectionEnd, "end");
+    insertTextRange("\n[]", inputField.selectionStart, inputField.selectionEnd);
 
     // Move cursor inside the new brackets `[|]`
     inputField.selectionStart = inputField.selectionEnd = cursorPosition + 2;
