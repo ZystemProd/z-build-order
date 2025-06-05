@@ -585,12 +585,7 @@ export async function searchCommunityBuilds(searchTerm) {
 
   const db = getFirestore();
   const type = localStorage.getItem("communityBuildType") || "public";
-  const constraints = [
-    where("titleLowercase", ">=", lower),
-    where("titleLowercase", "<=", lower + "\uf8ff"),
-    orderBy("titleLowercase"),
-    limit(20),
-  ];
+  const constraints = [orderBy("datePublished", "desc"), limit(50)];
 
   if (type === "public") {
     constraints.push(where("isPublic", "==", true));
@@ -644,10 +639,14 @@ export async function searchCommunityBuilds(searchTerm) {
   };
   });
 
+  const filteredBuilds = builds.filter((b) =>
+    b.title && b.title.toLowerCase().includes(lower)
+  );
+
   const container = document.getElementById("communityBuildsContainer");
   if (container) container.innerHTML = "";
 
-  renderCommunityBuildBatch(builds);
+  renderCommunityBuildBatch(filteredBuilds);
 }
 /*
 export function filterCommunityBuilds(categoryOrSubcat = "all") {
