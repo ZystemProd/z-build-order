@@ -141,6 +141,7 @@ async function loadBuild() {
     const mapImage = document.getElementById("map-preview-image");
     const selectedMapText = document.getElementById("selected-map-text");
 
+    let mapExists = false;
     // Map display for view-only
     if (mapImage) {
       if (build.map) {
@@ -163,6 +164,7 @@ async function loadBuild() {
 
         if (mapPath) {
           mapImage.setAttribute("src", mapPath);
+          mapExists = true;
         } else {
           mapImage.removeAttribute("src");
         }
@@ -173,12 +175,12 @@ async function loadBuild() {
     }
 
     if (selectedMapText) {
-      selectedMapText.innerText = build.map || "";
+      selectedMapText.innerText = build.map && mapExists ? build.map : "";
     }
 
     const mapContainerWrapper = document.getElementById("map-container");
     if (mapContainerWrapper) {
-      mapContainerWrapper.style.display = build.map ? "block" : "none";
+      mapContainerWrapper.style.display = mapExists ? "block" : "none";
     }
 
     // Setup map and annotations
@@ -278,14 +280,19 @@ async function loadBuild() {
       annotationsContainer.style.pointerEvents = "none"; // block any user interaction over the annotations
     }
     const additionalHeader = document.getElementById("additionalSettingsHeader");
-    if (additionalHeader) {
+    const mainLayout = document.querySelector(".main-layout");
+    if (additionalHeader || mainLayout) {
       const commentVisible = commentElement && commentElement.style.display !== "none";
       const videoVisible = youtubeEmbed && youtubeEmbed.style.display !== "none";
       const mapVisible = mapContainerWrapper && mapContainerWrapper.style.display !== "none";
-      if (!commentVisible && !videoVisible && !mapVisible) {
-        additionalHeader.style.display = "none";
-      } else {
-        additionalHeader.style.display = "block";
+
+      const anyVisible = commentVisible || videoVisible || mapVisible;
+
+      if (additionalHeader) {
+        additionalHeader.style.display = anyVisible ? "block" : "none";
+      }
+      if (mainLayout) {
+        mainLayout.style.display = anyVisible ? "block" : "none";
       }
     }
   } else {
