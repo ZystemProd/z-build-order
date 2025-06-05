@@ -563,20 +563,88 @@ window.publishBuildToCommunity = async function (buildId) {
 };
 
 export async function searchCommunityBuilds(searchTerm) {
-  const db = getFirestore();
-  const trimmed = searchTerm.trim().toLowerCase();
-  if (!trimmed) return [];
+  const lower = searchTerm.toLowerCase().trim();
 
-  const q = query(
-    collection(db, "publishedBuilds"),
-    where("titleLowercase", ">=", trimmed),
-    where("titleLowercase", "<=", trimmed + "\uf8ff"),
-    orderBy("titleLowercase"),
-    limit(20)
+  // Revert to existing filter when search is cleared
+  if (!lower) {
+    const stored = localStorage.getItem("communityFilterValue") || "all";
+    await filterCommunityBuilds(stored);
+    return;
+  }
+
+  // Reset race/matchup filters to avoid conflicts
+  localStorage.setItem("communityFilterValue", "all");
+  const buttons = document.querySelectorAll(
+    "#communityModal .filter-category, #communityModal .subcategory"
   );
+  buttons.forEach((btn) => btn.classList.remove("active"));
+  const allBtn = document.querySelector(
+    '#communityModal .filter-category[data-category="all"]'
+  );
+  if (allBtn) allBtn.classList.add("active");
 
+  const db = getFirestore();
+  const type = localStorage.getItem("communityBuildType") || "public";
+  const constraints = [
+    where("titleLowercase", ">=", lower),
+    where("titleLowercase", "<=", lower + "\uf8ff"),
+    orderBy("titleLowercase"),
+    limit(20),
+  ];
+
+  if (type === "public") {
+    constraints.push(where("isPublic", "==", true));
+  } else if (type === "clan") {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const clansSnap = await getDocs(collection(db, "clans"));
+    const clanIds = [];
+    clansSnap.forEach((doc) => {
+      const clan = doc.data();
+      if (clan.members?.includes(user.uid)) clanIds.push(doc.id);
+    });
+
+    if (clanIds.length === 0) {
+      renderCommunityBuildBatch([]);
+      return;
+    }
+
+    constraints.push(where("sharedToClans", "array-contains-any", clanIds));
+  }
+
+  const q = query(collection(db, "publishedBuilds"), ...constraints);
   const snap = await getDocs(q);
-  return snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+
+  const builds = snap.docs.map((doc) => {
+    const data = doc.data();
+
+    let datePublished = "Unknown";
+    try {
+      let ts = data.datePublished;
+      if (ts && typeof ts.toMillis === "function") ts = ts.toMillis();
+      if (typeof ts === "number") {
+        const d = new Date(ts);
+        if (!isNaN(d.getTime())) datePublished = d.toLocaleDateString("en-GB");
+      }
+    } catch (err) {
+      console.warn("❌ Failed to parse datePublished:", data.datePublished);
+    }
+
+    return {
+      id: doc.id,
+      ...data,
+      matchup: formatMatchup(
+        data.subcategoryLowercase || data.subcategory || ""
+      ),
+      datePublished,
+      views: data.views || 0,
+      upvotes: data.upvotes || 0,
+      downvotes: data.downvotes || 0,
+    };
+  });
+
+  renderCommunityBuildBatch(builds);
 }
 /*
 export function filterCommunityBuilds(categoryOrSubcat = "all") {
