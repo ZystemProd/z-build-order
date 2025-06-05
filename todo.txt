@@ -45,9 +45,7 @@ Maybe remove them if it doess not contain anything
 - Animation for the choosen maps
 
 ----------- My Builds ----------
-- preview don't show red font color on 15/14 (oversupply)
 
-- Published build button?
 
 Let me know if you'd like a toast warning before exiting edit mode if unsaved changes exist.
 
