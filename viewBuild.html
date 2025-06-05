@@ -91,7 +91,7 @@
       </div>
       <div class="build-info-item">
         <label>Publisher</label>
-        <span id="buildPublisher">Loading...</span>
+        <span id="buildPublisher" class="meta-chip publisher-chip">Loading...</span>
       </div>
       <div class="build-info-item">
         <label>Date Published</label>
@@ -125,7 +125,7 @@
     <div class="main-layout">
       <!-- Second Row: Map and Comment/Video -->
 
-      <h3 data-section="secondRow" class="toggle-title">
+      <h3 id="additionalSettingsHeader" data-section="secondRow" class="toggle-title" style="display: none">
         <span class="arrow"></span> Additional Settings
       </h3>
       <div class="hideable-section hidden" id="secondRow">
@@ -146,11 +146,10 @@
 
         <!-- RIGHT COLUMN: Comment & Video Container -->
         <div class="comment-video-container">
-          <h3 class="toggle-title">Comment</h3>
-          <textarea id="commentInput" placeholder="Add a comment..."></textarea>
+          <h3 id="commentHeader" class="toggle-title" style="display: none">Comment</h3>
+          <p id="buildComment" class="comment-display" style="display: none"></p>
 
-          <h3 class="toggle-title">Video</h3>
-          <input type="text" id="videoInput" placeholder="Paste YouTube link here..." />
+          <h3 id="videoHeader" class="toggle-title" style="display: none">Video</h3>
           <iframe id="videoIframe" style="display: none;" width="560" height="315" frameborder="0"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowfullscreen></iframe>

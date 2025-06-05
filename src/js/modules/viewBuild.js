@@ -73,8 +73,7 @@ async function loadBuild() {
       build.title || "Untitled Build";
     document.getElementById("buildCategory").innerText =
       build.category || "Unknown";
-    document.getElementById("buildMatchup").innerText =
-      build.subcategory || "Unknown";
+    document.getElementById("buildMatchup").innerText = (build.subcategory && build.subcategory.length === 3 ? build.subcategory.charAt(0).toUpperCase() + build.subcategory.charAt(1) + build.subcategory.charAt(2).toUpperCase() : build.subcategory || "Unknown");
     document.getElementById("buildPublisher").innerText =
       build.username || "Anonymous";
     document.getElementById("buildDate").innerText = new Date(
@@ -113,27 +112,30 @@ async function loadBuild() {
 
     // Set comment
     const commentElement = document.getElementById("buildComment");
-    if (commentElement && build.comment) {
-      commentElement.innerText = build.comment;
+    const commentHeader = document.getElementById("commentHeader");
+    if (commentElement && commentHeader) {
+      if (build.comment && build.comment.trim() !== "") {
+        commentElement.innerText = build.comment;
+        commentElement.style.display = "block";
+        commentHeader.style.display = "block";
+      } else {
+        commentElement.style.display = "none";
+        commentHeader.style.display = "none";
     }
 
     // Set YouTube link
     const youtubeEmbed = document.getElementById("videoIframe");
-    if (youtubeEmbed && build.youtube) {
-      youtubeEmbed.src = build.youtube;
+    const videoHeader = document.getElementById("videoHeader");
+    if (youtubeEmbed && videoHeader) {
+      if (build.youtube && build.youtube.trim() !== "") {
+        youtubeEmbed.src = build.youtube;
+        youtubeEmbed.style.display = "block";
+        videoHeader.style.display = "block";
+      } else {
+        youtubeEmbed.style.display = "none";
+        videoHeader.style.display = "none";
+      }
     }
-
-    // 🔒 Disable comment and video input fields for read-only
-    const commentInput = document.getElementById("commentInput");
-    if (commentInput) {
-      commentInput.disabled = true;
-    }
-
-    const videoInput = document.getElementById("videoInput");
-    if (videoInput) {
-      videoInput.disabled = true;
-    }
-
     // Set map image
     const mapImage = document.getElementById("map-preview-image");
     const selectedMapText = document.getElementById("selected-map-text");
@@ -169,6 +171,11 @@ async function loadBuild() {
 
     if (build.map && selectedMapText) {
       selectedMapText.innerText = build.map; // Display readable map name
+    }
+
+    const mapContainerWrapper = document.getElementById("map-container");
+    if (mapContainerWrapper) {
+      mapContainerWrapper.style.display = build.map ? "block" : "none";
     }
 
     // Setup map and annotations
@@ -266,6 +273,17 @@ async function loadBuild() {
 
       // Disable all interaction with annotations
       annotationsContainer.style.pointerEvents = "none"; // block any user interaction over the annotations
+    }
+    const additionalHeader = document.getElementById("additionalSettingsHeader");
+    if (additionalHeader) {
+      const commentVisible = commentElement && commentElement.style.display !== "none";
+      const videoVisible = youtubeEmbed && youtubeEmbed.style.display !== "none";
+      const mapVisible = mapContainerWrapper && mapContainerWrapper.style.display !== "none";
+      if (!commentVisible && !videoVisible && !mapVisible) {
+        additionalHeader.style.display = "none";
+      } else {
+        additionalHeader.style.display = "block";
+      }
     }
   } else {
     console.error("❌ Build not found in Firestore:", buildId);

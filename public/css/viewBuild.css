@@ -294,3 +294,11 @@ input[type="text"]:disabled {
     text-align: center;
   }
 }
+
+/* Disable pointer events for annotations in view mode */
+.annotation-circle,
+.annotation-circle-container,
+.annotation-arrow {
+  pointer-events: none;
+}
+
