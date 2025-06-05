@@ -303,11 +303,26 @@ function toggleMapPreviewVisibility() {
   }
 }
 
-function moveElementWithAnimation(element, target, direction, afterAppend) {
+function moveElementWithAnimation(element, target, afterAppend) {
+  const startRect = element.getBoundingClientRect();
   target.appendChild(element);
-  element.classList.add(direction);
-  setTimeout(() => element.classList.remove(direction), 300);
-  if (afterAppend) afterAppend();
+  const endRect = element.getBoundingClientRect();
+  const dx = startRect.left - endRect.left;
+  const dy = startRect.top - endRect.top;
+  element.style.transform = `translate(${dx}px, ${dy}px)`;
+  element.style.transition = "transform 0.3s ease";
+  requestAnimationFrame(() => {
+    element.style.transform = "translate(0, 0)";
+  });
+  element.addEventListener(
+    "transitionend",
+    () => {
+      element.style.transition = "";
+      element.style.transform = "";
+      if (afterAppend) afterAppend();
+    },
+    { once: true }
+  );
 }
 
 function updateStageIndicator() {
@@ -392,8 +407,7 @@ function advancedVeto(mapId, playerListId) {
   const li = document.getElementById(`adv-map${mapId}`);
   const target = document.getElementById(playerListId);
   if (!li || !target) return;
-  const direction = playerListId === "player1-list" ? "slide-left" : "slide-right";
-  moveElementWithAnimation(li, target, direction, () => li.classList.add("vetoed-map"));
+  moveElementWithAnimation(li, target, () => li.classList.add("vetoed-map"));
   checkAdvancedCompletion();
   updateStageIndicator();
 }
@@ -420,6 +434,7 @@ function checkAdvancedCompletion() {
   if (advancedStage === "veto" && limit && remaining.length === limit) {
     picks.innerHTML = "";
     picks.classList.remove("hidden");
+    picks.style.display = "flex";
     advancedStage = "pick";
     updateStageIndicator();
   }
@@ -435,9 +450,10 @@ function pickMap(mapId) {
   const picks = document.getElementById("picked-maps");
   if (!li || !picks || !advList) return;
   li.classList.remove("vetoed-map");
+  const startRect = li.getBoundingClientRect();
   const img = li.querySelector("img").cloneNode();
   const div = document.createElement("div");
-  div.className = "pick-item slide-down";
+  div.className = "pick-item";
   const num = document.createElement("span");
   num.className = "pick-number";
   num.textContent = pickOrder;
@@ -449,7 +465,22 @@ function pickMap(mapId) {
   div.appendChild(num);
   div.appendChild(label);
   picks.appendChild(div);
-  setTimeout(() => div.classList.remove("slide-down"), 300);
+  const endRect = div.getBoundingClientRect();
+  const dx = startRect.left - endRect.left;
+  const dy = startRect.top - endRect.top;
+  div.style.transform = `translate(${dx}px, ${dy}px)`;
+  div.style.transition = "transform 0.3s ease";
+  requestAnimationFrame(() => {
+    div.style.transform = "translate(0, 0)";
+  });
+  div.addEventListener(
+    "transitionend",
+    () => {
+      div.style.transition = "";
+      div.style.transform = "";
+    },
+    { once: true }
+  );
   li.remove();
   checkAdvancedCompletion();
   updateStageIndicator();

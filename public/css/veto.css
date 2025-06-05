@@ -510,6 +510,10 @@ label {
   display: none;
 }
 
+.advanced-view.hidden {
+  display: none;
+}
+
 /* ---------- Advanced View Styles ---------- */
 .advanced-view {
   display: flex;
@@ -599,6 +603,10 @@ label {
   justify-content: center;
   gap: 10px;
   margin-top: 10px;
+}
+
+.picked-maps.hidden {
+  display: none;
 }
 
 .pick-item {
