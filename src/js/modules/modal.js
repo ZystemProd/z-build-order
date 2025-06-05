@@ -67,11 +67,18 @@ export function applyBuildViewMode() {
   }
 }
 
-export function setBuildViewMode(mode) {
+export async function setBuildViewMode(mode) {
   buildViewMode = mode === "list" ? "list" : "grid";
   localStorage.setItem("buildViewMode", buildViewMode);
   applyBuildViewMode();
-  filterBuilds(getCurrentBuildFilter());
+
+  const spinnerWrapper = document.getElementById("buildsLoadingWrapper");
+  if (spinnerWrapper) spinnerWrapper.style.display = "flex";
+  try {
+    await filterBuilds(getCurrentBuildFilter());
+  } finally {
+    if (spinnerWrapper) spinnerWrapper.style.display = "none";
+  }
 }
 
 function isPublishedBuildsTabActive() {
@@ -716,12 +723,12 @@ export async function populateBuildList(
     if (isList) {
       buildEl.innerHTML = `
         <div class="build-left ${matchupClass}">
-          <img src="./img/race/${playerRace}.webp" alt="${playerRace}" class="matchup-icon">
+          <img src="./img/race/${playerRace}2.webp" alt="${playerRace}" class="matchup-icon">
         </div>
         <div class="build-right">
           <div class="build-title">${DOMPurify.sanitize(build.title)}</div>
           <div class="build-meta">
-            <span class="meta-chip matchup-chip">${build.subcategory || "?"}</span>
+            <span class="meta-chip matchup-chip">${formatMatchup(build.subcategory || "")}</span>
             <span class="meta-chip publisher-chip">
               <img src="./img/SVG/user-svgrepo-com.svg" alt="Publisher" class="meta-icon">
               You
