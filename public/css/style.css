@@ -1822,7 +1822,7 @@ textarea::-webkit-scrollbar-thumb:hover {
 }
 
 .autocomplete-popup {
-  position: absolute;
+  position: fixed;
   background-color: rgba(30, 30, 30, 0.95); /* Slight transparency */
   border: 1px solid #444; /* Darker border for a subtle look */
   border-radius: 12px; /* Rounded edges */
