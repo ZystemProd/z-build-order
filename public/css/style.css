@@ -3283,6 +3283,23 @@ td {
   color: #e0e0e0;
   line-height: 1.5;
 }
+.publish-checkbox-row span {
+  flex: 1;
+}
+
+.publish-divider {
+  border: none;
+  border-top: 1px solid #444;
+  width: 100%;
+  margin: 8px 0;
+}
+
+.clan-section-label {
+  font-weight: 600;
+  color: #e0e0e0;
+  margin: 4px 0;
+  width: 100%;
+}
 
 /* Checkbox styling replaced by custom toggle component */
 
