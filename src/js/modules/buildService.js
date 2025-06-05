@@ -53,9 +53,22 @@ export async function loadBuilds({
   q = query(q, limit(batchSize));
 
   const snap = await getDocs(q);
+  let builds = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+
+  if (type === "my") {
+    const publishedRef = collection(db, "publishedBuilds");
+    const publishedSnap = await getDocs(
+      query(publishedRef, where("publisherId", "==", user.uid))
+    );
+    const publishedIds = new Set(publishedSnap.docs.map((d) => d.id));
+    builds = builds.map((b) => ({
+      ...b,
+      isPublished: b.isPublished || publishedIds.has(b.id),
+    }));
+  }
 
   return {
-    builds: snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+    builds,
     lastDoc: snap.docs.length ? snap.docs[snap.docs.length - 1] : null,
   };
 }

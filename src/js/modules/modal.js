@@ -35,6 +35,10 @@ let lastVisibleBuild = null;
 let isLoadingMoreBuilds = false;
 let currentBuildFilter = "all";
 
+function isPublishedBuildsTabActive() {
+  return document.getElementById("publishedBuildsTab")?.classList.contains("active");
+}
+
 export function formatMatchup(matchup) {
   if (!matchup) return "Unknown Match-Up";
   return (
@@ -107,7 +111,7 @@ export async function loadMoreBuilds() {
   if (!user || !lastVisibleBuild) return;
 
   const newBuilds = await loadBuilds({
-    type: isPublishedTabActive ? "published" : "my",
+    type: isPublishedBuildsTabActive() ? "published" : "my",
     filter: currentBuildFilter,
     batchSize: 20,
     after: lastVisibleBuild,
@@ -144,7 +148,7 @@ async function handleScroll() {
     isLoadingMoreBuilds = true;
 
     const more = await loadBuilds({
-      type: isPublishedTabActive ? "published" : "my",
+      type: isPublishedBuildsTabActive() ? "published" : "my",
       filter: currentBuildFilter,
       batchSize: 20,
       startAfter: lastVisibleBuild,
@@ -436,8 +440,11 @@ window.openModal = openModal;
 //window.showAllBuilds = showAllBuilds;
 
 let currentBuildIdToPublish = null;
+window.currentBuildIdToPublish = null;
 
 export async function openPublishModal(buildId) {
+  currentBuildIdToPublish = buildId;
+  window.currentBuildIdToPublish = buildId;
   const user = auth.currentUser;
   if (!user) return;
 
@@ -744,21 +751,35 @@ export async function populateBuildList(
 
     const publishInfo = buildCard.querySelector(".build-publish-info");
     if (publishInfo) {
+      const publishedTab = isPublishedBuildsTabActive();
+      const isBuildPublished =
+        build.isPublished || build.isPublic || (build.sharedToClans?.length ?? 0) > 0;
+
       if (build.imported) {
         publishInfo.classList.add("publish-imported");
         publishInfo.innerHTML = `<span>Imported</span>`;
         publishInfo.style.pointerEvents = "none";
-      } else if (build.isPublic || (build.sharedToClans?.length ?? 0) > 0) {
+      } else if (isBuildPublished) {
         publishInfo.classList.add("publish-published");
-        publishInfo.innerHTML = `<span>Published </span><img src="./img/SVG/checkmark2.svg" class="publish-icon">`;
-        if (build.isPublic)
-          publishInfo.innerHTML += `<span class="tag public">Public</span>`;
-        if (build.sharedToClans?.length > 0)
-          publishInfo.innerHTML += `<span class="tag clan">Clan</span>`;
-        publishInfo.addEventListener("click", (e) => {
-          e.stopPropagation();
-          openPublishModal(build.id);
-        });
+        publishInfo.innerHTML = `
+          <span>Published</span>
+          <img src="./img/SVG/checkmark2.svg" class="publish-icon">
+        `;
+        if (publishedTab) {
+          if (build.isPublic)
+            publishInfo.innerHTML += `<span class="tag public">Public</span>`;
+          if (build.sharedToClans?.length > 0)
+            publishInfo.innerHTML += `<span class="tag clan">Clan</span>`;
+          publishInfo.style.pointerEvents = "auto";
+          publishInfo.classList.remove("no-border");
+          publishInfo.addEventListener("click", (e) => {
+            e.stopPropagation();
+            openPublishModal(build.id);
+          });
+        } else {
+          publishInfo.style.pointerEvents = "none";
+          publishInfo.classList.add("no-border");
+        }
       } else {
         publishInfo.classList.add("publish-unpublished");
         publishInfo.innerHTML = `<img src="./img/SVG/publish2.svg" class="publish-icon"><span>Publish</span>`;
@@ -850,8 +871,9 @@ export async function unpublishBuild(buildId) {
       const publishInfo = buildCard.querySelector(".build-publish-info");
       if (publishInfo) {
         publishInfo.innerHTML = `<img src="./img/SVG/publish2.svg" alt="Publish" class="publish-icon"><span>Publish</span>`;
-        publishInfo.classList.remove("publish-published");
+        publishInfo.classList.remove("publish-published", "no-border");
         publishInfo.classList.add("publish-unpublished");
+        publishInfo.style.pointerEvents = "auto";
         publishInfo.onclick = (event) => {
           event.stopPropagation();
           openPublishModal(buildId);

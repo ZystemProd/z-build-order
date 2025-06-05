@@ -1012,6 +1012,11 @@ textarea::-webkit-scrollbar-thumb:hover {
   border-color: #00c853;
 }
 
+/* When a build is shown in My Builds and already published, remove the button border */
+.publish-published.no-border {
+  border: none;
+}
+
 .publish-imported {
   color: #ff9800; /* Orange */
   background: rgba(255, 152, 0, 0.15);
