@@ -707,7 +707,7 @@ export async function populateBuildList(
       build.subcategory || "Unknown"
     );
 
-    const matchupClass = getMatchupClass(playerRace);
+    const matchupClass = getMatchupClass(playerRace) || "matchup-unknown";
 
     const matchupIconsHTML =
       playerRace && opponentRace
