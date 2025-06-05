@@ -27,6 +27,7 @@ import {
   clearEditingPublishedBuild,
 } from "./states/buildState.js";
 import { loadBuilds } from "./buildService.js";
+import { fetchUserBuilds, fetchPublishedUserBuilds } from "./buildManagement.js";
 import DOMPurify from "dompurify";
 
 // --- Firestore Pagination State
@@ -906,10 +907,38 @@ export function loadBuild(index) {
 }
 
 export async function searchBuilds(query) {
-  const lowerCaseQuery = query.toLowerCase();
-  const builds = await fetchUserBuilds(); // Fetch all builds
+  const lowerCaseQuery = query.toLowerCase().trim();
 
-  // Filter builds based on the query
+  // When query is empty, revert to current filter
+  if (!lowerCaseQuery) {
+    await filterBuilds(currentBuildFilter);
+    return;
+  }
+
+  // Activate "All" filter to avoid conflicts with race filters
+  currentBuildFilter = "all";
+  const buttons = document.querySelectorAll(
+    "#buildsModal .filter-category, #buildsModal .subcategory"
+  );
+  buttons.forEach((btn) => btn.classList.remove("active"));
+  const allBtn = document.querySelector(
+    '#buildsModal .filter-category[data-category="all"]'
+  );
+  if (allBtn) allBtn.classList.add("active");
+
+  // Determine which tab is active and fetch builds accordingly
+  const isPublishedTabActive = document
+    .getElementById("publishedBuildsTab")
+    ?.classList.contains("active");
+
+  let builds = [];
+  if (isPublishedTabActive) {
+    builds = await fetchPublishedUserBuilds("all");
+  } else {
+    builds = await fetchUserBuilds();
+  }
+
+  // Filter builds by title
   const filteredBuilds = builds.filter((build) =>
     build.title.toLowerCase().includes(lowerCaseQuery)
   );
