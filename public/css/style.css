@@ -187,8 +187,9 @@ body {
 #templateDropdown {
   display: none;
   position: absolute;
+  top: 30px;
   left: 0;
-  margin-left: 5px;
+  margin-left: 0;
   background-color: #2a2a2a; /* Darker background */
   min-width: 150px; /* Adjust width */
   border-radius: 5px;
@@ -686,28 +687,31 @@ button:hover {
   height: 150px;
 }
 
-.input-with-template {
-  display: flex;
-  align-items: flex-start;
+
+.template-wrapper {
+  position: relative;
+  display: inline-block;
 }
 
-.input-with-template textarea {
-  flex: 1;
-  margin-left: 10px;
+.template-wrapper textarea {
+  width: 100%;
 }
 
 .template-icon-button {
+  position: absolute;
+  top: -26px;
+  left: 0;
   background: #2c2c2c;
   border: 1px solid #444;
-  padding: 4px;
-  cursor: pointer;
-  border-radius: 0;
   color: #fff;
-  width: 24px;
-  height: 24px;
-  line-height: 24px;
+  width: 26px;
+  height: 26px;
+  line-height: 26px;
   text-align: center;
-  margin-right: 0;
+  font-size: 20px;
+  clip-path: polygon(0 0, 100% 0, 80% 100%, 0% 100%);
+  cursor: pointer;
+  padding: 0;
 }
 
 .template-icon-button:hover {
