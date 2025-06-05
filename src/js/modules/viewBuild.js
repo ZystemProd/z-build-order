@@ -121,6 +121,7 @@ async function loadBuild() {
       } else {
         commentElement.style.display = "none";
         commentHeader.style.display = "none";
+      }
     }
 
     // Set YouTube link
