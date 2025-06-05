@@ -2428,6 +2428,11 @@ td {
   min-width: 140px;
 }
 
+.meta-chip.publisher-chip {
+  display: block;
+  width: fit-content;
+  margin: auto;
+}
 .build-info-item label {
   display: block;
   font-size: 0.85rem;
