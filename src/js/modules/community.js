@@ -242,9 +242,9 @@ function showBuildPreview(build) {
 
 const communitySearchInput = document.getElementById("communitySearchBar");
 if (communitySearchInput) {
-  communitySearchInput.addEventListener("input", function () {
-    const query = this.value.toLowerCase();
-    filterCommunityBuilds(query);
+  communitySearchInput.addEventListener("input", async function () {
+    const query = this.value;
+    await searchCommunityBuilds(query);
   });
 }
 
