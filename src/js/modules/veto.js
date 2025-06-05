@@ -404,8 +404,12 @@ function pickMap(mapId) {
   num.className = "pick-number";
   num.textContent = pickOrder;
   pickOrder++;
+  const label = document.createElement("span");
+  label.className = "pick-label";
+  label.textContent = li.querySelector(".adv-map-label").textContent;
   div.appendChild(img);
   div.appendChild(num);
+  div.appendChild(label);
   picks.appendChild(div);
   setTimeout(() => div.classList.remove("slide-down"), 300);
   li.remove();

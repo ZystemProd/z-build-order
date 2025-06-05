@@ -530,16 +530,30 @@ label {
   padding: 0;
 }
 
+.advanced-map-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
 .advanced-map-list li,
 .player-list li {
   position: relative;
   margin: 5px auto;
-  width: 40%;
   max-width: 150px;
   border: 2px solid var(--darker-blue);
   border-radius: 8px;
   cursor: pointer;
   background: rgba(255, 255, 255, 0.05);
+}
+
+.advanced-map-list li {
+  width: 45%;
+}
+
+.player-list li {
+  width: 100%;
 }
 
 .advanced-map-list img,
@@ -562,6 +576,19 @@ label {
 .player-list li.vetoed-map,
 .advanced-map-list li.vetoed-map {
   border-color: var(--vetoed-red);
+  position: relative;
+}
+
+.player-list li.vetoed-map::after,
+.advanced-map-list li.vetoed-map::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 0, 0, 0.3);
+  border-radius: 8px;
 }
 
 .picked-maps {
@@ -575,8 +602,8 @@ label {
   position: relative;
   border: 2px solid var(--darker-blue);
   border-radius: 8px;
-  width: 100px;
-  height: 70px;
+  width: 140px;
+  height: 100px;
 }
 
 .pick-item img {
@@ -590,6 +617,16 @@ label {
   position: absolute;
   bottom: 4px;
   right: 4px;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.pick-label {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
   background: rgba(0, 0, 0, 0.6);
   padding: 1px 4px;
   border-radius: 4px;
