@@ -246,6 +246,15 @@ export async function initializeIndexPage() {
         newBuildButton.style.display = "inline-block";
         showToast("✅ Build saved!", "success");
 
+        const titleInput = document.getElementById("buildOrderTitleInput");
+        const editBanner = document.getElementById("editModeBanner");
+        if (editBanner && titleInput) {
+          editBanner.innerHTML = `[Edit Mode] <strong>${DOMPurify.sanitize(
+            titleInput.value.trim()
+          )}</strong>`;
+          editBanner.style.display = "block";
+        }
+
         const replayUrl = document
           .getElementById("replayLinkInput")
           ?.value.trim();
