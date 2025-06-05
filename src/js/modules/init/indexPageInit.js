@@ -250,6 +250,15 @@ export async function initializeIndexPage() {
         newBuildButton.style.display = "inline-block";
         showToast("✅ Build saved!", "success");
 
+        const titleInput = document.getElementById("buildOrderTitleInput");
+        const editBanner = document.getElementById("editModeBanner");
+        if (editBanner && titleInput) {
+          editBanner.innerHTML = `[Edit Mode] <strong>${DOMPurify.sanitize(
+            titleInput.value.trim()
+          )}</strong>`;
+          editBanner.style.display = "block";
+        }
+
         const replayUrl = document
           .getElementById("replayLinkInput")
           ?.value.trim();
@@ -317,7 +326,7 @@ export async function initializeIndexPage() {
     }
   });
 
-  // monitorBuildChanges();
+  monitorBuildChanges();
 
   safeAdd("showBuildsButton", "click", () => {
     if (!auth.currentUser) {
@@ -1022,5 +1031,35 @@ export async function initializeIndexPage() {
         mapModal.style.display = "none";
       }
     });
+  }
+
+  function monitorBuildChanges() {
+    const fields = [
+      "buildOrderInput",
+      "commentInput",
+      "videoInput",
+      "replayLinkInput",
+      "buildOrderTitleInput",
+    ];
+
+    fields.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el && !el.dataset.monitorAttached) {
+        el.addEventListener("input", () => {
+          saveBuildButton.disabled = false;
+          saveBuildButton.style.backgroundColor = "#963325";
+        });
+        el.dataset.monitorAttached = "true";
+      }
+    });
+
+    const categoryDropdown = document.getElementById("buildCategoryDropdown");
+    if (categoryDropdown && !categoryDropdown.dataset.monitorAttached) {
+      categoryDropdown.addEventListener("change", () => {
+        saveBuildButton.disabled = false;
+        saveBuildButton.style.backgroundColor = "#963325";
+      });
+      categoryDropdown.dataset.monitorAttached = "true";
+    }
   }
 }

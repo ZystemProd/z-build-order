@@ -115,20 +115,7 @@
         <h3 data-section="buildOrderInputField" class="toggle-title">
           <span id="buildOrderInputArrow" class="arrow open"></span> INPUT
         </h3>
-        <div class="template-controls">
-          <div class="dropdown">
-            <button id="templateMenuButton" class="dropdown-btn">
-              <img src="img/SVG/template.svg" alt="Template Icon" class="svg-icon">
-              Templates ▼
-            </button>
-            <div id="templateDropdown" class="dropdown-content">
-              <button id="openTemplatesButton">Open Templates</button>
-              <button id="saveTemplateButton">Save Template</button>
-            </div>
-          </div>
-
-        </div>
-        <div id="editModeBanner" style="display: none; font-weight: bold; margin-bottom: 10px;"></div>
+        <div id="editModeBanner"></div>
 
         <div id="box">
 
@@ -198,7 +185,23 @@
         </div>
       </div>
       <div id="buildOrderInputField" class="hideable-section" style="display: block">
-        <textarea id="buildOrderInput" placeholder="Spawning Pool"></textarea>
+        <div class="template-wrapper">
+          <div class="dropdown">
+            <svg id="templateMenuButton" class="template-icon-button" width="60" height="26" viewBox="0 0 60 26" xmlns="http://www.w3.org/2000/svg">
+              <polygon points="0,0 33,0 60,26 0,26"></polygon>
+              <path d="M0,0 L33,0"/>
+              <path d="M33,0 L60,26"/>
+              <path d="M60,26 L0,26"/>
+              <path d="M0,26 L0,0"/>
+              <text x="10" y="18">+</text>
+            </svg>
+            <div id="templateDropdown" class="dropdown-content">
+              <button id="openTemplatesButton">Open Templates</button>
+              <button id="saveTemplateButton">Save Template</button>
+            </div>
+          </div>
+          <textarea id="buildOrderInput" placeholder="Spawning Pool"></textarea>
+        </div>
       </div>
     </div>
 

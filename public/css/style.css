@@ -187,7 +187,9 @@ body {
 #templateDropdown {
   display: none;
   position: absolute;
-  right: 0;
+  top: 30px;
+  left: 0;
+  margin-left: 0;
   background-color: #2a2a2a; /* Darker background */
   min-width: 150px; /* Adjust width */
   border-radius: 5px;
@@ -683,6 +685,47 @@ button:hover {
 
 #buildOrderInput {
   height: 150px;
+  border-top-left-radius: 0;
+}
+
+
+.template-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.template-wrapper textarea {
+  width: 100%;
+}
+
+.template-icon-button {
+  position: absolute;
+  top: -15px;
+  left: -4px;
+  width: 60px;
+  height: 22px;
+  cursor: pointer;
+}
+
+.template-icon-button polygon {
+  fill: #2c2c2c;
+}
+
+.template-icon-button path {
+  stroke: #444;
+  stroke-width: 1px;
+}
+
+.template-icon-button text {
+  font-size: 18px;
+  fill: white;
+  font-family: Arial, sans-serif;
+  font-weight: bold;
+  pointer-events: none;
+}
+
+.template-icon-button:hover polygon {
+  fill: #444;
 }
 
 .buildOrderOutput {
@@ -2604,6 +2647,16 @@ td {
 
 #saveBuildButton:hover img {
   transform: scale(1.1); /* Slight animation effect */
+}
+
+#editModeBanner {
+  display: none;
+  background-color: #165016;
+  color: #fff;
+  padding: 6px;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  text-align: center;
 }
 
 .footer {
