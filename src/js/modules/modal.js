@@ -700,12 +700,7 @@ export async function populateBuildList(
       build.subcategory || "Unknown"
     );
 
-    const matchupClassMap = {
-      zerg: "matchup-zerg",
-      protoss: "matchup-protoss",
-      terran: "matchup-terran",
-    };
-    const matchupClass = matchupClassMap[playerRace] || "matchup-unknown";
+    const matchupClass = getMatchupClass(playerRace);
 
     const matchupIconsHTML =
       playerRace && opponentRace
@@ -893,6 +888,16 @@ function getRaceIcons(subcategory) {
   const opponentRace = raceMap[cleanedSubcategory.charAt(2)] || null;
 
   return [playerRace, opponentRace];
+}
+
+// ✅ Determine CSS class based on player's race
+function getMatchupClass(playerRace) {
+  const classes = {
+    zerg: "matchup-zerg",
+    protoss: "matchup-protoss",
+    terran: "matchup-terran",
+  };
+  return classes[playerRace] || "matchup-unknown";
 }
 
 export async function unpublishBuild(buildId) {
