@@ -241,6 +241,15 @@ export function initializeAutoCorrect() {
     const matches = suggestions.filter((item) =>
       item.name.toLowerCase().includes(currentWord)
     );
+
+    // Hide the popup if the word exactly matches a suggestion
+    const isExactMatch = suggestions.some(
+      (item) => item.name.toLowerCase() === currentWord
+    );
+    if (isExactMatch) {
+      popup.style.visibility = "hidden";
+      return;
+    }
   
     if (matches.length === 0) {
       popup.style.visibility = "hidden";
