@@ -2875,7 +2875,7 @@ td {
   padding-right: 10px;
   scrollbar-width: thin;
   scrollbar-color: #444 #222;
-  border-left: 30px solid var(--border-color);
+  padding-left: 30px;
 }
 #buildList.list-view::-webkit-scrollbar {
   width: 10px;
