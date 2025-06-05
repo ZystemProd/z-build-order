@@ -986,6 +986,7 @@ textarea::-webkit-scrollbar-thumb:hover {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  width: 100%;
 }
 .publish-checkbox-row label {
   font-weight: normal;
@@ -3264,6 +3265,7 @@ td {
   flex-direction: column;
   gap: 12px;
   align-items: flex-start;
+  width: 100%;
 }
 
 .publish-status-list label {
@@ -3275,16 +3277,13 @@ td {
 }
 
 .publish-checkbox-row {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr auto;
   align-items: center;
   width: 100%;
   font-size: 14px;
   color: #e0e0e0;
   line-height: 1.5;
-}
-.publish-checkbox-row span {
-  flex: 1;
 }
 
 .publish-divider {
@@ -3294,7 +3293,7 @@ td {
   margin: 8px 0;
 }
 
-.clan-section-label {
+.modal-section-label {
   font-weight: 600;
   color: #e0e0e0;
   margin: 4px 0;
