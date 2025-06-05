@@ -700,6 +700,15 @@ export async function populateBuildList(
       build.subcategory || "Unknown"
     );
 
+    const matchupClass =
+      playerRace === "zerg"
+        ? "matchup-zerg"
+        : playerRace === "protoss"
+        ? "matchup-protoss"
+        : playerRace === "terran"
+        ? "matchup-terran"
+        : "matchup-unknown";
+
     const matchupIconsHTML =
       playerRace && opponentRace
         ? `
