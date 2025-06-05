@@ -17,6 +17,8 @@ let currentBestOfIndex = 0;
 let currentMap = null;
 let lastHoveredMap = null;
 let currentAdvancedPlayer = "player1";
+let advancedStage = "veto"; // stages: veto, pick
+let pickOrder = 1;
 
 // DOM Content Loaded
 window.addEventListener("DOMContentLoaded", () => {
@@ -210,6 +212,8 @@ function resetAll() {
     picks.classList.add("hidden");
     const startSel = document.getElementById("startingPlayerSelect");
     if (startSel) currentAdvancedPlayer = startSel.value;
+    advancedStage = "veto";
+    pickOrder = 1;
     renderAdvancedMapList();
   }
 }
@@ -297,21 +301,26 @@ function toggleAdvancedView() {
   const adv = document.getElementById("advanced-view");
   const list = document.getElementById("map-list");
   const preview = document.querySelector(".map-preview");
+  const toggleBtn = document.getElementById("advancedToggle");
   if (!adv || !list) return;
 
   if (adv.classList.contains("hidden")) {
     const startSel = document.getElementById("startingPlayerSelect");
     if (startSel) currentAdvancedPlayer = startSel.value;
+    advancedStage = "veto";
+    pickOrder = 1;
     adv.classList.remove("hidden");
     adv.style.display = "flex";
     list.style.display = "none";
     if (preview) preview.style.display = "none";
     renderAdvancedMapList();
+    if (toggleBtn) toggleBtn.textContent = "Basic Mode";
   } else {
     adv.classList.add("hidden");
     adv.style.display = "none";
     list.style.display = "block";
     if (preview) preview.style.display = "block";
+    if (toggleBtn) toggleBtn.textContent = "Advanced Mode";
   }
 }
 
@@ -344,14 +353,24 @@ function advancedVeto(mapId, playerListId) {
   if (!li || !target) return;
 
   li.classList.add("vetoed-map");
+  li.classList.add(
+    playerListId === "player1-list" ? "slide-left" : "slide-right"
+  );
   target.appendChild(li);
+  setTimeout(() => {
+    li.classList.remove("slide-left", "slide-right");
+  }, 300);
   checkAdvancedCompletion();
 }
 
 function advancedVetoByTurn(mapId) {
   const playerListId =
     currentAdvancedPlayer === "player1" ? "player1-list" : "player2-list";
-  advancedVeto(mapId, playerListId);
+  if (advancedStage === "veto") {
+    advancedVeto(mapId, playerListId);
+  } else if (advancedStage === "pick") {
+    pickMap(mapId);
+  }
   currentAdvancedPlayer =
     currentAdvancedPlayer === "player1" ? "player2" : "player1";
 }
@@ -362,23 +381,35 @@ function checkAdvancedCompletion() {
   if (!advList || !picks) return;
   const remaining = advList.querySelectorAll("li");
   const limit = BEST_OF_SETTINGS[bestOfOptions[currentBestOfIndex]];
-  if (limit && remaining.length === limit) {
+  if (advancedStage === "veto" && limit && remaining.length === limit) {
     picks.innerHTML = "";
-    remaining.forEach((li, idx) => {
-      li.classList.remove("vetoed-map");
-      const img = li.querySelector("img").cloneNode();
-      const div = document.createElement("div");
-      div.className = "pick-item";
-      const num = document.createElement("span");
-      num.className = "pick-number";
-      num.textContent = idx + 1;
-      div.appendChild(img);
-      div.appendChild(num);
-      picks.appendChild(div);
-    });
-    advList.innerHTML = "";
     picks.classList.remove("hidden");
+    advancedStage = "pick";
   }
+  if (advancedStage === "pick" && remaining.length === 0) {
+    advancedStage = "done";
+  }
+}
+
+function pickMap(mapId) {
+  const li = document.getElementById(`adv-map${mapId}`);
+  const advList = document.getElementById("advanced-map-list");
+  const picks = document.getElementById("picked-maps");
+  if (!li || !picks || !advList) return;
+  li.classList.remove("vetoed-map");
+  const img = li.querySelector("img").cloneNode();
+  const div = document.createElement("div");
+  div.className = "pick-item slide-down";
+  const num = document.createElement("span");
+  num.className = "pick-number";
+  num.textContent = pickOrder;
+  pickOrder++;
+  div.appendChild(img);
+  div.appendChild(num);
+  picks.appendChild(div);
+  setTimeout(() => div.classList.remove("slide-down"), 300);
+  li.remove();
+  checkAdvancedCompletion();
 }
 
 window.addEventListener("DOMContentLoaded", async () => {
