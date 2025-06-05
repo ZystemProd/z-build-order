@@ -27,6 +27,7 @@ import {
   clearEditingPublishedBuild,
 } from "./states/buildState.js";
 import { loadBuilds } from "./buildService.js";
+import { fetchUserBuilds, fetchPublishedUserBuilds } from "./buildManagement.js";
 import DOMPurify from "dompurify";
 
 // --- Firestore Pagination State
@@ -471,19 +472,24 @@ export async function openPublishModal(buildId) {
     const cid = clanDoc.id;
 
     if (clan.members?.includes(user.uid)) {
-      const label = document.createElement("label");
-      label.classList.add("clan-checkbox-label");
+      const row = document.createElement("div");
+      row.classList.add("clan-checkbox-label", "publish-checkbox-row");
 
       const isShared = sourceData?.sharedToClans?.includes(cid);
 
-      label.innerHTML = `
-        <input type="checkbox" class="clanPublishCheckbox" value="${cid}" ${
-        isShared ? "checked" : ""
-      } />
-        Share with ${DOMPurify.sanitize(clan.name)}
+      row.innerHTML = `
+        <span class="label-clan">${DOMPurify.sanitize(clan.name)}</span>
+        <div class="checkbox-wrapper-59">
+          <label class="switch">
+            <input type="checkbox" class="clanPublishCheckbox" value="${cid}" ${
+              isShared ? "checked" : ""
+            } />
+            <span class="slider"></span>
+          </label>
+        </div>
       `;
 
-      clanContainer.appendChild(label);
+      clanContainer.appendChild(row);
     }
   });
 
@@ -907,10 +913,38 @@ export function loadBuild(index) {
 }
 
 export async function searchBuilds(query) {
-  const lowerCaseQuery = query.toLowerCase();
-  const builds = await fetchUserBuilds(); // Fetch all builds
+  const lowerCaseQuery = query.toLowerCase().trim();
 
-  // Filter builds based on the query
+  // When query is empty, revert to current filter
+  if (!lowerCaseQuery) {
+    await filterBuilds(currentBuildFilter);
+    return;
+  }
+
+  // Activate "All" filter to avoid conflicts with race filters
+  currentBuildFilter = "all";
+  const buttons = document.querySelectorAll(
+    "#buildsModal .filter-category, #buildsModal .subcategory"
+  );
+  buttons.forEach((btn) => btn.classList.remove("active"));
+  const allBtn = document.querySelector(
+    '#buildsModal .filter-category[data-category="all"]'
+  );
+  if (allBtn) allBtn.classList.add("active");
+
+  // Determine which tab is active and fetch builds accordingly
+  const isPublishedTabActive = document
+    .getElementById("publishedBuildsTab")
+    ?.classList.contains("active");
+
+  let builds = [];
+  if (isPublishedTabActive) {
+    builds = await fetchPublishedUserBuilds("all");
+  } else {
+    builds = await fetchUserBuilds();
+  }
+
+  // Filter builds by title
   const filteredBuilds = builds.filter((build) =>
     build.title.toLowerCase().includes(lowerCaseQuery)
   );

@@ -81,7 +81,11 @@ import {
   safeChange,
   capitalize,
 } from "../helpers/sharedEventUtils.js";
-import { isBracketInputEnabled, setBracketInputEnabled } from "../settings.js";
+import {
+  isBracketInputEnabled,
+  setBracketInputEnabled,
+  loadUserSettings,
+} from "../settings.js";
 import { checkForJoinRequestNotifications } from "../utils/notificationHelpers.js";
 
 function updateSupplyColumnVisibility() {
@@ -313,6 +317,12 @@ export async function initializeIndexPage() {
     if (user) {
       await checkForJoinRequestNotifications();
       initializeUserData(user);
+      await loadUserSettings();
+      const toggle = document.getElementById("bracketInputToggle");
+      if (toggle) {
+        toggle.checked = isBracketInputEnabled();
+        updateSupplyColumnVisibility();
+      }
     }
   });
 
