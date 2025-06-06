@@ -526,9 +526,23 @@ function pickMap(mapId, player) {
   labelSpan.className = "pick-label";
   labelSpan.textContent = label;
 
+  const p1Input = document.getElementById("player1NameInput");
+  const p2Input = document.getElementById("player2NameInput");
+  const banner = document.createElement("span");
+  banner.className = "pick-player-banner";
+  banner.textContent =
+    player === "player1"
+      ? p1Input && p1Input.value
+        ? p1Input.value
+        : "Player 1"
+      : p2Input && p2Input.value
+      ? p2Input.value
+      : "Player 2";
+
   div.appendChild(img);
   div.appendChild(num);
   div.appendChild(labelSpan);
+  div.appendChild(banner);
   picks.appendChild(div);
 
   const endRect = div.getBoundingClientRect();
