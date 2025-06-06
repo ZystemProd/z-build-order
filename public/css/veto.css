@@ -34,15 +34,13 @@ html {
 }
 
 body {
-  display: absolute;
-  font-family: Arial, sans-serif;
-  background-color: black; /* Set the background to black */
-  color: white; /* Set the text color to white */
+  display: flex;
   flex-direction: column;
-  justify-content: center; /* Center the container horizontally */
-  align-items: center; /* Center the container vertically */
-  height: 100vh; /* Make the body fill the viewport height */
-  margin: 0; /* Remove default margin */
+  font-family: Arial, sans-serif;
+  background-color: black;
+  color: white;
+  min-height: 100vh;
+  margin: 0;
 }
 
 .container {
@@ -539,6 +537,11 @@ label {
   flex-wrap: wrap;
   justify-content: center;
   gap: 10px;
+
+  min-width: 320px;
+  min-height: 320px; /* ✅ Prevents shrinking vertically */
+  padding: 10px;
+  box-sizing: border-box;
 }
 
 .advanced-map-list li,
@@ -554,7 +557,20 @@ label {
 }
 
 .advanced-map-list li {
-  width: 45%;
+  flex: 0 0 auto;
+  width: 140px;
+  height: 105px; /* Enforce 4:3 ratio (140 * 0.75 = 105) */
+  max-width: 140px;
+  border: 2px solid var(--darker-blue);
+  border-radius: 8px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.05);
+  transition: transform 0.3s ease;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  position: relative;
 }
 
 .player-list li {
@@ -566,6 +582,14 @@ label {
   width: 100%;
   display: block;
   border-radius: 8px;
+}
+
+.advanced-map-list img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+  display: block;
 }
 
 .adv-map-label {
@@ -601,8 +625,10 @@ label {
 .picked-maps {
   display: flex;
   justify-content: center;
-  gap: 10px;
-  margin-top: 10px;
+  gap: 20px;
+  margin-top: 40px;
+  margin-bottom: 40px;
+  flex-wrap: wrap;
 }
 
 .picked-maps.hidden {
@@ -613,15 +639,17 @@ label {
   position: relative;
   border: 2px solid var(--darker-blue);
   border-radius: 8px;
-  width: 140px;
-  height: 100px;
+  width: 180px;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .pick-item img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: 8px;
+  display: block;
 }
 
 .pick-number {
@@ -722,12 +750,44 @@ label {
   padding: 2px 4px;
 }
 
-
-.map-card{transition:transform 0.5s ease,opacity 0.5s ease;
+.map-card {
+  transition: transform 0.5s ease, opacity 0.5s ease;
 }
 
-.veto-left{transform:translateX(-100px);opacity:0;
+.veto-left {
+  transform: translateX(-100px);
+  opacity: 0;
 }
-.veto-right{transform:translateX(100px);opacity:0;
+.veto-right {
+  transform: translateX(100px);
+  opacity: 0;
+}
+body,
+html {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
+.main-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding-bottom: 60px; /* ensures spacing above footer */
+}
+
+.advanced-view {
+  min-height: 420px; /* ensures stable vertical size */
+}
+
+.control-container {
+  margin-top: 40px;
+}
+
+.center-column {
+  min-width: 300px; /* 🚨 prevents shrinking */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}

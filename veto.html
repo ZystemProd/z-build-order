@@ -10,92 +10,97 @@
 </head>
 
 <body>
-  <div class="container">
-    <a href="index.html" id="backButton" class="back-button">
-      <img src="./img/SVG/back.svg" alt="Back" />
-    </a>
+  <div class="main-wrapper">
+    <div class="container">
+      <a href="index.html" id="backButton" class="back-button">
+        <img src="./img/SVG/back.svg" alt="Back" />
+      </a>
 
-    <div class="map-list" id="map-list">
-      <ul class="map-list"></ul>
-      <!-- Empty list to be populated by JS -->
+      <div class="map-list" id="map-list">
+        <ul class="map-list"></ul>
+        <!-- Empty list to be populated by JS -->
+      </div>
+
+      <div class="map-preview">
+        <img id="previewImage" src="img/maps/current/incorporeal.webp" alt="Map Preview" />
+      </div>
     </div>
 
-    <div class="map-preview">
-      <img id="previewImage" src="img/maps/current/incorporeal.webp" alt="Map Preview" />
+    <div id="advanced-view" class="advanced-view hidden">
+      <div class="player-column" id="player1-column">
+        <h3>Player 1</h3>
+        <ul id="player1-list" class="player-list"></ul>
+      </div>
+      <div class="center-column">
+        <h2 id="stageIndicator" class="stage-indicator"></h2>
+        <ul id="advanced-map-list" class="advanced-map-list"></ul>
+        <div class="invisible-placeholder" style="width: 300px; height: 300px; opacity: 0; pointer-events: none;"></div>
+      </div>
+      <div class="player-column" id="player2-column">
+        <h3>Player 2</h3>
+        <ul id="player2-list" class="player-list"></ul>
+      </div>
     </div>
-  </div>
+    <div id="picked-maps" class="picked-maps hidden"></div>
 
-  <div id="advanced-view" class="advanced-view hidden">
-    <div class="player-column" id="player1-column">
-      <h3>Player 1</h3>
-      <ul id="player1-list" class="player-list"></ul>
-    </div>
-    <div class="center-column">
-      <h2 id="stageIndicator" class="stage-indicator"></h2>
-      <ul id="advanced-map-list" class="advanced-map-list"></ul>
-    </div>
-    <div class="player-column" id="player2-column">
-      <h3>Player 2</h3>
-      <ul id="player2-list" class="player-list"></ul>
-    </div>
-  </div>
-  <div id="picked-maps" class="picked-maps hidden"></div>
-
-  <!-- Control Area -->
-  <div class="control-container">
-    <div class="control-left">
-      <h5>
-        Map Settings
-        <button id="toggleVisibilityButton" class="toggle-button">
-          Show
-        </button>
-      </h5>
-      <!-- Heading for Map Settings -->
-      <div class="button-container">
-        <button id="prevMapButton">Previous</button>
-        <div class="option-display">
-          <p id="selectedMapText">Selected Map: Map 1</p>
-          <!-- Display the selected option -->
+    <!-- Control Area -->
+    <div class="control-container">
+      <div class="control-left">
+        <h5>
+          Map Settings
+          <button id="toggleVisibilityButton" class="toggle-button">
+            Show
+          </button>
+        </h5>
+        <!-- Heading for Map Settings -->
+        <div class="button-container">
+          <button id="prevMapButton">Previous</button>
+          <div class="option-display">
+            <p id="selectedMapText">Selected Map: Map 1</p>
+            <!-- Display the selected option -->
+          </div>
+          <button id="nextMapButton">Next</button>
         </div>
-        <button id="nextMapButton">Next</button>
-      </div>
 
-      <!-- Button for changing map name -->
-      <input type="file" id="mapFileInput" accept="image/*" style="display: none" />
-      <div id="ChangeMapPreview">
-        <button onclick="document.getElementById('mapFileInput').click()">
-          Change Map
-        </button>
-      </div>
-
-      <!-- Add the Hide Map Preview checkbox -->
-      <div id="custom-checkbox" class="checkbox-wrapper-59">
-        <label class="switch">
-          <input type="checkbox" id="hidePreviewCheckbox" />
-          <span class="slider"></span>
-        </label>
-        <label for="hidePreviewCheckbox">Hide Map Preview</label>
-      </div>
-    </div>
-
-    <div class="control-right">
-      <h5>Game Settings</h5>
-      <!-- Heading for Game Settings -->
-      <div class="button-container">
-        <button id="prevBestOfButton">←</button>
-        <!-- Left arrow for previous -->
-        <div class="option-display">
-          <p id="selectedBestOfText">Best of: None</p>
-          <!-- Display the selected Best of option -->
+        <!-- Button for changing map name -->
+        <input type="file" id="mapFileInput" accept="image/*" style="display: none" />
+        <div id="ChangeMapPreview">
+          <button onclick="document.getElementById('mapFileInput').click()">
+            Change Map
+          </button>
         </div>
-        <button id="nextBestOfButton">→</button>
-        <!-- Right arrow for next -->
+
+        <!-- Add the Hide Map Preview checkbox -->
+        <div id="custom-checkbox" class="checkbox-wrapper-59">
+          <label class="switch">
+            <input type="checkbox" id="hidePreviewCheckbox" />
+            <span class="slider"></span>
+          </label>
+          <label for="hidePreviewCheckbox">Hide Map Preview</label>
+        </div>
       </div>
 
-      <!-- Reset Button -->
-      <button id="resetButton">Reset All</button>
-      
-        <div id="startPlayerWrapper"><label for="startingPlayerSelect">Start:</label> <select id="startingPlayerSelect"><option value="player1">Player 1</option><option value="player2">Player 2</option></select></div>
+      <div class="control-right">
+        <h5>Game Settings</h5>
+        <!-- Heading for Game Settings -->
+        <div class="button-container">
+          <button id="prevBestOfButton">←</button>
+          <!-- Left arrow for previous -->
+          <div class="option-display">
+            <p id="selectedBestOfText">Best of: None</p>
+            <!-- Display the selected Best of option -->
+          </div>
+          <button id="nextBestOfButton">→</button>
+          <!-- Right arrow for next -->
+        </div>
+
+        <!-- Reset Button -->
+        <button id="resetButton">Reset All</button>
+
+        <div id="startPlayerWrapper"><label for="startingPlayerSelect">Start:</label> <select id="startingPlayerSelect">
+            <option value="player1">Player 1</option>
+            <option value="player2">Player 2</option>
+          </select></div>
 
         <div class="name-inputs">
           <label for="player1NameInput">Player 1 Name:</label>
@@ -105,9 +110,9 @@
         </div>
 
         <button id="advancedToggle">Advanced Mode</button>
+      </div>
     </div>
   </div>
-
   <!-- Footer Section -->
   <div class="footer">
     <p>Made by Zystem</p>

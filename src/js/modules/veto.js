@@ -123,6 +123,9 @@ function toggleVeto(mapNumber) {
     indicator.textContent = "";
   } else {
     if (!canVetoMoreMaps()) return;
+    // Choose direction based on currentAdvancedPlayer
+    const direction = currentAdvancedPlayer === "player1" ? "left" : "right";
+    animateVetoDirection(li, direction);
     li.classList.add("vetoed-map");
     indicator.style.display = "none";
   }
@@ -305,20 +308,51 @@ function toggleMapPreviewVisibility() {
 
 function moveElementWithAnimation(element, target, afterAppend) {
   const startRect = element.getBoundingClientRect();
+
+  const clone = element.cloneNode(true);
+  const cloneStyle = clone.style;
+
+  // Force same size and layout
+  cloneStyle.position = "fixed";
+  cloneStyle.top = `${startRect.top}px`;
+  cloneStyle.left = `${startRect.left}px`;
+  cloneStyle.width = `${startRect.width}px`;
+  cloneStyle.height = `${startRect.height}px`;
+  cloneStyle.margin = "0";
+  cloneStyle.zIndex = "1000";
+  cloneStyle.pointerEvents = "none";
+  cloneStyle.transition = "transform 0.3s ease, opacity 0.3s ease";
+  cloneStyle.borderRadius = getComputedStyle(element).borderRadius;
+  cloneStyle.overflow = "hidden";
+
+  // Match image size inside
+  const img = clone.querySelector("img");
+  if (img) {
+    img.style.width = "100%";
+    img.style.height = "100%";
+    img.style.objectFit = "cover";
+  }
+
+  document.body.appendChild(clone);
+
+  // Hide original, append to target
+  element.style.opacity = "0";
   target.appendChild(element);
+
+  // Get end position
   const endRect = element.getBoundingClientRect();
-  const dx = startRect.left - endRect.left;
-  const dy = startRect.top - endRect.top;
-  element.style.transform = `translate(${dx}px, ${dy}px)`;
-  element.style.transition = "transform 0.3s ease";
+  const dx = endRect.left - startRect.left;
+  const dy = endRect.top - startRect.top;
+
   requestAnimationFrame(() => {
-    element.style.transform = "translate(0, 0)";
+    cloneStyle.transform = `translate(${dx}px, ${dy}px)`;
   });
-  element.addEventListener(
+
+  clone.addEventListener(
     "transitionend",
     () => {
-      element.style.transition = "";
-      element.style.transform = "";
+      document.body.removeChild(clone);
+      element.style.opacity = "1";
       if (afterAppend) afterAppend();
     },
     { once: true }
@@ -343,8 +377,7 @@ function updateStageIndicator() {
   const p2Input = document.getElementById("player2NameInput");
   const p1Name = p1Input && p1Input.value ? p1Input.value : "Player 1";
   const p2Name = p2Input && p2Input.value ? p2Input.value : "Player 2";
-  const currentName =
-    currentAdvancedPlayer === "player1" ? p1Name : p2Name;
+  const currentName = currentAdvancedPlayer === "player1" ? p1Name : p2Name;
   const stageText =
     advancedStage === "veto"
       ? "Veto"
@@ -366,7 +399,7 @@ function toggleAdvancedView() {
   const preview = document.querySelector(".map-preview");
   const toggleBtn = document.getElementById("advancedToggle");
   if (!adv || !list) return;
-  
+
   if (adv.classList.contains("hidden")) {
     const startSel = document.getElementById("startingPlayerSelect");
     if (startSel) currentAdvancedPlayer = startSel.value;
@@ -377,7 +410,10 @@ function toggleAdvancedView() {
     list.style.display = "none";
     if (preview) preview.style.display = "none";
     const picks = document.getElementById("picked-maps");
-    if (picks) picks.style.display = picks.classList.contains("hidden") ? "none" : "flex";
+    if (picks)
+      picks.style.display = picks.classList.contains("hidden")
+        ? "none"
+        : "flex";
     renderAdvancedMapList();
     if (toggleBtn) toggleBtn.textContent = "Basic Mode";
     updateStageIndicator();
@@ -461,38 +497,71 @@ function pickMap(mapId) {
   const advList = document.getElementById("advanced-map-list");
   const picks = document.getElementById("picked-maps");
   if (!li || !picks || !advList) return;
-  li.classList.remove("vetoed-map");
+
   const startRect = li.getBoundingClientRect();
   const img = li.querySelector("img").cloneNode();
+  const label = li.querySelector(".adv-map-label")?.textContent || "";
+
   const div = document.createElement("div");
   div.className = "pick-item";
   const num = document.createElement("span");
   num.className = "pick-number";
   num.textContent = pickOrder;
   pickOrder++;
-  const label = document.createElement("span");
-  label.className = "pick-label";
-  label.textContent = li.querySelector(".adv-map-label").textContent;
+
+  const labelSpan = document.createElement("span");
+  labelSpan.className = "pick-label";
+  labelSpan.textContent = label;
+
   div.appendChild(img);
   div.appendChild(num);
-  div.appendChild(label);
+  div.appendChild(labelSpan);
   picks.appendChild(div);
+
   const endRect = div.getBoundingClientRect();
-  const dx = startRect.left - endRect.left;
-  const dy = startRect.top - endRect.top;
-  div.style.transform = `translate(${dx}px, ${dy}px)`;
-  div.style.transition = "transform 0.3s ease";
+
+  // 📦 Clone with matching size and style
+  const clone = li.cloneNode(true);
+  const cloneStyle = clone.style;
+  cloneStyle.position = "fixed";
+  cloneStyle.top = `${startRect.top}px`;
+  cloneStyle.left = `${startRect.left}px`;
+  cloneStyle.width = `${startRect.width}px`;
+  cloneStyle.height = `${startRect.height}px`;
+  cloneStyle.margin = "0";
+  cloneStyle.zIndex = "1000";
+  cloneStyle.pointerEvents = "none";
+  cloneStyle.transition = "transform 0.4s ease, opacity 0.4s ease";
+  cloneStyle.borderRadius = getComputedStyle(li).borderRadius;
+  cloneStyle.overflow = "hidden";
+
+  // Match image inside
+  const cloneImg = clone.querySelector("img");
+  if (cloneImg) {
+    cloneImg.style.width = "100%";
+    cloneImg.style.height = "100%";
+    cloneImg.style.objectFit = "cover";
+  }
+
+  document.body.appendChild(clone);
+
+  // Animate to destination
+  const dx = endRect.left - startRect.left;
+  const dy = endRect.top - startRect.top;
+
   requestAnimationFrame(() => {
-    div.style.transform = "translate(0, 0)";
+    cloneStyle.transform = `translate(${dx}px, ${dy}px)`;
+    cloneStyle.opacity = "0";
   });
-  div.addEventListener(
+
+  clone.addEventListener(
     "transitionend",
     () => {
-      div.style.transition = "";
-      div.style.transform = "";
+      document.body.removeChild(clone);
     },
     { once: true }
   );
+
   li.remove();
   checkAdvancedCompletion();
   updateStageIndicator();
