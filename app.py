@@ -85,26 +85,38 @@ def upload():
         supply_events = {}
         for event in replay.events:
             if isinstance(event, sc2reader.events.tracker.PlayerStatsEvent) and event.pid == player.pid:
-                supply_events[event.second] = int(event.food_used)
+                used = int(getattr(event, 'food_used', 0))
+                made = int(getattr(event, 'food_made', 0))
+                supply_events[event.second] = (used, made)
         supply_times = sorted(supply_events.keys())
 
-        def get_supply(second: int) -> int:
-            # try plugin data first
-            if hasattr(player, 'current_food_used'):
-                if isinstance(player.current_food_used, dict):
-                    if second in player.current_food_used:
-                        return int(player.current_food_used[second])
+        def get_supply(second: int):
+            used = made = 0
+            if hasattr(player, 'current_food_used') and hasattr(player, 'current_food_made'):
+                store_u = player.current_food_used
+                store_m = player.current_food_made
+                if isinstance(store_u, dict) and isinstance(store_m, dict):
+                    if second in store_u:
+                        used = int(store_u[second])
+                    if second in store_m:
+                        made = int(store_m[second])
                 else:
-                    for t, val in player.current_food_used:
-                        if t == second:
-                            return int(val)
-            # fallback to nearest PlayerStatsEvent at or before this second
-            if not supply_times:
-                return 0
-            idx = bisect.bisect_right(supply_times, second) - 1
-            if idx >= 0:
-                return supply_events[supply_times[idx]]
-            return 0
+                    if isinstance(store_u, list) and isinstance(store_m, list):
+                        for t, val in store_u:
+                            if t == second:
+                                used = int(val)
+                                break
+                        for t, val in store_m:
+                            if t == second:
+                                made = int(val)
+                                break
+            if used == 0 and not supply_times:
+                return 0, 0
+            if used == 0:
+                idx = bisect.bisect_right(supply_times, second) - 1
+                if idx >= 0:
+                    used, made = supply_events[supply_times[idx]]
+            return used, made
 
         skip_units = {"Egg", "Larva", "Overlord Cocoon"}
         if exclude_workers:
@@ -113,32 +125,49 @@ def upload():
         entries = []
 
         for event in replay.events:
+            if event.second == 0:
+                continue
+            etype = None
+            name = None
+
             if isinstance(event, sc2reader.events.tracker.UnitBornEvent):
-                if event.control_pid != player.pid:
-                    continue
-                if not event.unit_type_name or 'Beacon' in event.unit_type_name:
-                    continue
-                if event.unit_type_name in skip_units:
-                    continue
+                etype = 'unit'
+                name = event.unit_type_name
+            elif isinstance(event, sc2reader.events.tracker.UnitInitEvent):
+                etype = 'building'
+                name = event.unit_type_name
+            elif isinstance(event, sc2reader.events.tracker.UpgradeCompleteEvent):
+                etype = 'upgrade'
+                name = event.upgrade_type_name
+            else:
+                continue
 
-                supply = get_supply(event.second)
-                if stop_limit is not None and supply > stop_limit:
-                    break
-                minutes = event.second // 60
-                seconds = event.second % 60
-                timestamp = f"{minutes:02d}:{seconds:02d}"
+            if getattr(event, 'control_pid', getattr(event, 'pid', None)) != player.pid:
+                continue
+            if not name or 'Beacon' in name or name in skip_units:
+                continue
 
-                if entries and entries[-1]['supply'] == supply and entries[-1]['time'] == timestamp and entries[-1]['unit'] == event.unit_type_name:
-                    entries[-1]['count'] += 1
-                else:
-                    entries.append({'supply': supply, 'time': timestamp, 'unit': event.unit_type_name, 'count': 1})
+            supply_used, supply_made = get_supply(event.second)
+            if stop_limit is not None and supply_used > stop_limit:
+                break
+            minutes = event.second // 60
+            seconds = event.second % 60
+            timestamp = f"{minutes:02d}:{seconds:02d}"
+
+            if entries and entries[-1]['supply'] == supply_used and entries[-1]['time'] == timestamp and entries[-1]['unit'] == name:
+                entries[-1]['count'] += 1
+            else:
+                entries.append({'supply': supply_used, 'made': supply_made, 'time': timestamp, 'unit': name, 'count': 1})
 
         build_lines = [f"Build Order for {player.name} ({player.play_race})"]
 
         for item in entries:
             parts = []
             if not exclude_supply:
-                parts.append(str(item['supply']))
+                supply_str = str(item['supply'])
+                if item['supply'] > item['made'] and item['made'] > 0:
+                    supply_str = f"{item['supply']}/{item['made']}"
+                parts.append(supply_str)
             if not exclude_time:
                 parts.append(item['time'])
             prefix = f"[{' '.join(parts)}] " if parts else ""
