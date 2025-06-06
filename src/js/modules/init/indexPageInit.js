@@ -432,6 +432,8 @@ export async function initializeIndexPage() {
   });
 
   async function populateReplayOptions(file) {
+    const loader = document.getElementById("optionsLoadingWrapper");
+    if (loader) loader.style.display = "flex";
     const select = document.getElementById("playerSelect");
     if (!select) return;
     select.innerHTML = "<option>Loading...</option>";
@@ -456,6 +458,7 @@ export async function initializeIndexPage() {
       console.error("Failed to fetch players", err);
       select.innerHTML = "<option value='1'>Player 1</option>";
     }
+    if (loader) loader.style.display = "none";
   }
 
   safeAdd("replayFileInput", "change", async (e) => {
