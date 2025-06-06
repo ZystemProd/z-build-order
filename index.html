@@ -692,6 +692,33 @@
     </div>
 
 
+    <!-- Replay Options Modal -->
+    <div id="replayOptionsModal" class="modal" style="display: none;">
+      <div class="modal-content small-modal">
+        <span class="close-modal" id="closeReplayOptionsModal">&times;</span>
+        <h3>Replay Options</h3>
+        <div>
+          <label for="playerSelect">Select Player:</label>
+          <select id="playerSelect"></select>
+        </div>
+        <div class="publish-checkbox-row">
+          <span>Exclude Workers</span>
+          <div class="checkbox-wrapper-59">
+            <label class="switch">
+              <input type="checkbox" id="excludeWorkersCheckbox" />
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+        <div>
+          <label for="supplyLimitInput">Stop at supply:</label>
+          <input type="number" id="supplyLimitInput" min="0" placeholder="e.g. 50" />
+        </div>
+        <button id="confirmReplayOptionsButton" class="btn">Parse Replay</button>
+      </div>
+    </div>
+
+
 
 
 
@@ -718,7 +745,7 @@
     <div class="footer-center" id="site-info">
       <p>Made by Zystem</p>
 
-      <p>Version 0.5.7032</p>
+      <p>Version 0.5.7033</p>
 
 
     </div>

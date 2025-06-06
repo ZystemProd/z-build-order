@@ -1,4 +1,4 @@
-from flask import Flask, request
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 import sc2reader
 import io
@@ -10,6 +10,27 @@ CORS(app)
 @app.route('/')
 def index():
     return '🟢 SC2 Replay Parser is live!'
+
+
+@app.route('/players', methods=['POST'])
+def players():
+    if 'replay' not in request.files:
+        return 'No replay uploaded', 400
+
+    file = request.files['replay']
+    if file.filename == '':
+        return 'No replay uploaded', 400
+
+    replay_data = io.BytesIO(file.read())
+    try:
+        replay = sc2reader.load_replay(replay_data, load_map=True)
+    except Exception as e:
+        print('❌ Failed to load replay:', e)
+        return f'Failed to load replay: {e}', 400
+
+    players = [p for p in replay.players if not p.is_observer]
+    info = [{'pid': p.pid, 'name': p.name, 'race': p.play_race} for p in players]
+    return jsonify(info)
 
 @app.route('/upload', methods=['POST'])
 def upload():
@@ -49,6 +70,13 @@ def upload():
         if player is None:
             player = players[0]
 
+        exclude_flag = request.form.get('exclude_workers', '')
+        exclude_workers = str(exclude_flag).lower() in {'1', 'true', 'yes', 'on'}
+        stop_supply_raw = request.form.get('stop_supply')
+        stop_limit = None
+        if stop_supply_raw and stop_supply_raw.isdigit():
+            stop_limit = int(stop_supply_raw)
+
         # Build a map of supply values from PlayerStatsEvents as fallback
         supply_events = {}
         for event in replay.events:
@@ -75,6 +103,9 @@ def upload():
             return 0
 
         skip_units = {"Egg", "Larva", "Overlord Cocoon"}
+        if exclude_workers:
+            skip_units.update({"Drone", "Probe", "SCV"})
+
         build_lines = [f"Build Order for {player.name} ({player.play_race})"]
 
         for event in replay.events:
@@ -87,6 +118,8 @@ def upload():
                     continue
 
                 supply = get_supply(event.second)
+                if stop_limit is not None and supply > stop_limit:
+                    break
                 minutes = event.second // 60
                 seconds = event.second % 60
                 timestamp = f"{minutes:02d}:{seconds:02d}"
