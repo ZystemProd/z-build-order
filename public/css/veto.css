@@ -260,6 +260,18 @@ button {
   z-index: 1;
 }
 
+.control-right button,
+.control-right select,
+.control-right input {
+  margin: 5px 0;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
 .option-display {
   margin: 0 15px; /* Add horizontal space around the selected map text */
   color: #eee; /* Match text color */
@@ -308,13 +320,12 @@ button:hover {
 }
 
 .control-right h5 {
-  padding-top: 20px;
+  padding-top: 10px;
   padding-bottom: 5px;
-  margin-bottom: 10px; /* Space between the heading and controls */
+  margin: 0 0 8px;
   color: #eee; /* Text color to match the design */
   font-size: 18px; /* Font size for the headings */
   text-align: center;
-  margin-top: 10px;
 }
 button {
   margin-top: 10px;
