@@ -423,6 +423,28 @@ export async function initializeIndexPage() {
 
   safeInput("templateSearchBar", (val) => searchTemplates(val));
   safeInput("videoInput", (val) => updateYouTubeEmbed(val));
+  safeAdd("parseReplayButton", "click", () => {
+    const input = document.getElementById("replayFileInput");
+    if (input) input.click();
+  });
+  safeAdd("replayFileInput", "change", async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("replay", file);
+    try {
+      const res = await fetch("http://localhost:5000/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const text = await res.text();
+      const buildInput = document.getElementById("buildOrderInput");
+      if (buildInput) buildInput.value = text;
+      analyzeBuildOrder(text);
+    } catch (err) {
+      console.error("Replay upload failed", err);
+    }
+  });
   safeAdd("buildOrderTitleText", "click", () => toggleTitleInput(true));
   safeAdd("buildOrderTitleText", "focus", () => toggleTitleInput(true));
 
