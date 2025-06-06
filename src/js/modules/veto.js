@@ -3,23 +3,37 @@ let mapData = [];
 let mapImages = {};
 
 // Best of Settings
-const BEST_OF_SETTINGS = {
-  None: 0,
-  BO2: 2,
-  BO3: 3,
-  BO5: 5,
-  BO7: 7,
-  BO9: 9,
-};
-
-const bestOfOptions = ["None", "BO2", "BO3", "BO5", "BO7", "BO9"];
-let currentBestOfIndex = 0;
+let bestOfValue = 3; // Default best of setting
 let currentMap = null;
 let lastHoveredMap = null;
 let currentAdvancedPlayer = "player1";
 let advancedStage = "veto"; // stages: veto, pick
 let pickOrder = 1;
 let actionHistory = [];
+
+function showBestOfModal() {
+  const modal = document.getElementById("bestOfModal");
+  const input = document.getElementById("bestOfInput");
+  if (modal && input) {
+    input.value = bestOfValue;
+    modal.style.display = "flex";
+    input.focus();
+  }
+}
+
+function confirmBestOf(inputEl) {
+  if (!inputEl) return;
+  const val = parseInt(inputEl.value, 10);
+  if (val >= 1 && val <= 9) {
+    bestOfValue = val;
+    const modal = document.getElementById("bestOfModal");
+    if (modal) modal.style.display = "none";
+    updateDisplayedBestOf();
+    checkUnvetoedMapsForBestOf();
+  } else {
+    alert("Please enter a number between 1 and 9.");
+  }
+}
 
 // DOM Content Loaded
 window.addEventListener("DOMContentLoaded", () => {
@@ -37,18 +51,17 @@ window.addEventListener("DOMContentLoaded", () => {
     updateDisplayedMap();
   });
 
-  document.getElementById("prevBestOfButton").addEventListener("click", () => {
-    currentBestOfIndex =
-      (currentBestOfIndex - 1 + bestOfOptions.length) % bestOfOptions.length;
-    updateDisplayedBestOf();
-    checkUnvetoedMapsForBestOf();
-  });
 
-  document.getElementById("nextBestOfButton").addEventListener("click", () => {
-    currentBestOfIndex = (currentBestOfIndex + 1) % bestOfOptions.length;
-    updateDisplayedBestOf();
-    checkUnvetoedMapsForBestOf();
-  });
+  const confirmBtn = document.getElementById("confirmBestOfButton");
+  const bestOfInput = document.getElementById("bestOfInput");
+  if (confirmBtn)
+    confirmBtn.addEventListener("click", () => confirmBestOf(bestOfInput));
+  if (bestOfInput)
+    bestOfInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") confirmBestOf(bestOfInput);
+    });
+
+  showBestOfModal();
 
   document.getElementById("resetButton").addEventListener("click", resetAll);
   const undoBtn = document.getElementById("undoButton");
@@ -121,8 +134,7 @@ function toggleVeto(mapNumber) {
 
   if (li.classList.contains("vetoed-map")) {
     li.classList.remove("vetoed-map");
-    indicator.style.display =
-      currentBestOfIndex === 0 ? "none" : "inline-block";
+    indicator.style.display = bestOfValue <= 1 ? "none" : "inline-block";
     indicator.textContent = "";
   } else {
     if (!canVetoMoreMaps()) return;
@@ -144,7 +156,7 @@ function canVetoMoreMaps() {
   const unvetoed = [...document.querySelectorAll(".map-list li")].filter(
     (li) => !li.classList.contains("vetoed-map")
   ).length;
-  const bestOfLimit = BEST_OF_SETTINGS[bestOfOptions[currentBestOfIndex]];
+  const bestOfLimit = bestOfValue;
   return unvetoed > bestOfLimit;
 }
 
@@ -156,7 +168,7 @@ function checkUnvetoedMapsForBestOf() {
     .querySelectorAll(".map-list li")
     .forEach((li) => li.classList.remove("pulsing-border"));
 
-  const target = BEST_OF_SETTINGS[bestOfOptions[currentBestOfIndex]];
+  const target = bestOfValue;
   if (target && unvetoed.length === target) {
     unvetoed.forEach((li) => li.classList.add("pulsing-border"));
   }
@@ -167,13 +179,9 @@ function cycleOrder(mapNumber, event) {
   const li = document.getElementById(`map${mapNumber}`);
   const indicator = li.querySelector(".order-indicator");
 
-  if (
-    li.classList.contains("vetoed-map") ||
-    bestOfOptions[currentBestOfIndex] === "None"
-  )
-    return;
+  if (li.classList.contains("vetoed-map") || bestOfValue <= 1) return;
 
-  const maxOrders = BEST_OF_SETTINGS[bestOfOptions[currentBestOfIndex]];
+  const maxOrders = bestOfValue;
   const currentOrder = parseInt(indicator.textContent) || 0;
   indicator.textContent =
     currentOrder < maxOrders ? `${currentOrder + 1}.` : "";
@@ -194,9 +202,8 @@ function updateDisplayedMap() {
 }
 
 function updateDisplayedBestOf() {
-  document.getElementById(
-    "selectedBestOfText"
-  ).textContent = `Best of: ${bestOfOptions[currentBestOfIndex]}`;
+  const el = document.getElementById("bestOfIndicator");
+  if (el) el.textContent = `Best of: ${bestOfValue}`;
 }
 
 function resetAll() {
@@ -209,8 +216,8 @@ function resetAll() {
   currentMap = null;
   lastHoveredMap = null;
   resetPreview();
-  currentBestOfIndex = 0;
-  updateDisplayedBestOf();
+  bestOfValue = 3;
+  showBestOfModal();
 
   const advList = document.getElementById("advanced-map-list");
   const p1 = document.getElementById("player1-list");
@@ -492,7 +499,7 @@ function checkAdvancedCompletion() {
   const picks = document.getElementById("picked-maps");
   if (!advList || !picks) return;
   const remaining = advList.querySelectorAll("li");
-  const limit = BEST_OF_SETTINGS[bestOfOptions[currentBestOfIndex]];
+  const limit = bestOfValue;
   if (advancedStage === "veto" && limit && remaining.length === limit) {
     picks.innerHTML = "";
     picks.style.display = "flex";
@@ -598,7 +605,7 @@ function pickMap(mapId, player) {
 function recalcAdvancedStage() {
   const advList = document.getElementById("advanced-map-list");
   const remaining = advList ? advList.querySelectorAll("li").length : 0;
-  const limit = BEST_OF_SETTINGS[bestOfOptions[currentBestOfIndex]];
+  const limit = bestOfValue;
   if (remaining === 0) {
     advancedStage = "done";
   } else if (limit && remaining === limit) {
