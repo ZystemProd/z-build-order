@@ -414,6 +414,15 @@ function updateStageIndicator() {
   const h2 = document.querySelector("#player2-column h3");
   if (h1) h1.textContent = p1Name;
   if (h2) h2.textContent = p2Name;
+  if (h1) h1.classList.remove("active-player-name");
+  if (h2) h2.classList.remove("active-player-name");
+  if (advancedStage !== "done") {
+    if (currentAdvancedPlayer === "player1" && h1) {
+      h1.classList.add("active-player-name");
+    } else if (currentAdvancedPlayer === "player2" && h2) {
+      h2.classList.add("active-player-name");
+    }
+  }
 }
 
 // -------- Advanced View --------
