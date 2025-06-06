@@ -32,4 +32,13 @@ NAME_MAP = {
     "lurker den m p": "lurker den",
     "scv": "SCV",
     "s c v": "SCV",
+    "templar archive": "Templar Archives",
+    "psi storm tech": "psionic storm",
+    "blink tech": "blink",
+    "dark templar blink upgrade": "shadow stride",
+    "observer gravitic booster": "gravitic boosters",
+    "adept piercing attack": "resonating glaives",
+    "anion pulse-crystals upgrade": "Anion pulse-crystalsanion",
+    "void ray speed upgrade": "flux vanes",
+    "tempest ground attack upgrade": "tectonic destabilizers",
 }
