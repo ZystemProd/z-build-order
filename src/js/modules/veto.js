@@ -389,8 +389,13 @@ function updateStageIndicator() {
       : advancedStage === "pick"
       ? "Pick"
       : "Done";
-  if (indicator)
-    indicator.innerHTML = `<span class="stage-text ${stageText.toLowerCase()}">${stageText}</span> - ${currentName}`;
+  if (indicator) {
+    if (advancedStage === "done") {
+      indicator.innerHTML = `<span class="stage-text done">Done</span>`;
+    } else {
+      indicator.innerHTML = `<span class="stage-text ${stageText.toLowerCase()}">${stageText}</span> - ${currentName}`;
+    }
+  }
   const h1 = document.querySelector("#player1-column h3");
   const h2 = document.querySelector("#player2-column h3");
   if (h1) h1.textContent = p1Name;
