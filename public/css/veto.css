@@ -532,6 +532,8 @@ label {
 .player-list {
   list-style: none;
   padding: 0;
+  min-height: 320px; /* Keep player columns from jumping */
+  overflow-y: auto; /* Scroll when overflowing */
 }
 
 .advanced-map-list {
