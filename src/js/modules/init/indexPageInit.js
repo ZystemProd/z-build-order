@@ -443,6 +443,7 @@ export async function initializeIndexPage() {
       analyzeBuildOrder(text);
     } catch (err) {
       console.error("Replay upload failed", err);
+      alert("Could not parse the replay. Make sure the Python backend is running.");
     }
   });
   safeAdd("buildOrderTitleText", "click", () => toggleTitleInput(true));
