@@ -30,6 +30,10 @@ function confirmBestOf(inputEl) {
     if (modal) modal.style.display = "none";
     updateDisplayedBestOf();
     checkUnvetoedMapsForBestOf();
+    if (document.getElementById("advanced-map-list")) {
+      recalcAdvancedStage();
+      updateStageIndicator();
+    }
   } else {
     alert("Please enter a number between 1 and 9.");
   }
@@ -428,6 +432,7 @@ function toggleAdvancedView() {
       advancedStage = "veto";
       pickOrder = 1;
       renderAdvancedMapList();
+      recalcAdvancedStage();
     }
     adv.classList.remove("hidden");
     adv.style.display = "flex";
