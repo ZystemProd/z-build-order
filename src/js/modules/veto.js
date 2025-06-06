@@ -218,7 +218,12 @@ function resetAll() {
     p1.innerHTML = "";
     p2.innerHTML = "";
     picks.innerHTML = "";
-    picks.classList.add("hidden");
+    const adv = document.getElementById("advanced-view");
+    if (adv && adv.classList.contains("hidden")) {
+      picks.style.display = "none";
+    } else {
+      picks.style.display = "flex";
+    }
     const startSel = document.getElementById("startingPlayerSelect");
     if (startSel) currentAdvancedPlayer = startSel.value;
     advancedStage = "veto";
@@ -410,10 +415,7 @@ function toggleAdvancedView() {
     list.style.display = "none";
     if (preview) preview.style.display = "none";
     const picks = document.getElementById("picked-maps");
-    if (picks)
-      picks.style.display = picks.classList.contains("hidden")
-        ? "none"
-        : "flex";
+    if (picks) picks.style.display = "flex";
     renderAdvancedMapList();
     if (toggleBtn) toggleBtn.textContent = "Basic Mode";
     updateStageIndicator();
@@ -481,7 +483,6 @@ function checkAdvancedCompletion() {
   const limit = BEST_OF_SETTINGS[bestOfOptions[currentBestOfIndex]];
   if (advancedStage === "veto" && limit && remaining.length === limit) {
     picks.innerHTML = "";
-    picks.classList.remove("hidden");
     picks.style.display = "flex";
     advancedStage = "pick";
     updateStageIndicator();
