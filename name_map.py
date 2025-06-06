@@ -1,0 +1,25 @@
+NAME_MAP = {
+    # Upgrade or unit renames
+    "zerglingmovementspeed": "Metabolic Boost",
+    "zerglingattackspeed": "Adrenal Glands",
+    "overlordspeed": "Pneumatized Carapace",
+    "glialreconstitution": "Glial Reconstitution",
+    "tunnelingclaws": "Tunneling Claws",
+    "burrow": "Burrow",
+    "centrifugalhooks": "Centrifugal Hooks",
+    "combatshield": "Combat Shield",
+    "stimpack": "Stimpack",
+    # Additional mappings from unusual names
+    "shield wall": "Combat Shield",
+    "punisher grenades": "Concussive Shells",
+    "cyclone lock on damage": "Mag-Field Accelerator",
+    "personal cloaking": "Cloak",
+    "banshee speed": "Hyperflight Rotors",
+    "drill claws": "Drilling Claws",
+    "hi sec auto tracking": "Hi-Sec Auto Tracking",
+    "battlecruiser enable specializations": "Weapon Refit",
+    "terran neosteel armor": "Neosteel Armor",
+    "liberator a g range upgrade": "Advanced Ballistics",
+    "high capacity barrels": "Infernal Pre-Igniter",
+    "s c v": "SCV",
+}

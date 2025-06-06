@@ -5,29 +5,19 @@ import io
 import bisect
 import re
 from sc2reader.constants import GAME_SPEED_FACTOR
+from name_map import NAME_MAP
 
 app = Flask(__name__)
 CORS(app)
-
-# Mapping for upgrade names to user-friendly versions
-UPGRADE_NAME_MAP = {
-    "zerglingmovementspeed": "Metabolic Boost",
-    "zerglingattackspeed": "Adrenal Glands",
-    "overlordspeed": "Pneumatized Carapace",
-    "glialreconstitution": "Glial Reconstitution",
-    "tunnelingclaws": "Tunneling Claws",
-    "burrow": "Burrow",
-    "centrifugalhooks": "Centrifugal Hooks",
-    "combatshield": "Combat Shield",
-    "stimpack": "Stimpack",
-}
 
 
 def format_name(name: str) -> str:
     """Convert internal names like 'SpawningPool' to 'Spawning Pool'."""
     if not name:
         return name
-    name = UPGRADE_NAME_MAP.get(name.lower(), name)
+    lower = name.lower()
+    if lower in NAME_MAP:
+        return NAME_MAP[lower]
     # Insert space before capital letters and capitalize words
     return re.sub(r"(?<!^)(?=[A-Z])", " ", name).title()
 
@@ -147,6 +137,7 @@ def upload():
             "Larva",
             "Overlord Cocoon",
             "Mule",
+            "M U L E",
             "Scanner Sweep",
             "Kd8Charge",
         }
@@ -199,8 +190,8 @@ def upload():
             if stop_limit is not None and supply_used > stop_limit:
                 break
 
-            # Use the raw game second to match the in-game timer
-            game_sec = int(event.second)
+            # Convert real-time seconds to in-game seconds using the speed factor
+            game_sec = int(event.second / speed_factor)
             minutes = game_sec // 60
             seconds = game_sec % 60
             timestamp = f"{minutes:02d}:{seconds:02d}"
