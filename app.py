@@ -72,6 +72,10 @@ def upload():
 
         exclude_flag = request.form.get('exclude_workers', '')
         exclude_workers = str(exclude_flag).lower() in {'1', 'true', 'yes', 'on'}
+        exclude_supply_flag = request.form.get('exclude_supply', '')
+        exclude_supply = str(exclude_supply_flag).lower() in {'1', 'true', 'yes', 'on'}
+        exclude_time_flag = request.form.get('exclude_time', '')
+        exclude_time = str(exclude_time_flag).lower() in {'1', 'true', 'yes', 'on'}
         stop_supply_raw = request.form.get('stop_supply')
         stop_limit = None
         if stop_supply_raw and stop_supply_raw.isdigit():
@@ -106,7 +110,7 @@ def upload():
         if exclude_workers:
             skip_units.update({"Drone", "Probe", "SCV"})
 
-        build_lines = [f"Build Order for {player.name} ({player.play_race})"]
+        entries = []
 
         for event in replay.events:
             if isinstance(event, sc2reader.events.tracker.UnitBornEvent):
@@ -123,7 +127,23 @@ def upload():
                 minutes = event.second // 60
                 seconds = event.second % 60
                 timestamp = f"{minutes:02d}:{seconds:02d}"
-                build_lines.append(f"[{supply}] [{timestamp}] {event.unit_type_name}")
+
+                if entries and entries[-1]['supply'] == supply and entries[-1]['time'] == timestamp and entries[-1]['unit'] == event.unit_type_name:
+                    entries[-1]['count'] += 1
+                else:
+                    entries.append({'supply': supply, 'time': timestamp, 'unit': event.unit_type_name, 'count': 1})
+
+        build_lines = [f"Build Order for {player.name} ({player.play_race})"]
+
+        for item in entries:
+            parts = []
+            if not exclude_supply:
+                parts.append(str(item['supply']))
+            if not exclude_time:
+                parts.append(item['time'])
+            prefix = f"[{' '.join(parts)}] " if parts else ""
+            count_part = f"{item['count']} " if item['count'] > 1 else ""
+            build_lines.append(f"{prefix}{count_part}{item['unit']}")
 
         return '\n'.join(build_lines)
 

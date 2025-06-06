@@ -481,6 +481,12 @@ export async function initializeIndexPage() {
     if (document.getElementById("excludeWorkersCheckbox")?.checked) {
       formData.append("exclude_workers", "1");
     }
+    if (document.getElementById("excludeSupplyCheckbox")?.checked) {
+      formData.append("exclude_supply", "1");
+    }
+    if (document.getElementById("excludeTimeCheckbox")?.checked) {
+      formData.append("exclude_time", "1");
+    }
     const stop = document.getElementById("supplyLimitInput")?.value;
     if (stop) formData.append("stop_supply", stop);
 
