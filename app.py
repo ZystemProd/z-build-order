@@ -1,13 +1,14 @@
 from flask import Flask, request
 from flask_cors import CORS
 import sc2reader
-from sc2reader.engine.plugins import SupplyTracker
 import io
 
 app = Flask(__name__)
 CORS(app)
 
-sc2reader.engine.register_plugin(SupplyTracker())
+@app.route('/')
+def index():
+    return '🟢 SC2 Replay Parser is live!'
 
 @app.route('/upload', methods=['POST'])
 def upload():
@@ -17,7 +18,6 @@ def upload():
     if file.filename == '':
         return 'No replay uploaded', 400
 
-    # Read into BytesIO for sc2reader
     replay_data = io.BytesIO(file.read())
     try:
         replay = sc2reader.load_replay(replay_data, load_map=True)
