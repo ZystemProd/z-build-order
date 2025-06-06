@@ -739,6 +739,7 @@ export async function populateBuildList(
             </span>
           </div>
         </div>
+        <button class="delete-build-btn" title="Delete Build">×</button>
         <div class="build-publish-info"></div>`;
     } else {
       buildEl.innerHTML = `
