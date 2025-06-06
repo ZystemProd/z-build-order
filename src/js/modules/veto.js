@@ -16,6 +16,9 @@ const bestOfOptions = ["None", "BO2", "BO3", "BO5", "BO7", "BO9"];
 let currentBestOfIndex = 0;
 let currentMap = null;
 let lastHoveredMap = null;
+let currentAdvancedPlayer = "player1";
+let advancedStage = "veto"; // stages: veto, pick
+let pickOrder = 1;
 
 // DOM Content Loaded
 window.addEventListener("DOMContentLoaded", () => {
@@ -55,6 +58,16 @@ window.addEventListener("DOMContentLoaded", () => {
   document
     .getElementById("mapFileInput")
     .addEventListener("change", updateMapPreview);
+
+  document
+    .getElementById("advancedToggle")
+    .addEventListener("click", toggleAdvancedView);
+
+  const p1Input = document.getElementById("player1NameInput");
+  const p2Input = document.getElementById("player2NameInput");
+  if (p1Input) p1Input.addEventListener("input", updateStageIndicator);
+  if (p2Input) p2Input.addEventListener("input", updateStageIndicator);
+  updateStageIndicator();
 });
 
 // Map Rendering
@@ -110,6 +123,9 @@ function toggleVeto(mapNumber) {
     indicator.textContent = "";
   } else {
     if (!canVetoMoreMaps()) return;
+    // Choose direction based on currentAdvancedPlayer
+    const direction = currentAdvancedPlayer === "player1" ? "left" : "right";
+    animateVetoDirection(li, direction);
     li.classList.add("vetoed-map");
     indicator.style.display = "none";
   }
@@ -192,6 +208,24 @@ function resetAll() {
   resetPreview();
   currentBestOfIndex = 0;
   updateDisplayedBestOf();
+
+  const advList = document.getElementById("advanced-map-list");
+  const p1 = document.getElementById("player1-list");
+  const p2 = document.getElementById("player2-list");
+  const picks = document.getElementById("picked-maps");
+  if (advList && p1 && p2 && picks) {
+    advList.innerHTML = "";
+    p1.innerHTML = "";
+    p2.innerHTML = "";
+    picks.innerHTML = "";
+    picks.classList.add("hidden");
+    const startSel = document.getElementById("startingPlayerSelect");
+    if (startSel) currentAdvancedPlayer = startSel.value;
+    advancedStage = "veto";
+    pickOrder = 1;
+    renderAdvancedMapList();
+    updateStageIndicator();
+  }
 }
 
 function resetPreview() {
@@ -270,6 +304,267 @@ function toggleMapPreviewVisibility() {
   if (preview && checkbox) {
     preview.style.display = checkbox.checked ? "none" : "block";
   }
+}
+
+function moveElementWithAnimation(element, target, afterAppend) {
+  const startRect = element.getBoundingClientRect();
+
+  const clone = element.cloneNode(true);
+  const cloneStyle = clone.style;
+
+  // Force same size and layout
+  cloneStyle.position = "fixed";
+  cloneStyle.top = `${startRect.top}px`;
+  cloneStyle.left = `${startRect.left}px`;
+  cloneStyle.width = `${startRect.width}px`;
+  cloneStyle.height = `${startRect.height}px`;
+  cloneStyle.margin = "0";
+  cloneStyle.zIndex = "1000";
+  cloneStyle.pointerEvents = "none";
+  cloneStyle.transition = "transform 0.3s ease, opacity 0.3s ease";
+  cloneStyle.borderRadius = getComputedStyle(element).borderRadius;
+  cloneStyle.overflow = "hidden";
+
+  // Match image size inside
+  const img = clone.querySelector("img");
+  if (img) {
+    img.style.width = "100%";
+    img.style.height = "100%";
+    img.style.objectFit = "cover";
+  }
+
+  document.body.appendChild(clone);
+
+  // Hide original, append to target
+  element.style.opacity = "0";
+  target.appendChild(element);
+
+  // Get end position
+  const endRect = element.getBoundingClientRect();
+  const dx = endRect.left - startRect.left;
+  const dy = endRect.top - startRect.top;
+
+  requestAnimationFrame(() => {
+    cloneStyle.transform = `translate(${dx}px, ${dy}px)`;
+  });
+
+  clone.addEventListener(
+    "transitionend",
+    () => {
+      document.body.removeChild(clone);
+      element.style.opacity = "1";
+      if (afterAppend) afterAppend();
+    },
+    { once: true }
+  );
+}
+
+function animateVetoDirection(element, direction) {
+  const cls = direction === "left" ? "veto-left" : "veto-right";
+  element.classList.add(cls);
+  element.addEventListener(
+    "transitionend",
+    () => {
+      element.style.display = "none";
+    },
+    { once: true }
+  );
+}
+
+function updateStageIndicator() {
+  const indicator = document.getElementById("stageIndicator");
+  const p1Input = document.getElementById("player1NameInput");
+  const p2Input = document.getElementById("player2NameInput");
+  const p1Name = p1Input && p1Input.value ? p1Input.value : "Player 1";
+  const p2Name = p2Input && p2Input.value ? p2Input.value : "Player 2";
+  const currentName = currentAdvancedPlayer === "player1" ? p1Name : p2Name;
+  const stageText =
+    advancedStage === "veto"
+      ? "Veto"
+      : advancedStage === "pick"
+      ? "Pick"
+      : "Done";
+  if (indicator)
+    indicator.innerHTML = `<span class="stage-text ${stageText.toLowerCase()}">${stageText}</span> - ${currentName}`;
+  const h1 = document.querySelector("#player1-column h3");
+  const h2 = document.querySelector("#player2-column h3");
+  if (h1) h1.textContent = p1Name;
+  if (h2) h2.textContent = p2Name;
+}
+
+// -------- Advanced View --------
+function toggleAdvancedView() {
+  const adv = document.getElementById("advanced-view");
+  const list = document.getElementById("map-list");
+  const preview = document.querySelector(".map-preview");
+  const toggleBtn = document.getElementById("advancedToggle");
+  if (!adv || !list) return;
+
+  if (adv.classList.contains("hidden")) {
+    const startSel = document.getElementById("startingPlayerSelect");
+    if (startSel) currentAdvancedPlayer = startSel.value;
+    advancedStage = "veto";
+    pickOrder = 1;
+    adv.classList.remove("hidden");
+    adv.style.display = "flex";
+    list.style.display = "none";
+    if (preview) preview.style.display = "none";
+    const picks = document.getElementById("picked-maps");
+    if (picks)
+      picks.style.display = picks.classList.contains("hidden")
+        ? "none"
+        : "flex";
+    renderAdvancedMapList();
+    if (toggleBtn) toggleBtn.textContent = "Basic Mode";
+    updateStageIndicator();
+  } else {
+    adv.classList.add("hidden");
+    adv.style.display = "none";
+    list.style.display = "block";
+    if (preview) preview.style.display = "block";
+    const picks = document.getElementById("picked-maps");
+    if (picks) picks.style.display = "none";
+    if (toggleBtn) toggleBtn.textContent = "Advanced Mode";
+  }
+}
+
+function renderAdvancedMapList() {
+  const advList = document.getElementById("advanced-map-list");
+  if (!advList) return;
+  advList.innerHTML = "";
+  mapData.forEach((map) => {
+    const li = document.createElement("li");
+    li.id = `adv-map${map.id}`;
+
+    const img = document.createElement("img");
+    img.src = mapImages[map.id];
+    img.alt = map.name;
+    img.addEventListener("click", () => advancedVetoByTurn(map.id));
+
+    const span = document.createElement("span");
+    span.className = "adv-map-label";
+    span.textContent = map.name;
+
+    li.appendChild(img);
+    li.appendChild(span);
+    advList.appendChild(li);
+  });
+}
+
+function advancedVeto(mapId, playerListId) {
+  const li = document.getElementById(`adv-map${mapId}`);
+  const target = document.getElementById(playerListId);
+  if (!li || !target) return;
+  moveElementWithAnimation(li, target, () => li.classList.add("vetoed-map"));
+  checkAdvancedCompletion();
+  updateStageIndicator();
+}
+
+function advancedVetoByTurn(mapId) {
+  const playerListId =
+    currentAdvancedPlayer === "player1" ? "player1-list" : "player2-list";
+  if (advancedStage === "veto") {
+    advancedVeto(mapId, playerListId);
+  } else if (advancedStage === "pick") {
+    pickMap(mapId);
+  }
+  currentAdvancedPlayer =
+    currentAdvancedPlayer === "player1" ? "player2" : "player1";
+  updateStageIndicator();
+}
+
+function checkAdvancedCompletion() {
+  const advList = document.getElementById("advanced-map-list");
+  const picks = document.getElementById("picked-maps");
+  if (!advList || !picks) return;
+  const remaining = advList.querySelectorAll("li");
+  const limit = BEST_OF_SETTINGS[bestOfOptions[currentBestOfIndex]];
+  if (advancedStage === "veto" && limit && remaining.length === limit) {
+    picks.innerHTML = "";
+    picks.classList.remove("hidden");
+    picks.style.display = "flex";
+    advancedStage = "pick";
+    updateStageIndicator();
+  }
+  if (advancedStage === "pick" && remaining.length === 0) {
+    advancedStage = "done";
+    updateStageIndicator();
+  }
+}
+
+function pickMap(mapId) {
+  const li = document.getElementById(`adv-map${mapId}`);
+  const advList = document.getElementById("advanced-map-list");
+  const picks = document.getElementById("picked-maps");
+  if (!li || !picks || !advList) return;
+
+  const startRect = li.getBoundingClientRect();
+  const img = li.querySelector("img").cloneNode();
+  const label = li.querySelector(".adv-map-label")?.textContent || "";
+
+  const div = document.createElement("div");
+  div.className = "pick-item";
+  const num = document.createElement("span");
+  num.className = "pick-number";
+  num.textContent = pickOrder;
+  pickOrder++;
+
+  const labelSpan = document.createElement("span");
+  labelSpan.className = "pick-label";
+  labelSpan.textContent = label;
+
+  div.appendChild(img);
+  div.appendChild(num);
+  div.appendChild(labelSpan);
+  picks.appendChild(div);
+
+  const endRect = div.getBoundingClientRect();
+
+  // 📦 Clone with matching size and style
+  const clone = li.cloneNode(true);
+  const cloneStyle = clone.style;
+  cloneStyle.position = "fixed";
+  cloneStyle.top = `${startRect.top}px`;
+  cloneStyle.left = `${startRect.left}px`;
+  cloneStyle.width = `${startRect.width}px`;
+  cloneStyle.height = `${startRect.height}px`;
+  cloneStyle.margin = "0";
+  cloneStyle.zIndex = "1000";
+  cloneStyle.pointerEvents = "none";
+  cloneStyle.transition = "transform 0.4s ease, opacity 0.4s ease";
+  cloneStyle.borderRadius = getComputedStyle(li).borderRadius;
+  cloneStyle.overflow = "hidden";
+
+  // Match image inside
+  const cloneImg = clone.querySelector("img");
+  if (cloneImg) {
+    cloneImg.style.width = "100%";
+    cloneImg.style.height = "100%";
+    cloneImg.style.objectFit = "cover";
+  }
+
+  document.body.appendChild(clone);
+
+  // Animate to destination
+  const dx = endRect.left - startRect.left;
+  const dy = endRect.top - startRect.top;
+
+  requestAnimationFrame(() => {
+    cloneStyle.transform = `translate(${dx}px, ${dy}px)`;
+    cloneStyle.opacity = "0";
+  });
+
+  clone.addEventListener(
+    "transitionend",
+    () => {
+      document.body.removeChild(clone);
+    },
+    { once: true }
+  );
+
+  li.remove();
+  checkAdvancedCompletion();
+  updateStageIndicator();
 }
 
 window.addEventListener("DOMContentLoaded", async () => {
