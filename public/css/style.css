@@ -2900,8 +2900,9 @@ td {
   background: #222;
 }
 #buildList.list-view .build-entry .build-publish-info {
-  position: static;
-  margin-left: auto;
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
 }
 
 
