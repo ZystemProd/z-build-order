@@ -3,9 +3,33 @@ from flask_cors import CORS
 import sc2reader
 import io
 import bisect
+import re
+from sc2reader.constants import GAME_SPEED_FACTOR
 
 app = Flask(__name__)
 CORS(app)
+
+# Mapping for upgrade names to user-friendly versions
+UPGRADE_NAME_MAP = {
+    "zerglingmovementspeed": "Metabolic Boost",
+    "zerglingattackspeed": "Adrenal Glands",
+    "overlordspeed": "Pneumatized Carapace",
+    "glialreconstitution": "Glial Reconstitution",
+    "tunnelingclaws": "Tunneling Claws",
+    "burrow": "Burrow",
+    "centrifugalhooks": "Centrifugal Hooks",
+    "combatshield": "Combat Shield",
+    "stimpack": "Stimpack",
+}
+
+
+def format_name(name: str) -> str:
+    """Convert internal names like 'SpawningPool' to 'Spawning Pool'."""
+    if not name:
+        return name
+    name = UPGRADE_NAME_MAP.get(name.lower(), name)
+    # Insert space before capital letters and capitalize words
+    return re.sub(r"(?<!^)(?=[A-Z])", " ", name).title()
 
 @app.route('/')
 def index():
@@ -122,6 +146,8 @@ def upload():
         if exclude_workers:
             skip_units.update({"Drone", "Probe", "SCV"})
 
+        speed_factor = GAME_SPEED_FACTOR.get(replay.expansion, {}).get(replay.speed, 1.0)
+
         entries = []
 
         for event in replay.events:
@@ -144,14 +170,18 @@ def upload():
 
             if getattr(event, 'control_pid', getattr(event, 'pid', None)) != player.pid:
                 continue
-            if not name or 'Beacon' in name or name in skip_units:
+            if not name or 'Beacon' in name or 'Spray' in name or name in skip_units:
                 continue
+
+            name = format_name(name)
 
             supply_used, supply_made = get_supply(event.second)
             if stop_limit is not None and supply_used > stop_limit:
                 break
-            minutes = event.second // 60
-            seconds = event.second % 60
+
+            game_sec = int(event.second / speed_factor) if speed_factor else event.second
+            minutes = game_sec // 60
+            seconds = game_sec % 60
             timestamp = f"{minutes:02d}:{seconds:02d}"
 
             if entries and entries[-1]['supply'] == supply_used and entries[-1]['time'] == timestamp and entries[-1]['unit'] == name:
