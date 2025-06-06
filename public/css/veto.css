@@ -222,6 +222,8 @@ button {
   width: 100%;
   gap: 10px; /* Add gap between map list and map preview */
   margin: 0 auto; /* Center the container */
+  min-height: 240px; /* Keep the control area from jumping */
+  transition: min-height 0.3s ease; /* Smooth size changes */
 }
 
 /* Left side of the control area */
