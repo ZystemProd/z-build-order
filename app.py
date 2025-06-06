@@ -33,15 +33,17 @@ def upload():
             return 'No player found in replay', 400
 
         build_lines = []
+
         for event in replay.events:
-            if isinstance(event, sc2reader.events.tracker.UnitBornEvent) and event.control_pid == player.pid:
-                try:
-                    supply = int(player.current_food_used.get(event.second, 0))
-                    unit_name = event.unit_type_name or ""
-                    if "Beacon" not in unit_name:
-                        build_lines.append(f'[{supply}] {unit_name}')
-                except Exception as inner_error:
-                    print(f"⚠️ Skipped event due to error: {inner_error}")
+            if isinstance(event, sc2reader.events.tracker.UnitBornEvent):
+                actor = next((p for p in replay.players if p.pid == event.control_pid), None)
+                if actor and hasattr(actor, "current_food_used"):
+                    try:
+                        supply = int(actor.current_food_used.get(event.second, 0))
+                        if event.unit_type_name and 'Beacon' not in event.unit_type_name:
+                            build_lines.append(f'[{supply}] {event.unit_type_name}')
+                    except Exception as inner_error:
+                        print(f"⚠️ Skipped event due to error: {inner_error}")
 
         return '\n'.join(build_lines)
 
