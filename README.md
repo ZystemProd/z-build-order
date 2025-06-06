@@ -43,3 +43,16 @@ can toggle this in **Settings**:
 * Install Firebase CLI (`npm install -g firebase-tools` or `npx firebase login`).
 * Use `npm run build` followed by `firebase hosting:channel:deploy dev` for preview deployments.
 
+## Replay Parsing Backend
+
+To parse StarCraft II replays locally you must run the Python service:
+
+```bash
+pip install flask flask-cors sc2reader
+python app.py
+```
+
+The server listens on http://localhost:5000. The frontend will send uploaded
+replays to `/upload` on that server and populate the **Build Order** text area
+with the parsed results.
+
