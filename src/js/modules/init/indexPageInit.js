@@ -433,7 +433,7 @@ export async function initializeIndexPage() {
     const formData = new FormData();
     formData.append("replay", file);
     try {
-      const res = await fetch("http://localhost:5000/upload", {
+      const res = await fetch("https://z-build-order.onrender.com/upload", {
         method: "POST",
         body: formData,
       });
@@ -443,7 +443,9 @@ export async function initializeIndexPage() {
       analyzeBuildOrder(text);
     } catch (err) {
       console.error("Replay upload failed", err);
-      alert("Could not parse the replay. Make sure the Python backend is running.");
+      alert(
+        "Could not parse the replay. Make sure the Python backend is running."
+      );
     }
   });
   safeAdd("buildOrderTitleText", "click", () => toggleTitleInput(true));
