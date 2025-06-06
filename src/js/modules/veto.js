@@ -19,6 +19,7 @@ let lastHoveredMap = null;
 let currentAdvancedPlayer = "player1";
 let advancedStage = "veto"; // stages: veto, pick
 let pickOrder = 1;
+let actionHistory = [];
 
 // DOM Content Loaded
 window.addEventListener("DOMContentLoaded", () => {
@@ -50,6 +51,8 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   document.getElementById("resetButton").addEventListener("click", resetAll);
+  const undoBtn = document.getElementById("undoButton");
+  if (undoBtn) undoBtn.addEventListener("click", undoLastAction);
 
   document
     .getElementById("toggleVisibilityButton")
@@ -412,16 +415,19 @@ function toggleAdvancedView() {
 
   if (adv.classList.contains("hidden")) {
     const startSel = document.getElementById("startingPlayerSelect");
-    if (startSel) currentAdvancedPlayer = startSel.value;
-    advancedStage = "veto";
-    pickOrder = 1;
+    if (startSel && actionHistory.length === 0) currentAdvancedPlayer = startSel.value;
+    const advListEl = document.getElementById("advanced-map-list");
+    if (advListEl && advListEl.childElementCount === 0) {
+      advancedStage = "veto";
+      pickOrder = 1;
+      renderAdvancedMapList();
+    }
     adv.classList.remove("hidden");
     adv.style.display = "flex";
     list.style.display = "none";
     if (preview) preview.style.display = "none";
     const picks = document.getElementById("picked-maps");
     if (picks) picks.style.display = "flex";
-    renderAdvancedMapList();
     if (toggleBtn) toggleBtn.textContent = "Basic Mode";
     updateStageIndicator();
   } else {
@@ -458,10 +464,11 @@ function renderAdvancedMapList() {
   });
 }
 
-function advancedVeto(mapId, playerListId) {
+function advancedVeto(mapId, playerListId, player) {
   const li = document.getElementById(`adv-map${mapId}`);
   const target = document.getElementById(playerListId);
   if (!li || !target) return;
+  actionHistory.push({ action: "veto", mapId, player, playerListId, element: li });
   moveElementWithAnimation(li, target, () => li.classList.add("vetoed-map"));
   checkAdvancedCompletion();
   updateStageIndicator();
@@ -471,9 +478,9 @@ function advancedVetoByTurn(mapId) {
   const playerListId =
     currentAdvancedPlayer === "player1" ? "player1-list" : "player2-list";
   if (advancedStage === "veto") {
-    advancedVeto(mapId, playerListId);
+    advancedVeto(mapId, playerListId, currentAdvancedPlayer);
   } else if (advancedStage === "pick") {
-    pickMap(mapId);
+    pickMap(mapId, currentAdvancedPlayer);
   }
   currentAdvancedPlayer =
     currentAdvancedPlayer === "player1" ? "player2" : "player1";
@@ -498,7 +505,7 @@ function checkAdvancedCompletion() {
   }
 }
 
-function pickMap(mapId) {
+function pickMap(mapId, player) {
   const li = document.getElementById(`adv-map${mapId}`);
   const advList = document.getElementById("advanced-map-list");
   const picks = document.getElementById("picked-maps");
@@ -568,8 +575,45 @@ function pickMap(mapId) {
     { once: true }
   );
 
+  actionHistory.push({ action: "pick", mapId, player, li, pickEl: div });
   li.remove();
   checkAdvancedCompletion();
+  updateStageIndicator();
+}
+
+function recalcAdvancedStage() {
+  const advList = document.getElementById("advanced-map-list");
+  const remaining = advList ? advList.querySelectorAll("li").length : 0;
+  const limit = BEST_OF_SETTINGS[bestOfOptions[currentBestOfIndex]];
+  if (remaining === 0) {
+    advancedStage = "done";
+  } else if (limit && remaining === limit) {
+    advancedStage = "pick";
+  } else {
+    advancedStage = "veto";
+  }
+}
+
+function undoLastAction() {
+  const last = actionHistory.pop();
+  if (!last) return;
+  if (last.action === "pick") {
+    const picks = document.getElementById("picked-maps");
+    const advList = document.getElementById("advanced-map-list");
+    if (picks && last.pickEl) picks.removeChild(last.pickEl);
+    if (advList && last.li) advList.appendChild(last.li);
+    pickOrder = Math.max(1, pickOrder - 1);
+  } else if (last.action === "veto") {
+    const advList = document.getElementById("advanced-map-list");
+    const playerList = document.getElementById(last.playerListId);
+    if (playerList && advList && last.element) {
+      playerList.removeChild(last.element);
+      last.element.classList.remove("vetoed-map");
+      advList.appendChild(last.element);
+    }
+  }
+  currentAdvancedPlayer = last.player;
+  recalcAdvancedStage();
   updateStageIndicator();
 }
 

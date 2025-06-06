@@ -43,10 +43,18 @@ body {
   margin: 0;
 }
 
+#backButton {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 40px;
+}
+
 .container {
   display: flex;
   justify-content: center; /* Center the container */
   align-items: flex-start;
+  position: relative;
   max-width: 1200px; /* or any value suitable for your design */
   width: 100%;
   gap: 10px; /* Add gap between map list and map preview */
@@ -745,13 +753,16 @@ label {
 
 .name-inputs {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
   margin-top: 10px;
 }
 
 .name-inputs input {
   padding: 2px 4px;
+  flex: 1 1 120px;
 }
 
 .map-card {
