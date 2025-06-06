@@ -142,10 +142,24 @@ def upload():
                     used, made = supply_events[supply_times[idx]]
             return used, made
 
-        skip_units = {"Egg", "Larva", "Overlord Cocoon"}
+        skip_units = {
+            "Egg",
+            "Larva",
+            "Overlord Cocoon",
+            "Mule",
+            "Scanner Sweep",
+            "Kd8Charge",
+        }
+        # Skip any creep tumor variants or chrono boost abilities
+        skip_keywords = ["Creep Tumor", "Chrono", "Phase Shift"]
         if exclude_workers:
             skip_units.update({"Drone", "Probe", "SCV"})
 
+
+
+        # event.second is already reported in in-game seconds, so no additional
+        # conversion is needed. We still fetch the speed factor in case future
+        # adjustments are required.
         speed_factor = GAME_SPEED_FACTOR.get(replay.expansion, {}).get(replay.speed, 1.0)
 
         entries = []
@@ -170,7 +184,13 @@ def upload():
 
             if getattr(event, 'control_pid', getattr(event, 'pid', None)) != player.pid:
                 continue
-            if not name or 'Beacon' in name or 'Spray' in name or name in skip_units:
+            if (
+                not name
+                or 'Beacon' in name
+                or 'Spray' in name
+                or name in skip_units
+                or any(key in name for key in skip_keywords)
+            ):
                 continue
 
             name = format_name(name)
@@ -179,12 +199,15 @@ def upload():
             if stop_limit is not None and supply_used > stop_limit:
                 break
 
-            game_sec = int(event.second / speed_factor) if speed_factor else event.second
+            # Use the raw game second to match the in-game timer
+            game_sec = int(event.second)
             minutes = game_sec // 60
             seconds = game_sec % 60
             timestamp = f"{minutes:02d}:{seconds:02d}"
 
-            if entries and entries[-1]['supply'] == supply_used and entries[-1]['time'] == timestamp and entries[-1]['unit'] == name:
+            if entries and entries[-1]['supply'] == supply_used and entries[-1]['unit'] == name:
+                # Combine consecutive events for the same unit/building at the
+                # same supply regardless of slight timestamp differences.
                 entries[-1]['count'] += 1
             else:
                 entries.append({'supply': supply_used, 'made': supply_made, 'time': timestamp, 'unit': name, 'count': 1})
