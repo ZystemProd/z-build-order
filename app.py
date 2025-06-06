@@ -25,7 +25,11 @@ def upload():
     try:
         # Register supply plugin so we can track supply counts
         from sc2reader.engine.plugins.supply import SupplyTracker
-        if not any(isinstance(p, SupplyTracker) for p in sc2reader.engine.plugins()):
+        # Older versions of this plugin are missing a 'name' attribute which
+        # the GameEngine expects when registering plugins. Add one if needed.
+        if not hasattr(SupplyTracker, "name"):
+            SupplyTracker.name = "SupplyTracker"
+        if not any(getattr(p, "name", "") == "SupplyTracker" for p in sc2reader.engine.plugins()):
             sc2reader.engine.register_plugin(SupplyTracker())
         replay = sc2reader.load_replay(replay_data, load_map=True)
     except Exception as e:
