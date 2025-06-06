@@ -32,7 +32,8 @@ def upload():
     for event in replay.events:
         if isinstance(event, sc2reader.events.tracker.UnitBornEvent) and event.control_pid == player.pid:
             supply = int(player.current_food_used.get(event.second, 0))
-            build_lines.append(f'[{supply}] {event.unit_type_name}')
+            if event.unit_type_name and 'Beacon' not in event.unit_type_name:
+                build_lines.append(f'[{supply}] {event.unit_type_name}')
 
     return '\n'.join(build_lines)
 

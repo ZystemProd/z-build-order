@@ -427,17 +427,25 @@ export async function initializeIndexPage() {
     const input = document.getElementById("replayFileInput");
     if (input) input.click();
   });
+
   safeAdd("replayFileInput", "change", async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    const btn = document.getElementById("parseReplayButton");
+    btn.disabled = true;
+    btn.innerText = "⏳ Parsing...";
+
     const formData = new FormData();
     formData.append("replay", file);
+
     try {
       const res = await fetch("https://z-build-order.onrender.com/upload", {
         method: "POST",
         body: formData,
       });
       const text = await res.text();
+
       const buildInput = document.getElementById("buildOrderInput");
       if (buildInput) buildInput.value = text;
       analyzeBuildOrder(text);
@@ -447,7 +455,11 @@ export async function initializeIndexPage() {
         "Could not parse the replay. Make sure the Python backend is running."
       );
     }
+
+    btn.disabled = false;
+    btn.innerText = "Parse Local Replay";
   });
+
   safeAdd("buildOrderTitleText", "click", () => toggleTitleInput(true));
   safeAdd("buildOrderTitleText", "focus", () => toggleTitleInput(true));
 
