@@ -499,6 +499,9 @@ export async function initializeIndexPage() {
     if (document.getElementById("excludeTimeCheckbox")?.checked) {
       formData.append("exclude_time", "1");
     }
+    if (document.getElementById("compactModeCheckbox")?.checked) {
+      formData.append("compact", "1");
+    }
     const stop = document.getElementById("supplyLimitInput")?.value;
     if (stop) formData.append("stop_supply", stop);
 

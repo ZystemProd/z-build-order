@@ -88,6 +88,8 @@ def upload():
         exclude_supply = str(exclude_supply_flag).lower() in {'1', 'true', 'yes', 'on'}
         exclude_time_flag = request.form.get('exclude_time', '')
         exclude_time = str(exclude_time_flag).lower() in {'1', 'true', 'yes', 'on'}
+        compact_flag = request.form.get('compact', '')
+        compact = str(compact_flag).lower() in {'1', 'true', 'yes', 'on'}
         stop_supply_raw = request.form.get('stop_supply')
         stop_limit = None
         if stop_supply_raw and stop_supply_raw.isdigit():
@@ -188,18 +190,43 @@ def upload():
 
         build_lines = []
 
-        for item in entries:
-            parts = []
-            if not exclude_supply:
-                supply_str = str(item['supply'])
-                if item['supply'] > item['made'] and item['made'] > 0:
-                    supply_str = f"{item['supply']}/{item['made']}"
-                parts.append(supply_str)
-            if not exclude_time:
-                parts.append(item['time'])
-            prefix = f"[{' '.join(parts)}] " if parts else ""
-            count_part = f"{item['count']} " if item['count'] > 1 else ""
-            build_lines.append(f"{prefix}{count_part}{item['unit']}")
+        if compact:
+            i = 0
+            n = len(entries)
+            while i < n:
+                first = entries[i]
+                supply = first['supply']
+                made = first['made']
+                time = first['time']
+                units = []
+                while i < n and entries[i]['supply'] == supply and entries[i]['time'] == time:
+                    e = entries[i]
+                    count_part = f"{e['count']} " if e['count'] > 1 else ""
+                    units.append(f"{count_part}{e['unit']}")
+                    i += 1
+                parts = []
+                if not exclude_supply:
+                    supply_str = str(supply)
+                    if supply > made and made > 0:
+                        supply_str = f"{supply}/{made}"
+                    parts.append(supply_str)
+                if not exclude_time:
+                    parts.append(time)
+                prefix = f"[{' '.join(parts)}] " if parts else ""
+                build_lines.append(prefix + " + ".join(units))
+        else:
+            for item in entries:
+                parts = []
+                if not exclude_supply:
+                    supply_str = str(item['supply'])
+                    if item['supply'] > item['made'] and item['made'] > 0:
+                        supply_str = f"{item['supply']}/{item['made']}"
+                    parts.append(supply_str)
+                if not exclude_time:
+                    parts.append(item['time'])
+                prefix = f"[{' '.join(parts)}] " if parts else ""
+                count_part = f"{item['count']} " if item['count'] > 1 else ""
+                build_lines.append(f"{prefix}{count_part}{item['unit']}")
 
         return '\n'.join(build_lines)
 
