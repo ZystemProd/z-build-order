@@ -423,21 +423,88 @@ export async function initializeIndexPage() {
 
   safeInput("templateSearchBar", (val) => searchTemplates(val));
   safeInput("videoInput", (val) => updateYouTubeEmbed(val));
+
+  let selectedReplayFile = null;
+
   safeAdd("parseReplayButton", "click", () => {
     const input = document.getElementById("replayFileInput");
     if (input) input.click();
   });
 
+  async function populateReplayOptions(file) {
+    const loader = document.getElementById("optionsLoadingWrapper");
+    if (loader) loader.style.display = "flex";
+    const select = document.getElementById("playerSelect");
+    if (!select) return;
+    select.innerHTML = "<option>Loading...</option>";
+
+    const formData = new FormData();
+    formData.append("replay", file);
+
+    try {
+      const res = await fetch("https://z-build-order.onrender.com/players", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      const players = Array.isArray(data) ? data : data.players;
+      select.innerHTML = "";
+      players.forEach((p) => {
+        const opt = document.createElement("option");
+        opt.value = p.pid;
+        opt.textContent = `${p.name} (${p.race})`;
+        select.appendChild(opt);
+      });
+      const matchup = data.matchup;
+      if (matchup) {
+        const dropdown = document.getElementById("buildCategoryDropdown");
+        if (dropdown) {
+          dropdown.value = matchup;
+          updateDropdownColor();
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch players", err);
+      select.innerHTML = "<option value='1'>Player 1</option>";
+    }
+    if (loader) loader.style.display = "none";
+  }
+
   safeAdd("replayFileInput", "change", async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    selectedReplayFile = file;
 
-    const btn = document.getElementById("parseReplayButton");
+    await populateReplayOptions(file);
+    const modal = document.getElementById("replayOptionsModal");
+    if (modal) modal.style.display = "block";
+  });
+
+  safeAdd("confirmReplayOptionsButton", "click", async () => {
+    if (!selectedReplayFile) return;
+    const btn = document.getElementById("confirmReplayOptionsButton");
     btn.disabled = true;
     btn.innerText = "⏳ Parsing...";
 
     const formData = new FormData();
-    formData.append("replay", file);
+    formData.append("replay", selectedReplayFile);
+    const player = document.getElementById("playerSelect")?.value;
+    if (player) formData.append("player", player);
+    if (document.getElementById("excludeWorkersCheckbox")?.checked) {
+      formData.append("exclude_workers", "1");
+    }
+    if (document.getElementById("excludeSupplyCheckbox")?.checked) {
+      formData.append("exclude_supply", "1");
+    }
+    if (document.getElementById("excludeTimeCheckbox")?.checked) {
+      formData.append("exclude_time", "1");
+    }
+    if (document.getElementById("compactModeCheckbox")?.checked) {
+      formData.append("compact", "1");
+      formData.append("exclude_time", "1");
+    }
+    const stop = document.getElementById("supplyLimitInput")?.value;
+    if (stop) formData.append("stop_supply", stop);
 
     try {
       const res = await fetch("https://z-build-order.onrender.com/upload", {
@@ -457,7 +524,31 @@ export async function initializeIndexPage() {
     }
 
     btn.disabled = false;
-    btn.innerText = "Parse Local Replay";
+    btn.innerText = "Parse Replay";
+    const modal = document.getElementById("replayOptionsModal");
+    if (modal) modal.style.display = "none";
+  });
+
+  safeAdd("closeReplayOptionsModal", "click", () => {
+    const modal = document.getElementById("replayOptionsModal");
+    if (modal) modal.style.display = "none";
+  });
+
+  const compactBox = document.getElementById("compactModeCheckbox");
+  if (compactBox) {
+    compactBox.addEventListener("change", () => {
+      if (compactBox.checked) {
+        const timeBox = document.getElementById("excludeTimeCheckbox");
+        if (timeBox) timeBox.checked = true;
+      }
+    });
+  }
+
+  window.addEventListener("click", (event) => {
+    const modal = document.getElementById("replayOptionsModal");
+    if (modal && event.target === modal) {
+      modal.style.display = "none";
+    }
   });
 
   safeAdd("buildOrderTitleText", "click", () => toggleTitleInput(true));
