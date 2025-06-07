@@ -197,6 +197,7 @@
               <text x="10" y="18">+</text>
             </svg>
             <div id="templateDropdown" class="dropdown-content">
+              <button id="parseReplayButton" class="btn">Parse Local Replay</button>
               <button id="openTemplatesButton">Open Templates</button>
               <button id="saveTemplateButton">Save Template</button>
             </div>
@@ -318,7 +319,6 @@
           </div>
           <div style="margin-bottom: 10px;">
             <input type="file" id="replayFileInput" accept=".SC2Replay" style="display: none" />
-            <button id="parseReplayButton" class="btn">Parse Local Replay</button>
           </div>
 
           <!-- Replay Link View Button (visible if replayUrl exists) -->
@@ -705,7 +705,7 @@
           <span>Exclude Workers</span>
           <div class="checkbox-wrapper-59">
             <label class="switch">
-              <input type="checkbox" id="excludeWorkersCheckbox" />
+              <input type="checkbox" id="excludeWorkersCheckbox" checked />
               <span class="slider"></span>
             </label>
           </div>
@@ -723,7 +723,7 @@
           <span>Exclude Time</span>
           <div class="checkbox-wrapper-59">
             <label class="switch">
-              <input type="checkbox" id="excludeTimeCheckbox" />
+              <input type="checkbox" id="excludeTimeCheckbox" checked />
               <span class="slider"></span>
             </label>
           </div>
@@ -767,7 +767,7 @@
     <div class="footer-center" id="site-info">
       <p>Made by Zystem</p>
 
-      <p>Version 0.5.7046</p>
+      <p>Version 0.5.7047</p>
 
 
     </div>

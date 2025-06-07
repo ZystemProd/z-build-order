@@ -44,7 +44,12 @@ def players():
 
     players = [p for p in replay.players if not p.is_observer]
     info = [{'pid': p.pid, 'name': p.name, 'race': p.play_race} for p in players]
-    return jsonify(info)
+    matchup = None
+    if len(players) >= 2:
+        a = players[0].play_race[0].lower()
+        b = players[1].play_race[0].lower()
+        matchup = f"{a}v{b}"
+    return jsonify({'players': info, 'matchup': matchup})
 
 @app.route('/upload', methods=['POST'])
 def upload():
@@ -181,7 +186,7 @@ def upload():
             else:
                 entries.append({'supply': supply_used, 'made': supply_made, 'time': timestamp, 'unit': name, 'count': 1})
 
-        build_lines = [f"Build Order for {player.name} ({player.play_race})"]
+        build_lines = []
 
         for item in entries:
             parts = []

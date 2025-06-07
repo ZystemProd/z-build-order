@@ -28,6 +28,7 @@ NAME_MAP = {
     "liberatoragrangeupgrade": "Advanced Ballistics",
     "highcapacitybarrels": "Infernal Pre-Igniter",
     "smartservos": "Smart Servos",
+    "medivac caduceus reactor": "Caduceus Reactor",
     "frenzy": "Nanomuscular swell",
     "lurker den m p": "lurker den",
     "scv": "SCV",

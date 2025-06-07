@@ -446,7 +446,8 @@ export async function initializeIndexPage() {
         method: "POST",
         body: formData,
       });
-      const players = await res.json();
+      const data = await res.json();
+      const players = Array.isArray(data) ? data : data.players;
       select.innerHTML = "";
       players.forEach((p) => {
         const opt = document.createElement("option");
@@ -454,6 +455,14 @@ export async function initializeIndexPage() {
         opt.textContent = `${p.name} (${p.race})`;
         select.appendChild(opt);
       });
+      const matchup = data.matchup;
+      if (matchup) {
+        const dropdown = document.getElementById("buildCategoryDropdown");
+        if (dropdown) {
+          dropdown.value = matchup;
+          updateDropdownColor();
+        }
+      }
     } catch (err) {
       console.error("Failed to fetch players", err);
       select.innerHTML = "<option value='1'>Player 1</option>";
