@@ -977,6 +977,12 @@ textarea::-webkit-scrollbar-thumb:hover {
   color: #ff5252;
 }
 
+#buildList.list-view .delete-build-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
 .build-publish-info {
   position: absolute;
   bottom: 8px;
@@ -2428,7 +2434,7 @@ td {
   min-width: 140px;
 }
 
-.meta-chip.publisher-chip {
+.build-info-grid .meta-chip.publisher-chip {
   display: block;
   width: fit-content;
   margin: auto;
@@ -2894,8 +2900,9 @@ td {
   background: #222;
 }
 #buildList.list-view .build-entry .build-publish-info {
-  position: static;
-  margin-left: auto;
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
 }
 
 
@@ -2910,6 +2917,7 @@ td {
   color: white;
   cursor: pointer; /* ✅ Make div clickable */
   transition: background-color 0.2s ease, transform 0.1s ease;
+  position: relative;
 }
 
 /* ✅ Left section - Matchup image */
