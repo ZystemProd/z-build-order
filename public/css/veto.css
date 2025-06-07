@@ -43,10 +43,18 @@ body {
   margin: 0;
 }
 
+#backButton {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 40px;
+}
+
 .container {
   display: flex;
   justify-content: center; /* Center the container */
   align-items: flex-start;
+  position: relative;
   max-width: 1200px; /* or any value suitable for your design */
   width: 100%;
   gap: 10px; /* Add gap between map list and map preview */
@@ -222,6 +230,8 @@ button {
   width: 100%;
   gap: 10px; /* Add gap between map list and map preview */
   margin: 0 auto; /* Center the container */
+  min-height: 240px; /* Keep the control area from jumping */
+  transition: min-height 0.3s ease; /* Smooth size changes */
 }
 
 /* Left side of the control area */
@@ -248,6 +258,18 @@ button {
   gap: 5px; /* Add space between elements */
   padding: 0 10px 0 10px;
   z-index: 1;
+}
+
+.control-right button,
+.control-right select,
+.control-right input {
+  margin: 5px 0;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
 }
 
 .option-display {
@@ -298,13 +320,12 @@ button:hover {
 }
 
 .control-right h5 {
-  padding-top: 20px;
+  padding-top: 10px;
   padding-bottom: 5px;
-  margin-bottom: 10px; /* Space between the heading and controls */
+  margin: 0 0 8px;
   color: #eee; /* Text color to match the design */
   font-size: 18px; /* Font size for the headings */
   text-align: center;
-  margin-top: 10px;
 }
 button {
   margin-top: 10px;
@@ -435,6 +456,29 @@ label {
   animation: pulse 3s infinite ease-in-out;
 }
 
+/* Red pulsing animation for active player names */
+@keyframes pulse-red {
+  0% {
+    box-shadow: 0 0 10px 2px rgba(255, 0, 0, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 10px 4px rgba(255, 0, 0, 0.9);
+  }
+  100% {
+    box-shadow: 0 0 10px 2px rgba(255, 0, 0, 0.3);
+  }
+}
+
+.active-player-name {
+  display: inline-block;
+  width: fit-content;
+  box-shadow: 0 0 0 2px red;
+  border-radius: 6px;
+  padding: 2px 6px; /* matches default spacing */
+  animation: pulse-red 1.5s infinite ease-in-out;
+  margin: 1em auto; /* keep space consistent */
+}
+
 /* Toggle checkbox component */
 .checkbox-wrapper-59 {
   display: flex;
@@ -526,10 +570,17 @@ label {
   text-align: center;
 }
 
+/* Keep player name headings from shifting when active */
+.player-column h3 {
+  padding: 2px 6px;
+}
+
 .advanced-map-list,
 .player-list {
   list-style: none;
   padding: 0;
+  min-height: 320px; /* Keep player columns from jumping */
+  overflow-y: auto; /* Scroll when overflowing */
 }
 
 .advanced-map-list {
@@ -598,9 +649,13 @@ label {
   left: 0;
   right: 0;
   background: rgba(0, 0, 0, 0.6);
-  padding: 2px 4px;
-  font-size: 14px;
+  padding: 4px 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
   z-index: 2;
+  pointer-events: none;
 }
 
 .player-list li.vetoed-map,
@@ -617,7 +672,7 @@ label {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(255, 0, 0, 0.4);
+  background: rgba(255, 0, 0, 0.25);
   border-radius: 8px;
   z-index: 1;
 }
@@ -629,17 +684,14 @@ label {
   margin-top: 40px;
   margin-bottom: 40px;
   flex-wrap: wrap;
-}
-
-.picked-maps.hidden {
-  display: none;
+  min-height: 150px; /* Reserve space even when empty */
 }
 
 .pick-item {
   position: relative;
   border: 2px solid var(--darker-blue);
   border-radius: 8px;
-  width: 180px;
+  width: 220px;
   aspect-ratio: 4 / 3;
   overflow: hidden;
   background: rgba(255, 255, 255, 0.05);
@@ -659,7 +711,7 @@ label {
   background: rgba(0, 0, 0, 0.6);
   padding: 1px 4px;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .pick-label {
@@ -669,7 +721,18 @@ label {
   background: rgba(0, 0, 0, 0.6);
   padding: 1px 4px;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: 14px;
+}
+
+.pick-player-banner {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-size: 14px;
+  color: #fff;
 }
 
 @keyframes slideLeft {
@@ -740,13 +803,18 @@ label {
 }
 
 .name-inputs {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
   margin-top: 10px;
 }
 
-.name-inputs input {
+.name-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.name-field input {
   padding: 2px 4px;
 }
 
@@ -790,4 +858,30 @@ html {
   display: flex;
   flex-direction: column;
   align-items: center;
+}
+
+.best-of-indicator {
+  margin: 4px 0 12px;
+  font-size: 18px;
+  color: #eee;
+}
+
+.bestof-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.bestof-content {
+  background: #222;
+  padding: 20px;
+  border-radius: 8px;
+  text-align: center;
 }

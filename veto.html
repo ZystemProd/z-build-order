@@ -10,6 +10,13 @@
 </head>
 
 <body>
+  <div id="bestOfModal" class="bestof-modal" style="display:none;">
+    <div class="bestof-content">
+      <label for="bestOfInput">Best of (1-9):</label>
+      <input type="number" id="bestOfInput" min="1" max="9" />
+      <button id="confirmBestOfButton">Confirm</button>
+    </div>
+  </div>
   <div class="main-wrapper">
     <div class="container">
       <a href="index.html" id="backButton" class="back-button">
@@ -33,6 +40,7 @@
       </div>
       <div class="center-column">
         <h2 id="stageIndicator" class="stage-indicator"></h2>
+        <p id="bestOfIndicator" class="best-of-indicator"></p>
         <ul id="advanced-map-list" class="advanced-map-list"></ul>
         <div class="invisible-placeholder" style="width: 300px; height: 300px; opacity: 0; pointer-events: none;"></div>
       </div>
@@ -41,7 +49,7 @@
         <ul id="player2-list" class="player-list"></ul>
       </div>
     </div>
-    <div id="picked-maps" class="picked-maps hidden"></div>
+    <div id="picked-maps" class="picked-maps"></div>
 
     <!-- Control Area -->
     <div class="control-container">
@@ -82,20 +90,12 @@
 
       <div class="control-right">
         <h5>Game Settings</h5>
-        <!-- Heading for Game Settings -->
-        <div class="button-container">
-          <button id="prevBestOfButton">←</button>
-          <!-- Left arrow for previous -->
-          <div class="option-display">
-            <p id="selectedBestOfText">Best of: None</p>
-            <!-- Display the selected Best of option -->
-          </div>
-          <button id="nextBestOfButton">→</button>
-          <!-- Right arrow for next -->
-        </div>
 
-        <!-- Reset Button -->
-        <button id="resetButton">Reset All</button>
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+          <button id="resetButton">Reset All</button>
+          <button id="undoButton">Undo</button>
+        </div>
 
         <div id="startPlayerWrapper"><label for="startingPlayerSelect">Start:</label> <select id="startingPlayerSelect">
             <option value="player1">Player 1</option>
@@ -103,10 +103,14 @@
           </select></div>
 
         <div class="name-inputs">
-          <label for="player1NameInput">Player 1 Name:</label>
-          <input type="text" id="player1NameInput" placeholder="Player 1" />
-          <label for="player2NameInput">Player 2 Name:</label>
-          <input type="text" id="player2NameInput" placeholder="Player 2" />
+          <div class="name-field">
+            <label for="player1NameInput">Player 1 Name:</label>
+            <input type="text" id="player1NameInput" placeholder="Player 1" />
+          </div>
+          <div class="name-field">
+            <label for="player2NameInput">Player 2 Name:</label>
+            <input type="text" id="player2NameInput" placeholder="Player 2" />
+          </div>
         </div>
 
         <button id="advancedToggle">Advanced Mode</button>
@@ -119,7 +123,7 @@
     <a href="https://www.twitch.tv/zystem" target="_blank">
       <img src="img/logo_footer.webp" alt="Zystem Logo" class="footer-logo" />
     </a>
-    <p>︱Version 1.0.5</p>
+    <p>︱Version 0.5.7029</p>
     <!-- Version number here -->
   </div>
 
