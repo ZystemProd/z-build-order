@@ -476,7 +476,7 @@ label {
   border-radius: 6px;
   padding: 2px 6px; /* matches default spacing */
   animation: pulse-red 1.5s infinite ease-in-out;
-  margin: 0 auto;
+  margin: 1em auto; /* keep space consistent */
 }
 
 /* Toggle checkbox component */
