@@ -501,6 +501,7 @@ export async function initializeIndexPage() {
     }
     if (document.getElementById("compactModeCheckbox")?.checked) {
       formData.append("compact", "1");
+      formData.append("exclude_time", "1");
     }
     const stop = document.getElementById("supplyLimitInput")?.value;
     if (stop) formData.append("stop_supply", stop);
@@ -532,6 +533,16 @@ export async function initializeIndexPage() {
     const modal = document.getElementById("replayOptionsModal");
     if (modal) modal.style.display = "none";
   });
+
+  const compactBox = document.getElementById("compactModeCheckbox");
+  if (compactBox) {
+    compactBox.addEventListener("change", () => {
+      if (compactBox.checked) {
+        const timeBox = document.getElementById("excludeTimeCheckbox");
+        if (timeBox) timeBox.checked = true;
+      }
+    });
+  }
 
   window.addEventListener("click", (event) => {
     const modal = document.getElementById("replayOptionsModal");

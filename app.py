@@ -90,6 +90,8 @@ def upload():
         exclude_time = str(exclude_time_flag).lower() in {'1', 'true', 'yes', 'on'}
         compact_flag = request.form.get('compact', '')
         compact = str(compact_flag).lower() in {'1', 'true', 'yes', 'on'}
+        if compact:
+            exclude_time = True
         stop_supply_raw = request.form.get('stop_supply')
         stop_limit = None
         if stop_supply_raw and stop_supply_raw.isdigit():
@@ -197,9 +199,8 @@ def upload():
                 first = entries[i]
                 supply = first['supply']
                 made = first['made']
-                time = first['time']
                 units = []
-                while i < n and entries[i]['supply'] == supply and entries[i]['time'] == time:
+                while i < n and entries[i]['supply'] == supply:
                     e = entries[i]
                     count_part = f"{e['count']} " if e['count'] > 1 else ""
                     units.append(f"{count_part}{e['unit']}")
@@ -210,8 +211,6 @@ def upload():
                     if supply > made and made > 0:
                         supply_str = f"{supply}/{made}"
                     parts.append(supply_str)
-                if not exclude_time:
-                    parts.append(time)
                 prefix = f"[{' '.join(parts)}] " if parts else ""
                 build_lines.append(prefix + " + ".join(units))
         else:
