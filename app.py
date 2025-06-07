@@ -37,7 +37,7 @@ def players():
 
     replay_data = io.BytesIO(file.read())
     try:
-        replay = sc2reader.load_replay(replay_data, load_map=True)
+        replay = sc2reader.load_replay(replay_data, load_map=False)
     except Exception as e:
         print('❌ Failed to load replay:', e)
         return f'Failed to load replay: {e}', 400
@@ -58,15 +58,8 @@ def upload():
     # Read replay into memory
     replay_data = io.BytesIO(file.read())
     try:
-        # Register supply plugin so we can track supply counts
-        from sc2reader.engine.plugins.supply import SupplyTracker
-        # Older versions of this plugin are missing a 'name' attribute which
-        # the GameEngine expects when registering plugins. Add one if needed.
-        if not hasattr(SupplyTracker, "name"):
-            SupplyTracker.name = "SupplyTracker"
-        if not any(getattr(p, "name", "") == "SupplyTracker" for p in sc2reader.engine.plugins()):
-            sc2reader.engine.register_plugin(SupplyTracker())
-        replay = sc2reader.load_replay(replay_data, load_map=True)
+        # Loading without map reduces parsing time and avoids verbose output
+        replay = sc2reader.load_replay(replay_data, load_map=False)
     except Exception as e:
         print("❌ Failed to load replay:", e)
         return f'Failed to load replay: {e}', 400
@@ -105,32 +98,13 @@ def upload():
         supply_times = sorted(supply_events.keys())
 
         def get_supply(second: int):
-            used = made = 0
-            if hasattr(player, 'current_food_used') and hasattr(player, 'current_food_made'):
-                store_u = player.current_food_used
-                store_m = player.current_food_made
-                if isinstance(store_u, dict) and isinstance(store_m, dict):
-                    if second in store_u:
-                        used = int(store_u[second])
-                    if second in store_m:
-                        made = int(store_m[second])
-                else:
-                    if isinstance(store_u, list) and isinstance(store_m, list):
-                        for t, val in store_u:
-                            if t == second:
-                                used = int(val)
-                                break
-                        for t, val in store_m:
-                            if t == second:
-                                made = int(val)
-                                break
-            if used == 0 and not supply_times:
+            """Return (food_used, food_made) for the closest PlayerStatsEvent."""
+            if not supply_times:
                 return 0, 0
-            if used == 0:
-                idx = bisect.bisect_right(supply_times, second) - 1
-                if idx >= 0:
-                    used, made = supply_events[supply_times[idx]]
-            return used, made
+            idx = bisect.bisect_right(supply_times, second) - 1
+            if idx >= 0:
+                return supply_events[supply_times[idx]]
+            return 0, 0
 
         skip_units = {
             "Egg",
