@@ -114,7 +114,9 @@ def upload():
             "M U L E",
             "Scanner Sweep",
             "Kd8Charge",
+            "KD8Charge",
         }
+        skip_units_lower = {s.lower() for s in skip_units}
         # Skip any creep tumor variants or chrono boost abilities
         skip_keywords = ["Creep Tumor", "Chrono", "Phase Shift"]
         if exclude_workers:
@@ -149,11 +151,13 @@ def upload():
 
             if getattr(event, 'control_pid', getattr(event, 'pid', None)) != player.pid:
                 continue
+            lower_name = name.lower()
             if (
                 not name
                 or 'Beacon' in name
                 or 'Spray' in name
                 or name in skip_units
+                or lower_name in skip_units_lower
                 or any(key in name for key in skip_keywords)
             ):
                 continue
