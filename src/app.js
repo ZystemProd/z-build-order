@@ -1,29 +1,7 @@
-import { initializeApp } from "firebase/app";
-import {
-  getAuth,
-  GoogleAuthProvider,
-  signInWithPopup,
-  signOut,
-  deleteUser,
-  onAuthStateChanged,
-  setPersistence,
-  browserLocalPersistence,
-} from "firebase/auth";
-import {
-  getFirestore,
-  getDocs,
-  collection,
-  doc,
-  getDoc,
-  setDoc,
-  deleteDoc,
-} from "firebase/firestore";
-import { getPerformance } from "firebase/performance";
+import { getFirebase, loadAuth, loadFirestore } from "./js/firebase.js";
 import { bannedWords } from "./js/data/bannedWords.js";
 import { showToast } from "./js/modules/toastHandler.js";
 import { resetBuildInputs } from "./js/modules/utils.js";
-import { connectAuthEmulator } from "firebase/auth";
-import { connectFirestoreEmulator } from "firebase/firestore";
 
 // Firebase config
 const firebaseConfig = {
@@ -35,6 +13,18 @@ const firebaseConfig = {
   appId: "1:22023941178:web:ba417e9a52332a8e055903",
   measurementId: "G-LBDMKMG1W9",
 };
+let app, auth, db, provider, perf;
+async function initFirebase(){
+  if(!app){
+    const fb = await getFirebase();
+    app = fb.app;
+    auth = fb.auth;
+    db = fb.db;
+    provider = fb.provider;
+    perf = fb.perf;
+  }
+}
+
 
 // --- DOM Reset --- //
 document.addEventListener("DOMContentLoaded", () => {
@@ -47,21 +37,6 @@ document.addEventListener("DOMContentLoaded", () => {
   if (userMenu) userMenu.style.display = "none";
 });
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const provider = new GoogleAuthProvider();
-const perf = getPerformance(app);
-/*
-// Only use emulators during local development
-if (location.hostname === "localhost") {
-  connectAuthEmulator(auth, "http://localhost:9099");
-  connectFirestoreEmulator(db, "localhost", 8181);
-}
-*/
-// Set persistence
-setPersistence(auth, browserLocalPersistence);
 
 /*********************************************************************
  * Username Management
@@ -154,7 +129,7 @@ async function checkAndSetUsername(user) {
 /*********************************************************************
  * UI Updates Based on Auth State
  *********************************************************************/
-export function initializeAuthUI() {
+export async function initializeAuthUI() {
   const authLoadingWrapper = document.getElementById("authLoadingWrapper");
   const userName = document.getElementById("userName");
   const userPhoto = document.getElementById("userPhoto");
@@ -167,6 +142,9 @@ export function initializeAuthUI() {
   const signOutMenuItem = document.getElementById("signOutBtn");
   const deleteAccountMenuItem = document.getElementById("deleteAccountBtn");
   const menuDividers = document.querySelectorAll("#userMenu .menu-divider");
+  await initFirebase();
+  const { onAuthStateChanged } = await loadAuth();
+  const { doc, getDoc } = await loadFirestore();
 
   // ✅ IMMEDIATE HIDE to prevent any flashing before Firebase loads
   if (userMenu) userMenu.style.display = "none";
@@ -237,7 +215,9 @@ function closeUserMenu() {
   }
 }
 
-export function handleSignIn() {
+export async function handleSignIn() {
+  await initFirebase();
+  const { signInWithPopup } = await loadAuth();
   signInWithPopup(auth, provider)
     .then(() => {
       initializeAuthUI();
@@ -247,7 +227,9 @@ export function handleSignIn() {
     });
 }
 
-export function handleSignOut() {
+export async function handleSignOut() {
+  await initFirebase();
+  const { signOut } = await loadAuth();
   signOut(auth)
     .then(() => {
       resetBuildInputs();
@@ -261,6 +243,8 @@ export function handleSignOut() {
 }
 
 export async function handleSwitchAccount() {
+  await initFirebase();
+  const { signOut, signInWithPopup } = await loadAuth();
   try {
     await signOut(auth);
     const result = await signInWithPopup(auth, provider);
@@ -298,6 +282,10 @@ if (cancelDeleteAccountButton) {
 
 if (confirmDeleteAccountButton) {
   confirmDeleteAccountButton.addEventListener("click", async () => {
+    await initFirebase();
+    const { deleteUser } = await loadAuth();
+    const { getFirestore, collection, doc, getDoc, deleteDoc, getDocs } = await loadFirestore();
+    const db = getFirestore();
     const deleteCommunityBuilds = document.getElementById(
       "deleteCommunityBuildsCheckbox"
     ).checked;
@@ -306,7 +294,6 @@ if (confirmDeleteAccountButton) {
     const userId = user.uid;
 
     try {
-      const db = getFirestore();
 
       // 1. Get the username first
       const userRef = doc(db, "users", userId);
