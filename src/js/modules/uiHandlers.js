@@ -9,8 +9,8 @@ import {
 } from "./textFormatters.js";
 import { abbreviationMap } from "../data/abbreviationMap.js";
 import { setCurrentBuildId } from "./states/buildState.js";
-import { parseBuildOrder, applySmartSupply } from "./utils.js";
-import { isBracketInputEnabled, isSmartSupplyEnabled } from "./settings.js";
+import { parseBuildOrder } from "./utils.js";
+import { isBracketInputEnabled } from "./settings.js";
 
 // Function to toggle the title input field
 export function toggleTitleInput(showInput) {
@@ -222,16 +222,6 @@ export function formatWorkersOrTimestamp(
 // Function to analyze and update the build order table automatically
 export function analyzeBuildOrder(inputText) {
   requestAnimationFrame(() => {
-    if (isSmartSupplyEnabled()) {
-      const inputEl = document.getElementById("buildOrderInput");
-      if (inputEl) {
-        const updated = applySmartSupply(inputEl.value);
-        if (updated !== inputEl.value) {
-          inputEl.value = updated;
-          inputText = updated;
-        }
-      }
-    }
 
     const lines = inputText.split("\n");
     const table = document.getElementById("buildOrderTable");

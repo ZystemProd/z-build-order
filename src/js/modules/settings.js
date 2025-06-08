@@ -2,7 +2,6 @@ import { getFirestore, doc, getDoc, updateDoc } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
 const BRACKET_KEY = "enableBracketInput";
-const SMART_SUPPLY_KEY = "enableSmartSupply";
 export function isBracketInputEnabled() {
   const value = localStorage.getItem(BRACKET_KEY);
   return value === null ? true : value === "true";
@@ -20,22 +19,6 @@ export function setBracketInputEnabled(enabled) {
   }
 }
 
-export function isSmartSupplyEnabled() {
-  const value = localStorage.getItem(SMART_SUPPLY_KEY);
-  return value === "true";
-}
-
-export function setSmartSupplyEnabled(enabled) {
-  localStorage.setItem(SMART_SUPPLY_KEY, enabled ? "true" : "false");
-
-  const user = getAuth().currentUser;
-  if (user) {
-    const db = getFirestore();
-    updateDoc(doc(db, "users", user.uid), {
-      "settings.enableSmartSupply": enabled,
-    }).catch((err) => console.error("Failed to save smart supply setting", err));
-  }
-}
 
 
 export async function loadUserSettings() {
@@ -49,12 +32,6 @@ export async function loadUserSettings() {
       localStorage.setItem(
         BRACKET_KEY,
         data.enableBracketInput ? "true" : "false"
-      );
-    }
-    if (data.enableSmartSupply !== undefined) {
-      localStorage.setItem(
-        SMART_SUPPLY_KEY,
-        data.enableSmartSupply ? "true" : "false"
       );
     }
   } catch (err) {
