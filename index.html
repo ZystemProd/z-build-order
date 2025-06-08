@@ -112,9 +112,6 @@
 
       <!-- Build Order Input Section with Toggle -->
       <div class="toggle-header">
-        <h3 data-section="buildOrderInputField" class="toggle-title">
-          <span id="buildOrderInputArrow" class="arrow open"></span> INPUT
-        </h3>
         <div id="editModeBanner"></div>
 
         <div id="box">
@@ -197,7 +194,8 @@
               <text x="10" y="18">+</text>
             </svg>
             <div id="templateDropdown" class="dropdown-content">
-              <button id="parseReplayButton" class="btn">Parse Local Replay</button>
+              <button id="parseReplayButton" class="btn">Upload From Replay</button>
+              <hr class="dropdown-divider" />
               <button id="openTemplatesButton">Open Templates</button>
               <button id="saveTemplateButton">Save Template</button>
             </div>
@@ -656,6 +654,15 @@
             </label>
           </div>
         </div>
+        <div class="publish-checkbox-row">
+          <span>Show Build Input</span>
+          <div class="checkbox-wrapper-59">
+            <label class="switch">
+              <input type="checkbox" id="buildInputToggle" checked />
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -776,7 +783,7 @@
     <div class="footer-center" id="site-info">
       <p>Made by Zystem</p>
 
-      <p>Version 0.5.7056</p>
+      <p>Version 0.5.7057</p>
 
 
     </div>

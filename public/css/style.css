@@ -267,6 +267,12 @@ body {
   background-color: #504f4f;
 }
 
+.dropdown-content hr.dropdown-divider {
+  margin: 4px 0;
+  border: 0;
+  border-top: 1px solid #444;
+}
+
 /* User Info */
 .auth-info {
   display: flex;
@@ -699,15 +705,15 @@ button:hover {
 
 .template-icon-button {
   position: absolute;
-  top: -15px;
-  left: -4px;
-  width: 60px;
-  height: 22px;
+  top: -18px;
+  left: -6px;
+  width: 80px;
+  height: 30px;
   cursor: pointer;
 }
 
 .template-icon-button polygon {
-  fill: #2c2c2c;
+  fill: #383838;
 }
 
 .template-icon-button path {
@@ -716,7 +722,7 @@ button:hover {
 }
 
 .template-icon-button text {
-  font-size: 18px;
+  font-size: 22px;
   fill: white;
   font-family: Arial, sans-serif;
   font-weight: bold;

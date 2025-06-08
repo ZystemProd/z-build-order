@@ -86,6 +86,8 @@ import {
 import {
   isBracketInputEnabled,
   setBracketInputEnabled,
+  isBuildInputShown,
+  setBuildInputShown,
   loadUserSettings,
 } from "../settings.js";
 import { checkForJoinRequestNotifications } from "../utils/notificationHelpers.js";
@@ -98,6 +100,12 @@ function updateSupplyColumnVisibility() {
   } else {
     table.classList.add("hide-supply");
   }
+}
+
+function updateBuildInputVisibility() {
+  const section = document.getElementById("buildOrderInputField");
+  if (!section) return;
+  section.style.display = isBuildInputShown() ? "block" : "none";
 }
 
 setupTemplateModal(); // Always call early
@@ -323,8 +331,13 @@ export async function initializeIndexPage() {
       const toggle = document.getElementById("bracketInputToggle");
       if (toggle) {
         toggle.checked = isBracketInputEnabled();
-        updateSupplyColumnVisibility();
       }
+      const inputToggle = document.getElementById("buildInputToggle");
+      if (inputToggle) {
+        inputToggle.checked = isBuildInputShown();
+      }
+      updateSupplyColumnVisibility();
+      updateBuildInputVisibility();
     }
   });
 
@@ -660,6 +673,15 @@ export async function initializeIndexPage() {
     });
   }
 
+  const inputToggle = document.getElementById("buildInputToggle");
+  if (inputToggle) {
+    inputToggle.checked = isBuildInputShown();
+    inputToggle.addEventListener("change", () => {
+      setBuildInputShown(inputToggle.checked);
+      updateBuildInputVisibility();
+    });
+  }
+
 
   safeAdd("closePrivacyModal", "click", () => {
     const modal = document.getElementById("privacyModal");
@@ -783,6 +805,7 @@ export async function initializeIndexPage() {
   initializeTextareaClickHandler();
   initializeAutoCorrect();
   updateSupplyColumnVisibility();
+  updateBuildInputVisibility();
   initializeTooltips();
   setupCatActivationOnInput();
   checkPublishButtonVisibility();
