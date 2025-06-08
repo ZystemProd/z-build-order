@@ -188,7 +188,7 @@ def upload():
                 # same supply regardless of slight timestamp differences.
                 entries[-1]['count'] += 1
             else:
-                entries.append({'supply': supply_used, 'made': supply_made, 'time': timestamp, 'unit': name, 'count': 1})
+                entries.append({'supply': supply_used, 'made': supply_made, 'time': timestamp, 'secs': game_sec, 'unit': name, 'count': 1})
 
         build_lines = []
 
@@ -199,8 +199,9 @@ def upload():
                 first = entries[i]
                 supply = first['supply']
                 made = first['made']
+                start_time = first['secs']
                 units = []
-                while i < n and entries[i]['supply'] == supply:
+                while i < n and entries[i]['supply'] == supply and entries[i]['secs'] - start_time <= 5:
                     e = entries[i]
                     count_part = f"{e['count']} " if e['count'] > 1 else ""
                     units.append(f"{count_part}{e['unit']}")
@@ -234,4 +235,5 @@ def upload():
         return f'Failed to parse replay: {e}', 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    from waitress import serve
+    serve(app, host='0.0.0.0', port=5000)

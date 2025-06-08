@@ -54,7 +54,7 @@ import {
   searchCommunityBuilds,
   filterCommunityBuilds,
 } from "../community.js";
-import { resetBuildInputs } from "../utils.js";
+import { resetBuildInputs, applySmartSupply } from "../utils.js";
 import {
   renderCreateClanUI,
   renderChooseManageClanUI,
@@ -86,6 +86,8 @@ import {
 import {
   isBracketInputEnabled,
   setBracketInputEnabled,
+  isSmartSupplyEnabled,
+  setSmartSupplyEnabled,
   loadUserSettings,
 } from "../settings.js";
 import { checkForJoinRequestNotifications } from "../utils/notificationHelpers.js";
@@ -415,7 +417,24 @@ export async function initializeIndexPage() {
   safeAdd("saveTemplateButton", "click", showSaveTemplateModal);
 
   // --- Text Inputs
-  safeInput("buildOrderInput", (val) => analyzeBuildOrder(val));
+  const buildInput = document.getElementById("buildOrderInput");
+  let smartUpdating = false;
+  if (buildInput) {
+    buildInput.addEventListener("input", () => {
+      if (smartUpdating) return;
+      let text = buildInput.value;
+      if (isSmartSupplyEnabled()) {
+        const updated = applySmartSupply(text);
+        if (updated !== text) {
+          smartUpdating = true;
+          buildInput.value = updated;
+          text = updated;
+          smartUpdating = false;
+        }
+      }
+      analyzeBuildOrder(text.trim());
+    });
+  }
   safeInput("buildSearchBar", (val) => searchBuilds(val));
   safeInput("communitySearchBar", async (val) => {
     await searchCommunityBuilds(val);
@@ -641,6 +660,14 @@ export async function initializeIndexPage() {
     bracketToggle.addEventListener("change", () => {
       setBracketInputEnabled(bracketToggle.checked);
       updateSupplyColumnVisibility();
+    });
+  }
+
+  const smartToggle = document.getElementById("smartSupplyToggle");
+  if (smartToggle) {
+    smartToggle.checked = isSmartSupplyEnabled();
+    smartToggle.addEventListener("change", () => {
+      setSmartSupplyEnabled(smartToggle.checked);
     });
   }
 

@@ -26,6 +26,38 @@ export function parseBuildOrder(buildOrderText) {
     .filter((step) => step !== null); // Filter out invalid steps
 }
 
+export function applySmartSupply(text) {
+  const SUPPLY_GAINS = {
+    overlord: 8,
+    hatchery: 6,
+    'command center': 15,
+    nexus: 15,
+    pylon: 8,
+    'supply depot': 8,
+  };
+
+  let maxSupply = 0;
+  const lines = text.split('\n').map((line) => {
+    const match = line.match(/^\[(\d+)(?:\/(\d+))?\]\s*(.+)$/i);
+    if (!match) return line;
+    let current = parseInt(match[1], 10);
+    if (match[2]) {
+      maxSupply = parseInt(match[2], 10);
+    }
+    const action = match[3].trim();
+    const gain = SUPPLY_GAINS[action.toLowerCase()] || 0;
+    if (gain && !match[2]) {
+      maxSupply += gain;
+    }
+    if (!match[2]) {
+      return `[${current}/${maxSupply}] ${action}`;
+    }
+    return line;
+  });
+
+  return lines.join('\n');
+}
+
 export function resetBuildInputs() {
   console.log("🔄 Resetting inputs..."); // Debugging log
 
