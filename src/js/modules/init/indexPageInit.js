@@ -431,15 +431,9 @@ export async function initializeIndexPage() {
 
   let selectedReplayFile = null;
 
-  safeAdd("parseReplayButton", "click", async () => {
-    if (selectedReplayFile) {
-      await populateReplayOptions(selectedReplayFile);
-      const modal = document.getElementById("replayOptionsModal");
-      if (modal) modal.style.display = "block";
-    } else {
-      const input = document.getElementById("replayFileInput");
-      if (input) input.click();
-    }
+  safeAdd("parseReplayButton", "click", () => {
+    const input = document.getElementById("replayFileInput");
+    if (input) input.click();
   });
 
   async function populateReplayOptions(file) {
@@ -552,6 +546,16 @@ export async function initializeIndexPage() {
       if (compactBox.checked) {
         const timeBox = document.getElementById("excludeTimeCheckbox");
         if (timeBox) timeBox.checked = true;
+      }
+    });
+  }
+
+  const timeBox = document.getElementById("excludeTimeCheckbox");
+  if (timeBox) {
+    timeBox.addEventListener("change", () => {
+      if (!timeBox.checked) {
+        const cBox = document.getElementById("compactModeCheckbox");
+        if (cBox) cBox.checked = false;
       }
     });
   }
