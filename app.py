@@ -127,7 +127,7 @@ def upload():
         }
         skip_units_lower = {s.lower() for s in skip_units}
         # Skip any creep tumor variants or chrono boost abilities
-        skip_keywords = ["Creep Tumor", "Chrono", "Phase Shift"]
+        skip_keywords = ["Creep Tumor", "Chrono", "Phase Shift", "PhaseShift"]
         if exclude_workers:
             skip_units.update({"Drone", "Probe", "SCV"})
 
@@ -167,11 +167,16 @@ def upload():
                 or 'Spray' in name
                 or name in skip_units
                 or lower_name in skip_units_lower
-                or any(key in name for key in skip_keywords)
+                or any(key.lower() in lower_name for key in skip_keywords)
             ):
                 continue
 
             name = format_name(name)
+            ln = name.lower()
+            if ln.startswith("terran "):
+                name = name[7:]
+            elif ln.startswith("evolve "):
+                name = name[7:]
 
             supply_used, supply_made = get_supply(event.second)
             if stop_limit is not None and supply_used > stop_limit:
