@@ -710,7 +710,7 @@ button:hover {
 .template-icon-button {
   position: absolute;
   top: -22px;
-  left: -6px;
+  left: -5px;
   width: 80px;
   height: 30px;
   cursor: pointer;
