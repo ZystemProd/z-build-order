@@ -127,7 +127,13 @@ def upload():
         }
         skip_units_lower = {s.lower() for s in skip_units}
         # Skip any creep tumor variants or chrono boost abilities
-        skip_keywords = ["Creep Tumor", "Chrono", "Phase Shift", "PhaseShift"]
+        skip_keywords = [
+            "Creep Tumor",
+            "CreepTumor",
+            "Chrono",
+            "Phase Shift",
+            "PhaseShift",
+        ]
         if exclude_workers:
             skip_units.update({"Drone", "Probe", "SCV"})
 
