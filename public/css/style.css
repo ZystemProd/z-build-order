@@ -4382,3 +4382,22 @@ td {
 .checkbox-wrapper-59 input:checked + .slider {
   box-shadow: 0 0 0 2px limeGreen, 0 0 8px limeGreen;
 }
+
+/* Info icon for tooltips */
+.info-icon {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+  text-align: center;
+  border-radius: 50%;
+  background-color: #555;
+  color: white;
+  font-size: 12px;
+  margin-left: 4px;
+  cursor: help;
+}
+.info-icon:hover {
+  background-color: #777;
+}
+

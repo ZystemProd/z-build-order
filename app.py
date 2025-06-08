@@ -124,6 +124,8 @@ def upload():
             "Scanner Sweep",
             "Kd8Charge",
             "KD8Charge",
+            "Broodling",
+            "Changeling",
         }
         skip_units_lower = {s.lower() for s in skip_units}
         # Skip any creep tumor variants or chrono boost abilities
