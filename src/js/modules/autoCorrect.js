@@ -325,7 +325,9 @@ export function initializeAutoCorrect() {
 
   inputField.addEventListener("blur", () => {
     setTimeout(() => {
-      popup.style.visibility = "hidden";
-    }, 100);
+      if (!popup.matches(":hover")) {
+        popup.style.visibility = "hidden";
+      }
+    }, 200);
   });
 }

@@ -18,7 +18,7 @@ export const units = {
     "viper",
     "brood lord",
     "larva",
-    "changling",
+    "changeling",
     "drop overlord",
   ],
   protoss: [
