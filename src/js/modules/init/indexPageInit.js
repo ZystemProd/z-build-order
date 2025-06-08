@@ -431,9 +431,15 @@ export async function initializeIndexPage() {
 
   let selectedReplayFile = null;
 
-  safeAdd("parseReplayButton", "click", () => {
-    const input = document.getElementById("replayFileInput");
-    if (input) input.click();
+  safeAdd("parseReplayButton", "click", async () => {
+    if (selectedReplayFile) {
+      await populateReplayOptions(selectedReplayFile);
+      const modal = document.getElementById("replayOptionsModal");
+      if (modal) modal.style.display = "block";
+    } else {
+      const input = document.getElementById("replayFileInput");
+      if (input) input.click();
+    }
   });
 
   async function populateReplayOptions(file) {
@@ -479,6 +485,7 @@ export async function initializeIndexPage() {
     const file = e.target.files[0];
     if (!file) return;
     selectedReplayFile = file;
+    e.target.value = "";
 
     await populateReplayOptions(file);
     const modal = document.getElementById("replayOptionsModal");
@@ -549,7 +556,7 @@ export async function initializeIndexPage() {
     });
   }
 
-  window.addEventListener("click", (event) => {
+  window.addEventListener("mousedown", (event) => {
     const modal = document.getElementById("replayOptionsModal");
     if (modal && event.target === modal) {
       modal.style.display = "none";
@@ -569,7 +576,7 @@ export async function initializeIndexPage() {
     if (modal) modal.style.display = "none";
   });
 
-  window.addEventListener("click", (event) => {
+  window.addEventListener("mousedown", (event) => {
     const helpModal = document.getElementById("buildOrderHelpModal");
     if (helpModal && event.target === helpModal) {
       helpModal.style.display = "none";
@@ -634,7 +641,7 @@ export async function initializeIndexPage() {
   });
 
   const settingsModal = document.getElementById("settingsModal");
-  window.addEventListener("click", (event) => {
+  window.addEventListener("mousedown", (event) => {
     if (settingsModal && event.target === settingsModal) {
       settingsModal.style.display = "none";
     }
@@ -655,7 +662,7 @@ export async function initializeIndexPage() {
     if (modal) modal.style.display = "none";
   });
 
-  window.addEventListener("click", (event) => {
+  window.addEventListener("mousedown", (event) => {
     const modal = document.getElementById("privacyModal");
     if (modal && event.target === modal) {
       modal.style.display = "none";
@@ -753,7 +760,7 @@ export async function initializeIndexPage() {
     document.getElementById("publishedBuildsTab")?.click();
   });
 
-  window.addEventListener("click", (event) => {
+  window.addEventListener("mousedown", (event) => {
     const modal = document.getElementById("publishModal");
     const content = modal?.querySelector(".modal-content.small-modal");
 
@@ -895,7 +902,7 @@ export async function initializeIndexPage() {
     currentClanView = null;
   });
 
-  window.addEventListener("click", (event) => {
+  window.addEventListener("mousedown", (event) => {
     const modal = document.getElementById("clanModal");
     if (!modal || modal.style.display !== "block") return;
 
@@ -1177,7 +1184,7 @@ export async function initializeIndexPage() {
         }
       });
 
-    window.addEventListener("click", (event) => {
+    window.addEventListener("mousedown", (event) => {
       if (event.target === mapModal) {
         mapModal.style.display = "none";
       }

@@ -33,6 +33,12 @@ NAME_MAP = {
     "lurker den m p": "lurker den",
     "scv": "SCV",
     "s c v": "SCV",
+    "zerg ground armor level1": "carapace",
+    "zerg ground armor level2": "carapace",
+    "zerg ground armor level3": "carapace",
+    "zerggroundarmorlevel1": "carapace",
+    "zerggroundarmorlevel2": "carapace",
+    "zerggroundarmorlevel3": "carapace",
     # Protoss upgrades
     "templar archive": "Templar Archives",
     "templararchives": "Templar Archives",

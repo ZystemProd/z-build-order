@@ -4401,3 +4401,9 @@ td {
   background-color: #777;
 }
 
+.label-with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
