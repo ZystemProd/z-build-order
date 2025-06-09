@@ -522,8 +522,17 @@ export async function initializeIndexPage() {
       formData.append("compact", "1");
       formData.append("exclude_time", "1");
     }
-    const stop = document.getElementById("supplyLimitInput")?.value;
-    if (stop) formData.append("stop_supply", stop);
+    const stopInput = document.getElementById("stopLimitInput");
+    const toggleBtn = document.getElementById("toggleStopTypeBtn");
+    const stopVal = stopInput?.value;
+    const stopType = toggleBtn?.dataset.type || "supply";
+    if (stopVal) {
+      if (stopType === "time") {
+        formData.append("stop_time", stopVal);
+      } else {
+        formData.append("stop_supply", stopVal);
+      }
+    }
 
     try {
       const res = await fetch("https://z-build-order.onrender.com/upload", {
@@ -559,6 +568,31 @@ export async function initializeIndexPage() {
       if (compactBox.checked) {
         const timeBox = document.getElementById("excludeTimeCheckbox");
         if (timeBox) timeBox.checked = true;
+      }
+    });
+  }
+
+  const toggleStopTypeBtn = document.getElementById("toggleStopTypeBtn");
+  const stopLimitInput = document.getElementById("stopLimitInput");
+  const stopLimitLabel = document.getElementById("stopLimitLabel");
+  const stopUnitLabel = document.getElementById("stopUnitLabel");
+  if (toggleStopTypeBtn && stopLimitInput && stopLimitLabel && stopUnitLabel) {
+    toggleStopTypeBtn.addEventListener("click", () => {
+      const newType =
+        toggleStopTypeBtn.dataset.type === "time" ? "supply" : "time";
+      toggleStopTypeBtn.dataset.type = newType;
+      stopLimitInput.value = "";
+      if (newType === "time") {
+        stopLimitLabel.textContent = "Stop at time:";
+        toggleStopTypeBtn.textContent = "Use Supply";
+        stopLimitInput.placeholder = "e.g. 5";
+        stopLimitInput.step = "1";
+        stopUnitLabel.style.display = "inline";
+      } else {
+        stopLimitLabel.textContent = "Stop at supply:";
+        toggleStopTypeBtn.textContent = "Use Time";
+        stopLimitInput.placeholder = "e.g. 50";
+        stopUnitLabel.style.display = "none";
       }
     });
   }

@@ -748,8 +748,10 @@
           </div>
         </div>
         <div>
-          <label for="supplyLimitInput">Stop at supply:</label>
-          <input type="number" id="supplyLimitInput" min="0" value="50" placeholder="e.g. 50" />
+          <label id="stopLimitLabel" for="stopLimitInput">Stop at supply:</label>
+          <input type="number" id="stopLimitInput" min="0" value="50" placeholder="e.g. 50" />
+          <span id="stopUnitLabel" style="display: none;">min</span>
+          <button type="button" id="toggleStopTypeBtn" class="btn-small" data-type="supply">Use Time</button>
         </div>
         <button id="confirmReplayOptionsButton" class="btn">Parse Replay</button>
       </div>
@@ -785,7 +787,7 @@
     </div>
     <div class="footer-center" id="site-info">
       <p>Made by Zystem</p>
-      <p>Version 0.5.7066</p>
+      <p>Version 0.5.7067</p>
 
 
 

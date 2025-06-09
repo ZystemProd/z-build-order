@@ -3900,6 +3900,16 @@ td {
   text-align: left;
 }
 
+button.btn-small {
+  padding: 4px 10px;
+  background-color: var(--active-color);
+  border: none;
+  color: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85em;
+}
+
 .clan-member-table button.btn-small {
   padding: 4px 10px;
   background-color: var(--active-color);
