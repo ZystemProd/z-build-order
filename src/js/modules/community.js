@@ -456,10 +456,7 @@ export async function publishBuildToCommunity(buildId) {
     if (buildCard) {
       const publishInfo = buildCard.querySelector(".build-publish-info");
       if (publishInfo) {
-        publishInfo.innerHTML = `
-        <span class="publish-label">Published</span>
-        <img src="./img/SVG/checkmark2.svg" alt="Published" class="publish-icon">
-      `;
+        publishInfo.innerHTML = `<img src="./img/SVG/checkmark2.svg" alt="Published" class="publish-icon">`;
         publishInfo.classList.remove("publish-unpublished");
         publishInfo.classList.add("publish-published");
         publishInfo.onclick = (event) => {
@@ -535,10 +532,7 @@ window.publishBuildToCommunity = async function (buildId) {
     if (buildCard) {
       const publishInfo = buildCard.querySelector(".build-publish-info");
       if (publishInfo) {
-        publishInfo.innerHTML = `
-        <span class="publish-label">Published</span>
-        <img src="./img/SVG/checkmark2.svg" alt="Published" class="publish-icon">
-      `;
+        publishInfo.innerHTML = `<img src="./img/SVG/checkmark2.svg" alt="Published" class="publish-icon">`;
         publishInfo.classList.remove("publish-unpublished");
         publishInfo.classList.add("publish-published");
         publishInfo.onclick = (event) => {

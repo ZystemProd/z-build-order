@@ -834,14 +834,11 @@ export async function populateBuildList(
 
       if (build.imported) {
         publishInfo.classList.add("publish-imported");
-        publishInfo.innerHTML = `<span>Imported</span>`;
+        publishInfo.innerHTML = `<img src="./img/SVG/import.svg" class="publish-icon" alt="Imported">`;
         publishInfo.style.pointerEvents = "none";
       } else if (isBuildPublished) {
         publishInfo.classList.add("publish-published");
-        publishInfo.innerHTML = `
-          <span>Published</span>
-          <img src="./img/SVG/checkmark2.svg" class="publish-icon">
-        `;
+        publishInfo.innerHTML = `<img src="./img/SVG/checkmark2.svg" class="publish-icon" alt="Published">`;
         if (publishedTab) {
           if (build.isPublic)
             publishInfo.innerHTML += `<span class="tag public">Public</span>`;
@@ -859,7 +856,7 @@ export async function populateBuildList(
         }
       } else {
         publishInfo.classList.add("publish-unpublished");
-        publishInfo.innerHTML = `<img src="./img/SVG/publish2.svg" class="publish-icon"><span>Publish</span>`;
+        publishInfo.innerHTML = `<img src="./img/SVG/publish2.svg" class="publish-icon" alt="Publish">`;
         publishInfo.addEventListener("click", (e) => {
           e.stopPropagation();
           openPublishModal(build.id);
@@ -957,7 +954,7 @@ export async function unpublishBuild(buildId) {
     if (buildEl) {
       const publishInfo = buildEl.querySelector(".build-publish-info");
       if (publishInfo) {
-        publishInfo.innerHTML = `<img src="./img/SVG/publish2.svg" alt="Publish" class="publish-icon"><span>Publish</span>`;
+        publishInfo.innerHTML = `<img src="./img/SVG/publish2.svg" alt="Publish" class="publish-icon">`;
         publishInfo.classList.remove("publish-published", "no-border");
         publishInfo.classList.add("publish-unpublished");
         publishInfo.style.pointerEvents = "auto";

@@ -2976,6 +2976,9 @@ td {
   font-weight: bold;
   color: #ffffff;
   margin: 12px 0 4px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Metadata row */
@@ -4478,11 +4481,6 @@ button.btn-small {
   }
   .build-card .map-image {
     height: 54px;
-  }
-  .build-meta {
-    font-size: 0.7rem;
-    line-height: 0;
-    gap: 0px;
   }
   .build-title {
     font-size: 1rem;

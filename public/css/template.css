@@ -595,10 +595,7 @@
     gap: 10px;
   }
   .template-header .header-controls {
-    flex-direction: column;
-    gap: 10px;
     width: 100%;
-    align-items: stretch;
   }
   .template-header .search-bar {
     width: 100%;
@@ -617,7 +614,8 @@
     padding: 10px 15px;
   }
   .template-header .tab-buttons button {
-    width: 100%;
+    width: auto;
+    flex: 1;
   }
   .template-list {
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -627,9 +625,28 @@
     width: 120px;
   }
   #buildHeaderControls {
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "tabs tabs"
+      "search filters"
+      "view filters";
     gap: 10px;
-    align-items: stretch;
+  }
+  #buildHeaderControls .tab-buttons {
+    grid-area: tabs;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+  }
+  #buildHeaderControls .search-bar {
+    grid-area: search;
+  }
+  #buildHeaderControls .view-toggle-buttons {
+    grid-area: view;
+  }
+  #buildHeaderControls .filters-container {
+    grid-area: filters;
   }
   .template-list .build-card {
     width: 170px !important;
