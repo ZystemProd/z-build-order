@@ -843,7 +843,7 @@ export async function populateBuildList(
 
       if (build.imported) {
         publishInfo.classList.add("publish-imported");
-        publishInfo.innerHTML = `<img src="./img/SVG/import.svg" class="publish-icon" alt="Imported">`;
+        publishInfo.innerHTML = `<img src="./img/SVG/import2.svg" class="publish-icon" alt="Imported">`;
         publishInfo.style.pointerEvents = "none";
       } else if (isBuildPublished) {
         publishInfo.classList.add("publish-published");
