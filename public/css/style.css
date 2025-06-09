@@ -4490,4 +4490,7 @@ button.btn-small {
   .tab-text {
     display: none;
   }
+  #buildList.list-view {
+    padding-left: 10px;
+  }
 }
