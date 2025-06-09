@@ -4418,10 +4418,33 @@ td {
 }
 
 
+
 @media (max-width: 768px) {
   #auth-container {
     position: static;
     margin: 10px;
+    width: fit-content;
+  }
+  #userName {
+    display: none;
+  }
+  #userNameMenu {
+    display: inline-block;
+  }
+  #userNameDivider {
+    display: block;
+  }
+  #buildOrderTable #supplyHeader {
+    width: 1%;
+  }
+  #supplyHeader .full-text {
+    display: none;
+  }
+  #supplyHeader .short-text {
+    display: inline;
+  }
+  .toggle-header-right button {
+    padding: 4px 8px;
+    font-size: 0.85rem;
   }
 }
-

@@ -36,6 +36,11 @@
         <div id="authLoading" class="spinner"></div>
         <span id="authLoadingText" style="color: #555;">Loading user...</span>
       </div>
+
+      <div class="user-details">
+        <p id="userName" class="user-name fade-in" style="display: none;">Guest</p>
+      </div>
+
       <img id="userPhoto" class="user-avatar fade-in" src="img/default-avatar.webp" alt="User Avatar"
         style="width: 40px; height: 40px; display: none;" />
 
@@ -43,8 +48,8 @@
       <div id="userMenu" class="user-menu" style="display: none;">
 
         <div class="menu-section">
-          <p id="userName" class="user-name fade-in" style="display: none;">Guest</p>
-          <hr class="menu-divider" />
+          <p id="userNameMenu" class="user-name fade-in" style="display: none;">Guest</p>
+          <hr id="userNameDivider" class="menu-divider" />
           <button class="menu-item" id="mapVetoBtn">
             <img src="img/SVG/map-solid.svg" class="menu-icon" /> Map Veto
           </button>
@@ -252,7 +257,7 @@
       <!-- Existing table and buttons -->
       <table id="buildOrderTable">
         <tr>
-          <th id="supplyHeader">S/T</th>
+          <th id="supplyHeader"><span class="full-text">Supply/Time</span><span class="short-text">S/T</span></th>
           <th>Action</th>
         </tr>
       </table>
@@ -780,7 +785,7 @@
     </div>
     <div class="footer-center" id="site-info">
       <p>Made by Zystem</p>
-      <p>Version 0.5.7064</p>
+      <p>Version 0.5.7065</p>
 
 
 

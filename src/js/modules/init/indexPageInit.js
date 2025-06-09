@@ -853,6 +853,7 @@ export async function initializeIndexPage() {
       document.getElementById("userName").innerText = username;
       document.getElementById("userPhoto").src =
         user.photoURL || "img/default-avatar.webp";
+      document.getElementById("userNameMenu").innerText = username;
     } else {
       // Handle case when user data doesn't exist
       console.log("No user data found!");
