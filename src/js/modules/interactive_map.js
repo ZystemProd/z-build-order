@@ -344,3 +344,7 @@ export const mapAnnotations =
   document.getElementById("map-annotations")
     ? new MapAnnotations("map-preview-image", "map-annotations")
     : null;
+
+if (mapAnnotations) {
+  window.mapAnnotations = mapAnnotations;
+}

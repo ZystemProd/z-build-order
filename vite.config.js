@@ -1,7 +1,8 @@
-import { defineConfig } from "vite";
+import { defineConfig, splitVendorChunkPlugin } from "vite";
 import path from "path";
 
 export default defineConfig({
+  plugins: [splitVendorChunkPlugin()],
   build: {
     rollupOptions: {
       input: {

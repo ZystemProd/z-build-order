@@ -784,7 +784,7 @@
     <div class="footer-center" id="site-info">
       <p>Made by Zystem</p>
 
-      <p>Version 0.5.7059</p>
+      <p>Version 0.5.7063</p>
 
 
     </div>
@@ -863,13 +863,12 @@
 
 
   <script type="module">
-    import { initializeAuthUI } from './src/app.js'; // Import auth UI logic
-    import { initializeIndexPage } from './src/js/modules/init/indexPageInit.js'; // Import page logic
+    document.addEventListener("DOMContentLoaded", async () => {
+      const { initializeAuthUI } = await import('./src/app.js');
+      const { initializeIndexPage } = await import('./src/js/modules/init/indexPageInit.js');
 
-    // Wait for the DOM to load before initializing auth and page content
-    document.addEventListener("DOMContentLoaded", () => {
-      initializeAuthUI();  // First, initialize Firebase authentication
-      initializeIndexPage();  // Then, initialize the rest of the page
+      initializeAuthUI();
+      initializeIndexPage();
     });
   </script>
 
