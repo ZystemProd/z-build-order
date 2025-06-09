@@ -18,12 +18,9 @@ import {
   setDoc,
   deleteDoc,
 } from "firebase/firestore";
-import { getPerformance } from "firebase/performance";
 import { bannedWords } from "./js/data/bannedWords.js";
 import { showToast } from "./js/modules/toastHandler.js";
 import { resetBuildInputs } from "./js/modules/utils.js";
-import { connectAuthEmulator } from "firebase/auth";
-import { connectFirestoreEmulator } from "firebase/firestore";
 
 // Firebase config
 const firebaseConfig = {
@@ -52,13 +49,10 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
-const perf = getPerformance(app);
 /*
-// Only use emulators during local development
-if (location.hostname === "localhost") {
-  connectAuthEmulator(auth, "http://localhost:9099");
-  connectFirestoreEmulator(db, "localhost", 8181);
-}
+// If testing locally, you can enable Firebase emulators by importing
+// connectAuthEmulator and connectFirestoreEmulator from the relevant
+// Firebase packages and calling them here.
 */
 // Set persistence
 setPersistence(auth, browserLocalPersistence);
