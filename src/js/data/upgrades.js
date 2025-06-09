@@ -43,7 +43,7 @@ export const upgrades = [
   "weapon refit",
   "vehicle and ship plating",
   "vehicle weapons",
-  "stim",
+  "stimpack",
   "ship weapons",
   "smart servos",
   "neosteel armor",

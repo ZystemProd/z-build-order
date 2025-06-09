@@ -88,14 +88,22 @@ body {
   font-size: 1rem;
 }
 
+#buildsLoadingWrapper {
+  display: none;
+  justify-content: center;
+  align-items: center;
+  min-height: 100px;
+  width: 100%;
+}
+
 .spinner {
-  flex-shrink: 0; /* 🔥 Important: Spinner will not shrink or stretch */
-  width: 32px;
-  height: 32px;
-  border: 3px solid rgba(200, 200, 200, 0.6);
-  border-top: 3px solid #555;
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(255, 255, 255, 0.2);
+  border-top: 4px solid #ffffff;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
+  margin: 40px auto;
 }
 
 @keyframes spin {
@@ -179,9 +187,11 @@ body {
 #templateDropdown {
   display: none;
   position: absolute;
-  right: 0;
+  top: 7px;
+  left: 0;
+  margin-left: 0;
   background-color: #2a2a2a; /* Darker background */
-  min-width: 150px; /* Adjust width */
+  min-width: 160px; /* Adjust width */
   border-radius: 5px;
   box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.3); /* Softer shadow */
   z-index: 1000;
@@ -241,10 +251,6 @@ body {
   display: block;
 }
 
-#showClanModalButton {
-  position: relative;
-}
-
 /* Style each button inside the dropdown menu */
 .dropdown-content button {
   display: block;
@@ -259,6 +265,12 @@ body {
 
 .dropdown-content button:hover {
   background-color: #504f4f;
+}
+
+.dropdown-content hr.dropdown-divider {
+  margin: 4px 0;
+  border: 0;
+  border-top: 1px solid #444;
 }
 
 /* User Info */
@@ -482,6 +494,11 @@ button:hover {
   text-overflow: ellipsis; /* Add ellipsis when text overflows */
 }
 
+#buildOrderTable.hide-supply td:first-child,
+#buildOrderTable.hide-supply th:first-child {
+  display: none;
+}
+
 .titleInput {
   max-width: 70%;
   margin: 10px auto;
@@ -674,6 +691,50 @@ button:hover {
 
 #buildOrderInput {
   height: 150px;
+  border-top-left-radius: 0;
+}
+
+#buildOrderInputField {
+  overflow: visible;
+}
+
+.template-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.template-wrapper textarea {
+  width: 100%;
+}
+
+.template-icon-button {
+  position: absolute;
+  top: -22px;
+  left: -5px;
+  width: 80px;
+  height: 30px;
+  cursor: pointer;
+}
+
+.template-icon-button polygon {
+  fill: #383838;
+}
+
+.template-icon-button path {
+  stroke: #444;
+  stroke-width: 1px;
+}
+
+.template-icon-button text {
+  font-size: 22px;
+  fill: white;
+  font-family: Arial, sans-serif;
+  font-weight: bold;
+  pointer-events: none;
+}
+
+.template-icon-button:hover polygon {
+  fill: #444;
 }
 
 .buildOrderOutput {
@@ -926,6 +987,12 @@ textarea::-webkit-scrollbar-thumb:hover {
   color: #ff5252;
 }
 
+#buildList.list-view .delete-build-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
 .build-publish-info {
   position: absolute;
   bottom: 8px;
@@ -961,6 +1028,11 @@ textarea::-webkit-scrollbar-thumb:hover {
   border-color: #00c853;
 }
 
+/* When a build is shown in My Builds and already published, remove the button border */
+.publish-published.no-border {
+  border: none;
+}
+
 .publish-imported {
   color: #ff9800; /* Orange */
   background: rgba(255, 152, 0, 0.15);
@@ -976,7 +1048,8 @@ textarea::-webkit-scrollbar-thumb:hover {
   margin-top: 12px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
+  width: 100%;
 }
 .publish-checkbox-row label {
   font-weight: normal;
@@ -1037,6 +1110,11 @@ textarea::-webkit-scrollbar-thumb:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
   padding-bottom: 20px;
+}
+
+#showCommunityModalButton,
+#showBuildsButton {
+  margin-bottom: 0px;
 }
 
 /* Flex container for build cards */
@@ -1131,6 +1209,124 @@ textarea::-webkit-scrollbar-thumb:hover {
 .subcategory-container button:active {
   transform: scale(1); /* Reset scale on click */
   background-color: #666; /* Darker background when active */
+}
+
+.filters-wrapper {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: auto auto;
+  width: 110px;
+  margin: 0 auto;
+}
+
+/* Base style for all buttons */
+.filter-category {
+  position: relative;
+  background-color: #3a3a3a;
+  color: white;
+  font-weight: bold;
+  text-align: center;
+  padding: 5px 0;
+  font-size: 14px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s ease;
+  border-radius: 0;
+  position: relative;
+  border: 1px solid #444;
+}
+
+.filter-category:hover {
+  background-color: #555;
+}
+
+.filter-category.active {
+  background-color: #963325;
+}
+
+/* Top "All" button (span across 3 columns) */
+.filter-category[data-category="all"] {
+  grid-column: 1 / span 3;
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+}
+
+/* Bottom Z (left) */
+.filter-category[data-category="Zerg"] {
+  border-bottom-left-radius: 12px;
+}
+
+/* Bottom P (middle) — square */
+.filter-category[data-category="Protoss"] {
+  border-radius: 0;
+}
+
+/* Bottom T (right) */
+.filter-category[data-category="Terran"] {
+  border-bottom-right-radius: 12px;
+}
+
+/* Anchor T submenu to right */
+.filter-category[data-category="Terran"] .submenu {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+
+/* Submenu below each race button */
+.submenu {
+  position: absolute;
+  top: calc(100% + 2px);
+  background-color: #222;
+  border: 1px solid #444;
+  border-radius: 6px;
+  z-index: 9999;
+  white-space: nowrap;
+  display: none;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
+}
+
+/* Show submenu when hovering over the parent or submenu itself */
+.filter-category:hover .submenu,
+.filter-category:has(.submenu:hover) .submenu {
+  display: block;
+}
+
+.filter-category:hover .submenu {
+  display: block;
+}
+
+/* Anchor Z submenu to left */
+.filter-category[data-category="Zerg"] .submenu {
+  left: 0;
+}
+
+/* Anchor P submenu to center */
+.filter-category[data-category="Protoss"] .submenu {
+  left: 50%;
+  transform: translateX(-45%);
+}
+
+/* Anchor T submenu to right */
+.filter-category[data-category="Terran"] .submenu {
+  right: -12px;
+}
+
+/* Subcategory items */
+.subcategory {
+  padding: 6px 14px;
+  color: white;
+  font-weight: normal;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.subcategory:hover {
+  background-color: #444;
+}
+
+.subcategory.active {
+  background-color: #963325;
 }
 
 .dropdown-container {
@@ -1642,7 +1838,7 @@ textarea::-webkit-scrollbar-thumb:hover {
 }
 
 .autocomplete-popup {
-  position: absolute;
+  position: fixed;
   background-color: rgba(30, 30, 30, 0.95); /* Slight transparency */
   border: 1px solid #444; /* Darker border for a subtle look */
   border-radius: 12px; /* Rounded edges */
@@ -2248,6 +2444,11 @@ td {
   min-width: 140px;
 }
 
+.build-info-grid .meta-chip.publisher-chip {
+  display: block;
+  width: fit-content;
+  margin: auto;
+}
 .build-info-item label {
   display: block;
   font-size: 0.85rem;
@@ -2262,7 +2463,7 @@ td {
 }
 
 .build-order-container {
-  background: #2c2c2c;
+  background: #141414;
   padding: 20px;
   border-radius: 8px;
 }
@@ -2309,10 +2510,15 @@ td {
 }
 
 #importBuildButton {
-  display: inline-block;
-  margin-top: 30px;
-  padding: 12px 24px;
-  width: 150px;
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 0;
+  padding: 8px 16px;
+  width: auto;
   font-size: 1rem;
   font-weight: 600;
   color: #ffffff;
@@ -2330,9 +2536,9 @@ td {
 
 .build-info-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr); /* 4 equal columns */
-  gap: 20px;
-  margin-bottom: 30px;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 15px;
+  margin-bottom: 20px;
 }
 
 .build-info-item {
@@ -2344,16 +2550,16 @@ td {
 
 .build-info-item label {
   display: block;
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   color: #aaaaaa;
-  margin-bottom: 5px;
+  margin-bottom: 4px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .build-info-item span {
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 700;
   color: #ffffff;
 }
@@ -2476,6 +2682,16 @@ td {
 
 #saveBuildButton:hover img {
   transform: scale(1.1); /* Slight animation effect */
+}
+
+#editModeBanner {
+  display: none;
+  background-color: #165016;
+  color: #fff;
+  padding: 6px;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  text-align: center;
 }
 
 .footer {
@@ -2669,6 +2885,36 @@ td {
 #communityBuildsContainer::-webkit-scrollbar-track {
   background: #222;
 }
+#buildList.list-view {
+  display: flex;
+  flex-direction: column;
+  gap: 0px;
+  padding: 10px;
+  max-height: 78vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: #444 #222;
+  padding-left: 30px;
+}
+#buildList.list-view::-webkit-scrollbar {
+  width: 10px;
+}
+#buildList.list-view::-webkit-scrollbar-thumb {
+  background-color: #444;
+  border-radius: 4px;
+  border: 2px solid #222;
+}
+#buildList.list-view::-webkit-scrollbar-track {
+  background: #222;
+}
+#buildList.list-view .build-entry .build-publish-info {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+}
+
 
 /* Each build entry */
 .build-entry {
@@ -2681,6 +2927,7 @@ td {
   color: white;
   cursor: pointer; /* ✅ Make div clickable */
   transition: background-color 0.2s ease, transform 0.1s ease;
+  position: relative;
 }
 
 /* ✅ Left section - Matchup image */
@@ -2837,12 +3084,16 @@ td {
 }
 
 .view-btn {
-  background: none;
-  border: none;
-  padding: 6px;
+  background: #2a2a2a;
+  border: 1px solid var(--border-color);
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   opacity: 1;
-  transition: opacity 0.2s;
+  transition: opacity 0.2s, background-color 0.2s, border-color 0.2s;
 }
 
 .view-btn img {
@@ -2850,6 +3101,12 @@ td {
   height: 20px;
   filter: brightness(1.2);
 }
+.view-btn.active {
+  background-color: var(--active-color);
+  border-color: var(--active-color);
+}
+.view-btn.active img { filter: brightness(1.8); }
+.view-btn:not(.active) { opacity: 0.5; }
 
 .help-circle.animated-help {
   width: 30px;
@@ -3062,6 +3319,8 @@ td {
 /* Publish Modal Styles */
 .small-modal {
   max-width: 420px;
+  min-height: 400px;
+  height: auto;
   background: #2b2b2b;
   padding: 30px 24px;
   border-radius: 14px;
@@ -3135,6 +3394,7 @@ td {
   flex-direction: column;
   gap: 12px;
   align-items: flex-start;
+  width: 100%;
 }
 
 .publish-status-list label {
@@ -3146,22 +3406,42 @@ td {
 }
 
 .publish-checkbox-row {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr auto;
   align-items: center;
   width: 100%;
-  font-size: 14px;
+  font-size: 18px;
   color: #e0e0e0;
   line-height: 1.5;
 }
 
-.publish-checkbox-row input[type="checkbox"] {
-  margin-left: 20px;
-  transform: scale(1.2);
-  vertical-align: middle; /* Aligns with label text baseline */
-  position: relative;
-  top: 1px; /* Fine-tune vertical position */
+.publish-divider {
+  border: none;
+  border-top: 1px solid #444;
+  width: 100%;
+  margin: 8px 0;
 }
+
+.modal-section-label {
+  font-weight: 600;
+  color: #e0e0e0;
+  font-size: 18px;
+  margin: 4px 0;
+  width: 100%;
+}
+
+.label-community {
+  color: #70b3ff;
+  font-weight: 600;
+}
+
+.label-clans,
+.label-clan {
+  color: #50c878;
+  font-weight: 600;
+}
+
+/* Checkbox styling replaced by custom toggle component */
 
 /* Username input default */
 #usernameInput {
@@ -3800,6 +4080,25 @@ td {
   font-weight: bold;
 }
 
+.community-type-toggle {
+  display: flex;
+  gap: 8px;
+  margin-right: 16px;
+}
+
+.community-type-btn {
+  padding: 6px 12px;
+  border: none;
+  background-color: #444;
+  color: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.community-type-btn.active {
+  background-color: #007cf0;
+}
+
 #showClanModalButton .notification-dot {
   top: 0px;
   right: 4px;
@@ -3937,6 +4236,30 @@ td {
   text-decoration: none;
 }
 
+.tag {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 6px;
+  margin-left: 6px;
+  color: white;
+}
+
+.tag.public {
+  background-color: #2e7d32; /* green */
+}
+
+.tag.clan {
+  background-color: #3949ab; /* blue */
+}
+
+#myBuildsTab.active,
+#publishedBuildsTab.active {
+  background-color: var(--active-color);
+  color: white;
+}
+
 @media screen and (max-width: 768px) {
   html #content {
     width: 100%;
@@ -4009,3 +4332,88 @@ td {
     max-width: 100px;
   }
 }
+
+/* Toggle checkbox component */
+.checkbox-wrapper-59 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.checkbox-wrapper-59 input[type="checkbox"] {
+  visibility: hidden;
+  display: none;
+}
+
+.checkbox-wrapper-59 *,
+.checkbox-wrapper-59 ::after,
+.checkbox-wrapper-59 ::before {
+  box-sizing: border-box;
+}
+
+.checkbox-wrapper-59 .switch {
+  width: 45px;
+  height: 20px;
+  position: relative;
+  display: inline-block;
+}
+
+.checkbox-wrapper-59 .slider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  border-radius: 30px;
+  box-shadow: 0 0 0 2px #777, 0 0 4px #777;
+  cursor: pointer;
+  border: 4px solid transparent;
+  overflow: hidden;
+  transition: 0.2s;
+}
+
+.checkbox-wrapper-59 .slider:before {
+  position: absolute;
+  content: "";
+  width: 12px;
+  height: 12px;
+  left: 0px;
+  bottom: 0px;
+  background-color: #777;
+  border-radius: 50%;
+  transition: 0.2s;
+}
+
+.checkbox-wrapper-59 input:checked + .slider:before {
+  transform: translateX(24px);
+  background-color: limeGreen;
+}
+
+.checkbox-wrapper-59 input:checked + .slider {
+  box-shadow: 0 0 0 2px limeGreen, 0 0 8px limeGreen;
+}
+
+/* Info icon for tooltips */
+.info-icon {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+  text-align: center;
+  border-radius: 50%;
+  background-color: #555;
+  color: white;
+  font-size: 12px;
+  margin-left: 4px;
+  cursor: help;
+}
+.info-icon:hover {
+  background-color: #777;
+}
+
+.label-with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+

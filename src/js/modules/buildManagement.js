@@ -7,17 +7,22 @@ import {
   getDoc,
   query,
   where,
+  orderBy,
 } from "firebase/firestore";
 
 import { getAuth } from "firebase/auth";
 import { db, auth } from "../../app.js";
-import { getSavedBuilds, setSavedBuilds } from "./buildStorage.js";
+import {
+  getSavedBuilds,
+  setSavedBuilds,
+  saveSavedBuildsToLocalStorage,
+} from "./buildStorage.js";
 import { showToast } from "./toastHandler.js";
 import { filterBuilds } from "./modal.js";
 import { parseBuildOrder } from "./utils.js";
 import { mapAnnotations } from "./interactive_map.js";
 import { checkPublishButtonVisibility } from "./community.js";
-import { saveBuildToClan } from "./clan.js";
+
 import DOMPurify from "dompurify";
 
 export async function fetchUserBuilds() {
@@ -46,8 +51,8 @@ export async function fetchUserBuilds() {
   });
 
   // 🔍 Now fetch community builds by this user
-  const communityRef = collection(db, "communityBuilds");
-  const q = query(communityRef, where("publisherId", "==", user.uid));
+  const publishedRef = collection(db, "publishedBuilds");
+  const q = query(publishedRef, where("publisherId", "==", user.uid));
   const communitySnapshot = await getDocs(q);
   const publishedTitles = new Set(
     communitySnapshot.docs.map((doc) => doc.data().title)
@@ -135,11 +140,10 @@ export async function saveCurrentBuild() {
 
   // ✅ Guard against invalid map parsing
   if (mapImage?.src && mapName === "No map selected") {
-    showToast(
-      "❌ Failed to detect map name. Try re-selecting the map.",
-      "error"
+    console.warn(
+      "⚠ Failed to parse map name, proceeding without a valid name."
     );
-    return null;
+    // optionally keep the default "No map selected"
   }
 
   let mapFolder = "current";
@@ -332,12 +336,22 @@ export async function updateCurrentBuild(buildId) {
 
   await setDoc(buildDocRef, updatedData, { merge: true });
 
+  const localBuilds = getSavedBuilds();
+  const localIndex = localBuilds.findIndex((b) => b.encodedTitle === buildId);
+  if (localIndex !== -1) {
+    localBuilds[localIndex] = {
+      ...localBuilds[localIndex],
+      ...updatedData,
+    };
+    saveSavedBuildsToLocalStorage();
+  }
+
   // 🔄 Also update community version if published
-  const communityRef = doc(db, "communityBuilds", buildId);
-  const communitySnap = await getDoc(communityRef);
+  const publishedRef = doc(db, "publishedBuilds", buildId);
+  const communitySnap = await getDoc(publishedRef);
 
   if (communitySnap.exists()) {
-    await setDoc(communityRef, updatedData, { merge: true });
+    await setDoc(publishedRef, updatedData, { merge: true });
     console.log("🌍 Community build updated as well.");
   }
 
@@ -391,21 +405,62 @@ export async function loadClanBuilds() {
   const user = auth.currentUser;
   if (!user) return [];
 
-  // 🔍 Find user's clan
   const clansSnap = await getDocs(collection(db, "clans"));
-  let clanId = null;
-  clansSnap.forEach((docSnap) => {
-    const clan = docSnap.data();
-    if (clan.members?.includes(user.uid)) {
-      clanId = docSnap.id;
+  const userClanIds = [];
+
+  clansSnap.forEach((doc) => {
+    const data = doc.data();
+    if (data.members?.includes(user.uid)) {
+      userClanIds.push(doc.id);
     }
   });
-  if (!clanId) return [];
 
-  const buildsSnap = await getDocs(collection(db, `clans/${clanId}/builds`));
-  return buildsSnap.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-    isClan: true,
-  }));
+  if (userClanIds.length === 0) return [];
+
+  const publishedSnap = await getDocs(collection(db, "publishedBuilds"));
+  const clanBuilds = [];
+
+  publishedSnap.forEach((doc) => {
+    const data = doc.data();
+    const isSharedToClan = data.sharedToClans?.some((clanId) =>
+      userClanIds.includes(clanId)
+    );
+    if (isSharedToClan) {
+      clanBuilds.push({
+        id: doc.id,
+        ...data,
+        source: "published",
+      });
+    }
+  });
+
+  return clanBuilds;
+}
+
+export async function fetchPublishedUserBuilds(filter = "all") {
+  const db = getFirestore();
+  const user = getAuth().currentUser;
+  if (!user) return [];
+
+  const baseRef = collection(db, "publishedBuilds");
+  let q;
+
+  if (filter === "all") {
+    q = query(baseRef, where("publisherId", "==", user.uid));
+  } else if (/^[zpt]v[zpt]$/i.test(filter)) {
+    q = query(
+      baseRef,
+      where("publisherId", "==", user.uid),
+      where("subcategoryLowercase", "==", filter)
+    );
+  } else {
+    q = query(
+      baseRef,
+      where("publisherId", "==", user.uid),
+      where("category", "==", filter)
+    );
+  }
+
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 }

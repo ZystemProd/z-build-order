@@ -11,17 +11,16 @@ import {
 } from "firebase/auth";
 import {
   getFirestore,
+  getDocs,
+  collection,
   doc,
   getDoc,
   setDoc,
   deleteDoc,
 } from "firebase/firestore";
-import { getPerformance } from "firebase/performance";
 import { bannedWords } from "./js/data/bannedWords.js";
 import { showToast } from "./js/modules/toastHandler.js";
 import { resetBuildInputs } from "./js/modules/utils.js";
-import { connectAuthEmulator } from "firebase/auth";
-import { connectFirestoreEmulator } from "firebase/firestore";
 
 // Firebase config
 const firebaseConfig = {
@@ -50,13 +49,10 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
-const perf = getPerformance(app);
 /*
-// Only use emulators during local development
-if (location.hostname === "localhost") {
-  connectAuthEmulator(auth, "http://localhost:9099");
-  connectFirestoreEmulator(db, "localhost", 8181);
-}
+// If testing locally, you can enable Firebase emulators by importing
+// connectAuthEmulator and connectFirestoreEmulator from the relevant
+// Firebase packages and calling them here.
 */
 // Set persistence
 setPersistence(auth, browserLocalPersistence);
@@ -159,9 +155,16 @@ export function initializeAuthUI() {
   const userMenu = document.getElementById("userMenu");
   const signInBtn = document.getElementById("signInBtn");
   const showClanBtn = document.getElementById("showClanModalButton");
+  const mapVetoBtn = document.getElementById("mapVetoBtn");
+  const settingsMenuItem = document.getElementById("settingsBtn");
+  const switchAccountMenuItem = document.getElementById("switchAccountBtn");
+  const signOutMenuItem = document.getElementById("signOutBtn");
+  const deleteAccountMenuItem = document.getElementById("deleteAccountBtn");
+  const menuDividers = document.querySelectorAll("#userMenu .menu-divider");
 
   // ✅ IMMEDIATE HIDE to prevent any flashing before Firebase loads
   if (userMenu) userMenu.style.display = "none";
+  menuDividers.forEach((d) => (d.style.display = "none"));
 
   if (authLoadingWrapper) authLoadingWrapper.style.display = "flex";
   if (userName) userName.style.display = "none";
@@ -188,12 +191,26 @@ export function initializeAuthUI() {
       if (userPhoto) userPhoto.src = user.photoURL || "img/default-avatar.webp";
       if (signInBtn) signInBtn.style.display = "none";
       if (showClanBtn) showClanBtn.disabled = false;
+      if (mapVetoBtn) mapVetoBtn.style.display = "block";
+      if (showClanBtn) showClanBtn.style.display = "block";
+      if (settingsMenuItem) settingsMenuItem.style.display = "block";
+      if (switchAccountMenuItem) switchAccountMenuItem.style.display = "block";
+      if (signOutMenuItem) signOutMenuItem.style.display = "block";
+      if (deleteAccountMenuItem) deleteAccountMenuItem.style.display = "block";
+      menuDividers.forEach((d) => (d.style.display = "block"));
     } else {
       if (userName) userName.innerText = "Guest";
       if (userPhoto) userPhoto.src = "img/default-avatar.webp";
       if (userMenu) userMenu.style.display = "none";
       if (signInBtn) signInBtn.style.display = "inline-block";
       if (showClanBtn) showClanBtn.disabled = true;
+      if (mapVetoBtn) mapVetoBtn.style.display = "block";
+      if (showClanBtn) showClanBtn.style.display = "none";
+      if (settingsMenuItem) settingsMenuItem.style.display = "none";
+      if (switchAccountMenuItem) switchAccountMenuItem.style.display = "none";
+      if (signOutMenuItem) signOutMenuItem.style.display = "none";
+      if (deleteAccountMenuItem) deleteAccountMenuItem.style.display = "none";
+      menuDividers.forEach((d) => (d.style.display = "none"));
       resetBuildInputs();
     }
 
@@ -315,8 +332,8 @@ if (confirmDeleteAccountButton) {
 
       // 5. Optionally delete community builds by this user
       if (deleteCommunityBuilds && usernameToDelete) {
-        const communityRef = collection(db, "communityBuilds");
-        const querySnapshot = await getDocs(communityRef);
+        const publishedRef = collection(db, "publishedBuilds");
+        const querySnapshot = await getDocs(publishedRef);
         const toDelete = querySnapshot.docs.filter(
           (doc) =>
             doc.data().username === usernameToDelete ||

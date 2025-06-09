@@ -8,7 +8,9 @@ import {
   formatWorkersOrTimestampText,
 } from "./textFormatters.js";
 import { abbreviationMap } from "../data/abbreviationMap.js";
+import { setCurrentBuildId } from "./states/buildState.js";
 import { parseBuildOrder } from "./utils.js";
+import { isBracketInputEnabled } from "./settings.js";
 
 // Function to toggle the title input field
 export function toggleTitleInput(showInput) {
@@ -42,15 +44,22 @@ export function toggleSection(header) {
   const sectionId = header.getAttribute("data-section");
   const section = document.getElementById(sectionId);
   const arrow = header.querySelector(".arrow");
+  const catBox = document.getElementById("box");
 
   if (section.classList.contains("hidden")) {
     section.classList.remove("hidden");
     section.classList.add("visible");
     arrow.classList.add("open");
+    if (sectionId === "buildOrderInputField" && catBox) {
+      catBox.style.display = "inline-block";
+    }
   } else {
     section.classList.remove("visible");
     section.classList.add("hidden");
     arrow.classList.remove("open");
+    if (sectionId === "buildOrderInputField" && catBox) {
+      catBox.style.display = "none";
+    }
   }
 }
 
@@ -64,6 +73,16 @@ export function initializeSectionToggles() {
 export function populateBuildDetails(index) {
   const savedBuilds = getSavedBuilds();
   const build = savedBuilds[index];
+
+  setCurrentBuildId(build.encodedTitle); // or build.id if that's how you're storing it
+
+  const saveBuildButton = document.getElementById("saveBuildButton");
+  if (saveBuildButton) {
+    saveBuildButton.innerText = "Update Build";
+    saveBuildButton.removeAttribute("data-tooltip");
+    void saveBuildButton.offsetWidth; // force reflow
+    saveBuildButton.setAttribute("data-tooltip", "Update Current Build");
+  }
 
   if (!build) {
     console.log("Build not found at index:", index);
@@ -203,7 +222,7 @@ export function formatWorkersOrTimestamp(
 // Function to analyze and update the build order table automatically
 export function analyzeBuildOrder(inputText) {
   requestAnimationFrame(() => {
-    // Ensures real-time UI update
+
     const lines = inputText.split("\n");
     const table = document.getElementById("buildOrderTable");
 
@@ -259,6 +278,7 @@ export function initializeTextareaClickHandler() {
   }
 
   textarea.addEventListener("click", function () {
+    if (!isBracketInputEnabled()) return;
     if (textarea.value.trim() === "") {
       // If the textarea is empty, set its value to "[]"
       textarea.value = "[]";
@@ -396,7 +416,7 @@ export function showBuildOrderHelpModal() {
     },
     {
       title: "Completed Upgrade with Percent",
-      input: "@100% stim push opponent third base",
+      input: "@100% stimpack push opponent third base",
       description:
         "Using <code><u>@100%</u>, <u>@100</u> or <u>100%</u></code> marks the action as fully completed and visually emphasizes the upgrade status.",
     },

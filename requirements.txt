@@ -1,0 +1,4 @@
+flask
+flask-cors
+sc2reader
+waitress

@@ -41,7 +41,7 @@ export const upgradeImages = {
   weapon_refit: "img/upgrade/weapon_refit.webp",
   vehicle_and_ship_plating: "img/upgrade/vehicle_and_ship_plating.webp",
   vehicle_weapons: "img/upgrade/vehicle_weapons.webp",
-  stim: "img/upgrade/stim.webp",
+  stimpack: "img/upgrade/stim.webp",
   ship_weapons: "img/upgrade/ship_weapons.webp",
   smart_servos: "img/upgrade/smart_servos.webp",
   neosteel_armor: "img/upgrade/neosteel_armor.webp",

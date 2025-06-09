@@ -22,13 +22,69 @@ import { formatActionText } from "./textFormatters.js";
 import { capitalize } from "./helpers/sharedEventUtils.js";
 import { analyzeBuildOrder } from "./uiHandlers.js";
 import { publishBuildToCommunity } from "./community.js";
-import { setCurrentBuildId } from "./states/buildState.js";
+import {
+  setCurrentBuildId,
+  clearEditingPublishedBuild,
+} from "./states/buildState.js";
+import { loadBuilds } from "./buildService.js";
+import { fetchUserBuilds, fetchPublishedUserBuilds } from "./buildManagement.js";
+import { setSavedBuilds } from "./buildStorage.js";
 import DOMPurify from "dompurify";
 
 // --- Firestore Pagination State
 let lastVisibleBuild = null;
 let isLoadingMoreBuilds = false;
 let currentBuildFilter = "all";
+
+// --- View Mode State
+const storedViewMode = localStorage.getItem("buildViewMode") || "grid";
+let buildViewMode = storedViewMode;
+
+export function getBuildViewMode() {
+  return buildViewMode;
+}
+
+export function applyBuildViewMode() {
+  const container = document.getElementById("buildList");
+  const gridBtn = document.getElementById("gridViewBtn");
+  const listBtn = document.getElementById("listViewBtn");
+
+  if (container) {
+    if (buildViewMode === "list") {
+      container.classList.add("list-view");
+    } else {
+      container.classList.remove("list-view");
+    }
+  }
+
+  if (gridBtn && listBtn) {
+    if (buildViewMode === "list") {
+      listBtn.classList.add("active");
+      gridBtn.classList.remove("active");
+    } else {
+      gridBtn.classList.add("active");
+      listBtn.classList.remove("active");
+    }
+  }
+}
+
+export async function setBuildViewMode(mode) {
+  buildViewMode = mode === "list" ? "list" : "grid";
+  localStorage.setItem("buildViewMode", buildViewMode);
+  applyBuildViewMode();
+
+  const spinnerWrapper = document.getElementById("buildsLoadingWrapper");
+  if (spinnerWrapper) spinnerWrapper.style.display = "flex";
+  try {
+    await filterBuilds(getCurrentBuildFilter());
+  } finally {
+    if (spinnerWrapper) spinnerWrapper.style.display = "none";
+  }
+}
+
+function isPublishedBuildsTabActive() {
+  return document.getElementById("publishedBuildsTab")?.classList.contains("active");
+}
 
 export function formatMatchup(matchup) {
   if (!matchup) return "Unknown Match-Up";
@@ -41,20 +97,36 @@ export function formatMatchup(matchup) {
 
 export async function filterBuilds(categoryOrSubcategory = "all") {
   const heading = document.querySelector("#buildsModal .template-header h3");
-  const db = getFirestore();
   const user = getAuth().currentUser;
   if (!user) return;
 
   currentBuildFilter = categoryOrSubcategory.toLowerCase();
   lastVisibleBuild = null;
-  document.getElementById("buildList").innerHTML = "";
+  isLoadingMoreBuilds = false;
 
-  const builds = await fetchFilteredBuilds();
+  const buildListEl = document.getElementById("buildList");
+  if (buildListEl) buildListEl.innerHTML = "";
+
+  const isPublishedTabActive = document
+    .getElementById("publishedBuildsTab")
+    ?.classList.contains("active");
+
+  console.log("🧪 Filtering builds...");
+  console.log("➡️ Filter:", currentBuildFilter);
+  console.log("📦 Tab:", isPublishedTabActive ? "Published" : "My Builds");
+
+  const { builds, lastDoc } = await loadBuilds({
+    type: isPublishedTabActive ? "published" : "my",
+    filter: currentBuildFilter,
+    batchSize: 20,
+  });
+
+  lastVisibleBuild = lastDoc;
 
   const label =
     currentBuildFilter === "all"
-      ? "Build Orders"
-      : `Build Orders - ${
+      ? `Build Orders${isPublishedTabActive ? " - Published Builds" : ""}`
+      : `Build Orders${isPublishedTabActive ? " - Published Builds" : ""} - ${
           [
             "zvp",
             "zvt",
@@ -71,75 +143,71 @@ export async function filterBuilds(categoryOrSubcategory = "all") {
         }`;
 
   if (heading) heading.textContent = label;
+  console.log("🧪 Builds fetched for filter:", currentBuildFilter, builds);
 
   populateBuildList(builds);
   attachBuildScrollListener();
 }
 
-async function fetchFilteredBuilds(batchSize = 20) {
-  const db = getFirestore();
+export async function loadMoreBuilds() {
+  if (isLoadingMoreBuilds) return;
+  isLoadingMoreBuilds = true;
+
+  const container = document.getElementById("buildList");
   const user = getAuth().currentUser;
-  if (!user) return [];
+  if (!user || !lastVisibleBuild) return;
 
-  let q = collection(db, `users/${user.uid}/builds`);
-  const lowerFilter = currentBuildFilter;
+  const newBuilds = await loadBuilds({
+    type: isPublishedBuildsTabActive() ? "published" : "my",
+    filter: currentBuildFilter,
+    batchSize: 20,
+    after: lastVisibleBuild,
+  });
 
-  if (lowerFilter === "all") {
-    q = query(q, orderBy("timestamp", "desc"), limit(batchSize));
-  } else if (
-    ["zvp", "zvt", "zvz", "pvp", "pvt", "pvz", "tvp", "tvt", "tvz"].includes(
-      lowerFilter
-    )
-  ) {
-    q = query(
-      q,
-      where("subcategoryLowercase", "==", lowerFilter),
-      orderBy("timestamp", "desc"),
-      limit(batchSize)
-    );
-  } else if (["zerg", "protoss", "terran"].includes(lowerFilter)) {
-    q = query(
-      q,
-      where("category", "==", capitalize(lowerFilter)),
-      orderBy("timestamp", "desc"),
-      limit(batchSize)
-    );
+  if (newBuilds.length > 0) {
+    lastVisibleBuild = newBuilds[newBuilds.length - 1];
+    populateBuildList(newBuilds, true);
   }
 
-  if (lastVisibleBuild) {
-    q = query(q, startAfter(lastVisibleBuild));
-  }
+  isLoadingMoreBuilds = false;
+}
 
-  const snap = await getDocs(q);
-  if (!snap.empty) {
-    lastVisibleBuild = snap.docs[snap.docs.length - 1];
-  }
-
-  return snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+export function getCurrentBuildFilter() {
+  return currentBuildFilter;
 }
 
 function attachBuildScrollListener() {
-  const container = document.querySelector("#buildsModal .modal-content");
+  const container = document.getElementById("buildList");
   if (!container) return;
 
-  container.removeEventListener("scroll", handleBuildScroll);
-  container.addEventListener("scroll", handleBuildScroll);
+  container.removeEventListener("scroll", handleScroll); // Prevent duplicates
+  container.addEventListener("scroll", handleScroll);
 }
 
-async function handleBuildScroll() {
-  const container = document.querySelector("#buildsModal .modal-content");
-  if (
-    isLoadingMoreBuilds ||
-    !container ||
-    container.scrollTop + container.clientHeight < container.scrollHeight - 200
-  ) {
-    return;
-  }
+async function handleScroll() {
+  if (isLoadingMoreBuilds || !lastVisibleBuild) return;
 
-  isLoadingMoreBuilds = true;
-  const builds = await fetchFilteredBuilds();
-  populateBuildList(builds, true);
-  isLoadingMoreBuilds = false;
+  const container = document.getElementById("buildList");
+  if (
+    container.scrollTop + container.clientHeight >=
+    container.scrollHeight - 200
+  ) {
+    isLoadingMoreBuilds = true;
+
+    const more = await loadBuilds({
+      type: isPublishedBuildsTabActive() ? "published" : "my",
+      filter: currentBuildFilter,
+      batchSize: 20,
+      startAfter: lastVisibleBuild,
+    });
+
+    if (more.builds.length) {
+      populateBuildList(more.builds, { append: true });
+      lastVisibleBuild = more.lastDoc;
+    }
+
+    isLoadingMoreBuilds = false;
+  }
 }
 
 async function uploadReplayFile(file) {
@@ -350,6 +418,12 @@ export async function viewBuild(buildId) {
     analyzeBuildOrder(buildOrderInput?.value || "");
     setCurrentBuildId(buildId);
 
+    const editBanner = document.getElementById("editModeBanner");
+    if (editBanner) {
+      editBanner.innerHTML = `[Edit Mode] <strong>${DOMPurify.sanitize(build.title)}</strong>`;
+      editBanner.style.display = "block";
+    }
+
     const saveBtn = document.getElementById("saveBuildButton");
     const newBtn = document.getElementById("newBuildButton");
     if (saveBtn) saveBtn.innerText = "Update Build";
@@ -413,36 +487,69 @@ window.openModal = openModal;
 //window.showAllBuilds = showAllBuilds;
 
 let currentBuildIdToPublish = null;
+window.currentBuildIdToPublish = null;
 
 export async function openPublishModal(buildId) {
   currentBuildIdToPublish = buildId;
+  window.currentBuildIdToPublish = buildId;
+  const user = auth.currentUser;
+  if (!user) return;
+
+  // 🧠 Check if this build has already been published
+  const publishedRef = doc(db, `publishedBuilds/${buildId}`);
+  const publishedSnap = await getDoc(publishedRef);
+  const publishedData = publishedSnap.exists() ? publishedSnap.data() : null;
+
+  // 🧠 Default to user's build if unpublished
+  const sourceData = publishedData
+    ? publishedData
+    : (await getDoc(doc(db, `users/${user.uid}/builds/${buildId}`)))?.data();
+
+  if (!sourceData) {
+    console.warn("❌ Could not find the build to open in publish modal.");
+    return;
+  }
+
+  // ✅ Update publishToCommunity checkbox
+  const communityCheckbox = document.getElementById("publishToCommunity");
+  if (communityCheckbox) {
+    communityCheckbox.checked = !!sourceData.isPublic;
+  }
+
+  // ✅ Update clan checkboxes
+  const clanContainer = document.getElementById("clanPublishList");
+  clanContainer.innerHTML = "";
+
+  const clansSnap = await getDocs(collection(db, "clans"));
+  clansSnap.forEach((clanDoc) => {
+    const clan = clanDoc.data();
+    const cid = clanDoc.id;
+
+    if (clan.members?.includes(user.uid)) {
+      const row = document.createElement("div");
+      row.classList.add("clan-checkbox-label", "publish-checkbox-row");
+
+      const isShared = sourceData?.sharedToClans?.includes(cid);
+
+      row.innerHTML = `
+        <span class="label-clan">${DOMPurify.sanitize(clan.name)}</span>
+        <div class="checkbox-wrapper-59">
+          <label class="switch">
+            <input type="checkbox" class="clanPublishCheckbox" value="${cid}" ${
+              isShared ? "checked" : ""
+            } />
+            <span class="slider"></span>
+          </label>
+        </div>
+      `;
+
+      clanContainer.appendChild(row);
+    }
+  });
+
+  // ✅ Show modal
   const modal = document.getElementById("publishModal");
   modal.style.display = "block";
-
-  // 🧠 Populate list of clans user is a member of
-  const clanContainer = document.getElementById("clanPublishList");
-  if (clanContainer) {
-    clanContainer.innerHTML = ""; // Clear previous list
-    const user = auth.currentUser;
-    if (!user) return;
-
-    const clansSnap = await getDocs(collection(db, "clans"));
-
-    clansSnap.forEach((docSnap) => {
-      const clan = docSnap.data();
-      const clanId = docSnap.id;
-
-      if (clan.members?.includes(user.uid)) {
-        const label = document.createElement("label");
-        label.className = "publish-checkbox-row";
-        label.innerHTML = `
-          <input type="checkbox" class="clanPublishCheckbox" value="${clanId}" />
-          Share with ${clan.name}
-        `;
-        clanContainer.appendChild(label);
-      }
-    });
-  }
 }
 
 export function showSubcategories(event) {
@@ -474,10 +581,9 @@ export async function showBuildsModal() {
     return;
   }
 
-  // Disable the button to prevent multiple clicks
   showBuildsButton.disabled = true;
 
-  // Find or create the loader element
+  // Find or create loader
   let loader = buildList.querySelector(".lds-roller");
   if (!loader) {
     loader = document.createElement("div");
@@ -488,14 +594,22 @@ export async function showBuildsModal() {
   }
   loader.style.display = "block";
 
-  // Clear existing build cards (but keep the loader)
+  // Clear all but loader
   Array.from(buildList.children).forEach((child) => {
     if (!child.classList.contains("lds-roller")) {
       buildList.removeChild(child);
     }
   });
 
-  // ✅ Visually activate the "All" filter tab
+  // ✅ Activate the "My Builds" tab
+  const myTab = document.getElementById("myBuildsTab");
+  const pubTab = document.getElementById("publishedBuildsTab");
+  if (myTab && pubTab) {
+    myTab.classList.add("active");
+    pubTab.classList.remove("active");
+  }
+
+  // ✅ Activate "All" category filter
   const allTab = document.querySelector(
     '#buildsModal .filter-category[data-category="all"]'
   );
@@ -504,10 +618,28 @@ export async function showBuildsModal() {
   if (allTab) allTab.classList.add("active");
 
   // ✅ Update heading
-  if (heading) heading.textContent = "Build Orders - All";
+  if (heading) heading.textContent = "Build Orders - My Builds";
 
-  // ✅ Run new Firestore-indexed fetch
-  await filterBuilds("all");
+  // ✅ Load My Builds
+  try {
+    // 🔁 Only fetch when My Builds tab is active
+    const myTabActive = document
+      .getElementById("myBuildsTab")
+      ?.classList.contains("active");
+
+    if (myTabActive) {
+      const activeCategory =
+        document.querySelector("#buildsModal .filter-category.active")?.dataset
+          .category ||
+        document.querySelector("#buildsModal .subcategory.active")?.dataset
+          .subcategory ||
+        "all";
+
+      await filterBuilds(activeCategory);
+    }
+  } catch (err) {
+    console.error("Error loading My Builds:", err);
+  }
 
   loader.style.display = "none";
   buildModal.style.display = "block";
@@ -527,7 +659,10 @@ window.showBuildsModal = showBuildsModal;
 
 let isPopulatingBuildList = false;
 
-export async function populateBuildList(filteredBuilds = null) {
+export async function populateBuildList(
+  filteredBuilds = null,
+  { append = false } = {}
+) {
   const buildList = document.getElementById("buildList");
   const buildPreview = document.getElementById("buildPreview");
 
@@ -539,11 +674,13 @@ export async function populateBuildList(filteredBuilds = null) {
   if (isPopulatingBuildList) return;
   isPopulatingBuildList = true;
 
-  buildList.innerHTML = "";
+  if (!append) buildList.innerHTML = "";
 
   const builds = filteredBuilds || [];
 
-  if (!builds.length) {
+  console.log("🔍 populateBuildList received builds:", builds); // ✅ Safe to use here
+
+  if (!builds.length && !append) {
     buildList.innerHTML = "<p>No builds available.</p>";
     isPopulatingBuildList = false;
     return;
@@ -552,21 +689,26 @@ export async function populateBuildList(filteredBuilds = null) {
   let lastHoveredBuild = null;
   const fragment = document.createDocumentFragment();
 
-  builds.forEach((build) => {
-    const buildCard = document.createElement("div");
-    buildCard.classList.add("build-card");
-    buildCard.dataset.id = build.id;
-    buildCard.style.position = "relative";
-
-    // ✅ Add .published class if published
-    if (build.isPublished) {
-      buildCard.classList.add("published");
+  for (const build of builds) {
+    const isList = getBuildViewMode() === "list";
+    const buildEl = document.createElement("div");
+    if (isList) {
+      buildEl.classList.add("build-entry");
+    } else {
+      buildEl.classList.add("build-card");
+      buildEl.style.position = "relative";
     }
+    buildEl.dataset.id = build.id;
+    buildEl.dataset.source = build.source || "user";
+    buildEl.dataset.clanid = build.clanId || "";
 
-    // ✅ Determine races based on matchup
+    if (build.isPublished) buildEl.classList.add("published");
+
     const [playerRace, opponentRace] = getRaceIcons(
       build.subcategory || "Unknown"
     );
+
+    const matchupClass = getMatchupClass(playerRace) || "matchup-unknown";
 
     const matchupIconsHTML =
       playerRace && opponentRace
@@ -579,161 +721,157 @@ export async function populateBuildList(filteredBuilds = null) {
     `
         : `<div class="matchup-icons">Invalid Matchup</div>`;
 
-    buildCard.innerHTML = `
-      <div class="build-card-header">
-        ${matchupIconsHTML}
+    if (isList) {
+      buildEl.innerHTML = `
+        <div class="build-left ${matchupClass}">
+          <img src="./img/race/${playerRace}2.webp" alt="${playerRace}" class="matchup-icon">
+        </div>
+        <div class="build-right">
+          <div class="build-title">${DOMPurify.sanitize(build.title)}</div>
+          <div class="build-meta">
+            <span class="meta-chip matchup-chip">${formatMatchup(build.subcategory || "")}</span>
+            <span class="meta-chip publisher-chip">
+              <img src="./img/SVG/user-svgrepo-com.svg" alt="Publisher" class="meta-icon">
+              ${DOMPurify.sanitize(build.publisher || "You")}
+            </span>
+            <span class="meta-chip">
+              <img src="./img/SVG/time.svg" alt="Date" class="meta-icon">
+              ${new Date(build.timestamp).toLocaleDateString()}
+            </span>
+          </div>
+        </div>
         <button class="delete-build-btn" title="Delete Build">×</button>
-      </div>
-      <h3 class="build-title">${DOMPurify.sanitize(build.title)}</h3>
-      <div class="build-meta">
-        <p>Publisher: You</p>
-        <p>Date: ${new Date(build.timestamp).toLocaleDateString()}</p>
-      </div>
-      <div class="build-publish-info"></div> <!-- Placeholder -->
-    `;
-
-    // ✅ Set dynamic colors
-    if (build.subcategory?.toUpperCase().startsWith("ZV")) {
-      buildCard.style.setProperty("--gradient-color1", "#8e2de2");
-      buildCard.style.setProperty("--gradient-color2", "#4a00e0");
-      buildCard.style.setProperty("--race-color", "#8e2de2");
-    } else if (build.subcategory?.toUpperCase().startsWith("PV")) {
-      buildCard.style.setProperty("--gradient-color1", "#5fe5ff");
-      buildCard.style.setProperty("--gradient-color2", "#007cf0");
-      buildCard.style.setProperty("--race-color", "#5fe5ff");
-    } else if (build.subcategory?.toUpperCase().startsWith("TV")) {
-      buildCard.style.setProperty("--gradient-color1", "#ff3a30");
-      buildCard.style.setProperty("--gradient-color2", "#ff7b00");
-      buildCard.style.setProperty("--race-color", "#ff3a30");
+        <div class="build-publish-info"></div>`;
     } else {
-      buildCard.style.setProperty("--gradient-color1", "#555");
-      buildCard.style.setProperty("--gradient-color2", "#333");
-      buildCard.style.setProperty("--race-color", "#888");
+      buildEl.innerHTML = `
+        <div class="build-card-header">
+          ${matchupIconsHTML}
+          <button class="delete-build-btn" title="Delete Build">×</button>
+        </div>
+        <h3 class="build-title">${DOMPurify.sanitize(build.title)}</h3>
+        <div class="build-meta">
+          <p>Publisher: ${DOMPurify.sanitize(build.publisher || "You")}</p>
+          <p>Date: ${new Date(build.timestamp).toLocaleDateString()}</p>
+        </div>
+        <div class="build-publish-info"></div>
+      `;
     }
 
-    // ✅ Hover preview
-    buildCard.addEventListener("mouseover", () => {
+    // Color styles
+    const sub = build.subcategory?.toUpperCase() || "";
+    if (sub.startsWith("ZV")) {
+      buildEl.style.setProperty("--gradient-color1", "#8e2de2");
+      buildEl.style.setProperty("--gradient-color2", "#4a00e0");
+      buildEl.style.setProperty("--race-color", "#8e2de2");
+    } else if (sub.startsWith("PV")) {
+      buildEl.style.setProperty("--gradient-color1", "#5fe5ff");
+      buildEl.style.setProperty("--gradient-color2", "#007cf0");
+      buildEl.style.setProperty("--race-color", "#5fe5ff");
+    } else if (sub.startsWith("TV")) {
+      buildEl.style.setProperty("--gradient-color1", "#ff3a30");
+      buildEl.style.setProperty("--gradient-color2", "#ff7b00");
+      buildEl.style.setProperty("--race-color", "#ff3a30");
+    } else {
+      buildEl.style.setProperty("--gradient-color1", "#555");
+      buildEl.style.setProperty("--gradient-color2", "#333");
+      buildEl.style.setProperty("--race-color", "#888");
+    }
+
+    // Hover + click preview
+    buildEl.addEventListener("mouseover", () => {
       if (lastHoveredBuild !== build) {
         updateBuildPreview(build);
         lastHoveredBuild = build;
       }
     });
 
-    // ✅ Click to view build
-    buildCard.addEventListener("click", () => viewBuild(build.id));
-
-    deleteButton.addEventListener("click", async (event) => {
-      event.stopPropagation();
-      const confirmation = confirm(
-        `Are you sure you want to delete "${build.title}"?`
-      );
-      if (!confirmation) return;
-
-      await deleteBuildFromFirestore(build.id);
-
-      // 🔄 Remove from localStorage
-      const savedBuilds = getSavedBuilds();
-      const index = savedBuilds.findIndex((b) => b.id === build.id);
-      if (index !== -1) {
-        savedBuilds.splice(index, 1);
-        setSavedBuilds(savedBuilds);
-      }
-
-      const updatedBuilds = await fetchUserBuilds();
-      setSavedBuilds(updatedBuilds); // keep memory sync
-
-      let activeFilter =
-        document
-          .querySelector(
-            "#buildsModal .filter-category.active, #buildsModal .subcategory.active"
-          )
-          ?.getAttribute("data-category") ||
-        document
-          .querySelector("#buildsModal .subcategory.active")
-          ?.getAttribute("data-subcategory") ||
-        "all";
-
-      filterBuilds(activeFilter);
-
-      const preview = document.getElementById("buildPreview");
-      if (preview && preview.dataset.buildId === build.id) {
-        preview.innerHTML = `<h4>Build Preview</h4><p>Select a build to view details here.</p>`;
-        delete preview.dataset.buildId;
-      }
-
-      const heading = document.querySelector(
-        "#buildsModal .template-header h3"
-      );
-      if (heading) {
-        heading.textContent =
-          activeFilter === "all"
-            ? "Build Orders"
-            : `Build Orders - ${activeFilter}`;
+    buildEl.addEventListener("click", () => {
+      if (build.source === "community" || build.source === "clan") {
+        setEditingPublishedBuild(build);
+        loadBuildIntoEditor(build);
+        showEditorUIForPublishedEdit();
+        document.getElementById("buildsModal").style.display = "none";
+      } else {
+        clearEditingPublishedBuild();
+        viewBuild(build.id);
       }
     });
 
-    const publishButton = buildCard.querySelector(".build-publish-info");
-    if (publishButton) {
-      publishButton.addEventListener("click", (event) => {
-        event.stopPropagation();
-        window.currentBuildIdToPublish = build.id;
-
-        const publishModal = document.getElementById("publishModal");
-        if (publishModal) publishModal.style.display = "block";
-      });
+    // Handle delete button
+    if (build.source !== "community" && build.source !== "clan") {
+      const deleteButton = buildEl.querySelector(".delete-build-btn");
+      if (deleteButton) {
+        deleteButton.addEventListener("click", async (event) => {
+          event.stopPropagation();
+          if (!confirm(`Delete "${build.title}"?`)) return;
+          await deleteBuildFromFirestore(build.id);
+          const updatedBuilds = await fetchUserBuilds();
+          setSavedBuilds(updatedBuilds);
+          const activeFilter =
+            document.querySelector("#buildsModal .filter-category.active")
+              ?.dataset.category ||
+            document.querySelector("#buildsModal .subcategory.active")?.dataset
+              .subcategory ||
+            "all";
+          filterBuilds(activeFilter);
+          const preview = document.getElementById("buildPreview");
+          if (preview?.dataset.buildId === build.id) {
+            preview.innerHTML = `<h4>Build Preview</h4><p>Select a build to view details here.</p>`;
+            delete preview.dataset.buildId;
+          }
+        });
+      }
+    } else {
+      const deleteBtn = buildEl.querySelector(".delete-build-btn");
+      if (deleteBtn) deleteBtn.remove();
     }
 
-    // ✅ Setup publish-info button
-    const publishInfo = buildCard.querySelector(".build-publish-info");
+    const publishInfo = buildEl.querySelector(".build-publish-info");
     if (publishInfo) {
+      const publishedTab = isPublishedBuildsTabActive();
+      const isBuildPublished =
+        build.isPublished || build.isPublic || (build.sharedToClans?.length ?? 0) > 0;
+
       if (build.imported) {
-        // Imported build (non-clickable)
         publishInfo.classList.add("publish-imported");
         publishInfo.innerHTML = `<span>Imported</span>`;
         publishInfo.style.pointerEvents = "none";
-        publishInfo.style.cursor = "default";
-      } else if (build.isPublished) {
-        // Published build
+      } else if (isBuildPublished) {
         publishInfo.classList.add("publish-published");
-        publishInfo.innerHTML = `<span>Published </span><img src="./img/SVG/checkmark2.svg" alt="Published" class="publish-icon">`;
-        publishInfo.addEventListener("click", (event) => {
-          event.stopPropagation();
-          openPublishSettingsModal(build.id);
-        });
+        publishInfo.innerHTML = `
+          <span>Published</span>
+          <img src="./img/SVG/checkmark2.svg" class="publish-icon">
+        `;
+        if (publishedTab) {
+          if (build.isPublic)
+            publishInfo.innerHTML += `<span class="tag public">Public</span>`;
+          if (build.sharedToClans?.length > 0)
+            publishInfo.innerHTML += `<span class="tag clan">Clan</span>`;
+          publishInfo.style.pointerEvents = "auto";
+          publishInfo.classList.remove("no-border");
+          publishInfo.addEventListener("click", (e) => {
+            e.stopPropagation();
+            openPublishModal(build.id);
+          });
+        } else {
+          publishInfo.style.pointerEvents = "none";
+          publishInfo.classList.add("no-border");
+        }
       } else {
-        // Not published build
         publishInfo.classList.add("publish-unpublished");
-        publishInfo.innerHTML = `<img src="./img/SVG/publish2.svg" alt="Publish" class="publish-icon"><span>Publish</span>`;
-        publishInfo.addEventListener("click", (event) => {
-          event.stopPropagation();
+        publishInfo.innerHTML = `<img src="./img/SVG/publish2.svg" class="publish-icon"><span>Publish</span>`;
+        publishInfo.addEventListener("click", (e) => {
+          e.stopPropagation();
           openPublishModal(build.id);
         });
       }
     }
 
-    fragment.appendChild(buildCard);
-  });
+    fragment.appendChild(buildEl);
+  }
 
   buildList.appendChild(fragment);
   isPopulatingBuildList = false;
-}
-
-export function openPublishSettingsModal(buildId) {
-  console.log(`⚙️ Open manage publish settings for build: ${buildId}`);
-  currentBuildIdToPublish = buildId;
-
-  const modal = document.getElementById("publishModal");
-  modal.style.display = "block";
-
-  // Load current publish state
-  const buildCard = document.querySelector(`.build-card[data-id="${buildId}"]`);
-  if (buildCard) {
-    const isPublished = buildCard.classList.contains("published"); // or based on your state
-    const checkbox = document.getElementById("publishToCommunity");
-    if (checkbox) {
-      checkbox.checked = isPublished;
-    }
-  }
 }
 
 // ✅ Helper function to parse matchup races correctly
@@ -760,21 +898,17 @@ function getRaceIcons(subcategory) {
 
   return [playerRace, opponentRace];
 }
-/*
-// ✅ Helper to set border color based on race
-function getRaceBorderColor(subcategory) {
-  if (!subcategory) return "#555555";
 
-  if (subcategory.startsWith("Zv")) {
-    return "#7e57c2"; // Zerg purple
-  } else if (subcategory.startsWith("Pv")) {
-    return "#5fe5ff"; // Protoss blue
-  } else if (subcategory.startsWith("Tv")) {
-    return "#ff5252"; // Terran red
-  }
-  return "#555555"; // Default gray
+// ✅ Determine CSS class based on player's race
+function getMatchupClass(playerRace) {
+  const classes = {
+    zerg: "matchup-zerg",
+    protoss: "matchup-protoss",
+    terran: "matchup-terran",
+  };
+  return classes[playerRace] || "matchup-unknown";
 }
-*/
+
 export async function unpublishBuild(buildId) {
   try {
     const db = getFirestore();
@@ -791,14 +925,14 @@ export async function unpublishBuild(buildId) {
       isPublished: false,
     });
 
-    // ✅ Now search communityBuilds where publisherId == user.uid
-    const communityRef = collection(db, "communityBuilds");
+    // ✅ Now search publishedBuilds where publisherId == user.uid
+    const publishedRef = collection(db, "publishedBuilds");
     const buildSnapshot = await getDoc(buildRef);
     const buildData = buildSnapshot.data();
     const title = buildData?.title;
 
     const q = query(
-      communityRef,
+      publishedRef,
       where("publisherId", "==", user.uid),
       where("title", "==", title)
     );
@@ -809,29 +943,30 @@ export async function unpublishBuild(buildId) {
       if (buildData.title) {
         // Optional more matching checks
         // ✅ Delete this community build
-        await deleteDoc(doc(db, "communityBuilds", docSnap.id));
-        console.log(`✅ Deleted from communityBuilds: ${docSnap.id}`);
+        await deleteDoc(doc(db, "publishedBuilds", docSnap.id));
+        console.log(`✅ Deleted from publishedBuilds: ${docSnap.id}`);
       }
     });
 
     showToast("✅ Build unpublished!", "success");
 
     // ✅ Update card UI live
-    const buildCard = document.querySelector(
-      `.build-card[data-id="${buildId}"]`
+    const buildEl = document.querySelector(
+      `.build-card[data-id="${buildId}"], .build-entry[data-id="${buildId}"]`
     );
-    if (buildCard) {
-      const publishInfo = buildCard.querySelector(".build-publish-info");
+    if (buildEl) {
+      const publishInfo = buildEl.querySelector(".build-publish-info");
       if (publishInfo) {
         publishInfo.innerHTML = `<img src="./img/SVG/publish2.svg" alt="Publish" class="publish-icon"><span>Publish</span>`;
-        publishInfo.classList.remove("publish-published");
+        publishInfo.classList.remove("publish-published", "no-border");
         publishInfo.classList.add("publish-unpublished");
+        publishInfo.style.pointerEvents = "auto";
         publishInfo.onclick = (event) => {
           event.stopPropagation();
           openPublishModal(buildId);
         };
       }
-      buildCard.classList.remove("published");
+      buildEl.classList.remove("published");
     }
   } catch (error) {
     console.error("❌ Error unpublishing build:", error.message);
@@ -887,10 +1022,38 @@ export function loadBuild(index) {
 }
 
 export async function searchBuilds(query) {
-  const lowerCaseQuery = query.toLowerCase();
-  const builds = await fetchUserBuilds(); // Fetch all builds
+  const lowerCaseQuery = query.toLowerCase().trim();
 
-  // Filter builds based on the query
+  // When query is empty, revert to current filter
+  if (!lowerCaseQuery) {
+    await filterBuilds(currentBuildFilter);
+    return;
+  }
+
+  // Activate "All" filter to avoid conflicts with race filters
+  currentBuildFilter = "all";
+  const buttons = document.querySelectorAll(
+    "#buildsModal .filter-category, #buildsModal .subcategory"
+  );
+  buttons.forEach((btn) => btn.classList.remove("active"));
+  const allBtn = document.querySelector(
+    '#buildsModal .filter-category[data-category="all"]'
+  );
+  if (allBtn) allBtn.classList.add("active");
+
+  // Determine which tab is active and fetch builds accordingly
+  const isPublishedTabActive = document
+    .getElementById("publishedBuildsTab")
+    ?.classList.contains("active");
+
+  let builds = [];
+  if (isPublishedTabActive) {
+    builds = await fetchPublishedUserBuilds("all");
+  } else {
+    builds = await fetchUserBuilds();
+  }
+
+  // Filter builds by title
   const filteredBuilds = builds.filter((build) =>
     build.title.toLowerCase().includes(lowerCaseQuery)
   );
@@ -920,6 +1083,48 @@ export async function populateMapModal(maps) {
 
     mapContainer.appendChild(mapCard);
   });
+}
+
+function showEditorUIForPublishedEdit() {
+  const titleBanner = document.getElementById("editModeBanner");
+  const saveButton = document.getElementById("saveBuildButton");
+  const updateButton = document.getElementById("updateBuildButton");
+  const newButton = document.getElementById("newBuildButton");
+
+  const build = getEditingPublishedBuild();
+  if (!build) return;
+
+  // Show edit banner
+  titleBanner.innerHTML = `[Edit Mode] <strong>${DOMPurify.sanitize(
+    build.title
+  )}</strong>`;
+  titleBanner.style.display = "block";
+  titleBanner.style.backgroundColor = "#165016";
+  titleBanner.style.color = "#fff";
+
+  // Button logic
+  saveButton.style.display = "none";
+  updateButton.style.display = "inline-block";
+  newButton.style.display = "inline-block";
+}
+
+function loadBuildIntoEditor(build) {
+  document.getElementById("buildOrderTitleInput").value = build.title || "";
+  document.getElementById("buildCategoryDropdown").value =
+    build.subcategory || "";
+  document.getElementById("commentInput").value = build.comment || "";
+  document.getElementById("videoInput").value = build.videoLink || "";
+  document.getElementById("buildOrderInput").value = Array.isArray(
+    build.buildOrder
+  )
+    ? build.buildOrder
+        .map((step) =>
+          `[${step.workersOrTimestamp || ""}] ${step.action || ""}`.trim()
+        )
+        .join("\n")
+    : "";
+
+  // Optional: Map annotations, replayUrl, etc.
 }
 
 export { closeBuildsModal };

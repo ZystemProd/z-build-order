@@ -1150,9 +1150,3 @@ function createClanBanner(clan) {
   bannerWrapper.append(logo, name);
   return bannerWrapper;
 }
-
-export async function saveBuildToClan(clanId, buildId, buildData) {
-  if (!clanId || !buildId) throw new Error("Missing clanId or buildId");
-  const ref = doc(db, `clans/${clanId}/builds/${buildId}`);
-  await setDoc(ref, buildData);
-}

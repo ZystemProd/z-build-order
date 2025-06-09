@@ -18,10 +18,14 @@ export function parseBuildOrder(buildOrderText) {
           action: match[2],
         };
       }
-      return null; // Return null if no valid match
+      if (line.trim() !== "") {
+        return { workersOrTimestamp: "", action: line };
+      }
+      return null; // Return null if empty line
     })
     .filter((step) => step !== null); // Filter out invalid steps
 }
+
 
 export function resetBuildInputs() {
   console.log("🔄 Resetting inputs..."); // Debugging log

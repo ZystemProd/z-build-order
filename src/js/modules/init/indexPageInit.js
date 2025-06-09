@@ -1,4 +1,15 @@
-import { getDoc, getDocs, doc, collection } from "firebase/firestore";
+import {
+  getDoc,
+  getDocs,
+  doc,
+  collection,
+  updateDoc,
+  deleteDoc,
+  setDoc,
+  query,
+  where,
+  Timestamp,
+} from "firebase/firestore";
 import { auth, db } from "../../../app.js";
 import DOMPurify from "dompurify";
 import {
@@ -6,6 +17,8 @@ import {
   populateBuildsModal,
   updateCurrentBuild,
   loadClanBuilds,
+  fetchUserBuilds,
+  fetchPublishedUserBuilds,
 } from "../buildManagement.js";
 import { initializeAutoCorrect } from "../autoCorrect.js";
 import { populateBuildDetails, analyzeBuildOrder } from "../uiHandlers.js";
@@ -17,6 +30,9 @@ import {
   filterBuilds,
   searchBuilds,
   populateBuildList,
+  getCurrentBuildFilter,
+  setBuildViewMode,
+  applyBuildViewMode,
 } from "../modal.js";
 import {
   initializeSectionToggles,
@@ -43,7 +59,6 @@ import {
   renderCreateClanUI,
   renderChooseManageClanUI,
   renderFindClanUI,
-  saveBuildToClan,
 } from "../clan.js";
 import {
   MapAnnotations,
@@ -51,15 +66,16 @@ import {
   initializeMapSelection,
   mapAnnotations,
 } from "../interactive_map.js";
-import { getSavedBuilds } from "../buildStorage.js";
+import {
+  getSavedBuilds,
+  saveSavedBuildsToLocalStorage,
+} from "../buildStorage.js";
 import { setupCatActivationOnInput } from "../helpers/companion.js";
-// import {
-//   attachCategoryClicks,
-//   attachSubcategoryClicks,
-//   attachCommunityCategoryClicks,
-//   updateDropdownColor,
-//   monitorBuildChanges,
-// } from "./clickHandlers.js";
+import {
+  getCurrentBuildId,
+  setCurrentBuildId,
+  clearEditingPublishedBuild,
+} from "../states/buildState.js";
 
 import {
   safeAdd,
@@ -67,12 +83,36 @@ import {
   safeChange,
   capitalize,
 } from "../helpers/sharedEventUtils.js";
+import {
+  isBracketInputEnabled,
+  setBracketInputEnabled,
+  isBuildInputShown,
+  setBuildInputShown,
+  loadUserSettings,
+} from "../settings.js";
 import { checkForJoinRequestNotifications } from "../utils/notificationHelpers.js";
 
+function updateSupplyColumnVisibility() {
+  const table = document.getElementById("buildOrderTable");
+  if (!table) return;
+  if (isBracketInputEnabled()) {
+    table.classList.remove("hide-supply");
+  } else {
+    table.classList.add("hide-supply");
+  }
+}
+
+function updateBuildInputVisibility() {
+  const section = document.getElementById("buildOrderInputField");
+  if (!section) return;
+  section.style.display = isBuildInputShown() ? "block" : "none";
+}
+
 setupTemplateModal(); // Always call early
-let currentBuildId = null;
+
 let currentClanView = null;
 let allBuilds = [];
+let currentBuildFilter = "all";
 
 /** ----------------
  *  Initialize index.html
@@ -163,10 +203,27 @@ export async function initializeIndexPage() {
 
   // Save or update build depending on context
   safeAdd("saveBuildButton", "click", async () => {
-    if (currentBuildId) {
+    const buildId = getCurrentBuildId();
+
+    if (buildId) {
       try {
-        console.log("🔄 Updating build:", currentBuildId);
-        await updateCurrentBuild(currentBuildId);
+        console.log("🔄 Updating build:", buildId);
+        await updateCurrentBuild(buildId);
+
+        const updatedDoc = await getDoc(
+          doc(db, `users/${auth.currentUser.uid}/builds/${buildId}`)
+        );
+        if (updatedDoc.exists()) {
+          const builds = getSavedBuilds();
+          const idx = builds.findIndex((b) => b.encodedTitle === buildId);
+          if (idx !== -1) {
+            builds[idx] = { ...builds[idx], ...updatedDoc.data() };
+            saveSavedBuildsToLocalStorage();
+            populateBuildDetails(idx);
+          }
+        }
+
+        clearEditingPublishedBuild(); // ✅ this line is required
         showToast("✅ Build updated!", "success");
 
         const replayUrl = document
@@ -183,7 +240,6 @@ export async function initializeIndexPage() {
           replayBtn.innerText = "Download Replay on Drop.sc";
         }
 
-        // ✅ Reset button after update
         saveBuildButton.disabled = true;
         saveBuildButton.style.backgroundColor = "";
       } catch (err) {
@@ -192,14 +248,26 @@ export async function initializeIndexPage() {
       }
     } else {
       try {
-        const savedId = await saveCurrentBuild(); // should return encodedTitle or null
+        const savedId = await saveCurrentBuild();
+        if (!savedId) return;
 
-        if (!savedId) return; // 🛑 Stop if validation failed inside saveCurrentBuild
-
-        currentBuildId = savedId;
+        setCurrentBuildId(savedId);
         saveBuildButton.innerText = "Update Build";
+        saveBuildButton.removeAttribute("data-tooltip");
+        void saveBuildButton.offsetWidth; // force reflow
+        saveBuildButton.setAttribute("data-tooltip", "Update Current Build");
+
         newBuildButton.style.display = "inline-block";
         showToast("✅ Build saved!", "success");
+
+        const titleInput = document.getElementById("buildOrderTitleInput");
+        const editBanner = document.getElementById("editModeBanner");
+        if (editBanner && titleInput) {
+          editBanner.innerHTML = `[Edit Mode] <strong>${DOMPurify.sanitize(
+            titleInput.value.trim()
+          )}</strong>`;
+          editBanner.style.display = "block";
+        }
 
         const replayUrl = document
           .getElementById("replayLinkInput")
@@ -215,7 +283,6 @@ export async function initializeIndexPage() {
           replayBtn.innerText = "Download Replay on Drop.sc";
         }
 
-        // ✅ Reset button after save
         saveBuildButton.disabled = true;
         saveBuildButton.style.backgroundColor = "";
       } catch (err) {
@@ -227,10 +294,25 @@ export async function initializeIndexPage() {
 
   // Start a new build
   safeAdd("newBuildButton", "click", () => {
-    currentBuildId = null;
+    setCurrentBuildId(null); // ✅ Correct
     resetBuildInputs();
+    clearEditingPublishedBuild();
+
+    const editBanner = document.getElementById("editModeBanner");
+    if (editBanner) editBanner.style.display = "none";
+
+    const saveBtn = document.getElementById("saveBuildButton");
+    const updateBtn = document.getElementById("updateBuildButton");
+    const newBtn = document.getElementById("newBuildButton");
+
+    if (saveBtn) saveBtn.style.display = "inline-block";
+    if (updateBtn) updateBtn.style.display = "none";
+    if (newBtn) newBtn.style.display = "none";
+
     saveBuildButton.innerText = "Save Build";
-    newBuildButton.style.display = "none";
+    saveBuildButton.removeAttribute("data-tooltip");
+    void saveBuildButton.offsetWidth;
+    saveBuildButton.setAttribute("data-tooltip", "Save Current Build");
   });
 
   auth.onAuthStateChanged(async (user) => {
@@ -245,10 +327,22 @@ export async function initializeIndexPage() {
     if (user) {
       await checkForJoinRequestNotifications();
       initializeUserData(user);
+      await loadUserSettings();
+      const toggle = document.getElementById("bracketInputToggle");
+      if (toggle) {
+        toggle.checked = isBracketInputEnabled();
+      }
+      const inputToggle = document.getElementById("buildInputToggle");
+      if (inputToggle) {
+        inputToggle.checked = isBuildInputShown();
+      }
+      updateSupplyColumnVisibility();
+      updateBuildInputVisibility();
     }
   });
 
-  // monitorBuildChanges();
+  monitorBuildChanges();
+  applyBuildViewMode();
 
   safeAdd("showBuildsButton", "click", () => {
     if (!auth.currentUser) {
@@ -259,6 +353,27 @@ export async function initializeIndexPage() {
       return;
     }
     showBuildsModal(); // ✅ when logged in
+  });
+
+  safeAdd("gridViewBtn", "click", () => setBuildViewMode("grid"));
+  safeAdd("listViewBtn", "click", () => setBuildViewMode("list"));
+
+  safeAdd("filterPublicBtn", "click", () => {
+    document.getElementById("filterPublicBtn").classList.add("active");
+    document.getElementById("filterClanBtn").classList.remove("active");
+    localStorage.setItem("communityBuildType", "public");
+    filterCommunityBuilds(
+      localStorage.getItem("communityFilterValue") || "all"
+    );
+  });
+
+  safeAdd("filterClanBtn", "click", () => {
+    document.getElementById("filterClanBtn").classList.add("active");
+    document.getElementById("filterPublicBtn").classList.remove("active");
+    localStorage.setItem("communityBuildType", "clan");
+    filterCommunityBuilds(
+      localStorage.getItem("communityFilterValue") || "all"
+    );
   });
 
   safeAdd("showCommunityModalButton", "click", async () => {
@@ -275,18 +390,27 @@ export async function initializeIndexPage() {
     modal.style.display = "block";
     document.getElementById("communityBuildsContainer").scrollTop = 0;
 
+    // ✅ Set default to Public filter
+    localStorage.setItem("communityBuildType", "public");
+    document.getElementById("filterPublicBtn")?.classList.add("active");
+    document.getElementById("filterClanBtn")?.classList.remove("active");
+
+    // ✅ Clear other filter buttons
     document
       .querySelectorAll("#communityModal .filter-category, .subcategory")
       .forEach((btn) => btn.classList.remove("active"));
 
+    // ✅ Set "All" category active
     const allBtn = document.querySelector(
       '#communityModal .filter-category[data-category="all"]'
     );
     if (allBtn) allBtn.classList.add("active");
 
+    // ✅ Clear search input
     const input = document.getElementById("communitySearchBar");
     if (input) input.value = "";
 
+    // ✅ Load builds and setup filters
     await populateCommunityBuilds();
     attachCommunityCategoryClicks();
 
@@ -304,7 +428,12 @@ export async function initializeIndexPage() {
   safeAdd("saveTemplateButton", "click", showSaveTemplateModal);
 
   // --- Text Inputs
-  safeInput("buildOrderInput", (val) => analyzeBuildOrder(val));
+  const buildInput = document.getElementById("buildOrderInput");
+  if (buildInput) {
+    buildInput.addEventListener("input", () => {
+      analyzeBuildOrder(buildInput.value.trim());
+    });
+  }
   safeInput("buildSearchBar", (val) => searchBuilds(val));
   safeInput("communitySearchBar", async (val) => {
     await searchCommunityBuilds(val);
@@ -312,7 +441,147 @@ export async function initializeIndexPage() {
 
   safeInput("templateSearchBar", (val) => searchTemplates(val));
   safeInput("videoInput", (val) => updateYouTubeEmbed(val));
+
+  let selectedReplayFile = null;
+
+  safeAdd("parseReplayButton", "click", () => {
+    const input = document.getElementById("replayFileInput");
+    if (input) input.click();
+  });
+
+  async function populateReplayOptions(file) {
+    const loader = document.getElementById("optionsLoadingWrapper");
+    if (loader) loader.style.display = "flex";
+    const select = document.getElementById("playerSelect");
+    if (!select) return;
+    select.innerHTML = "<option>Loading...</option>";
+
+    const formData = new FormData();
+    formData.append("replay", file);
+
+    try {
+      const res = await fetch("https://z-build-order.onrender.com/players", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      const players = Array.isArray(data) ? data : data.players;
+      select.innerHTML = "";
+      players.forEach((p) => {
+        const opt = document.createElement("option");
+        opt.value = p.pid;
+        opt.textContent = `${p.name} (${p.race})`;
+        select.appendChild(opt);
+      });
+      const matchup = data.matchup;
+      if (matchup) {
+        const dropdown = document.getElementById("buildCategoryDropdown");
+        if (dropdown) {
+          dropdown.value = matchup;
+          updateDropdownColor();
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch players", err);
+      select.innerHTML = "<option value='1'>Player 1</option>";
+    }
+    if (loader) loader.style.display = "none";
+  }
+
+  safeAdd("replayFileInput", "change", async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    selectedReplayFile = file;
+    e.target.value = "";
+
+    await populateReplayOptions(file);
+    const modal = document.getElementById("replayOptionsModal");
+    if (modal) modal.style.display = "block";
+  });
+
+  safeAdd("confirmReplayOptionsButton", "click", async () => {
+    if (!selectedReplayFile) return;
+    const btn = document.getElementById("confirmReplayOptionsButton");
+    btn.disabled = true;
+    btn.innerText = "⏳ Parsing...";
+
+    const formData = new FormData();
+    formData.append("replay", selectedReplayFile);
+    const player = document.getElementById("playerSelect")?.value;
+    if (player) formData.append("player", player);
+    if (document.getElementById("excludeWorkersCheckbox")?.checked) {
+      formData.append("exclude_workers", "1");
+    }
+    if (document.getElementById("excludeSupplyCheckbox")?.checked) {
+      formData.append("exclude_supply", "1");
+    }
+    if (document.getElementById("excludeTimeCheckbox")?.checked) {
+      formData.append("exclude_time", "1");
+    }
+    if (document.getElementById("compactModeCheckbox")?.checked) {
+      formData.append("compact", "1");
+      formData.append("exclude_time", "1");
+    }
+    const stop = document.getElementById("supplyLimitInput")?.value;
+    if (stop) formData.append("stop_supply", stop);
+
+    try {
+      const res = await fetch("https://z-build-order.onrender.com/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const text = await res.text();
+
+      const buildInput = document.getElementById("buildOrderInput");
+      if (buildInput) buildInput.value = text;
+      analyzeBuildOrder(text);
+    } catch (err) {
+      console.error("Replay upload failed", err);
+      alert(
+        "Could not parse the replay. Make sure the Python backend is running."
+      );
+    }
+
+    btn.disabled = false;
+    btn.innerText = "Parse Replay";
+    const modal = document.getElementById("replayOptionsModal");
+    if (modal) modal.style.display = "none";
+  });
+
+  safeAdd("closeReplayOptionsModal", "click", () => {
+    const modal = document.getElementById("replayOptionsModal");
+    if (modal) modal.style.display = "none";
+  });
+
+  const compactBox = document.getElementById("compactModeCheckbox");
+  if (compactBox) {
+    compactBox.addEventListener("change", () => {
+      if (compactBox.checked) {
+        const timeBox = document.getElementById("excludeTimeCheckbox");
+        if (timeBox) timeBox.checked = true;
+      }
+    });
+  }
+
+  const timeBox = document.getElementById("excludeTimeCheckbox");
+  if (timeBox) {
+    timeBox.addEventListener("change", () => {
+      if (!timeBox.checked) {
+        const cBox = document.getElementById("compactModeCheckbox");
+        if (cBox) cBox.checked = false;
+      }
+    });
+  }
+
+  window.addEventListener("mousedown", (event) => {
+    const modal = document.getElementById("replayOptionsModal");
+    if (modal && event.target === modal) {
+      modal.style.display = "none";
+    }
+  });
+
   safeAdd("buildOrderTitleText", "click", () => toggleTitleInput(true));
+  safeAdd("buildOrderTitleText", "focus", () => toggleTitleInput(true));
 
   // --- Dropdown Color Change
   safeChange("buildCategoryDropdown", updateDropdownColor);
@@ -324,10 +593,46 @@ export async function initializeIndexPage() {
     if (modal) modal.style.display = "none";
   });
 
-  window.addEventListener("click", (event) => {
+  window.addEventListener("mousedown", (event) => {
     const helpModal = document.getElementById("buildOrderHelpModal");
     if (helpModal && event.target === helpModal) {
       helpModal.style.display = "none";
+    }
+  });
+
+  safeAdd("myBuildsTab", "click", async () => {
+    const spinnerWrapper = document.getElementById("buildsLoadingWrapper");
+    const buildList = document.getElementById("buildList");
+
+    buildList.innerHTML = "";
+    spinnerWrapper.style.display = "flex";
+
+    try {
+      document.getElementById("myBuildsTab").classList.add("active");
+      document.getElementById("publishedBuildsTab").classList.remove("active");
+      await filterBuilds(getCurrentBuildFilter());
+    } catch (err) {
+      console.error("Error loading My Builds:", err);
+    } finally {
+      spinnerWrapper.style.display = "none";
+    }
+  });
+
+  safeAdd("publishedBuildsTab", "click", async () => {
+    const spinnerWrapper = document.getElementById("buildsLoadingWrapper");
+    const buildList = document.getElementById("buildList");
+
+    buildList.innerHTML = "";
+    spinnerWrapper.style.display = "flex";
+
+    try {
+      document.getElementById("publishedBuildsTab").classList.add("active");
+      document.getElementById("myBuildsTab").classList.remove("active");
+      await filterBuilds(getCurrentBuildFilter());
+    } catch (err) {
+      console.error("Error loading Published Builds:", err);
+    } finally {
+      spinnerWrapper.style.display = "none";
     }
   });
 
@@ -347,12 +652,43 @@ export async function initializeIndexPage() {
     if (modal) modal.style.display = "block";
   });
 
+  safeAdd("closeSettingsModal", "click", () => {
+    const modal = document.getElementById("settingsModal");
+    if (modal) modal.style.display = "none";
+  });
+
+  const settingsModal = document.getElementById("settingsModal");
+  window.addEventListener("mousedown", (event) => {
+    if (settingsModal && event.target === settingsModal) {
+      settingsModal.style.display = "none";
+    }
+  });
+
+  const bracketToggle = document.getElementById("bracketInputToggle");
+  if (bracketToggle) {
+    bracketToggle.checked = isBracketInputEnabled();
+    bracketToggle.addEventListener("change", () => {
+      setBracketInputEnabled(bracketToggle.checked);
+      updateSupplyColumnVisibility();
+    });
+  }
+
+  const inputToggle = document.getElementById("buildInputToggle");
+  if (inputToggle) {
+    inputToggle.checked = isBuildInputShown();
+    inputToggle.addEventListener("change", () => {
+      setBuildInputShown(inputToggle.checked);
+      updateBuildInputVisibility();
+    });
+  }
+
+
   safeAdd("closePrivacyModal", "click", () => {
     const modal = document.getElementById("privacyModal");
     if (modal) modal.style.display = "none";
   });
 
-  window.addEventListener("click", (event) => {
+  window.addEventListener("mousedown", (event) => {
     const modal = document.getElementById("privacyModal");
     if (modal && event.target === modal) {
       modal.style.display = "none";
@@ -376,58 +712,81 @@ export async function initializeIndexPage() {
   });
 
   safeAdd("savePublishSettingsButton", "click", async () => {
-    const publishToCommunity =
-      document.getElementById("publishToCommunity")?.checked;
+    const user = auth.currentUser;
+    if (!user) return;
 
-    if (!window.currentBuildIdToPublish) {
+    const buildId = window.currentBuildIdToPublish;
+    if (!buildId) {
       console.error("❌ No build selected to update.");
       return;
     }
 
-    // ✅ Handle community publishing
-    if (publishToCommunity) {
-      await window.publishBuildToCommunity(window.currentBuildIdToPublish);
-    } else {
-      await window.unpublishBuild(window.currentBuildIdToPublish);
-    }
+    const publishToCommunity =
+      document.getElementById("publishToCommunity")?.checked;
 
-    // ✅ Handle clan publishing via checked checkboxes
+    // ✅ Get checked clans
     const checkedClans = Array.from(
       document.querySelectorAll(".clanPublishCheckbox:checked")
     ).map((cb) => cb.value);
 
-    const user = auth.currentUser;
-    if (!user) return;
-
-    const usernameSnap = await getDoc(doc(db, "usernames", user.displayName));
-    const username = usernameSnap.exists() ? usernameSnap.id : "Unknown";
-
-    const buildId = window.currentBuildIdToPublish;
+    // ✅ Fetch user's personal build
     const userBuildRef = doc(db, `users/${user.uid}/builds/${buildId}`);
     const buildSnap = await getDoc(userBuildRef);
     if (!buildSnap.exists()) return;
 
     const buildData = buildSnap.data();
 
-    for (const clanId of checkedClans) {
-      await saveBuildToClan(clanId, buildId, {
-        ...buildData,
-        ownerUid: user.uid,
-        username,
-        timestamp: Date.now(),
+    // ✅ Fetch display name
+    const usernameQuery = query(
+      collection(db, "usernames"),
+      where("userId", "==", user.uid)
+    );
+    const usernameSnap = await getDocs(usernameQuery);
+    const username = !usernameSnap.empty ? usernameSnap.docs[0].id : "Unknown";
+
+    // ✅ Create/Update the published version
+    const publishedBuildRef = doc(db, "publishedBuilds", buildId);
+    const publishedData = {
+      ...buildData,
+      publisherId: user.uid,
+      username,
+      isPublic: publishToCommunity,
+      sharedToClans: checkedClans,
+      datePublished: Timestamp.now(), // ✅ Firestore-native timestamp
+      views: 0,
+      upvotes: 0,
+      downvotes: 0,
+    };
+
+    await setDoc(publishedBuildRef, publishedData);
+
+    // ✅ Delete if fully unpublished (optional)
+    if (!publishToCommunity && checkedClans.length === 0) {
+      await deleteDoc(publishedBuildRef);
+      await updateDoc(userBuildRef, {
+        isPublished: false,
+        isPublic: false,
+        sharedToClans: [],
+      });
+    } else {
+      await updateDoc(userBuildRef, {
+        isPublished: true,
+        isPublic: publishToCommunity,
+        sharedToClans: checkedClans,
       });
     }
 
-    if (checkedClans.length > 0) {
-      showToast("✅ Shared with selected clans!", "success");
-    }
+    showToast("✅ Publish settings updated!", "success");
 
-    // ✅ Close the publish modal
+    // ✅ Close modal
     const modal = document.getElementById("publishModal");
     if (modal) modal.style.display = "none";
+
+    // ✅ Trigger the "Published Builds" tab to refresh view
+    document.getElementById("publishedBuildsTab")?.click();
   });
 
-  window.addEventListener("click", (event) => {
+  window.addEventListener("mousedown", (event) => {
     const modal = document.getElementById("publishModal");
     const content = modal?.querySelector(".modal-content.small-modal");
 
@@ -445,6 +804,8 @@ export async function initializeIndexPage() {
   initializeSectionToggles();
   initializeTextareaClickHandler();
   initializeAutoCorrect();
+  updateSupplyColumnVisibility();
+  updateBuildInputVisibility();
   initializeTooltips();
   setupCatActivationOnInput();
   checkPublishButtonVisibility();
@@ -502,6 +863,17 @@ export async function initializeIndexPage() {
     window.location.href = "/veto.html";
   });
 
+  document.getElementById("settingsBtn")?.addEventListener("click", () => {
+    const userMenu = document.getElementById("userMenu");
+    if (userMenu) userMenu.style.display = "none";
+    const modal = document.getElementById("settingsModal");
+    if (modal) {
+      modal.style.display = "block";
+      const toggle = document.getElementById("bracketInputToggle");
+      if (toggle) toggle.checked = isBracketInputEnabled();
+    }
+  });
+
   const clanModal = document.getElementById("clanModal");
 
   document
@@ -557,7 +929,7 @@ export async function initializeIndexPage() {
     currentClanView = null;
   });
 
-  window.addEventListener("click", (event) => {
+  window.addEventListener("mousedown", (event) => {
     const modal = document.getElementById("clanModal");
     if (!modal || modal.style.display !== "block") return;
 
@@ -604,10 +976,10 @@ export async function initializeIndexPage() {
   function attachMyBuildsCategoryClicks() {
     const heading = document.querySelector("#buildsModal .template-header h3");
     const categoryButtons = document.querySelectorAll(
-      "#buildsModal .filter-category"
+      "#buildsModal .filter-category, #communityModal .filter-category"
     );
     const subcategoryButtons = document.querySelectorAll(
-      "#buildsModal .subcategory"
+      "#buildsModal .subcategory, #communityModal .subcategory"
     );
 
     categoryButtons.forEach((el) => {
@@ -615,72 +987,93 @@ export async function initializeIndexPage() {
         const category = el.getAttribute("data-category");
         if (!category) return;
 
-        // 🔄 UI state
+        // 🔄 UI
         categoryButtons.forEach((btn) => btn.classList.remove("active"));
         subcategoryButtons.forEach((btn) => btn.classList.remove("active"));
         el.classList.add("active");
 
-        // 🔄 Clear search bar
-        const search = document.getElementById("buildSearchBar");
-        if (search) search.value = "";
+        // 🔄 Clear search
+        document.getElementById("buildSearchBar").value = "";
+        document.getElementById("communitySearchBar").value = "";
 
-        // 🧠 Special case: Clan Builds
-        if (category === "clan") {
-          const builds = await loadClanBuilds(); // <- your new function
-          populateBuildList(builds); // <- reuse your card renderer
-          if (heading) heading.textContent = "Clan Builds";
-          return;
+        // 🔎 Apply filter
+        const isPublishedTabActive = document
+          .getElementById("publishedBuildsTab")
+          ?.classList.contains("active");
+
+        if (isPublishedTabActive) {
+          const publishedBuilds = await fetchPublishedUserBuilds(category);
+          populateBuildList(publishedBuilds);
+        } else {
+          filterBuilds(category); // My Builds
         }
+        await filterCommunityBuilds(category); // Community
 
-        // 🔎 Normal filtering
-        filterBuilds(category);
+        // 📝 Headings
+        const buildsHeading = document.querySelector(
+          "#buildsModal .template-header h3"
+        );
+        const communityHeading = document.querySelector("#communityModal h3");
 
-        // 📝 Heading
-        if (heading) {
-          heading.textContent =
+        if (buildsHeading) {
+          buildsHeading.textContent =
             category.toLowerCase() === "all"
               ? "Build Orders"
               : `Build Orders - ${capitalize(category)}`;
+        }
+
+        if (communityHeading) {
+          communityHeading.textContent =
+            category.toLowerCase() === "all"
+              ? "Community Builds"
+              : `Community Builds - ${capitalize(category)}`;
         }
       });
     });
   }
 
   function attachSubcategoryClicks() {
-    const heading = document.querySelector("#buildsModal .template-header h3");
     const allCategories = document.querySelectorAll(
-      "#buildsModal .filter-category"
+      "#buildsModal .filter-category, #communityModal .filter-category"
     );
     const allSubcategories = document.querySelectorAll(
-      "#buildsModal .subcategory"
+      "#buildsModal .subcategory, #communityModal .subcategory"
     );
 
     allSubcategories.forEach((el) => {
-      el.addEventListener("click", (e) => {
+      el.addEventListener("click", async (e) => {
         e.stopPropagation();
         const subcat = el.getAttribute("data-subcategory");
         if (!subcat) return;
 
-        // Clear actives
         allCategories.forEach((btn) => btn.classList.remove("active"));
         allSubcategories.forEach((btn) => btn.classList.remove("active"));
-
-        // Set current subcategory and parent as active
         el.classList.add("active");
+
         const parent = el.closest(".filter-category");
         if (parent) parent.classList.add("active");
 
-        // Clear search bar
-        const buildSearch = document.getElementById("buildSearchBar");
-        if (buildSearch) buildSearch.value = "";
+        document.getElementById("buildSearchBar").value = "";
+        document.getElementById("communitySearchBar").value = "";
 
-        // Update heading
-        if (heading) {
-          heading.textContent = `Build Orders - ${capitalize(subcat)}`;
-        }
+        // ✅ Always use the new unified filterBuilds logic
+        await filterBuilds(subcat);
 
-        // Filter builds
-        filterBuilds(subcat);
+        // ✅ Also filter community builds if needed
+        await filterCommunityBuilds(subcat);
+
+        // ✅ Update headings
+        const buildsHeading = document.querySelector(
+          "#buildsModal .template-header h3"
+        );
+        const communityHeading = document.querySelector("#communityModal h3");
+
+        if (buildsHeading)
+          buildsHeading.textContent = `Build Orders - ${capitalize(subcat)}`;
+        if (communityHeading)
+          communityHeading.textContent = `Community Builds - ${capitalize(
+            subcat
+          )}`;
       });
     });
   }
@@ -765,6 +1158,22 @@ export async function initializeIndexPage() {
     });
   }
 
+  function updateBuildsTabUI(activeTabId, headingText) {
+    const myTab = document.getElementById("myBuildsTab");
+    const pubTab = document.getElementById("publishedBuildsTab");
+
+    if (myTab && pubTab) {
+      myTab.classList.remove("active");
+      pubTab.classList.remove("active");
+
+      const activeTab = document.getElementById(activeTabId);
+      if (activeTab) activeTab.classList.add("active");
+    }
+
+    const heading = document.querySelector("#buildsModal .template-header h3");
+    if (heading) heading.textContent = headingText;
+  }
+
   function setupMapModalListeners() {
     const mapPreview = document.getElementById("map-preview-container");
     const mapModal = document.getElementById("mapSelectionModal");
@@ -802,10 +1211,40 @@ export async function initializeIndexPage() {
         }
       });
 
-    window.addEventListener("click", (event) => {
+    window.addEventListener("mousedown", (event) => {
       if (event.target === mapModal) {
         mapModal.style.display = "none";
       }
     });
+  }
+
+  function monitorBuildChanges() {
+    const fields = [
+      "buildOrderInput",
+      "commentInput",
+      "videoInput",
+      "replayLinkInput",
+      "buildOrderTitleInput",
+    ];
+
+    fields.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el && !el.dataset.monitorAttached) {
+        el.addEventListener("input", () => {
+          saveBuildButton.disabled = false;
+          saveBuildButton.style.backgroundColor = "#963325";
+        });
+        el.dataset.monitorAttached = "true";
+      }
+    });
+
+    const categoryDropdown = document.getElementById("buildCategoryDropdown");
+    if (categoryDropdown && !categoryDropdown.dataset.monitorAttached) {
+      categoryDropdown.addEventListener("change", () => {
+        saveBuildButton.disabled = false;
+        saveBuildButton.style.backgroundColor = "#963325";
+      });
+      categoryDropdown.dataset.monitorAttached = "true";
+    }
   }
 }

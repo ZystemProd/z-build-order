@@ -45,6 +45,21 @@ Maybe remove them if it doess not contain anything
 - Animation for the choosen maps
 
 ----------- My Builds ----------
-- preview don't show red font color on 15/14 (oversupply)
 
-- Published build button?
+
+Let me know if you'd like a toast warning before exiting edit mode if unsaved changes exist.
+
+**Urgent** the build is published in clan but shown as publish tag and on a different user it don't show up. shows only yourself.
+
+read placeholder  [14] with settings on
+
+- updateing a build only works once.
+
+- Put the loader in the input when importing from scReplay 
+
+----------- data ----------
++ bile
++ Mag-Field Accelerator
+-+ stim -> stimpack
++ mule
++ultralisk Cavern
