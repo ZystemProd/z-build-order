@@ -2008,7 +2008,7 @@ textarea::-webkit-scrollbar-thumb:hover {
 
 .map-cards-container {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
   gap: 20px;
   padding: 10px;
   max-height: 400px;
@@ -2039,7 +2039,7 @@ textarea::-webkit-scrollbar-thumb:hover {
 
 .map-card {
   display: flex;
-  width: 200px;
+  width: 120px;
   flex-direction: column;
   align-items: center;
   padding: 10px;
@@ -4415,5 +4415,13 @@ td {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+}
+
+
+@media (max-width: 768px) {
+  #auth-container {
+    position: static;
+    margin: 10px;
+  }
 }
 

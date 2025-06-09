@@ -581,3 +581,21 @@
 .subcategory.active {
   font-weight: bold;
 }
+@media (max-width: 768px) {
+  .modal-content-template {
+    margin: 1% 0;
+    width: 100%;
+    max-width: none;
+    height: 95%;
+  }
+  .template-header {
+    position: static;
+  }
+  .template-list {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    padding: 5px;
+  }
+  .template-card {
+    width: 120px;
+  }
+}
