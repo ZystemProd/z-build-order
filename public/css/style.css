@@ -64,20 +64,6 @@ body {
   box-sizing: border-box;
 }
 
-.utility-container {
-  margin-top: 15px;
-}
-
-.mapAndButtons {
-  display: flex;
-  flex-direction: row; /* Align items horizontally */
-  align-items: flex-start; /* Align at the top */
-  gap: 20px; /* Add spacing between the map and the content */
-  margin-top: 20px;
-  margin: auto;
-  max-width: 70%;
-}
-
 #authLoading {
   position: flex;
   margin: auto;
@@ -141,10 +127,6 @@ body {
   border: 2px solid transparent;
 }
 
-#userInfo {
-  display: none;
-}
-
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -162,21 +144,6 @@ body {
 }
 
 /* Dropdown button */
-.dropdown-btn {
-  background-color: #444;
-  color: white;
-  padding: 10px 15px;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: background-color 0.3s ease, transform 0.2s ease;
-}
-
-.dropdown-btn:hover {
-  background-color: #555;
-  transform: scale(1.05);
-}
 
 /* Show dropdown when the class is toggled */
 #templateDropdown.active {
@@ -282,14 +249,6 @@ body {
 }
 
 /* Avatar */
-#userAvatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  cursor: pointer;
-  vertical-align: middle;
-  margin-left: 8px;
-}
 
 .user-avatar {
   border-radius: 100px;
@@ -315,11 +274,6 @@ body {
   margin: 0;
 }
 
-.user-email {
-  color: #ccc;
-  font-size: 12px;
-}
-
 /* Auth Buttons */
 .auth-button {
   background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
@@ -335,18 +289,6 @@ body {
 .auth-button:hover {
   background: linear-gradient(135deg, #0056b3 0%, #003f80 100%);
   transform: scale(1.05);
-}
-
-.auth-button.sign-out {
-  background: linear-gradient(135deg, #d32f2f 0%, #b71c1c 100%);
-}
-
-.auth-button.sign-out:hover {
-  background: linear-gradient(135deg, #b71c1c 0%, #900000 100%);
-}
-
-.highlight {
-  animation: highlight 1.5s ease-in-out 0s infinite alternate;
 }
 
 @keyframes highlight {
@@ -375,8 +317,7 @@ table {
   overflow: hidden; /* Hide any overflow in case of rounding */
 }
 
-th,
-td {
+th {
   padding: 12px 15px; /* Increase padding for more comfortable spacing */
   text-align: left;
   border: 1px solid #444; /* Darker borders for table cells */
@@ -388,10 +329,6 @@ th {
   color: #e0e0e0; /* Lighter text color for headers */
 }
 
-td {
-  background-color: #2c2c2c; /* Slightly lighter than body background */
-}
-
 tr:nth-child(even) {
   background-color: #3a3a3a; /* Zebra striping effect for alternating rows */
 }
@@ -401,7 +338,7 @@ tr:hover {
 }
 
 /* Limit width of the first column (Workers/Timestamp) */
-#buildOrderTable td:first-child,
+
 #buildOrderTable th:first-child {
   width: 50px;
   overflow: hidden;
@@ -434,8 +371,7 @@ input::placeholder {
   font-style: italic;
 }
 
-button,
-.custom-file-input {
+button {
   background-color: #444;
   color: #e0e0e0;
   padding: 10px 20px;
@@ -453,14 +389,12 @@ button,
   user-select: none; /* Standard syntax */
 }
 
-button:hover,
-.custom-file-input:hover {
+button:hover {
   background-color: #555;
   transform: scale(1.05); /* Slight scaling on hover */
 }
 
-button:active,
-.custom-file-input:active {
+button:active {
   transform: scale(1); /* Slightly reduce the scale when clicked */
 }
 
@@ -468,52 +402,12 @@ button:hover {
   background-color: #963325; /* Slightly lighter on hover */
 }
 
-.icon-button {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 20px;
-  color: #333; /* Adjust the color */
-  padding: 5px;
-  transition: color 0.3s ease;
-}
-
-.icon-button:hover {
-  color: #007bff; /* Change color on hover */
-}
-
-.icon-button:focus {
-  outline: none;
-}
-
 /* Set the first column (workers/timestamp) max width */
-#buildOrderTable td:first-child,
+
 #buildOrderTable th:first-child {
   word-wrap: break-word; /* Ensure long words break and don't overflow */
   overflow: hidden;
   text-overflow: ellipsis; /* Add ellipsis when text overflows */
-}
-
-#buildOrderTable.hide-supply td:first-child,
-#buildOrderTable.hide-supply th:first-child {
-  display: none;
-}
-
-.titleInput {
-  max-width: 70%;
-  margin: 10px auto;
-  text-align: center;
-}
-
-.titleInput input {
-  width: 100%;
-  padding: 10px;
-  font-size: 1.2em;
-  border: 1px solid #444;
-  border-radius: 5px;
-  background-color: #2c2c2c;
-  color: #e0e0e0;
-  font-size: 1.4em; /* Slightly larger for the title */
 }
 
 #buildOrderTitleText {
@@ -569,11 +463,6 @@ button:hover {
   color: white;
   text-align: center;
   vertical-align: middle;
-}
-
-#buildOrderTitleInput.highlight {
-  outline: 3px solid red; /* Use outline instead of border */
-  animation: highlight 1s ease-in-out 0s infinite alternate;
 }
 
 /* Comment and Video Sections */
@@ -643,45 +532,16 @@ button:hover {
 }
 
 /* Style for bold and purple text on unit names */
-.bold-purple {
-  color: #c07aeb; /* Purple color */
-  font-weight: bold;
-}
 
 /* Protoss Units - Bright Blue */
-.bold-blue {
-  color: #00b0f0; /* Bright blue color for Protoss */
-  font-weight: bold;
-}
-
-.bold-orange {
-  color: orange;
-  font-weight: bold;
-}
 
 /* Terran Units - Bright Red */
-.bold-red {
-  color: #ff3b30; /* Bright red color for Terran */
-  font-weight: bold;
-}
 
 /* Style for bold and yellow text on structure names */
-.bold-yellow {
-  color: #f0a500; /* Yellow color */
-  font-weight: bold;
-}
 
 /* Style for red-colored numbers */
-.red-text {
-  color: #ff03b3; /* Bright green for high visibility */
-  font-weight: bold; /* Bold for more emphasis */
-}
 
 /* Unique style for upgrades */
-.upgrade-highlight {
-  color: #ff006a; /* Orange color, you can change this to any color */
-  font-weight: bold;
-}
 
 .upperInput {
   margin-top: 150px; /* Adjust if needed for spacing */
@@ -754,10 +614,6 @@ button:hover {
   transform: rotate(270deg); /* Start pointing right */
 }
 
-.arrow.open {
-  transform: rotate(360deg); /* Point up when section is open */
-}
-
 #videoIframe {
   width: 560px; /* Width for 16:9 ratio */
   height: 315px; /* Height for 16:9 ratio */
@@ -794,25 +650,6 @@ textarea::-webkit-scrollbar-track {
 textarea::-webkit-scrollbar-thumb:hover {
   background-color: #666; /* Lighter thumb color on hover */
   cursor: context-menu;
-}
-
-.term-image,
-.upgrade-image,
-.ability-image,
-.unit-image,
-.structure-image {
-  width: 30px; /* Adjust as necessary */
-  height: 30px;
-  margin-left: 5px;
-  border-radius: 7px; /* Rounded corners */
-  vertical-align: middle; /* Align the image properly with the text */
-  object-fit: cover;
-}
-
-.upgrade-image,
-.ability-image {
-  box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.3);
-  border: 1px solid #1e1e1e;
 }
 
 /* Modal background */
@@ -892,157 +729,8 @@ textarea::-webkit-scrollbar-thumb:hover {
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 */
-.build-card {
-  position: relative;
-  background: #181818;
-  border-radius: 12px;
-  padding: 16px;
-  margin: 10px;
-  width: 250px !important;
-  height: 250px !important;
-  display: flex;
-  flex-direction: column;
-  justify-content: start;
-  box-shadow: 0 0 8px rgba(0, 0, 0, 0.6);
-  background-clip: padding-box;
-  border: 3px solid transparent;
-  box-sizing: border-box; /* ✅ important */
-  overflow: hidden; /* ✅ prevent internal shifts */
-  transition: box-shadow 0.3s, transform 0.3s; /* ✅ only transition shadow or transform, not size */
-}
-
-.build-card::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 2px;
-  border-radius: 12px;
-  background: linear-gradient(
-    135deg,
-    var(--gradient-color1, #555),
-    var(--gradient-color2, #333)
-  );
-  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); /* Standard */
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); /* WebKit fallback */
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  pointer-events: none;
-  z-index: 1;
-  transition: filter 0.3s; /* ✅ soft glow without layout shift */
-}
-
-.build-card:hover {
-  transform: translateY(-3px); /* ✅ optional hover lift */
-}
-
-.build-card:hover::before {
-  filter: brightness(1.3) blur(4px); /* ✅ soft glow effect */
-}
-
-.build-card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.race-icon-wrapper {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.matchup-icons {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.race-icon {
-  width: 26px;
-  height: 26px;
-  object-fit: contain;
-}
-
-.versus-text {
-  font-size: 0.9rem;
-  color: #cccccc;
-  font-weight: bold;
-}
-
-.delete-build-btn {
-  background: transparent;
-  border: none;
-  font-size: 1.5rem;
-  color: #cccccc;
-  cursor: pointer;
-  transition: color 0.3s;
-}
-
-.delete-build-btn:hover {
-  color: #ff5252;
-}
-
-#buildList.list-view .delete-build-btn {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-}
-
-.build-publish-info {
-  position: absolute;
-  bottom: 8px;
-  right: 8px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.75rem;
-  padding: 4px 8px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background 0.3s, color 0.3s, transform 0.3s;
-  color: var(--race-color, #5fe5ff);
-  background: rgba(95, 229, 255, 0.08); /* Softer background */
-  border: 1px solid var(--race-color, #5fe5ff);
-}
-
-.build-publish-info:hover {
-  background: rgba(95, 229, 255, 0.2); /* Just a little brighter, not solid */
-  color: #ffffff; /* Keep text white */
-  transform: scale(1.05); /* Slight grow effect */
-}
-
-.publish-unpublished {
-  color: #5fe5ff; /* Soft blue */
-  background: rgba(95, 229, 255, 0.15);
-  border-color: #5fe5ff;
-}
-
-.publish-published {
-  color: #00c853; /* Green */
-  background: rgba(0, 200, 83, 0.15);
-  border-color: #00c853;
-}
 
 /* When a build is shown in My Builds and already published, remove the button border */
-.publish-published.no-border {
-  border: none;
-}
-
-.publish-imported {
-  color: #ff9800; /* Orange */
-  background: rgba(255, 152, 0, 0.15);
-  border-color: #ff9800;
-}
-
-.publish-icon {
-  width: 16px;
-  height: 16px;
-}
 
 .publish-checkbox-list {
   margin-top: 12px;
@@ -1053,10 +741,6 @@ textarea::-webkit-scrollbar-thumb:hover {
 }
 .publish-checkbox-row label {
   font-weight: normal;
-}
-
-.build-card .map-image {
-  height: 135px;
 }
 /*
 .build-card::after {
@@ -1071,29 +755,6 @@ textarea::-webkit-scrollbar-thumb:hover {
   transition: opacity 0.3s ease-in-out;
 }
 */
-.build-card:hover {
-  transform: scale(1.1, 1.1);
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.6);
-}
-
-.build-card:hover::after {
-  opacity: 1;
-}
-
-.delete-icon {
-  position: absolute;
-  top: 5px;
-  right: 15px;
-  cursor: pointer;
-  font-size: 18px;
-  color: #ff5c5c;
-  font-weight: bold;
-  transition: transform 0.2s, color 0.2s;
-}
-.delete-icon:hover {
-  transform: scale(1.2);
-  color: #ff1c1c;
-}
 
 /* Build card title */
 /*
@@ -1102,15 +763,6 @@ textarea::-webkit-scrollbar-thumb:hover {
   font-weight: bold;
 }
 */
-.build-card-title {
-  font-size: 1rem;
-  color: white;
-  text-align: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  padding-bottom: 20px;
-}
 
 #showCommunityModalButton,
 #showBuildsButton {
@@ -1125,90 +777,10 @@ textarea::-webkit-scrollbar-thumb:hover {
   justify-content: center;
 }
 
-#buildCategoryTabs button,
-#buildSubCategoryTabs button {
-  padding: 10px;
-  margin-right: 5px;
-  cursor: pointer;
-}
-
-.active-tab {
-  background-color: #ccc;
-}
-
 .zerg,
 .protoss,
 .terran {
   display: none;
-}
-
-.category-tabs {
-  display: flex;
-  gap: 20px;
-  align-items: center;
-}
-
-.category {
-  position: relative; /* Set positioning for stacking context */
-  z-index: 5; /* Ensure this layer stays above others if needed */
-  cursor: pointer;
-}
-
-.category,
-.all-builds {
-  padding: 10px 15px;
-  cursor: pointer;
-  background-color: #f9f9f900;
-  border-radius: 8px;
-  text-align: center;
-  transition: background-color 0.2s, transform 0.2s, box-shadow 0.2s;
-}
-.category:hover,
-.all-builds:hover {
-  background-color: #eaeaea00; /* Subtle color change */
-  transform: scale(1.05); /* Slight scaling */
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.9); /* Shadow for depth */
-}
-.category:hover .subcategory-container {
-  display: block; /* Show dropdown on hover of the parent */
-}
-
-.subcategory-container {
-  position: absolute; /* Position it relative to the parent category */
-  top: 100%; /* Position below the category */
-  left: 0; /* Align with the left edge of the category */
-  display: none; /* Hide dropdown by default */
-  z-index: 10; /* Ensure it appears above other elements */
-  background-color: #1e1e1e;
-  border: 1px solid #444;
-  border-radius: 8px;
-  padding: 10px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.8);
-  width: 200px; /* Optional: Adjust width */
-}
-
-.category:hover .subcategory-container {
-  display: block;
-}
-
-.subcategory-container button {
-  width: 100%; /* Full width clickable buttons */
-  text-align: left; /* Align text to the left */
-  padding: 10px;
-  background: none;
-  border: none;
-  color: white;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-}
-
-.subcategory-container button:hover {
-  background-color: #555; /* Highlight button on hover */
-}
-
-.subcategory-container button:active {
-  transform: scale(1); /* Reset scale on click */
-  background-color: #666; /* Darker background when active */
 }
 
 .filters-wrapper {
@@ -1329,19 +901,6 @@ textarea::-webkit-scrollbar-thumb:hover {
   background-color: #963325;
 }
 
-.dropdown-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center; /* Center align with other elements */
-  margin: 15px 0; /* Add spacing above and below */
-}
-
-.dropdown-container label {
-  margin-bottom: 5px;
-  font-size: 14px;
-  color: #e0e0e0; /* Match the dark mode text color */
-}
-
 .styled-dropdown {
   padding: 5px 10px;
   font-size: 14px;
@@ -1386,7 +945,7 @@ textarea::-webkit-scrollbar-thumb:hover {
   margin: 20px 0; /* Vertical spacing */
 }
 
-.form-center,
+
 .form-right {
   display: flex;
   justify-content: center; /* Center content horizontally */
@@ -1396,72 +955,12 @@ textarea::-webkit-scrollbar-thumb:hover {
   justify-content: flex-end;
 }
 
-.titleContainer {
-  display: flex;
-  justify-content: center;
-  flex-direction: column; /* Stack elements vertically */
-  text-align: center;
-}
-
 .form-container > * {
   flex: 1; /* Adjust as needed for proportional sizing */
 }
 
 .saveLoadContainer button {
   margin-right: 10px;
-}
-
-.green-text {
-  color: #44e418;
-  font-weight: bold;
-}
-
-.blue-text {
-  color: #5fe5ff;
-  font-weight: bold;
-}
-
-.resource-image {
-  width: 16px; /* Adjust the size of the image */
-  height: 16px;
-  vertical-align: middle;
-  margin-left: 0px; /* Add some spacing between text and image */
-  margin-bottom: 3px;
-}
-
-.remove-all-builds-button {
-  position: absolute;
-  bottom: 20px; /* Adjust as needed to place at the bottom-right */
-  right: 20px; /* Adjust as needed for spacing */
-  background-color: #d32f2f; /* Warning red */
-  color: white; /* White text for contrast */
-  border: none; /* Remove default border */
-  padding: 10px 20px; /* Add padding for better clickability */
-  font-size: 14px; /* Adjust font size */
-  font-weight: bold; /* Make it stand out */
-  border-radius: 5px; /* Smooth edges */
-  cursor: pointer; /* Indicate interactivity */
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2); /* Subtle shadow for depth */
-  transition: background-color 0.3s ease, transform 0.2s ease;
-}
-
-.remove-all-builds-button:hover {
-  background-color: #c62828; /* Slightly darker red on hover */
-  transform: scale(1.05); /* Slight enlargement on hover */
-}
-
-.remove-all-builds-button:active {
-  background-color: #b71c1c; /* Even darker red when clicked */
-  transform: scale(1); /* Reset scale on click */
-}
-
-.menu {
-  position: fixed;
-  top: 10px;
-  right: 10px;
-  display: flex;
-  gap: 10px;
-  z-index: 900;
 }
 
 .menu-button {
@@ -1493,50 +992,6 @@ textarea::-webkit-scrollbar-thumb:hover {
   background-color: var(--active-color);
   color: white;
   font-weight: bold;
-}
-
-.close-map-button {
-  background: none;
-  border: none;
-  color: #666;
-  font-size: 16px;
-  cursor: pointer;
-  padding: 2px 5px;
-  border-radius: 4px;
-}
-
-.close-map-button:hover {
-  background-color: #e0e0e0;
-  color: #333;
-}
-
-.title-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background-color: #333;
-  color: white;
-  padding: 5px 10px;
-  font-size: 14px;
-  border-bottom: 1px solid #555;
-}
-
-.title-bar-buttons {
-  display: flex;
-  gap: 5px; /* Space between buttons */
-}
-
-.title-bar-buttons button {
-  background: none;
-  border: none;
-  color: white;
-  font-size: 14px;
-  cursor: pointer;
-  padding: 2px 5px;
-}
-
-.title-bar-buttons button:hover {
-  color: #ff5555;
 }
 
 #map-container {
@@ -1657,25 +1112,6 @@ textarea::-webkit-scrollbar-thumb:hover {
   border: 1px solid black;
 }
 */
-#map-title-bar {
-  display: flex;
-  justify-content: space-between; /* Align children to the left and right */
-  align-items: center;
-  padding: 5px 10px;
-  background-color: #333;
-  color: #fff;
-  cursor: move;
-}
-
-#map-title-bar .title-bar-left {
-  display: flex;
-  gap: 10px;
-}
-
-#map-title-bar .title-bar-right {
-  display: flex;
-  gap: 10px; /* Add spacing between buttons */
-}
 
 .map-preview {
   position: relative;
@@ -1701,122 +1137,8 @@ textarea::-webkit-scrollbar-thumb:hover {
   z-index: 2;
 }
 
-.annotation-circle {
-  width: 30px;
-  height: 30px;
-  border: 2px solid red;
-  background-color: rgba(255, 0, 0, 0.24);
-  border-radius: 50%;
-  box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.5);
-}
-
-.annotation-number {
-  font-size: 16px;
-  color: red;
-  text-shadow: black 0px 2px 4px;
-  pointer-events: none; /* Prevent interfering with click events */
-}
-
-.annotation-circle-container {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  display: flex; /* Align number and circle horizontally */
-  align-items: center; /* Center vertically */
-  gap: 5px; /* Add spacing between the number and the circle */
-  pointer-events: auto;
-}
-
-.annotation-arrow {
-  position: absolute;
-  height: 4px; /* Arrow thickness */
-  background-color: rgb(0, 153, 255); /* Arrow color */
-  transform-origin: 0 50%; /* Rotate from the starting point */
-  pointer-events: auto;
-  border-radius: 10px;
-  box-shadow: 0px 0px 2px rgba(0, 0, 0, 0.3);
-}
-
-.annotation-arrow::after {
-  content: "";
-  position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translate(50%, -50%) rotate(45deg);
-  width: 15px;
-  height: 15px;
-  border-top: 3px solid rgb(0, 153, 255);
-  border-right: 3px solid rgb(0, 153, 255);
-}
-
-.done-underline {
-  text-decoration: underline;
-  text-decoration-color: #75fb4c;
-  text-underline-offset: 2px;
-}
-
-.producing-underline {
-  text-decoration: underline;
-  text-decoration-color: #f19e39;
-  text-underline-offset: 2px;
-}
-
-.producing-percent {
-  color: #f19e39;
-  font-weight: bold;
-  margin-right: 4px;
-}
-
-.pos-image,
-.inline-icon {
-  width: 30px;
-  height: 30px;
-  vertical-align: middle;
-  margin-left: 5px;
-}
-
-.preview-arrow {
-  background-color: rgba(
-    0,
-    153,
-    255,
-    0.5
-  ); /* Semi-transparent blue for preview */
-  z-index: 3;
-}
-
-.close-map-button {
-  background-color: #555;
-  color: #fff;
-  border: none;
-  padding: 5px 10px;
-  border-radius: 3px;
-  cursor: pointer;
-}
-
-.clear-annotations-button:hover,
-.close-map-button:hover {
+.clear-annotations-button:hover {
   background-color: #777;
-}
-
-.toast {
-  font-family: Arial, sans-serif;
-  font-size: 15px;
-  line-height: 1.5;
-  position: fixed;
-  margin-bottom: 10px;
-  padding: 10px 20px;
-  border-radius: 5px;
-  color: #fff;
-  animation: fadeInOut 5s ease-in-out;
-  left: 44%;
-}
-
-.toast-success {
-  background-color: #4caf50;
-}
-
-.toast-error {
-  background-color: #f44336;
 }
 
 @keyframes fadeInOut {
@@ -1852,39 +1174,6 @@ textarea::-webkit-scrollbar-thumb:hover {
   visibility: hidden; /* Hidden by default */
 }
 
-.autocomplete-popup .suggestion {
-  padding: 10px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 10px; /* Space between text and image */
-  font-size: 14px; /* Adjust text size */
-  font-family: "Roboto", Arial, sans-serif; /* Ensure font consistency */
-  color: #f0f0f0; /* Lighter text for dark background */
-  transition: background-color 0.2s ease, transform 0.2s ease;
-  border-radius: 12px; /* Rounded edges */
-}
-
-.autocomplete-popup .suggestion img {
-  width: 24px; /* Slightly larger images */
-  height: 24px;
-  margin-right: 10px; /* Consistent spacing */
-  border-radius: 4px; /* Rounded corners for images */
-}
-
-.autocomplete-popup .suggestion:hover {
-  background-color: rgba(60, 60, 60, 0.9); /* Hover effect */
-  border-radius: 12px;
-}
-
-.suggestion.active {
-  background-color: rgba(80, 80, 80, 1); /* Active highlight */
-  color: #ffffff; /* Ensure high contrast */
-  font-weight: bold; /* Make the active suggestion stand out */
-  transform: scale(1.04); /* Subtle scale effect */
-  border-radius: 12px; /* Rounded edges */
-}
-
 .autocomplete-popup::-webkit-scrollbar {
   width: 6px; /* Narrow scrollbar */
 }
@@ -1896,21 +1185,6 @@ textarea::-webkit-scrollbar-thumb:hover {
 
 .autocomplete-popup::-webkit-scrollbar-thumb:hover {
   background: #666; /* Lighter thumb on hover */
-}
-
-.resource {
-  font-weight: bold;
-  color: #ff9800; /* Highlight color for resources */
-}
-
-.resource.gas::before {
-  content: url("/img/resources/gas.webp");
-  margin-right: 4px;
-}
-
-.resource.minerals::before {
-  content: url("/img/resources/minerals.webp");
-  margin-right: 4px;
 }
 /* General Layout for Main Sections */
 .main-layout {
@@ -1928,10 +1202,6 @@ textarea::-webkit-scrollbar-thumb:hover {
 }
 
 /* Second Row: Map and Comment/Video */
-.second-row {
-  display: flex;
-  gap: 20px; /* Space between the columns */
-}
 
 /* Map Container (First Column) */
 #map-container {
@@ -1942,11 +1212,6 @@ textarea::-webkit-scrollbar-thumb:hover {
 }
 
 /* Map Controls */
-#map-controls {
-  display: flex;
-  justify-content: center; /* Center controls under the map */
-  gap: 10px; /* Space between buttons */
-}
 
 /* Comment and Video Container (Second Column) */
 .comment-video-container {
@@ -1961,113 +1226,7 @@ textarea::-webkit-scrollbar-thumb:hover {
   margin-top: 0px;
 }
 
-.tooltip {
-  position: absolute;
-  transform: translateX(-50%);
-  background-color: #333; /* Background */
-  color: #fff; /* Text color */
-  padding: 5px 10px;
-  font-size: 12px;
-  border-radius: 5px;
-  white-space: nowrap; /* Prevent wrapping */
-  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.2); /* Add shadow */
-  opacity: 0; /* Hidden by default */
-  visibility: hidden; /* Hidden by default */
-  transition: opacity 0.3s ease, visibility 0.3s ease;
-  z-index: 1000;
-}
-
-.tooltip::after {
-  content: "";
-  position: absolute;
-  bottom: -5px;
-  left: 50%;
-  transform: translateX(-50%);
-  border: 5px solid transparent;
-  border-top-color: #333; /* Arrow color matches tooltip */
-}
-
 /* Map Modal Styles */
-.map-modal {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background-color: rgba(0, 0, 0, 0.6); /* Darker overlay */
-}
-
-.map-modal-content {
-  display: none;
-  max-width: 800px;
-  padding: 20px;
-  background-color: #2c2c2c; /* Dark background */
-  color: #fff; /* Light text */
-  border-radius: 10px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
-  overflow: hidden;
-}
-
-.map-cards-container {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 20px;
-  padding: 10px;
-  max-height: 400px;
-  overflow-y: auto;
-}
-
-.map-cards-container .map-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 10px;
-  border: 1px solid #444;
-  border-radius: 8px;
-  background-color: #333;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-  transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.map-cards-container .map-card:hover {
-  transform: scale(1.05);
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
-}
-
-.map-cards-container .map-card img {
-  max-width: 100%;
-  border-radius: 5px;
-}
-
-.map-card {
-  display: flex;
-  width: 200px;
-  flex-direction: column;
-  align-items: center;
-  padding: 10px;
-  border: 1px solid #444;
-  border-radius: 8px;
-  background-color: #333;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-  transition: transform 0.2s, box-shadow 0.2s;
-  cursor: pointer;
-}
-
-.map-card:hover {
-  transform: scale(1.05);
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
-}
-
-.map-card-title {
-  font-size: 14px;
-  color: #fff;
-  margin-bottom: 5px;
-  text-align: center;
-}
-
-.map-card img {
-  max-width: 100%;
-  height: auto;
-  border-radius: 5px;
-}
 
 @media screen and (max-width: 425px) {
   #content {
@@ -2119,44 +1278,6 @@ textarea::-webkit-scrollbar-thumb:hover {
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
 }
 
-#communityBuildsTable {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 10px;
-}
-
-#communityBuildsTable td,
-#communityBuildsTable th {
-  padding: 0 10px; /* Remove vertical padding to maintain fixed height */
-  text-align: left; /* Align content for better readability */
-  overflow: hidden; /* Hide overflowing content */
-  white-space: nowrap; /* Prevent wrapping to keep rows compact */
-}
-
-#communityBuildsTable th {
-  font-size: 14px; /* Adjust header font size for compact rows */
-  line-height: 30px; /* Align text vertically in the fixed height */
-  background-color: #333; /* Keep distinct background for headers */
-}
-
-#communityBuildsTable td {
-  font-size: 14px; /* Adjust data font size */
-  line-height: 30px; /* Align text vertically in the fixed height */
-  background-color: #2c2c2c; /* Consistent row background */
-}
-
-#communityBuildsTable td {
-  background-color: #2c2c2c;
-}
-
-#communityBuildsTable tr {
-  height: 30px; /* Let rows adapt to their content */
-}
-
-#communityBuildsTable tr:hover {
-  background-color: #444; /* Maintain hover effect */
-}
-
 #communityHeaderControls {
   display: flex;
   justify-content: flex-end;
@@ -2164,10 +1285,7 @@ textarea::-webkit-scrollbar-thumb:hover {
 }
 
 /* General button styling */
-.vote-button,
-.import-button,
-.view-build-button,
-.view-preview-button {
+.vote-button {
   background: none;
   border: none;
   cursor: pointer;
@@ -2180,36 +1298,24 @@ textarea::-webkit-scrollbar-thumb:hover {
 }
 
 /* Ensure all SVGs inside buttons have the same size */
-.vote-button img,
-.import-button img,
-.view-build-button img,
-.view-preview-button img {
+.vote-button img {
   width: 20px;
   height: 20px;
   transition: transform 0.2s ease;
 }
 
 /* Hover effect: slightly enlarge icons */
-.vote-button:hover img,
-.import-button:hover img,
-.view-build-button:hover img,
-.view-preview-button:hover img {
+.vote-button:hover img {
   transform: scale(1.2);
 }
 
 /* Click effect */
-.vote-button:active img,
-.import-button:active img,
-.view-build-button:active img,
-.view-preview-button:active img {
+.vote-button:active img {
   transform: scale(0.9);
 }
 
 /* Add a subtle background on hover for all buttons */
-.vote-button:hover,
-.import-button:hover,
-.view-build-button:hover,
-.view-preview-button:hover {
+.vote-button:hover {
   background-color: rgba(255, 255, 255, 0.1);
   border-radius: 5px;
 }
@@ -2230,16 +1336,8 @@ textarea::-webkit-scrollbar-thumb:hover {
 }
 
 /* Keep import and view buttons horizontally aligned */
-.import-button,
-.view-build-button {
-  margin: 0 4px; /* Space between import/view */
-}
 
 /* Proper spacing inside table cells */
-td {
-  display: table-cell;
-  vertical-align: middle;
-}
 
 /* Styling for the vote percentage display */
 .vote-percentage {
@@ -2277,52 +1375,6 @@ td {
 }
 
 /* Mark selected vote with a filled color */
-.vote-button.voted-up {
-  background-color: rgba(0, 255, 0, 0.2); /* Light green */
-  border-radius: 5px;
-}
-
-.vote-button.voted-up img {
-  filter: brightness(0) invert(1) sepia(1) hue-rotate(90deg) saturate(3);
-}
-
-.vote-button.voted-down {
-  background-color: rgba(255, 0, 0, 0.2); /* Light red */
-  border-radius: 5px;
-}
-
-.vote-button.voted-down img {
-  filter: brightness(0) invert(1) sepia(1) hue-rotate(0deg) saturate(3);
-}
-
-.vote-info {
-  display: inline-block;
-  text-align: center;
-  vertical-align: middle;
-  margin-left: 8px; /* adjust as needed */
-  line-height: 12px;
-}
-
-.vote-info .vote-percentage {
-  margin-bottom: 2px;
-  margin-top: 2px;
-}
-
-.vote-info .vote-percentage,
-.vote-info .vote-count {
-  display: block;
-}
-.vote-info .vote-count {
-  font-size: 0.8em;
-  color: #666;
-}
-
-.vote-button-container {
-  display: inline-block;
-  text-align: center;
-  vertical-align: middle;
-  margin-left: 8px; /* adjust as needed */
-}
 
 .community-layout {
   display: grid;
@@ -2343,34 +1395,6 @@ td {
   border-radius: 8px;
   overflow: auto;
   min-height: 250px;
-}
-
-.build-preview pre {
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  font-size: 14px;
-  background: none;
-  color: #e0e0e0;
-}
-
-.publish-btn {
-  background-color: #007bff; /* Blue color */
-  color: white;
-  font-weight: bold;
-  border: none;
-  padding: 10px 15px;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: background-color 0.3s ease, transform 0.2s ease;
-}
-
-.publish-btn:hover {
-  background-color: #0056b3; /* Darker blue on hover */
-  transform: scale(1.05);
-}
-
-.publish-btn:active {
-  transform: scale(1);
 }
 
 .modal input {
@@ -2415,27 +1439,6 @@ td {
   background: #333; /* Background of scrollbar */
 }
 
-.build-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: #1a1a1a;
-  padding: 12px 16px;
-  margin-bottom: 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.build-row:hover {
-  background: #2a2a2a;
-}
-
-.build-info {
-  display: flex;
-  flex-direction: column;
-}
-
 .build-info-item {
   background: rgba(255, 255, 255, 0.05);
   padding: 10px 20px;
@@ -2475,13 +1478,6 @@ td {
   border-radius: 4px;
   font-size: 1rem;
   line-height: 1.4;
-}
-
-.build-order-container pre {
-  font-size: 1rem;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  color: #e0e0e0;
 }
 
 .build-order-container h3 {
@@ -2570,40 +1566,7 @@ td {
   }
 }
 
-.build-output {
-  flex-grow: 1; /* Allow it to take up remaining space */
-  overflow-y: auto; /* Ensure scrolling if needed */
-  font-size: 1rem;
-  background-color: rgba(255, 255, 255, 0.03);
-  padding: 15px;
-  border-radius: 8px;
-  text-align: left;
-  height: 94%;
-  max-height: 100%; /* Ensure it does not overflow parent */
-  overflow-y: auto;
-  color: white;
-}
-
-.build-output img {
-  vertical-align: middle;
-  height: 28px;
-  margin-left: 5px;
-}
-
 /* Style for the View button */
-.view-preview-button {
-  background-color: #444;
-  color: white;
-  border: none;
-  padding: 5px 10px;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-}
-
-.view-preview-button:hover {
-  background-color: #555;
-}
 
 #communityBuildPreview {
   max-height: 100%; /* Limits the height */
@@ -2885,110 +1848,21 @@ td {
 #communityBuildsContainer::-webkit-scrollbar-track {
   background: #222;
 }
-#buildList.list-view {
-  display: flex;
-  flex-direction: column;
-  gap: 0px;
-  padding: 10px;
-  max-height: 78vh;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding-right: 10px;
-  scrollbar-width: thin;
-  scrollbar-color: #444 #222;
-  padding-left: 30px;
-}
-#buildList.list-view::-webkit-scrollbar {
-  width: 10px;
-}
-#buildList.list-view::-webkit-scrollbar-thumb {
-  background-color: #444;
-  border-radius: 4px;
-  border: 2px solid #222;
-}
-#buildList.list-view::-webkit-scrollbar-track {
-  background: #222;
-}
-#buildList.list-view .build-entry .build-publish-info {
-  position: absolute;
-  bottom: 8px;
-  right: 8px;
-}
 
 
 /* Each build entry */
-.build-entry {
-  display: flex;
-  align-items: center; /* ✅ Aligns image and content */
-  padding: 12px;
-  background-color: #2c2c2c;
-  border-bottom: 1px solid #444;
-  font-size: 16px;
-  color: white;
-  cursor: pointer; /* ✅ Make div clickable */
-  transition: background-color 0.2s ease, transform 0.1s ease;
-  position: relative;
-}
 
 /* ✅ Left section - Matchup image */
-.build-left {
-  flex-shrink: 0; /* Prevents image from shrinking */
-  margin-right: 12px; /* Space between image and text */
-}
 
 /* ✅ Right section - Text content */
-.build-right {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-}
-
-.matchup-icon {
-  width: 40px; /* ✅ Adjust as needed */
-  height: 40px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid #888; /* ✅ Add border for better visibility */
-}
 
 /* Race-specific dark border tones */
-.matchup-terran .matchup-icon {
-  border-color: #b52a21; /* dark terran red */
-}
-
-.matchup-zerg .matchup-icon {
-  border-color: #7b3ea1; /* dark zerg purple */
-}
-
-.matchup-protoss .matchup-icon {
-  border-color: #006a91; /* dark protoss blue */
-}
 
 /* Hover effect */
-.build-entry:hover {
-  background-color: #3a3a3a;
-  transform: scale(1.02);
-}
 
 /* Title row */
-.build-title {
-  font-size: 1.3rem;
-  font-weight: bold;
-  color: #ffffff;
-  margin: 12px 0 4px 0;
-}
 
 /* Metadata row */
-.build-meta {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  flex-wrap: wrap; /* Optional: wrap if screen is too small */
-  gap: 8px; /* Optional: clean spacing between items */
-  font-size: 0.9rem;
-  color: #aaaaaa;
-  margin-top: 5px;
-}
 
 /* Meta "chip" style */
 .meta-chip {
@@ -3008,19 +1882,8 @@ td {
 }
 
 /* ✅ Matchup chip (Custom Styling) */
-.meta-chip.matchup-chip {
-  background-color: #444 !important;
-  color: #ffcc00 !important;
-  font-weight: bold;
-}
 
 /* Vote info */
-.vote-info {
-  display: flex;
-  gap: 5px;
-  font-size: 14px;
-  color: white;
-}
 
 /* Icons inside meta chips */
 .meta-icon {
@@ -3029,11 +1892,6 @@ td {
 }
 
 /* Voting section */
-.build-voting {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
 
 .vote-button {
   background: none;
@@ -3048,33 +1906,7 @@ td {
   transform: scale(1.2);
 }
 
-.vote-info {
-  text-align: center;
-  font-size: 14px;
-  color: #e0e0e0;
-}
-
 /* Action buttons (preview, import, view) */
-.build-actions {
-  display: flex;
-  gap: 10px;
-}
-
-.build-actions button {
-  background: none;
-  border: none;
-  cursor: pointer;
-}
-
-.build-actions img {
-  width: 20px;
-  height: 20px;
-  transition: transform 0.2s ease;
-}
-
-.build-actions button:hover img {
-  transform: scale(1.2);
-}
 
 .view-toggle-buttons {
   display: flex;
@@ -3149,171 +1981,11 @@ td {
   }
 }
 
-.example-block {
-  margin-bottom: 50px;
-}
-
-.example-input {
-  background-color: #222;
-  padding: 10px;
-  border-radius: 5px;
-  font-family: monospace;
-  color: #ccc;
-}
-
-.formatted-preview {
-  background-color: #2c2c2c;
-  border: 1px solid #444;
-  padding: 10px;
-  border-radius: 5px;
-  font-size: 1.1em;
-  margin-top: 5px;
-  line-height: 1.6;
-}
-
-.abbreviation-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 8px 20px;
-  margin-top: 10px;
-  margin-bottom: 20px;
-}
-
-.abbr-item {
-  background-color: #2c2c2c;
-  border: 1px solid #444;
-  border-radius: 5px;
-  padding: 8px 10px;
-  font-size: 0.95em;
-  display: flex;
-  justify-content: space-between;
-  color: #e0e0e0;
-}
-
-.abbreviation-list {
-  display: flex;
-  flex-wrap: wrap; /* Allow rows to wrap */
-  gap: 10px; /* Space between rows */
-  margin-top: 10px;
-  margin-bottom: 20px;
-}
-
-.abbr-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background-color: #2c2c2c;
-  border: 1px solid #444;
-  border-radius: 6px;
-  padding: 8px 12px;
-  box-sizing: border-box;
-  flex-grow: 0;
-}
-
-.abbr-left {
-  font-family: monospace;
-  font-weight: bold;
-  color: #cfcfcf;
-  margin-right: 10px;
-  white-space: nowrap;
-}
-
-.abbr-right {
-  flex: 1;
-  text-align: left;
-}
-
 .arrow {
   margin: 0 10px;
   color: #e0e0e0;
   font-weight: bold;
   white-space: nowrap;
-}
-.example-flex {
-  display: flex;
-  gap: 40px;
-  margin-top: 10px;
-  flex-wrap: wrap;
-}
-
-.example-left,
-.example-right {
-  flex: 1;
-  min-width: 300px;
-}
-.example-left {
-  background-color: #252525;
-  padding: 10px;
-  border-radius: 5px;
-}
-
-.example-left p {
-  padding-left: 20px;
-}
-
-.example-right {
-  background-color: #1f1f1f;
-  padding: 10px;
-  border-radius: 5px;
-}
-
-.example-subtitle {
-  font-size: 1.2em;
-  font-weight: bold;
-  color: #e0e0e0;
-  margin-bottom: 20px;
-  padding-left: 10px;
-  text-align: center;
-}
-
-.example-description {
-  background-color: #1e1e1e;
-  padding: 10px;
-  border-radius: 5px;
-  border: 1px solid #444;
-  color: #ccc;
-  font-size: 0.95em;
-  line-height: 1.5;
-}
-
-.example-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 8px;
-}
-
-.example-table td {
-  padding: 6px 10px;
-  border: 1px solid #444;
-  background-color: #1f1f1f;
-  color: #ddd;
-}
-
-.example-col-1 {
-  width: 120px;
-  font-weight: bold;
-  color: #aaa;
-}
-
-.example-image {
-  width: 100%;
-  max-width: 300px;
-  margin-top: 10px;
-  border-radius: 8px;
-  border: 1px solid #444;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-  display: block;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-.supply-overcap {
-  color: red;
-  font-weight: bold;
-}
-
-.supply-normal {
-  color: inherit;
 }
 
 /* Publish Modal Styles */
@@ -3345,14 +2017,6 @@ td {
 
 .small-modal > * + * {
   margin-top: 16px;
-}
-
-.publish-options {
-  margin: 20px 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  text-align: left;
 }
 
 .modal-buttons {
@@ -3435,8 +2099,7 @@ td {
   font-weight: 600;
 }
 
-.label-clans,
-.label-clan {
+.label-clans {
   color: #50c878;
   font-weight: 600;
 }
@@ -3452,16 +2115,8 @@ td {
 }
 
 /* Valid username */
-.username-valid {
-  border-color: #00e676;
-  box-shadow: 0 0 8px #00e676;
-}
 
 /* Invalid username */
-.username-invalid {
-  border-color: #ff5252;
-  box-shadow: 0 0 8px #ff5252;
-}
 
 .spinner-small {
   position: absolute;
@@ -3627,41 +2282,6 @@ td {
   background-color: rgba(30, 30, 30, 1);
 }
 
-.clan-card {
-  width: 180px;
-  border: 1px solid #444;
-  border-radius: 8px;
-  background-color: #1a1a1a;
-  overflow: hidden;
-  margin: 8px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  font-size: 0.9rem;
-}
-
-.clan-card-banner {
-  width: 100%;
-  height: 100px;
-  background-size: contain;
-  background-repeat: no-repeat;
-  background-position: center;
-  background-color: #111;
-  border-bottom: 1px solid #333;
-}
-
-.clan-card-content {
-  padding: 10px;
-  text-align: center;
-  width: 100%;
-}
-
-.clan-card-content button {
-  margin-top: 6px;
-  padding: 6px 12px;
-  font-size: 0.8rem;
-}
-
 /* Top-level tab switcher (Create, Manage, Find) */
 .clan-main-tabs {
   display: flex;
@@ -3680,58 +2300,6 @@ td {
 
 #clan-requests-tab {
   padding: 12px 16px;
-}
-
-.clan-settings-form {
-  max-width: 500px;
-  margin: 0 auto;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  background: #111;
-  border-radius: 8px;
-  max-width: 600px;
-}
-
-.clan-settings-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.clan-settings-field label {
-  display: block;
-  font-weight: bold;
-  margin-bottom: 6px;
-  color: #ccc;
-}
-
-.clan-settings-field input,
-.clan-settings-field textarea {
-  width: 100%;
-  padding: 8px;
-  border: 1px solid #444;
-  background: #1a1a1a;
-  color: #eee;
-  border-radius: 4px;
-}
-
-.clan-settings-form textarea {
-  resize: vertical;
-  min-height: 80px;
-}
-
-.clan-settings-form button {
-  align-self: flex-end;
-  margin-top: 8px;
-  padding: 8px 16px;
-  background-color: var(--active-color);
-  border: none;
-  border-radius: 4px;
-  color: white;
-  font-weight: bold;
-  cursor: pointer;
 }
 
 /* Override modal button styles specifically for clan tabs */
@@ -3776,309 +2344,11 @@ td {
   color: #fff;
 }
 
-.clan-banner h3 {
-  font-size: 1.5em;
-  font-weight: bold;
-  color: white;
-}
-
-.clan-content-card {
-  background-color: #1a1a1a;
-  border: 1px solid #333;
-  border-radius: 8px;
-  padding: 16px;
-  max-width: 700px;
-  margin: 16px auto;
-}
-
-.clan-info-card {
-  background: #2c2c2c;
-  border-radius: 10px;
-  margin: 16px 10px;
-}
-
-.clan-info-card p {
-  padding-left: 10px;
-}
-
-.clan-info-card h3 {
-  padding-left: 10px;
-}
-
-.clan-search-input {
-  padding: 8px 12px;
-  font-size: 1rem;
-  border-radius: 6px;
-  border: 1px solid #444;
-  background-color: #222;
-  color: #eee;
-  margin-left: auto;
-  width: 220px;
-}
-
-.template-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 16px;
-}
-
-.clan-banner-wrapper {
-  display: flex;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  justify-content: start;
-  gap: 20px;
-  position: relative; /* ✅ allows join button positioning */
-  background-color: #1e1e1e;
-  border-bottom: solid #353535;
-}
-
-.clan-banner-logo {
-  width: 200px;
-  height: 200px;
-  object-fit: cover;
-  border-radius: 8px;
-}
-
-.clan-banner-text {
-  max-width: 400px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.clan-banner-title {
-  margin: 0;
-  font-size: 1.6rem;
-  font-weight: bold;
-  color: #fff;
-}
-
-.clan-banner-description {
-  color: #aaa;
-  font-size: 0.95rem;
-}
-
-.clan-banner-info {
-  color: #ccc;
-  font-size: 0.9rem;
-  text-align: right;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  text-align: initial;
-}
-
-.clan-banner-wrapper img {
-  width: 200px;
-  height: 200px;
-  object-fit: cover;
-  border-radius: 8px;
-}
-
-.clan-banner-wrapper h3 {
-  margin: 0;
-  font-size: 1.6rem;
-  color: #fff;
-}
-
-.clan-member-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 12px;
-}
-
-.clan-member-table th,
-.clan-member-table td {
-  padding: 10px 12px;
-  border: 1px solid #444;
-  color: #eee;
-}
-
-.clan-member-table th {
-  background-color: #2a2a2a;
-  text-align: left;
-}
-
-.clan-member-table button.btn-small {
-  padding: 4px 10px;
-  background-color: var(--active-color);
-  border: none;
-  color: #fff;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.85em;
-}
-
-.clan-member-table td:first-child,
-.clan-member-table th:first-child {
-  border-left: none;
-}
-
-.clan-member-table td:last-child,
-.clan-member-table th:last-child {
-  border-right: none;
-}
-
-.clan-select-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.clan-select-card {
-  background-color: #1a1a1a;
-  border: 1px solid #333;
-  color: #eee;
-  padding: 16px;
-  margin: 8px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: bold;
-  transition: background-color 0.2s;
-}
-
-.clan-select-card:hover {
-  background-color: #2a2a2a;
-}
-
-.clan-grid-manage {
-  max-height: 70vh;
-  overflow-y: auto;
-}
-
-.clan-grid-manage::-webkit-scrollbar {
-  width: 10px;
-}
-
-.clan-grid-manage::-webkit-scrollbar-thumb {
-  background: #666; /* Darker color for scroll thumb */
-  border-radius: 5px; /* Rounded edges */
-}
-
-.clan-grid-manage::-webkit-scrollbar-thumb:hover {
-  background: #333; /* Background of scrollbar */
-}
-
 /* Green accept button */
-.modal .clan-tab-content .btn-accept {
-  background-color: #28a745; /* Green */
-  color: white;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.modal .clan-tab-content .btn-deny {
-  background-color: #dc3545; /* Red */
-  color: white;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.settings-scroll-wrapper {
-  max-height: 728px; /* Adjust as needed */
-  overflow-y: auto;
-  padding-right: 6px;
-}
 
 /* Custom scrollbar styling */
-.settings-scroll-wrapper::-webkit-scrollbar {
-  width: 6px;
-}
-
-.settings-scroll-wrapper::-webkit-scrollbar-thumb {
-  background: #444;
-  border-radius: 3px;
-}
-
-.settings-scroll-wrapper::-webkit-scrollbar-thumb:hover {
-  background: #666;
-}
-
-.highlight-captain {
-  background-color: #222830;
-  border-left: 4px solid gold;
-  font-weight: bold;
-  color: gold;
-}
-
-.highlight-co-captain {
-  background-color: #1c2732;
-  border-left: 4px solid #5fe5ff;
-  font-weight: bold;
-  color: #5fe5ff;
-}
 
 /* Optional: darker on hover */
-.btn-accept:hover {
-  background-color: #27ae60;
-}
-
-.btn-accept:hover:enabled {
-  background-color: #45a045;
-}
-
-.btn-deny:hover {
-  background-color: #c0392b;
-}
-
-.btn-disabled {
-  background-color: #555;
-  color: #ccc;
-  cursor: not-allowed;
-  pointer-events: none;
-  transition: none !important;
-}
-
-.btn-disabled:hover {
-  background-color: #555 !important;
-  color: #ccc !important;
-}
-
-.clan-breadcrumb {
-  font-size: 0.9rem;
-  margin-bottom: 12px;
-  color: #aaa;
-  padding-left: 8px;
-}
-
-.clan-breadcrumb {
-  font-size: 1.2rem;
-  color: #999;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 16px;
-  margin-top: 16px;
-  padding-left: 8px;
-}
-
-.breadcrumb-link {
-  color: #ccc;
-  cursor: pointer;
-  transition: color 0.2s ease;
-}
-
-.breadcrumb-link:hover {
-  color: #fff;
-}
-
-.breadcrumb-divider::before {
-  content: "›";
-  color: #888;
-  font-size: 1.2rem; /* bigger */
-  font-weight: 600; /* bolder */
-  margin: 0 4px;
-}
-
-.breadcrumb-current {
-  color: #fff;
-  font-weight: bold;
-}
 
 .community-type-toggle {
   display: flex;
@@ -4099,43 +2369,10 @@ td {
   background-color: #007cf0;
 }
 
-#showClanModalButton .notification-dot {
-  top: 0px;
-  right: 4px;
-}
-
-.notification-dot {
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  width: 10px;
-  height: 10px;
-  background-color: red;
-  border-radius: 50%;
-  z-index: 10;
-}
-
-.notification-dot {
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  width: 10px;
-  height: 10px;
-  background-color: red;
-  border-radius: 50%;
-  z-index: 10;
-  opacity: 0;
-  animation: fadeInDot 0.3s forwards;
-}
-
 @keyframes fadeInDot {
   to {
     opacity: 1;
   }
-}
-
-.notification-dot.removing {
-  animation: fadeOutDot 0.3s forwards;
 }
 
 @keyframes fadeOutDot {
@@ -4143,45 +2380,6 @@ td {
     opacity: 0;
     transform: scale(0.5);
   }
-}
-
-.clan-grid-manage {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
-  padding: 10px 0;
-  justify-content: center;
-}
-
-.clan-card-manage {
-  background-color: #1d1d1d;
-  border: 1px solid #333;
-  border-radius: 12px;
-  padding: 15px;
-  width: 180px;
-  height: 160px;
-  position: relative;
-  cursor: pointer;
-  text-align: center;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.clan-card-manage:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
-}
-
-.clan-card-logo {
-  width: 64px;
-  height: 64px;
-  object-fit: contain;
-  margin-bottom: 10px;
-}
-
-.clan-card-title {
-  font-weight: bold;
-  color: #ddd;
-  font-size: 16px;
 }
 
 .drop-sc-upload-btn {
@@ -4236,24 +2434,6 @@ td {
   text-decoration: none;
 }
 
-.tag {
-  display: inline-block;
-  font-size: 0.7rem;
-  font-weight: 600;
-  padding: 2px 6px;
-  border-radius: 6px;
-  margin-left: 6px;
-  color: white;
-}
-
-.tag.public {
-  background-color: #2e7d32; /* green */
-}
-
-.tag.clan {
-  background-color: #3949ab; /* blue */
-}
-
 #myBuildsTab.active,
 #publishedBuildsTab.active {
   background-color: var(--active-color);
@@ -4279,11 +2459,6 @@ td {
   .comment-video-container {
     max-width: 100%;
     width: 100%;
-  }
-  .second-row {
-    flex-direction: column; /* Stack the second row vertically */
-    align-items: stretch; /* Ensure elements take full width */
-    gap: 20px; /* Add spacing between elements */
   }
   #map-preview-container {
     max-width: 100%; /* Full width */
