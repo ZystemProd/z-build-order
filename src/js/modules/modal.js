@@ -843,10 +843,12 @@ export async function populateBuildList(
 
       if (build.imported) {
         publishInfo.classList.add("publish-imported");
+        publishInfo.dataset.tooltip = "imported";
         publishInfo.innerHTML = `<img src="./img/SVG/import2.svg" class="publish-icon" alt="Imported">`;
         publishInfo.style.pointerEvents = "none";
       } else if (isBuildPublished) {
         publishInfo.classList.add("publish-published");
+        publishInfo.dataset.tooltip = "published";
         publishInfo.innerHTML = `<img src="./img/SVG/checkmark2.svg" class="publish-icon" alt="Published">`;
         if (publishedTab) {
           if (build.isPublic)
@@ -865,6 +867,7 @@ export async function populateBuildList(
         }
       } else {
         publishInfo.classList.add("publish-unpublished");
+        publishInfo.dataset.tooltip = "publish";
         publishInfo.innerHTML = `<img src="./img/SVG/publish2.svg" class="publish-icon" alt="Publish">`;
         publishInfo.addEventListener("click", (e) => {
           e.stopPropagation();
@@ -964,6 +967,7 @@ export async function unpublishBuild(buildId) {
       const publishInfo = buildEl.querySelector(".build-publish-info");
       if (publishInfo) {
         publishInfo.innerHTML = `<img src="./img/SVG/publish2.svg" alt="Publish" class="publish-icon">`;
+        publishInfo.dataset.tooltip = "publish";
         publishInfo.classList.remove("publish-published", "no-border");
         publishInfo.classList.add("publish-unpublished");
         publishInfo.style.pointerEvents = "auto";

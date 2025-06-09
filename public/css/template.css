@@ -644,6 +644,13 @@
     display: flex;
     flex-direction: row;
     justify-content: space-between;
+    gap: 0;
+  }
+  #buildHeaderControls #myBuildsTab {
+    margin-right: 10px;
+  }
+  #buildHeaderControls #publishedBuildsTab {
+    margin-left: 10px;
   }
   #buildHeaderControls .search-bar {
     grid-area: search;
@@ -651,6 +658,7 @@
   #buildHeaderControls .view-toggle-buttons {
     grid-area: view;
     justify-self: end;
+    width: auto;
   }
   #buildHeaderControls .filters-container {
     grid-area: filters;
