@@ -588,7 +588,36 @@
     height: 95%;
   }
   .template-header {
-    position: static;
+    position: relative;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 10px;
+    gap: 10px;
+  }
+  .template-header .header-controls {
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    align-items: stretch;
+  }
+  .template-header .search-bar {
+    width: 100%;
+  }
+  .template-header .tab-buttons,
+  .template-header .community-type-toggle,
+  .template-header .filters-container,
+  .template-header .view-toggle-buttons {
+    width: 100%;
+  }
+  .template-header .filters-wrapper {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .template-header .filter-category {
+    padding: 10px 15px;
+  }
+  .template-header .tab-buttons button {
+    width: 100%;
   }
   .template-list {
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
