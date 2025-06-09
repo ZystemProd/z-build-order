@@ -608,7 +608,7 @@
   }
   .template-header .filters-wrapper {
     flex-wrap: wrap;
-    gap: 10px;
+    gap: 0;
   }
   .template-header .filter-category {
     padding: 10px 15px;
@@ -636,7 +636,7 @@
     grid-template-areas:
       "tabs tabs"
       "search filters"
-      "view filters";
+      "view view";
     gap: 10px;
   }
   #buildHeaderControls .tab-buttons {
@@ -650,6 +650,7 @@
   }
   #buildHeaderControls .view-toggle-buttons {
     grid-area: view;
+    justify-self: end;
   }
   #buildHeaderControls .filters-container {
     grid-area: filters;

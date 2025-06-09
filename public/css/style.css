@@ -4477,6 +4477,7 @@ button.btn-small {
     grid-template-columns: repeat(4, 1fr);
     grid-template-rows: auto;
     width: fit-content;
+    gap: 0;
   }
   .filters-wrapper .filter-category[data-category="all"] {
     grid-column: auto;
