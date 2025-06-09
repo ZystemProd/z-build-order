@@ -4473,13 +4473,21 @@ button.btn-small {
     display: none;
   }
   .build-card {
-    width: 100px !important;
-    height: 100px !important;
+    width: 170px !important;
+    height: 170px !important;
   }
   .build-card .map-image {
     height: 54px;
   }
   .build-meta {
     font-size: 0.7rem;
+    line-height: 0;
+    gap: 0px;
+  }
+  .build-title {
+    font-size: 1rem;
+  }
+  .tab-text {
+    display: none;
   }
 }

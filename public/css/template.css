@@ -50,7 +50,6 @@
   flex: 1;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  grid-template-rows: 300px 300px;
   gap: 10px;
   overflow-y: auto; /* ✅ Enables scrolling */
   max-height: 76vh; /* ✅ Limits height to fit screen */
@@ -597,5 +596,14 @@
   }
   .template-card {
     width: 120px;
+  }
+  #buildHeaderControls {
+    flex-direction: column;
+    gap: 10px;
+    align-items: stretch;
+  }
+  .template-list .build-card {
+    width: 170px !important;
+    height: 170px !important;
   }
 }
