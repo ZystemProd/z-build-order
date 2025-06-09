@@ -21,6 +21,10 @@ Create a production build with:
 npm run build
 ```
 
+The build configuration uses Vite's `splitVendorChunkPlugin` to automatically
+separate vendor dependencies into smaller chunks. This helps reduce unused
+JavaScript on initial page load.
+
 ## Preview Deployment
 
 Deploy the current build to the `dev` preview channel:
