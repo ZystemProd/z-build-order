@@ -222,7 +222,7 @@ export function formatWorkersOrTimestamp(
 // Function to analyze and update the build order table automatically
 export function analyzeBuildOrder(inputText) {
   requestAnimationFrame(() => {
-    // Ensures real-time UI update
+
     const lines = inputText.split("\n");
     const table = document.getElementById("buildOrderTable");
 
@@ -416,7 +416,7 @@ export function showBuildOrderHelpModal() {
     },
     {
       title: "Completed Upgrade with Percent",
-      input: "@100% stim push opponent third base",
+      input: "@100% stimpack push opponent third base",
       description:
         "Using <code><u>@100%</u>, <u>@100</u> or <u>100%</u></code> marks the action as fully completed and visually emphasizes the upgrade status.",
     },

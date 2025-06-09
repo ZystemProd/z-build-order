@@ -2,6 +2,7 @@ import { getFirestore, doc, getDoc, updateDoc } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
 const BRACKET_KEY = "enableBracketInput";
+const INPUT_KEY = "showBuildInput";
 export function isBracketInputEnabled() {
   const value = localStorage.getItem(BRACKET_KEY);
   return value === null ? true : value === "true";
@@ -19,6 +20,24 @@ export function setBracketInputEnabled(enabled) {
   }
 }
 
+export function isBuildInputShown() {
+  const value = localStorage.getItem(INPUT_KEY);
+  return value === null ? true : value === "true";
+}
+
+export function setBuildInputShown(shown) {
+  localStorage.setItem(INPUT_KEY, shown ? "true" : "false");
+
+  const user = getAuth().currentUser;
+  if (user) {
+    const db = getFirestore();
+    updateDoc(doc(db, "users", user.uid), {
+      "settings.showBuildInput": shown,
+    }).catch((err) => console.error("Failed to save input field setting", err));
+  }
+}
+
+
 
 export async function loadUserSettings() {
   const user = getAuth().currentUser;
@@ -31,6 +50,12 @@ export async function loadUserSettings() {
       localStorage.setItem(
         BRACKET_KEY,
         data.enableBracketInput ? "true" : "false"
+      );
+    }
+    if (data.showBuildInput !== undefined) {
+      localStorage.setItem(
+        INPUT_KEY,
+        data.showBuildInput ? "true" : "false"
       );
     }
   } catch (err) {

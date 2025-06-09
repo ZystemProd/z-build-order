@@ -26,6 +26,7 @@ export function parseBuildOrder(buildOrderText) {
     .filter((step) => step !== null); // Filter out invalid steps
 }
 
+
 export function resetBuildInputs() {
   console.log("🔄 Resetting inputs..."); // Debugging log
 

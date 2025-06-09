@@ -112,9 +112,6 @@
 
       <!-- Build Order Input Section with Toggle -->
       <div class="toggle-header">
-        <h3 data-section="buildOrderInputField" class="toggle-title">
-          <span id="buildOrderInputArrow" class="arrow open"></span> INPUT
-        </h3>
         <div id="editModeBanner"></div>
 
         <div id="box">
@@ -194,9 +191,11 @@
               <path d="M33,0 L60,26" />
               <path d="M60,26 L0,26" />
               <path d="M0,26 L0,0" />
-              <text x="10" y="18">+</text>
+              <text x="10" y="20">+</text>
             </svg>
             <div id="templateDropdown" class="dropdown-content">
+              <button id="parseReplayButton" class="btn">Upload From Replay</button>
+              <hr class="dropdown-divider" />
               <button id="openTemplatesButton">Open Templates</button>
               <button id="saveTemplateButton">Save Template</button>
             </div>
@@ -315,6 +314,9 @@
             <p>then →</p>
             <input type="url" id="replayLinkInput" placeholder="Paste Drop.sc replay URL here..." style="flex: 1;" />
 
+          </div>
+          <div style="margin-bottom: 10px;">
+            <input type="file" id="replayFileInput" accept=".SC2Replay" style="display: none" />
           </div>
 
           <!-- Replay Link View Button (visible if replayUrl exists) -->
@@ -652,6 +654,15 @@
             </label>
           </div>
         </div>
+        <div class="publish-checkbox-row">
+          <span>Show Build Input</span>
+          <div class="checkbox-wrapper-59">
+            <label class="switch">
+              <input type="checkbox" id="buildInputToggle" checked />
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -688,6 +699,65 @@
     </div>
 
 
+    <!-- Replay Options Modal -->
+    <div id="replayOptionsModal" class="modal" style="display: none;">
+      <div class="modal-content small-modal">
+        <span class="close-modal" id="closeReplayOptionsModal">&times;</span>
+        <h3>Replay Options</h3>
+        <div>
+          <label for="playerSelect">Select Player:</label>
+          <select id="playerSelect"></select>
+        </div>
+        <div class="publish-checkbox-row">
+          <span>Exclude Workers</span>
+          <div class="checkbox-wrapper-59">
+            <label class="switch">
+              <input type="checkbox" id="excludeWorkersCheckbox" checked />
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+        <div class="publish-checkbox-row">
+          <span>Exclude Supply</span>
+          <div class="checkbox-wrapper-59">
+            <label class="switch">
+              <input type="checkbox" id="excludeSupplyCheckbox" />
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+        <div class="publish-checkbox-row">
+          <span>Exclude Time</span>
+          <div class="checkbox-wrapper-59">
+            <label class="switch">
+              <input type="checkbox" id="excludeTimeCheckbox" checked />
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+        <div class="publish-checkbox-row">
+          <span class="label-with-icon">Compact Mode <span class="info-icon"
+              data-tooltip="Combines actions at same supply. Requires 'Exclude Time' checked">?</span></span>
+          <div class="checkbox-wrapper-59">
+            <label class="switch">
+              <input type="checkbox" id="compactModeCheckbox" />
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+        <div>
+          <label for="supplyLimitInput">Stop at supply:</label>
+          <input type="number" id="supplyLimitInput" min="0" value="50" placeholder="e.g. 50" />
+        </div>
+        <button id="confirmReplayOptionsButton" class="btn">Parse Replay</button>
+      </div>
+    </div>
+
+    <div id="optionsLoadingWrapper" style="display: none; justify-content: center;">
+      <div class="spinner"></div>
+    </div>
+
+
 
 
 
@@ -714,8 +784,7 @@
     <div class="footer-center" id="site-info">
       <p>Made by Zystem</p>
 
-
-      <p>Version 0.5.7027</p>
+      <p>Version 0.5.7059</p>
 
 
     </div>

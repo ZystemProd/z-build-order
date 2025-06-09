@@ -86,6 +86,8 @@ import {
 import {
   isBracketInputEnabled,
   setBracketInputEnabled,
+  isBuildInputShown,
+  setBuildInputShown,
   loadUserSettings,
 } from "../settings.js";
 import { checkForJoinRequestNotifications } from "../utils/notificationHelpers.js";
@@ -98,6 +100,12 @@ function updateSupplyColumnVisibility() {
   } else {
     table.classList.add("hide-supply");
   }
+}
+
+function updateBuildInputVisibility() {
+  const section = document.getElementById("buildOrderInputField");
+  if (!section) return;
+  section.style.display = isBuildInputShown() ? "block" : "none";
 }
 
 setupTemplateModal(); // Always call early
@@ -323,8 +331,13 @@ export async function initializeIndexPage() {
       const toggle = document.getElementById("bracketInputToggle");
       if (toggle) {
         toggle.checked = isBracketInputEnabled();
-        updateSupplyColumnVisibility();
       }
+      const inputToggle = document.getElementById("buildInputToggle");
+      if (inputToggle) {
+        inputToggle.checked = isBuildInputShown();
+      }
+      updateSupplyColumnVisibility();
+      updateBuildInputVisibility();
     }
   });
 
@@ -415,7 +428,12 @@ export async function initializeIndexPage() {
   safeAdd("saveTemplateButton", "click", showSaveTemplateModal);
 
   // --- Text Inputs
-  safeInput("buildOrderInput", (val) => analyzeBuildOrder(val));
+  const buildInput = document.getElementById("buildOrderInput");
+  if (buildInput) {
+    buildInput.addEventListener("input", () => {
+      analyzeBuildOrder(buildInput.value.trim());
+    });
+  }
   safeInput("buildSearchBar", (val) => searchBuilds(val));
   safeInput("communitySearchBar", async (val) => {
     await searchCommunityBuilds(val);
@@ -423,6 +441,145 @@ export async function initializeIndexPage() {
 
   safeInput("templateSearchBar", (val) => searchTemplates(val));
   safeInput("videoInput", (val) => updateYouTubeEmbed(val));
+
+  let selectedReplayFile = null;
+
+  safeAdd("parseReplayButton", "click", () => {
+    const input = document.getElementById("replayFileInput");
+    if (input) input.click();
+  });
+
+  async function populateReplayOptions(file) {
+    const loader = document.getElementById("optionsLoadingWrapper");
+    if (loader) loader.style.display = "flex";
+    const select = document.getElementById("playerSelect");
+    if (!select) return;
+    select.innerHTML = "<option>Loading...</option>";
+
+    const formData = new FormData();
+    formData.append("replay", file);
+
+    try {
+      const res = await fetch("https://z-build-order.onrender.com/players", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      const players = Array.isArray(data) ? data : data.players;
+      select.innerHTML = "";
+      players.forEach((p) => {
+        const opt = document.createElement("option");
+        opt.value = p.pid;
+        opt.textContent = `${p.name} (${p.race})`;
+        select.appendChild(opt);
+      });
+      const matchup = data.matchup;
+      if (matchup) {
+        const dropdown = document.getElementById("buildCategoryDropdown");
+        if (dropdown) {
+          dropdown.value = matchup;
+          updateDropdownColor();
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch players", err);
+      select.innerHTML = "<option value='1'>Player 1</option>";
+    }
+    if (loader) loader.style.display = "none";
+  }
+
+  safeAdd("replayFileInput", "change", async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    selectedReplayFile = file;
+    e.target.value = "";
+
+    await populateReplayOptions(file);
+    const modal = document.getElementById("replayOptionsModal");
+    if (modal) modal.style.display = "block";
+  });
+
+  safeAdd("confirmReplayOptionsButton", "click", async () => {
+    if (!selectedReplayFile) return;
+    const btn = document.getElementById("confirmReplayOptionsButton");
+    btn.disabled = true;
+    btn.innerText = "⏳ Parsing...";
+
+    const formData = new FormData();
+    formData.append("replay", selectedReplayFile);
+    const player = document.getElementById("playerSelect")?.value;
+    if (player) formData.append("player", player);
+    if (document.getElementById("excludeWorkersCheckbox")?.checked) {
+      formData.append("exclude_workers", "1");
+    }
+    if (document.getElementById("excludeSupplyCheckbox")?.checked) {
+      formData.append("exclude_supply", "1");
+    }
+    if (document.getElementById("excludeTimeCheckbox")?.checked) {
+      formData.append("exclude_time", "1");
+    }
+    if (document.getElementById("compactModeCheckbox")?.checked) {
+      formData.append("compact", "1");
+      formData.append("exclude_time", "1");
+    }
+    const stop = document.getElementById("supplyLimitInput")?.value;
+    if (stop) formData.append("stop_supply", stop);
+
+    try {
+      const res = await fetch("https://z-build-order.onrender.com/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const text = await res.text();
+
+      const buildInput = document.getElementById("buildOrderInput");
+      if (buildInput) buildInput.value = text;
+      analyzeBuildOrder(text);
+    } catch (err) {
+      console.error("Replay upload failed", err);
+      alert(
+        "Could not parse the replay. Make sure the Python backend is running."
+      );
+    }
+
+    btn.disabled = false;
+    btn.innerText = "Parse Replay";
+    const modal = document.getElementById("replayOptionsModal");
+    if (modal) modal.style.display = "none";
+  });
+
+  safeAdd("closeReplayOptionsModal", "click", () => {
+    const modal = document.getElementById("replayOptionsModal");
+    if (modal) modal.style.display = "none";
+  });
+
+  const compactBox = document.getElementById("compactModeCheckbox");
+  if (compactBox) {
+    compactBox.addEventListener("change", () => {
+      if (compactBox.checked) {
+        const timeBox = document.getElementById("excludeTimeCheckbox");
+        if (timeBox) timeBox.checked = true;
+      }
+    });
+  }
+
+  const timeBox = document.getElementById("excludeTimeCheckbox");
+  if (timeBox) {
+    timeBox.addEventListener("change", () => {
+      if (!timeBox.checked) {
+        const cBox = document.getElementById("compactModeCheckbox");
+        if (cBox) cBox.checked = false;
+      }
+    });
+  }
+
+  window.addEventListener("mousedown", (event) => {
+    const modal = document.getElementById("replayOptionsModal");
+    if (modal && event.target === modal) {
+      modal.style.display = "none";
+    }
+  });
+
   safeAdd("buildOrderTitleText", "click", () => toggleTitleInput(true));
   safeAdd("buildOrderTitleText", "focus", () => toggleTitleInput(true));
 
@@ -436,7 +593,7 @@ export async function initializeIndexPage() {
     if (modal) modal.style.display = "none";
   });
 
-  window.addEventListener("click", (event) => {
+  window.addEventListener("mousedown", (event) => {
     const helpModal = document.getElementById("buildOrderHelpModal");
     if (helpModal && event.target === helpModal) {
       helpModal.style.display = "none";
@@ -501,7 +658,7 @@ export async function initializeIndexPage() {
   });
 
   const settingsModal = document.getElementById("settingsModal");
-  window.addEventListener("click", (event) => {
+  window.addEventListener("mousedown", (event) => {
     if (settingsModal && event.target === settingsModal) {
       settingsModal.style.display = "none";
     }
@@ -516,12 +673,22 @@ export async function initializeIndexPage() {
     });
   }
 
+  const inputToggle = document.getElementById("buildInputToggle");
+  if (inputToggle) {
+    inputToggle.checked = isBuildInputShown();
+    inputToggle.addEventListener("change", () => {
+      setBuildInputShown(inputToggle.checked);
+      updateBuildInputVisibility();
+    });
+  }
+
+
   safeAdd("closePrivacyModal", "click", () => {
     const modal = document.getElementById("privacyModal");
     if (modal) modal.style.display = "none";
   });
 
-  window.addEventListener("click", (event) => {
+  window.addEventListener("mousedown", (event) => {
     const modal = document.getElementById("privacyModal");
     if (modal && event.target === modal) {
       modal.style.display = "none";
@@ -619,7 +786,7 @@ export async function initializeIndexPage() {
     document.getElementById("publishedBuildsTab")?.click();
   });
 
-  window.addEventListener("click", (event) => {
+  window.addEventListener("mousedown", (event) => {
     const modal = document.getElementById("publishModal");
     const content = modal?.querySelector(".modal-content.small-modal");
 
@@ -638,6 +805,7 @@ export async function initializeIndexPage() {
   initializeTextareaClickHandler();
   initializeAutoCorrect();
   updateSupplyColumnVisibility();
+  updateBuildInputVisibility();
   initializeTooltips();
   setupCatActivationOnInput();
   checkPublishButtonVisibility();
@@ -761,7 +929,7 @@ export async function initializeIndexPage() {
     currentClanView = null;
   });
 
-  window.addEventListener("click", (event) => {
+  window.addEventListener("mousedown", (event) => {
     const modal = document.getElementById("clanModal");
     if (!modal || modal.style.display !== "block") return;
 
@@ -1043,7 +1211,7 @@ export async function initializeIndexPage() {
         }
       });
 
-    window.addEventListener("click", (event) => {
+    window.addEventListener("mousedown", (event) => {
       if (event.target === mapModal) {
         mapModal.style.display = "none";
       }
