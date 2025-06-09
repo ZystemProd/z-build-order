@@ -4463,7 +4463,14 @@ button.btn-small {
   }
   #showBuildsButton,
   #showCommunityModalButton {
-    transform: scale(2);
+    transform: scale(1.4);
+    margin: 5px;
+  }
+  .toggle-header-right {
+    margin-top: 10px;
+  }
+  .user-details {
+    display: none;
   }
   .build-card {
     width: 100px !important;
