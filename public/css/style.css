@@ -2976,10 +2976,13 @@ td {
   font-weight: bold;
   color: #ffffff;
   margin: 12px 0 4px 0;
-  margin-right: 100px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+#buildList.list-view .build-title {
+  margin-right: 100px;
 }
 
 /* Metadata row */
@@ -4470,6 +4473,26 @@ button.btn-small {
     transform: scale(1.4);
     margin: 5px;
   }
+  .filters-wrapper {
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: auto;
+    width: fit-content;
+  }
+  .filters-wrapper .filter-category[data-category="all"] {
+    grid-column: auto;
+    border-top-left-radius: 12px;
+    border-bottom-left-radius: 12px;
+    border-top-right-radius: 0;
+  }
+  .filters-wrapper .filter-category[data-category="Zerg"],
+  .filters-wrapper .filter-category[data-category="Protoss"] {
+    border-radius: 0;
+  }
+  .filters-wrapper .filter-category[data-category="Terran"] {
+    border-top-right-radius: 12px;
+    border-bottom-right-radius: 12px;
+    border-top-left-radius: 0;
+  }
   .toggle-header-right {
     margin-top: 10px;
   }
@@ -4485,6 +4508,8 @@ button.btn-small {
   }
   .build-title {
     font-size: 1rem;
+  }
+  #buildList.list-view .build-title {
     margin-right: 100px;
   }
   .tab-text {
