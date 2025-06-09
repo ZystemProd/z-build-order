@@ -617,6 +617,9 @@
     width: auto;
     flex: 1;
   }
+  .template-header h3 {
+    margin-bottom: 0;
+  }
   .template-list {
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     padding: 5px;

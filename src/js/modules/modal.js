@@ -95,6 +95,15 @@ export function formatMatchup(matchup) {
   );
 }
 
+export function formatShortDate(dateValue) {
+  const d = new Date(dateValue);
+  if (isNaN(d)) return "";
+  const day = d.getDate();
+  const month = d.getMonth() + 1;
+  const year = String(d.getFullYear()).slice(-2);
+  return `${day}/${month}-${year}`;
+}
+
 export async function filterBuilds(categoryOrSubcategory = "all") {
   const heading = document.querySelector("#buildsModal .template-header h3");
   const user = getAuth().currentUser;
@@ -736,7 +745,7 @@ export async function populateBuildList(
             </span>
             <span class="meta-chip">
               <img src="./img/SVG/time.svg" alt="Date" class="meta-icon">
-              ${new Date(build.timestamp).toLocaleDateString()}
+              ${formatShortDate(build.timestamp)}
             </span>
           </div>
         </div>
@@ -751,7 +760,7 @@ export async function populateBuildList(
         <h3 class="build-title">${DOMPurify.sanitize(build.title)}</h3>
         <div class="build-meta">
           <p>Publisher: ${DOMPurify.sanitize(build.publisher || "You")}</p>
-          <p>Date: ${new Date(build.timestamp).toLocaleDateString()}</p>
+          <p>Date: ${formatShortDate(build.timestamp)}</p>
         </div>
         <div class="build-publish-info"></div>
       `;

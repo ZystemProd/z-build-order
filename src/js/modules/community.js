@@ -16,7 +16,7 @@ import {
 } from "firebase/firestore";
 import { formatActionText } from "./textFormatters.js";
 import { showToast } from "./toastHandler.js";
-import { formatMatchup } from "./modal.js";
+import { formatMatchup, formatShortDate } from "./modal.js";
 import { populateBuildsModal } from "./buildManagement.js"; // ✅ Corrected import
 import { auth, db } from "../../app.js"; // ✅ Ensure auth and db are imported correctly
 import DOMPurify from "dompurify";
@@ -83,7 +83,7 @@ async function fetchNextCommunityBuilds(batchSize = 20) {
         const parsedDate = new Date(timestampValue);
         if (!isNaN(parsedDate.getTime())) {
           datePublishedRaw = timestampValue;
-          datePublished = parsedDate.toLocaleDateString("en-GB"); // e.g., 23/05/2025
+          datePublished = formatShortDate(parsedDate);
         }
       }
     } catch (err) {
@@ -622,7 +622,7 @@ export async function searchCommunityBuilds(searchTerm) {
         const d = new Date(ts);
         if (!isNaN(d.getTime())) {
           datePublishedRaw = ts;
-          datePublished = d.toLocaleDateString("en-GB");
+          datePublished = formatShortDate(d);
         }
       }
     } catch (err) {
@@ -754,7 +754,7 @@ function renderCommunityBuildBatch(builds) {
           </span>
           <span class="meta-chip">
             <img src="./img/SVG/time.svg" alt="Date" class="meta-icon">
-            ${new Date(build.datePublished).toLocaleDateString("sv-SE")}
+            ${formatShortDate(build.datePublished)}
           </span>
           <span class="meta-chip view-chip" data-id="${build.id}">
             <img src="./img/SVG/preview.svg" alt="Views" class="meta-icon">
@@ -870,7 +870,7 @@ export async function filterCommunityBuilds(filter = "all") {
           const parsed = new Date(timestampValue);
           if (!isNaN(parsed.getTime())) {
             datePublishedRaw = timestampValue;
-            datePublished = parsed.toLocaleDateString("en-GB"); // ✅ Format: DD/MM/YYYY
+            datePublished = formatShortDate(parsed);
           }
         }
       } catch (err) {
