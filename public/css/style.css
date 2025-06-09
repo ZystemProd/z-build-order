@@ -4431,8 +4431,9 @@ button.btn-small {
 
 @media (max-width: 768px) {
   #auth-container {
-    position: static;
-    margin: 10px;
+    position: fixed;
+    top: 10px;
+    right: 10px;
     width: fit-content;
   }
   #userName {
@@ -4459,5 +4460,19 @@ button.btn-small {
   }
   .btn-text {
     display: none;
+  }
+  #showBuildsButton,
+  #showCommunityModalButton {
+    transform: scale(2);
+  }
+  .build-card {
+    width: 100px !important;
+    height: 100px !important;
+  }
+  .build-card .map-image {
+    height: 54px;
+  }
+  .build-meta {
+    font-size: 0.7rem;
   }
 }
