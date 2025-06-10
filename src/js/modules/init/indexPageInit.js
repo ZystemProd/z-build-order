@@ -108,6 +108,14 @@ function updateBuildInputVisibility() {
   section.style.display = isBuildInputShown() ? "block" : "none";
 }
 
+function updateBuildInputPlaceholder() {
+  const textarea = document.getElementById("buildOrderInput");
+  if (!textarea) return;
+  textarea.placeholder = isBracketInputEnabled()
+    ? "[12] Spawning Pool"
+    : "Spawning Pool";
+}
+
 setupTemplateModal(); // Always call early
 
 let currentClanView = null;
@@ -338,6 +346,7 @@ export async function initializeIndexPage() {
       }
       updateSupplyColumnVisibility();
       updateBuildInputVisibility();
+      updateBuildInputPlaceholder();
     }
   });
 
@@ -704,6 +713,7 @@ export async function initializeIndexPage() {
     bracketToggle.addEventListener("change", () => {
       setBracketInputEnabled(bracketToggle.checked);
       updateSupplyColumnVisibility();
+      updateBuildInputPlaceholder();
     });
   }
 
@@ -840,6 +850,7 @@ export async function initializeIndexPage() {
   initializeAutoCorrect();
   updateSupplyColumnVisibility();
   updateBuildInputVisibility();
+  updateBuildInputPlaceholder();
   initializeTooltips();
   setupCatActivationOnInput();
   checkPublishButtonVisibility();

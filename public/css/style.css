@@ -4350,6 +4350,15 @@ button.btn-small {
     max-width: 100%;
   }
 
+  #buildOrderHelpModal .modal-content {
+    height: 90%;
+    font-size: 16px;
+  }
+
+  #buildOrderHelpModal .modal-content h5 {
+    font-size: 1em;
+  }
+
   #buildOrderHelpContent {
     font-size: 10px;
     padding: 10px;
