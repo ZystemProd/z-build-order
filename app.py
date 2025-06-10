@@ -93,9 +93,13 @@ def upload():
         if compact:
             exclude_time = True
         stop_supply_raw = request.form.get('stop_supply')
+        stop_time_raw = request.form.get('stop_time')
         stop_limit = None
+        time_limit = None
         if stop_supply_raw and stop_supply_raw.isdigit():
             stop_limit = int(stop_supply_raw)
+        if stop_time_raw and stop_time_raw.isdigit():
+            time_limit = int(stop_time_raw) * 60
 
         # Build a map of supply values from PlayerStatsEvents as fallback
         supply_events = {}
@@ -186,12 +190,15 @@ def upload():
             elif ln.startswith("evolve "):
                 name = name[7:]
 
+            # Convert real-time seconds to in-game seconds using the speed factor
+            game_sec = int(event.second / speed_factor)
+            if time_limit is not None and game_sec > time_limit:
+                break
+
             supply_used, supply_made = get_supply(event.second)
             if stop_limit is not None and supply_used > stop_limit:
                 break
 
-            # Convert real-time seconds to in-game seconds using the speed factor
-            game_sec = int(event.second / speed_factor)
             minutes = game_sec // 60
             seconds = game_sec % 60
             timestamp = f"{minutes:02d}:{seconds:02d}"

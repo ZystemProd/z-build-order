@@ -522,8 +522,17 @@ export async function initializeIndexPage() {
       formData.append("compact", "1");
       formData.append("exclude_time", "1");
     }
-    const stop = document.getElementById("supplyLimitInput")?.value;
-    if (stop) formData.append("stop_supply", stop);
+    const stopInput = document.getElementById("stopLimitInput");
+    const toggleBtn = document.getElementById("toggleStopTypeBtn");
+    const stopVal = stopInput?.value;
+    const stopType = toggleBtn?.dataset.type || "supply";
+    if (stopVal) {
+      if (stopType === "time") {
+        formData.append("stop_time", stopVal);
+      } else {
+        formData.append("stop_supply", stopVal);
+      }
+    }
 
     try {
       const res = await fetch("https://z-build-order.onrender.com/upload", {
@@ -559,6 +568,31 @@ export async function initializeIndexPage() {
       if (compactBox.checked) {
         const timeBox = document.getElementById("excludeTimeCheckbox");
         if (timeBox) timeBox.checked = true;
+      }
+    });
+  }
+
+  const toggleStopTypeBtn = document.getElementById("toggleStopTypeBtn");
+  const stopLimitInput = document.getElementById("stopLimitInput");
+  const stopLimitLabel = document.getElementById("stopLimitLabel");
+  const stopUnitLabel = document.getElementById("stopUnitLabel");
+  if (toggleStopTypeBtn && stopLimitInput && stopLimitLabel && stopUnitLabel) {
+    toggleStopTypeBtn.addEventListener("click", () => {
+      const newType =
+        toggleStopTypeBtn.dataset.type === "time" ? "supply" : "time";
+      toggleStopTypeBtn.dataset.type = newType;
+      stopLimitInput.value = "";
+      if (newType === "time") {
+        stopLimitLabel.textContent = "Stop at time:";
+        toggleStopTypeBtn.textContent = "Use Supply";
+        stopLimitInput.placeholder = "e.g. 5";
+        stopLimitInput.step = "1";
+        stopUnitLabel.style.display = "inline";
+      } else {
+        stopLimitLabel.textContent = "Stop at supply:";
+        toggleStopTypeBtn.textContent = "Use Time";
+        stopLimitInput.placeholder = "e.g. 50";
+        stopUnitLabel.style.display = "none";
       }
     });
   }
@@ -853,6 +887,7 @@ export async function initializeIndexPage() {
       document.getElementById("userName").innerText = username;
       document.getElementById("userPhoto").src =
         user.photoURL || "img/default-avatar.webp";
+      document.getElementById("userNameMenu").innerText = username;
     } else {
       // Handle case when user data doesn't exist
       console.log("No user data found!");
@@ -862,6 +897,16 @@ export async function initializeIndexPage() {
   document.getElementById("mapVetoBtn")?.addEventListener("click", () => {
     window.location.href = "/veto.html";
   });
+
+  // Close the avatar submenu after selecting any menu item
+  const userMenuEl = document.getElementById("userMenu");
+  if (userMenuEl) {
+    userMenuEl.addEventListener("click", (e) => {
+      if (e.target.closest(".menu-item")) {
+        userMenuEl.style.display = "none";
+      }
+    });
+  }
 
   document.getElementById("settingsBtn")?.addEventListener("click", () => {
     const userMenu = document.getElementById("userMenu");
@@ -987,6 +1032,25 @@ export async function initializeIndexPage() {
         const category = el.getAttribute("data-category");
         if (!category) return;
 
+        if (window.innerWidth <= 768) {
+          const wasOpen = el.classList.contains("show-submenu");
+          document
+            .querySelectorAll(
+              "#buildsModal .filter-category.show-submenu, #communityModal .filter-category.show-submenu"
+            )
+            .forEach((c) => {
+              if (c !== el) c.classList.remove("show-submenu");
+            });
+          const submenu = el.querySelector(".submenu");
+          if (submenu) {
+            if (wasOpen) {
+              el.classList.remove("show-submenu");
+            } else {
+              el.classList.add("show-submenu");
+            }
+          }
+        }
+
         // 🔄 UI
         categoryButtons.forEach((btn) => btn.classList.remove("active"));
         subcategoryButtons.forEach((btn) => btn.classList.remove("active"));
@@ -1074,6 +1138,11 @@ export async function initializeIndexPage() {
           communityHeading.textContent = `Community Builds - ${capitalize(
             subcat
           )}`;
+
+        if (window.innerWidth <= 768) {
+          const parent = el.closest(".filter-category");
+          if (parent) parent.classList.remove("show-submenu");
+        }
       });
     });
   }
@@ -1111,6 +1180,25 @@ export async function initializeIndexPage() {
       el.addEventListener("click", async () => {
         const category = el.getAttribute("data-category");
         if (!category) return;
+
+        if (window.innerWidth <= 768) {
+          const wasOpen = el.classList.contains("show-submenu");
+          document
+            .querySelectorAll(
+              "#communityModal .filter-category.show-submenu"
+            )
+            .forEach((c) => {
+              if (c !== el) c.classList.remove("show-submenu");
+            });
+          const submenu = el.querySelector(".submenu");
+          if (submenu) {
+            if (wasOpen) {
+              el.classList.remove("show-submenu");
+            } else {
+              el.classList.add("show-submenu");
+            }
+          }
+        }
 
         // 🔄 UI active states
         categoryButtons.forEach((btn) => btn.classList.remove("active"));
@@ -1154,6 +1242,11 @@ export async function initializeIndexPage() {
         // 📝 Update heading
         const heading = document.querySelector("#communityModal h3");
         heading.textContent = `Community Builds - ${capitalize(subcat)}`;
+
+        if (window.innerWidth <= 768) {
+          const parent = el.closest(".filter-category");
+          if (parent) parent.classList.remove("show-submenu");
+        }
       });
     });
   }
