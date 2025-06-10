@@ -1042,8 +1042,12 @@ export async function initializeIndexPage() {
               if (c !== el) c.classList.remove("show-submenu");
             });
           const submenu = el.querySelector(".submenu");
-          if (submenu && !wasOpen) {
-            el.classList.add("show-submenu");
+          if (submenu) {
+            if (wasOpen) {
+              el.classList.remove("show-submenu");
+            } else {
+              el.classList.add("show-submenu");
+            }
           }
         }
 
@@ -1187,8 +1191,12 @@ export async function initializeIndexPage() {
               if (c !== el) c.classList.remove("show-submenu");
             });
           const submenu = el.querySelector(".submenu");
-          if (submenu && !wasOpen) {
-            el.classList.add("show-submenu");
+          if (submenu) {
+            if (wasOpen) {
+              el.classList.remove("show-submenu");
+            } else {
+              el.classList.add("show-submenu");
+            }
           }
         }
 
