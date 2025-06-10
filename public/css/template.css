@@ -586,6 +586,7 @@
     width: 100%;
     max-width: none;
     height: 99%;
+    padding: 10px;
   }
   .template-header {
     position: relative;
@@ -670,34 +671,6 @@
   #communityHeaderControls {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    grid-template-areas:
-      "public clan"
-      "search filters"
-      "sort sort";
     gap: 10px;
-  }
-
-  #communityHeaderControls .community-type-toggle {
-    display: contents;
-  }
-
-  #filterPublicBtn {
-    grid-area: public;
-  }
-
-  #filterClanBtn {
-    grid-area: clan;
-  }
-
-  #communitySearchBar {
-    grid-area: search;
-  }
-
-  #communityHeaderControls .filters-container {
-    grid-area: filters;
-  }
-
-  #communityHeaderControls .community-sort-wrapper {
-    grid-area: sort;
   }
 }

@@ -4537,5 +4537,12 @@ button.btn-small {
     width: 100%;
     max-width: none;
     height: 99%;
+    padding: 10px;
+  }
+
+  #communityHeaderControls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
   }
 }
