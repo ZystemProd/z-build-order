@@ -70,6 +70,10 @@ window.addEventListener("DOMContentLoaded", () => {
   document.getElementById("resetButton").addEventListener("click", resetAll);
   const undoBtn = document.getElementById("undoButton");
   if (undoBtn) undoBtn.addEventListener("click", undoLastAction);
+  const mobileReset = document.getElementById("resetButtonMobile");
+  if (mobileReset) mobileReset.addEventListener("click", resetAll);
+  const mobileUndo = document.getElementById("undoButtonMobile");
+  if (mobileUndo) mobileUndo.addEventListener("click", undoLastAction);
 
   document
     .getElementById("toggleVisibilityButton")
@@ -171,10 +175,13 @@ function checkUnvetoedMapsForBestOf() {
   document
     .querySelectorAll(".map-list li")
     .forEach((li) => li.classList.remove("pulsing-border"));
-
+  const indicators = document.querySelectorAll(".order-indicator");
   const target = bestOfValue;
   if (target && unvetoed.length === target) {
     unvetoed.forEach((li) => li.classList.add("pulsing-border"));
+    indicators.forEach((ind) => (ind.style.background = "#555"));
+  } else {
+    indicators.forEach((ind) => (ind.style.background = ""));
   }
 }
 
@@ -216,6 +223,7 @@ function resetAll() {
     const indicator = li.querySelector(".order-indicator");
     indicator.textContent = "";
     indicator.style.display = "inline-block";
+      indicator.style.background = "";
   });
   currentMap = null;
   lastHoveredMap = null;

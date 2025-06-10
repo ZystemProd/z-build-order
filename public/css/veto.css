@@ -272,6 +272,16 @@ button {
   justify-content: space-between;
 }
 
+.mobile-action-buttons {
+  display: none;
+  gap: 10px;
+  margin-top: 10px;
+  justify-content: space-between;
+}
+
+.mobile-action-buttons button {
+  flex: 1;
+}
 .option-display {
   margin: 0 15px; /* Add horizontal space around the selected map text */
   color: #eee; /* Match text color */
@@ -900,11 +910,13 @@ html {
   }
 
   .map-preview {
+    display: none;
     margin-top: 20px;
     height: auto;
   }
 
   .control-container {
+    display: none;
     flex-direction: column;
     align-items: stretch;
   }
@@ -912,6 +924,9 @@ html {
   .control-left,
   .control-right {
     width: 100%;
+  }
+  .mobile-action-buttons {
+    display: flex;
   }
 
   .footer {
