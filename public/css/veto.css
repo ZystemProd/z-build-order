@@ -151,10 +151,6 @@ body {
   background: #555; /* Darker background on hover */
 }
 /* Normal hover effect */
-.map-list li:hover {
-  border-color: var(--hover-blue); /* Neon blue border on hover */
-  background: #03040f; /* background on hover */
-}
 
 /* Vetoed maps (checked maps) */
 .map-list li.vetoed-map {
@@ -905,7 +901,7 @@ html {
 
   .map-list,
   .map-preview {
-    width: 100%;
+    width: 70%;
     max-width: 420px;
   }
 
@@ -931,6 +927,8 @@ html {
   }
   .mobile-action-buttons {
     display: flex;
+    position: fixed;
+    bottom: 20%;
   }
 
   .footer {
