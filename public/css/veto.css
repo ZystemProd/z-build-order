@@ -151,10 +151,6 @@ body {
   background: #555; /* Darker background on hover */
 }
 /* Normal hover effect */
-.map-list li:hover {
-  border-color: var(--hover-blue); /* Neon blue border on hover */
-  background: #03040f; /* background on hover */
-}
 
 /* Vetoed maps (checked maps) */
 .map-list li.vetoed-map {
@@ -206,6 +202,7 @@ button {
   align-items: center; /* Center the text vertically within the footer */
   color: white;
   font-family: Arial, sans-serif;
+  z-index: -1;
 }
 
 .footer-logo {
@@ -272,6 +269,16 @@ button {
   justify-content: space-between;
 }
 
+.mobile-action-buttons {
+  display: none;
+  gap: 10px;
+  margin-top: 10px;
+  justify-content: space-between;
+}
+
+.mobile-action-buttons button {
+  flex: 1;
+}
 .option-display {
   margin: 0 15px; /* Add horizontal space around the selected map text */
   color: #eee; /* Match text color */
@@ -884,4 +891,80 @@ html {
   padding: 20px;
   border-radius: 8px;
   text-align: center;
+}
+
+/* Responsive Layout */
+@media (max-width: 768px) {
+  .container {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .map-list,
+  .map-preview {
+    width: 70%;
+    max-width: 420px;
+  }
+
+  .map-list {
+    height: calc(100vh - 220px);
+    overflow-y: auto;
+  }
+
+  .map-preview {
+    display: none;
+    margin-top: 20px;
+    height: auto;
+  }
+
+  .control-container {
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .control-left,
+  .control-right {
+    width: 100%;
+  }
+  .mobile-action-buttons {
+    display: flex;
+    position: fixed;
+    bottom: 60px;
+    width: 70%;
+    max-width: 420px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .footer {
+    flex-direction: column;
+    height: auto;
+    padding: 10px 0;
+    z-index: -1;
+  }
+
+  .footer-logo {
+    position: static;
+    margin-top: 6px;
+    right: auto;
+    bottom: auto;
+  }
+}
+
+@media (max-width: 600px) {
+  .advanced-view {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .player-column,
+  .center-column {
+    width: 100%;
+  }
+
+  .advanced-map-list li {
+    width: 48%;
+    max-width: none;
+  }
 }
