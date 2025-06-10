@@ -232,10 +232,12 @@ function updateDisplayedBestOf() {
 function resetAll() {
   document.querySelectorAll(".map-list li").forEach((li) => {
     li.classList.remove("vetoed-map", "pulsing-border");
+    li.classList.remove("veto-left", "veto-right");
+    li.style.display = "";
     const indicator = li.querySelector(".order-indicator");
     indicator.textContent = "";
     indicator.style.display = "inline-block";
-      indicator.style.background = "";
+    indicator.style.background = "";
   });
   currentMap = null;
   lastHoveredMap = null;
@@ -671,14 +673,16 @@ function undoLastAction() {
     const li = document.getElementById(`map${last.mapId}`);
     const indicator = li.querySelector(".order-indicator");
     if (li && indicator) {
+      li.classList.remove("veto-left", "veto-right");
       if (last.prevVetoed) {
         li.classList.add("vetoed-map");
-        indicator.style.display = "none";
+        li.style.display = "none";
       } else {
         li.classList.remove("vetoed-map");
-        indicator.style.display = bestOfValue <= 1 ? "none" : "inline-block";
+        li.style.display = "";
       }
       indicator.textContent = last.prevText;
+      indicator.style.display = last.prevDisplay;
       checkUnvetoedMapsForBestOf();
     }
   }
