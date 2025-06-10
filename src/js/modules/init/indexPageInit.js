@@ -1033,15 +1033,17 @@ export async function initializeIndexPage() {
         if (!category) return;
 
         if (window.innerWidth <= 768) {
+          const wasOpen = el.classList.contains("show-submenu");
           document
             .querySelectorAll(
               "#buildsModal .filter-category.show-submenu, #communityModal .filter-category.show-submenu"
             )
-            .forEach((c) => c.classList.remove("show-submenu"));
+            .forEach((c) => {
+              if (c !== el) c.classList.remove("show-submenu");
+            });
           const submenu = el.querySelector(".submenu");
-          if (submenu) {
-            const open = el.classList.contains("show-submenu");
-            if (!open) el.classList.add("show-submenu");
+          if (submenu && !wasOpen) {
+            el.classList.add("show-submenu");
           }
         }
 
@@ -1174,6 +1176,21 @@ export async function initializeIndexPage() {
       el.addEventListener("click", async () => {
         const category = el.getAttribute("data-category");
         if (!category) return;
+
+        if (window.innerWidth <= 768) {
+          const wasOpen = el.classList.contains("show-submenu");
+          document
+            .querySelectorAll(
+              "#communityModal .filter-category.show-submenu"
+            )
+            .forEach((c) => {
+              if (c !== el) c.classList.remove("show-submenu");
+            });
+          const submenu = el.querySelector(".submenu");
+          if (submenu && !wasOpen) {
+            el.classList.add("show-submenu");
+          }
+        }
 
         // 🔄 UI active states
         categoryButtons.forEach((btn) => btn.classList.remove("active"));
