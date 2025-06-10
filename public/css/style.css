@@ -1016,6 +1016,19 @@ textarea::-webkit-scrollbar-thumb:hover {
   transform: scale(1.05); /* Slight grow effect */
 }
 
+/* Disable hover effects for read-only publish states */
+.publish-published,
+.publish-imported {
+  pointer-events: auto;
+  cursor: default;
+}
+
+.publish-published:hover,
+.publish-imported:hover {
+  background: inherit;
+  transform: none;
+}
+
 .publish-unpublished {
   color: #5fe5ff; /* Soft blue */
   background: rgba(95, 229, 255, 0.15);

@@ -846,7 +846,7 @@ export async function populateBuildList(
         publishInfo.classList.add("publish-imported");
         publishInfo.dataset.tooltip = "imported";
         publishInfo.innerHTML = `<img src="./img/SVG/import2.svg" class="publish-icon" alt="Imported">`;
-        publishInfo.style.pointerEvents = "none";
+        publishInfo.style.pointerEvents = "auto";
       } else if (isBuildPublished) {
         publishInfo.classList.add("publish-published");
         publishInfo.dataset.tooltip = "published";
@@ -863,7 +863,7 @@ export async function populateBuildList(
             openPublishModal(build.id);
           });
         } else {
-          publishInfo.style.pointerEvents = "none";
+          publishInfo.style.pointerEvents = "auto";
           publishInfo.classList.add("no-border");
         }
       } else {

@@ -671,26 +671,32 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     grid-template-areas:
-      "types types"
+      "public clan"
       "search filters"
       "sort sort";
     gap: 10px;
   }
+
   #communityHeaderControls .community-type-toggle {
-    grid-area: types;
-    display: flex;
-    justify-content: space-between;
-    gap: 0;
+    display: contents;
   }
-  #communityHeaderControls .community-type-btn {
-    flex: 1;
+
+  #filterPublicBtn {
+    grid-area: public;
   }
-  #communityHeaderControls .search-bar {
+
+  #filterClanBtn {
+    grid-area: clan;
+  }
+
+  #communitySearchBar {
     grid-area: search;
   }
+
   #communityHeaderControls .filters-container {
     grid-area: filters;
   }
+
   #communityHeaderControls .community-sort-wrapper {
     grid-area: sort;
   }
