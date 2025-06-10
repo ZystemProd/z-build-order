@@ -585,7 +585,7 @@
     margin: 1% 0;
     width: 100%;
     max-width: none;
-    height: 95%;
+    height: 99%;
   }
   .template-header {
     position: relative;
@@ -666,5 +666,32 @@
   .template-list .build-card {
     width: 170px !important;
     height: 170px !important;
+  }
+  #communityHeaderControls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "types types"
+      "search filters"
+      "sort sort";
+    gap: 10px;
+  }
+  #communityHeaderControls .community-type-toggle {
+    grid-area: types;
+    display: flex;
+    justify-content: space-between;
+    gap: 0;
+  }
+  #communityHeaderControls .community-type-btn {
+    flex: 1;
+  }
+  #communityHeaderControls .search-bar {
+    grid-area: search;
+  }
+  #communityHeaderControls .filters-container {
+    grid-area: filters;
+  }
+  #communityHeaderControls .community-sort-wrapper {
+    grid-area: sort;
   }
 }

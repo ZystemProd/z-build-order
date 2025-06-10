@@ -4519,4 +4519,10 @@ button.btn-small {
   #buildList.list-view {
     padding-left: 10px;
   }
+  #communityModal .modal-content-template {
+    margin: 1% 0;
+    width: 100%;
+    max-width: none;
+    height: 99%;
+  }
 }

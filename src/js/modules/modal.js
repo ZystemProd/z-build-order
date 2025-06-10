@@ -30,6 +30,7 @@ import { loadBuilds } from "./buildService.js";
 import { fetchUserBuilds, fetchPublishedUserBuilds } from "./buildManagement.js";
 import { setSavedBuilds } from "./buildStorage.js";
 import DOMPurify from "dompurify";
+import { updateTooltips } from "./tooltip.js";
 
 // --- Firestore Pagination State
 let lastVisibleBuild = null;
@@ -880,6 +881,7 @@ export async function populateBuildList(
   }
 
   buildList.appendChild(fragment);
+  updateTooltips();
   isPopulatingBuildList = false;
 }
 

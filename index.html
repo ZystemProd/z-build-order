@@ -510,24 +510,13 @@
         <div class="template-header">
           <span class="close-modal" id="closeCommunityModal">&times;</span>
           <h3>Community Builds</h3>
-          <div class="community-type-toggle">
-            <button id="filterPublicBtn" class="community-type-btn active" data-type="public">Public</button>
-            <button id="filterClanBtn" class="community-type-btn" data-type="clan">Clan</button>
-          </div>
           <div id="communityHeaderControls" class="header-controls">
-            <label for="communitySortDropdown" class="sort-label">Sort by:</label>
-            <select id="communitySortDropdown" class="styled-dropdown">
-              <option value="hot">Hot</option>
-              <option value="top">Top</option>
-              <option value="new">New</option>
-            </select>
-
-
+            <div class="community-type-toggle">
+              <button id="filterPublicBtn" class="community-type-btn active" data-type="public">Public</button>
+              <button id="filterClanBtn" class="community-type-btn" data-type="clan">Clan</button>
+            </div>
             <input id="communitySearchBar" type="text" placeholder="Search community builds..." class="search-bar" />
-
             <div class="filters-container">
-
-
               <div class="filters-wrapper">
                 <div class="filter-category" data-category="all">All</div>
                 <div class="filter-category" data-category="Zerg">
@@ -554,8 +543,15 @@
                     <div class="subcategory" data-subcategory="TvT">TvT</div>
                   </div>
                 </div>
-              </div>
-
+                </div>
+            </div>
+            <div class="community-sort-wrapper">
+              <label for="communitySortDropdown" class="sort-label">Sort by:</label>
+              <select id="communitySortDropdown" class="styled-dropdown">
+                <option value="hot">Hot</option>
+                <option value="top">Top</option>
+                <option value="new">New</option>
+              </select>
             </div>
           </div>
         </div>
@@ -793,7 +789,7 @@
     </div>
     <div class="footer-center" id="site-info">
       <p>Made by Zystem</p>
-      <p>Version 0.5.7080</p>
+      <p>Version 0.5.7081</p>
 
 
 

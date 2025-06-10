@@ -20,6 +20,7 @@ import { formatMatchup, formatShortDate } from "./modal.js";
 import { populateBuildsModal } from "./buildManagement.js"; // ✅ Corrected import
 import { auth, db } from "../../app.js"; // ✅ Ensure auth and db are imported correctly
 import DOMPurify from "dompurify";
+import { updateTooltips } from "./tooltip.js";
 
 let communitySortMode = "hot"; // default sort mode
 
@@ -772,6 +773,7 @@ function renderCommunityBuildBatch(builds) {
 
     container.appendChild(buildEntry);
   });
+  updateTooltips();
 }
 
 document
