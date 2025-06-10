@@ -202,6 +202,7 @@ button {
   align-items: center; /* Center the text vertically within the footer */
   color: white;
   font-family: Arial, sans-serif;
+  z-index: -1;
 }
 
 .footer-logo {
@@ -906,7 +907,8 @@ html {
   }
 
   .map-list {
-    margin-top: 100px;
+    height: calc(100vh - 220px);
+    overflow-y: auto;
   }
 
   .map-preview {
@@ -928,13 +930,18 @@ html {
   .mobile-action-buttons {
     display: flex;
     position: fixed;
-    bottom: 20%;
+    bottom: 60px;
+    width: 70%;
+    max-width: 420px;
+    left: 50%;
+    transform: translateX(-50%);
   }
 
   .footer {
     flex-direction: column;
     height: auto;
     padding: 10px 0;
+    z-index: -1;
   }
 
   .footer-logo {
