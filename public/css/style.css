@@ -586,7 +586,7 @@ button:hover {
   display: flex;
   align-items: center; /* Aligns items in center of the container */
   font-size: 1.1em;
-  max-width: 200px;
+  max-width: 210px;
   color: #e0e0e0;
   cursor: pointer;
   margin-top: 15px;
