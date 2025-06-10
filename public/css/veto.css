@@ -909,6 +909,10 @@ html {
     max-width: 420px;
   }
 
+  .map-list {
+    margin-top: 100px;
+  }
+
   .map-preview {
     display: none;
     margin-top: 20px;

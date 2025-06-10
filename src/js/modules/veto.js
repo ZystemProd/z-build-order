@@ -140,7 +140,11 @@ function toggleVeto(mapNumber) {
   const li = document.getElementById(`map${mapNumber}`);
   const indicator = li.querySelector(".order-indicator");
 
-  if (li.classList.contains("vetoed-map")) {
+  const prevVetoed = li.classList.contains("vetoed-map");
+  const prevText = indicator.textContent;
+  const prevDisplay = indicator.style.display;
+
+  if (prevVetoed) {
     li.classList.remove("vetoed-map");
     indicator.style.display = bestOfValue <= 1 ? "none" : "inline-block";
     indicator.textContent = "";
@@ -152,6 +156,14 @@ function toggleVeto(mapNumber) {
     li.classList.add("vetoed-map");
     indicator.style.display = "none";
   }
+
+  actionHistory.push({
+    action: "basicToggle",
+    mapId: mapNumber,
+    prevVetoed,
+    prevText,
+    prevDisplay,
+  });
 
   currentMap = mapNumber;
   const previewImage = document.getElementById("previewImage");
@@ -655,7 +667,22 @@ function undoLastAction() {
       advList.appendChild(last.element);
     }
   }
-  currentAdvancedPlayer = last.player;
+  else if (last.action === "basicToggle") {
+    const li = document.getElementById(`map${last.mapId}`);
+    const indicator = li.querySelector(".order-indicator");
+    if (li && indicator) {
+      if (last.prevVetoed) {
+        li.classList.add("vetoed-map");
+        indicator.style.display = "none";
+      } else {
+        li.classList.remove("vetoed-map");
+        indicator.style.display = bestOfValue <= 1 ? "none" : "inline-block";
+      }
+      indicator.textContent = last.prevText;
+      checkUnvetoedMapsForBestOf();
+    }
+  }
+  if (last.player) currentAdvancedPlayer = last.player;
   recalcAdvancedStage();
   updateStageIndicator();
 }
