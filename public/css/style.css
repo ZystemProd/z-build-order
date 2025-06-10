@@ -4360,7 +4360,7 @@ button.btn-small {
   }
 
   #buildOrderHelpContent {
-    font-size: 10px;
+    font-size: 16px;
     padding: 10px;
     max-height: none;
     overflow-y: auto;
