@@ -3045,6 +3045,13 @@ td {
   height: 14px;
 }
 
+@media (max-width: 768px) {
+  /* Hide publisher icon on small screens */
+  .publisher-chip .meta-icon {
+    display: none;
+  }
+}
+
 /* Voting section */
 .build-voting {
   display: flex;
