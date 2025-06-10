@@ -312,6 +312,15 @@ input[type="text"]:disabled {
     display: block;
     grid-column: 1;
     text-align: left;
+    font-size: 0.8rem;
+  }
+
+  .mobile-info label {
+    font-size: 0.6rem;
+  }
+
+  .mobile-info span {
+    font-size: 0.8rem;
   }
 
   .rating-item {
