@@ -282,6 +282,23 @@ input[type="text"]:disabled {
   #youtubeEmbed {
     max-width: 100%;
   }
+
+  /* two-column build info layout */
+  .build-info-grid {
+    grid-template-columns: 1fr auto;
+    gap: 4px 10px;
+  }
+
+  .build-info-grid .build-info-item:nth-child(-n+4) {
+    grid-column: 1;
+    margin-bottom: 4px;
+  }
+
+  .build-info-grid .build-info-item:nth-child(5) {
+    grid-column: 2;
+    grid-row: 1 / span 4;
+    align-self: center;
+  }
 }
 
 /* Optional: Responsive adjustment */
@@ -295,6 +312,12 @@ input[type="text"]:disabled {
   #buildTitle {
     width: 100%;
     text-align: center;
+  }
+
+  #buildTitle {
+    position: static;
+    transform: none;
+    margin-top: 10px;
   }
 }
 
