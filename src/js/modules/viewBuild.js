@@ -10,43 +10,50 @@ import {
 initializeAuthUI();
 
 const backButton = document.getElementById("backButton");
+const pageBackButton = document.getElementById("pageBackButton");
+
+function handleBackClick(e) {
+  e.preventDefault();
+
+  localStorage.setItem("restoreCommunityModal", "true");
+
+  // Save search input
+  const searchInput = document.getElementById("communitySearchBar");
+  if (searchInput && searchInput.value.trim()) {
+    localStorage.setItem("communitySearchQuery", searchInput.value.trim());
+  } else {
+    localStorage.removeItem("communitySearchQuery");
+  }
+
+  // Save active filter
+  const activeCategory = document
+    .querySelector("#communityModal .filter-category.active")
+    ?.getAttribute("data-category");
+
+  const activeSubcategory = document
+    .querySelector("#communityModal .subcategory.active")
+    ?.getAttribute("data-subcategory");
+
+  if (activeSubcategory) {
+    localStorage.setItem("communityFilterType", "subcategory");
+    localStorage.setItem("communityFilterValue", activeSubcategory);
+  } else if (activeCategory && activeCategory !== "all") {
+    localStorage.setItem("communityFilterType", "category");
+    localStorage.setItem("communityFilterValue", activeCategory);
+  } else {
+    localStorage.removeItem("communityFilterType");
+    localStorage.removeItem("communityFilterValue");
+  }
+
+  window.location.href = "index.html";
+}
 
 if (backButton) {
-  backButton.addEventListener("click", (e) => {
-    e.preventDefault();
+  backButton.addEventListener("click", handleBackClick);
+}
 
-    localStorage.setItem("restoreCommunityModal", "true");
-
-    // Save search input
-    const searchInput = document.getElementById("communitySearchBar");
-    if (searchInput && searchInput.value.trim()) {
-      localStorage.setItem("communitySearchQuery", searchInput.value.trim());
-    } else {
-      localStorage.removeItem("communitySearchQuery");
-    }
-
-    // Save active filter
-    const activeCategory = document
-      .querySelector("#communityModal .filter-category.active")
-      ?.getAttribute("data-category");
-
-    const activeSubcategory = document
-      .querySelector("#communityModal .subcategory.active")
-      ?.getAttribute("data-subcategory");
-
-    if (activeSubcategory) {
-      localStorage.setItem("communityFilterType", "subcategory");
-      localStorage.setItem("communityFilterValue", activeSubcategory);
-    } else if (activeCategory && activeCategory !== "all") {
-      localStorage.setItem("communityFilterType", "category");
-      localStorage.setItem("communityFilterValue", activeCategory);
-    } else {
-      localStorage.removeItem("communityFilterType");
-      localStorage.removeItem("communityFilterValue");
-    }
-
-    window.location.href = "index.html";
-  });
+if (pageBackButton) {
+  pageBackButton.addEventListener("click", handleBackClick);
 }
 
 async function loadBuild() {
