@@ -898,6 +898,16 @@ export async function initializeIndexPage() {
     window.location.href = "/veto.html";
   });
 
+  // Close the avatar submenu after selecting any menu item
+  const userMenuEl = document.getElementById("userMenu");
+  if (userMenuEl) {
+    userMenuEl.addEventListener("click", (e) => {
+      if (e.target.closest(".menu-item")) {
+        userMenuEl.style.display = "none";
+      }
+    });
+  }
+
   document.getElementById("settingsBtn")?.addEventListener("click", () => {
     const userMenu = document.getElementById("userMenu");
     if (userMenu) userMenu.style.display = "none";
