@@ -267,6 +267,13 @@ input[type="text"]:disabled {
   color: #ccc;
 }
 
+.rating-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
 .back-button img {
   width: 24px;
   height: 24px;
@@ -332,8 +339,10 @@ input[type="text"]:disabled {
 
   .rating-item {
     grid-column: 1 / -1;
-    align-self: center;
     width: 100%;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
   }
 }
 

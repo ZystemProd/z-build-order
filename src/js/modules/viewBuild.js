@@ -11,6 +11,22 @@ initializeAuthUI();
 
 const backButton = document.getElementById("backButton");
 const pageBackButton = document.getElementById("pageBackButton");
+const ratingItem = document.getElementById("ratingItem");
+const infoGrid = document.querySelector(".build-info-grid");
+const mainLayout = document.querySelector(".main-layout");
+
+function adjustRatingPosition() {
+  if (!ratingItem || !infoGrid || !mainLayout) return;
+  if (window.innerWidth <= 768) {
+    if (ratingItem.parentElement !== mainLayout.parentNode) {
+      mainLayout.insertAdjacentElement("afterend", ratingItem);
+    }
+  } else {
+    if (!infoGrid.contains(ratingItem)) {
+      infoGrid.appendChild(ratingItem);
+    }
+  }
+}
 
 function handleBackClick(e) {
   e.preventDefault();
@@ -469,6 +485,9 @@ function updateVoteUI(buildId, upvotes, downvotes, userVote) {
 
 document.addEventListener("DOMContentLoaded", async () => {
   if (!window.location.pathname.includes("viewBuild.html")) return;
+
+  adjustRatingPosition();
+  window.addEventListener("resize", adjustRatingPosition);
 
   const importBtn = document.getElementById("importBuildButton");
 
