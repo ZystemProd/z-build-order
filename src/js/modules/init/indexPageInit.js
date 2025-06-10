@@ -1032,6 +1032,19 @@ export async function initializeIndexPage() {
         const category = el.getAttribute("data-category");
         if (!category) return;
 
+        if (window.innerWidth <= 768) {
+          document
+            .querySelectorAll(
+              "#buildsModal .filter-category.show-submenu, #communityModal .filter-category.show-submenu"
+            )
+            .forEach((c) => c.classList.remove("show-submenu"));
+          const submenu = el.querySelector(".submenu");
+          if (submenu) {
+            const open = el.classList.contains("show-submenu");
+            if (!open) el.classList.add("show-submenu");
+          }
+        }
+
         // 🔄 UI
         categoryButtons.forEach((btn) => btn.classList.remove("active"));
         subcategoryButtons.forEach((btn) => btn.classList.remove("active"));
@@ -1120,9 +1133,10 @@ export async function initializeIndexPage() {
             subcat
           )}`;
 
-        // 👋 Hide the open submenu so it collapses on mobile
-        const submenu = el.closest(".submenu");
-        if (submenu) submenu.style.display = "none";
+        if (window.innerWidth <= 768) {
+          const parent = el.closest(".filter-category");
+          if (parent) parent.classList.remove("show-submenu");
+        }
       });
     });
   }
@@ -1204,9 +1218,10 @@ export async function initializeIndexPage() {
         const heading = document.querySelector("#communityModal h3");
         heading.textContent = `Community Builds - ${capitalize(subcat)}`;
 
-        // 👋 Hide the open submenu to collapse it on mobile
-        const submenu = el.closest(".submenu");
-        if (submenu) submenu.style.display = "none";
+        if (window.innerWidth <= 768) {
+          const parent = el.closest(".filter-category");
+          if (parent) parent.classList.remove("show-submenu");
+        }
       });
     });
   }

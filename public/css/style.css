@@ -4492,6 +4492,10 @@ button.btn-small {
     width: fit-content;
     gap: 0;
   }
+
+  .filter-category.show-submenu .submenu {
+    display: block;
+  }
   .filters-wrapper .filter-category[data-category="all"] {
     grid-column: auto;
     border-top-left-radius: 12px;
