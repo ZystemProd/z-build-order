@@ -78,14 +78,29 @@ async function loadBuild() {
     // Set basic build info
     document.getElementById("buildTitle").innerText =
       build.title || "Untitled Build";
-    document.getElementById("buildCategory").innerText =
-      build.category || "Unknown";
-    document.getElementById("buildMatchup").innerText = (build.subcategory && build.subcategory.length === 3 ? build.subcategory.charAt(0).toUpperCase() + build.subcategory.charAt(1) + build.subcategory.charAt(2).toUpperCase() : build.subcategory || "Unknown");
-    document.getElementById("buildPublisher").innerText =
-      build.username || "Anonymous";
-    document.getElementById("buildDate").innerText = new Date(
-      build.datePublished
-    ).toLocaleDateString();
+    const categoryText = build.category || "Unknown";
+    const matchupText =
+      build.subcategory && build.subcategory.length === 3
+        ? build.subcategory.charAt(0).toUpperCase() +
+          build.subcategory.charAt(1) +
+          build.subcategory.charAt(2).toUpperCase()
+        : build.subcategory || "Unknown";
+    const publisherText = build.username || "Anonymous";
+    const dateText = new Date(build.datePublished).toLocaleDateString();
+
+    document.getElementById("buildCategory").innerText = categoryText;
+    document.getElementById("buildMatchup").innerText = matchupText;
+    document.getElementById("buildPublisher").innerText = publisherText;
+    document.getElementById("buildDate").innerText = dateText;
+
+    const mobileCat = document.getElementById("buildCategoryMobile");
+    if (mobileCat) mobileCat.innerText = categoryText;
+    const mobileMatch = document.getElementById("buildMatchupMobile");
+    if (mobileMatch) mobileMatch.innerText = matchupText;
+    const mobilePub = document.getElementById("buildPublisherMobile");
+    if (mobilePub) mobilePub.innerText = publisherText;
+    const mobileDate = document.getElementById("buildDateMobile");
+    if (mobileDate) mobileDate.innerText = dateText;
 
     // Set build order
     const buildOrderContainer = document.getElementById("buildOrder");
