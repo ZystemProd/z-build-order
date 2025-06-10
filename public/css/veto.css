@@ -885,3 +885,62 @@ html {
   border-radius: 8px;
   text-align: center;
 }
+
+/* Responsive Layout */
+@media (max-width: 768px) {
+  .container {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .map-list,
+  .map-preview {
+    width: 100%;
+    max-width: 420px;
+  }
+
+  .map-preview {
+    margin-top: 20px;
+    height: auto;
+  }
+
+  .control-container {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .control-left,
+  .control-right {
+    width: 100%;
+  }
+
+  .footer {
+    flex-direction: column;
+    height: auto;
+    padding: 10px 0;
+  }
+
+  .footer-logo {
+    position: static;
+    margin-top: 6px;
+    right: auto;
+    bottom: auto;
+  }
+}
+
+@media (max-width: 600px) {
+  .advanced-view {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .player-column,
+  .center-column {
+    width: 100%;
+  }
+
+  .advanced-map-list li {
+    width: 48%;
+    max-width: none;
+  }
+}
