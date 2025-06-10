@@ -1119,6 +1119,10 @@ export async function initializeIndexPage() {
           communityHeading.textContent = `Community Builds - ${capitalize(
             subcat
           )}`;
+
+        // 👋 Hide the open submenu so it collapses on mobile
+        const submenu = el.closest(".submenu");
+        if (submenu) submenu.style.display = "none";
       });
     });
   }
@@ -1199,6 +1203,10 @@ export async function initializeIndexPage() {
         // 📝 Update heading
         const heading = document.querySelector("#communityModal h3");
         heading.textContent = `Community Builds - ${capitalize(subcat)}`;
+
+        // 👋 Hide the open submenu to collapse it on mobile
+        const submenu = el.closest(".submenu");
+        if (submenu) submenu.style.display = "none";
       });
     });
   }
