@@ -1016,6 +1016,19 @@ textarea::-webkit-scrollbar-thumb:hover {
   transform: scale(1.05); /* Slight grow effect */
 }
 
+/* Disable hover effects for read-only publish states */
+.publish-published,
+.publish-imported {
+  pointer-events: auto;
+  cursor: default;
+}
+
+.publish-published:hover,
+.publish-imported:hover {
+  background: inherit;
+  transform: none;
+}
+
 .publish-unpublished {
   color: #5fe5ff; /* Soft blue */
   background: rgba(95, 229, 255, 0.15);
@@ -2008,7 +2021,7 @@ textarea::-webkit-scrollbar-thumb:hover {
 
 .map-cards-container {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
   gap: 20px;
   padding: 10px;
   max-height: 400px;
@@ -2039,7 +2052,7 @@ textarea::-webkit-scrollbar-thumb:hover {
 
 .map-card {
   display: flex;
-  width: 200px;
+  width: 120px;
   flex-direction: column;
   align-items: center;
   padding: 10px;
@@ -2976,6 +2989,13 @@ td {
   font-weight: bold;
   color: #ffffff;
   margin: 12px 0 4px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#buildList.list-view .build-title {
+  margin-right: 100px;
 }
 
 /* Metadata row */
@@ -2995,7 +3015,7 @@ td {
   display: flex;
   align-items: center;
   gap: 5px;
-  background-color: #3a3a3a;
+  background-color: #444;
   padding: 4px 10px;
   border-radius: 12px;
   font-size: 14px;
@@ -3900,6 +3920,16 @@ td {
   text-align: left;
 }
 
+button.btn-small {
+  padding: 4px 10px;
+  background-color: var(--active-color);
+  border: none;
+  color: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85em;
+}
+
 .clan-member-table button.btn-small {
   padding: 4px 10px;
   background-color: var(--active-color);
@@ -4417,3 +4447,106 @@ td {
   gap: 4px;
 }
 
+
+
+@media (max-width: 768px) {
+  #auth-container {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    width: fit-content;
+  }
+  #userName {
+    display: none;
+  }
+  #userNameMenu {
+    display: inline-block;
+  }
+  #userNameDivider {
+    display: block;
+  }
+  #buildOrderTable #supplyHeader {
+    width: 1%;
+  }
+  #supplyHeader .full-text {
+    display: none;
+  }
+  #supplyHeader .short-text {
+    display: inline;
+  }
+  .toggle-header-right button {
+    padding: 4px 8px;
+    font-size: 0.85rem;
+  }
+  .btn-text {
+    display: none;
+  }
+  #showBuildsButton,
+  #showCommunityModalButton {
+    transform: scale(1.4);
+    margin: 5px;
+  }
+  .filters-wrapper {
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: auto;
+    width: fit-content;
+    gap: 0;
+  }
+
+  .filter-category.show-submenu .submenu {
+    display: block;
+  }
+  .filters-wrapper .filter-category[data-category="all"] {
+    grid-column: auto;
+    border-top-left-radius: 12px;
+    border-bottom-left-radius: 12px;
+    border-top-right-radius: 0;
+  }
+  .filters-wrapper .filter-category[data-category="Zerg"],
+  .filters-wrapper .filter-category[data-category="Protoss"] {
+    border-radius: 0;
+  }
+  .filters-wrapper .filter-category[data-category="Terran"] {
+    border-top-right-radius: 12px;
+    border-bottom-right-radius: 12px;
+    border-top-left-radius: 0;
+  }
+  .toggle-header-right {
+    margin-top: 10px;
+  }
+  .user-details {
+    display: none;
+  }
+  .build-card {
+    width: 170px !important;
+    height: 170px !important;
+  }
+  .build-card .map-image {
+    height: 54px;
+  }
+  .build-title {
+    font-size: 1rem;
+  }
+  #buildList.list-view .build-title {
+    margin-right: 100px;
+  }
+  .tab-text {
+    display: none;
+  }
+  #buildList.list-view {
+    padding-left: 10px;
+  }
+  #communityModal .modal-content-template {
+    margin: 1% 0;
+    width: 100%;
+    max-width: none;
+    height: 99%;
+    padding: 10px;
+  }
+
+  #communityHeaderControls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+}

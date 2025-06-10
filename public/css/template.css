@@ -50,7 +50,6 @@
   flex: 1;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  grid-template-rows: 300px 300px;
   gap: 10px;
   overflow-y: auto; /* ✅ Enables scrolling */
   max-height: 76vh; /* ✅ Limits height to fit screen */
@@ -580,4 +579,98 @@
 
 .subcategory.active {
   font-weight: bold;
+}
+@media (max-width: 768px) {
+  .modal-content-template {
+    margin: 1% 0;
+    width: 100%;
+    max-width: none;
+    height: 99%;
+    padding: 10px;
+  }
+  .template-header {
+    position: relative;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 5px;
+    gap: 5px;
+  }
+  .template-header .header-controls {
+    width: 100%;
+  }
+  .template-header .search-bar {
+    width: 100%;
+  }
+  .template-header .tab-buttons,
+  .template-header .community-type-toggle,
+  .template-header .filters-container,
+  .template-header .view-toggle-buttons {
+    width: 100%;
+  }
+  .template-header .filters-wrapper {
+    flex-wrap: wrap;
+    gap: 0;
+  }
+  .template-header .filter-category {
+    padding: 10px 15px;
+  }
+  .template-header .tab-buttons button {
+    width: auto;
+    flex: 1;
+  }
+  .template-header h3 {
+    margin-bottom: 0;
+  }
+  .template-list {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    padding: 5px;
+  }
+  .template-list.list-view {
+    padding-left: 10px;
+  }
+  .template-card {
+    width: 120px;
+  }
+  #buildHeaderControls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "tabs tabs"
+      "search filters"
+      "view view";
+    gap: 10px;
+  }
+  #buildHeaderControls .tab-buttons {
+    grid-area: tabs;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    gap: 0;
+  }
+  #buildHeaderControls #myBuildsTab {
+    margin-right: 10px;
+  }
+  #buildHeaderControls #publishedBuildsTab {
+    margin-left: 10px;
+  }
+  #buildHeaderControls .search-bar {
+    grid-area: search;
+  }
+  #buildHeaderControls .view-toggle-buttons {
+    grid-area: view;
+    justify-self: end;
+    width: auto;
+  }
+  #buildHeaderControls .filters-container {
+    grid-area: filters;
+  }
+  .template-list .build-card {
+    width: 170px !important;
+    height: 170px !important;
+  }
+  #communityHeaderControls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
 }

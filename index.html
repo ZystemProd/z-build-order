@@ -48,6 +48,8 @@
       <div id="userMenu" class="user-menu" style="display: none;">
 
         <div class="menu-section">
+          <p id="userNameMenu" class="user-name fade-in" style="display: none;">Guest</p>
+          <hr id="userNameDivider" class="menu-divider" />
           <button class="menu-item" id="mapVetoBtn">
             <img src="img/SVG/map-solid.svg" class="menu-icon" /> Map Veto
           </button>
@@ -173,10 +175,10 @@
 
         <div class="toggle-header-right">
           <button id="showBuildsButton" disabled>
-            <img src="img/SVG/library.svg" alt="Library Icon" class="svg-icon"> My Builds
+            <img src="img/SVG/library.svg" alt="Library Icon" class="svg-icon"> <span class="btn-text">My Builds</span>
           </button>
           <button id="showCommunityModalButton" class="btn" disabled>
-            <img src="img/SVG/community.svg" alt="Community Icon" class="svg-icon"> Community Builds
+            <img src="img/SVG/community.svg" alt="Community Icon" class="svg-icon"> <span class="btn-text">Community Builds</span>
           </button>
           <button id="buildOrderHelpBtn" class="help-circle animated-help" title="Help">?</button>
         </div>
@@ -255,7 +257,7 @@
       <!-- Existing table and buttons -->
       <table id="buildOrderTable">
         <tr>
-          <th id="supplyHeader">Supply/Time</th>
+          <th id="supplyHeader"><span class="full-text">Supply/Time</span><span class="short-text">S/T</span></th>
           <th>Action</th>
         </tr>
       </table>
@@ -436,8 +438,14 @@
           <h3>Build Orders</h3>
           <div id="buildHeaderControls" class="header-controls">
             <div class="tab-buttons">
-              <button id="myBuildsTab" class="active">My Builds</button>
-              <button id="publishedBuildsTab">Published Builds</button>
+              <button id="myBuildsTab" class="active">
+                <img src="img/SVG/library.svg" class="svg-icon" alt="My Builds" />
+                <span class="tab-text">My Builds</span>
+              </button>
+              <button id="publishedBuildsTab">
+                <img src="img/SVG/community.svg" class="svg-icon" alt="Community" />
+                <span class="tab-text">Published Builds</span>
+              </button>
             </div>
 
             <input id="buildSearchBar" type="text" placeholder="Search builds..." class="search-bar" />
@@ -471,8 +479,8 @@
               </div>
             </div>
             <div class="view-toggle-buttons">
-              <button id="gridViewBtn" class="view-btn active"><img src="./img/SVG/grid.svg" alt="Grid"></button>
-              <button id="listViewBtn" class="view-btn"><img src="./img/SVG/list.svg" alt="List"></button>
+              <button id="gridViewBtn" class="view-btn active" data-tooltip="Grid"><img src="./img/SVG/grid.svg" alt="Grid"></button>
+              <button id="listViewBtn" class="view-btn" data-tooltip="List"><img src="./img/SVG/list.svg" alt="List"></button>
             </div>
           </div>
         </div>
@@ -502,24 +510,13 @@
         <div class="template-header">
           <span class="close-modal" id="closeCommunityModal">&times;</span>
           <h3>Community Builds</h3>
-          <div class="community-type-toggle">
-            <button id="filterPublicBtn" class="community-type-btn active" data-type="public">Public</button>
-            <button id="filterClanBtn" class="community-type-btn" data-type="clan">Clan</button>
-          </div>
           <div id="communityHeaderControls" class="header-controls">
-            <label for="communitySortDropdown" class="sort-label">Sort by:</label>
-            <select id="communitySortDropdown" class="styled-dropdown">
-              <option value="hot">Hot</option>
-              <option value="top">Top</option>
-              <option value="new">New</option>
-            </select>
-
-
+            <div class="community-type-toggle">
+              <button id="filterPublicBtn" class="community-type-btn active" data-type="public">Public</button>
+              <button id="filterClanBtn" class="community-type-btn" data-type="clan">Clan</button>
+            </div>
             <input id="communitySearchBar" type="text" placeholder="Search community builds..." class="search-bar" />
-
             <div class="filters-container">
-
-
               <div class="filters-wrapper">
                 <div class="filter-category" data-category="all">All</div>
                 <div class="filter-category" data-category="Zerg">
@@ -546,8 +543,15 @@
                     <div class="subcategory" data-subcategory="TvT">TvT</div>
                   </div>
                 </div>
-              </div>
-
+                </div>
+            </div>
+            <div class="community-sort-wrapper">
+              <label for="communitySortDropdown" class="sort-label">Sort by:</label>
+              <select id="communitySortDropdown" class="styled-dropdown">
+                <option value="hot">Hot</option>
+                <option value="top">Top</option>
+                <option value="new">New</option>
+              </select>
             </div>
           </div>
         </div>
@@ -746,8 +750,10 @@
           </div>
         </div>
         <div>
-          <label for="supplyLimitInput">Stop at supply:</label>
-          <input type="number" id="supplyLimitInput" min="0" value="50" placeholder="e.g. 50" />
+          <label id="stopLimitLabel" for="stopLimitInput">Stop at supply:</label>
+          <input type="number" id="stopLimitInput" min="0" value="50" placeholder="e.g. 50" />
+          <span id="stopUnitLabel" style="display: none;">min</span>
+          <button type="button" id="toggleStopTypeBtn" class="btn-small" data-type="supply">Use Time</button>
         </div>
         <button id="confirmReplayOptionsButton" class="btn">Parse Replay</button>
       </div>
@@ -784,8 +790,7 @@
     <div class="footer-center" id="site-info">
       <p>Made by Zystem</p>
 
-      <p>Version 0.5.7061</p>
-
+      <p>Version 0.5.7088</p>
 
     </div>
     <div class="footer-right" id="site-logo">

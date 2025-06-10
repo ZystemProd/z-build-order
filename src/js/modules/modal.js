@@ -30,6 +30,7 @@ import { loadBuilds } from "./buildService.js";
 import { fetchUserBuilds, fetchPublishedUserBuilds } from "./buildManagement.js";
 import { setSavedBuilds } from "./buildStorage.js";
 import DOMPurify from "dompurify";
+import { updateTooltips } from "./tooltip.js";
 
 // --- Firestore Pagination State
 let lastVisibleBuild = null;
@@ -93,6 +94,15 @@ export function formatMatchup(matchup) {
     matchup.slice(1, -1).toLowerCase() +
     matchup.charAt(matchup.length - 1).toUpperCase()
   );
+}
+
+export function formatShortDate(dateValue) {
+  const d = new Date(dateValue);
+  if (isNaN(d)) return "";
+  const day = d.getDate();
+  const month = d.getMonth() + 1;
+  const year = String(d.getFullYear()).slice(-2);
+  return `${day}/${month}-${year}`;
 }
 
 export async function filterBuilds(categoryOrSubcategory = "all") {
@@ -736,7 +746,7 @@ export async function populateBuildList(
             </span>
             <span class="meta-chip">
               <img src="./img/SVG/time.svg" alt="Date" class="meta-icon">
-              ${new Date(build.timestamp).toLocaleDateString()}
+              ${formatShortDate(build.timestamp)}
             </span>
           </div>
         </div>
@@ -751,7 +761,7 @@ export async function populateBuildList(
         <h3 class="build-title">${DOMPurify.sanitize(build.title)}</h3>
         <div class="build-meta">
           <p>Publisher: ${DOMPurify.sanitize(build.publisher || "You")}</p>
-          <p>Date: ${new Date(build.timestamp).toLocaleDateString()}</p>
+          <p>Date: ${formatShortDate(build.timestamp)}</p>
         </div>
         <div class="build-publish-info"></div>
       `;
@@ -834,14 +844,13 @@ export async function populateBuildList(
 
       if (build.imported) {
         publishInfo.classList.add("publish-imported");
-        publishInfo.innerHTML = `<span>Imported</span>`;
-        publishInfo.style.pointerEvents = "none";
+        publishInfo.dataset.tooltip = "imported";
+        publishInfo.innerHTML = `<img src="./img/SVG/import2.svg" class="publish-icon" alt="Imported">`;
+        publishInfo.style.pointerEvents = "auto";
       } else if (isBuildPublished) {
         publishInfo.classList.add("publish-published");
-        publishInfo.innerHTML = `
-          <span>Published</span>
-          <img src="./img/SVG/checkmark2.svg" class="publish-icon">
-        `;
+        publishInfo.dataset.tooltip = "published";
+        publishInfo.innerHTML = `<img src="./img/SVG/checkmark2.svg" class="publish-icon" alt="Published">`;
         if (publishedTab) {
           if (build.isPublic)
             publishInfo.innerHTML += `<span class="tag public">Public</span>`;
@@ -854,12 +863,13 @@ export async function populateBuildList(
             openPublishModal(build.id);
           });
         } else {
-          publishInfo.style.pointerEvents = "none";
+          publishInfo.style.pointerEvents = "auto";
           publishInfo.classList.add("no-border");
         }
       } else {
         publishInfo.classList.add("publish-unpublished");
-        publishInfo.innerHTML = `<img src="./img/SVG/publish2.svg" class="publish-icon"><span>Publish</span>`;
+        publishInfo.dataset.tooltip = "publish";
+        publishInfo.innerHTML = `<img src="./img/SVG/publish2.svg" class="publish-icon" alt="Publish">`;
         publishInfo.addEventListener("click", (e) => {
           e.stopPropagation();
           openPublishModal(build.id);
@@ -871,6 +881,7 @@ export async function populateBuildList(
   }
 
   buildList.appendChild(fragment);
+  updateTooltips();
   isPopulatingBuildList = false;
 }
 
@@ -957,7 +968,8 @@ export async function unpublishBuild(buildId) {
     if (buildEl) {
       const publishInfo = buildEl.querySelector(".build-publish-info");
       if (publishInfo) {
-        publishInfo.innerHTML = `<img src="./img/SVG/publish2.svg" alt="Publish" class="publish-icon"><span>Publish</span>`;
+        publishInfo.innerHTML = `<img src="./img/SVG/publish2.svg" alt="Publish" class="publish-icon">`;
+        publishInfo.dataset.tooltip = "publish";
         publishInfo.classList.remove("publish-published", "no-border");
         publishInfo.classList.add("publish-unpublished");
         publishInfo.style.pointerEvents = "auto";

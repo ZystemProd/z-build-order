@@ -27,7 +27,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyBBLnneYwLDfIp-Oep2MvExGnVk_EvDQoo",
   authDomain: "z-build-order.firebaseapp.com",
   projectId: "z-build-order",
-  storageBucket: "z-build-order.firebasestorage.app",
+  storageBucket: "z-build-order.appspot.com",
   messagingSenderId: "22023941178",
   appId: "1:22023941178:web:ba417e9a52332a8e055903",
   measurementId: "G-LBDMKMG1W9",
@@ -39,8 +39,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const userName = document.getElementById("userName");
   const userMenu = document.getElementById("userMenu");
 
+  const userNameMenu = document.getElementById("userNameMenu");
   if (userPhoto) userPhoto.style.display = "none";
   if (userName) userName.style.display = "none";
+  if (userNameMenu) userNameMenu.style.display = "none";
   if (userMenu) userMenu.style.display = "none";
 });
 
@@ -137,6 +139,8 @@ async function checkAndSetUsername(user) {
         showToast(`✅ Username set as: ${username}`, "success");
 
         document.getElementById("userName").innerText = username;
+        document.getElementById("userNameMenu").innerText = username;
+        document.getElementById("userNameMenu").style.display = "inline-block";
         document.getElementById("userName").style.display = "inline-block";
         document.getElementById("userPhoto").style.display = "inline-block";
         usernameModal.style.display = "none";
@@ -153,6 +157,7 @@ export function initializeAuthUI() {
   const userName = document.getElementById("userName");
   const userPhoto = document.getElementById("userPhoto");
   const userMenu = document.getElementById("userMenu");
+  const userNameMenu = document.getElementById("userNameMenu");
   const signInBtn = document.getElementById("signInBtn");
   const showClanBtn = document.getElementById("showClanModalButton");
   const mapVetoBtn = document.getElementById("mapVetoBtn");
@@ -188,6 +193,7 @@ export function initializeAuthUI() {
       }
 
       if (userName) userName.innerText = username || "Guest";
+      if (userNameMenu) userNameMenu.innerText = username || "Guest";
       if (userPhoto) userPhoto.src = user.photoURL || "img/default-avatar.webp";
       if (signInBtn) signInBtn.style.display = "none";
       if (showClanBtn) showClanBtn.disabled = false;
@@ -200,6 +206,7 @@ export function initializeAuthUI() {
       menuDividers.forEach((d) => (d.style.display = "block"));
     } else {
       if (userName) userName.innerText = "Guest";
+      if (userNameMenu) userNameMenu.innerText = "Guest";
       if (userPhoto) userPhoto.src = "img/default-avatar.webp";
       if (userMenu) userMenu.style.display = "none";
       if (signInBtn) signInBtn.style.display = "inline-block";
@@ -216,6 +223,7 @@ export function initializeAuthUI() {
 
     if (authLoadingWrapper) authLoadingWrapper.style.display = "none";
     if (userName) userName.style.display = "inline";
+    if (userNameMenu) userNameMenu.style.display = "inline-block";
     if (userPhoto) userPhoto.style.display = "inline";
   });
 }
@@ -424,10 +432,12 @@ async function handleCancelUsername() {
 
   // Reset to guest and sign out
   const userName = document.getElementById("userName");
+  const userNameMenu = document.getElementById("userNameMenu");
   const userPhoto = document.getElementById("userPhoto");
 
   if (userPhoto) userPhoto.src = "img/default-avatar.webp";
   if (userName) userName.innerText = "Guest";
+  if (userNameMenu) userNameMenu.innerText = "Guest";
 
   await signOut(auth);
 }
