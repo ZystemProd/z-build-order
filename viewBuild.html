@@ -4,6 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Detailed StarCraft build order and strategy information" />
   <title>View Build</title>
   <link rel="icon" type="image/x-icon" href="/img/favicon.ico" />
   <link rel="stylesheet" type="text/css" href="public/css/style.css" />
@@ -60,15 +61,6 @@
   <!-- Optional Loading Status -->
   <p id="authLoading" style="color: #555"></p>
 
-  <!-- Username Modal -->
-  <div id="usernameModal" class="modal" style="display: none">
-    <div class="modal-content">
-      <h3>Choose a Username</h3>
-      <input type="text" id="usernameInput" placeholder="Enter your username" />
-      <br /><br />
-      <button id="confirmUsernameButton">Confirm</button>
-    </div>
-  </div>
 
   <div class="view-build-container">
     <div class="build-header-row">
@@ -146,9 +138,9 @@
     <div class="main-layout">
       <!-- Second Row: Map and Comment/Video -->
 
-      <h3 id="additionalSettingsHeader" data-section="secondRow" class="toggle-title" style="display: none">
+      <h2 id="additionalSettingsHeader" data-section="secondRow" class="toggle-title" style="display: none">
         <span class="arrow"></span> Additional Settings
-      </h3>
+      </h2>
       <div class="hideable-section hidden" id="secondRow">
         <div id="map-container">
           <!-- Map preview and controls -->
@@ -180,6 +172,17 @@
 
   </div>
 
+  </div>
+
+
+  <!-- Username Modal moved to end for heading order -->
+  <div id="usernameModal" class="modal" style="display: none">
+    <div class="modal-content">
+      <h4>Choose a Username</h4>
+      <input type="text" id="usernameInput" placeholder="Enter your username" />
+      <br /><br />
+      <button id="confirmUsernameButton">Confirm</button>
+    </div>
   </div>
 
 
