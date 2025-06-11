@@ -2710,9 +2710,10 @@ td {
   text-align: center;
   background-color: #151515;
   color: #fff;
-  padding: 10px 20px;
+  padding: 16px 20px;
   width: 100vw;
   left: 0px;
+  min-height: 60px;
 }
 
 .footer img {
@@ -2873,12 +2874,24 @@ td {
   flex-direction: column;
   gap: 0px;
   padding: 10px;
+  position: relative;
   max-height: 78vh; /* Or whatever fits well inside your modal */
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 10px; /* Prevent text from going under scrollbar */
   scrollbar-width: thin;
   scrollbar-color: #444 #222; /* Firefox */
+}
+
+#buildCount {
+  position: sticky;
+  top: 0;
+  right: 0;
+  text-align: right;
+  background-color: #2c2c2c;
+  padding: 4px 8px;
+  font-size: 14px;
+  z-index: 2;
 }
 
 /* Chrome, Safari */
@@ -4303,6 +4316,7 @@ button.btn-small {
   .footer {
     font-size: 12px; /* Slightly smaller text for small screens */
     padding: 16px 10px;
+    min-height: 60px;
   }
 
   #secondRow {

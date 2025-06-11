@@ -2,6 +2,7 @@ import {
   getFirestore,
   collection,
   getDocs,
+  getCountFromServer,
   doc,
   addDoc,
   getDoc,
@@ -29,6 +30,53 @@ const batchSize = 13;
 let lastVisibleDoc = null;
 let isLoadingMoreBuilds = false;
 let hasMoreBuilds = true;
+
+async function updateTotalBuildCount(filter = "all") {
+  const db = getFirestore();
+  const constraints = [];
+  const type = localStorage.getItem("communityBuildType") || "public";
+
+  if (type === "public") {
+    constraints.push(where("isPublic", "==", true));
+  } else if (type === "clan") {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const clansSnap = await getDocs(collection(db, "clans"));
+    const clanIds = [];
+    clansSnap.forEach((d) => {
+      const c = d.data();
+      if (c.members?.includes(user.uid)) clanIds.push(d.id);
+    });
+    if (clanIds.length === 0) {
+      const el = document.getElementById("buildCount");
+      if (el) el.textContent = "0 builds";
+      return;
+    }
+    constraints.push(where("sharedToClans", "array-contains-any", clanIds));
+  }
+
+  const lowerFilter = filter.toLowerCase();
+  if (
+    ["zvp", "zvt", "zvz", "pvp", "pvt", "pvz", "tvp", "tvt", "tvz"].includes(
+      lowerFilter
+    )
+  ) {
+    constraints.push(where("subcategoryLowercase", "==", lowerFilter));
+  } else if (["zerg", "protoss", "terran"].includes(lowerFilter)) {
+    constraints.push(where("category", "==", capitalize(lowerFilter)));
+  }
+
+  try {
+    const q = query(collection(db, "publishedBuilds"), ...constraints);
+    const snap = await getCountFromServer(q);
+    const count = snap.data().count || 0;
+    const el = document.getElementById("buildCount");
+    if (el) el.textContent = `${count} build${count === 1 ? "" : "s"}`;
+  } catch (err) {
+    console.error("Failed to fetch build count", err);
+  }
+}
 
 async function fetchNextCommunityBuilds(batchSize = 20) {
   if (isLoadingMoreBuilds || !hasMoreBuilds) return [];
@@ -156,6 +204,9 @@ export async function populateCommunityBuilds() {
 
     const firstBatch = await fetchNextCommunityBuilds(batchSize);
     renderCommunityBuildBatch(firstBatch);
+    await updateTotalBuildCount(
+      localStorage.getItem("communityFilterValue") || "all"
+    );
 
     const scrollContainer = document.getElementById("communityBuildsContainer");
     if (scrollContainer) {
@@ -679,6 +730,9 @@ export async function searchCommunityBuilds(searchTerm) {
   if (container) container.innerHTML = "";
 
   renderCommunityBuildBatch(filteredBuilds);
+  const countEl = document.getElementById("buildCount");
+  if (countEl) countEl.textContent = `${filteredBuilds.length} build${
+    filteredBuilds.length === 1 ? "" : "s"}`;
 }
 /*
 export function filterCommunityBuilds(categoryOrSubcat = "all") {
@@ -895,6 +949,8 @@ export async function filterCommunityBuilds(filter = "all") {
     });
 
     renderCommunityBuildBatch(builds);
+
+    await updateTotalBuildCount(filter);
 
     // 📝 Update heading
     const heading = document.querySelector("#communityModal h3");
