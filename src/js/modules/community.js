@@ -31,6 +31,7 @@ let lastVisibleDoc = null;
 let isLoadingMoreBuilds = false;
 let hasMoreBuilds = true;
 let currentRequestId = 0;
+const renderedBuildIds = new Set();
 
 async function updateTotalBuildCount(filter = "all") {
   const db = getFirestore();
@@ -184,6 +185,7 @@ export async function populateCommunityBuilds() {
   currentRequestId++;
   const container = document.getElementById("communityBuildsContainer");
   container.innerHTML = "";
+  renderedBuildIds.clear();
 
   lastVisibleDoc = null;
   hasMoreBuilds = true;
@@ -736,7 +738,10 @@ export async function searchCommunityBuilds(searchTerm) {
   if (heading) heading.textContent = `Community Builds - ${searchTerm}`;
 
   const container = document.getElementById("communityBuildsContainer");
-  if (container) container.innerHTML = "";
+  if (container) {
+    container.innerHTML = "";
+    renderedBuildIds.clear();
+  }
 
   // Disable infinite scroll when searching to prevent duplicate batches
   const scrollContainer = document.getElementById("communityBuildsContainer");
@@ -778,17 +783,13 @@ export function filterCommunityBuilds(categoryOrSubcat = "all") {
 */
 function renderCommunityBuildBatch(builds) {
   const container = document.getElementById("communityBuildsContainer");
-  const seenIds = new Set();
-  const nextBatch = builds.filter((b) => {
-    if (seenIds.has(b.id)) return false;
-    seenIds.add(b.id);
-    return true;
-  });
+  const nextBatch = builds;
 
   nextBatch.forEach((build) => {
-    if (container.querySelector(`.build-entry[data-id="${build.id}"]`)) {
+    if (renderedBuildIds.has(build.id)) {
       return;
     }
+    renderedBuildIds.add(build.id);
     const totalVotes = build.upvotes + build.downvotes;
     const votePercentage =
       totalVotes > 0 ? Math.round((build.upvotes / totalVotes) * 100) : 0;
@@ -881,6 +882,7 @@ export async function filterCommunityBuilds(filter = "all") {
   const db = getFirestore();
   const container = document.getElementById("communityBuildsContainer");
   container.innerHTML = "";
+  renderedBuildIds.clear();
 
   // Disable infinite scroll when filtering to avoid duplicate builds
   const scrollContainer = document.getElementById("communityBuildsContainer");
