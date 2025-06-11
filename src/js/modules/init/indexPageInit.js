@@ -1140,47 +1140,66 @@ export async function initializeIndexPage() {
   }
 
   function attachSubcategoryClicks() {
-    const allCategories = document.querySelectorAll(
-      "#buildsModal .filter-category, #communityModal .filter-category"
+    const buildSubcats = document.querySelectorAll(
+      "#buildsModal .subcategory"
     );
-    const allSubcategories = document.querySelectorAll(
-      "#buildsModal .subcategory, #communityModal .subcategory"
+    const communitySubcats = document.querySelectorAll(
+      "#communityModal .subcategory"
     );
 
-    allSubcategories.forEach((el) => {
+    buildSubcats.forEach((el) => {
       el.addEventListener("click", async (e) => {
         e.stopPropagation();
         const subcat = el.getAttribute("data-subcategory");
         if (!subcat) return;
 
-        allCategories.forEach((btn) => btn.classList.remove("active"));
-        allSubcategories.forEach((btn) => btn.classList.remove("active"));
+        document
+          .querySelectorAll("#buildsModal .filter-category")
+          .forEach((btn) => btn.classList.remove("active"));
+        buildSubcats.forEach((btn) => btn.classList.remove("active"));
         el.classList.add("active");
 
         const parent = el.closest(".filter-category");
         if (parent) parent.classList.add("active");
 
         document.getElementById("buildSearchBar").value = "";
-        document.getElementById("communitySearchBar").value = "";
 
-        // ✅ Always use the new unified filterBuilds logic
         await filterBuilds(subcat);
 
-        // ✅ Also filter community builds if needed
-        await filterCommunityBuilds(subcat);
-
-        // ✅ Update headings
-        const buildsHeading = document.querySelector(
+        const heading = document.querySelector(
           "#buildsModal .template-header h3"
         );
-        const communityHeading = document.querySelector("#communityModal h3");
+        if (heading)
+          heading.textContent = `Build Orders - ${capitalize(subcat)}`;
 
-        if (buildsHeading)
-          buildsHeading.textContent = `Build Orders - ${capitalize(subcat)}`;
-        if (communityHeading)
-          communityHeading.textContent = `Community Builds - ${capitalize(
-            subcat
-          )}`;
+        if (window.innerWidth <= 768) {
+          const parent = el.closest(".filter-category");
+          if (parent) parent.classList.remove("show-submenu");
+        }
+      });
+    });
+
+    communitySubcats.forEach((el) => {
+      el.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const subcat = el.getAttribute("data-subcategory");
+        if (!subcat) return;
+
+        document
+          .querySelectorAll("#communityModal .filter-category")
+          .forEach((btn) => btn.classList.remove("active"));
+        communitySubcats.forEach((btn) => btn.classList.remove("active"));
+        el.classList.add("active");
+        const parent = el.closest(".filter-category");
+        if (parent) parent.classList.add("active");
+
+        document.getElementById("communitySearchBar").value = "";
+
+        await filterCommunityBuilds(subcat);
+
+        const heading = document.querySelector("#communityModal h3");
+        if (heading)
+          heading.textContent = `Community Builds - ${capitalize(subcat)}`;
 
         if (window.innerWidth <= 768) {
           const parent = el.closest(".filter-category");
