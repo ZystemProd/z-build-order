@@ -31,7 +31,6 @@ let lastVisibleDoc = null;
 let isLoadingMoreBuilds = false;
 let hasMoreBuilds = true;
 let currentRequestId = 0;
-const renderedBuildIds = new Set();
 
 async function updateTotalBuildCount(filter = "all") {
   const db = getFirestore();
@@ -185,7 +184,6 @@ export async function populateCommunityBuilds() {
   currentRequestId++;
   const container = document.getElementById("communityBuildsContainer");
   container.innerHTML = "";
-  renderedBuildIds.clear();
 
   lastVisibleDoc = null;
   hasMoreBuilds = true;
@@ -738,10 +736,7 @@ export async function searchCommunityBuilds(searchTerm) {
   if (heading) heading.textContent = `Community Builds - ${searchTerm}`;
 
   const container = document.getElementById("communityBuildsContainer");
-  if (container) {
-    container.innerHTML = "";
-    renderedBuildIds.clear();
-  }
+  if (container) container.innerHTML = "";
 
   // Disable infinite scroll when searching to prevent duplicate batches
   const scrollContainer = document.getElementById("communityBuildsContainer");
@@ -786,10 +781,9 @@ function renderCommunityBuildBatch(builds) {
   const nextBatch = builds;
 
   nextBatch.forEach((build) => {
-    if (renderedBuildIds.has(build.id)) {
+    if (container.querySelector(`.build-entry[data-id="${build.id}"]`)) {
       return;
     }
-    renderedBuildIds.add(build.id);
     const totalVotes = build.upvotes + build.downvotes;
     const votePercentage =
       totalVotes > 0 ? Math.round((build.upvotes / totalVotes) * 100) : 0;
@@ -882,7 +876,6 @@ export async function filterCommunityBuilds(filter = "all") {
   const db = getFirestore();
   const container = document.getElementById("communityBuildsContainer");
   container.innerHTML = "";
-  renderedBuildIds.clear();
 
   // Disable infinite scroll when filtering to avoid duplicate builds
   const scrollContainer = document.getElementById("communityBuildsContainer");
