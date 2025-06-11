@@ -2338,6 +2338,7 @@ td {
 }
 
 .community-layout {
+  position: relative;
   display: grid;
   grid-template-columns: 1fr 3fr; /* Allocate more space for table */
   gap: 20px;
@@ -2884,16 +2885,16 @@ td {
 }
 
 #buildCount {
-  position: sticky;
+  position: absolute;
   top: 0;
   right: 0;
-  text-align: right;
   background-color: #212121;
   box-shadow: rgba(0, 0, 0, 0.2) 0px 10px 15px -3px;
   color: #e0e0e0;
   padding: 4px 8px;
   font-size: 14px;
   z-index: 3;
+  width: fit-content;
 }
 
 /* Chrome, Safari */
@@ -4352,6 +4353,7 @@ button.btn-small {
   }
 
   .community-layout {
+    position: relative;
     grid-template-columns: 1fr; /* Stack the preview and builds list in one column */
   }
 
