@@ -865,7 +865,6 @@ export async function initializeIndexPage() {
   // attachCategoryClicks();
   attachMyBuildsCategoryClicks();
   attachSubcategoryClicks();
-  attachCommunityCategoryClicks();
 
   const replayUrl = document.getElementById("replayLinkInput")?.value.trim();
   const replayWrapper = document.getElementById("replayInputWrapper");
@@ -1033,15 +1032,20 @@ export async function initializeIndexPage() {
   }
 
   function attachMyBuildsCategoryClicks() {
-    const heading = document.querySelector("#buildsModal .template-header h3");
-    const categoryButtons = document.querySelectorAll(
-      "#buildsModal .filter-category, #communityModal .filter-category"
+    const buildsCategories = document.querySelectorAll(
+      "#buildsModal .filter-category"
     );
-    const subcategoryButtons = document.querySelectorAll(
-      "#buildsModal .subcategory, #communityModal .subcategory"
+    const communityCategories = document.querySelectorAll(
+      "#communityModal .filter-category"
+    );
+    const buildsSubcategories = document.querySelectorAll(
+      "#buildsModal .subcategory"
+    );
+    const communitySubcategories = document.querySelectorAll(
+      "#communityModal .subcategory"
     );
 
-    categoryButtons.forEach((el) => {
+    buildsCategories.forEach((el) => {
       el.addEventListener("click", async (e) => {
         if (e.target.closest(".subcategory")) return;
         const category = el.getAttribute("data-category");
@@ -1050,9 +1054,7 @@ export async function initializeIndexPage() {
         if (window.innerWidth <= 768) {
           const wasOpen = el.classList.contains("show-submenu");
           document
-            .querySelectorAll(
-              "#buildsModal .filter-category.show-submenu, #communityModal .filter-category.show-submenu"
-            )
+            .querySelectorAll("#buildsModal .filter-category.show-submenu")
             .forEach((c) => {
               if (c !== el) c.classList.remove("show-submenu");
             });
@@ -1066,16 +1068,12 @@ export async function initializeIndexPage() {
           }
         }
 
-        // 🔄 UI
-        categoryButtons.forEach((btn) => btn.classList.remove("active"));
-        subcategoryButtons.forEach((btn) => btn.classList.remove("active"));
+        buildsCategories.forEach((btn) => btn.classList.remove("active"));
+        buildsSubcategories.forEach((btn) => btn.classList.remove("active"));
         el.classList.add("active");
 
-        // 🔄 Clear search
         document.getElementById("buildSearchBar").value = "";
-        document.getElementById("communitySearchBar").value = "";
 
-        // 🔎 Apply filter
         const isPublishedTabActive = document
           .getElementById("publishedBuildsTab")
           ?.classList.contains("active");
@@ -1084,25 +1082,55 @@ export async function initializeIndexPage() {
           const publishedBuilds = await fetchPublishedUserBuilds(category);
           populateBuildList(publishedBuilds);
         } else {
-          filterBuilds(category); // My Builds
+          filterBuilds(category);
         }
-        await filterCommunityBuilds(category); // Community
 
-        // 📝 Headings
-        const buildsHeading = document.querySelector(
+        const heading = document.querySelector(
           "#buildsModal .template-header h3"
         );
-        const communityHeading = document.querySelector("#communityModal h3");
-
-        if (buildsHeading) {
-          buildsHeading.textContent =
+        if (heading) {
+          heading.textContent =
             category.toLowerCase() === "all"
               ? "Build Orders"
               : `Build Orders - ${capitalize(category)}`;
         }
+      });
+    });
 
-        if (communityHeading) {
-          communityHeading.textContent =
+    communityCategories.forEach((el) => {
+      el.addEventListener("click", async (e) => {
+        if (e.target.closest(".subcategory")) return;
+        const category = el.getAttribute("data-category");
+        if (!category) return;
+
+        if (window.innerWidth <= 768) {
+          const wasOpen = el.classList.contains("show-submenu");
+          document
+            .querySelectorAll("#communityModal .filter-category.show-submenu")
+            .forEach((c) => {
+              if (c !== el) c.classList.remove("show-submenu");
+            });
+          const submenu = el.querySelector(".submenu");
+          if (submenu) {
+            if (wasOpen) {
+              el.classList.remove("show-submenu");
+            } else {
+              el.classList.add("show-submenu");
+            }
+          }
+        }
+
+        communityCategories.forEach((btn) => btn.classList.remove("active"));
+        communitySubcategories.forEach((btn) => btn.classList.remove("active"));
+        el.classList.add("active");
+
+        document.getElementById("communitySearchBar").value = "";
+
+        await filterCommunityBuilds(category);
+
+        const heading = document.querySelector("#communityModal h3");
+        if (heading) {
+          heading.textContent =
             category.toLowerCase() === "all"
               ? "Community Builds"
               : `Community Builds - ${capitalize(category)}`;
