@@ -30,6 +30,7 @@ const batchSize = 13;
 let lastVisibleDoc = null;
 let isLoadingMoreBuilds = false;
 let hasMoreBuilds = true;
+let currentRequestId = 0;
 
 async function updateTotalBuildCount(filter = "all") {
   const db = getFirestore();
@@ -79,6 +80,7 @@ async function updateTotalBuildCount(filter = "all") {
 }
 
 async function fetchNextCommunityBuilds(batchSize = 20) {
+  const requestId = ++currentRequestId;
   if (isLoadingMoreBuilds || !hasMoreBuilds) return [];
 
   isLoadingMoreBuilds = true;
@@ -104,6 +106,10 @@ async function fetchNextCommunityBuilds(batchSize = 20) {
   }
 
   const snap = await getDocs(q);
+  if (requestId !== currentRequestId) {
+    isLoadingMoreBuilds = false;
+    return [];
+  }
   const docs = snap.docs;
 
   if (docs.length < batchSize) hasMoreBuilds = false;
@@ -175,6 +181,7 @@ async function fetchNextCommunityBuilds(batchSize = 20) {
 }
 
 export async function populateCommunityBuilds() {
+  currentRequestId++;
   const container = document.getElementById("communityBuildsContainer");
   container.innerHTML = "";
 
@@ -612,6 +619,7 @@ window.publishBuildToCommunity = async function (buildId) {
 
 export async function searchCommunityBuilds(searchTerm) {
   const lower = searchTerm.toLowerCase().trim();
+  const requestId = ++currentRequestId;
 
   // Revert to existing filter when search is cleared
   if (!lower) {
@@ -658,6 +666,7 @@ export async function searchCommunityBuilds(searchTerm) {
 
   const q = query(collection(db, "publishedBuilds"), ...constraints);
   const snap = await getDocs(q);
+  if (requestId !== currentRequestId) return;
 
   const now = Date.now();
 
@@ -863,6 +872,7 @@ function capitalize(str) {
 }
 
 export async function filterCommunityBuilds(filter = "all") {
+  const requestId = ++currentRequestId;
   const db = getFirestore();
   const container = document.getElementById("communityBuildsContainer");
   container.innerHTML = "";
@@ -929,6 +939,7 @@ export async function filterCommunityBuilds(filter = "all") {
 
   try {
     const snap = await getDocs(q);
+    if (requestId !== currentRequestId) return;
 
     const builds = snap.docs.map((doc) => {
       const data = doc.data();
