@@ -1043,7 +1043,8 @@ export async function initializeIndexPage() {
     );
 
     categoryButtons.forEach((el) => {
-      el.addEventListener("click", async () => {
+      el.addEventListener("click", async (e) => {
+        if (e.target.closest(".subcategory")) return;
         const category = el.getAttribute("data-category");
         if (!category) return;
 
@@ -1192,7 +1193,8 @@ export async function initializeIndexPage() {
     );
 
     categoryButtons.forEach((el) => {
-      el.addEventListener("click", async () => {
+      el.addEventListener("click", async (e) => {
+        if (e.target.closest(".subcategory")) return;
         const category = el.getAttribute("data-category");
         if (!category) return;
 
