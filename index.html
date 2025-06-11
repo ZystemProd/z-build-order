@@ -17,6 +17,14 @@
   <link rel="stylesheet" href="public/css/showToast.css">
   <link rel="stylesheet" href="public/css/catHelper.css" />
 
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('consent', 'default', { 'analytics_storage': 'denied' });
+  </script>
 
   <!-- JS Files -->
   <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.3/purify.min.js"></script>-->
@@ -788,7 +796,7 @@
         target="_blank">Discord</a>
     </div>
     <div class="footer-center" id="site-info">
-      <p>Version 0.5.7107</p>
+      <p>Version 0.5.7108</p>
 
     </div>
     <div class="footer-right" id="site-logo">
@@ -843,22 +851,30 @@
         device.
       </p>
 
-      <h4>4. Data Sharing</h4>
+      <h4>4. Google Analytics</h4>
+      <p>
+        Google Analytics collects anonymous usage statistics to help improve this site. Analytics is disabled until you accept this policy.
+      </p>
+
+      <h4>5. Data Sharing</h4>
       <p>
         No personal data is sold or shared with third parties. Replay links may point to external services with their
         own privacy policies.
       </p>
 
-      <h4>5. Liability Disclaimer</h4>
+      <h4>6. Liability Disclaimer</h4>
       <p>
         This app is provided “as is” without warranty of any kind. You use this site at your own risk. The owner of this
         site is not liable for any content you upload, link to, or view using this tool.
       </p>
 
-      <h4>6. Contact</h4>
+      <h4>7. Contact</h4>
       <p>
         For any concerns or questions, please contact the developer directly.
       </p>
+      <div style="margin-top: 20px; text-align: center;">
+        <button id="acceptPrivacyPolicy" class="auth-button">I Accept</button>
+      </div>
     </div>
 
   </div>
