@@ -57,6 +57,17 @@ can toggle this in **Settings**:
 * Install Firebase CLI (`npm install -g firebase-tools` or `npx firebase login`).
 * Use `npm run build` followed by `firebase hosting:channel:deploy dev` for preview deployments.
 
+## Tests
+
+Run the JavaScript and Python test suites with:
+
+```bash
+npm test
+pytest
+```
+
+The project currently contains basic example tests to ensure these commands succeed.
+
 ## Replay Parsing Backend
 
 To parse StarCraft II replays locally you must run the Python service:
