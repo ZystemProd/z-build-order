@@ -713,6 +713,7 @@ export async function initializeIndexPage() {
   });
 
   const settingsModal = document.getElementById("settingsModal");
+  const privacyModal = document.getElementById("privacyModal");
   window.addEventListener("mousedown", (event) => {
     if (settingsModal && event.target === settingsModal) {
       settingsModal.style.display = "none";
@@ -746,8 +747,8 @@ export async function initializeIndexPage() {
 
 
   window.addEventListener("mousedown", (event) => {
-    if (modal && event.target === modal) {
-      modal.style.display = "none";
+    if (privacyModal && event.target === privacyModal) {
+      privacyModal.style.display = "none";
     }
   });
 
