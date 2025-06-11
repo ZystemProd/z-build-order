@@ -426,7 +426,6 @@ export async function initializeIndexPage() {
     } else {
       await populateCommunityBuilds();
     }
-    attachCommunityCategoryClicks(); // Always attach after
 
     const heading = document.querySelector("#communityModal h3");
     if (heading) heading.textContent = "Community Builds";
