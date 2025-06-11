@@ -800,8 +800,8 @@ function renderCommunityBuildBatch(builds) {
     buildEntry.dataset.id = build.id;
 
     buildEntry.addEventListener("click", async () => {
-      window.location.href = `viewBuild.html?id=${build.id}`;
       await incrementBuildViews(db, build.id);
+      window.location.href = `viewBuild.html?id=${build.id}`;
     });
 
     buildEntry.addEventListener("mouseover", () => showBuildPreview(build));

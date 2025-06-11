@@ -1,5 +1,12 @@
 import { auth, db, initializeAuthUI } from "../../app.js"; // ✅ Reuse Firebase app
-import { collection, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  increment,
+} from "firebase/firestore";
 import { formatActionText } from "../modules/textFormatters.js"; // ✅ Format build steps
 import {
   MapAnnotations,
@@ -72,6 +79,16 @@ if (pageBackButton) {
   pageBackButton.addEventListener("click", handleBackClick);
 }
 
+async function incrementBuildViews(buildId) {
+  try {
+    const buildRef = doc(db, "publishedBuilds", buildId);
+    await updateDoc(buildRef, { views: increment(1) });
+    console.log(`👀 View count updated for Build ID: ${buildId}`);
+  } catch (error) {
+    console.error("❌ Error updating view count:", error);
+  }
+}
+
 async function loadBuild() {
   const urlParams = new URLSearchParams(window.location.search);
   const buildId = urlParams.get("id");
@@ -89,6 +106,7 @@ async function loadBuild() {
 
   if (buildSnapshot.exists()) {
     const build = buildSnapshot.data();
+    await incrementBuildViews(buildId);
     console.log("✅ Build Loaded:", build);
 
     // Set basic build info
