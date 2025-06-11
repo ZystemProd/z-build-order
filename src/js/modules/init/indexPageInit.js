@@ -141,10 +141,7 @@ export async function initializeIndexPage() {
   const filterValue = localStorage.getItem("communityFilterValue");
   const searchQuery = localStorage.getItem("communitySearchQuery");
 
-  if (localStorage.getItem("privacyAccepted") !== "true") {
-    const modal = document.getElementById("privacyModal");
-    if (modal) modal.style.display = "block";
-  } else {
+  if (localStorage.getItem("privacyAccepted") === "true") {
     enableAnalytics();
   }
 
@@ -747,15 +744,8 @@ export async function initializeIndexPage() {
     if (modal) modal.style.display = "none";
   });
 
-  safeAdd("acceptPrivacyPolicy", "click", () => {
-    localStorage.setItem("privacyAccepted", "true");
-    const modal = document.getElementById("privacyModal");
-    if (modal) modal.style.display = "none";
-    enableAnalytics();
-  });
 
   window.addEventListener("mousedown", (event) => {
-    const modal = document.getElementById("privacyModal");
     if (modal && event.target === modal) {
       modal.style.display = "none";
     }

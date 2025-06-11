@@ -772,6 +772,9 @@ function renderCommunityBuildBatch(builds) {
   const nextBatch = builds;
 
   nextBatch.forEach((build) => {
+    if (container.querySelector(`.build-entry[data-id="${build.id}"]`)) {
+      return;
+    }
     const totalVotes = build.upvotes + build.downvotes;
     const votePercentage =
       totalVotes > 0 ? Math.round((build.upvotes / totalVotes) * 100) : 0;
