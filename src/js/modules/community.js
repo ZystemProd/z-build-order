@@ -176,7 +176,7 @@ async function fetchNextCommunityBuilds(batchSize = 20) {
 
 export async function populateCommunityBuilds() {
   const container = document.getElementById("communityBuildsContainer");
-  container.innerHTML = "";
+  container.innerHTML = '<div id="buildCount" class="build-count"></div>';
 
   lastVisibleDoc = null;
   hasMoreBuilds = true;
@@ -727,7 +727,8 @@ export async function searchCommunityBuilds(searchTerm) {
   if (heading) heading.textContent = `Community Builds - ${searchTerm}`;
 
   const container = document.getElementById("communityBuildsContainer");
-  if (container) container.innerHTML = "";
+  if (container)
+    container.innerHTML = '<div id="buildCount" class="build-count"></div>';
 
   renderCommunityBuildBatch(filteredBuilds);
   const countEl = document.getElementById("buildCount");
@@ -854,7 +855,7 @@ function capitalize(str) {
 export async function filterCommunityBuilds(filter = "all") {
   const db = getFirestore();
   const container = document.getElementById("communityBuildsContainer");
-  container.innerHTML = "";
+  container.innerHTML = '<div id="buildCount" class="build-count"></div>';
 
   const lowerFilter = filter.toLowerCase();
   const type = localStorage.getItem("communityBuildType") || "public";
