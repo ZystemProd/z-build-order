@@ -2890,6 +2890,7 @@ td {
   right: 0;
   background-color: #212121;
   box-shadow: rgba(0, 0, 0, 0.2) 0px 10px 15px -3px;
+  border-bottom-left-radius: 12px;
   color: #e0e0e0;
   padding: 4px 8px;
   font-size: 14px;
