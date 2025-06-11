@@ -91,6 +91,7 @@ import {
   loadUserSettings,
 } from "../settings.js";
 import { checkForJoinRequestNotifications } from "../utils/notificationHelpers.js";
+import { logAnalyticsEvent } from "../analyticsHelper.js";
 
 function updateSupplyColumnVisibility() {
   const table = document.getElementById("buildOrderTable");
@@ -557,11 +558,16 @@ export async function initializeIndexPage() {
       const buildInput = document.getElementById("buildOrderInput");
       if (buildInput) buildInput.value = text;
       analyzeBuildOrder(text);
+      logAnalyticsEvent("replay_uploaded", {
+        fileName: selectedReplayFile.name,
+        sizeKB: Math.round(selectedReplayFile.size / 1024),
+      });
     } catch (err) {
       console.error("Replay upload failed", err);
       alert(
         "Could not parse the replay. Make sure the Python backend is running."
       );
+      logAnalyticsEvent("replay_upload_failed", { error: err.message });
     }
 
     btn.disabled = false;
@@ -806,6 +812,12 @@ export async function initializeIndexPage() {
     };
 
     await setDoc(publishedBuildRef, publishedData);
+    if (publishToCommunity || checkedClans.length > 0) {
+      logAnalyticsEvent("build_published", {
+        race: buildData.category,
+        matchup: buildData.subcategory,
+      });
+    }
 
     // ✅ Delete if fully unpublished (optional)
     if (!publishToCommunity && checkedClans.length === 0) {

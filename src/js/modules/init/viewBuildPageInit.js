@@ -4,6 +4,7 @@ import { initializeSectionToggles } from "../uiHandlers.js";
 // Import Firestore methods from local Firebase SDK
 import { doc, getDoc, setDoc, collection } from "firebase/firestore";
 import { populateBuildsModal } from "../buildManagement.js";
+import { logAnalyticsEvent } from "../analyticsHelper.js";
 
 export function initializeViewBuildPage() {
   safeAdd("signInBtn", "click", window.handleSignIn);
@@ -55,6 +56,8 @@ async function importBuildHandler() {
       timestamp: Date.now(),
     });
 
+    logAnalyticsEvent("build_imported", { source: "community" });
+
     document.getElementById("importBuildButton").disabled = true;
     document.getElementById("importBuildButton").textContent = "Imported";
 
@@ -63,5 +66,6 @@ async function importBuildHandler() {
   } catch (error) {
     console.error(error);
     alert("❌ Failed to import build.");
+    logAnalyticsEvent("build_import_failed", { reason: error.message });
   }
 }
