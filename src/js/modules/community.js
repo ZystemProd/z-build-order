@@ -30,6 +30,7 @@ const batchSize = 13;
 let lastVisibleDoc = null;
 let isLoadingMoreBuilds = false;
 let hasMoreBuilds = true;
+let currentRequestId = 0;
 
 async function updateTotalBuildCount(filter = "all") {
   const db = getFirestore();
@@ -79,6 +80,7 @@ async function updateTotalBuildCount(filter = "all") {
 }
 
 async function fetchNextCommunityBuilds(batchSize = 20) {
+  const requestId = ++currentRequestId;
   if (isLoadingMoreBuilds || !hasMoreBuilds) return [];
 
   isLoadingMoreBuilds = true;
@@ -104,6 +106,10 @@ async function fetchNextCommunityBuilds(batchSize = 20) {
   }
 
   const snap = await getDocs(q);
+  if (requestId !== currentRequestId) {
+    isLoadingMoreBuilds = false;
+    return [];
+  }
   const docs = snap.docs;
 
   if (docs.length < batchSize) hasMoreBuilds = false;
@@ -175,6 +181,7 @@ async function fetchNextCommunityBuilds(batchSize = 20) {
 }
 
 export async function populateCommunityBuilds() {
+  currentRequestId++;
   const container = document.getElementById("communityBuildsContainer");
   container.innerHTML = "";
 
@@ -612,6 +619,7 @@ window.publishBuildToCommunity = async function (buildId) {
 
 export async function searchCommunityBuilds(searchTerm) {
   const lower = searchTerm.toLowerCase().trim();
+  const requestId = ++currentRequestId;
 
   // Revert to existing filter when search is cleared
   if (!lower) {
@@ -658,6 +666,7 @@ export async function searchCommunityBuilds(searchTerm) {
 
   const q = query(collection(db, "publishedBuilds"), ...constraints);
   const snap = await getDocs(q);
+  if (requestId !== currentRequestId) return;
 
   const now = Date.now();
 
@@ -729,6 +738,14 @@ export async function searchCommunityBuilds(searchTerm) {
   const container = document.getElementById("communityBuildsContainer");
   if (container) container.innerHTML = "";
 
+  // Disable infinite scroll when searching to prevent duplicate batches
+  const scrollContainer = document.getElementById("communityBuildsContainer");
+  if (scrollContainer) {
+    scrollContainer.removeEventListener("scroll", handlePaginatedScroll);
+  }
+  lastVisibleDoc = null;
+  hasMoreBuilds = false;
+
   renderCommunityBuildBatch(filteredBuilds);
   const countEl = document.getElementById("buildCount");
   if (countEl) countEl.textContent = `${filteredBuilds.length} build${
@@ -764,6 +781,9 @@ function renderCommunityBuildBatch(builds) {
   const nextBatch = builds;
 
   nextBatch.forEach((build) => {
+    if (container.querySelector(`.build-entry[data-id="${build.id}"]`)) {
+      return;
+    }
     const totalVotes = build.upvotes + build.downvotes;
     const votePercentage =
       totalVotes > 0 ? Math.round((build.upvotes / totalVotes) * 100) : 0;
@@ -852,9 +872,18 @@ function capitalize(str) {
 }
 
 export async function filterCommunityBuilds(filter = "all") {
+  const requestId = ++currentRequestId;
   const db = getFirestore();
   const container = document.getElementById("communityBuildsContainer");
   container.innerHTML = "";
+
+  // Disable infinite scroll when filtering to avoid duplicate builds
+  const scrollContainer = document.getElementById("communityBuildsContainer");
+  if (scrollContainer) {
+    scrollContainer.removeEventListener("scroll", handlePaginatedScroll);
+  }
+  lastVisibleDoc = null;
+  hasMoreBuilds = false;
 
   const lowerFilter = filter.toLowerCase();
   const type = localStorage.getItem("communityBuildType") || "public";
@@ -910,6 +939,7 @@ export async function filterCommunityBuilds(filter = "all") {
 
   try {
     const snap = await getDocs(q);
+    if (requestId !== currentRequestId) return;
 
     const builds = snap.docs.map((doc) => {
       const data = doc.data();

@@ -116,11 +116,19 @@ function updateBuildInputPlaceholder() {
     : "Spawning Pool";
 }
 
+function enableAnalytics() {
+  if (window.gtag) {
+    gtag('consent', 'update', { analytics_storage: 'granted' });
+    gtag('config', 'G-XXXXXXXXXX');
+  }
+}
+
 setupTemplateModal(); // Always call early
 
 let currentClanView = null;
 let allBuilds = [];
 let currentBuildFilter = "all";
+let communityCategoryClicksInitialized = false;
 
 /** ----------------
  *  Initialize index.html
@@ -132,6 +140,10 @@ export async function initializeIndexPage() {
   const filterType = localStorage.getItem("communityFilterType");
   const filterValue = localStorage.getItem("communityFilterValue");
   const searchQuery = localStorage.getItem("communitySearchQuery");
+
+  if (localStorage.getItem("privacyAccepted") === "true") {
+    enableAnalytics();
+  }
 
   if (restoreCommunity === "true") {
     const modal = document.getElementById("communityModal");
@@ -701,6 +713,7 @@ export async function initializeIndexPage() {
   });
 
   const settingsModal = document.getElementById("settingsModal");
+  const privacyModal = document.getElementById("privacyModal");
   window.addEventListener("mousedown", (event) => {
     if (settingsModal && event.target === settingsModal) {
       settingsModal.style.display = "none";
@@ -732,10 +745,10 @@ export async function initializeIndexPage() {
     if (modal) modal.style.display = "none";
   });
 
+
   window.addEventListener("mousedown", (event) => {
-    const modal = document.getElementById("privacyModal");
-    if (modal && event.target === modal) {
-      modal.style.display = "none";
+    if (privacyModal && event.target === privacyModal) {
+      privacyModal.style.display = "none";
     }
   });
 
@@ -1180,6 +1193,8 @@ export async function initializeIndexPage() {
   });
 
   function attachCommunityCategoryClicks() {
+    if (communityCategoryClicksInitialized) return;
+    communityCategoryClicksInitialized = true;
     const categoryButtons = document.querySelectorAll(
       "#communityModal .filter-category"
     );
