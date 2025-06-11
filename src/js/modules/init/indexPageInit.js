@@ -116,12 +116,6 @@ function updateBuildInputPlaceholder() {
     : "Spawning Pool";
 }
 
-function enableAnalytics() {
-  if (window.gtag) {
-    gtag('consent', 'update', { analytics_storage: 'granted' });
-    gtag('config', 'G-XXXXXXXXXX');
-  }
-}
 
 setupTemplateModal(); // Always call early
 
@@ -141,9 +135,6 @@ export async function initializeIndexPage() {
   const filterValue = localStorage.getItem("communityFilterValue");
   const searchQuery = localStorage.getItem("communitySearchQuery");
 
-  if (localStorage.getItem("privacyAccepted") === "true") {
-    enableAnalytics();
-  }
 
   if (restoreCommunity === "true") {
     const modal = document.getElementById("communityModal");
