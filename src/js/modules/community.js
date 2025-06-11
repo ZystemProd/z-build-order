@@ -778,7 +778,12 @@ export function filterCommunityBuilds(categoryOrSubcat = "all") {
 */
 function renderCommunityBuildBatch(builds) {
   const container = document.getElementById("communityBuildsContainer");
-  const nextBatch = builds;
+  const seenIds = new Set();
+  const nextBatch = builds.filter((b) => {
+    if (seenIds.has(b.id)) return false;
+    seenIds.add(b.id);
+    return true;
+  });
 
   nextBatch.forEach((build) => {
     if (container.querySelector(`.build-entry[data-id="${build.id}"]`)) {
