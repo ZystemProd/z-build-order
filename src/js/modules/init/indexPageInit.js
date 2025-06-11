@@ -158,10 +158,10 @@ export async function initializeIndexPage() {
       }
 
       // ✅ Apply filter + search after build list loads
-      await populateCommunityBuilds();
-
       if (filterType && filterValue) {
-        filterCommunityBuilds(filterValue);
+        await filterCommunityBuilds(filterValue); // Only do filtered call
+      } else {
+        await populateCommunityBuilds(); // Only do full list if no filter
       }
 
       if (searchQuery) {
@@ -420,8 +420,13 @@ export async function initializeIndexPage() {
     if (input) input.value = "";
 
     // ✅ Load builds and setup filters
-    await populateCommunityBuilds();
-    attachCommunityCategoryClicks();
+    const storedFilter = localStorage.getItem("communityFilterValue") || "all";
+    if (storedFilter && storedFilter !== "all") {
+      await filterCommunityBuilds(storedFilter);
+    } else {
+      await populateCommunityBuilds();
+    }
+    attachCommunityCategoryClicks(); // Always attach after
 
     const heading = document.querySelector("#communityModal h3");
     if (heading) heading.textContent = "Community Builds";
@@ -725,7 +730,6 @@ export async function initializeIndexPage() {
       updateBuildInputVisibility();
     });
   }
-
 
   safeAdd("closePrivacyModal", "click", () => {
     const modal = document.getElementById("privacyModal");
@@ -1195,9 +1199,7 @@ export async function initializeIndexPage() {
         if (window.innerWidth <= 768) {
           const wasOpen = el.classList.contains("show-submenu");
           document
-            .querySelectorAll(
-              "#communityModal .filter-category.show-submenu"
-            )
+            .querySelectorAll("#communityModal .filter-category.show-submenu")
             .forEach((c) => {
               if (c !== el) c.classList.remove("show-submenu");
             });

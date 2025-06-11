@@ -9,7 +9,6 @@
   <link rel="icon" type="image/x-icon" href="/img/favicon.ico" />
   <link rel="stylesheet" type="text/css" href="public/css/style.css" />
   <link rel="stylesheet" type="text/css" href="public/css/viewBuild.css" />
-  <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.3/purify.min.js"></script>-->
   <script type="module" src="./src/app.js"></script>
   <script type="module" src="./src/js/modules/viewBuild.js"></script>
   <script type="module" src="./src/js/modules/init/viewBuildPageInit.js"></script>
@@ -61,6 +60,15 @@
   <!-- Optional Loading Status -->
   <p id="authLoading" style="color: #555"></p>
 
+  <!-- Username Modal -->
+  <div id="usernameModal" class="modal" style="display: none">
+    <div class="modal-content">
+      <h3>Choose a Username</h3>
+      <input type="text" id="usernameInput" placeholder="Enter your username" />
+      <br /><br />
+      <button id="confirmUsernameButton">Confirm</button>
+    </div>
+  </div>
 
   <div class="view-build-container">
     <div class="build-header-row">
@@ -82,7 +90,8 @@
       </div>
       <div class="build-info-item desktop-info">
         <label>Publisher</label>
-        <span class="meta-chip publisher-chip"><img src="./img/SVG/user-svgrepo-com.svg" alt="Publisher" class="meta-icon" /> <span id="buildPublisher">Loading...</span></span>
+        <span class="meta-chip publisher-chip"><img src="./img/SVG/user-svgrepo-com.svg" alt="Publisher"
+            class="meta-icon" /> <span id="buildPublisher">Loading...</span></span>
       </div>
       <div class="build-info-item desktop-info">
         <label>Date Published</label>
@@ -99,7 +108,8 @@
         </div>
         <div class="info-row">
           <label>Publisher</label>
-          <span class="meta-chip publisher-chip"><img src="./img/SVG/user-svgrepo-com.svg" alt="Publisher" class="meta-icon" /> <span id="buildPublisherMobile">Loading...</span></span>
+          <span class="meta-chip publisher-chip"><img src="./img/SVG/user-svgrepo-com.svg" alt="Publisher"
+              class="meta-icon" /> <span id="buildPublisherMobile">Loading...</span></span>
         </div>
         <div class="info-row">
           <label>Date</label>
@@ -138,9 +148,9 @@
     <div class="main-layout">
       <!-- Second Row: Map and Comment/Video -->
 
-      <h2 id="additionalSettingsHeader" data-section="secondRow" class="toggle-title" style="display: none">
+      <h3 id="additionalSettingsHeader" data-section="secondRow" class="toggle-title" style="display: none">
         <span class="arrow"></span> Additional Settings
-      </h2>
+      </h3>
       <div class="hideable-section hidden" id="secondRow">
         <div id="map-container">
           <!-- Map preview and controls -->
@@ -172,17 +182,6 @@
 
   </div>
 
-  </div>
-
-
-  <!-- Username Modal moved to end for heading order -->
-  <div id="usernameModal" class="modal" style="display: none">
-    <div class="modal-content">
-      <h4>Choose a Username</h4>
-      <input type="text" id="usernameInput" placeholder="Enter your username" />
-      <br /><br />
-      <button id="confirmUsernameButton">Confirm</button>
-    </div>
   </div>
 
 

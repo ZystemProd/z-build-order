@@ -720,7 +720,7 @@ export async function searchCommunityBuilds(searchTerm) {
   } else if (sortMode === "hot") {
     filteredBuilds.sort((a, b) => b.hotnessScore - a.hotnessScore);
   } else {
-  filteredBuilds.sort((a, b) => b.datePublishedRaw - a.datePublishedRaw);
+    filteredBuilds.sort((a, b) => b.datePublishedRaw - a.datePublishedRaw);
   }
 
   const heading = document.querySelector("#communityModal h3");
@@ -731,8 +731,10 @@ export async function searchCommunityBuilds(searchTerm) {
 
   renderCommunityBuildBatch(filteredBuilds);
   const countEl = document.getElementById("buildCount");
-  if (countEl) countEl.textContent = `${filteredBuilds.length} build${
-    filteredBuilds.length === 1 ? "" : "s"}`;
+  if (countEl)
+    countEl.textContent = `${filteredBuilds.length} build${
+      filteredBuilds.length === 1 ? "" : "s"
+    }`;
 }
 /*
 export function filterCommunityBuilds(categoryOrSubcat = "all") {
@@ -763,7 +765,14 @@ function renderCommunityBuildBatch(builds) {
   const container = document.getElementById("communityBuildsContainer");
   const nextBatch = builds;
 
+  // ✅ Track already-rendered builds to avoid duplication
+  const existingIds = new Set(
+    Array.from(container.children).map((el) => el.dataset.id)
+  );
+
   nextBatch.forEach((build) => {
+    if (existingIds.has(build.id)) return; // 🛑 Skip duplicate
+
     const totalVotes = build.upvotes + build.downvotes;
     const votePercentage =
       totalVotes > 0 ? Math.round((build.upvotes / totalVotes) * 100) : 0;
@@ -802,12 +811,12 @@ function renderCommunityBuildBatch(builds) {
         <img src="${matchupImage}" alt="${matchup}" class="matchup-icon">
       </div>
       <div class="build-right">
-        <div class="build-title">${build.title}</div>
+        <div class="build-title">${DOMPurify.sanitize(build.title)}</div>
         <div class="build-meta">
           <span class="meta-chip matchup-chip">${formatMatchup(matchup)}</span>
           <span class="meta-chip publisher-chip">
             <img src="./img/SVG/user-svgrepo-com.svg" alt="Publisher" class="meta-icon">
-            ${build.publisher}
+            ${DOMPurify.sanitize(build.publisher)}
           </span>
           <span class="meta-chip">
             <img src="./img/SVG/time.svg" alt="Date" class="meta-icon">
@@ -827,6 +836,7 @@ function renderCommunityBuildBatch(builds) {
 
     container.appendChild(buildEntry);
   });
+
   updateTooltips();
 }
 
@@ -839,7 +849,9 @@ document
 
 function setCommunitySortMode(mode) {
   communitySortMode = mode;
-  const searchValue = document.getElementById("communitySearchBar")?.value.trim();
+  const searchValue = document
+    .getElementById("communitySearchBar")
+    ?.value.trim();
   if (searchValue) {
     searchCommunityBuilds(searchValue);
   } else {
@@ -969,6 +981,7 @@ export async function filterCommunityBuilds(filter = "all") {
   } catch (err) {
     console.error("Error filtering community builds:", err);
   }
+  localStorage.removeItem("communityFilterValue");
 }
 
 // Call check function on page load
