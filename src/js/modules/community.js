@@ -729,6 +729,14 @@ export async function searchCommunityBuilds(searchTerm) {
   const container = document.getElementById("communityBuildsContainer");
   if (container) container.innerHTML = "";
 
+  // Disable infinite scroll when searching to prevent duplicate batches
+  const scrollContainer = document.getElementById("communityBuildsContainer");
+  if (scrollContainer) {
+    scrollContainer.removeEventListener("scroll", handlePaginatedScroll);
+  }
+  lastVisibleDoc = null;
+  hasMoreBuilds = false;
+
   renderCommunityBuildBatch(filteredBuilds);
   const countEl = document.getElementById("buildCount");
   if (countEl) countEl.textContent = `${filteredBuilds.length} build${
@@ -855,6 +863,14 @@ export async function filterCommunityBuilds(filter = "all") {
   const db = getFirestore();
   const container = document.getElementById("communityBuildsContainer");
   container.innerHTML = "";
+
+  // Disable infinite scroll when filtering to avoid duplicate builds
+  const scrollContainer = document.getElementById("communityBuildsContainer");
+  if (scrollContainer) {
+    scrollContainer.removeEventListener("scroll", handlePaginatedScroll);
+  }
+  lastVisibleDoc = null;
+  hasMoreBuilds = false;
 
   const lowerFilter = filter.toLowerCase();
   const type = localStorage.getItem("communityBuildType") || "public";
