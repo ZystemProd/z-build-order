@@ -53,7 +53,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
-const analytics = getAnalytics(app);
+getAnalytics(app);
 initAnalytics(app);
 /*
 // If testing locally, you can enable Firebase emulators by importing
