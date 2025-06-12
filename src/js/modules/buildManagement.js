@@ -166,6 +166,17 @@ export async function saveCurrentBuild() {
     return null;
   }
 
+  const existingBuilds = await fetchUserBuilds();
+  setSavedBuilds(existingBuilds);
+  saveSavedBuildsToLocalStorage();
+  const lower = title.toLowerCase();
+  if (existingBuilds.some((b) => b.title.toLowerCase() === lower)) {
+    showToast("A build with this title already exists.", "error");
+    highlightField(titleInput);
+    highlightField(titleText);
+    return null;
+  }
+
   const db = getFirestore();
   const userRef = doc(db, "users", user.uid);
 

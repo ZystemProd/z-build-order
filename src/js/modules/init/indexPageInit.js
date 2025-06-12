@@ -68,6 +68,7 @@ import {
 } from "../interactive_map.js";
 import {
   getSavedBuilds,
+  setSavedBuilds,
   saveSavedBuildsToLocalStorage,
 } from "../buildStorage.js";
 import { setupCatActivationOnInput } from "../helpers/companion.js";
@@ -337,6 +338,9 @@ export async function initializeIndexPage() {
       await checkForJoinRequestNotifications();
       initializeUserData(user);
       await loadUserSettings();
+      const builds = await fetchUserBuilds();
+      setSavedBuilds(builds);
+      saveSavedBuildsToLocalStorage();
       const toggle = document.getElementById("bracketInputToggle");
       if (toggle) {
         toggle.checked = isBracketInputEnabled();
