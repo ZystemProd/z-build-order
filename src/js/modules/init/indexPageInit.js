@@ -47,7 +47,12 @@ import {
   searchTemplates,
   previewTemplate,
 } from "../template.js";
-import { initializeTooltips } from "../tooltip.js";
+import {
+  initializeTooltips,
+  updateTooltips,
+  forceShowTooltip,
+  forceHideTooltip,
+} from "../tooltip.js";
 import {
   populateCommunityBuilds,
   checkPublishButtonVisibility,
@@ -68,6 +73,7 @@ import {
 } from "../interactive_map.js";
 import {
   getSavedBuilds,
+  setSavedBuilds,
   saveSavedBuildsToLocalStorage,
 } from "../buildStorage.js";
 import { setupCatActivationOnInput } from "../helpers/companion.js";
@@ -337,6 +343,9 @@ export async function initializeIndexPage() {
       await checkForJoinRequestNotifications();
       initializeUserData(user);
       await loadUserSettings();
+      const builds = await fetchUserBuilds();
+      setSavedBuilds(builds);
+      saveSavedBuildsToLocalStorage();
       const toggle = document.getElementById("bracketInputToggle");
       if (toggle) {
         toggle.checked = isBracketInputEnabled();
@@ -1410,6 +1419,41 @@ export async function initializeIndexPage() {
         el.addEventListener("input", () => {
           saveBuildButton.disabled = false;
           saveBuildButton.style.backgroundColor = "#963325";
+
+          if (id === "buildOrderTitleInput") {
+            const titleText = document.getElementById("buildOrderTitleText");
+            const titleInput = document.getElementById("buildOrderTitleInput");
+            const title = el.value.trim().toLowerCase();
+            const savedBuilds = getSavedBuilds();
+            const currentId = getCurrentBuildId();
+            const duplicate = savedBuilds.some(
+              (b) =>
+                !b.imported &&
+                b.title.toLowerCase() === title &&
+                b.encodedTitle !== currentId
+            );
+            if (duplicate) {
+              saveBuildButton.disabled = true;
+              if (titleText) titleText.classList.add("highlight");
+              if (titleInput) {
+                titleInput.classList.add("highlight");
+                titleInput.setAttribute(
+                  "data-tooltip",
+                  "Title cannot match an existing build in My Builds"
+                );
+                updateTooltips();
+                forceShowTooltip(titleInput);
+              }
+            } else {
+              if (titleText) titleText.classList.remove("highlight");
+              if (titleInput) {
+                titleInput.classList.remove("highlight");
+                titleInput.removeAttribute("data-tooltip");
+                updateTooltips();
+                forceHideTooltip(titleInput);
+              }
+            }
+          }
         });
         el.dataset.monitorAttached = "true";
       }

@@ -48,3 +48,11 @@ export function initializeTooltips() {
 export function updateTooltips() {
   initializeTooltips();
 }
+
+export function forceShowTooltip(element) {
+  element.dispatchEvent(new Event("mouseenter"));
+}
+
+export function forceHideTooltip(element) {
+  element.dispatchEvent(new Event("mouseleave"));
+}
