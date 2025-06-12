@@ -705,6 +705,11 @@ export async function initializeIndexPage() {
     if (modal) modal.style.display = "block";
   });
 
+  safeAdd("cookiePolicyLink", "click", () => {
+    const modal = document.getElementById("privacyModal");
+    if (modal) modal.style.display = "block";
+  });
+
   safeAdd("closeSettingsModal", "click", () => {
     const modal = document.getElementById("settingsModal");
     if (modal) modal.style.display = "none";
