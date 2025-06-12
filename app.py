@@ -162,14 +162,50 @@ def upload():
             etype = None
             name = None
 
-            if isinstance(event, sc2reader.events.tracker.UnitBornEvent):
-                etype = 'unit'
+            if isinstance(
+                event,
+                (
+                    sc2reader.events.game.DataCommandEvent,
+                    sc2reader.events.game.TargetUnitCommandEvent,
+                ),
+            ):
+                # Commands represent the start of a unit/structure or upgrade
+                if event.pid != player.pid:
+                    continue
+                ability = getattr(event, "ability", None)
+                if not ability:
+                    continue
+                ability_name = ability.name or getattr(event, "ability_name", "")
+                if ability_name.startswith("Cancel"):
+                    continue
+
+                if ability.is_build and ability.build_unit:
+                    unit = ability.build_unit
+                    etype = "building" if unit.is_building else "unit"
+                    name = unit.name
+                else:
+                    for prefix in (
+                        "Research",
+                        "UpgradeTo",
+                        "Upgrade",
+                        "MorphTo",
+                        "Morph",
+                        "TransformTo",
+                        "Transform",
+                    ):
+                        if ability_name.startswith(prefix):
+                            name = ability_name[len(prefix) :]
+                            etype = "upgrade"
+                            break
+
+            elif isinstance(event, sc2reader.events.tracker.UnitBornEvent):
+                etype = "unit"
                 name = event.unit_type_name
             elif isinstance(event, sc2reader.events.tracker.UnitInitEvent):
-                etype = 'building'
+                etype = "building"
                 name = event.unit_type_name
             elif isinstance(event, sc2reader.events.tracker.UpgradeCompleteEvent):
-                etype = 'upgrade'
+                etype = "upgrade"
                 name = event.upgrade_type_name
             else:
                 continue
