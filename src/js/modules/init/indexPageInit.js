@@ -1049,8 +1049,9 @@ export async function initializeIndexPage() {
     if (dropdown) {
       const selectedOption = dropdown.options[dropdown.selectedIndex];
       const optgroup = selectedOption.parentElement;
-      if (optgroup && optgroup.style.color) {
-        dropdown.style.color = optgroup.style.color;
+      if (optgroup) {
+        const color = window.getComputedStyle(optgroup).color;
+        dropdown.style.color = color || "";
       }
     }
   }
