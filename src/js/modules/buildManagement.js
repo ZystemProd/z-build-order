@@ -99,7 +99,7 @@ export async function saveCurrentBuild() {
     field.addEventListener("focus", () => field.classList.remove("highlight"));
     field.addEventListener("change", () => field.classList.remove("highlight"));
   }
-  removeHighlightOnFocus(titleInput);
+  // Allow title highlight to remain even when input is focused
   removeHighlightOnFocus(categoryDropdown);
 
   if (!title) {
@@ -163,6 +163,21 @@ export async function saveCurrentBuild() {
   if (!user) {
     console.error("⚠ Attempted to save without signing in.");
     showToast("⚠ You must sign in to save your build!", "error");
+    return null;
+  }
+
+  const existingBuilds = await fetchUserBuilds();
+  setSavedBuilds(existingBuilds);
+  saveSavedBuildsToLocalStorage();
+  const lower = title.toLowerCase();
+  if (
+    existingBuilds.some(
+      (b) => !b.imported && b.title.toLowerCase() === lower
+    )
+  ) {
+    showToast("A build with this title already exists.", "error");
+    highlightField(titleInput);
+    highlightField(titleText);
     return null;
   }
 

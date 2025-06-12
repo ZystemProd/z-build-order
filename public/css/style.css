@@ -354,17 +354,14 @@ body {
   0% {
     border-color: red;
     box-shadow: 0 0 10px red;
-    transform: scale(1);
   }
   50% {
     border-color: orange;
     box-shadow: 0 0 20px orange;
-    transform: scale(1.02);
   }
   100% {
     border-color: red;
     box-shadow: 0 0 10px red;
-    transform: scale(1);
   }
 }
 
