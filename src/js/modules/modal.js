@@ -347,6 +347,9 @@ export async function viewBuild(buildId) {
       if (mapImage) mapImage.src = mapUrl;
       if (selectedMapText) selectedMapText.innerText = formattedMapName;
 
+      const clearBtn = document.querySelector('.clear-annotations-button');
+      if (clearBtn) clearBtn.style.display = 'inline-block';
+
       const secondRow = document.getElementById("secondRow");
       const secondRowHeader = document.querySelector('[data-section="secondRow"]');
       if (secondRow) {
