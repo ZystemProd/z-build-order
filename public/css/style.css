@@ -4584,6 +4584,7 @@ button.btn-small {
 }
 .cookie-banner {
   position: fixed;
+
   bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
@@ -4604,6 +4605,7 @@ button.btn-small {
   50% {
     box-shadow: 0 0 20px rgba(255, 59, 48, 1);
   }
+
 }
 .cookie-banner button {
   margin-left: 10px;
@@ -4619,9 +4621,11 @@ button.btn-small {
 .cookie-banner button.cookie-btn:hover {
   background-color: #777;
 }
+
 #cookieAccept {
   background-color: #ff3b30;
 }
 #cookieAccept:hover {
   background-color: #ff6458;
 }
+
