@@ -54,6 +54,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
 
+
 function initCookieConsent() {
   const banner = document.getElementById("cookieBanner");
   const acceptBtn = document.getElementById("cookieAccept");
@@ -93,6 +94,7 @@ function initCookieConsent() {
 }
 
 initCookieConsent();
+
 /*
 // If testing locally, you can enable Firebase emulators by importing
 // connectAuthEmulator and connectFirestoreEmulator from the relevant
