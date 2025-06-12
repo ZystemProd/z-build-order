@@ -47,7 +47,12 @@ import {
   searchTemplates,
   previewTemplate,
 } from "../template.js";
-import { initializeTooltips, updateTooltips } from "../tooltip.js";
+import {
+  initializeTooltips,
+  updateTooltips,
+  forceShowTooltip,
+  forceHideTooltip,
+} from "../tooltip.js";
 import {
   populateCommunityBuilds,
   checkPublishButtonVisibility,
@@ -1434,15 +1439,18 @@ export async function initializeIndexPage() {
                   "data-tooltip",
                   "Title cannot match an existing build in My Builds"
                 );
+                updateTooltips();
+                forceShowTooltip(titleInput);
               }
             } else {
               if (titleText) titleText.classList.remove("highlight");
               if (titleInput) {
                 titleInput.classList.remove("highlight");
                 titleInput.removeAttribute("data-tooltip");
+                updateTooltips();
+                forceHideTooltip(titleInput);
               }
             }
-            if (titleInput) updateTooltips();
           }
         });
         el.dataset.monitorAttached = "true";
