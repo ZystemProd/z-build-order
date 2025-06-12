@@ -145,10 +145,14 @@ def upload():
 
 
 
-        # event.second is already reported in in-game seconds, so no additional
-        # conversion is needed. We still fetch the speed factor in case future
-        # adjustments are required.
-        speed_factor = GAME_SPEED_FACTOR.get(replay.expansion, {}).get(replay.speed, 1.0)
+        # ``event.second`` is reported in real-time seconds. Convert it to the
+        # in-game clock using the replay's speed factor. LotV replays on
+        # "Faster" still require a 1.4x adjustment to match the in-game timer.
+        speed_factor = GAME_SPEED_FACTOR.get(replay.expansion, {}).get(
+            replay.speed, 1.0
+        )
+        if replay.expansion == "LotV" and replay.speed == "Faster" and speed_factor == 1.0:
+            speed_factor = 1.4
 
         entries = []
 
@@ -191,7 +195,7 @@ def upload():
                 name = name[7:]
 
             # Convert real-time seconds to in-game seconds using the speed factor
-            game_sec = int(event.second / speed_factor)
+            game_sec = int(event.second * speed_factor)
             if time_limit is not None and game_sec > time_limit:
                 break
 
