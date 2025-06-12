@@ -1410,6 +1410,23 @@ export async function initializeIndexPage() {
         el.addEventListener("input", () => {
           saveBuildButton.disabled = false;
           saveBuildButton.style.backgroundColor = "#963325";
+
+          if (id === "buildOrderTitleInput") {
+            const titleText = document.getElementById("buildOrderTitleText");
+            const title = el.value.trim().toLowerCase();
+            const savedBuilds = getSavedBuilds();
+            const currentId = getCurrentBuildId();
+            const duplicate = savedBuilds.some(
+              (b) =>
+                b.title.toLowerCase() === title && b.encodedTitle !== currentId
+            );
+            if (duplicate) {
+              saveBuildButton.disabled = true;
+              if (titleText) titleText.classList.add("highlight");
+            } else if (titleText) {
+              titleText.classList.remove("highlight");
+            }
+          }
         });
         el.dataset.monitorAttached = "true";
       }
