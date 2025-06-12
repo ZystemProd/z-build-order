@@ -245,6 +245,20 @@ async function loadBuild() {
       mapContainerWrapper.style.display = mapExists ? "block" : "none";
     }
 
+    // Ensure additional section is visible before rendering annotations
+    if (mapExists) {
+      const secondRow = document.getElementById("secondRow");
+      const secondRowHeader = document.querySelector('[data-section="secondRow"]');
+      if (secondRow) {
+        secondRow.classList.remove("hidden");
+        secondRow.classList.add("visible");
+      }
+      if (secondRowHeader) {
+        const arrowIcon = secondRowHeader.querySelector(".arrow");
+        if (arrowIcon) arrowIcon.classList.add("open");
+      }
+    }
+
     // Setup map and annotations
     const mapContainer = document.getElementById("map-preview-image");
     const annotationsContainer = document.getElementById("map-annotations");

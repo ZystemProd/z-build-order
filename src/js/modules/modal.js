@@ -346,6 +346,17 @@ export async function viewBuild(buildId) {
 
       if (mapImage) mapImage.src = mapUrl;
       if (selectedMapText) selectedMapText.innerText = formattedMapName;
+
+      const secondRow = document.getElementById("secondRow");
+      const secondRowHeader = document.querySelector('[data-section="secondRow"]');
+      if (secondRow) {
+        secondRow.classList.remove("hidden");
+        secondRow.classList.add("visible");
+      }
+      if (secondRowHeader) {
+        const arrowIcon = secondRowHeader.querySelector(".arrow");
+        if (arrowIcon) arrowIcon.classList.add("open");
+      }
     } else if (selectedMapText) {
       selectedMapText.innerText = "No map selected";
     }

@@ -1358,11 +1358,10 @@ export async function initializeIndexPage() {
     if (!mapPreview || !mapModal) return;
 
     const mapPreviewImage = document.getElementById("map-preview-image");
-    let isMapSelected =
-      !!(mapPreviewImage && mapPreviewImage.getAttribute("src"));
 
     mapPreview.addEventListener("click", () => {
-      if (!isMapSelected) {
+      const hasMap = mapPreviewImage && mapPreviewImage.getAttribute("src");
+      if (!hasMap) {
         mapModal.style.display = "block";
       }
     });
@@ -1385,7 +1384,6 @@ export async function initializeIndexPage() {
           if (mapPreviewImage) mapPreviewImage.src = mapImageSrc;
           if (selectedMapText) selectedMapText.innerText = mapName;
 
-          isMapSelected = true;
           mapModal.style.display = "none";
         }
       });
