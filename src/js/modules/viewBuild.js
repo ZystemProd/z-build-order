@@ -267,73 +267,74 @@ async function loadBuild() {
         viewMapAnnotations.handleMouseLeave
       );
 
-      // 🔥 Load saved circles
-      // After creating circles from build
-      if (build.interactiveMap && Array.isArray(build.interactiveMap.circles)) {
-        build.interactiveMap.circles.forEach((circle) => {
-          if (circle.x !== undefined && circle.y !== undefined) {
-            viewMapAnnotations.createCircle(circle.x, circle.y);
-          }
-        });
+      const renderAnnotations = () => {
+        // 🔥 Load saved circles
+        if (build.interactiveMap && Array.isArray(build.interactiveMap.circles)) {
+          build.interactiveMap.circles.forEach((circle) => {
+            if (circle.x !== undefined && circle.y !== undefined) {
+              viewMapAnnotations.createCircle(circle.x, circle.y);
+            }
+          });
 
-        // 🛡 Disable click delete by replacing circles
-        viewMapAnnotations.circles.forEach((circleData, index) => {
-          const cleanClone = circleData.element.cloneNode(true);
-          circleData.element.parentNode.replaceChild(
-            cleanClone,
-            circleData.element
-          );
-          viewMapAnnotations.circles[index].element = cleanClone;
-        });
+          // 🛡 Disable click delete by replacing circles
+          viewMapAnnotations.circles.forEach((circleData, index) => {
+            const cleanClone = circleData.element.cloneNode(true);
+            circleData.element.parentNode.replaceChild(
+              cleanClone,
+              circleData.element
+            );
+            viewMapAnnotations.circles[index].element = cleanClone;
+          });
+        }
+
+        // 🔥 Load saved arrows
+        if (build.interactiveMap && Array.isArray(build.interactiveMap.arrows)) {
+          build.interactiveMap.arrows.forEach((arrow) => {
+            if (
+              arrow.startX !== undefined &&
+              arrow.startY !== undefined &&
+              arrow.endX !== undefined &&
+              arrow.endY !== undefined
+            ) {
+              const newArrow = document.createElement("div");
+              newArrow.classList.add("annotation-arrow");
+
+              const rect = mapContainer.getBoundingClientRect();
+              const mapWidth = rect.width;
+              const mapHeight = rect.height;
+
+              const startXPixels = (arrow.startX / 100) * mapWidth;
+              const startYPixels = (arrow.startY / 100) * mapHeight;
+              const endXPixels = (arrow.endX / 100) * mapWidth;
+              const endYPixels = (arrow.endY / 100) * mapHeight;
+
+              const deltaX = endXPixels - startXPixels;
+              const deltaY = endYPixels - startYPixels;
+              const angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
+              const length = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+              newArrow.style.position = "absolute";
+              newArrow.style.left = `${startXPixels}px`;
+              newArrow.style.top = `${startYPixels}px`;
+              newArrow.style.width = `${length}px`;
+              newArrow.style.height = "2px";
+              newArrow.style.background = "#00bcd4";
+              newArrow.style.transform = `rotate(${angle}deg)`;
+              newArrow.style.transformOrigin = "0 0";
+
+              annotationsContainer.appendChild(newArrow);
+            }
+          });
+        }
+
+        annotationsContainer.style.pointerEvents = "none";
+      };
+
+      if (mapImage.complete && mapImage.naturalWidth > 0) {
+        renderAnnotations();
+      } else {
+        mapImage.addEventListener("load", renderAnnotations, { once: true });
       }
-
-      // 🔥 Load saved arrows
-      if (build.interactiveMap && Array.isArray(build.interactiveMap.arrows)) {
-        build.interactiveMap.arrows.forEach((arrow) => {
-          if (
-            arrow.startX !== undefined &&
-            arrow.startY !== undefined &&
-            arrow.endX !== undefined &&
-            arrow.endY !== undefined
-          ) {
-            // Create an arrow manually
-            const newArrow = document.createElement("div");
-            newArrow.classList.add("annotation-arrow");
-
-            // Calculate placement
-            const rect = mapContainer.getBoundingClientRect();
-            const mapWidth = rect.width;
-            const mapHeight = rect.height;
-
-            const startXPixels = (arrow.startX / 100) * mapWidth;
-            const startYPixels = (arrow.startY / 100) * mapHeight;
-            const endXPixels = (arrow.endX / 100) * mapWidth;
-            const endYPixels = (arrow.endY / 100) * mapHeight;
-
-            const deltaX = endXPixels - startXPixels;
-            const deltaY = endYPixels - startYPixels;
-            const angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
-            const length = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-
-            // Style the arrow
-            newArrow.style.position = "absolute";
-            newArrow.style.left = `${startXPixels}px`;
-            newArrow.style.top = `${startYPixels}px`;
-            newArrow.style.width = `${length}px`;
-            newArrow.style.height = "2px"; // thin line
-            newArrow.style.background = "#00bcd4"; // arrow color
-            newArrow.style.transform = `rotate(${angle}deg)`;
-            newArrow.style.transformOrigin = "0 0";
-
-            annotationsContainer.appendChild(newArrow);
-          }
-        });
-
-        // No onclick events needed for arrows (since they are manually added)
-      }
-
-      // Disable all interaction with annotations
-      annotationsContainer.style.pointerEvents = "none"; // block any user interaction over the annotations
     }
     const additionalHeader = document.getElementById("additionalSettingsHeader");
     const mainLayout = document.querySelector(".main-layout");

@@ -351,16 +351,24 @@ export async function viewBuild(buildId) {
     }
 
     // Annotations
-    if (build.interactiveMap) {
-      mapAnnotations.circles = [];
-      mapAnnotations.annotationsContainer.innerHTML = "";
-      build.interactiveMap.circles?.forEach(({ x, y }) =>
-        mapAnnotations.createCircle(x, y)
-      );
-      build.interactiveMap.arrows?.forEach(({ startX, startY, endX, endY }) =>
-        mapAnnotations.createArrow(startX, startY, endX, endY)
-      );
-      mapAnnotations.updateCircleNumbers();
+    const loadAnnotations = () => {
+      if (build.interactiveMap) {
+        mapAnnotations.circles = [];
+        mapAnnotations.annotationsContainer.innerHTML = "";
+        build.interactiveMap.circles?.forEach(({ x, y }) =>
+          mapAnnotations.createCircle(x, y)
+        );
+        build.interactiveMap.arrows?.forEach(({ startX, startY, endX, endY }) =>
+          mapAnnotations.createArrow(startX, startY, endX, endY)
+        );
+        mapAnnotations.updateCircleNumbers();
+      }
+    };
+
+    if (mapImage && mapImage.complete && mapImage.naturalWidth > 0) {
+      loadAnnotations();
+    } else if (mapImage) {
+      mapImage.addEventListener("load", loadAnnotations, { once: true });
     }
 
     // Title
