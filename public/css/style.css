@@ -20,6 +20,7 @@
   --bg-color-subcategory: #2a2a2a;
   --hover-color: #504f4f;
   --active-color: #963325;
+  --link-color: #fc0;
 }
 
 /* Dark mode for the main application */
@@ -2942,7 +2943,6 @@ td {
   right: 8px;
 }
 
-
 /* Each build entry */
 .build-entry {
   display: flex;
@@ -3146,8 +3146,12 @@ td {
   background-color: var(--active-color);
   border-color: var(--active-color);
 }
-.view-btn.active img { filter: brightness(1.8); }
-.view-btn:not(.active) { opacity: 0.5; }
+.view-btn.active img {
+  filter: brightness(1.8);
+}
+.view-btn:not(.active) {
+  opacity: 0.5;
+}
 
 .help-circle.animated-help {
   width: 30px;
@@ -4479,8 +4483,6 @@ button.btn-small {
   gap: 4px;
 }
 
-
-
 @media (max-width: 768px) {
   #auth-container {
     position: fixed;
@@ -4585,7 +4587,7 @@ button.btn-small {
 .cookie-banner {
   position: fixed;
 
-  bottom: 20px;
+  bottom: 70px;
   left: 50%;
   transform: translateX(-50%);
   max-width: 420px;
@@ -4599,13 +4601,13 @@ button.btn-small {
   animation: cookie-pulse 3s ease-in-out infinite;
 }
 @keyframes cookie-pulse {
-  0%, 100% {
-    box-shadow: 0 0 10px rgba(255, 59, 48, 0.6);
+  0%,
+  100% {
+    box-shadow: 0 0 10px rgba(255, 59, 48, 0.4);
   }
   50% {
-    box-shadow: 0 0 20px rgba(255, 59, 48, 1);
+    box-shadow: 0 0 20px rgba(255, 59, 48, 0.7);
   }
-
 }
 .cookie-banner button {
   margin-left: 10px;
@@ -4629,3 +4631,6 @@ button.btn-small {
   background-color: #ff6458;
 }
 
+#cookiePolicyLink {
+  color: var(--link-color);
+}
