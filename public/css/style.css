@@ -120,7 +120,7 @@ body {
   display: flex;
   min-height: 50px;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   justify-content: center; /* Center horizontally if you want */
 }
 
@@ -279,7 +279,7 @@ body {
   display: flex;
   min-height: 50px;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 /* Avatar */
@@ -602,12 +602,12 @@ button:hover {
   align-items: self-end;
   flex-wrap: wrap;
   margin-bottom: 5px;
-  gap: 10px;
+  gap: 8px;
 }
 
 .toggle-header-right {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   margin-left: auto; /* Push to right */
   align-items: center;
 }
@@ -1062,7 +1062,7 @@ textarea::-webkit-scrollbar-thumb:hover {
   margin-top: 12px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
 }
 .publish-checkbox-row label {
@@ -1396,7 +1396,7 @@ textarea::-webkit-scrollbar-thumb:hover {
   display: grid;
   grid-template-columns: 1fr 2fr 1fr; /* Three-column layout */
   align-items: center; /* Center vertically */
-  gap: 10px; /* Space between columns */
+  gap: 8px; /* Space between columns */
   margin: 20px 0; /* Vertical spacing */
 }
 
@@ -1474,7 +1474,7 @@ textarea::-webkit-scrollbar-thumb:hover {
   top: 10px;
   right: 10px;
   display: flex;
-  gap: 10px;
+  gap: 8px;
   z-index: 900;
 }
 
@@ -1499,7 +1499,7 @@ textarea::-webkit-scrollbar-thumb:hover {
 
 .map-folder-toggle {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   margin-bottom: 10px;
 }
 
@@ -1683,12 +1683,12 @@ textarea::-webkit-scrollbar-thumb:hover {
 
 #map-title-bar .title-bar-left {
   display: flex;
-  gap: 10px;
+  gap: 8px;
 }
 
 #map-title-bar .title-bar-right {
   display: flex;
-  gap: 10px; /* Add spacing between buttons */
+  gap: 8px; /* Add spacing between buttons */
 }
 
 .map-preview {
@@ -1871,7 +1871,7 @@ textarea::-webkit-scrollbar-thumb:hover {
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 10px; /* Space between text and image */
+  gap: 8px; /* Space between text and image */
   font-size: 14px; /* Adjust text size */
   font-family: "Roboto", Arial, sans-serif; /* Ensure font consistency */
   color: #f0f0f0; /* Lighter text for dark background */
@@ -1959,7 +1959,7 @@ textarea::-webkit-scrollbar-thumb:hover {
 #map-controls {
   display: flex;
   justify-content: center; /* Center controls under the map */
-  gap: 10px; /* Space between buttons */
+  gap: 8px; /* Space between buttons */
 }
 
 /* Comment and Video Container (Second Column) */
@@ -1968,7 +1968,7 @@ textarea::-webkit-scrollbar-thumb:hover {
   max-width: 50%; /* Limit width */
   display: flex;
   flex-direction: column; /* Stack comment and video sections */
-  gap: 10px; /* Space between comment & video */
+  gap: 8px; /* Space between comment & video */
 }
 
 .comment-video-container h3 {
@@ -3098,7 +3098,7 @@ td {
 /* Action buttons (preview, import, view) */
 .build-actions {
   display: flex;
-  gap: 10px;
+  gap: 8px;
 }
 
 .build-actions button {
@@ -3238,7 +3238,7 @@ td {
 .abbreviation-list {
   display: flex;
   flex-wrap: wrap; /* Allow rows to wrap */
-  gap: 10px; /* Space between rows */
+  gap: 8px; /* Space between rows */
   margin-top: 10px;
   margin-bottom: 20px;
 }
@@ -3396,7 +3396,7 @@ td {
   margin: 20px 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   text-align: left;
 }
 
@@ -3889,7 +3889,7 @@ td {
   max-width: 400px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .clan-banner-title {
@@ -4581,7 +4581,7 @@ button.btn-small {
   #communityHeaderControls {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 10px;
+    gap: 8px;
   }
 }
 .cookie-banner {
@@ -4634,3 +4634,40 @@ button.btn-small {
 #cookiePolicyLink {
   color: var(--link-color);
 }
+/* Inline styles moved from HTML */
+.hidden { display: none !important; }
+
+#authLoadingText { color: #555; }
+#userPhoto { width: 40px; height: 40px; display: none; }
+#userMenu { display: none; }
+#userNameMenu { display: none; }
+#usernameModal { display: none; }
+#closeUsernameModal { position: absolute; top: 10px; right: 15px; font-size: 24px; cursor: pointer; }
+.username-input-wrapper { position: relative; display: inline-block; width: 100%; }
+#usernameInput { width: 100%; }
+#usernameSpinner { display: none; }
+#buildOrderInputField { display: block; }
+optgroup[label="Zerg"] { color: #c07aeb; }
+optgroup[label="Protoss"] { color: #5fe5ff; }
+optgroup[label="Terran"] { color: #ff3a30; }
+#buildOrderTitleInput { display: none; }
+#newBuildButton { display: none; }
+.icon-20 { width: 20px; height: 20px; }
+#replayInputWrapper { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+#replayLinkInput { flex: 1; }
+.margin-bottom-10 { margin-bottom: 10px; }
+#replayFileInput { display: none; }
+#replayViewWrapper { display: none; }
+#videoIframe { display: block; }
+#saveTemplateModal { display: none; }
+#buildsLoadingWrapper { display: none; justify-content: center; }
+#createClanView, #manageClanView, #chooseManageClanView,
+#clan-requests-tab, #clan-settings-tab, #findClanView,
+#viewClanPage { display: none; }
+#publishModal { display: none; }
+#settingsModal { display: none; }
+#replayOptionsModal { display: none; }
+#stopUnitLabel { display: none; }
+#optionsLoadingWrapper { display: none; justify-content: center; }
+#cookieBanner { display: none; }
+#privacyModal { display: none; }

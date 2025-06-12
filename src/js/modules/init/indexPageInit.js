@@ -511,6 +511,9 @@ export async function initializeIndexPage() {
       return;
     }
 
+    selectedReplayFile = file;
+    e.target.value = "";
+
     await populateReplayOptions(file);
     const modal = document.getElementById("replayOptionsModal");
     if (modal) modal.style.display = "block";
@@ -638,6 +641,7 @@ export async function initializeIndexPage() {
 
   safeAdd("buildOrderTitleText", "click", () => toggleTitleInput(true));
   safeAdd("buildOrderTitleText", "focus", () => toggleTitleInput(true));
+  safeAdd("buildOrderTitleInput", "blur", () => toggleTitleInput(false));
 
   // --- Dropdown Color Change
   safeChange("buildCategoryDropdown", updateDropdownColor);
