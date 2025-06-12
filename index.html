@@ -7,6 +7,8 @@
     content="Plan and save your StarCraft 2 build orders with Z-Build Order. Supports custom builds, categories, and templates.">
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self'; script-src 'self' https://www.googletagmanager.com https://www.gstatic.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firebase.googleapis.com https://www.google-analytics.com https://region1.google-analytics.com https://z-build-order.onrender.com; img-src 'self' data: https://www.google.com https://*.googleusercontent.com;">
   <link rel="icon" type="image/x-icon" href="/img/favicon.ico" />
 
 
@@ -30,25 +32,25 @@
 
   <!-- Auth Container -->
   <div id="auth-container">
-    <div class="auth-info" style="display: flex; align-items: center; gap: 10px;">
+    <div class="auth-info">
 
-      <div id="authLoadingWrapper" style="display: flex; align-items: center; gap: 8px;">
+      <div id="authLoadingWrapper">
         <div id="authLoading" class="spinner"></div>
-        <span id="authLoadingText" style="color: #555;">Loading user...</span>
+        <span id="authLoadingText">Loading user...</span>
       </div>
 
       <div class="user-details">
-        <p id="userName" class="user-name fade-in" style="display: none;">Guest</p>
+        <p id="userName" class="user-name fade-in">Guest</p>
       </div>
 
       <img id="userPhoto" class="user-avatar fade-in" src="img/default-avatar.webp" alt="User Avatar"
-        style="width: 40px; height: 40px; display: none;" />
+        />
 
 
-      <div id="userMenu" class="user-menu" style="display: none;">
+      <div id="userMenu" class="user-menu">
 
         <div class="menu-section">
-          <p id="userNameMenu" class="user-name fade-in" style="display: none;">Guest</p>
+          <p id="userNameMenu" class="user-name fade-in">Guest</p>
           <hr id="userNameDivider" class="menu-divider" />
           <button class="menu-item" id="mapVetoBtn">
             <img src="img/SVG/map-solid.svg" class="menu-icon" /> Map Veto
@@ -82,14 +84,13 @@
   </div>
 
   <!-- Username Modal -->
-  <div id="usernameModal" class="modal" style="display: none;">
+  <div id="usernameModal" class="modal">
     <div class="modal-content" id="usernameModalContent">
-      <span id="closeUsernameModal"
-        style="position: absolute; top: 10px; right: 15px; font-size: 24px; cursor: pointer;">&times;</span>
+      <span id="closeUsernameModal">&times;</span>
       <h3>Choose a Username</h3>
-      <div class="username-input-wrapper" style="position: relative; display: inline-block; width: 100%;">
-        <input type="text" id="usernameInput" placeholder="Enter your username" style="width: 100%;">
-        <div id="usernameSpinner" class="spinner-small" style="display: none;"></div>
+      <div class="username-input-wrapper">
+        <input type="text" id="usernameInput" placeholder="Enter your username">
+        <div id="usernameSpinner" class="spinner-small"></div>
       </div>
       <br /><br />
       <button id="confirmUsernameButton">Confirm</button>
@@ -183,7 +184,7 @@
           <button id="buildOrderHelpBtn" class="help-circle animated-help" title="Help">?</button>
         </div>
       </div>
-      <div id="buildOrderInputField" class="hideable-section" style="display: block">
+      <div id="buildOrderInputField" class="hideable-section">
         <div class="template-wrapper">
           <div class="dropdown">
             <svg id="templateMenuButton" class="template-icon-button" width="60" height="26" viewBox="0 0 60 26"
@@ -222,17 +223,17 @@
           <label for="buildCategoryDropdown" class="visually-hidden">Select Match-Up</label>
           <select id="buildCategoryDropdown" class="styled-dropdown">
             <option value="" disabled selected>Match-Up</option>
-            <optgroup label="Zerg" style="color: #c07aeb;">
+            <optgroup label="Zerg">
               <option value="zvp">ZvP</option>
               <option value="zvt">ZvT</option>
               <option value="zvz">ZvZ</option>
             </optgroup>
-            <optgroup label="Protoss" style="color: #5fe5ff;">
+            <optgroup label="Protoss">
               <option value="pvp">PvP</option>
               <option value="pvz">PvZ</option>
               <option value="pvt">PvT</option>
             </optgroup>
-            <optgroup label="Terran" style="color: #ff3a30;">
+            <optgroup label="Terran">
               <option value="tvp">TvP</option>
               <option value="tvt">TvT</option>
               <option value="tvz">TvZ</option>
@@ -246,8 +247,7 @@
           Enter build order title here...
         </span>
 
-        <input type="text" id="buildOrderTitleInput" placeholder="Enter build order title here..."
-          style="display: none;" onblur="toggleTitleInput(false)" />
+        <input type="text" id="buildOrderTitleInput" placeholder="Enter build order title here..." />
 
         <!-- Right Column: Empty -->
         <div class="form-right"></div>
@@ -269,7 +269,7 @@
           <img src="img/SVG/save.svg" alt="Save Icon" class="svg-icon">
           Save Build
         </button>
-        <button id="newBuildButton" style="display:none;" data-tooltip="Start New Build">
+        <button id="newBuildButton" data-tooltip="Start New Build">
           <img src="img/SVG/plus.svg" alt="New Build Icon" class="svg-icon">
           New Build
         </button>
@@ -290,10 +290,10 @@
           <div id="map-controls-row">
             <span id="selected-map-text">No map selected</span>
             <button id="openMapModalButton" class="menu-button" data-tooltip="Map Selection">
-              <img src="img/SVG/map-solid.svg" alt="Map Icon" style="width:20px; height:20px;" class="svg-icon">
+              <img src="img/SVG/map-solid.svg" alt="Map Icon" class="svg-icon icon-20">
             </button>
             <button class="clear-annotations-button" data-tooltip="Erase All">
-              <img src="img/SVG/eraser-solid.svg" alt="Eraser Icon" style="width:20px; height:20px;" class="svg-icon">
+              <img src="img/SVG/eraser-solid.svg" alt="Eraser Icon" class="svg-icon icon-20">
             </button>
           </div>
 
@@ -309,20 +309,20 @@
           <h3 class="toggle-title">Replay</h3>
 
           <!-- Replay Input Row (visible if no replayUrl) -->
-          <div id="replayInputWrapper" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-            <a href="https://drop.sc/upload" target="_blank" class="drop-sc-upload-btn" style="white-space: nowrap;">
+          <div id="replayInputWrapper">
+            <a href="https://drop.sc/upload" target="_blank" class="drop-sc-upload-btn">
               ⬆ Upload Replay to Drop.sc
             </a>
             <p>then →</p>
-            <input type="url" id="replayLinkInput" placeholder="Paste Drop.sc replay URL here..." style="flex: 1;" />
+            <input type="url" id="replayLinkInput" placeholder="Paste Drop.sc replay URL here..." />
 
           </div>
-          <div style="margin-bottom: 10px;">
-            <input type="file" id="replayFileInput" accept=".SC2Replay" style="display: none" />
+          <div class="margin-bottom-10">
+            <input type="file" id="replayFileInput" accept=".SC2Replay" />
           </div>
 
           <!-- Replay Link View Button (visible if replayUrl exists) -->
-          <div id="replayViewWrapper" style="display: none;">
+          <div id="replayViewWrapper">
             <a id="replayDownloadBtn" href="#" target="_blank" class="download-replay-link">
               Download Replay on Drop.sc
             </a>
@@ -334,7 +334,7 @@
 
           <h3 class="toggle-title">Video</h3>
           <input type="text" id="videoInput" placeholder="Paste YouTube link here..." />
-          <iframe id="videoIframe" title="YouTube video player" style="display: block;" width="560" height="315"
+          <iframe id="videoIframe" title="YouTube video player" width="560" height="315"
             frameborder="0"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowfullscreen></iframe>
@@ -385,7 +385,7 @@
       </div>
     </div>
 
-    <div id="saveTemplateModal" class="modal" style="display: none;">
+    <div id="saveTemplateModal" class="modal">
       <div class="modal-content">
         <span id="closeSaveTemplateModal" class="close-modal">&times;</span>
         <h3>Save Template</h3>
@@ -493,7 +493,7 @@
           <div class="template-list" id="buildList">
             <!-- Build cards will be dynamically added here -->
           </div>
-          <div id="buildsLoadingWrapper" style="display: none; justify-content: center;">
+          <div id="buildsLoadingWrapper">
             <div id="buildsLoadingIndicator" class="spinner"></div>
           </div>
 
@@ -586,34 +586,34 @@
 
         <div class="clan-views">
           <!-- Create Clan View -->
-          <div id="createClanView" class="clan-subview" style="display: none;"></div>
+          <div id="createClanView" class="clan-subview"></div>
 
           <!-- Manage Clan View -->
-          <div id="manageClanView" class="clan-subview" style="display: none;">
+          <div id="manageClanView" class="clan-subview">
             <div class="clan-tabs">
               <button class="clan-tab-button" data-tab="members">Members</button>
               <button class="clan-tab-button" data-tab="requests">Requests</button>
               <button class="clan-tab-button" data-tab="settings">Settings</button>
             </div>
-            <div id="chooseManageClanView" class="clan-subview" style="display: none;"></div>
+            <div id="chooseManageClanView" class="clan-subview"></div>
 
             <div class="clan-tab-content" id="clan-members-tab"></div>
-            <div class="clan-tab-content" id="clan-requests-tab" style="display: none;"></div>
-            <div class="clan-tab-content" id="clan-settings-tab" style="display: none;"></div>
+            <div class="clan-tab-content" id="clan-requests-tab"></div>
+            <div class="clan-tab-content" id="clan-settings-tab"></div>
           </div>
 
 
 
           <!-- Find Clan View -->
-          <div id="findClanView" class="clan-subview" style="display: none;"></div>
-          <div id="viewClanPage" class="clan-subview" style="display: none;"></div>
+          <div id="findClanView" class="clan-subview"></div>
+          <div id="viewClanPage" class="clan-subview"></div>
         </div>
       </div>
     </div>
 
 
     <!-- Manage Publish Modal -->
-    <div id="publishModal" class="modal" style="display: none;">
+    <div id="publishModal" class="modal">
       <div class="modal-content small-modal">
         <h2>Publish Build</h2>
         <p>Where would you like to publish this build?</p>
@@ -645,7 +645,7 @@
 
 
     <!-- Settings Modal -->
-    <div id="settingsModal" class="modal" style="display: none;">
+    <div id="settingsModal" class="modal">
       <div class="modal-content small-modal">
         <span class="close-modal" id="closeSettingsModal">&times;</span>
         <h3>Settings</h3>
@@ -704,7 +704,7 @@
 
 
     <!-- Replay Options Modal -->
-    <div id="replayOptionsModal" class="modal" style="display: none;">
+    <div id="replayOptionsModal" class="modal">
       <div class="modal-content small-modal">
         <span class="close-modal" id="closeReplayOptionsModal">&times;</span>
         <h3>Replay Options</h3>
@@ -752,14 +752,14 @@
         <div>
           <label id="stopLimitLabel" for="stopLimitInput">Stop at supply:</label>
           <input type="number" id="stopLimitInput" min="0" value="50" placeholder="e.g. 50" />
-          <span id="stopUnitLabel" style="display: none;">min</span>
+          <span id="stopUnitLabel">min</span>
           <button type="button" id="toggleStopTypeBtn" class="btn-small" data-type="supply">Use Time</button>
         </div>
         <button id="confirmReplayOptionsButton" class="btn">Parse Replay</button>
       </div>
     </div>
 
-    <div id="optionsLoadingWrapper" style="display: none; justify-content: center;">
+    <div id="optionsLoadingWrapper">
       <div class="spinner"></div>
     </div>
 
@@ -788,7 +788,7 @@
         target="_blank">Discord</a>
     </div>
     <div class="footer-center" id="site-info">
-      <p>Version 0.5.7118</p>
+      <p>Version 0.5.7127</p>
     </div>
     <div class="footer-right" id="site-logo">
       <a href="https://www.twitch.tv/zystem" target="_blank">
@@ -796,14 +796,14 @@
       </a>
     </div>
   
-  <div id="cookieBanner" class="cookie-banner" style="display: none;">
+  <div id="cookieBanner" class="cookie-banner">
     <span>This site uses cookies for login and optional analytics. Learn more in our <a href="#" id="cookiePolicyLink">Privacy Policy</a>.</span>
     <button id="cookieAccept" class="cookie-btn">Accept</button>
     <button id="cookieDecline" class="cookie-btn">Decline</button>
   </div>
 
   <!-- Privacy Policy Modal -->
-  <div id="privacyModal" class="modal" style="display: none;">
+  <div id="privacyModal" class="modal">
     <div class="modal-content small-modal wide-privacy-modal">
       <span class="close-modal" id="closePrivacyModal">×</span>
       <h3>Privacy & Legal Notice</h3>
@@ -872,15 +872,7 @@
 
 
 
-  <script type="module">
-    document.addEventListener("DOMContentLoaded", async () => {
-      const { initializeAuthUI } = await import('./src/app.js');
-      const { initializeIndexPage } = await import('./src/js/modules/init/indexPageInit.js');
-
-      initializeAuthUI();
-      initializeIndexPage();
-    });
-  </script>
+  <script type="module" src="./src/initMain.js"></script>
 
 
 </body>
