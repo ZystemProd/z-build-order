@@ -505,6 +505,11 @@ export async function initializeIndexPage() {
   safeAdd("replayFileInput", "change", async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".sc2replay")) {
+      alert("Please select a .SC2Replay file");
+      e.target.value = "";
+      return;
+    }
     selectedReplayFile = file;
     e.target.value = "";
 

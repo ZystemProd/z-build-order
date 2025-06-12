@@ -70,3 +70,8 @@ The server listens on http://localhost:5000. The frontend will send uploaded
 replays to `/upload` on that server and populate the **Build Order** text area
 with the parsed results.
 
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for guidance on keeping the website and backend services secure.
+
