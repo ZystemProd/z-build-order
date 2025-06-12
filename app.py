@@ -194,8 +194,9 @@ def upload():
             elif ln.startswith("evolve "):
                 name = name[7:]
 
-            # Convert real-time seconds to in-game seconds using the speed factor
-            game_sec = int(event.second / 1.4)
+            # Use event.second as-is for LotV/Faster
+            game_sec = int(event.second)
+
 
             if time_limit is not None and game_sec > time_limit:
                 break
