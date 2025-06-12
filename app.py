@@ -191,7 +191,8 @@ def upload():
                 name = name[7:]
 
             # Convert real-time seconds to in-game seconds using the speed factor
-            game_sec = int(event.second / speed_factor)
+            game_sec = int(event.second / 1.4)
+
             if time_limit is not None and game_sec > time_limit:
                 break
 
