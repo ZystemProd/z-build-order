@@ -22,6 +22,7 @@ import { filterBuilds } from "./modal.js";
 import { parseBuildOrder } from "./utils.js";
 import { mapAnnotations } from "./interactive_map.js";
 import { checkPublishButtonVisibility } from "./community.js";
+import { logAnalyticsEvent } from "./analyticsHelper.js";
 
 import DOMPurify from "dompurify";
 
@@ -226,6 +227,10 @@ export async function saveCurrentBuild() {
 
   try {
     await setDoc(buildDoc, newBuild);
+    logAnalyticsEvent("build_saved", {
+      race: newBuild.category,
+      matchup: newBuild.subcategory,
+    });
     showToast("✅ Build saved successfully!", "success");
     console.log("✅ Build saved with title:", title);
     checkPublishButtonVisibility();
@@ -335,6 +340,15 @@ export async function updateCurrentBuild(buildId) {
   }
 
   await setDoc(buildDocRef, updatedData, { merge: true });
+  const matchup = updatedData.subcategory || "";
+  const race = matchup.startsWith("Zv")
+    ? "Zerg"
+    : matchup.startsWith("Pv")
+    ? "Protoss"
+    : matchup.startsWith("Tv")
+    ? "Terran"
+    : "Unknown";
+  logAnalyticsEvent("build_updated", { race, matchup });
 
   const localBuilds = getSavedBuilds();
   const localIndex = localBuilds.findIndex((b) => b.encodedTitle === buildId);

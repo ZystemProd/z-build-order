@@ -1,6 +1,7 @@
 import { analyzeBuildOrder } from "./uiHandlers.js";
 import { formatActionText } from "./textFormatters.js";
 import DOMPurify from "dompurify";
+import { logAnalyticsEvent } from "./analyticsHelper.js";
 
 const predefinedTemplates = [
   {
@@ -243,6 +244,10 @@ export function loadTemplateFromTemplateData(template) {
   const inputField = document.getElementById("buildOrderInput");
   inputField.value = DOMPurify.sanitize(template.data);
   analyzeBuildOrder(inputField.value);
+  logAnalyticsEvent("template_used", {
+    title: template.title,
+    race: template.category,
+  });
   closeTemplateModal();
 }
 

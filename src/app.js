@@ -1,4 +1,6 @@
 import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+import { initAnalytics } from "./js/modules/analyticsHelper.js";
 import {
   getAuth,
   GoogleAuthProvider,
@@ -51,6 +53,8 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
+const analytics = getAnalytics(app);
+initAnalytics(app);
 /*
 // If testing locally, you can enable Firebase emulators by importing
 // connectAuthEmulator and connectFirestoreEmulator from the relevant
@@ -442,7 +446,7 @@ async function handleCancelUsername() {
   await signOut(auth);
 }
 
-export { auth, db };
+export { app, auth, db };
 window.handleSignIn = handleSignIn;
 window.handleSignOut = handleSignOut;
 window.handleSwitchAccount = handleSwitchAccount;
