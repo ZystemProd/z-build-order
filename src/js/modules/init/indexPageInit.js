@@ -511,6 +511,9 @@ export async function initializeIndexPage() {
       return;
     }
 
+    selectedReplayFile = file;
+    e.target.value = "";
+
     await populateReplayOptions(file);
     const modal = document.getElementById("replayOptionsModal");
     if (modal) modal.style.display = "block";
