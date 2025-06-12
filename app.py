@@ -145,20 +145,14 @@ def upload():
 
 
 
-        # Convert the raw frame count into in-game seconds.
-        # sc2reader reports ``event.second`` based on a 16 FPS reference which
-        # does not always match the actual game speed.  Derive the correct
-        # frames-per-second using the replay expansion and speed, falling back
-        # to sc2reader's default ``game_fps`` when information is missing.
-        fps = getattr(replay, "game_fps", 16.0)
+        # ``event.second`` is reported in real-time seconds. Convert it to the
+        # in-game clock using the replay's speed factor. LotV replays on
+        # "Faster" still require a 1.4x adjustment to match the in-game timer.
         speed_factor = GAME_SPEED_FACTOR.get(replay.expansion, {}).get(
             replay.speed, 1.0
         )
-        # LotV replays require an additional 1.4x multiplier even when
-        # ``GAME_SPEED_FACTOR`` returns ``1.0`` for "Faster".
         if replay.expansion == "LotV" and replay.speed == "Faster" and speed_factor == 1.0:
             speed_factor = 1.4
-        fps *= speed_factor
 
         entries = []
 
@@ -200,8 +194,8 @@ def upload():
             elif ln.startswith("evolve "):
                 name = name[7:]
 
-            # Convert the event frame to in-game seconds using the derived FPS
-            game_sec = int(event.frame / fps)
+            # Convert real-time seconds to in-game seconds using the speed factor
+            game_sec = int(event.second / speed_factor)
             if time_limit is not None and game_sec > time_limit:
                 break
 
