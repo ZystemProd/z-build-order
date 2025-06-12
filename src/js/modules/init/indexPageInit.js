@@ -1357,7 +1357,9 @@ export async function initializeIndexPage() {
 
     if (!mapPreview || !mapModal) return;
 
-    let isMapSelected = false;
+    const mapPreviewImage = document.getElementById("map-preview-image");
+    let isMapSelected =
+      !!(mapPreviewImage && mapPreviewImage.getAttribute("src"));
 
     mapPreview.addEventListener("click", () => {
       if (!isMapSelected) {

@@ -101,6 +101,12 @@ async function loadBuild() {
 
   console.log("🔍 Loading build with ID:", buildId);
 
+  // Clear existing map annotations and image before loading new build
+  const existingMapImage = document.getElementById("map-preview-image");
+  const existingAnnotations = document.getElementById("map-annotations");
+  if (existingMapImage) existingMapImage.removeAttribute("src");
+  if (existingAnnotations) existingAnnotations.innerHTML = "";
+
   const buildRef = doc(db, "publishedBuilds", buildId);
   const buildSnapshot = await getDoc(buildRef);
 
@@ -296,33 +302,19 @@ async function loadBuild() {
               arrow.endX !== undefined &&
               arrow.endY !== undefined
             ) {
-              const newArrow = document.createElement("div");
-              newArrow.classList.add("annotation-arrow");
-
-              const rect = mapContainer.getBoundingClientRect();
-              const mapWidth = rect.width;
-              const mapHeight = rect.height;
-
-              const startXPixels = (arrow.startX / 100) * mapWidth;
-              const startYPixels = (arrow.startY / 100) * mapHeight;
-              const endXPixels = (arrow.endX / 100) * mapWidth;
-              const endYPixels = (arrow.endY / 100) * mapHeight;
-
-              const deltaX = endXPixels - startXPixels;
-              const deltaY = endYPixels - startYPixels;
-              const angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
-              const length = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-
-              newArrow.style.position = "absolute";
-              newArrow.style.left = `${startXPixels}px`;
-              newArrow.style.top = `${startYPixels}px`;
-              newArrow.style.width = `${length}px`;
-              newArrow.style.height = "2px";
-              newArrow.style.background = "#00bcd4";
-              newArrow.style.transform = `rotate(${angle}deg)`;
-              newArrow.style.transformOrigin = "0 0";
-
-              annotationsContainer.appendChild(newArrow);
+              viewMapAnnotations.createArrow(
+                arrow.startX,
+                arrow.startY,
+                arrow.endX,
+                arrow.endY
+              );
+              const last =
+                viewMapAnnotations.arrows[viewMapAnnotations.arrows.length - 1];
+              if (last && last.element) {
+                const clone = last.element.cloneNode(true);
+                last.element.parentNode.replaceChild(clone, last.element);
+                last.element = clone;
+              }
             }
           });
         }
