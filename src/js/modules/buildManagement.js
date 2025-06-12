@@ -170,7 +170,11 @@ export async function saveCurrentBuild() {
   setSavedBuilds(existingBuilds);
   saveSavedBuildsToLocalStorage();
   const lower = title.toLowerCase();
-  if (existingBuilds.some((b) => b.title.toLowerCase() === lower)) {
+  if (
+    existingBuilds.some(
+      (b) => !b.imported && b.title.toLowerCase() === lower
+    )
+  ) {
     showToast("A build with this title already exists.", "error");
     highlightField(titleInput);
     highlightField(titleText);

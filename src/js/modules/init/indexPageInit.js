@@ -1428,7 +1428,9 @@ export async function initializeIndexPage() {
             const currentId = getCurrentBuildId();
             const duplicate = savedBuilds.some(
               (b) =>
-                b.title.toLowerCase() === title && b.encodedTitle !== currentId
+                !b.imported &&
+                b.title.toLowerCase() === title &&
+                b.encodedTitle !== currentId
             );
             if (duplicate) {
               saveBuildButton.disabled = true;
