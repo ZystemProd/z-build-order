@@ -641,6 +641,7 @@ export async function initializeIndexPage() {
 
   safeAdd("buildOrderTitleText", "click", () => toggleTitleInput(true));
   safeAdd("buildOrderTitleText", "focus", () => toggleTitleInput(true));
+  safeAdd("buildOrderTitleInput", "blur", () => toggleTitleInput(false));
 
   // --- Dropdown Color Change
   safeChange("buildCategoryDropdown", updateDropdownColor);

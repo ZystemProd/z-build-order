@@ -8,7 +8,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'self'; script-src 'self' https://www.googletagmanager.com https://www.gstatic.com 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firebase.googleapis.com https://www.google-analytics.com https://region1.google-analytics.com https://z-build-order.onrender.com; img-src 'self' data: https://www.google.com https://*.googleusercontent.com;">
+    content="default-src 'self'; script-src 'self' https://www.googletagmanager.com https://www.gstatic.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firebase.googleapis.com https://www.google-analytics.com https://region1.google-analytics.com https://z-build-order.onrender.com; img-src 'self' data: https://www.google.com https://*.googleusercontent.com;">
   <link rel="icon" type="image/x-icon" href="/img/favicon.ico" />
 
 
@@ -247,8 +247,7 @@
           Enter build order title here...
         </span>
 
-        <input type="text" id="buildOrderTitleInput" placeholder="Enter build order title here..."
-          onblur="toggleTitleInput(false)" />
+        <input type="text" id="buildOrderTitleInput" placeholder="Enter build order title here..." />
 
         <!-- Right Column: Empty -->
         <div class="form-right"></div>
@@ -789,7 +788,7 @@
         target="_blank">Discord</a>
     </div>
     <div class="footer-center" id="site-info">
-      <p>Version 0.5.7125</p>
+      <p>Version 0.5.7126</p>
     </div>
     <div class="footer-right" id="site-logo">
       <a href="https://www.twitch.tv/zystem" target="_blank">
@@ -873,15 +872,7 @@
 
 
 
-  <script type="module">
-    document.addEventListener("DOMContentLoaded", async () => {
-      const { initializeAuthUI } = await import('./src/app.js');
-      const { initializeIndexPage } = await import('./src/js/modules/init/indexPageInit.js');
-
-      initializeAuthUI();
-      initializeIndexPage();
-    });
-  </script>
+  <script type="module" src="./src/initMain.js"></script>
 
 
 </body>
