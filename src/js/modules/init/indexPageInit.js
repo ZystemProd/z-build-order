@@ -1049,8 +1049,9 @@ export async function initializeIndexPage() {
     if (dropdown) {
       const selectedOption = dropdown.options[dropdown.selectedIndex];
       const optgroup = selectedOption.parentElement;
-      if (optgroup && optgroup.style.color) {
-        dropdown.style.color = optgroup.style.color;
+      if (optgroup) {
+        const color = window.getComputedStyle(optgroup).color;
+        dropdown.style.color = color || "";
       }
     }
   }
@@ -1356,10 +1357,11 @@ export async function initializeIndexPage() {
 
     if (!mapPreview || !mapModal) return;
 
-    let isMapSelected = false;
+    const mapPreviewImage = document.getElementById("map-preview-image");
 
     mapPreview.addEventListener("click", () => {
-      if (!isMapSelected) {
+      const hasMap = mapPreviewImage && mapPreviewImage.getAttribute("src");
+      if (!hasMap) {
         mapModal.style.display = "block";
       }
     });
@@ -1382,7 +1384,6 @@ export async function initializeIndexPage() {
           if (mapPreviewImage) mapPreviewImage.src = mapImageSrc;
           if (selectedMapText) selectedMapText.innerText = mapName;
 
-          isMapSelected = true;
           mapModal.style.display = "none";
         }
       });

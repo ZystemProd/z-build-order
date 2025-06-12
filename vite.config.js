@@ -11,6 +11,9 @@ export default defineConfig({
         veto: path.resolve(__dirname, "veto.html"),
       },
       output: {
+        entryFileNames: "[name].js",
+        chunkFileNames: "[name].js",
+        assetFileNames: "[name].[ext]",
         manualChunks(id) {
           // External Libraries
           if (id.includes("node_modules")) {

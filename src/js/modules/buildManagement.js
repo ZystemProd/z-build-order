@@ -288,6 +288,9 @@ export async function loadBuildAnnotations(buildId) {
       mapAnnotations.arrows.forEach(({ startX, startY, endX, endY }) =>
         mapAnnotations.createArrow(startX, startY, endX, endY)
       );
+
+      const clearBtn = document.querySelector('.clear-annotations-button');
+      if (clearBtn) clearBtn.style.display = 'inline-block';
     }
   } else {
     console.error("Build not found!");
