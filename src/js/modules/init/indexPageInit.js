@@ -47,7 +47,7 @@ import {
   searchTemplates,
   previewTemplate,
 } from "../template.js";
-import { initializeTooltips } from "../tooltip.js";
+import { initializeTooltips, updateTooltips } from "../tooltip.js";
 import {
   populateCommunityBuilds,
   checkPublishButtonVisibility,
@@ -1417,6 +1417,7 @@ export async function initializeIndexPage() {
 
           if (id === "buildOrderTitleInput") {
             const titleText = document.getElementById("buildOrderTitleText");
+            const titleInput = document.getElementById("buildOrderTitleInput");
             const title = el.value.trim().toLowerCase();
             const savedBuilds = getSavedBuilds();
             const currentId = getCurrentBuildId();
@@ -1427,9 +1428,21 @@ export async function initializeIndexPage() {
             if (duplicate) {
               saveBuildButton.disabled = true;
               if (titleText) titleText.classList.add("highlight");
-            } else if (titleText) {
-              titleText.classList.remove("highlight");
+              if (titleInput) {
+                titleInput.classList.add("highlight");
+                titleInput.setAttribute(
+                  "data-tooltip",
+                  "Title cannot match an existing build in My Builds"
+                );
+              }
+            } else {
+              if (titleText) titleText.classList.remove("highlight");
+              if (titleInput) {
+                titleInput.classList.remove("highlight");
+                titleInput.removeAttribute("data-tooltip");
+              }
             }
+            if (titleInput) updateTooltips();
           }
         });
         el.dataset.monitorAttached = "true";

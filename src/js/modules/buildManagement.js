@@ -99,7 +99,7 @@ export async function saveCurrentBuild() {
     field.addEventListener("focus", () => field.classList.remove("highlight"));
     field.addEventListener("change", () => field.classList.remove("highlight"));
   }
-  removeHighlightOnFocus(titleInput);
+  // Allow title highlight to remain even when input is focused
   removeHighlightOnFocus(categoryDropdown);
 
   if (!title) {
