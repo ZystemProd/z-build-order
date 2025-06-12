@@ -4582,3 +4582,46 @@ button.btn-small {
     gap: 10px;
   }
 }
+.cookie-banner {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 420px;
+  background-color: rgba(30, 30, 30, 0.95);
+  color: #fff;
+  padding: 15px 20px;
+  text-align: center;
+  z-index: 2000;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(255, 59, 48, 0.6);
+  animation: cookie-pulse 3s ease-in-out infinite;
+}
+@keyframes cookie-pulse {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(255, 59, 48, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(255, 59, 48, 1);
+  }
+}
+.cookie-banner button {
+  margin-left: 10px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.cookie-banner button.cookie-btn {
+  background-color: #555;
+  color: #fff;
+}
+.cookie-banner button.cookie-btn:hover {
+  background-color: #777;
+}
+#cookieAccept {
+  background-color: #ff3b30;
+}
+#cookieAccept:hover {
+  background-color: #ff6458;
+}
