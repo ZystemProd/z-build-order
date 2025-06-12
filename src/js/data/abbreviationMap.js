@@ -43,5 +43,6 @@ export const abbreviationMap = {
     "colossus range": "extended thermal lance",
     "lib range": "advanced ballistics",
     "liberator range": "advanced ballistics",
+    stim: "stimpack",
   },
 };
