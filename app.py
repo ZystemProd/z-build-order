@@ -173,13 +173,14 @@ def upload():
                 if event.pid != player.pid:
                     continue
                 ability = getattr(event, "ability", None)
-                if not ability:
-                    continue
-                ability_name = ability.name or getattr(event, "ability_name", "")
+                ability_name = (
+                    (ability.name if ability and ability.name else None)
+                    or getattr(event, "ability_name", "")
+                )
                 if ability_name.startswith("Cancel"):
                     continue
 
-                if ability.is_build and ability.build_unit:
+                if ability and ability.is_build and ability.build_unit:
                     unit = ability.build_unit
                     etype = "building" if unit.is_building else "unit"
                     name = unit.name
