@@ -184,19 +184,31 @@ def upload():
                     etype = "building" if unit.is_building else "unit"
                     name = unit.name
                 else:
-                    for prefix in (
-                        "Research",
-                        "UpgradeTo",
-                        "Upgrade",
-                        "MorphTo",
-                        "Morph",
-                        "TransformTo",
-                        "Transform",
-                    ):
-                        if ability_name.startswith(prefix):
-                            name = ability_name[len(prefix) :]
-                            etype = "upgrade"
-                            break
+                    # Fall back to parsing the ability name for known prefixes
+                    lowered = ability_name.lower()
+                    if "train" in ability_name:
+                        name = ability_name.split("Train")[-1]
+                        etype = "unit"
+                    elif lowered.startswith("warp") and "train" in ability_name:
+                        name = ability_name.split("Train")[-1]
+                        etype = "unit"
+                    elif lowered.startswith("build"):
+                        name = ability_name[len("Build") :]
+                        etype = "building"
+                    else:
+                        for prefix in (
+                            "Research",
+                            "UpgradeTo",
+                            "Upgrade",
+                            "MorphTo",
+                            "Morph",
+                            "TransformTo",
+                            "Transform",
+                        ):
+                            if ability_name.startswith(prefix):
+                                name = ability_name[len(prefix) :]
+                                etype = "upgrade"
+                                break
 
             elif isinstance(event, sc2reader.events.tracker.UnitBornEvent):
                 etype = "unit"
@@ -230,8 +242,8 @@ def upload():
             elif ln.startswith("evolve "):
                 name = name[7:]
 
-            # Use event.second as-is for LotV/Faster
-            game_sec = int(event.second)
+            # Convert real-time seconds to in-game seconds
+            game_sec = int(event.second * speed_factor)
 
 
             if time_limit is not None and game_sec > time_limit:
