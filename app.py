@@ -173,6 +173,7 @@ def upload():
                 if event.pid != player.pid:
                     continue
                 ability = getattr(event, "ability", None)
+
                 ability_name = (
                     (ability.name if ability and ability.name else None)
                     or getattr(event, "ability_name", "")
@@ -181,10 +182,12 @@ def upload():
                     continue
 
                 if ability and ability.is_build and ability.build_unit:
+
                     unit = ability.build_unit
                     etype = "building" if unit.is_building else "unit"
                     name = unit.name
                 else:
+
                     # Fall back to parsing the ability name for known prefixes
                     lowered = ability_name.lower()
                     if "train" in ability_name:
@@ -210,6 +213,7 @@ def upload():
                                 name = ability_name[len(prefix) :]
                                 etype = "upgrade"
                                 break
+
 
             elif isinstance(event, sc2reader.events.tracker.UnitBornEvent):
                 etype = "unit"
