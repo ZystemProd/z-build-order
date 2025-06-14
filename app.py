@@ -250,6 +250,17 @@ def upload():
     return "\n".join(lines), 200
 
 
-# ─────────────────────────── main (dev only) ─────────────────────────
+# ─────────────────────────── main (Render) ───────────────────────────
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    import os
+
+    port = int(os.environ.get("PORT", 5000))   # Render sets $PORT
+
+    # Use waitress (production-ready) if available, otherwise fallback to Flask
+    try:
+        from waitress import serve
+
+        serve(app, host="0.0.0.0", port=port)
+    except ImportError:
+        # Dev / local: Flask’s built-in server
+        app.run(host="0.0.0.0", port=port)
