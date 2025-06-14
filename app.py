@@ -1,340 +1,218 @@
+# ──────────────────────────────────────────────────────────────────────
+#  SC2 Replay Parser – correct game-time build-order extraction
+#  👉 drop this file in place of the old app.py and restart
+# ──────────────────────────────────────────────────────────────────────
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import sc2reader
 import io
 import bisect
 import re
-from sc2reader.constants import GAME_SPEED_FACTOR
+
+# Optional: human-friendly renames (“SpawningPool” ➜ “Spawning Pool”, …)
 from name_map import NAME_MAP
 
 app = Flask(__name__)
 CORS(app)
 
-
+# ─────────────────────────── helpers ─────────────────────────────────
 def format_name(name: str) -> str:
-    """Convert internal names like 'SpawningPool' to 'Spawning Pool'."""
+    """Convert internal names (SpawningPool) ➜ Spawning Pool."""
     if not name:
         return name
     lower = name.lower()
     if lower in NAME_MAP:
         return NAME_MAP[lower]
-    # Insert space before capital letters and capitalize words
+    # insert space before capitals and title-case
     return re.sub(r"(?<!^)(?=[A-Z])", " ", name).title()
 
-@app.route('/')
+
+def sec2clock(sec: int) -> str:
+    """42 → '00:42' ( game seconds )."""
+    return f"{sec // 60:02d}:{sec % 60:02d}"
+
+
+# ─────────────────────────── routes ──────────────────────────────────
+@app.route("/")
 def index():
-    return '🟢 SC2 Replay Parser is live!'
+    return "🟢 SC2 Replay Parser is live!"
 
 
-@app.route('/players', methods=['POST'])
+@app.route("/players", methods=["POST"])
 def players():
-    if 'replay' not in request.files:
-        return 'No replay uploaded', 400
+    if "replay" not in request.files or request.files["replay"].filename == "":
+        return "No replay uploaded", 400
 
-    file = request.files['replay']
-    if file.filename == '':
-        return 'No replay uploaded', 400
-
-    replay_data = io.BytesIO(file.read())
-    try:
-        replay = sc2reader.load_replay(replay_data, load_map=False)
-    except Exception as e:
-        print('❌ Failed to load replay:', e)
-        return f'Failed to load replay: {e}', 400
-
+    replay = sc2reader.load_replay(io.BytesIO(request.files["replay"].read()), load_map=False)
     players = [p for p in replay.players if not p.is_observer]
-    info = [{'pid': p.pid, 'name': p.name, 'race': p.play_race} for p in players]
+
+    info = [{"pid": p.pid, "name": p.name, "race": p.play_race} for p in players]
     matchup = None
     if len(players) >= 2:
-        a = players[0].play_race[0].lower()
-        b = players[1].play_race[0].lower()
+        a, b = players[0].play_race[0].lower(), players[1].play_race[0].lower()
         matchup = f"{a}v{b}"
-    return jsonify({'players': info, 'matchup': matchup})
+    return jsonify({"players": info, "matchup": matchup})
 
-@app.route('/upload', methods=['POST'])
+
+@app.route("/upload", methods=["POST"])
 def upload():
-    if 'replay' not in request.files:
-        return 'No replay uploaded', 400
+    if "replay" not in request.files or request.files["replay"].filename == "":
+        return "No replay uploaded", 400
 
-    file = request.files['replay']
-    if file.filename == '':
-        return 'No replay uploaded', 400
-
-    # Read replay into memory
-    replay_data = io.BytesIO(file.read())
+    # ── load replay ──────────────────────────────────────────────────
     try:
-        # Loading without map reduces parsing time and avoids verbose output
-        replay = sc2reader.load_replay(replay_data, load_map=False)
+        replay = sc2reader.load_replay(io.BytesIO(request.files["replay"].read()), load_map=False)
     except Exception as e:
-        print("❌ Failed to load replay:", e)
-        return f'Failed to load replay: {e}', 400
+        return f"Failed to load replay: {e}", 400
 
-    try:
-        players = [p for p in replay.players if not p.is_observer]
-        if not players:
-            return 'No player found in replay', 400
+    # choose player (first by default or ?player= / form field)
+    players = [p for p in replay.players if not p.is_observer]
+    if not players:
+        return "No players in replay", 400
+    requested = request.form.get("player") or request.args.get("player")
+    player = next((p for p in players if str(p.pid) == requested or p.name == requested), players[0])
 
-        # allow player selection by name or pid
-        requested = request.form.get('player') or request.args.get('player')
-        player = None
-        if requested:
-            player = next((p for p in players if str(p.pid) == requested or p.name == requested), None)
-        if player is None:
-            player = players[0]
+    # optional filters
+    exclude_workers   = (request.form.get("exclude_workers", "") or "").lower() in {"1", "true", "yes", "on"}
+    exclude_supply    = (request.form.get("exclude_supply", "")  or "").lower() in {"1", "true", "yes", "on"}
+    exclude_time      = (request.form.get("exclude_time", "")    or "").lower() in {"1", "true", "yes", "on"}
+    compact           = (request.form.get("compact", "")         or "").lower() in {"1", "true", "yes", "on"}
+    stop_limit        = int(request.form.get("stop_supply", 0) or 0) or None
+    time_limit        = int(request.form.get("stop_time",   0) or 0) * 60 or None
 
-        exclude_flag = request.form.get('exclude_workers', '')
-        exclude_workers = str(exclude_flag).lower() in {'1', 'true', 'yes', 'on'}
-        exclude_supply_flag = request.form.get('exclude_supply', '')
-        exclude_supply = str(exclude_supply_flag).lower() in {'1', 'true', 'yes', 'on'}
-        exclude_time_flag = request.form.get('exclude_time', '')
-        exclude_time = str(exclude_time_flag).lower() in {'1', 'true', 'yes', 'on'}
-        compact_flag = request.form.get('compact', '')
-        compact = str(compact_flag).lower() in {'1', 'true', 'yes', 'on'}
-        if compact:
-            exclude_time = True
-        stop_supply_raw = request.form.get('stop_supply')
-        stop_time_raw = request.form.get('stop_time')
-        stop_limit = None
-        time_limit = None
-        if stop_supply_raw and stop_supply_raw.isdigit():
-            stop_limit = int(stop_supply_raw)
-        if stop_time_raw and stop_time_raw.isdigit():
-            time_limit = int(stop_time_raw) * 60
+    # ── supply lookup table from PlayerStatsEvents ───────────────────
+    supply_events = {}
+    for ev in replay.tracker_events:
+        if isinstance(ev, sc2reader.events.tracker.PlayerStatsEvent) and ev.pid == player.pid:
+            supply_events[ev.second] = (int(ev.food_used), int(ev.food_made))
+    supply_times = sorted(supply_events)
 
-        # Build a map of supply values from PlayerStatsEvents as fallback
-        supply_events = {}
-        for event in replay.events:
-            if isinstance(event, sc2reader.events.tracker.PlayerStatsEvent) and event.pid == player.pid:
-                used = int(getattr(event, 'food_used', 0))
-                made = int(getattr(event, 'food_made', 0))
-                supply_events[event.second] = (used, made)
-        supply_times = sorted(supply_events.keys())
+    def get_supply(sec: int):
+        if not supply_times:
+            return (0, 0)
+        idx = bisect.bisect_right(supply_times, sec) - 1
+        return supply_events[supply_times[idx]] if idx >= 0 else (0, 0)
 
-        def get_supply(second: int):
-            """Return (food_used, food_made) for the closest PlayerStatsEvent."""
-            if not supply_times:
-                return 0, 0
-            idx = bisect.bisect_right(supply_times, second) - 1
-            if idx >= 0:
-                return supply_events[supply_times[idx]]
-            return 0, 0
+    # ── filters ──────────────────────────────────────────────────────
+    skip_units = {
+        "Egg", "Larva", "Overlord Cocoon", "Mule", "M U L E", "Scanner Sweep",
+        "Kd8Charge", "KD8Charge", "Broodling", "Changeling",
+    }
+    if exclude_workers:
+        skip_units.update({"Drone", "Probe", "SCV"})
+    skip_keywords = {"creep tumor", "chronoboost", "phase shift", "reward", "dance"}
 
-        skip_units = {
-            "Egg",
-            "Larva",
-            "Overlord Cocoon",
-            "Mule",
-            "M U L E",
-            "Scanner Sweep",
-            "Kd8Charge",
-            "KD8Charge",
-            "Broodling",
-            "Changeling",
-        }
-        skip_units_lower = {s.lower() for s in skip_units}
-        # Skip any creep tumor variants or chrono boost abilities
-        skip_keywords = [
-             "Creep Tumor",
-             "CreepTumor",
-             "Chrono",
-             "Phase Shift",
-             "PhaseShift",
-            "reward",
-            "dance",
-        ]
-        if exclude_workers:
-            skip_units.update({"Drone", "Probe", "SCV"})
+    # ── build-order extraction ───────────────────────────────────────
+    entries = []
+    for ev in replay.tracker_events:
 
+        # skip the countdown – keep the 0-second “Train Probe” order
+        if ev.second < 0:
+            continue
 
+        # ignore pre-placed starting buildings & units at 0 : 00
+        if ev.second == 0 and isinstance(
+            ev,
+            (sc2reader.events.tracker.UnitBornEvent,
+             sc2reader.events.tracker.UnitInitEvent,
+             sc2reader.events.tracker.UpgradeCompleteEvent),
+        ):
+            continue
 
-        # Convert the raw tracker time (frames/16) to Blizzard-UI seconds.
-        # If the mapping is missing we fall back to the correct LotV numbers.
-        speed_factor = GAME_SPEED_FACTOR.get(replay.expansion, {}).get(replay.speed)
-        if speed_factor is None:
-            speed_factor = 1.4 if replay.speed == "Faster" else 1.0
+        etype, name = None, None
 
-        entries = []
-
-        for event in replay.events:
-            # ── skip the -3…-1 countdown ───────────────────────────────
-            if event.second < 0:
-                 continue
-            # ── skip all starting units/buildings shown at 0 : 00 ─────
-            if event.second == 0 and isinstance(
-                event,
-                (
-                    sc2reader.events.tracker.UnitBornEvent,
-                    sc2reader.events.tracker.UnitInitEvent,
-                    sc2reader.events.tracker.UpgradeCompleteEvent,
-                ),
-            ):
+        # ── units finish on UnitBornEvent ────────────────────────────
+        if isinstance(ev, sc2reader.events.tracker.UnitBornEvent):
+            if ev.unit_controller.pid != player.pid:
                 continue
+            etype, name = "unit", ev.unit_type_name
+
+        # ── buildings finish on UnitDoneEvent ────────────────────────
+        elif isinstance(ev, sc2reader.events.tracker.UnitDoneEvent):
+            if ev.unit_controller.pid != player.pid:
                 continue
-            etype = None
-            name = None
+            etype, name = "building", ev.unit_type_name
 
-            if isinstance(
-                event,
-                (
-                    sc2reader.events.game.DataCommandEvent,
-                    sc2reader.events.game.TargetUnitCommandEvent,
-                ),
-            ):
-                # Commands represent the start of a unit/structure or upgrade
-                if event.pid != player.pid:
-                    continue
-                ability = getattr(event, "ability", None)
-
-                ability_name = (
-                    (ability.name if ability and ability.name else None)
-                    or getattr(event, "ability_name", "")
-                )
-                                # Ignore Blizzard “Reward Dance …” achievement spam
-                if ability_name.startswith("Reward") or "Reward" in ability_name or "Dance" in ability_name:
-                    continue
-                if ability_name.startswith("Cancel"):
-                    continue
-
-                if ability and ability.is_build and ability.build_unit:
-
-                    unit = ability.build_unit
-                    etype = "building" if unit.is_building else "unit"
-                    name = unit.name
-                else:
-
-                    # Fall back to parsing the ability name for known prefixes
-                    lowered = ability_name.lower()
-                    if "train" in ability_name:
-                        name = ability_name.split("Train")[-1]
-                        etype = "unit"
-                    elif lowered.startswith("warp") and "train" in ability_name:
-                        name = ability_name.split("Train")[-1]
-                        etype = "unit"
-                    elif lowered.startswith("build"):
-                        name = ability_name[len("Build") :]
-                        etype = "building"
-                    else:
-                        for prefix in (
-                            "Research",
-                            "UpgradeTo",
-                            "Upgrade",
-                            "MorphTo",
-                            "Morph",
-                            "TransformTo",
-                            "Transform",
-                        ):
-                            if ability_name.startswith(prefix):
-                                name = ability_name[len(prefix) :]
-                                etype = "upgrade"
-                                break
-
-
-            elif isinstance(event, sc2reader.events.tracker.UnitBornEvent):
-                etype = "unit"
-                name = event.unit_type_name
-            elif isinstance(event, sc2reader.events.tracker.UnitInitEvent):
-                etype = "building"
-                name = event.unit_type_name
-            elif isinstance(event, sc2reader.events.tracker.UpgradeCompleteEvent):
-                etype = "upgrade"
-                name = event.upgrade_type_name
-            else:
+        # ── upgrades finish on UpgradeCompleteEvent ──────────────────
+        elif isinstance(ev, sc2reader.events.tracker.UpgradeCompleteEvent):
+            if ev.pid != player.pid:
                 continue
+            etype, name = "upgrade", ev.upgrade_type_name
 
-            if getattr(event, 'control_pid', getattr(event, 'pid', None)) != player.pid:
-                continue
-            lower_name = name.lower()
-            if (
-                not name
-                or 'Beacon' in name
-                or 'Spray' in name
-                or name in skip_units
-                or lower_name in skip_units_lower
-                or any(key.lower() in lower_name for key in skip_keywords)
-            ):
-                continue
-
-            name = format_name(name)
-            ln = name.lower()
-            if ln.startswith("terran "):
-                name = name[7:]
-            elif ln.startswith("evolve "):
-                name = name[7:]
-
-            # Convert tracker seconds to Blizzard-UI seconds
-            game_sec = int(event.second / speed_factor)
-
-
-            if time_limit is not None and game_sec > time_limit:
-                break
-
-            supply_used, supply_made = get_supply(event.second)
-            if stop_limit is not None and supply_used > stop_limit:
-                break
-
-            minutes = game_sec // 60
-            seconds = game_sec % 60
-            timestamp = f"{minutes:02d}:{seconds:02d}"
-
-            if (entries
-                and entries[-1]['unit'] == name
-                and abs(supply_used - entries[-1]['supply']) <= 1):  # command vs completion
-                prev = entries[-1]
-                prev['count'] += 1
-                # keep the EARLIEST time stamp …
-                if game_sec < prev['secs']:
-                    prev['secs'] = game_sec
-                    prev['time'] = timestamp
-                # … and the LARGER supply (after the unit pops out)
-                if supply_used > prev['supply']:
-                    prev['supply'] = supply_used
-            else:
-                entries.append({'supply': supply_used, 'made': supply_made, 'time': timestamp, 'secs': game_sec, 'unit': name, 'count': 1})
-
-        build_lines = []
-
-        if compact:
-            i = 0
-            n = len(entries)
-            while i < n:
-                first = entries[i]
-                supply = first['supply']
-                made = first['made']
-                start_time = first['secs']
-                units = []
-                while i < n and entries[i]['supply'] == supply and entries[i]['secs'] - start_time <= 5:
-                    e = entries[i]
-                    count_part = f"{e['count']} " if e['count'] > 1 else ""
-                    units.append(f"{count_part}{e['unit']}")
-                    i += 1
-                parts = []
-                if not exclude_supply:
-                    supply_str = str(supply)
-                    if supply > made and made > 0:
-                        supply_str = f"{supply}/{made}"
-                    parts.append(supply_str)
-                prefix = f"[{' '.join(parts)}] " if parts else ""
-                build_lines.append(prefix + " + ".join(units))
+        # ignore everything else (commands, cancels, morphs, etc.)
         else:
-            for item in entries:
-                parts = []
-                if not exclude_supply:
-                    supply_str = str(item['supply'])
-                    if item['supply'] > item['made'] and item['made'] > 0:
-                        supply_str = f"{item['supply']}/{item['made']}"
-                    parts.append(supply_str)
-                if not exclude_time:
-                    parts.append(item['time'])
-                prefix = f"[{' '.join(parts)}] " if parts else ""
-                count_part = f"{item['count']} " if item['count'] > 1 else ""
-                build_lines.append(f"{prefix}{count_part}{item['unit']}")
+            continue
 
-        return '\n'.join(build_lines)
+        # universal skips
+        lower = name.lower()
+        if (
+            not name
+            or any(k in name for k in ("Beacon", "Spray"))
+            or name in skip_units
+            or lower in (s.lower() for s in skip_units)
+            or any(k in lower for k in skip_keywords)
+        ):
+            continue
 
-    except Exception as e:
-        print("❌ Error while processing events:", e)
-        return f'Failed to parse replay: {e}', 500
+        # human-readable name
+        name = format_name(name)
 
-if __name__ == '__main__':
+        # supply at this second
+        used, cap = get_supply(ev.second)
+
+        # stop limits
+        if stop_limit is not None and used > stop_limit:
+            break
+        if time_limit is not None and ev.second > time_limit:
+            break
+
+        # record
+        entries.append(
+            {
+                "secs":   ev.second,
+                "time":   sec2clock(ev.second),
+                "supply": used,
+                "cap":    cap,
+                "unit":   name,
+            }
+        )
+
+    # ── format output (compact vs full) ──────────────────────────────
+    lines = []
+    if compact:
+        # group lines that share the same supply & happen ≤ 5 s apart
+        i, n = 0, len(entries)
+        while i < n:
+            first = entries[i]
+            supply, start = first["supply"], first["secs"]
+            units, j = [], i
+            while j < n and entries[j]["supply"] == supply and entries[j]["secs"] - start <= 5:
+                units.append(entries[j]["unit"])
+                j += 1
+            prefix = ""
+            if not exclude_supply:
+                supply_str = f"{supply}/{first['cap']}" if supply > first["cap"] else str(supply)
+                prefix += f"[{supply_str}] "
+            if not exclude_time:
+                prefix += f"[{sec2clock(start)}] "
+            lines.append(prefix + " + ".join(units))
+            i = j
+    else:
+        for e in entries:
+            parts = []
+            if not exclude_supply:
+                supply_str = f"{e['supply']}/{e['cap']}" if e['supply'] > e['cap'] else str(e['supply'])
+                parts.append(supply_str)
+            if not exclude_time:
+                parts.append(e["time"])
+            prefix = f"[{' '.join(parts)}] " if parts else ""
+            lines.append(prefix + e["unit"])
+
+    return "\n".join(lines), 200
+
+
+# ─────────────────────────── main ────────────────────────────────────
+if __name__ == "__main__":
     from waitress import serve
-    serve(app, host='0.0.0.0', port=5000)
+
+    serve(app, host="0.0.0.0", port=5000)
