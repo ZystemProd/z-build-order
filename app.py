@@ -145,19 +145,18 @@ def upload():
 
 
 
-        # ``event.second`` is reported in real-time seconds. Convert it to the
-        # in-game clock using the replay's speed factor. LotV replays on
-        # "Faster" still require a 1.4x adjustment to match the in-game timer.
-        speed_factor = GAME_SPEED_FACTOR.get(replay.expansion, {}).get(
-            replay.speed, 1.0
-        )
-        if replay.expansion == "LotV" and replay.speed == "Faster" and speed_factor == 1.0:
-            speed_factor = 1.4
+        # Convert the raw tracker time (frames/16) to Blizzard-UI seconds.
+        # If the mapping is missing we fall back to the correct LotV numbers.
+        speed_factor = GAME_SPEED_FACTOR.get(replay.expansion, {}).get(replay.speed)
+        if speed_factor is None:
+            speed_factor = 1.4 if replay.speed == "Faster" else 1.0
 
         entries = []
 
         for event in replay.events:
-            if event.second == 0:
+            # keep the very first Train/Build command so the timestamps
+            # match the in-game build-order; ignore only the pre-game countdown
+            if event.second < 1:
                 continue
             etype = None
             name = None
@@ -247,7 +246,7 @@ def upload():
             elif ln.startswith("evolve "):
                 name = name[7:]
 
-            # Convert real-time seconds to in-game seconds
+            # Convert tracker seconds to Blizzard-UI seconds
             game_sec = int(event.second / speed_factor)
 
 
@@ -263,9 +262,12 @@ def upload():
             timestamp = f"{minutes:02d}:{seconds:02d}"
 
             if entries and entries[-1]['supply'] == supply_used and entries[-1]['unit'] == name:
-                # Combine consecutive events for the same unit/building at the
-                # same supply regardless of slight timestamp differences.
+                # We have both the command and the completion – keep the EARLIEST
+                # timestamp so our output shows the order time.
                 entries[-1]['count'] += 1
+                if game_sec < entries[-1]['secs']:           # keep earliest
+                    entries[-1]['secs'] = game_sec
+                    entries[-1]['time'] = timestamp
             else:
                 entries.append({'supply': supply_used, 'made': supply_made, 'time': timestamp, 'secs': game_sec, 'unit': name, 'count': 1})
 
