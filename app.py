@@ -1,6 +1,6 @@
 # ──────────────────────────────────────────────────────────────────────
-#  SC2 Replay Parser – correct game-time build-order extraction
-#  👉 drop this file in place of the old app.py and restart
+#  SC2 Replay Parser – game-time-accurate build-order extraction
+#  (safe even if you don’t have name_map.py)
 # ──────────────────────────────────────────────────────────────────────
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -9,15 +9,18 @@ import io
 import bisect
 import re
 
-# Optional: human-friendly renames (“SpawningPool” ➜ “Spawning Pool”, …)
-from name_map import NAME_MAP
+# ---- optional prettifying of internal unit names --------------------
+try:
+    from name_map import NAME_MAP        # your own dict {'spawningpool':'Spawning Pool', …}
+except ImportError:
+    NAME_MAP = {}                        # fall back to “as-is” names
 
 app = Flask(__name__)
 CORS(app)
 
 # ─────────────────────────── helpers ─────────────────────────────────
 def format_name(name: str) -> str:
-    """Convert internal names (SpawningPool) ➜ Spawning Pool."""
+    """Convert internal names (SpawningPool) → 'Spawning Pool'."""
     if not name:
         return name
     lower = name.lower()
@@ -28,7 +31,7 @@ def format_name(name: str) -> str:
 
 
 def sec2clock(sec: int) -> str:
-    """42 → '00:42' ( game seconds )."""
+    """42 → '00:42' (game seconds)."""
     return f"{sec // 60:02d}:{sec % 60:02d}"
 
 
@@ -43,7 +46,9 @@ def players():
     if "replay" not in request.files or request.files["replay"].filename == "":
         return "No replay uploaded", 400
 
-    replay = sc2reader.load_replay(io.BytesIO(request.files["replay"].read()), load_map=False)
+    replay = sc2reader.load_replay(
+        io.BytesIO(request.files["replay"].read()), load_map=False
+    )
     players = [p for p in replay.players if not p.is_observer]
 
     info = [{"pid": p.pid, "name": p.name, "race": p.play_race} for p in players]
@@ -61,7 +66,9 @@ def upload():
 
     # ── load replay ──────────────────────────────────────────────────
     try:
-        replay = sc2reader.load_replay(io.BytesIO(request.files["replay"].read()), load_map=False)
+        replay = sc2reader.load_replay(
+            io.BytesIO(request.files["replay"].read()), load_map=False
+        )
     except Exception as e:
         return f"Failed to load replay: {e}", 400
 
@@ -70,20 +77,37 @@ def upload():
     if not players:
         return "No players in replay", 400
     requested = request.form.get("player") or request.args.get("player")
-    player = next((p for p in players if str(p.pid) == requested or p.name == requested), players[0])
+    player = next(
+        (p for p in players if str(p.pid) == requested or p.name == requested),
+        players[0],
+    )
 
     # optional filters
-    exclude_workers   = (request.form.get("exclude_workers", "") or "").lower() in {"1", "true", "yes", "on"}
-    exclude_supply    = (request.form.get("exclude_supply", "")  or "").lower() in {"1", "true", "yes", "on"}
-    exclude_time      = (request.form.get("exclude_time", "")    or "").lower() in {"1", "true", "yes", "on"}
-    compact           = (request.form.get("compact", "")         or "").lower() in {"1", "true", "yes", "on"}
-    stop_limit        = int(request.form.get("stop_supply", 0) or 0) or None
-    time_limit        = int(request.form.get("stop_time",   0) or 0) * 60 or None
+    exclude_workers = (
+        (request.form.get("exclude_workers", "") or "").lower()
+        in {"1", "true", "yes", "on"}
+    )
+    exclude_supply = (
+        (request.form.get("exclude_supply", "") or "").lower()
+        in {"1", "true", "yes", "on"}
+    )
+    exclude_time = (
+        (request.form.get("exclude_time", "") or "").lower()
+        in {"1", "true", "yes", "on"}
+    )
+    compact = (
+        (request.form.get("compact", "") or "").lower() in {"1", "true", "yes", "on"}
+    )
+    stop_limit = int(request.form.get("stop_supply", 0) or 0) or None
+    time_limit = int(request.form.get("stop_time", 0) or 0) * 60 or None
 
     # ── supply lookup table from PlayerStatsEvents ───────────────────
     supply_events = {}
     for ev in replay.tracker_events:
-        if isinstance(ev, sc2reader.events.tracker.PlayerStatsEvent) and ev.pid == player.pid:
+        if (
+            isinstance(ev, sc2reader.events.tracker.PlayerStatsEvent)
+            and ev.pid == player.pid
+        ):
             supply_events[ev.second] = (int(ev.food_used), int(ev.food_made))
     supply_times = sorted(supply_events)
 
@@ -95,8 +119,16 @@ def upload():
 
     # ── filters ──────────────────────────────────────────────────────
     skip_units = {
-        "Egg", "Larva", "Overlord Cocoon", "Mule", "M U L E", "Scanner Sweep",
-        "Kd8Charge", "KD8Charge", "Broodling", "Changeling",
+        "Egg",
+        "Larva",
+        "Overlord Cocoon",
+        "Mule",
+        "M U L E",
+        "Scanner Sweep",
+        "Kd8Charge",
+        "KD8Charge",
+        "Broodling",
+        "Changeling",
     }
     if exclude_workers:
         skip_units.update({"Drone", "Probe", "SCV"})
@@ -105,57 +137,54 @@ def upload():
     # ── build-order extraction ───────────────────────────────────────
     entries = []
     for ev in replay.tracker_events:
-
-        # skip the countdown – keep the 0-second “Train Probe” order
+        # skip the −3…−1 countdown; keep 0-second “Train Probe” orders
         if ev.second < 0:
             continue
 
-        # ignore pre-placed starting buildings & units at 0 : 00
+        # ignore pre-placed starting buildings / units at 0 : 00
         if ev.second == 0 and isinstance(
             ev,
-            (sc2reader.events.tracker.UnitBornEvent,
-             sc2reader.events.tracker.UnitInitEvent,
-             sc2reader.events.tracker.UpgradeCompleteEvent),
+            (
+                sc2reader.events.tracker.UnitBornEvent,
+                sc2reader.events.tracker.UnitInitEvent,
+                sc2reader.events.tracker.UpgradeCompleteEvent,
+            ),
         ):
             continue
 
-        etype, name = None, None
+        etype, raw_name = None, None
 
-        # ── units finish on UnitBornEvent ────────────────────────────
+        # workers finish on UnitBornEvent
         if isinstance(ev, sc2reader.events.tracker.UnitBornEvent):
             if ev.unit_controller.pid != player.pid:
                 continue
-            etype, name = "unit", ev.unit_type_name
+            etype, raw_name = "unit", ev.unit_type_name
 
-        # ── buildings finish on UnitDoneEvent ────────────────────────
+        # buildings finish on UnitDoneEvent
         elif isinstance(ev, sc2reader.events.tracker.UnitDoneEvent):
             if ev.unit_controller.pid != player.pid:
                 continue
-            etype, name = "building", ev.unit_type_name
+            etype, raw_name = "building", ev.unit_type_name
 
-        # ── upgrades finish on UpgradeCompleteEvent ──────────────────
+        # upgrades finish on UpgradeCompleteEvent
         elif isinstance(ev, sc2reader.events.tracker.UpgradeCompleteEvent):
             if ev.pid != player.pid:
                 continue
-            etype, name = "upgrade", ev.upgrade_type_name
+            etype, raw_name = "upgrade", ev.upgrade_type_name
 
-        # ignore everything else (commands, cancels, morphs, etc.)
-        else:
+        else:  # ignore command, cancel, morph, etc.
             continue
 
         # universal skips
-        lower = name.lower()
         if (
-            not name
-            or any(k in name for k in ("Beacon", "Spray"))
-            or name in skip_units
-            or lower in (s.lower() for s in skip_units)
-            or any(k in lower for k in skip_keywords)
+            not raw_name
+            or raw_name in skip_units
+            or raw_name.lower() in skip_keywords
+            or any(k in raw_name for k in ("Beacon", "Spray"))
         ):
             continue
 
-        # human-readable name
-        name = format_name(name)
+        name = format_name(raw_name)
 
         # supply at this second
         used, cap = get_supply(ev.second)
@@ -166,32 +195,38 @@ def upload():
         if time_limit is not None and ev.second > time_limit:
             break
 
-        # record
         entries.append(
             {
-                "secs":   ev.second,
-                "time":   sec2clock(ev.second),
+                "secs": ev.second,
+                "time": sec2clock(ev.second),
                 "supply": used,
-                "cap":    cap,
-                "unit":   name,
+                "cap": cap,
+                "unit": name,
             }
         )
 
     # ── format output (compact vs full) ──────────────────────────────
     lines = []
     if compact:
-        # group lines that share the same supply & happen ≤ 5 s apart
         i, n = 0, len(entries)
         while i < n:
             first = entries[i]
             supply, start = first["supply"], first["secs"]
             units, j = [], i
-            while j < n and entries[j]["supply"] == supply and entries[j]["secs"] - start <= 5:
+            while (
+                j < n
+                and entries[j]["supply"] == supply
+                and entries[j]["secs"] - start <= 5
+            ):
                 units.append(entries[j]["unit"])
                 j += 1
             prefix = ""
             if not exclude_supply:
-                supply_str = f"{supply}/{first['cap']}" if supply > first["cap"] else str(supply)
+                supply_str = (
+                    f"{supply}/{first['cap']}"
+                    if supply > first["cap"]
+                    else str(supply)
+                )
                 prefix += f"[{supply_str}] "
             if not exclude_time:
                 prefix += f"[{sec2clock(start)}] "
@@ -201,7 +236,11 @@ def upload():
         for e in entries:
             parts = []
             if not exclude_supply:
-                supply_str = f"{e['supply']}/{e['cap']}" if e['supply'] > e['cap'] else str(e['supply'])
+                supply_str = (
+                    f"{e['supply']}/{e['cap']}"
+                    if e["supply"] > e["cap"]
+                    else str(e["supply"])
+                )
                 parts.append(supply_str)
             if not exclude_time:
                 parts.append(e["time"])
@@ -211,8 +250,6 @@ def upload():
     return "\n".join(lines), 200
 
 
-# ─────────────────────────── main ────────────────────────────────────
+# ─────────────────────────── main (dev only) ─────────────────────────
 if __name__ == "__main__":
-    from waitress import serve
-
-    serve(app, host="0.0.0.0", port=5000)
+    app.run(debug=True, port=5000)
