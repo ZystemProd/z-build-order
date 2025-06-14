@@ -154,9 +154,8 @@ def upload():
         entries = []
 
         for event in replay.events:
-            # keep the very first Train/Build command so the timestamps
-            # match the in-game build-order; ignore only the pre-game countdown
-            if event.second < 1:
+            # keep 0-second “Train …” commands; skip only the -3…-1 countdown
+            if event.second < 0:
                 continue
             etype = None
             name = None
@@ -261,13 +260,18 @@ def upload():
             seconds = game_sec % 60
             timestamp = f"{minutes:02d}:{seconds:02d}"
 
-            if entries and entries[-1]['supply'] == supply_used and entries[-1]['unit'] == name:
-                # We have both the command and the completion – keep the EARLIEST
-                # timestamp so our output shows the order time.
-                entries[-1]['count'] += 1
-                if game_sec < entries[-1]['secs']:           # keep earliest
-                    entries[-1]['secs'] = game_sec
-                    entries[-1]['time'] = timestamp
+            if (entries
+                and entries[-1]['unit'] == name
+                and abs(supply_used - entries[-1]['supply']) <= 1):  # command vs completion
+                prev = entries[-1]
+                prev['count'] += 1
+                # keep the EARLIEST time stamp …
+                if game_sec < prev['secs']:
+                    prev['secs'] = game_sec
+                    prev['time'] = timestamp
+                # … and the LARGER supply (after the unit pops out)
+                if supply_used > prev['supply']:
+                    prev['supply'] = supply_used
             else:
                 entries.append({'supply': supply_used, 'made': supply_made, 'time': timestamp, 'secs': game_sec, 'unit': name, 'count': 1})
 
