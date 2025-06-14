@@ -1,70 +1,71 @@
 # ──────────────────────────────────────────────────────────────────────
-#  SC2 Replay Parser – game-time-accurate build-order extraction
-#  (safe even if you don’t have name_map.py)
+#  StarCraft II replay parser – game-time-accurate build order
 # ──────────────────────────────────────────────────────────────────────
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import sc2reader
-import io
-import bisect
-import re
+import io, bisect, re, os
 
-# ---- optional prettifying of internal unit names --------------------
+# Optional prettified names — omit the file and we fall back gracefully
 try:
-    from name_map import NAME_MAP        # your own dict {'spawningpool':'Spawning Pool', …}
+    from name_map import NAME_MAP        # {'spawningpool': 'Spawning Pool', …}
 except ImportError:
-    NAME_MAP = {}                        # fall back to “as-is” names
+    NAME_MAP = {}
 
-app = Flask(__name__)
-CORS(app)
-
-# ─────────────────────────── helpers ─────────────────────────────────
-def format_name(name: str) -> str:
-    """Convert internal names (SpawningPool) → 'Spawning Pool'."""
-    if not name:
-        return name
-    lower = name.lower()
+# ───────────────────────── helpers ───────────────────────────────────
+def format_name(raw: str) -> str:
+    """'SpawningPool' → 'Spawning Pool' (or custom NAME_MAP entry)."""
+    if not raw:
+        return raw
+    lower = raw.lower()
     if lower in NAME_MAP:
         return NAME_MAP[lower]
-    # insert space before capitals and title-case
-    return re.sub(r"(?<!^)(?=[A-Z])", " ", name).title()
+    return re.sub(r"(?<!^)(?=[A-Z])", " ", raw).title()
 
 
 def sec2clock(sec: int) -> str:
-    """42 → '00:42' (game seconds)."""
     return f"{sec // 60:02d}:{sec % 60:02d}"
 
 
-# ─────────────────────────── routes ──────────────────────────────────
+# ───────────────────────── Flask app ─────────────────────────────────
+app = Flask(__name__)
+CORS(app)
+
+
 @app.route("/")
-def index():
-    return "🟢 SC2 Replay Parser is live!"
+def root():
+    return "🟢 SC2 replay parser running"
 
 
+# ---------------------------------------------------------------------
+#   /players  – quick endpoint to list players & matchup
+# ---------------------------------------------------------------------
 @app.route("/players", methods=["POST"])
 def players():
-    if "replay" not in request.files or request.files["replay"].filename == "":
+    if "replay" not in request.files or not request.files["replay"].filename:
         return "No replay uploaded", 400
 
-    replay = sc2reader.load_replay(
-        io.BytesIO(request.files["replay"].read()), load_map=False
-    )
-    players = [p for p in replay.players if not p.is_observer]
+    replay = sc2reader.load_replay(io.BytesIO(request.files["replay"].read()),
+                                   load_map=False)
+    roster = [p for p in replay.players if not p.is_observer]
+    info = [{"pid": p.pid, "name": p.name, "race": p.play_race} for p in roster]
 
-    info = [{"pid": p.pid, "name": p.name, "race": p.play_race} for p in players]
     matchup = None
-    if len(players) >= 2:
-        a, b = players[0].play_race[0].lower(), players[1].play_race[0].lower()
+    if len(roster) >= 2:
+        a, b = roster[0].play_race[0].lower(), roster[1].play_race[0].lower()
         matchup = f"{a}v{b}"
+
     return jsonify({"players": info, "matchup": matchup})
 
 
+# ---------------------------------------------------------------------
+#   /upload  – main build-order extraction
+# ---------------------------------------------------------------------
 @app.route("/upload", methods=["POST"])
 def upload():
-    if "replay" not in request.files or request.files["replay"].filename == "":
+    if "replay" not in request.files or not request.files["replay"].filename:
         return "No replay uploaded", 400
 
-    # ── load replay ──────────────────────────────────────────────────
     try:
         replay = sc2reader.load_replay(
             io.BytesIO(request.files["replay"].read()), load_map=False
@@ -72,76 +73,55 @@ def upload():
     except Exception as e:
         return f"Failed to load replay: {e}", 400
 
-    # choose player (first by default or ?player= / form field)
-    players = [p for p in replay.players if not p.is_observer]
-    if not players:
-        return "No players in replay", 400
-    requested = request.form.get("player") or request.args.get("player")
-    player = next(
-        (p for p in players if str(p.pid) == requested or p.name == requested),
-        players[0],
-    )
+    # ───── select player (default: first non-observer) ───────────────
+    contenders = [p for p in replay.players if not p.is_observer]
+    if not contenders:
+        return "No active players", 400
 
-    # optional filters
-    exclude_workers = (
-        (request.form.get("exclude_workers", "") or "").lower()
-        in {"1", "true", "yes", "on"}
-    )
-    exclude_supply = (
-        (request.form.get("exclude_supply", "") or "").lower()
-        in {"1", "true", "yes", "on"}
-    )
-    exclude_time = (
-        (request.form.get("exclude_time", "") or "").lower()
-        in {"1", "true", "yes", "on"}
-    )
-    compact = (
-        (request.form.get("compact", "") or "").lower() in {"1", "true", "yes", "on"}
-    )
-    stop_limit = int(request.form.get("stop_supply", 0) or 0) or None
-    time_limit = int(request.form.get("stop_time", 0) or 0) * 60 or None
+    req = request.form.get("player") or request.args.get("player")
+    player = next((p for p in contenders if str(p.pid) == req or p.name == req),
+                  contenders[0])
 
-    # ── supply lookup table from PlayerStatsEvents ───────────────────
-    supply_events = {}
+    # ───── optional query-string / form toggles ──────────────────────
+    def truthy(val): return (val or "").lower() in {"1", "true", "yes", "on"}
+
+    exclude_workers = truthy(request.values.get("exclude_workers"))
+    exclude_supply  = truthy(request.values.get("exclude_supply"))
+    exclude_time    = truthy(request.values.get("exclude_time"))
+    compact         = truthy(request.values.get("compact"))
+
+    stop_limit = int(request.values.get("stop_supply", 0) or 0) or None
+    time_limit = int(request.values.get("stop_time", 0) or 0) * 60 or None
+
+    # ───── supply lookup (PlayerStatsEvent) ──────────────────────────
+    supply_events, order = {}, []
     for ev in replay.tracker_events:
-        if (
-            isinstance(ev, sc2reader.events.tracker.PlayerStatsEvent)
-            and ev.pid == player.pid
-        ):
+        if isinstance(ev, sc2reader.events.tracker.PlayerStatsEvent) and ev.pid == player.pid:
             supply_events[ev.second] = (int(ev.food_used), int(ev.food_made))
     supply_times = sorted(supply_events)
 
-    def get_supply(sec: int):
+    def supply_at(sec: int):
         if not supply_times:
-            return (0, 0)
+            return 0, 0
         idx = bisect.bisect_right(supply_times, sec) - 1
         return supply_events[supply_times[idx]] if idx >= 0 else (0, 0)
 
-    # ── filters ──────────────────────────────────────────────────────
+    # ───── filters ───────────────────────────────────────────────────
     skip_units = {
-        "Egg",
-        "Larva",
-        "Overlord Cocoon",
-        "Mule",
-        "M U L E",
-        "Scanner Sweep",
-        "Kd8Charge",
-        "KD8Charge",
-        "Broodling",
-        "Changeling",
+        "Egg", "Larva", "Overlord Cocoon", "Broodling", "Changeling",
+        "Mule", "M U L E", "Scanner Sweep", "Kd8Charge", "KD8Charge"
     }
     if exclude_workers:
-        skip_units.update({"Drone", "Probe", "SCV"})
-    skip_keywords = {"creep tumor", "chronoboost", "phase shift", "reward", "dance"}
+        skip_units |= {"Probe", "SCV", "Drone"}
+    skip_kw = {"creep tumor", "chronoboost", "phase shift", "reward", "dance"}
 
-    # ── build-order extraction ───────────────────────────────────────
-    entries = []
+    # ───── build-order extraction ────────────────────────────────────
     for ev in replay.tracker_events:
-        # skip the −3…−1 countdown; keep 0-second “Train Probe” orders
+        # ignore pre-game countdown (-3 … -1)
         if ev.second < 0:
             continue
 
-        # ignore pre-placed starting buildings / units at 0 : 00
+        # drop starting assets logged at 0:00
         if ev.second == 0 and isinstance(
             ev,
             (
@@ -152,115 +132,97 @@ def upload():
         ):
             continue
 
-        etype, raw_name = None, None
+        etype = raw = None
 
-        # workers finish on UnitBornEvent
+        # units finish on UnitBornEvent
         if isinstance(ev, sc2reader.events.tracker.UnitBornEvent):
-            if ev.unit_controller.pid != player.pid:
+            ctrl = getattr(ev, "unit_controller", None)
+            if not ctrl or ctrl.pid != player.pid:
                 continue
-            etype, raw_name = "unit", ev.unit_type_name
+            etype, raw = "unit", ev.unit_type_name
 
         # buildings finish on UnitDoneEvent
         elif isinstance(ev, sc2reader.events.tracker.UnitDoneEvent):
-            if ev.unit_controller.pid != player.pid:
+            ctrl = getattr(ev, "unit_controller", None)
+            if not ctrl or ctrl.pid != player.pid:
                 continue
-            etype, raw_name = "building", ev.unit_type_name
+            etype, raw = "building", ev.unit_type_name
 
         # upgrades finish on UpgradeCompleteEvent
         elif isinstance(ev, sc2reader.events.tracker.UpgradeCompleteEvent):
             if ev.pid != player.pid:
                 continue
-            etype, raw_name = "upgrade", ev.upgrade_type_name
+            etype, raw = "upgrade", ev.upgrade_type_name
 
-        else:  # ignore command, cancel, morph, etc.
-            continue
+        else:
+            continue  # skip all other events
 
         # universal skips
         if (
-            not raw_name
-            or raw_name in skip_units
-            or raw_name.lower() in skip_keywords
-            or any(k in raw_name for k in ("Beacon", "Spray"))
+            not raw
+            or raw in skip_units
+            or raw.lower() in skip_kw
+            or any(k in raw for k in ("Beacon", "Spray"))
         ):
             continue
 
-        name = format_name(raw_name)
+        name = format_name(raw)
+        used, cap = supply_at(ev.second)
 
-        # supply at this second
-        used, cap = get_supply(ev.second)
-
-        # stop limits
-        if stop_limit is not None and used > stop_limit:
+        if stop_limit and used > stop_limit:
             break
-        if time_limit is not None and ev.second > time_limit:
+        if time_limit and ev.second > time_limit:
             break
 
-        entries.append(
+        order.append(
             {
-                "secs": ev.second,
-                "time": sec2clock(ev.second),
+                "secs":   ev.second,
+                "time":   sec2clock(ev.second),
                 "supply": used,
-                "cap": cap,
-                "unit": name,
+                "cap":    cap,
+                "unit":   name,
             }
         )
 
-    # ── format output (compact vs full) ──────────────────────────────
+    # ───── output formatting ─────────────────────────────────────────
     lines = []
     if compact:
-        i, n = 0, len(entries)
+        i, n = 0, len(order)
         while i < n:
-            first = entries[i]
-            supply, start = first["supply"], first["secs"]
+            first = order[i]
+            sup, t0 = first["supply"], first["secs"]
             units, j = [], i
-            while (
-                j < n
-                and entries[j]["supply"] == supply
-                and entries[j]["secs"] - start <= 5
-            ):
-                units.append(entries[j]["unit"])
+            while j < n and order[j]["supply"] == sup and order[j]["secs"] - t0 <= 5:
+                units.append(order[j]["unit"])
                 j += 1
             prefix = ""
             if not exclude_supply:
-                supply_str = (
-                    f"{supply}/{first['cap']}"
-                    if supply > first["cap"]
-                    else str(supply)
-                )
-                prefix += f"[{supply_str}] "
+                prefix += f"[{sup}/{first['cap'] if sup > first['cap'] else sup}] "
             if not exclude_time:
-                prefix += f"[{sec2clock(start)}] "
+                prefix += f"[{sec2clock(t0)}] "
             lines.append(prefix + " + ".join(units))
             i = j
     else:
-        for e in entries:
-            parts = []
+        for e in order:
+            pieces = []
             if not exclude_supply:
-                supply_str = (
-                    f"{e['supply']}/{e['cap']}"
-                    if e["supply"] > e["cap"]
-                    else str(e["supply"])
+                pieces.append(
+                    f"{e['supply']}/{e['cap']}" if e["supply"] > e["cap"] else str(e["supply"])
                 )
-                parts.append(supply_str)
             if not exclude_time:
-                parts.append(e["time"])
-            prefix = f"[{' '.join(parts)}] " if parts else ""
+                pieces.append(e["time"])
+            prefix = f"[{' '.join(pieces)}] " if pieces else ""
             lines.append(prefix + e["unit"])
 
     return "\n".join(lines), 200
 
 
-# ─────────────────────────── main (Render) ───────────────────────────
+# ───────────────────────── production entrypoint ─────────────────────
 if __name__ == "__main__":
-    import os
+    PORT = int(os.environ.get("PORT", 5000))  # Render sets $PORT
 
-    port = int(os.environ.get("PORT", 5000))   # Render sets $PORT
-
-    # Use waitress (production-ready) if available, otherwise fallback to Flask
     try:
         from waitress import serve
-
-        serve(app, host="0.0.0.0", port=port)
+        serve(app, host="0.0.0.0", port=PORT)
     except ImportError:
-        # Dev / local: Flask’s built-in server
-        app.run(host="0.0.0.0", port=port)
+        app.run(host="0.0.0.0", port=PORT, debug=True)
