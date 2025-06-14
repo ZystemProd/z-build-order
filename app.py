@@ -134,11 +134,13 @@ def upload():
         skip_units_lower = {s.lower() for s in skip_units}
         # Skip any creep tumor variants or chrono boost abilities
         skip_keywords = [
-            "Creep Tumor",
-            "CreepTumor",
-            "Chrono",
-            "Phase Shift",
-            "PhaseShift",
+             "Creep Tumor",
+             "CreepTumor",
+             "Chrono",
+             "Phase Shift",
+             "PhaseShift",
+            "reward",
+            "dance",
         ]
         if exclude_workers:
             skip_units.update({"Drone", "Probe", "SCV"})
@@ -154,8 +156,19 @@ def upload():
         entries = []
 
         for event in replay.events:
-            # keep 0-second “Train …” commands; skip only the -3…-1 countdown
+            # ── skip the -3…-1 countdown ───────────────────────────────
             if event.second < 0:
+                 continue
+            # ── skip all starting units/buildings shown at 0 : 00 ─────
+            if event.second == 0 and isinstance(
+                event,
+                (
+                    sc2reader.events.tracker.UnitBornEvent,
+                    sc2reader.events.tracker.UnitInitEvent,
+                    sc2reader.events.tracker.UpgradeCompleteEvent,
+                ),
+            ):
+                continue
                 continue
             etype = None
             name = None
@@ -176,6 +189,9 @@ def upload():
                     (ability.name if ability and ability.name else None)
                     or getattr(event, "ability_name", "")
                 )
+                                # Ignore Blizzard “Reward Dance …” achievement spam
+                if ability_name.startswith("Reward") or "Reward" in ability_name or "Dance" in ability_name:
+                    continue
                 if ability_name.startswith("Cancel"):
                     continue
 
