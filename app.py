@@ -1,20 +1,21 @@
-# ──────────────────────────────────────────────────────────────────────
-#  StarCraft II replay parser – game-time-accurate build order
-# ──────────────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────────
+#  StarCraft II replay parser – shows the exact build-order times
+#  you see in the SC2 match-history panel (command start times).
+# ────────────────────────────────────────────────────────────────────
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import sc2reader
 import io, bisect, re, os
 
-# Optional prettified names — omit the file and we fall back gracefully
+# Optional pretty names — if name_map.py is missing we fall back safely
 try:
-    from name_map import NAME_MAP        # {'spawningpool': 'Spawning Pool', …}
+    from name_map import NAME_MAP          # {"spawningpool": "Spawning Pool", ...}
 except ImportError:
     NAME_MAP = {}
 
-# ───────────────────────── helpers ───────────────────────────────────
-def format_name(raw: str) -> str:
-    """'SpawningPool' → 'Spawning Pool' (or custom NAME_MAP entry)."""
+# ── helpers ─────────────────────────────────────────────────────────
+def pretty(raw: str) -> str:
+    """'SpawningPool' → 'Spawning Pool' (or NAME_MAP entry)."""
     if not raw:
         return raw
     lower = raw.lower()
@@ -23,11 +24,15 @@ def format_name(raw: str) -> str:
     return re.sub(r"(?<!^)(?=[A-Z])", " ", raw).title()
 
 
-def sec2clock(sec: int) -> str:
+def clock(sec: int) -> str:                # 42 → "00:42"
     return f"{sec // 60:02d}:{sec % 60:02d}"
 
 
-# ───────────────────────── Flask app ─────────────────────────────────
+def truthy(val) -> bool:                   # "1", "true", "Yes" → True
+    return (val or "").lower() in {"1", "true", "yes", "on"}
+
+
+# ── Flask app ───────────────────────────────────────────────────────
 app = Flask(__name__)
 CORS(app)
 
@@ -37,64 +42,59 @@ def root():
     return "🟢 SC2 replay parser running"
 
 
-# ---------------------------------------------------------------------
-#   /players  – quick endpoint to list players & matchup
-# ---------------------------------------------------------------------
+# -------------------------------------------------------------------
+#  /players  – quick list of players & matchup
+# -------------------------------------------------------------------
 @app.route("/players", methods=["POST"])
 def players():
-    if "replay" not in request.files or not request.files["replay"].filename:
+    f = request.files.get("replay")
+    if not f or not f.filename:
         return "No replay uploaded", 400
 
-    replay = sc2reader.load_replay(io.BytesIO(request.files["replay"].read()),
-                                   load_map=False)
+    replay = sc2reader.load_replay(io.BytesIO(f.read()), load_map=False)
     roster = [p for p in replay.players if not p.is_observer]
-    info = [{"pid": p.pid, "name": p.name, "race": p.play_race} for p in roster]
+    info   = [{"pid": p.pid, "name": p.name, "race": p.play_race} for p in roster]
 
     matchup = None
     if len(roster) >= 2:
         a, b = roster[0].play_race[0].lower(), roster[1].play_race[0].lower()
         matchup = f"{a}v{b}"
-
     return jsonify({"players": info, "matchup": matchup})
 
 
-# ---------------------------------------------------------------------
-#   /upload  – main build-order extraction
-# ---------------------------------------------------------------------
+# -------------------------------------------------------------------
+#  /upload  – the main build-order endpoint
+# -------------------------------------------------------------------
 @app.route("/upload", methods=["POST"])
 def upload():
-    if "replay" not in request.files or not request.files["replay"].filename:
+    f = request.files.get("replay")
+    if not f or not f.filename:
         return "No replay uploaded", 400
 
     try:
-        replay = sc2reader.load_replay(
-            io.BytesIO(request.files["replay"].read()), load_map=False
-        )
+        replay = sc2reader.load_replay(io.BytesIO(f.read()), load_map=False)
     except Exception as e:
         return f"Failed to load replay: {e}", 400
 
-    # ───── select player (default: first non-observer) ───────────────
+    # ── choose player ───────────────────────────────────────────────
     contenders = [p for p in replay.players if not p.is_observer]
     if not contenders:
         return "No active players", 400
 
-    req = request.form.get("player") or request.args.get("player")
+    req   = request.values.get("player")
     player = next((p for p in contenders if str(p.pid) == req or p.name == req),
                   contenders[0])
 
-    # ───── optional query-string / form toggles ──────────────────────
-    def truthy(val): return (val or "").lower() in {"1", "true", "yes", "on"}
+    # ── optional flags / limits ─────────────────────────────────────
+    excl_workers = truthy(request.values.get("exclude_workers"))
+    excl_supply  = truthy(request.values.get("exclude_supply"))
+    excl_time    = truthy(request.values.get("exclude_time"))
+    compact      = truthy(request.values.get("compact"))
+    stop_supply  = int(request.values.get("stop_supply", 0) or 0) or None
+    stop_time    = int(request.values.get("stop_time" , 0) or 0) * 60 or None
 
-    exclude_workers = truthy(request.values.get("exclude_workers"))
-    exclude_supply  = truthy(request.values.get("exclude_supply"))
-    exclude_time    = truthy(request.values.get("exclude_time"))
-    compact         = truthy(request.values.get("compact"))
-
-    stop_limit = int(request.values.get("stop_supply", 0) or 0) or None
-    time_limit = int(request.values.get("stop_time", 0) or 0) * 60 or None
-
-    # ───── supply lookup (PlayerStatsEvent) ──────────────────────────
-    supply_events, order = {}, []
+    # ── supply lookup from PlayerStatsEvent ─────────────────────────
+    supply_events = {}
     for ev in replay.tracker_events:
         if isinstance(ev, sc2reader.events.tracker.PlayerStatsEvent) and ev.pid == player.pid:
             supply_events[ev.second] = (int(ev.food_used), int(ev.food_made))
@@ -106,85 +106,72 @@ def upload():
         idx = bisect.bisect_right(supply_times, sec) - 1
         return supply_events[supply_times[idx]] if idx >= 0 else (0, 0)
 
-    # ───── filters ───────────────────────────────────────────────────
+    # ── skip lists ──────────────────────────────────────────────────
     skip_units = {
         "Egg", "Larva", "Overlord Cocoon", "Broodling", "Changeling",
         "Mule", "M U L E", "Scanner Sweep", "Kd8Charge", "KD8Charge"
     }
-    if exclude_workers:
+    if excl_workers:
         skip_units |= {"Probe", "SCV", "Drone"}
-    skip_kw = {"creep tumor", "chronoboost", "phase shift", "reward", "dance"}
 
-    # ───── build-order extraction ────────────────────────────────────
-    for ev in replay.tracker_events:
-        # ignore pre-game countdown (-3 … -1)
+    skip_keywords = {"creep tumor", "chronoboost", "phase shift",
+                     "reward", "dance"}
+
+    def clean_ability(name: str) -> str:
+        """Strip 'Train ', 'Build Protoss ', 'WarpIn ', etc."""
+        prefixes = (
+            "Train ", "WarpIn ", "Warp In ", "Build Protoss ",
+            "Build Terran ", "Build Zerg ", "Build ", "Research ", "Morph ",
+            "Upgrade to "
+        )
+        for p in prefixes:
+            if name.startswith(p):
+                return name[len(p):]
+        return name
+
+    # ── build-order extraction (command start times) ────────────────
+    order = []
+    for ev in replay.game_events:          # DataCommand / TargetUnitCommand live here
+        # ignore pre-game countdown (-3 .. -1)
         if ev.second < 0:
             continue
-
-        # drop starting assets logged at 0:00
-        if ev.second == 0 and isinstance(
-            ev,
-            (
-                sc2reader.events.tracker.UnitBornEvent,
-                sc2reader.events.tracker.UnitInitEvent,
-                sc2reader.events.tracker.UpgradeCompleteEvent,
-            ),
-        ):
+        # we only want the player's commands
+        if ev.pid != player.pid:
+            continue
+        if not isinstance(ev, (sc2reader.events.game.DataCommandEvent,
+                               sc2reader.events.game.TargetUnitCommandEvent)):
             continue
 
-        etype = raw = None
+        ability = getattr(ev, "ability", None)
+        ab_name = (ability.name if ability and ability.name else
+                   getattr(ev, "ability_name", ""))
 
-        # units finish on UnitBornEvent
-        if isinstance(ev, sc2reader.events.tracker.UnitBornEvent):
-            ctrl = getattr(ev, "unit_controller", None)
-            if not ctrl or ctrl.pid != player.pid:
-                continue
-            etype, raw = "unit", ev.unit_type_name
-
-        # buildings finish on UnitDoneEvent
-        elif isinstance(ev, sc2reader.events.tracker.UnitDoneEvent):
-            ctrl = getattr(ev, "unit_controller", None)
-            if not ctrl or ctrl.pid != player.pid:
-                continue
-            etype, raw = "building", ev.unit_type_name
-
-        # upgrades finish on UpgradeCompleteEvent
-        elif isinstance(ev, sc2reader.events.tracker.UpgradeCompleteEvent):
-            if ev.pid != player.pid:
-                continue
-            etype, raw = "upgrade", ev.upgrade_type_name
-
-        else:
-            continue  # skip all other events
-
-        # universal skips
-        if (
-            not raw
-            or raw in skip_units
-            or raw.lower() in skip_kw
-            or any(k in raw for k in ("Beacon", "Spray"))
-        ):
+        if not ab_name or ab_name.startswith("Cancel"):
+            continue
+        lb = ab_name.lower()
+        if any(kw in lb for kw in skip_keywords):
             continue
 
-        name = format_name(raw)
+        unit_name = clean_ability(ab_name)
+        if unit_name in skip_units or unit_name.lower() in skip_units:
+            continue
+
         used, cap = supply_at(ev.second)
 
-        if stop_limit and used > stop_limit:
+        if stop_supply and used > stop_supply:
             break
-        if time_limit and ev.second > time_limit:
+        if stop_time and ev.second > stop_time:
             break
 
-        order.append(
-            {
-                "secs":   ev.second,
-                "time":   sec2clock(ev.second),
-                "supply": used,
-                "cap":    cap,
-                "unit":   name,
-            }
-        )
+        order.append({
+            "secs":   ev.second,
+            "time":   clock(ev.second),
+            "supply": used,
+            "cap":    cap,
+            "unit":   pretty(unit_name),
+        })
 
-    # ───── output formatting ─────────────────────────────────────────
+    # ── format output ───────────────────────────────────────────────
     lines = []
     if compact:
         i, n = 0, len(order)
@@ -196,33 +183,31 @@ def upload():
                 units.append(order[j]["unit"])
                 j += 1
             prefix = ""
-            if not exclude_supply:
+            if not excl_supply:
                 prefix += f"[{sup}/{first['cap'] if sup > first['cap'] else sup}] "
-            if not exclude_time:
-                prefix += f"[{sec2clock(t0)}] "
+            if not excl_time:
+                prefix += f"[{clock(t0)}] "
             lines.append(prefix + " + ".join(units))
             i = j
     else:
         for e in order:
-            pieces = []
-            if not exclude_supply:
-                pieces.append(
-                    f"{e['supply']}/{e['cap']}" if e["supply"] > e["cap"] else str(e["supply"])
-                )
-            if not exclude_time:
-                pieces.append(e["time"])
-            prefix = f"[{' '.join(pieces)}] " if pieces else ""
+            parts = []
+            if not excl_supply:
+                parts.append(f"{e['supply']}/{e['cap']}" if e['supply'] > e['cap'] else str(e['supply']))
+            if not excl_time:
+                parts.append(e["time"])
+            prefix = f"[{' '.join(parts)}] " if parts else ""
             lines.append(prefix + e["unit"])
 
     return "\n".join(lines), 200
 
 
-# ───────────────────────── production entrypoint ─────────────────────
+# ───────────────────────── production entrypoint ────────────────────
 if __name__ == "__main__":
-    PORT = int(os.environ.get("PORT", 5000))  # Render sets $PORT
+    PORT = int(os.environ.get("PORT", 5000))      # Render passes $PORT
 
     try:
-        from waitress import serve
+        from waitress import serve                # Production WSGI
         serve(app, host="0.0.0.0", port=PORT)
-    except ImportError:
+    except ImportError:                           # Local dev fallback
         app.run(host="0.0.0.0", port=PORT, debug=True)
