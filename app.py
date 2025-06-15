@@ -4,7 +4,6 @@ import sc2reader
 import io
 import bisect
 import re
-from sc2reader.constants import GAME_SPEED_FACTOR
 from name_map import NAME_MAP
 
 app = Flask(__name__)
@@ -145,14 +144,8 @@ def upload():
 
 
 
-        # ``event.second`` is reported in real-time seconds. Convert it to the
-        # in-game clock using the replay's speed factor. LotV replays on
-        # "Faster" still require a 1.4x adjustment to match the in-game timer.
-        speed_factor = GAME_SPEED_FACTOR.get(replay.expansion, {}).get(
-            replay.speed, 1.0
-        )
-        if replay.expansion == "LotV" and replay.speed == "Faster" and speed_factor == 1.0:
-            speed_factor = 1.4
+        # ``event.second`` already reflects the in-game timer, so no
+        # additional speed adjustment is required.
 
         entries = []
 
@@ -169,11 +162,11 @@ def upload():
                     sc2reader.events.game.TargetUnitCommandEvent,
                 ),
             ):
-                # Commands represent the start of a unit/structure or upgrade
+                # Commands represent the start of a unit or upgrade
                 if event.pid != player.pid:
                     continue
-                ability = getattr(event, "ability", None)
 
+                ability = getattr(event, "ability", None)
                 ability_name = (
                     (ability.name if ability and ability.name else None)
                     or getattr(event, "ability_name", "")
@@ -181,49 +174,34 @@ def upload():
                 if ability_name.startswith("Cancel"):
                     continue
 
-                if ability and ability.is_build and ability.build_unit:
-
-                    unit = ability.build_unit
-                    etype = "building" if unit.is_building else "unit"
-                    name = unit.name
+                for prefix in (
+                    "Train ",
+                    "Warp In ",
+                    "Warp ",
+                    "Morph ",
+                ):
+                    if ability_name.startswith(prefix):
+                        name = ability_name[len(prefix) :]
+                        etype = "unit"
+                        break
                 else:
+                    for prefix in (
+                        "Research ",
+                        "Upgrade ",
+                        "UpgradeTo ",
+                        "MorphTo ",
+                        "TransformTo ",
+                        "Transform ",
+                    ):
+                        if ability_name.startswith(prefix):
+                            name = ability_name[len(prefix) :]
+                            etype = "upgrade"
+                            break
 
-                    # Fall back to parsing the ability name for known prefixes
-                    lowered = ability_name.lower()
-                    if "train" in ability_name:
-                        name = ability_name.split("Train")[-1]
-                        etype = "unit"
-                    elif lowered.startswith("warp") and "train" in ability_name:
-                        name = ability_name.split("Train")[-1]
-                        etype = "unit"
-                    elif lowered.startswith("build"):
-                        name = ability_name[len("Build") :]
-                        etype = "building"
-                    else:
-                        for prefix in (
-                            "Research",
-                            "UpgradeTo",
-                            "Upgrade",
-                            "MorphTo",
-                            "Morph",
-                            "TransformTo",
-                            "Transform",
-                        ):
-                            if ability_name.startswith(prefix):
-                                name = ability_name[len(prefix) :]
-                                etype = "upgrade"
-                                break
-
-
-            elif isinstance(event, sc2reader.events.tracker.UnitBornEvent):
-                etype = "unit"
-                name = event.unit_type_name
             elif isinstance(event, sc2reader.events.tracker.UnitInitEvent):
+                # Buildings begin construction
                 etype = "building"
                 name = event.unit_type_name
-            elif isinstance(event, sc2reader.events.tracker.UpgradeCompleteEvent):
-                etype = "upgrade"
-                name = event.upgrade_type_name
             else:
                 continue
 
@@ -247,8 +225,8 @@ def upload():
             elif ln.startswith("evolve "):
                 name = name[7:]
 
-            # Convert real-time seconds to in-game seconds
-            game_sec = int(event.second / speed_factor)
+            # ``event.second`` is already in game seconds
+            game_sec = int(event.second)
 
 
             if time_limit is not None and game_sec > time_limit:
