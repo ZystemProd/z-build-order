@@ -4,11 +4,24 @@ import sc2reader
 import io
 import bisect
 import re
-from sc2reader.constants import GAME_SPEED_FACTOR
 from name_map import NAME_MAP
 
 app = Flask(__name__)
 CORS(app)
+
+
+@app.after_request
+def add_csp(resp):
+    """Inject Content Security Policy headers."""
+    resp.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' https://www.googletagmanager.com https://www.gstatic.com https://apis.google.com; "
+        "style-src 'self' 'unsafe-inline'; "
+        "connect-src 'self' https://*.googleapis.com https://www.google-analytics.com https://region1.google-analytics.com https://z-build-order.onrender.com; "
+        "img-src 'self' data: https://www.google.com https://*.googleusercontent.com; "
+        "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://z-build-order.firebaseapp.com;"
+    )
+    return resp
 
 
 def format_name(name: str) -> str:
@@ -145,16 +158,11 @@ def upload():
 
 
 
-        # ``event.second`` is reported in real-time seconds. Convert it to the
-        # in-game clock using the replay's speed factor. LotV replays on
-        # "Faster" still require a 1.4x adjustment to match the in-game timer.
-        speed_factor = GAME_SPEED_FACTOR.get(replay.expansion, {}).get(
-            replay.speed, 1.0
-        )
-        if replay.expansion == "LotV" and replay.speed == "Faster" and speed_factor == 1.0:
-            speed_factor = 1.4
+        # ``event.second`` already reflects the in-game timer, so no
+        # additional speed adjustment is required.
 
         entries = []
+        build_command_times = {}
 
         for event in replay.events:
             if event.second == 0:
@@ -169,61 +177,67 @@ def upload():
                     sc2reader.events.game.TargetUnitCommandEvent,
                 ),
             ):
-                # Commands represent the start of a unit/structure or upgrade
+                # Commands mark the beginning of unit, building, or upgrade production
                 if event.pid != player.pid:
                     continue
-                ability = getattr(event, "ability", None)
 
+                ability = getattr(event, "ability", None)
                 ability_name = (
                     (ability.name if ability and ability.name else None)
                     or getattr(event, "ability_name", "")
                 )
-                if ability_name.startswith("Cancel"):
+                if not ability_name or ability_name.startswith("Cancel"):
                     continue
 
-                if ability and ability.is_build and ability.build_unit:
+                sanitized = ability_name.replace(" ", "")
+                lowered = sanitized.lower()
 
+                if ability and ability.build_unit:
+                    # Ability metadata knows exactly which unit is created
                     unit = ability.build_unit
                     etype = "building" if unit.is_building else "unit"
                     name = unit.name
+                    if unit.is_building:
+                        build_command_times.setdefault(name.lower(), []).append(event.second)
                 else:
+                    # Fallback to prefix checks on ability name
+                    prefix_map = {
+                        "build": "building",
+                        "train": "unit",
+                        "warpin": "unit",
+                        "warp": "unit",
+                        "morph": "unit",
+                        "research": "upgrade",
+                        "upgrade": "upgrade",
+                        "upgradeto": "upgrade",
+                        "morphto": "upgrade",
+                        "transformto": "upgrade",
+                        "transform": "upgrade",
+                    }
 
-                    # Fall back to parsing the ability name for known prefixes
-                    lowered = ability_name.lower()
-                    if "train" in ability_name:
-                        name = ability_name.split("Train")[-1]
-                        etype = "unit"
-                    elif lowered.startswith("warp") and "train" in ability_name:
-                        name = ability_name.split("Train")[-1]
-                        etype = "unit"
-                    elif lowered.startswith("build"):
-                        name = ability_name[len("Build") :]
-                        etype = "building"
-                    else:
-                        for prefix in (
-                            "Research",
-                            "UpgradeTo",
-                            "Upgrade",
-                            "MorphTo",
-                            "Morph",
-                            "TransformTo",
-                            "Transform",
-                        ):
-                            if ability_name.startswith(prefix):
-                                name = ability_name[len(prefix) :]
-                                etype = "upgrade"
-                                break
+                    matched = False
+                    for prefix, et in prefix_map.items():
+                        if lowered.startswith(prefix):
+                            name = sanitized[len(prefix):]
+                            etype = et
+                            matched = True
+                            if et == "building":
+                                build_command_times.setdefault(name.lower(), []).append(event.second)
+                            break
 
+                    if not matched:
+                        continue
 
-            elif isinstance(event, sc2reader.events.tracker.UnitBornEvent):
-                etype = "unit"
-                name = event.unit_type_name
             elif isinstance(event, sc2reader.events.tracker.UnitInitEvent):
+                # Buildings begin construction
+                if (
+                    build_command_times.get(event.unit_type_name.lower())
+                    and event.second - build_command_times[event.unit_type_name.lower()][-1] <= 2
+                ):
+                    # Already captured by a build command event
+                    continue
                 etype = "building"
                 name = event.unit_type_name
-            elif isinstance(event, sc2reader.events.tracker.UpgradeCompleteEvent):
-                etype = "upgrade"
-                name = event.upgrade_type_name
             else:
                 continue
 
@@ -247,8 +261,8 @@ def upload():
             elif ln.startswith("evolve "):
                 name = name[7:]
 
-            # Convert real-time seconds to in-game seconds
-            game_sec = int(event.second / speed_factor)
+            # ``event.second`` is already in game seconds
+            game_sec = int(event.second)
 
 
             if time_limit is not None and game_sec > time_limit:
