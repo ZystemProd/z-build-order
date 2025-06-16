@@ -10,6 +10,20 @@ app = Flask(__name__)
 CORS(app)
 
 
+@app.after_request
+def add_csp(resp):
+    """Inject Content Security Policy headers."""
+    resp.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' https://www.googletagmanager.com https://www.gstatic.com https://apis.google.com; "
+        "style-src 'self' 'unsafe-inline'; "
+        "connect-src 'self' https://*.googleapis.com https://www.google-analytics.com https://region1.google-analytics.com https://z-build-order.onrender.com; "
+        "img-src 'self' data: https://www.google.com https://*.googleusercontent.com; "
+        "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://z-build-order.firebaseapp.com;"
+    )
+    return resp
+
+
 def format_name(name: str) -> str:
     """Convert internal names like 'SpawningPool' to 'Spawning Pool'."""
     if not name:
