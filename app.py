@@ -173,30 +173,38 @@ def upload():
                 )
                 if not ability_name or ability_name.startswith("Cancel"):
                     continue
-
-                unit_prefixes = ["Train ", "Warp In ", "Warp ", "Morph "]
                 upgrade_prefixes = [
-                    "Research ",
-                    "Upgrade ",
-                    "UpgradeTo ",
-                    "MorphTo ",
-                    "TransformTo ",
-                    "Transform ",
+                    "Research",
+                    "Upgrade",
+                    "UpgradeTo",
+                    "MorphTo",
+                    "TransformTo",
+                    "Transform",
                 ]
 
-                for prefix in unit_prefixes:
-                    if ability_name.startswith(prefix):
-                        name = ability_name[len(prefix) :]
-                        etype = "unit"
-                        break
+                if ability and ability.is_build and ability.build_unit:
+                    unit_obj = ability.build_unit
+                    if unit_obj.is_building:
+                        # Building start times come from UnitInitEvent
+                        continue
+                    etype = "unit"
+                    name = unit_obj.name
                 else:
-                    for prefix in upgrade_prefixes:
-                        if ability_name.startswith(prefix):
-                            name = ability_name[len(prefix) :]
-                            etype = "upgrade"
+                    cleaned = ability_name.replace(" ", "")
+                    unit_prefixes = ["Train", "WarpIn", "Warp", "Morph"]
+                    for prefix in unit_prefixes:
+                        if cleaned.startswith(prefix):
+                            name = ability_name[len(prefix) :].strip()
+                            etype = "unit"
                             break
                     else:
-                        continue
+                        for prefix in upgrade_prefixes:
+                            if ability_name.startswith(prefix):
+                                name = ability_name[len(prefix) :]
+                                etype = "upgrade"
+                                break
+                        else:
+                            continue
 
             elif isinstance(event, sc2reader.events.tracker.UnitInitEvent):
                 # Buildings begin construction
