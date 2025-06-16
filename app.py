@@ -65,6 +65,18 @@ def upload():
     try:
         # Loading without map reduces parsing time and avoids verbose output
         replay = sc2reader.load_replay(replay_data, load_map=False)
+        # Use s2protocol to lookup ability names when sc2reader lacks them
+        ability_lookup = {}
+        try:
+            import s2protocol.versions as versions
+            protocol = versions.build(replay.base_build)
+            if hasattr(protocol, "abil_lookup"):
+                ability_lookup = {
+                    (link, index): name
+                    for (link, index), name in protocol.abil_lookup.items()
+                }
+        except Exception as e:
+            print("s2protocol lookup failed:", e)
     except Exception as e:
         print("❌ Failed to load replay:", e)
         return f'Failed to load replay: {e}', 400
@@ -178,6 +190,10 @@ def upload():
                     (ability.name if ability and ability.name else None)
                     or getattr(event, "ability_name", "")
                 )
+                if not ability_name and ability_lookup:
+                    ability_name = ability_lookup.get(
+                        (event.ability_link, event.command_index), ""
+                    )
                 if ability_name.startswith("Cancel"):
                     continue
 

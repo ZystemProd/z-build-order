@@ -62,7 +62,7 @@ can toggle this in **Settings**:
 To parse StarCraft II replays locally you must run the Python service:
 
 ```bash
-pip install flask flask-cors sc2reader
+pip install flask flask-cors sc2reader s2protocol
 python app.py
 ```
 
