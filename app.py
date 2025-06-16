@@ -196,11 +196,7 @@ def upload():
                             etype = "upgrade"
                             break
                     else:
-                        if ability_name.startswith("Build "):
-                            name = ability_name[len("Build ") :]
-                            etype = "building"
-                        else:
-                            continue
+                        continue
 
             elif isinstance(event, sc2reader.events.tracker.UnitInitEvent):
                 # Buildings begin construction
