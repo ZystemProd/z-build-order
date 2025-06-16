@@ -192,7 +192,13 @@ def upload():
                 sanitized = ability_name.replace(" ", "")
                 lowered = sanitized.lower()
 
-                if lowered.startswith("build"):
+                if ability and ability.is_build and ability.build_unit:
+                    unit = ability.build_unit
+                    etype = "building" if unit.is_building else "unit"
+                    name = unit.name
+                    if unit.is_building:
+                        build_command_times.setdefault(name.lower(), []).append(event.second)
+                elif lowered.startswith("build"):
                     # Building construction begins with a build command
                     name = sanitized[len("Build"):]
                     etype = "building"
