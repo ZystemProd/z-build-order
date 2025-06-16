@@ -62,11 +62,15 @@ can toggle this in **Settings**:
 To parse StarCraft II replays locally you must run the Python service:
 
 ```bash
-pip install flask flask-cors sc2reader
+pip install flask flask-cors sc2reader s2protocol
 python app.py
 ```
 
 The server listens on http://localhost:5000. The frontend will send uploaded
 replays to `/upload` on that server and populate the **Build Order** text area
-with the parsed results.
+with the parsed results. Pass `debug=true` in the form data to receive a JSON
+response with a `build` string and `debug` lines indicating whether each entry
+came from a start or completion event. When this flag is set, the build lines
+themselves include `(start)` or `(born)` after each unit to show where the
+timestamp originated.
 

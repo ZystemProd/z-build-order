@@ -65,6 +65,18 @@ def upload():
     try:
         # Loading without map reduces parsing time and avoids verbose output
         replay = sc2reader.load_replay(replay_data, load_map=False)
+        # Use s2protocol to lookup ability names when sc2reader lacks them
+        ability_lookup = {}
+        try:
+            import s2protocol.versions as versions
+            protocol = versions.build(replay.base_build)
+            if hasattr(protocol, "abil_lookup"):
+                ability_lookup = {
+                    (link, index): abil
+                    for (link, index), abil in protocol.abil_lookup.items()
+                }
+        except Exception as e:
+            print("s2protocol lookup failed:", e)
     except Exception as e:
         print("❌ Failed to load replay:", e)
         return f'Failed to load replay: {e}', 400
@@ -92,6 +104,10 @@ def upload():
         compact = str(compact_flag).lower() in {'1', 'true', 'yes', 'on'}
         if compact:
             exclude_time = True
+
+        debug_flag = request.form.get('debug', request.args.get('debug', ''))
+        debug = str(debug_flag).lower() in {'1', 'true', 'yes', 'on'}
+        debug_lines = []
         stop_supply_raw = request.form.get('stop_supply')
         stop_time_raw = request.form.get('stop_time')
         stop_limit = None
@@ -161,6 +177,8 @@ def upload():
                 continue
             etype = None
             name = None
+            source = None
+            unit = None
 
             if isinstance(
                 event,
@@ -178,14 +196,28 @@ def upload():
                     (ability.name if ability and ability.name else None)
                     or getattr(event, "ability_name", "")
                 )
+                protocol_info = None
+                if not ability_name and ability_lookup:
+                    protocol_info = ability_lookup.get(
+                        (event.ability_link, event.command_index)
+                    )
+                    if protocol_info:
+                        ability_name = (
+                            protocol_info.get("buttonname")
+                            or protocol_info.get("friendlyname")
+                            or protocol_info.get("name", "")
+                        )
+                        event.ability_name = ability_name
+                        unit = protocol_info.get("build_unit")
                 if ability_name.startswith("Cancel"):
                     continue
 
-                if ability and ability.is_build and ability.build_unit:
+                if (ability and ability.is_build and ability.build_unit) or unit:
 
-                    unit = ability.build_unit
-                    etype = "building" if unit.is_building else "unit"
-                    name = unit.name
+                    unit_obj = unit or ability.build_unit
+                    etype = "building" if getattr(unit_obj, "is_building", False) else "unit"
+                    name = getattr(unit_obj, "name", str(unit_obj))
+                    source = "start"
                 else:
 
                     # Fall back to parsing the ability name for known prefixes
@@ -193,12 +225,15 @@ def upload():
                     if "train" in ability_name:
                         name = ability_name.split("Train")[-1]
                         etype = "unit"
+                        source = "start"
                     elif lowered.startswith("warp") and "train" in ability_name:
                         name = ability_name.split("Train")[-1]
                         etype = "unit"
+                        source = "start"
                     elif lowered.startswith("build"):
                         name = ability_name[len("Build") :]
                         etype = "building"
+                        source = "start"
                     else:
                         for prefix in (
                             "Research",
@@ -212,18 +247,22 @@ def upload():
                             if ability_name.startswith(prefix):
                                 name = ability_name[len(prefix) :]
                                 etype = "upgrade"
+                                source = "start"
                                 break
 
 
             elif isinstance(event, sc2reader.events.tracker.UnitBornEvent):
                 etype = "unit"
                 name = event.unit_type_name
+                source = "born"
             elif isinstance(event, sc2reader.events.tracker.UnitInitEvent):
                 etype = "building"
                 name = event.unit_type_name
+                source = "start"
             elif isinstance(event, sc2reader.events.tracker.UpgradeCompleteEvent):
                 etype = "upgrade"
                 name = event.upgrade_type_name
+                source = "born"
             else:
                 continue
 
@@ -267,7 +306,9 @@ def upload():
                 # same supply regardless of slight timestamp differences.
                 entries[-1]['count'] += 1
             else:
-                entries.append({'supply': supply_used, 'made': supply_made, 'time': timestamp, 'secs': game_sec, 'unit': name, 'count': 1})
+                entries.append({'supply': supply_used, 'made': supply_made, 'time': timestamp, 'secs': game_sec, 'unit': name, 'count': 1, 'source': source})
+            if debug and source:
+                debug_lines.append(f"{source} {name} {timestamp} {supply_used}/{supply_made}")
 
         build_lines = []
 
@@ -283,7 +324,10 @@ def upload():
                 while i < n and entries[i]['supply'] == supply and entries[i]['secs'] - start_time <= 5:
                     e = entries[i]
                     count_part = f"{e['count']} " if e['count'] > 1 else ""
-                    units.append(f"{count_part}{e['unit']}")
+                    unit_line = f"{count_part}{e['unit']}"
+                    if debug and e.get('source'):
+                        unit_line += f" ({e['source']})"
+                    units.append(unit_line)
                     i += 1
                 parts = []
                 if not exclude_supply:
@@ -305,9 +349,15 @@ def upload():
                     parts.append(item['time'])
                 prefix = f"[{' '.join(parts)}] " if parts else ""
                 count_part = f"{item['count']} " if item['count'] > 1 else ""
-                build_lines.append(f"{prefix}{count_part}{item['unit']}")
+                line = f"{prefix}{count_part}{item['unit']}"
+                if debug and item.get('source'):
+                    line += f" ({item['source']})"
+                build_lines.append(line)
 
-        return '\n'.join(build_lines)
+        result = '\n'.join(build_lines)
+        if debug:
+            return jsonify({'build': result, 'debug': debug_lines})
+        return result
 
     except Exception as e:
         print("❌ Error while processing events:", e)
