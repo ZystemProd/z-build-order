@@ -193,34 +193,39 @@ def upload():
                 lowered = sanitized.lower()
 
                 if lowered.startswith("build"):
-                    # Building construction begins with a build command.
+                    # Building construction begins with a build command
                     name = sanitized[len("Build"):]
                     etype = "building"
                     build_command_times.setdefault(name.lower(), []).append(event.second)
                 else:
-                    unit_prefixes = ["Train", "WarpIn", "Warp", "Morph"]
                     upgrade_prefixes = [
                         "Research",
-                        "Upgrade",
                         "UpgradeTo",
+                        "Upgrade",
                         "MorphTo",
                         "TransformTo",
                         "Transform",
                     ]
+                    unit_prefixes = ["Train", "WarpIn", "Warp", "Morph"]
 
-                    for prefix in unit_prefixes:
-                        if prefix in sanitized:
-                            name = sanitized.split(prefix)[-1]
-                            etype = "unit"
+                    matched = False
+                    for prefix in upgrade_prefixes:
+                        if lowered.startswith(prefix.lower()):
+                            name = sanitized[len(prefix):]
+                            etype = "upgrade"
+                            matched = True
                             break
-                    else:
-                        for prefix in upgrade_prefixes:
-                            if prefix in sanitized:
-                                name = sanitized.split(prefix)[-1]
-                                etype = "upgrade"
+
+                    if not matched:
+                        for prefix in unit_prefixes:
+                            if lowered.startswith(prefix.lower()):
+                                name = sanitized[len(prefix):]
+                                etype = "unit"
+                                matched = True
                                 break
-                        else:
-                            continue
+
+                    if not matched:
+                        continue
 
             elif isinstance(event, sc2reader.events.tracker.UnitInitEvent):
                 # Buildings begin construction
