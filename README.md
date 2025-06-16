@@ -68,5 +68,7 @@ python app.py
 
 The server listens on http://localhost:5000. The frontend will send uploaded
 replays to `/upload` on that server and populate the **Build Order** text area
-with the parsed results.
+with the parsed results. Pass `debug=true` in the form data to receive a JSON
+response with a `build` string and `debug` lines indicating whether each entry
+came from a start or completion event.
 
