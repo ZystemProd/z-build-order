@@ -72,8 +72,8 @@ def upload():
             protocol = versions.build(replay.base_build)
             if hasattr(protocol, "abil_lookup"):
                 ability_lookup = {
-                    (link, index): name
-                    for (link, index), name in protocol.abil_lookup.items()
+                    (link, index): abil
+                    for (link, index), abil in protocol.abil_lookup.items()
                 }
         except Exception as e:
             print("s2protocol lookup failed:", e)
@@ -178,6 +178,7 @@ def upload():
             etype = None
             name = None
             source = None
+            unit = None
 
             if isinstance(
                 event,
@@ -195,18 +196,27 @@ def upload():
                     (ability.name if ability and ability.name else None)
                     or getattr(event, "ability_name", "")
                 )
+                protocol_info = None
                 if not ability_name and ability_lookup:
-                    ability_name = ability_lookup.get(
-                        (event.ability_link, event.command_index), ""
+                    protocol_info = ability_lookup.get(
+                        (event.ability_link, event.command_index)
                     )
+                    if protocol_info:
+                        ability_name = (
+                            protocol_info.get("buttonname")
+                            or protocol_info.get("friendlyname")
+                            or protocol_info.get("name", "")
+                        )
+                        event.ability_name = ability_name
+                        unit = protocol_info.get("build_unit")
                 if ability_name.startswith("Cancel"):
                     continue
 
-                if ability and ability.is_build and ability.build_unit:
+                if (ability and ability.is_build and ability.build_unit) or unit:
 
-                    unit = ability.build_unit
-                    etype = "building" if unit.is_building else "unit"
-                    name = unit.name
+                    unit_obj = unit or ability.build_unit
+                    etype = "building" if getattr(unit_obj, "is_building", False) else "unit"
+                    name = getattr(unit_obj, "name", str(unit_obj))
                     source = "start"
                 else:
 
