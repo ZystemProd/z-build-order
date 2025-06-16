@@ -70,5 +70,7 @@ The server listens on http://localhost:5000. The frontend will send uploaded
 replays to `/upload` on that server and populate the **Build Order** text area
 with the parsed results. Pass `debug=true` in the form data to receive a JSON
 response with a `build` string and `debug` lines indicating whether each entry
-came from a start or completion event.
+came from a start or completion event. When this flag is set, the build lines
+themselves include `(start)` or `(born)` after each unit to show where the
+timestamp originated.
 

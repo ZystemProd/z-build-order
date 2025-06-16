@@ -306,7 +306,7 @@ def upload():
                 # same supply regardless of slight timestamp differences.
                 entries[-1]['count'] += 1
             else:
-                entries.append({'supply': supply_used, 'made': supply_made, 'time': timestamp, 'secs': game_sec, 'unit': name, 'count': 1})
+                entries.append({'supply': supply_used, 'made': supply_made, 'time': timestamp, 'secs': game_sec, 'unit': name, 'count': 1, 'source': source})
             if debug and source:
                 debug_lines.append(f"{source} {name} {timestamp} {supply_used}/{supply_made}")
 
@@ -324,7 +324,10 @@ def upload():
                 while i < n and entries[i]['supply'] == supply and entries[i]['secs'] - start_time <= 5:
                     e = entries[i]
                     count_part = f"{e['count']} " if e['count'] > 1 else ""
-                    units.append(f"{count_part}{e['unit']}")
+                    unit_line = f"{count_part}{e['unit']}"
+                    if debug and e.get('source'):
+                        unit_line += f" ({e['source']})"
+                    units.append(unit_line)
                     i += 1
                 parts = []
                 if not exclude_supply:
@@ -346,7 +349,10 @@ def upload():
                     parts.append(item['time'])
                 prefix = f"[{' '.join(parts)}] " if parts else ""
                 count_part = f"{item['count']} " if item['count'] > 1 else ""
-                build_lines.append(f"{prefix}{count_part}{item['unit']}")
+                line = f"{prefix}{count_part}{item['unit']}"
+                if debug and item.get('source'):
+                    line += f" ({item['source']})"
+                build_lines.append(line)
 
         result = '\n'.join(build_lines)
         if debug:
