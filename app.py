@@ -162,7 +162,7 @@ def upload():
                     sc2reader.events.game.TargetUnitCommandEvent,
                 ),
             ):
-                # Commands represent the start of a unit or upgrade
+                # Commands mark the beginning of unit production or upgrades
                 if event.pid != player.pid:
                     continue
 
@@ -171,32 +171,36 @@ def upload():
                     (ability.name if ability and ability.name else None)
                     or getattr(event, "ability_name", "")
                 )
-                if ability_name.startswith("Cancel"):
+                if not ability_name or ability_name.startswith("Cancel"):
                     continue
 
-                for prefix in (
-                    "Train ",
-                    "Warp In ",
-                    "Warp ",
-                    "Morph ",
-                ):
+                unit_prefixes = ["Train ", "Warp In ", "Warp ", "Morph "]
+                upgrade_prefixes = [
+                    "Research ",
+                    "Upgrade ",
+                    "UpgradeTo ",
+                    "MorphTo ",
+                    "TransformTo ",
+                    "Transform ",
+                ]
+
+                for prefix in unit_prefixes:
                     if ability_name.startswith(prefix):
                         name = ability_name[len(prefix) :]
                         etype = "unit"
                         break
                 else:
-                    for prefix in (
-                        "Research ",
-                        "Upgrade ",
-                        "UpgradeTo ",
-                        "MorphTo ",
-                        "TransformTo ",
-                        "Transform ",
-                    ):
+                    for prefix in upgrade_prefixes:
                         if ability_name.startswith(prefix):
                             name = ability_name[len(prefix) :]
                             etype = "upgrade"
                             break
+                    else:
+                        if ability_name.startswith("Build "):
+                            name = ability_name[len("Build ") :]
+                            etype = "building"
+                        else:
+                            continue
 
             elif isinstance(event, sc2reader.events.tracker.UnitInitEvent):
                 # Buildings begin construction
