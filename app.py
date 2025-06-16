@@ -162,6 +162,7 @@ def upload():
         # additional speed adjustment is required.
 
         entries = []
+        build_command_times = {}
 
         for event in replay.events:
             if event.second == 0:
@@ -189,37 +190,46 @@ def upload():
                     continue
 
                 sanitized = ability_name.replace(" ", "")
-                if sanitized.lower().startswith("build"):
-                    # Building commands produce duplicate events; rely on
-                    # UnitInitEvent instead.
-                    continue
+                lowered = sanitized.lower()
 
-                unit_prefixes = ["Train", "WarpIn", "Warp", "Morph"]
-                upgrade_prefixes = [
-                    "Research",
-                    "Upgrade",
-                    "UpgradeTo",
-                    "MorphTo",
-                    "TransformTo",
-                    "Transform",
-                ]
-
-                for prefix in unit_prefixes:
-                    if prefix in sanitized:
-                        name = sanitized.split(prefix)[-1]
-                        etype = "unit"
-                        break
+                if lowered.startswith("build"):
+                    # Building construction begins with a build command.
+                    name = sanitized[len("Build"):]
+                    etype = "building"
+                    build_command_times.setdefault(name.lower(), []).append(event.second)
                 else:
-                    for prefix in upgrade_prefixes:
+                    unit_prefixes = ["Train", "WarpIn", "Warp", "Morph"]
+                    upgrade_prefixes = [
+                        "Research",
+                        "Upgrade",
+                        "UpgradeTo",
+                        "MorphTo",
+                        "TransformTo",
+                        "Transform",
+                    ]
+
+                    for prefix in unit_prefixes:
                         if prefix in sanitized:
                             name = sanitized.split(prefix)[-1]
-                            etype = "upgrade"
+                            etype = "unit"
                             break
                     else:
-                        continue
+                        for prefix in upgrade_prefixes:
+                            if prefix in sanitized:
+                                name = sanitized.split(prefix)[-1]
+                                etype = "upgrade"
+                                break
+                        else:
+                            continue
 
             elif isinstance(event, sc2reader.events.tracker.UnitInitEvent):
                 # Buildings begin construction
+                if (
+                    build_command_times.get(event.unit_type_name.lower())
+                    and event.second - build_command_times[event.unit_type_name.lower()][-1] <= 2
+                ):
+                    # Already captured by a build command event
+                    continue
                 etype = "building"
                 name = event.unit_type_name
             else:
