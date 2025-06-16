@@ -177,7 +177,7 @@ def upload():
                     sc2reader.events.game.TargetUnitCommandEvent,
                 ),
             ):
-                # Commands mark the beginning of unit production or upgrades
+                # Commands mark the beginning of unit, building, or upgrade production
                 if event.pid != player.pid:
                     continue
 
@@ -192,43 +192,38 @@ def upload():
                 sanitized = ability_name.replace(" ", "")
                 lowered = sanitized.lower()
 
-                if ability and ability.is_build and ability.build_unit:
+                if ability and ability.build_unit:
+                    # Ability metadata knows exactly which unit is created
                     unit = ability.build_unit
                     etype = "building" if unit.is_building else "unit"
                     name = unit.name
                     if unit.is_building:
                         build_command_times.setdefault(name.lower(), []).append(event.second)
-                elif lowered.startswith("build"):
-                    # Building construction begins with a build command
-                    name = sanitized[len("Build"):]
-                    etype = "building"
-                    build_command_times.setdefault(name.lower(), []).append(event.second)
                 else:
-                    upgrade_prefixes = [
-                        "Research",
-                        "UpgradeTo",
-                        "Upgrade",
-                        "MorphTo",
-                        "TransformTo",
-                        "Transform",
-                    ]
-                    unit_prefixes = ["Train", "WarpIn", "Warp", "Morph"]
+                    # Fallback to prefix checks on ability name
+                    prefix_map = {
+                        "build": "building",
+                        "train": "unit",
+                        "warpin": "unit",
+                        "warp": "unit",
+                        "morph": "unit",
+                        "research": "upgrade",
+                        "upgrade": "upgrade",
+                        "upgradeto": "upgrade",
+                        "morphto": "upgrade",
+                        "transformto": "upgrade",
+                        "transform": "upgrade",
+                    }
 
                     matched = False
-                    for prefix in upgrade_prefixes:
-                        if lowered.startswith(prefix.lower()):
+                    for prefix, et in prefix_map.items():
+                        if lowered.startswith(prefix):
                             name = sanitized[len(prefix):]
-                            etype = "upgrade"
+                            etype = et
                             matched = True
+                            if et == "building":
+                                build_command_times.setdefault(name.lower(), []).append(event.second)
                             break
-
-                    if not matched:
-                        for prefix in unit_prefixes:
-                            if lowered.startswith(prefix.lower()):
-                                name = sanitized[len(prefix):]
-                                etype = "unit"
-                                matched = True
-                                break
 
                     if not matched:
                         continue
