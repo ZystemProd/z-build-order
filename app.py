@@ -56,8 +56,6 @@ import collections
 from sc2reader.constants import GAME_SPEED_FACTOR
 from name_map import NAME_MAP
 
-# track which upgrade (if any) each building tag is researching
-building_busy = collections.defaultdict(lambda: None)
 
 
 def is_queued_research(ev) -> bool:
@@ -102,6 +100,14 @@ def prettify_upgrade(ability_name: str) -> str:
     core = UPGRADE_PREFIX.sub('', ability_name)
     words = re.sub(r'([a-z])([A-Z])', r'\1 \2', core)
     return words.replace('_', ' ').strip().title()
+
+
+def producer_tag(ev):
+    if getattr(ev, "target", None):  # TargetUnitCommandEvent
+        return ev.target.tag
+    if getattr(ev, "unit", None):
+        return ev.unit.tag
+    return None
 
 # Build times in game seconds for LotV 5.x. Values are approximate. See
 
@@ -229,8 +235,43 @@ UPGRADE_TIME = {
     "Weapon Refit": 100,
     "Advanced Ballistics": 79,
     "Neosteel Frame": 79,
-    "Cloak": 79,
+
+"Cloak": 79,
 }
+
+# --- legal upgrade lists -------------------------------------------------
+TERRAN_UP = {
+    "Infantry Weapons", "Infantry Armor", "Vehicle Weapons", "Ship Weapons",
+    "Vehicle And Ship Plating", "Stimpack", "Combat Shield", "Concussive Shells",
+    "Infernal Pre-Igniter", "Smart Servos", "Drilling Claws",
+    "Hyperflight Rotors", "Hi-Sec Auto Tracking", "Hurricane Engines",
+    "Mag-Field Accelerator", "Caduceus Reactor", "Interference Matrix",
+    "Weapon Refit", "Advanced Ballistics", "Neosteel Frame", "Cloak",
+}
+PROTOSS_UP = {
+    "Warp Gate", "Shields", "Ground Weapons", "Ground Armor", "Air Weapons",
+    "Air Armor", "Blink", "Charge", "Resonating Glaives", "Psionic Storm",
+    "Anion Pulse-Crystals", "Extended Thermal Lance", "Gravitic Boosters",
+    "Gravitic Drive", "Flux Vanes", "Tectonic Destabilizers", "Shadow Stride",
+}
+ZERG_UP = {
+    "Metabolic Boost", "Adrenal Glands", "Glial Reconstitution",
+    "Tunneling Claws", "Grooved Spines", "Muscular Augments",
+    "Chitinous Plating", "Anabolic Synthesis", "Neural Parasite",
+    "Centrifugal Hooks", "Burrow", "Ground Carapace", "Melee Attack",
+    "Missile Attack", "Flyer Armor", "Flyer Attack", "Adaptive Talons",
+    "Seismic Spines", "Pneumatized Carapace",
+}
+
+LEGAL_BY_RACE = {
+    "terran": TERRAN_UP,
+    "protoss": PROTOSS_UP,
+    "zerg": ZERG_UP,
+}
+
+
+def is_legal_upgrade(race: str, upg: str) -> bool:
+    return upg in LEGAL_BY_RACE.get(race.lower(), set())
 
 # player-pid → set of upgrades currently researching
 researching_now = collections.defaultdict(set)
@@ -382,6 +423,8 @@ def upload():
             speed_factor = 1.4
 
         entries = []
+        researching_now = collections.defaultdict(set)
+        building_busy = collections.defaultdict(lambda: None)
         init_map = {}
         chrono_until = {p.pid: 0 for p in players}
 
@@ -424,41 +467,36 @@ def upload():
 
                 # Upgrade research start
                 if ability.startswith("Research"):
-                    # ----- skip queued copies ---------------------------------
-                    if is_queued_research(event):
-                        continue
-                    # ----------------------------------------------------------
-                    pid = getattr(event, "pid", None) or getattr(event, "player", None).pid
-                    if pid != player.pid:
+
+                    # 5-a skip if queued
+                    if getattr(event, "queued", False) or (getattr(event, "flags", 0) & 0x3):
                         continue
 
+                    # 5-b race-gate
                     raw_name = prettify_upgrade(ability)
-                    upgrade_name = tidy(raw_name)
-                    if upgrade_name is None:
+                    upg_name = tidy(raw_name)
+                    if upg_name is None or not is_legal_upgrade(player.play_race, upg_name):
                         continue
-                    # skip if this upgrade is already in progress (queued duplicate)
-                    if upgrade_name in researching_now[pid]:
+
+                    # 5-c skip if building is busy
+                    tag = producer_tag(event)
+                    if tag and building_busy[tag] is not None:
                         continue
-                    researching_now[pid].add(upgrade_name)
+
+                    # 5-d record start row
                     used, made = get_supply(event.second)
-
-                    if stop_limit and used > stop_limit:
-                        continue
-                    if time_limit and int(event.second / speed_factor) > time_limit:
-                        continue
-
                     entries.append(
                         dict(
                             clock_sec=int(event.second / speed_factor),
                             supply=used,
                             made=made,
-                            unit=upgrade_name,
+                            unit=upg_name,
                             kind="start",
                         )
                     )
-                    prod = getattr(event, "unit", None)
-                    if prod:
-                        building_busy[prod.tag] = upgrade_name
+                    researching_now[player.pid].add(upg_name)
+                    if tag:
+                        building_busy[tag] = upg_name
                     continue
             # ----------------------------------------------------------------
 
@@ -550,47 +588,32 @@ def upload():
                 continue
 
                 if isinstance(event, sc2reader.events.tracker.UpgradeCompleteEvent):
-                    if getattr(event, "pid", player.pid) != player.pid:
-                        continue
-                    name = format_name(event.upgrade_type_name)
-                    name = tidy(name)
-                    if name is None:
+                    name = tidy(format_name(event.upgrade_type_name))
+                    if name is None or not is_legal_upgrade(player.play_race, name):
                         continue
 
-                    # free whichever building was researching this upgrade
-                    for tag, upg in list(building_busy.items()):
-                        if upg == name:
-                            del building_busy[tag]
-
-                    # remove from "in-progress" set
+                    # skip if we never logged a start
+                    if name not in researching_now[player.pid]:
+                        continue
                     researching_now[player.pid].discard(name)
 
-                if any(e["unit"] == name and e["kind"] == "start" for e in entries):
+                    # free building
+                    tag = producer_tag(event)
+                    if tag and building_busy.get(tag) == name:
+                        del building_busy[tag]
+
+                    # optional finish row (will be stripped)
+                    used, made = get_supply(event.second)
+                    entries.append(
+                        dict(
+                            clock_sec=int(event.second / speed_factor),
+                            supply=used,
+                            made=made,
+                            unit=name,
+                            kind="finish",
+                        )
+                    )
                     continue
-
-                duration = UPGRADE_TIME.get(name, 0)
-                start_real = event.second - duration * speed_factor
-                used, made = get_supply(start_real)
-
-                entries.append(
-                    dict(
-                        clock_sec=int(start_real / speed_factor),
-                        supply=used,
-                        made=made,
-                        unit=name,
-                        kind="start",
-                    )
-                )
-                entries.append(
-                    dict(
-                        clock_sec=int(event.second / speed_factor),
-                        supply=used,
-                        made=made,
-                        unit=name,
-                        kind="finish",
-                    )
-                )
-                continue
 
 
         entries = [e for e in entries if e.get("kind") == "start"]
