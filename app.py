@@ -56,6 +56,27 @@ import collections
 from sc2reader.constants import GAME_SPEED_FACTOR
 from name_map import NAME_MAP
 
+# track which upgrade (if any) each building tag is researching
+building_busy = collections.defaultdict(lambda: None)
+
+
+def is_queued_research(ev) -> bool:
+    """Return True if this Research_* event is only queued."""
+    # a) modern property
+    if getattr(ev, "queued", False):
+        return True
+
+    # b) raw command flags (0x1 or 0x2 most common for "queued")
+    if getattr(ev, "flags", 0) & 0x3:
+        return True
+
+    # c) producer-building already busy with another upgrade
+    prod = getattr(ev, "unit", None)
+    if prod and building_busy[prod.tag] is not None:
+        return True
+
+    return False
+
 # --- Ability/Command events helper for any sc2reader version ---
 from sc2reader.events import game as ge
 
@@ -403,13 +424,10 @@ def upload():
 
                 # Upgrade research start
                 if ability.startswith("Research"):
-                    # ----------------------------------------------------------------
-                    # Ignore commands that are merely queued (event.queued is True).
-                    # sc2reader emits the same Research_* twice: once when queued,
-                    # again when it actually begins.  We only want the latter.
-                    if getattr(event, "queued", False):
+                    # ----- skip queued copies ---------------------------------
+                    if is_queued_research(event):
                         continue
-                    # ----------------------------------------------------------------
+                    # ----------------------------------------------------------
                     pid = getattr(event, "pid", None) or getattr(event, "player", None).pid
                     if pid != player.pid:
                         continue
@@ -438,6 +456,9 @@ def upload():
                             kind="start",
                         )
                     )
+                    prod = getattr(event, "unit", None)
+                    if prod:
+                        building_busy[prod.tag] = upgrade_name
                     continue
             # ----------------------------------------------------------------
 
@@ -528,16 +549,21 @@ def upload():
                     })
                 continue
 
-            if isinstance(event, sc2reader.events.tracker.UpgradeCompleteEvent):
-                if getattr(event, "pid", player.pid) != player.pid:
-                    continue
-                name = format_name(event.upgrade_type_name)
-                name = tidy(name)
-                if name is None:
-                    continue
+                if isinstance(event, sc2reader.events.tracker.UpgradeCompleteEvent):
+                    if getattr(event, "pid", player.pid) != player.pid:
+                        continue
+                    name = format_name(event.upgrade_type_name)
+                    name = tidy(name)
+                    if name is None:
+                        continue
 
-                # remove from "in-progress" set
-                researching_now[player.pid].discard(name)
+                    # free whichever building was researching this upgrade
+                    for tag, upg in list(building_busy.items()):
+                        if upg == name:
+                            del building_busy[tag]
+
+                    # remove from "in-progress" set
+                    researching_now[player.pid].discard(name)
 
                 if any(e["unit"] == name and e["kind"] == "start" for e in entries):
                     continue
