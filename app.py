@@ -6,6 +6,7 @@ import sc2reader
 import io
 import bisect
 import re
+import collections
 from sc2reader.constants import GAME_SPEED_FACTOR
 from name_map import NAME_MAP
 
@@ -163,6 +164,9 @@ UPGRADE_TIME = {
     "Neosteel Frame": 79,
     "Cloak": 79,
 }
+
+# player-pid → set of upgrades currently researching
+researching_now = collections.defaultdict(set)
 
 app = Flask(__name__)
 CORS(app)
@@ -358,6 +362,10 @@ def upload():
                         continue
 
                     upgrade_name = prettify_upgrade(ability)
+                    # skip if this upgrade is already in progress (queued duplicate)
+                    if upgrade_name in researching_now[pid]:
+                        continue
+                    researching_now[pid].add(upgrade_name)
                     used, made = get_supply(event.second)
 
                     if stop_limit and used > stop_limit:
@@ -462,6 +470,9 @@ def upload():
                 if getattr(event, "pid", player.pid) != player.pid:
                     continue
                 name = format_name(event.upgrade_type_name)
+
+                # remove from "in-progress" set
+                researching_now[player.pid].discard(name)
 
                 if any(e["unit"] == name and e["kind"] == "start" for e in entries):
                     continue
