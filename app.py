@@ -56,6 +56,21 @@ import collections
 from sc2reader.constants import GAME_SPEED_FACTOR
 from name_map import NAME_MAP
 
+
+def owner_pid(ev) -> int | None:
+    """Return the player-id that owns `ev`, or None if unknown."""
+    # Tracker events (Unit*, Upgrade*) usually expose .pid
+    if getattr(ev, "pid", None):
+        return ev.pid
+    # Game events (Ability/Command) sometimes carry .player
+    if getattr(ev, "player", None):
+        return ev.player.pid
+    # Fall back to control_pid / upkeep_pid if present
+    for attr in ("control_pid", "upkeep_pid"):
+        if getattr(ev, attr, None):
+            return getattr(ev, attr)
+    return None
+
 # --- Ability/Command events helper for any sc2reader version ---
 from sc2reader.events import game as ge
 
@@ -146,6 +161,42 @@ BUILD_TIME = {
     "Overseer": 17,
 }
 
+# ── legal-upgrade sets, keyed by tidy() names ────────────────
+TERRAN_UP = {
+    "Stimpack", "Combat Shield", "Concussive Shells", "Infernal Pre-Igniter",
+    "Smart Servos", "Drilling Claws", "Hyperflight Rotors",
+    "Hi-Sec Auto Tracking", "Hurricane Engines", "Mag-Field Accelerator",
+    "Caduceus Reactor", "Interference Matrix", "Weapon Refit",
+    "Advanced Ballistics", "Neosteel Frame", "Cloak",
+    "Infantry Weapons", "Infantry Armor",
+    "Vehicle Weapons", "Ship Weapons",
+    "Vehicle And Ship Plating",
+}
+
+PROTOSS_UP = {
+    "Warp Gate", "Blink", "Charge", "Resonating Glaives", "Psionic Storm",
+    "Anion Pulse-Crystals", "Extended Thermal Lance", "Gravitic Boosters",
+    "Gravitic Drive", "Flux Vanes", "Tectonic Destabilizers",
+    "Shadow Stride", "Shields", "Ground Weapons", "Ground Armor",
+    "Air Weapons", "Air Armor",
+}
+
+ZERG_UP = {
+    "Metabolic Boost", "Adrenal Glands", "Glial Reconstitution",
+    "Tunneling Claws", "Grooved Spines", "Muscular Augments",
+    "Chitinous Plating", "Anabolic Synthesis", "Neural Parasite",
+    "Centrifugal Hooks", "Burrow", "Ground Carapace", "Melee Attack",
+    "Missile Attack", "Flyer Armor", "Flyer Attack", "Adaptive Talons",
+    "Seismic Spines", "Pneumatized Carapace",
+}
+
+RACE2SET = {
+    "terran":  TERRAN_UP,
+    "protoss": PROTOSS_UP,
+    "zerg":    ZERG_UP,
+}
+# ──────────────────────────────────────────────────────────────
+
 UPGRADE_TIME = {
     # Zerg
     "Metabolic Boost": 79,
@@ -211,8 +262,6 @@ UPGRADE_TIME = {
     "Cloak": 79,
 }
 
-# player-pid → set of upgrades currently researching
-researching_now = collections.defaultdict(set)
 
 app = Flask(__name__)
 CORS(app)
@@ -360,9 +409,10 @@ def upload():
         if replay.expansion == "LotV" and replay.speed == "Faster" and speed_factor == 1.0:
             speed_factor = 1.4
 
-        entries = []
-        init_map = {}
-        chrono_until = {p.pid: 0 for p in players}
+        researching_now = collections.defaultdict(set)   # per-request
+        chrono_until    = {p.pid: 0 for p in players}
+        init_map        = {}
+        entries         = []
 
         for event in replay.events:
             if event.second == 0:
@@ -394,6 +444,28 @@ def upload():
             ability = ability_raw
 
             if ability:
+                # -- fall-back: ability is only a numeric ID -----------------
+                if ability.isdigit():
+                    # treat the raw ID as a label so we can see it in the output
+                    used, made = get_supply(event.second)
+
+                    if stop_limit and used > stop_limit:
+                        continue
+                    if time_limit and int(event.second / speed_factor) > time_limit:
+                        continue
+
+                    entries.append(
+                        dict(
+                            clock_sec=int(event.second / speed_factor),
+                            supply=used,
+                            made=made,
+                            unit=f"Ability {ability}",
+                            kind="start",
+                        )
+                    )
+                    continue
+                # ------------------------------------------------------------
+
                 # Chrono Boost detection
                 if ability.endswith(("ChronoBoostEnergyCost", "ChronoBoost")):
                     chrono_until[event.pid] = max(
@@ -403,13 +475,20 @@ def upload():
 
                 # Upgrade research start
                 if ability.startswith("Research"):
-                    pid = getattr(event, "pid", None) or getattr(event, "player", None).pid
+                    # ignore queued research orders – they have .queued == True
+                    if getattr(event, "queued", False):
+                        continue       # we'll log the upgrade when it really starts
+                    pid = owner_pid(event)
                     if pid != player.pid:
                         continue
 
                     raw_name = prettify_upgrade(ability)
                     upgrade_name = tidy(raw_name)
                     if upgrade_name is None:
+                        continue
+                    # race-gate: skip alien tech
+                    legal = RACE2SET.get(player.play_race.lower(), set())
+                    if upgrade_name not in legal:
                         continue
                     # skip if this upgrade is already in progress (queued duplicate)
                     if upgrade_name in researching_now[pid]:
@@ -435,7 +514,7 @@ def upload():
             # ----------------------------------------------------------------
 
             if isinstance(event, sc2reader.events.tracker.UnitBornEvent):
-                if getattr(event, "control_pid", None) != player.pid:
+                if owner_pid(event) != player.pid:
                     continue
                 unit = event.unit
                 is_building = getattr(unit, "is_building", False)
@@ -482,7 +561,7 @@ def upload():
                 continue
 
             if isinstance(event, sc2reader.events.tracker.UnitInitEvent):
-                if event.control_pid != player.pid:
+                if owner_pid(event) != player.pid:
                     continue
                 name = format_name(event.unit_type_name)
                 name = tidy(name)
@@ -522,41 +601,62 @@ def upload():
                 continue
 
             if isinstance(event, sc2reader.events.tracker.UpgradeCompleteEvent):
-                if getattr(event, "pid", player.pid) != player.pid:
+                if owner_pid(event) != player.pid:
                     continue
                 name = format_name(event.upgrade_type_name)
                 name = tidy(name)
                 if name is None:
                     continue
-
-                # remove from "in-progress" set
-                researching_now[player.pid].discard(name)
-
-                if any(e["unit"] == name and e["kind"] == "start" for e in entries):
+                # -----------------------------------------------------------------
+                # 1)  Race-gate: ignore upgrades that don’t belong to this race
+                legal = RACE2SET.get(player.play_race.lower(), set())
+                if name not in legal:
                     continue
 
-                duration = UPGRADE_TIME.get(name, 0)
-                start_real = event.second - duration * speed_factor
-                used, made = get_supply(start_real)
+                # 2)  Was a proper Research_* start recorded?
+                if name in researching_now[player.pid]:
+                    researching_now[player.pid].discard(name)
+                    have_start = True
+                else:
+                    have_start = False
 
-                entries.append(
-                    dict(
-                        clock_sec=int(start_real / speed_factor),
-                        supply=used,
-                        made=made,
-                        unit=name,
-                        kind="start",
-                    )
-                )
+                # 3)  Always keep the FINISH row (will be stripped if you still
+                #     filter kind!="start" later; useful for debug).
+                used_fin, made_fin = get_supply(event.second)
                 entries.append(
                     dict(
                         clock_sec=int(event.second / speed_factor),
-                        supply=used,
-                        made=made,
+                        supply=used_fin,
+                        made=made_fin,
                         unit=name,
                         kind="finish",
                     )
                 )
+
+                # 4)  If the start was *missing* but the upgrade is legal,
+                #     back-fill a start row using the duration table.
+                if not have_start:
+                    duration = UPGRADE_TIME.get(name)
+                    if duration:            # only back-fill if we know the time
+                        start_real = event.second - duration * speed_factor
+                        used_sta, made_sta = get_supply(start_real)
+
+                        # stop/supply limits still honoured
+                        if stop_limit and used_sta > stop_limit:
+                            continue
+                        if time_limit and int(start_real / speed_factor) > time_limit:
+                            continue
+
+                        entries.append(
+                            dict(
+                                clock_sec=int(start_real / speed_factor),
+                                supply=used_sta,
+                                made=made_sta,
+                                unit=name,
+                                kind="start",
+                            )
+                        )
+                # -----------------------------------------------------------------
                 continue
 
 
