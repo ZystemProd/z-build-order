@@ -253,14 +253,25 @@ def upload():
             if event.second == 0:
                 continue
 
-            if isinstance(event, ABILITY_EVENTS):
-                ability = getattr(event, "ability_name", "")
-                if ability.endswith("ChronoBoostEnergyCost") or ability.endswith("ChronoBoost"):
-                    chrono_until[event.pid] = max(chrono_until.get(event.pid, 0), event.second) + 9.6 * speed_factor
+            # -- Ability / command events ------------------------------------
+            if getattr(event, "ability_name", None):
+                # 1-a  Chrono Boost window
+                if event.ability_name.endswith(("ChronoBoostEnergyCost", "ChronoBoost")):
+                    chrono_until[event.pid] = max(
+                        chrono_until.get(event.pid, 0), event.second
+                    ) + 9.6 * speed_factor
                     continue
 
-                if ability.startswith("Research") and event.pid == player.pid:
-                    upgrade_name = prettify_upgrade(ability)
+                # 1-b  Upgrade research start
+                if event.ability_name.startswith("Research"):
+                    # accept even when ABILITY_EVENTS tuple is empty or incomplete
+                    pid = getattr(event, "pid", None)
+                    if pid is None and hasattr(event, "player"):
+                        pid = event.player.pid
+                    if pid != player.pid:
+                        continue
+
+                    upgrade_name = prettify_upgrade(event.ability_name)
                     used, made = get_supply(event.second)
 
                     if stop_limit is not None and used > stop_limit:
@@ -268,16 +279,17 @@ def upload():
                     if time_limit is not None and int(event.second / speed_factor) > time_limit:
                         continue
 
-                    entries.append({
-                        "clock_sec": int(event.second / speed_factor),
-                        "supply":    used,
-                        "made":      made,
-                        "unit":      upgrade_name,
-                        "kind":      "start",
-                    })
+                    entries.append(
+                        {
+                            "clock_sec": int(event.second / speed_factor),
+                            "supply": used,
+                            "made": made,
+                            "unit": upgrade_name,
+                            "kind": "start",
+                        }
+                    )
                     continue
-
-                continue
+            # ----------------------------------------------------------------
 
             if isinstance(event, sc2reader.events.tracker.UnitBornEvent):
                 if getattr(event, "control_pid", None) != player.pid:
