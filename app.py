@@ -99,6 +99,71 @@ BUILD_TIME = {
     "Overseer": 17,
 }
 
+UPGRADE_TIME = {
+    # Zerg
+    "Metabolic Boost": 79,
+    "Adrenal Glands": 93,
+    "Glial Reconstitution": 79,
+    "Tunneling Claws": 79,
+    "Grooved Spines": 50,
+    "Muscular Augments": 64,
+    "Chitinous Plating": 79,
+    "Anabolic Synthesis": 43,
+    "Neural Parasite": 79,
+    "Centrifugal Hooks": 71,
+    "Burrow": 71,
+    "Ground Carapace": 114,
+    "Melee Attack": 114,
+    "Missile Attack": 114,
+    "Flyer Armor": 114,
+    "Flyer Attack": 114,
+    "Adaptive Talons": 57,
+    "Seismic Spines": 57,
+    "Pneumatized Carapace": 43,
+
+    # Protoss
+    "Warp Gate": 100,
+    "Shields": 121,
+    "Ground Weapons": 121,
+    "Ground Armor": 121,
+    "Air Weapons": 129,
+    "Air Armor": 129,
+    "Blink": 121,
+    "Charge": 100,
+    "Resonating Glaives": 100,
+    "Psionic Storm": 79,
+    "Anion Pulse-Crystals": 64,
+    "Extended Thermal Lance": 100,
+    "Gravitic Boosters": 57,
+    "Gravitic Drive": 57,
+    "Flux Vanes": 57,
+    "Tectonic Destabilizers": 100,
+    "Shadow Stride": 100,
+
+    # Terran
+    "Infantry Weapons": 114,
+    "Infantry Armor": 114,
+    "Vehicle Weapons": 114,
+    "Ship Weapons": 114,
+    "Vehicle And Ship Plating": 114,
+    "Stimpack": 100,
+    "Combat Shield": 79,
+    "Concussive Shells": 79,
+    "Infernal Pre-Igniter": 110,
+    "Smart Servos": 79,
+    "Drilling Claws": 79,
+    "Hyperflight Rotors": 100,
+    "Hi-Sec Auto Tracking": 57,
+    "Hurricane Engines": 100,
+    "Mag-Field Accelerator": 100,
+    "Caduceus Reactor": 80,
+    "Interference Matrix": 57,
+    "Weapon Refit": 100,
+    "Advanced Ballistics": 79,
+    "Neosteel Frame": 79,
+    "Cloak": 79,
+}
+
 app = Flask(__name__)
 CORS(app)
 
@@ -254,39 +319,42 @@ def upload():
                 continue
 
             # -- Ability / command events ------------------------------------
-            if getattr(event, "ability_name", None):
-                # 1-a  Chrono Boost window
-                if event.ability_name.endswith(("ChronoBoostEnergyCost", "ChronoBoost")):
+            ability = (
+                getattr(event, "ability_name", None)
+                or getattr(event, "ability_link", None)
+                or getattr(event, "ability", None)
+            )
+
+            if ability:
+                # Chrono Boost detection
+                if ability.endswith(("ChronoBoostEnergyCost", "ChronoBoost")):
                     chrono_until[event.pid] = max(
                         chrono_until.get(event.pid, 0), event.second
                     ) + 9.6 * speed_factor
                     continue
 
-                # 1-b  Upgrade research start
-                if event.ability_name.startswith("Research"):
-                    # accept even when ABILITY_EVENTS tuple is empty or incomplete
-                    pid = getattr(event, "pid", None)
-                    if pid is None and hasattr(event, "player"):
-                        pid = event.player.pid
+                # Upgrade research start
+                if ability.startswith("Research"):
+                    pid = getattr(event, "pid", None) or getattr(event, "player", None).pid
                     if pid != player.pid:
                         continue
 
-                    upgrade_name = prettify_upgrade(event.ability_name)
+                    upgrade_name = prettify_upgrade(ability)
                     used, made = get_supply(event.second)
 
-                    if stop_limit is not None and used > stop_limit:
+                    if stop_limit and used > stop_limit:
                         continue
-                    if time_limit is not None and int(event.second / speed_factor) > time_limit:
+                    if time_limit and int(event.second / speed_factor) > time_limit:
                         continue
 
                     entries.append(
-                        {
-                            "clock_sec": int(event.second / speed_factor),
-                            "supply": used,
-                            "made": made,
-                            "unit": upgrade_name,
-                            "kind": "start",
-                        }
+                        dict(
+                            clock_sec=int(event.second / speed_factor),
+                            supply=used,
+                            made=made,
+                            unit=upgrade_name,
+                            kind="start",
+                        )
                     )
                     continue
             # ----------------------------------------------------------------
@@ -378,14 +446,33 @@ def upload():
                 if getattr(event, "pid", player.pid) != player.pid:
                     continue
                 name = format_name(event.upgrade_type_name)
-                used, made = get_supply(event.second)
-                entries.append({
-                    "clock_sec": int(event.second / speed_factor),
-                    "supply": used,
-                    "made": made,
-                    "unit": name,
-                    "kind": "finish",
-                })
+
+                if any(e["unit"] == name and e["kind"] == "start" for e in entries):
+                    continue
+
+                duration = UPGRADE_TIME.get(name, 0)
+                start_real = event.second - duration * speed_factor
+                used, made = get_supply(start_real)
+
+                entries.append(
+                    dict(
+                        clock_sec=int(start_real / speed_factor),
+                        supply=used,
+                        made=made,
+                        unit=name,
+                        kind="start",
+                    )
+                )
+                entries.append(
+                    dict(
+                        clock_sec=int(event.second / speed_factor),
+                        supply=used,
+                        made=made,
+                        unit=name,
+                        kind="finish",
+                    )
+                )
+                continue
 
 
         entries = [e for e in entries if e.get("kind") == "start"]
