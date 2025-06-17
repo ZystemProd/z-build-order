@@ -161,6 +161,42 @@ BUILD_TIME = {
     "Overseer": 17,
 }
 
+# ── legal-upgrade sets, keyed by tidy() names ────────────────
+TERRAN_UP = {
+    "Stimpack", "Combat Shield", "Concussive Shells", "Infernal Pre-Igniter",
+    "Smart Servos", "Drilling Claws", "Hyperflight Rotors",
+    "Hi-Sec Auto Tracking", "Hurricane Engines", "Mag-Field Accelerator",
+    "Caduceus Reactor", "Interference Matrix", "Weapon Refit",
+    "Advanced Ballistics", "Neosteel Frame", "Cloak",
+    "Infantry Weapons", "Infantry Armor",
+    "Vehicle Weapons", "Ship Weapons",
+    "Vehicle And Ship Plating",
+}
+
+PROTOSS_UP = {
+    "Warp Gate", "Blink", "Charge", "Resonating Glaives", "Psionic Storm",
+    "Anion Pulse-Crystals", "Extended Thermal Lance", "Gravitic Boosters",
+    "Gravitic Drive", "Flux Vanes", "Tectonic Destabilizers",
+    "Shadow Stride", "Shields", "Ground Weapons", "Ground Armor",
+    "Air Weapons", "Air Armor",
+}
+
+ZERG_UP = {
+    "Metabolic Boost", "Adrenal Glands", "Glial Reconstitution",
+    "Tunneling Claws", "Grooved Spines", "Muscular Augments",
+    "Chitinous Plating", "Anabolic Synthesis", "Neural Parasite",
+    "Centrifugal Hooks", "Burrow", "Ground Carapace", "Melee Attack",
+    "Missile Attack", "Flyer Armor", "Flyer Attack", "Adaptive Talons",
+    "Seismic Spines", "Pneumatized Carapace",
+}
+
+RACE2SET = {
+    "terran":  TERRAN_UP,
+    "protoss": PROTOSS_UP,
+    "zerg":    ZERG_UP,
+}
+# ──────────────────────────────────────────────────────────────
+
 UPGRADE_TIME = {
     # Zerg
     "Metabolic Boost": 79,
@@ -425,6 +461,10 @@ def upload():
                     upgrade_name = tidy(raw_name)
                     if upgrade_name is None:
                         continue
+                    # race-gate: skip alien tech
+                    legal = RACE2SET.get(player.play_race.lower(), set())
+                    if upgrade_name not in legal:
+                        continue
                     # skip if this upgrade is already in progress (queued duplicate)
                     if upgrade_name in researching_now[pid]:
                         continue
@@ -541,6 +581,9 @@ def upload():
                 name = format_name(event.upgrade_type_name)
                 name = tidy(name)
                 if name is None:
+                    continue
+                legal = RACE2SET.get(player.play_race.lower(), set())
+                if name not in legal:
                     continue
 
                 # skip if we never logged a start (ability might belong to another player)
