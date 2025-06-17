@@ -319,11 +319,17 @@ def upload():
                 continue
 
             # -- Ability / command events ------------------------------------
-            ability = (
+            ability_raw = (
                 getattr(event, "ability_name", None)
                 or getattr(event, "ability_link", None)
                 or getattr(event, "ability", None)
             )
+
+            # Skip or cast non-string values
+            if not isinstance(ability_raw, str):
+                ability_raw = str(ability_raw)
+
+            ability = ability_raw
 
             if ability:
                 # Chrono Boost detection
