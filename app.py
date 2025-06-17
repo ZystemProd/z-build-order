@@ -21,6 +21,7 @@ _ALIAS = {
     "templar archive": "Templar Archives",
     "psi storm tech": "Psionic Storm",
     "medivac caduceus reactor": "Caduceus reactor",
+    "shadow strides": "Shadow Stride",
 }
 
 _RE_TERRAN = re.compile(r"^terran\s+", re.I)
@@ -450,9 +451,13 @@ def upload():
                 # Upgrade research start
                 if ability.startswith("Research"):
 
-                    # skip queued copy (will fire again when it actually starts)
-                    if getattr(event, "queued", False):
+                    # --- skip if this is just a queued copy ---------------------
+                    tag = producer_tag(event)
+                    building_already_busy = tag and building_busy.get(tag) is not None
+
+                    if getattr(event, "queued", False) or building_already_busy:
                         continue
+                    # ------------------------------------------------------------
 
                     # 5-b race-gate
                     raw_name = prettify_upgrade(ability)
@@ -577,12 +582,11 @@ def upload():
                     # skip if we never logged a start
                     if name not in researching_now[player.pid]:
                         continue
-                    researching_now[player.pid].discard(name)
-
-                    # free building
                     tag = producer_tag(event)
-                    if tag and building_busy.get(tag) == name:
+                    if tag in building_busy:
                         del building_busy[tag]
+
+                    researching_now[player.pid].discard(name)
 
                     # optional finish row (will be stripped)
                     used, made = get_supply(event.second)
