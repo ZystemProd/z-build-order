@@ -582,27 +582,56 @@ def upload():
                 name = tidy(name)
                 if name is None:
                     continue
+                # -----------------------------------------------------------------
+                # 1)  Race-gate: ignore upgrades that don’t belong to this race
                 legal = RACE2SET.get(player.play_race.lower(), set())
                 if name not in legal:
                     continue
 
-                # skip if we never logged a start (ability might belong to another player)
-                if name not in researching_now[player.pid]:
-                    continue
-                researching_now[player.pid].discard(name)
+                # 2)  Was a proper Research_* start recorded?
+                if name in researching_now[player.pid]:
+                    researching_now[player.pid].discard(name)
+                    have_start = True
+                else:
+                    have_start = False
 
-                used, made = get_supply(event.second)
-
-                # optional: append a FINISH row for debugging (will be stripped later)
+                # 3)  Always keep the FINISH row (will be stripped if you still
+                #     filter kind!="start" later; useful for debug).
+                used_fin, made_fin = get_supply(event.second)
                 entries.append(
                     dict(
                         clock_sec=int(event.second / speed_factor),
-                        supply=used,
-                        made=made,
+                        supply=used_fin,
+                        made=made_fin,
                         unit=name,
                         kind="finish",
                     )
                 )
+
+                # 4)  If the start was *missing* but the upgrade is legal,
+                #     back-fill a start row using the duration table.
+                if not have_start:
+                    duration = UPGRADE_TIME.get(name)
+                    if duration:            # only back-fill if we know the time
+                        start_real = event.second - duration * speed_factor
+                        used_sta, made_sta = get_supply(start_real)
+
+                        # stop/supply limits still honoured
+                        if stop_limit and used_sta > stop_limit:
+                            continue
+                        if time_limit and int(start_real / speed_factor) > time_limit:
+                            continue
+
+                        entries.append(
+                            dict(
+                                clock_sec=int(start_real / speed_factor),
+                                supply=used_sta,
+                                made=made_sta,
+                                unit=name,
+                                kind="start",
+                            )
+                        )
+                # -----------------------------------------------------------------
                 continue
 
 
