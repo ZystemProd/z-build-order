@@ -1,4 +1,6 @@
 from flask import Flask, request, jsonify
+"""Minimal StarCraft II replay parser producing build orders."""
+
 from flask_cors import CORS
 import sc2reader
 import io
@@ -6,6 +8,68 @@ import bisect
 import re
 from sc2reader.constants import GAME_SPEED_FACTOR
 from name_map import NAME_MAP
+
+# Build times in game seconds for LotV 5.x. Values are approximate. See
+# https://liquipedia.net/starcraft2/ for updates.
+BUILD_TIME = {
+    # Terran
+    "SCV": 12,
+    "Marine": 18,
+    "Marauder": 21,
+    "Reaper": 32,
+    "Ghost": 29,
+    "Hellion": 30,
+    "Hellbat": 30,
+    "Widow Mine": 28,
+    "Cyclone": 32,
+    "Siege Tank": 32,
+    "Thor": 43,
+    "Viking": 30,
+    "Medivac": 30,
+    "Liberator": 43,
+    "Banshee": 46,
+    "Raven": 43,
+    "Battlecruiser": 64,
+
+    # Protoss
+    "Probe": 12,
+    "Zealot": 27,
+    "Stalker": 30,
+    "Sentry": 26,
+    "Adept": 27,
+    "High Templar": 39,
+    "Dark Templar": 39,
+    "Immortal": 39,
+    "Colossus": 54,
+    "Disruptor": 39,
+    "Observer": 21,
+    "Warp Prism": 36,
+    "Phoenix": 25,
+    "Void Ray": 37,
+    "Oracle": 37,
+    "Tempest": 43,
+    "Carrier": 64,
+    "Mothership": 86,
+
+    # Zerg
+    "Drone": 12,
+    "Zergling": 17,
+    "Overlord": 18,
+    "Queen": 36,
+    "Roach": 19,
+    "Ravager": 12,
+    "Hydralisk": 29,
+    "Lurker": 18,
+    "Baneling": 14,
+    "Mutalisk": 33,
+    "Corruptor": 29,
+    "Brood Lord": 34,
+    "Infestor": 43,
+    "Swarm Host": 43,
+    "Ultralisk": 39,
+    "Viper": 29,
+    "Overseer": 17,
+}
 
 app = Flask(__name__)
 CORS(app)
@@ -23,7 +87,7 @@ def format_name(name: str) -> str:
 
 @app.route('/')
 def index():
-    return '🟢 SC2 Replay Parser is live!'
+    return '🟢 SC2 build-order parser is live!'
 
 
 @app.route('/players', methods=['POST'])
@@ -92,6 +156,8 @@ def upload():
         compact = str(compact_flag).lower() in {'1', 'true', 'yes', 'on'}
         if compact:
             exclude_time = True
+        debug_flag = request.form.get('debug', '')
+        debug = str(debug_flag).lower() in {'1', 'true', 'yes', 'on'}
         stop_supply_raw = request.form.get('stop_supply')
         stop_time_raw = request.form.get('stop_time')
         stop_limit = None
@@ -132,11 +198,10 @@ def upload():
             "Changeling",
         }
         skip_units_lower = {s.lower() for s in skip_units}
-        # Skip any creep tumor variants or chrono boost abilities
+        # Skip any creep tumor variants or phase shift abilities
         skip_keywords = [
             "Creep Tumor",
             "CreepTumor",
-            "Chrono",
             "Phase Shift",
             "PhaseShift",
         ]
@@ -155,119 +220,132 @@ def upload():
             speed_factor = 1.4
 
         entries = []
+        init_map = {}
+        chrono_until = {p.pid: 0 for p in players}
 
         for event in replay.events:
             if event.second == 0:
                 continue
-            etype = None
-            name = None
 
-            if isinstance(
-                event,
-                (
-                    sc2reader.events.game.DataCommandEvent,
-                    sc2reader.events.game.TargetUnitCommandEvent,
-                ),
-            ):
-                # Commands represent the start of a unit/structure or upgrade
-                if event.pid != player.pid:
+            if isinstance(event, sc2reader.events.game.AbilityEvent):
+                ability_name = getattr(event, "ability_name", "")
+                if ability_name.endswith("ChronoBoostEnergyCost") or ability_name.endswith("ChronoBoost"):
+                    chrono_until[event.pid] = max(chrono_until.get(event.pid, 0), event.second) + 9.6 * speed_factor
                     continue
-                ability = getattr(event, "ability", None)
+                if ability_name.startswith("Research") and event.pid == player.pid:
+                    upg_name = format_name(ability_name[len("Research") :])
+                    used, made = get_supply(event.second)
+                    if stop_limit is not None and used > stop_limit:
+                        break
+                    if time_limit is not None and int(event.second / speed_factor) > time_limit:
+                        break
+                    entries.append({
+                        "clock_sec": int(event.second / speed_factor),
+                        "supply": used,
+                        "made": made,
+                        "unit": upg_name,
+                        "kind": "start",
+                    })
+                continue
 
-                ability_name = (
-                    (ability.name if ability and ability.name else None)
-                    or getattr(event, "ability_name", "")
-                )
-                if ability_name.startswith("Cancel"):
+            if isinstance(event, sc2reader.events.tracker.UnitBornEvent):
+                if getattr(event, "control_pid", None) != player.pid:
                     continue
-
-                if ability and ability.is_build and ability.build_unit:
-
-                    unit = ability.build_unit
-                    etype = "building" if unit.is_building else "unit"
-                    name = unit.name
-                else:
-
-                    # Fall back to parsing the ability name for known prefixes
-                    lowered = ability_name.lower()
-                    if "train" in ability_name:
-                        name = ability_name.split("Train")[-1]
-                        etype = "unit"
-                    elif lowered.startswith("warp") and "train" in ability_name:
-                        name = ability_name.split("Train")[-1]
-                        etype = "unit"
-                    elif lowered.startswith("build"):
-                        name = ability_name[len("Build") :]
-                        etype = "building"
-                    else:
-                        for prefix in (
-                            "Research",
-                            "UpgradeTo",
-                            "Upgrade",
-                            "MorphTo",
-                            "Morph",
-                            "TransformTo",
-                            "Transform",
-                        ):
-                            if ability_name.startswith(prefix):
-                                name = ability_name[len(prefix) :]
-                                etype = "upgrade"
-                                break
-
-
-            elif isinstance(event, sc2reader.events.tracker.UnitBornEvent):
-                etype = "unit"
-                name = event.unit_type_name
-            elif isinstance(event, sc2reader.events.tracker.UnitInitEvent):
-                etype = "building"
-                name = event.unit_type_name
-            elif isinstance(event, sc2reader.events.tracker.UpgradeCompleteEvent):
-                etype = "upgrade"
-                name = event.upgrade_type_name
-            else:
+                unit = event.unit
+                is_building = getattr(unit, "is_building", False)
+                if is_building:
+                    continue
+                name = format_name(event.unit_type_name)
+                lower_name = name.lower()
+                if (
+                    not name
+                    or "Beacon" in name
+                    or "Spray" in name
+                    or name in skip_units
+                    or lower_name in skip_units_lower
+                    or any(key.lower() in lower_name for key in skip_keywords)
+                ):
+                    continue
+                build_time = BUILD_TIME.get(event.unit_type_name, 0)
+                start_real = event.second - build_time * speed_factor
+                if player.play_race.lower() == "protoss" and start_real < chrono_until.get(player.pid, 0):
+                    if start_real >= chrono_until[player.pid] - 9.6 * speed_factor:
+                        start_real = event.second - build_time * 0.65 * speed_factor
+                used, made = get_supply(start_real)
+                if stop_limit is not None and used > stop_limit:
+                    break
+                if time_limit is not None and int(start_real / speed_factor) > time_limit:
+                    break
+                entries.append({
+                    "clock_sec": int(start_real / speed_factor),
+                    "supply": used,
+                    "made": made,
+                    "unit": name,
+                    "kind": "start",
+                })
+                used_finish, made_finish = get_supply(event.second)
+                entries.append({
+                    "clock_sec": int(event.second / speed_factor),
+                    "supply": used_finish,
+                    "made": made_finish,
+                    "unit": name,
+                    "kind": "finish",
+                })
                 continue
 
-            if getattr(event, 'control_pid', getattr(event, 'pid', None)) != player.pid:
+            if isinstance(event, sc2reader.events.tracker.UnitInitEvent):
+                if event.control_pid != player.pid:
+                    continue
+                name = format_name(event.unit_type_name)
+                lower_name = name.lower()
+                if (
+                    not name
+                    or "Beacon" in name
+                    or "Spray" in name
+                    or name in skip_units
+                    or lower_name in skip_units_lower
+                    or any(key.lower() in lower_name for key in skip_keywords)
+                ):
+                    continue
+                used, made = get_supply(event.second)
+                init_map[event.unit_id] = name
+                entries.append({
+                    "clock_sec": int(event.second / speed_factor),
+                    "supply": used,
+                    "made": made,
+                    "unit": name,
+                    "kind": "start",
+                })
                 continue
-            lower_name = name.lower()
-            if (
-                not name
-                or 'Beacon' in name
-                or 'Spray' in name
-                or name in skip_units
-                or lower_name in skip_units_lower
-                or any(key.lower() in lower_name for key in skip_keywords)
-            ):
+
+            if isinstance(event, sc2reader.events.tracker.UnitDoneEvent):
+                if event.unit_id in init_map:
+                    name = init_map[event.unit_id]
+                    used, made = get_supply(event.second)
+                    entries.append({
+                        "clock_sec": int(event.second / speed_factor),
+                        "supply": used,
+                        "made": made,
+                        "unit": name,
+                        "kind": "finish",
+                    })
                 continue
 
-            name = format_name(name)
-            ln = name.lower()
-            if ln.startswith("terran "):
-                name = name[7:]
-            elif ln.startswith("evolve "):
-                name = name[7:]
+            if isinstance(event, sc2reader.events.tracker.UpgradeCompleteEvent):
+                if getattr(event, "pid", player.pid) != player.pid:
+                    continue
+                name = format_name(event.upgrade_type_name)
+                used, made = get_supply(event.second)
+                entries.append({
+                    "clock_sec": int(event.second / speed_factor),
+                    "supply": used,
+                    "made": made,
+                    "unit": name,
+                    "kind": "finish",
+                })
 
-            # Convert real-time seconds to in-game seconds
-            game_sec = int(event.second / speed_factor)
 
-
-            if time_limit is not None and game_sec > time_limit:
-                break
-
-            supply_used, supply_made = get_supply(event.second)
-            if stop_limit is not None and supply_used > stop_limit:
-                break
-
-            minutes = game_sec // 60
-            seconds = game_sec % 60
-            timestamp = f"{minutes:02d}:{seconds:02d}"
-
-            if entries and entries[-1]['supply'] == supply_used and entries[-1]['unit'] == name:
-                # Combine consecutive events for the same unit/building at the
-                # same supply regardless of slight timestamp differences.
-                entries[-1]['count'] += 1
-            else:
-                entries.append({'supply': supply_used, 'made': supply_made, 'time': timestamp, 'secs': game_sec, 'unit': name, 'count': 1})
+        entries.sort(key=lambda e: (e['clock_sec'], e['kind'] == 'finish'))
 
         build_lines = []
 
@@ -278,12 +356,12 @@ def upload():
                 first = entries[i]
                 supply = first['supply']
                 made = first['made']
-                start_time = first['secs']
+                start_time = first['clock_sec']
                 units = []
-                while i < n and entries[i]['supply'] == supply and entries[i]['secs'] - start_time <= 5:
+                while i < n and entries[i]['supply'] == supply and abs(entries[i]['clock_sec'] - start_time) <= 5:
                     e = entries[i]
-                    count_part = f"{e['count']} " if e['count'] > 1 else ""
-                    units.append(f"{count_part}{e['unit']}")
+                    label = f"{e['unit']} ({e['kind']})" if debug else e['unit']
+                    units.append(label)
                     i += 1
                 parts = []
                 if not exclude_supply:
@@ -302,10 +380,12 @@ def upload():
                         supply_str = f"{item['supply']}/{item['made']}"
                     parts.append(supply_str)
                 if not exclude_time:
-                    parts.append(item['time'])
+                    minutes = item['clock_sec'] // 60
+                    seconds = item['clock_sec'] % 60
+                    parts.append(f"{minutes:02d}:{seconds:02d}")
                 prefix = f"[{' '.join(parts)}] " if parts else ""
-                count_part = f"{item['count']} " if item['count'] > 1 else ""
-                build_lines.append(f"{prefix}{count_part}{item['unit']}")
+                label = f"{item['unit']} ({item['kind']})" if debug else item['unit']
+                build_lines.append(prefix + label)
 
         return '\n'.join(build_lines)
 
