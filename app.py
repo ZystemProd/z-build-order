@@ -13,6 +13,7 @@ _DROP = {
     "spray terran",
     "spray zerg",
     "spray protoss",
+    "interceptor",          # drop Carrier interceptor rows
 }
 
 _ALIAS = {
