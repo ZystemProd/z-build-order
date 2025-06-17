@@ -86,10 +86,15 @@ def prettify_upgrade(ability_name: str) -> str:
 
 
 def producer_tag(ev):
-    if getattr(ev, "target", None):  # TargetUnitCommandEvent
-        return ev.target.tag
-    if getattr(ev, "unit", None):
+    """
+    Return the tag of the structure that will perform this research.
+    For TargetUnitCommandEvent / AbilityEvent the *unit* is the producer;
+    .target is usually None.
+    """
+    if getattr(ev, "unit", None):        # primary
         return ev.unit.tag
+    if getattr(ev, "target", None):      # fallback
+        return ev.target.tag
     return None
 
 # Build times in game seconds for LotV 5.x. Values are approximate. See
@@ -455,7 +460,12 @@ def upload():
                     tag = producer_tag(event)
                     building_already_busy = tag and building_busy.get(tag) is not None
 
-                    if getattr(event, "queued", False) or building_already_busy:
+                    is_queued = (
+                        getattr(event, "queued", False)          # modern flag
+                        or (getattr(event, "flags", 0) & 0x1)    # legacy queued bit
+                        or building_already_busy                 # producer busy
+                    )
+                    if is_queued:
                         continue
                     # ------------------------------------------------------------
 
@@ -582,13 +592,14 @@ def upload():
                     # skip if we never logged a start
                     if name not in researching_now[player.pid]:
                         continue
-                    tag = producer_tag(event)
-                    if tag in building_busy:
-                        del building_busy[tag]
+                    # free whichever building was researching this upgrade
+                    for t, up in list(building_busy.items()):
+                        if up == name:
+                            del building_busy[t]
 
                     researching_now[player.pid].discard(name)
 
-                    # optional finish row (will be stripped)
+                    # optional finish row (kept for debug, later filtered)
                     used, made = get_supply(event.second)
                     entries.append(
                         dict(
@@ -599,7 +610,7 @@ def upload():
                             kind="finish",
                         )
                     )
-                    continue
+                    continue   # (rest of branch unchanged)
 
 
         entries = [e for e in entries if e.get("kind") == "start"]
