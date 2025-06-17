@@ -318,6 +318,18 @@ def upload():
             if event.second == 0:
                 continue
 
+            # ----- global stop limits ---------------------------------
+            game_time = int(event.second / speed_factor)   # in-game seconds
+
+            if time_limit is not None and game_time > time_limit:
+                break
+
+            if stop_limit is not None:
+                used_now, _ = get_supply(event.second)
+                if used_now > stop_limit:
+                    break
+            # -----------------------------------------------------------
+
             # -- Ability / command events ------------------------------------
             ability_raw = (
                 getattr(event, "ability_name", None)
