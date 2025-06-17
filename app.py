@@ -475,6 +475,9 @@ def upload():
 
                 # Upgrade research start
                 if ability.startswith("Research"):
+                    # ignore queued research orders – they have .queued == True
+                    if getattr(event, "queued", False):
+                        continue       # we'll log the upgrade when it really starts
                     pid = owner_pid(event)
                     if pid != player.pid:
                         continue
