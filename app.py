@@ -19,7 +19,7 @@ _DROP = {
 _ALIAS = {
     "overlordspeed": "Overlord speed",
     "templar archive": "Templar Archives",
-    "psi storm tech": "psionic storm",
+    "psi storm tech": "Psionic Storm",
     "medivac caduceus reactor": "Caduceus reactor",
 }
 
@@ -56,24 +56,6 @@ import collections
 from sc2reader.constants import GAME_SPEED_FACTOR
 from name_map import NAME_MAP
 
-
-
-def is_queued_research(ev) -> bool:
-    """Return True if this Research_* event is only queued."""
-    # a) modern property
-    if getattr(ev, "queued", False):
-        return True
-
-    # b) raw command flags (0x1 or 0x2 most common for "queued")
-    if getattr(ev, "flags", 0) & 0x3:
-        return True
-
-    # c) producer-building already busy with another upgrade
-    prod = getattr(ev, "unit", None)
-    if prod and building_busy[prod.tag] is not None:
-        return True
-
-    return False
 
 # --- Ability/Command events helper for any sc2reader version ---
 from sc2reader.events import game as ge
@@ -468,8 +450,8 @@ def upload():
                 # Upgrade research start
                 if ability.startswith("Research"):
 
-                    # 5-a skip if queued
-                    if getattr(event, "queued", False) or (getattr(event, "flags", 0) & 0x3):
+                    # skip queued copy (will fire again when it actually starts)
+                    if getattr(event, "queued", False):
                         continue
 
                     # 5-b race-gate
