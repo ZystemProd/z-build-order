@@ -543,25 +543,14 @@ def upload():
                 if name is None:
                     continue
 
-                # remove from "in-progress" set
+                # skip if we never logged a start (ability might belong to another player)
+                if name not in researching_now[player.pid]:
+                    continue
                 researching_now[player.pid].discard(name)
 
-                if any(e["unit"] == name and e["kind"] == "start" for e in entries):
-                    continue
+                used, made = get_supply(event.second)
 
-                duration = UPGRADE_TIME.get(name, 0)
-                start_real = event.second - duration * speed_factor
-                used, made = get_supply(start_real)
-
-                entries.append(
-                    dict(
-                        clock_sec=int(start_real / speed_factor),
-                        supply=used,
-                        made=made,
-                        unit=name,
-                        kind="start",
-                    )
-                )
+                # optional: append a FINISH row for debugging (will be stripped later)
                 entries.append(
                     dict(
                         clock_sec=int(event.second / speed_factor),
