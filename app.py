@@ -211,8 +211,6 @@ UPGRADE_TIME = {
     "Cloak": 79,
 }
 
-# player-pid → set of upgrades currently researching
-researching_now = collections.defaultdict(set)
 
 app = Flask(__name__)
 CORS(app)
@@ -360,9 +358,10 @@ def upload():
         if replay.expansion == "LotV" and replay.speed == "Faster" and speed_factor == 1.0:
             speed_factor = 1.4
 
-        entries = []
-        init_map = {}
-        chrono_until = {p.pid: 0 for p in players}
+        researching_now = collections.defaultdict(set)   # per-request
+        chrono_until    = {p.pid: 0 for p in players}
+        init_map        = {}
+        entries         = []
 
         for event in replay.events:
             if event.second == 0:
