@@ -72,6 +72,7 @@ for _name in (
 
 ABILITY_EVENTS = tuple(_ABILITY_CLASSES)
 
+
 # Helper for parsing upgrade ability names
 UPGRADE_PREFIX = re.compile(r'^(Research|Upgrade)_?')
 
@@ -83,6 +84,7 @@ def prettify_upgrade(ability_name: str) -> str:
     return words.replace('_', ' ').strip().title()
 
 # Build times in game seconds for LotV 5.x. Values are approximate. See
+
 
 # Build times in game seconds for LotV 5.x. Values are approximate. See
 # https://liquipedia.net/starcraft2/ for updates.
@@ -145,6 +147,7 @@ BUILD_TIME = {
     "Viper": 29,
     "Overseer": 17,
 }
+
 
 UPGRADE_TIME = {
     # Zerg
@@ -213,6 +216,7 @@ UPGRADE_TIME = {
 
 # player-pid → set of upgrades currently researching
 researching_now = collections.defaultdict(set)
+
 
 app = Flask(__name__)
 CORS(app)
@@ -368,6 +372,7 @@ def upload():
             if event.second == 0:
                 continue
 
+
             # ----- global stop limits ---------------------------------
             game_time = int(event.second / speed_factor)   # in-game seconds
 
@@ -488,24 +493,29 @@ def upload():
                 name = tidy(name)
                 if name is None:
                     continue
+
                 lower_name = name.lower()
                 if (
                     not name
                     or "Beacon" in name
+
                     or name in skip_units
                     or lower_name in skip_units_lower
                     or any(key.lower() in lower_name for key in skip_keywords)
                 ):
                     continue
+
                 used, made = get_supply(event.second)
                 init_map[event.unit_id] = name
                 entries.append({
                     "clock_sec": int(event.second / speed_factor),
+
                     "supply": used,
                     "made": made,
                     "unit": name,
                     "kind": "start",
                 })
+
                 continue
 
             if isinstance(event, sc2reader.events.tracker.UnitDoneEvent):
@@ -581,6 +591,7 @@ def upload():
         entries = tmp
         # ----------------------------------------------------------------
 
+
         entries.sort(key=lambda e: e['clock_sec'])
 
         build_lines = []
@@ -596,9 +607,11 @@ def upload():
                 units = []
                 while i < n and entries[i]['supply'] == supply and abs(entries[i]['clock_sec'] - start_time) <= 5:
                     e = entries[i]
+
                     qty = e.get("count", 1)
                     label = f"{qty} {e['unit']}" if qty > 1 else e['unit']
                     units.append(label)
+
                     i += 1
                 parts = []
                 if not exclude_supply:
@@ -621,9 +634,11 @@ def upload():
                     seconds = item['clock_sec'] % 60
                     parts.append(f"{minutes:02d}:{seconds:02d}")
                 prefix = f"[{' '.join(parts)}] " if parts else ""
+
                 qty = item.get("count", 1)
                 label = f"{qty} {item['unit']}" if qty > 1 else item['unit']
                 build_lines.append(prefix + label)
+
 
         return '\n'.join(build_lines)
 
