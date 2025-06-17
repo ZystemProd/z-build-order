@@ -6,6 +6,51 @@ import sc2reader
 import io
 import bisect
 import re
+
+# --- label normalisation / filter ---------------------------------
+_DROP = {
+    "k d8 charge",
+    "spray terran",
+    "spray zerg",
+    "spray protoss",
+}
+
+_ALIAS = {
+    "overlordspeed": "Overlord speed",
+    "templar archive": "Templar Archives",
+    "psi storm tech": "psionic storm",
+    "medivac caduceus reactor": "Caduceus reactor",
+}
+
+_RE_TERRAN = re.compile(r"^terran\s+", re.I)
+_RE_EVOLVE = re.compile(r"^evolve\s+", re.I)
+_RE_UPGRADE = re.compile(r"\s+upgrade$", re.I)
+_RE_MP_TAG = re.compile(r"\s+m\s*p\s*$", re.I)
+
+
+def tidy(label: str) -> str | None:
+    """Clean a unit / upgrade label. Return None to drop it."""
+    low = label.lower()
+
+    if low in _DROP:
+        return None
+
+    if low in _ALIAS:
+        return _ALIAS[low]
+
+    label = _RE_TERRAN.sub("", label)
+    label = _RE_EVOLVE.sub("", label)
+    label = _RE_UPGRADE.sub("", label)
+    label = _RE_MP_TAG.sub("", label)
+
+    label = re.sub(r"\s{2,}", " ", label).strip()
+    if not label or label.lower() in _DROP:
+        return None
+
+    return label[0].upper() + label[1:]
+
+# -------------------------------------------------------------------
+
 import collections
 from sc2reader.constants import GAME_SPEED_FACTOR
 from name_map import NAME_MAP
@@ -361,7 +406,10 @@ def upload():
                     if pid != player.pid:
                         continue
 
-                    upgrade_name = prettify_upgrade(ability)
+                    raw_name = prettify_upgrade(ability)
+                    upgrade_name = tidy(raw_name)
+                    if upgrade_name is None:
+                        continue
                     # skip if this upgrade is already in progress (queued duplicate)
                     if upgrade_name in researching_now[pid]:
                         continue
@@ -393,6 +441,9 @@ def upload():
                 if is_building:
                     continue
                 name = format_name(event.unit_type_name)
+                name = tidy(name)
+                if name is None:
+                    continue
                 lower_name = name.lower()
                 if (
                     not name
@@ -433,6 +484,9 @@ def upload():
                 if event.control_pid != player.pid:
                     continue
                 name = format_name(event.unit_type_name)
+                name = tidy(name)
+                if name is None:
+                    continue
                 lower_name = name.lower()
                 if (
                     not name
@@ -470,6 +524,9 @@ def upload():
                 if getattr(event, "pid", player.pid) != player.pid:
                     continue
                 name = format_name(event.upgrade_type_name)
+                name = tidy(name)
+                if name is None:
+                    continue
 
                 # remove from "in-progress" set
                 researching_now[player.pid].discard(name)
