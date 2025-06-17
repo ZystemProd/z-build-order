@@ -9,6 +9,22 @@ import re
 from sc2reader.constants import GAME_SPEED_FACTOR
 from name_map import NAME_MAP
 
+# --- Ability/Command events helper for any sc2reader version ---
+from sc2reader.events import game as ge
+
+_ABILITY_CLASSES = []
+for _name in (
+    "AbilityEvent",            # pre-2.0
+    "CommandEvent",            # 2.0 alpha
+    "TargetPointCommandEvent", # 2.x stable
+    "TargetUnitCommandEvent",
+):
+    _cls = getattr(ge, _name, None)
+    if _cls:
+        _ABILITY_CLASSES.append(_cls)
+
+ABILITY_EVENTS = tuple(_ABILITY_CLASSES)
+
 # Build times in game seconds for LotV 5.x. Values are approximate. See
 # https://liquipedia.net/starcraft2/ for updates.
 BUILD_TIME = {
@@ -227,7 +243,7 @@ def upload():
             if event.second == 0:
                 continue
 
-            if isinstance(event, sc2reader.events.game.AbilityEvent):
+            if isinstance(event, ABILITY_EVENTS):
                 ability_name = getattr(event, "ability_name", "")
                 if ability_name.endswith("ChronoBoostEnergyCost") or ability_name.endswith("ChronoBoost"):
                     chrono_until[event.pid] = max(chrono_until.get(event.pid, 0), event.second) + 9.6 * speed_factor
