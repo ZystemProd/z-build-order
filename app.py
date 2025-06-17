@@ -172,8 +172,6 @@ def upload():
         compact = str(compact_flag).lower() in {'1', 'true', 'yes', 'on'}
         if compact:
             exclude_time = True
-        debug_flag = request.form.get('debug', '')
-        debug = str(debug_flag).lower() in {'1', 'true', 'yes', 'on'}
         stop_supply_raw = request.form.get('stop_supply')
         stop_time_raw = request.form.get('stop_time')
         stop_limit = None
@@ -361,7 +359,8 @@ def upload():
                 })
 
 
-        entries.sort(key=lambda e: (e['clock_sec'], e['kind'] == 'finish'))
+        entries = [e for e in entries if e.get("kind") == "start"]
+        entries.sort(key=lambda e: e['clock_sec'])
 
         build_lines = []
 
@@ -376,8 +375,7 @@ def upload():
                 units = []
                 while i < n and entries[i]['supply'] == supply and abs(entries[i]['clock_sec'] - start_time) <= 5:
                     e = entries[i]
-                    label = f"{e['unit']} ({e['kind']})" if debug else e['unit']
-                    units.append(label)
+                    units.append(e['unit'])
                     i += 1
                 parts = []
                 if not exclude_supply:
@@ -400,8 +398,7 @@ def upload():
                     seconds = item['clock_sec'] % 60
                     parts.append(f"{minutes:02d}:{seconds:02d}")
                 prefix = f"[{' '.join(parts)}] " if parts else ""
-                label = f"{item['unit']} ({item['kind']})" if debug else item['unit']
-                build_lines.append(prefix + label)
+                build_lines.append(prefix + item['unit'])
 
         return '\n'.join(build_lines)
 
