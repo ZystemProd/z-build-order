@@ -125,6 +125,10 @@ function updateBuildInputPlaceholder() {
 
 setupTemplateModal(); // Always call early
 
+// — replay meta, filled by populateReplayOptions —
+let replayPlayers = [];
+let pendingMatchup = null;
+
 let currentClanView = null;
 let allBuilds = [];
 let currentBuildFilter = "all";
@@ -497,13 +501,8 @@ export async function initializeIndexPage() {
         select.appendChild(opt);
       });
       const matchup = data.matchup;
-      if (matchup) {
-        const dropdown = document.getElementById("buildCategoryDropdown");
-        if (dropdown) {
-          dropdown.value = matchup;
-          updateDropdownColor();
-        }
-      }
+      replayPlayers = players; // save for Confirm-click
+      pendingMatchup = matchup; // e.g. "zvp"
     } catch (err) {
       console.error("Failed to fetch players", err);
       select.innerHTML = "<option value='1'>Player 1</option>";
@@ -589,6 +588,25 @@ export async function initializeIndexPage() {
     btn.innerText = "Parse Replay";
     const modal = document.getElementById("replayOptionsModal");
     if (modal) modal.style.display = "none";
+
+    // —–––– update build-category dropdown AFTER parsing —––––
+    const dd = document.getElementById("buildCategoryDropdown");
+    if (dd && replayPlayers.length >= 2) {
+      const chosenPid = Number(playerSelect.value);
+      const me = replayPlayers.find((p) => p.pid === chosenPid);
+      const foe = replayPlayers.find((p) => p.pid !== chosenPid);
+
+      if (me && foe) {
+        const abbrev = (r) => r[0].toUpperCase();
+        const match = `${abbrev(me.race)}v${abbrev(foe.race)}`; // "ZvP"
+        dd.value = match.toLowerCase();
+        updateDropdownColor();
+      } else if (pendingMatchup) {
+        dd.value = pendingMatchup;
+        updateDropdownColor();
+      }
+    }
+    // —–––––––––––––––––––––––––––––––––––––––––––––––––––––––
   });
 
   safeAdd("closeReplayOptionsModal", "click", () => {
