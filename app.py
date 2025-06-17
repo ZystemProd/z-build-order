@@ -444,6 +444,28 @@ def upload():
             ability = ability_raw
 
             if ability:
+                # -- fall-back: ability is only a numeric ID -----------------
+                if ability.isdigit():
+                    # treat the raw ID as a label so we can see it in the output
+                    used, made = get_supply(event.second)
+
+                    if stop_limit and used > stop_limit:
+                        continue
+                    if time_limit and int(event.second / speed_factor) > time_limit:
+                        continue
+
+                    entries.append(
+                        dict(
+                            clock_sec=int(event.second / speed_factor),
+                            supply=used,
+                            made=made,
+                            unit=f"Ability {ability}",
+                            kind="start",
+                        )
+                    )
+                    continue
+                # ------------------------------------------------------------
+
                 # Chrono Boost detection
                 if ability.endswith(("ChronoBoostEnergyCost", "ChronoBoost")):
                     chrono_until[event.pid] = max(
