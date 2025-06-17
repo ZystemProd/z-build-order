@@ -403,6 +403,13 @@ def upload():
 
                 # Upgrade research start
                 if ability.startswith("Research"):
+                    # ----------------------------------------------------------------
+                    # Ignore commands that are merely queued (event.queued is True).
+                    # sc2reader emits the same Research_* twice: once when queued,
+                    # again when it actually begins.  We only want the latter.
+                    if getattr(event, "queued", False):
+                        continue
+                    # ----------------------------------------------------------------
                     pid = getattr(event, "pid", None) or getattr(event, "player", None).pid
                     if pid != player.pid:
                         continue
