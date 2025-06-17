@@ -56,6 +56,21 @@ import collections
 from sc2reader.constants import GAME_SPEED_FACTOR
 from name_map import NAME_MAP
 
+
+def owner_pid(ev) -> int | None:
+    """Return the player-id that owns `ev`, or None if unknown."""
+    # Tracker events (Unit*, Upgrade*) usually expose .pid
+    if getattr(ev, "pid", None):
+        return ev.pid
+    # Game events (Ability/Command) sometimes carry .player
+    if getattr(ev, "player", None):
+        return ev.player.pid
+    # Fall back to control_pid / upkeep_pid if present
+    for attr in ("control_pid", "upkeep_pid"):
+        if getattr(ev, attr, None):
+            return getattr(ev, attr)
+    return None
+
 # --- Ability/Command events helper for any sc2reader version ---
 from sc2reader.events import game as ge
 
@@ -402,7 +417,7 @@ def upload():
 
                 # Upgrade research start
                 if ability.startswith("Research"):
-                    pid = getattr(event, "pid", None) or getattr(event, "player", None).pid
+                    pid = owner_pid(event)
                     if pid != player.pid:
                         continue
 
@@ -434,7 +449,7 @@ def upload():
             # ----------------------------------------------------------------
 
             if isinstance(event, sc2reader.events.tracker.UnitBornEvent):
-                if getattr(event, "control_pid", None) != player.pid:
+                if owner_pid(event) != player.pid:
                     continue
                 unit = event.unit
                 is_building = getattr(unit, "is_building", False)
@@ -481,7 +496,7 @@ def upload():
                 continue
 
             if isinstance(event, sc2reader.events.tracker.UnitInitEvent):
-                if event.control_pid != player.pid:
+                if owner_pid(event) != player.pid:
                     continue
                 name = format_name(event.unit_type_name)
                 name = tidy(name)
@@ -521,7 +536,7 @@ def upload():
                 continue
 
             if isinstance(event, sc2reader.events.tracker.UpgradeCompleteEvent):
-                if getattr(event, "pid", player.pid) != player.pid:
+                if owner_pid(event) != player.pid:
                     continue
                 name = format_name(event.upgrade_type_name)
                 name = tidy(name)
