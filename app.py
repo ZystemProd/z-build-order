@@ -389,7 +389,6 @@ def upload():
                 if (
                     not name
                     or "Beacon" in name
-                    or "Spray" in name
                     or name in skip_units
                     or lower_name in skip_units_lower
                     or any(key.lower() in lower_name for key in skip_keywords)
@@ -430,7 +429,6 @@ def upload():
                 if (
                     not name
                     or "Beacon" in name
-                    or "Spray" in name
                     or name in skip_units
                     or lower_name in skip_units_lower
                     or any(key.lower() in lower_name for key in skip_keywords)
