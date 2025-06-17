@@ -494,6 +494,26 @@ def upload():
 
 
         entries = [e for e in entries if e.get("kind") == "start"]
+
+        # ----- collapse identical unit/supply rows ------------------
+        # assumes entries are still unsorted; we'll sort after grouping
+        tmp = []
+
+        for e in sorted(entries, key=lambda x: (x["clock_sec"], x["supply"], x["unit"])):
+            if (
+                tmp
+                and e["unit"] == tmp[-1]["unit"]
+                and e["supply"] == tmp[-1]["supply"]
+            ):
+                # same unit & supply → bump count
+                tmp[-1]["count"] = tmp[-1].get("count", 1) + 1
+            else:
+                e["count"] = 1
+                tmp.append(e)
+
+        entries = tmp
+        # ----------------------------------------------------------------
+
         entries.sort(key=lambda e: e['clock_sec'])
 
         build_lines = []
@@ -509,7 +529,9 @@ def upload():
                 units = []
                 while i < n and entries[i]['supply'] == supply and abs(entries[i]['clock_sec'] - start_time) <= 5:
                     e = entries[i]
-                    units.append(e['unit'])
+                    qty = e.get("count", 1)
+                    label = f"{qty} {e['unit']}" if qty > 1 else e['unit']
+                    units.append(label)
                     i += 1
                 parts = []
                 if not exclude_supply:
@@ -532,7 +554,9 @@ def upload():
                     seconds = item['clock_sec'] % 60
                     parts.append(f"{minutes:02d}:{seconds:02d}")
                 prefix = f"[{' '.join(parts)}] " if parts else ""
-                build_lines.append(prefix + item['unit'])
+                qty = item.get("count", 1)
+                label = f"{qty} {item['unit']}" if qty > 1 else item['unit']
+                build_lines.append(prefix + label)
 
         return '\n'.join(build_lines)
 
