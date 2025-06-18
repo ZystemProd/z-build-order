@@ -458,26 +458,16 @@ def upload():
             if isinstance(event, sc2reader.events.tracker.UpgradeCompleteEvent):
                 if event.pid != player.pid:
                     continue
-                upgrade_id = getattr(event, "upgrade_type_id", None)
-                duration = durations.get(upgrade_id)
-                if duration is None:
-                    duration = durations.get(event.upgrade_type_name)
-                if duration is None:
-                    continue  # still unknown, skip politely
 
-                start_frame = event.frame - duration
-                start_sec = start_frame / replay.game_fps
-                start_supply = _supply_at(frames_by_pid[player.pid], supply_by_pid[player.pid], start_frame)
                 name = tidy(event.upgrade_type_name)
                 if name is None:
                     continue
+
                 entries.append({
-                    "time": int(start_sec),
+                    "time": int(event.second / speed_factor),  # just current in-game time
                     "label": name,
                     "type": "upgrade"
                 })
-
-                upgrade_starts.pop(name, None)
 
         # add any unmatched upgrade starts ---------------------------
         entries.extend(upgrade_starts.values())
