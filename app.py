@@ -138,9 +138,7 @@ _ALIAS = {
     "gravity sling": "Tectonic Destabilizers",
 }
 
-# ─── feature flags ───────────────────────────────────────
-ENABLE_RACE_GATE = False        # ← set to False to disable
-# ─────────────────────────────────────────────────────────
+
 
 _RE_TERRAN = re.compile(r"^terran\s+", re.I)
 _RE_EVOLVE = re.compile(r"^evolve\s+", re.I)
@@ -339,6 +337,7 @@ def upload():
         entries = []
         init_map = {}                                          # unit_id → unit name
         chrono_until = {p.pid: 0 for p in players}
+        upgrade_starts = {}
 
         # NEW: running supply snapshot (O(1) look‑ups) --------------
         current_used = 0
@@ -391,7 +390,16 @@ def upload():
 
             # ---- Upgrade start (Research ability) -----------------
             if ability.startswith("Research") and getattr(event, 'pid', None) == player.pid:
-                # Skip — UpgradeCompleteEvent now handles upgrades correctly
+                name = tidy(prettify_upgrade(ability))
+                if name:
+                    supply_at_start = _supply_at(frames_by_pid[player.pid], supply_by_pid[player.pid], event.frame)
+                    upgrade_starts[name] = {
+                        'clock_sec': int(event.frame / replay.game_fps),
+                        'supply': supply_at_start if supply_at_start is not None else current_used,
+                        'made': current_made,
+                        'unit': name,
+                        'kind': 'upgrade'
+                    }
                 continue
 
 
@@ -461,7 +469,7 @@ def upload():
                 start_sec = start_frame / replay.game_fps
                 start_supply = _supply_at(frames_by_pid[player.pid], supply_by_pid[player.pid], start_frame)
                 name = tidy(event.upgrade_type_name)
-                if name is None or (ENABLE_RACE_GATE and name not in LEGAL_BY_RACE.get(player.play_race.lower(), set())):
+                if name is None:
                     continue
                 entries.append({
                     "clock_sec": int(start_sec),
@@ -470,6 +478,10 @@ def upload():
                     "unit": name,
                     "kind": "upgrade"
                 })
+                upgrade_starts.pop(name, None)
+
+        # add any unmatched upgrade starts ---------------------------
+        entries.extend(upgrade_starts.values())
 
         # keep only start rows --------------------------------------
         entries = [e for e in entries if e['kind'] in {'start', 'upgrade'}]
