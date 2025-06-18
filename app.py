@@ -393,36 +393,10 @@ def upload():
 
             # ---- Upgrade start (Research ability) -----------------
             if ability.startswith("Research") and getattr(event, 'pid', None) == player.pid:
-                is_queued = (
-                    getattr(event, "queued", False) or (getattr(event, "flags", 0) & 0x3)
-                )
-                if is_queued:
-                    continue
+                # Skip — UpgradeCompleteEvent now handles upgrades correctly
+                continue
 
-                raw_name = prettify_upgrade(ability)
-                upg_name = tidy(raw_name)
-                if upg_name is None or (ENABLE_RACE_GATE and upg_name not in LEGAL_BY_RACE.get(player.play_race.lower(), set())):
-                    continue
 
-                tag = producer_tag(event)
-                if tag in building_busy and building_busy[tag] != upg_name:
-                    continue  # producer still busy
-
-                # use live snapshot if available, else fall back
-                used, made = (current_used, current_made) if have_stats else get_supply(event.second)
-
-                entries.append({
-                    'clock_sec': int(event.second / speed_factor),
-                    'supply': used,
-                    'made': made,
-                    'unit': upg_name,
-                    'kind': 'start',
-                })
-                if tag:
-                    building_busy[tag] = upg_name
-                continue  # skip rest of ability block
-
-            # --------------------------------------------------------
             # ---- UnitBornEvent ------------------------------------
             if isinstance(event, sc2reader.events.tracker.UnitBornEvent):
                 if getattr(event, "control_pid", None) != player.pid:
