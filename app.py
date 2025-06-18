@@ -53,6 +53,64 @@ def _duration_map(replay) -> Dict[int, int]:
         60: 100 * L,
     }
 
+# --- approximate build times (in seconds) for units --------------
+BUILD_TIME = {
+    "SCV": 12,
+    "Probe": 12,
+    "Drone": 12,
+    "Mule": 0,
+    "Marine": 18,
+    "Reaper": 32,
+    "Marauder": 21,
+    "Hellion": 21,
+    "Widow Mine": 21,
+    "Siege Tank": 32,
+    "Cyclone": 32,
+    "Thor": 43,
+    "Medivac": 30,
+    "Viking": 30,
+    "Liberator": 43,
+    "Raven": 43,
+    "Banshee": 43,
+    "Battlecruiser": 64,
+
+    "Zergling": 17,
+    "Baneling": 14,
+    "Roach": 19,
+    "Ravager": 12,
+    "Hydralisk": 24,
+    "Lurker": 24,
+    "Mutalisk": 33,
+    "Corruptor": 29,
+    "Brood Lord": 34,
+    "Viper": 29,
+    "Ultralisk": 55,
+    "Queen": 36,
+    "Overlord": 18,
+    "Overseer": 12,
+    "Infestor": 43,
+    "Swarm Host": 43,
+
+    "Zealot": 27,
+    "Adept": 27,
+    "Stalker": 30,
+    "Sentry": 26,
+    "Observer": 21,
+    "Immortal": 39,
+    "Colossus": 54,
+    "Disruptor": 39,
+    "Phoenix": 25,
+    "Void Ray": 43,
+    "Oracle": 37,
+    "Tempest": 57,
+    "Carrier": 64,
+    "Mothership": 86,
+    "Archon": 9,
+    "Dark Templar": 39,
+    "High Templar": 39,
+
+    # Add more if needed...
+}
 
 # --- label normalisation / filter ---------------------------------
 _DROP = {
