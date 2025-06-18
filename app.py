@@ -282,21 +282,6 @@ def tidy(label: str) -> str | None:
 # --- Ability/Command events helper for any sc2reader version ---
 from sc2reader.events import game as ge
 
-# --- capture upgrade start (CommandEvent) ---
-for event in replay.events:
-    ...
-    # --- capture upgrade start (ALL ability/command events) ---
-    if isinstance(event, ABILITY_EVENTS):
-        ability_raw = getattr(event, "ability_name", None)
-        if ability_raw and ability_raw.startswith("Research") and getattr(event, "pid", None) == player.pid:
-            name = prettify_upgrade(ability_raw)
-            name = tidy(name)
-            if name is None:
-                continue
-            mapped_name = upgrade_name_map.get(name, name)
-            upgrade_starts[mapped_name] = int(event.frame / replay.game_fps)
-
-
 
 _ABILITY_CLASSES = []
 for _name in (
@@ -494,29 +479,24 @@ def upload():
                 have_stats = True
                 # no continue – we still want to process other events on this frame
 
+            # --- capture upgrade start (ALL ability/command events) ---
+            if isinstance(event, ABILITY_EVENTS):
+                ability_raw = getattr(event, "ability_name", None)
+                if ability_raw and ability_raw.startswith("Research") and getattr(event, "pid", None) == player.pid:
+                    name = prettify_upgrade(ability_raw)
+                    name = tidy(name)
+                    if name is None:
+                        continue
+                    mapped_name = upgrade_name_map.get(name, name)
+                    upgrade_starts[mapped_name] = int(event.frame / replay.game_fps)
+    
+
             # ----- global stop limits ------------------------------
             game_time = int(event.second / speed_factor)  # in‑game seconds
             if time_limit is not None and game_time > time_limit:
                 break
             if stop_limit is not None and current_used > stop_limit:  # uses live snapshot
                 break
-
-            # ----- Ability / command events ------------------------
-            ability_raw = (
-                getattr(event, "ability_name", None)
-                or getattr(event, "ability_link", None)
-                or getattr(event, "ability", None)
-            )
-            ability = str(ability_raw) if not isinstance(ability_raw, str) else ability_raw
-
-            # --- capture upgrade start (Research ability) ---
-            if ability.startswith("Research") and event.pid == player.pid:
-                name = prettify_upgrade(ability)
-                name = tidy(name)
-                if name is None:
-                    continue
-                mapped_name = upgrade_name_map.get(name, name)
-                upgrade_starts[mapped_name] = int(event.frame / replay.game_fps)
 
 
             # Chrono Boost detection
