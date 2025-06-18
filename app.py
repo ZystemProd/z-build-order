@@ -515,11 +515,30 @@ def upload():
             n = len(entries)
             while i < n:
                 first = entries[i]
+                if first['kind'] == 'upgrade':
+                    parts = []
+                    if not exclude_supply:
+                        supply_str = (
+                            f"{first['supply']}/{first['made']}"
+                            if first['supply'] > first['made'] and first['made'] > 0
+                            else str(first['supply'])
+                        )
+                        parts.append(supply_str)
+                    prefix = f"[{' '.join(parts)}] " if parts else ""
+                    build_lines.append(prefix + first['unit'])
+                    i += 1
+                    continue
+
                 supply = first['supply']
                 made = first['made']
                 start_time = first['clock_sec']
                 units = []
-                while i < n and entries[i]['supply'] == supply and abs(entries[i]['clock_sec'] - start_time) <= 5:
+                while (
+                    i < n
+                    and entries[i]['kind'] == 'start'
+                    and entries[i]['supply'] == supply
+                    and abs(entries[i]['clock_sec'] - start_time) <= 5
+                ):
                     e = entries[i]
                     qty = e.get('count', 1)
                     label = f"{qty} {e['unit']}" if qty > 1 else e['unit']
@@ -527,7 +546,9 @@ def upload():
                     i += 1
                 parts = []
                 if not exclude_supply:
-                    supply_str = f"{supply}/{made}" if supply > made and made > 0 else str(supply)
+                    supply_str = (
+                        f"{supply}/{made}" if supply > made and made > 0 else str(supply)
+                    )
                     parts.append(supply_str)
                 prefix = f"[{' '.join(parts)}] " if parts else ""
                 build_lines.append(prefix + " + ".join(units))
