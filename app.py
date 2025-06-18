@@ -470,48 +470,39 @@ def upload():
                     continue
 
                 # Upgrade research start
-                if ability.startswith("Research"):
+            if ability.startswith("Research"):
+                is_queued = (
+                    getattr(event, "queued", False)
+                    or (getattr(event, "flags", 0) & 0x3)
+                )
+                if is_queued:
+                    continue
 
-                    # --- skip if this is just a queued copy ---------------------
-                    tag = producer_tag(event)
-                    building_already_busy = tag and building_busy.get(tag) is not None
+                raw_name = prettify_upgrade(ability)
+                upg_name = tidy(raw_name)
+                if upg_name is None or (ENABLE_RACE_GATE and not is_legal_upgrade(player.play_race, upg_name)):
+                    continue
 
-                    # 1) skip queued copies: either explicit flag or legacy bit-0/1
-                    is_queued = (
-                        getattr(event, "queued", False)          # modern SC2 patches
-                        or (getattr(event, "flags", 0) & 0x3)    # older patches (bit 0 or 1)
+                tag = producer_tag(event)
+                if tag and building_busy.get(tag) is not None:
+                    continue    # producer is still busy
+
+                # append start row
+                used, made = get_supply(event.second)
+                entries.append(
+                    dict(
+                        clock_sec=int(event.second / speed_factor),
+                        supply=used,
+                        made=made,
+                        unit=upg_name,
+                        kind="start",
                     )
-                    if is_queued:
-                        continue
-                    # ------------------------------------------------------------
+                )
+                researching_now[player.pid].add(upg_name)
 
-                    # 5-b race-gate
-                    raw_name = prettify_upgrade(ability)
-                    upg_name = tidy(raw_name)
-                    if upg_name is None or (ENABLE_RACE_GATE and not is_legal_upgrade(player.play_race, upg_name)):
-                        continue
+                if tag:
+                    building_busy[tag] = upg_name
 
-
-                    # 5-c skip if building is busy
-                    tag = producer_tag(event)        # producer_tag() defined below
-                    if tag and building_busy.get(tag) is not None:
-                        continue    # the structure is still researching the previous upgrade
-
-
-                    # 5-d record start row
-                    used, made = get_supply(event.second)
-                    entries.append(
-                        dict(
-                            clock_sec=int(event.second / speed_factor),
-                            supply=used,
-                            made=made,
-                            unit=upg_name,
-                            kind="start",
-                        )
-                    )
-                    researching_now[player.pid].add(upg_name)
-                    if tag:
-                        building_busy[tag] = upg_name
                     continue
             # ----------------------------------------------------------------
 
