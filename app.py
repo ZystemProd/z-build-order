@@ -25,10 +25,10 @@ _ALIAS = {
     "medivac caduceus reactor": "Caduceus reactor",
     "shadow strides": "Shadow Stride",
     "resonatingglaives": "Resonating Glaives",
-    "Infernal Pre Igniter": "Infernal Pre-Igniter",
-    "Cyclonecyclone Lock On Damage": "Mag-Field Accelerator",
-    "Hi Sec Auto Tracking":"Hi-Sec Auto Tracking",
-    "Banshee Speed":"Hyperflight Rotors",
+    "infernal pre igniter": "Infernal Pre-Igniter",
+    "cyclone lock on damage": "Mag-Field Accelerator",
+    "hi sec auto tracking":"Hi-Sec Auto Tracking",
+    "banshee speed":"Hyperflight Rotors",
 }
 
 # ─── feature flags ───────────────────────────────────────
