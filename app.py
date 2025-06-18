@@ -533,7 +533,7 @@ def upload():
                     supply_str = f"{item['supply']}/{item['made']}" if item['supply'] > item['made'] and item['made'] > 0 else str(item['supply'])
                     parts.append(supply_str)
                 if not exclude_time:
-                    minutes, seconds = divmod(item['clock_sec'], 60)
+                    minutes, seconds = divmod(item.get('clock_sec', item.get('time', 0)), 60)
                     parts.append(f"{minutes:02d}:{seconds:02d}")
                 prefix = f"[{' '.join(parts)}] " if parts else ""
                 qty = item.get('count', 1)
