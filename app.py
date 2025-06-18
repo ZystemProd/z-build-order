@@ -388,20 +388,6 @@ def upload():
                 chrono_until[event.pid] = max(chrono_until.get(event.pid, 0), event.second) + 9.6 * speed_factor
                 continue
 
-            # ---- Upgrade start (Research ability) -----------------
-            if ability.startswith("Research") and getattr(event, 'pid', None) == player.pid:
-                name = tidy(prettify_upgrade(ability))
-                if name:
-                    supply_at_start = _supply_at(frames_by_pid[player.pid], supply_by_pid[player.pid], event.frame)
-                    upgrade_starts[name] = {
-                        'clock_sec': int(event.frame / replay.game_fps),
-                        'supply': supply_at_start if supply_at_start is not None else current_used,
-                        'made': current_made,
-                        'unit': name,
-                        'kind': 'upgrade'
-                    }
-                continue
-
 
             # ---- UnitBornEvent ------------------------------------
             if isinstance(event, sc2reader.events.tracker.UnitBornEvent):
@@ -469,8 +455,6 @@ def upload():
                     "type": "upgrade"
                 })
 
-        # add any unmatched upgrade starts ---------------------------
-        entries.extend(upgrade_starts.values())
 
         # keep only start rows --------------------------------------
         entries = [e for e in entries if e['kind'] in {'start', 'upgrade'}]
