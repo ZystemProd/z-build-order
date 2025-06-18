@@ -282,6 +282,22 @@ def tidy(label: str) -> str | None:
 # --- Ability/Command events helper for any sc2reader version ---
 from sc2reader.events import game as ge
 
+# --- capture upgrade start (CommandEvent) ---
+for event in replay.events:
+    ...
+    # --- capture upgrade start (ALL ability/command events) ---
+    if isinstance(event, ABILITY_EVENTS):
+        ability_raw = getattr(event, "ability_name", None)
+        if ability_raw and ability_raw.startswith("Research") and getattr(event, "pid", None) == player.pid:
+            name = prettify_upgrade(ability_raw)
+            name = tidy(name)
+            if name is None:
+                continue
+            mapped_name = upgrade_name_map.get(name, name)
+            upgrade_starts[mapped_name] = int(event.frame / replay.game_fps)
+
+
+
 _ABILITY_CLASSES = []
 for _name in (
     "AbilityEvent",            # pre‑2.0
@@ -493,6 +509,16 @@ def upload():
             )
             ability = str(ability_raw) if not isinstance(ability_raw, str) else ability_raw
 
+            # --- capture upgrade start (Research ability) ---
+            if ability.startswith("Research") and event.pid == player.pid:
+                name = prettify_upgrade(ability)
+                name = tidy(name)
+                if name is None:
+                    continue
+                mapped_name = upgrade_name_map.get(name, name)
+                upgrade_starts[mapped_name] = int(event.frame / replay.game_fps)
+
+
             # Chrono Boost detection
             if ability and ability.endswith(("ChronoBoostEnergyCost", "ChronoBoost")):
                 chrono_until[event.pid] = max(chrono_until.get(event.pid, 0), event.second) + 9.6 * speed_factor
@@ -563,8 +589,11 @@ def upload():
                 research_time = upgrade_times.get(mapped_name)
 
                 frame_sec = event.frame / replay.game_fps
-                start_time_sec = int(frame_sec - research_time) if research_time else int(frame_sec)
 
+                if mapped_name in upgrade_starts:
+                    start_time_sec = upgrade_starts[mapped_name]
+                else:
+                    start_time_sec = int(frame_sec - research_time) if research_time else int(frame_sec)
 
                 entries.append({
                     "time": start_time_sec,
@@ -572,6 +601,7 @@ def upload():
                     "type": "upgrade",
                     "research_time": research_time
                 })
+
 
 
         # keep only start rows --------------------------------------
