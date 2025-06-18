@@ -479,8 +479,8 @@ def upload():
                 have_stats = True
                 # no continue – we still want to process other events on this frame
 
-            # --- capture upgrade start (ALL ability/command events) ---
-            if isinstance(event, ABILITY_EVENTS):
+            # --- capture upgrade start (CommandEvent only — CORRECT!) ---
+            if isinstance(event, sc2reader.events.game.CommandEvent):
                 ability_raw = getattr(event, "ability_name", None)
                 if ability_raw and ability_raw.startswith("Research") and getattr(event, "pid", None) == player.pid:
                     name = prettify_upgrade(ability_raw)
@@ -489,6 +489,7 @@ def upload():
                         continue
                     mapped_name = upgrade_name_map.get(name, name)
                     upgrade_starts[mapped_name] = int(event.frame / replay.game_fps)
+
 
             # ------ GET ability name for Chrono Boost -------------------
             ability_raw = getattr(event, "ability_name", None)
