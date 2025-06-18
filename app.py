@@ -489,17 +489,10 @@ def upload():
             n = len(entries)
             while i < n:
                 first = entries[i]
-                if first['kind'] == 'upgrade':
-                    parts = []
-                    if not exclude_supply:
-                        supply_str = (
-                            f"{first['supply']}/{first['made']}"
-                            if first['supply'] > first['made'] and first['made'] > 0
-                            else str(first['supply'])
-                        )
-                        parts.append(supply_str)
-                    prefix = f"[{' '.join(parts)}] " if parts else ""
-                    build_lines.append(prefix + first['unit'])
+                if first.get('type') == 'upgrade':
+                    minutes, seconds = divmod(first.get('clock_sec', first.get('time', 0)), 60)
+                    label = first.get('label', 'Unknown')
+                    build_lines.append(f"[{minutes:02d}:{seconds:02d}] {label}")
                     i += 1
                     continue
 
@@ -528,6 +521,12 @@ def upload():
                 build_lines.append(prefix + " + ".join(units))
         else:
             for item in entries:
+                if item.get('type') == 'upgrade':
+                    minutes, seconds = divmod(item.get('clock_sec', item.get('time', 0)), 60)
+                    label = item.get('label', 'Unknown')
+                    build_lines.append(f"[{minutes:02d}:{seconds:02d}] {label}")
+                    continue
+
                 parts = []
                 if not exclude_supply:
                     supply_str = f"{item['supply']}/{item['made']}" if item['supply'] > item['made'] and item['made'] > 0 else str(item['supply'])
@@ -539,6 +538,7 @@ def upload():
                 qty = item.get('count', 1)
                 label = f"{qty} {item['unit']}" if qty > 1 else item['unit']
                 build_lines.append(prefix + label)
+
 
         return '\n'.join(build_lines)
 
