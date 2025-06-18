@@ -474,8 +474,9 @@ def upload():
                     'supply': start_supply or 0,
                     'made': current_made,
                     'unit': name,
-                    'kind': 'start'
+                    'kind': 'upgrade'   # <— fix here
                 })
+
 
                 # remember producer is now busy with this upgrade
                 building_busy[name] = name
@@ -486,7 +487,7 @@ def upload():
         # end for event
 
         # keep only start rows --------------------------------------
-        entries = [e for e in entries if e['kind'] == 'start']
+        entries = [e for e in entries if e['kind'] in {'start', 'upgrade'}]
 
         # collapse identical supply+unit rows -----------------------
         tmp = []
