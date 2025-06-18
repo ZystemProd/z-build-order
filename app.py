@@ -29,6 +29,8 @@ _ALIAS = {
     "cyclone lock on damage": "Mag-Field Accelerator",
     "hi sec auto tracking":"Hi-Sec Auto Tracking",
     "banshee speed":"Hyperflight Rotors",
+    "vehicle and ship armors":"Vehicle And Ship Plaiting",
+    "adept piercing attack":"Resonating Glaives"
 }
 
 # ─── feature flags ───────────────────────────────────────
