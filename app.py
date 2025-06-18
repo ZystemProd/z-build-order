@@ -464,19 +464,29 @@ def upload():
 
         # collapse identical supply+unit rows (units only) ----------
         tmp = []
-        for e in sorted(entries, key=lambda x: (x['clock_sec'], x['supply'], x['unit'])):
+        for e in sorted(entries, key=lambda x: (
+            x.get('clock_sec', x.get('time', 0)),
+            x.get('supply', 0),
+            x.get('unit', x.get('label', ''))
+        )):
+            if e.get('kind') != 'start':
+                # do not collapse upgrades — just add
+                tmp.append(e)
+                continue
+
             if (
                 tmp
-                and e['kind'] == 'start'
-                and tmp[-1]['kind'] == 'start'
-                and e['unit'] == tmp[-1]['unit']
-                and e['supply'] == tmp[-1]['supply']
+                and tmp[-1].get('kind') == 'start'
+                and e.get('unit') == tmp[-1].get('unit')
+                and e.get('supply') == tmp[-1].get('supply')
             ):
                 tmp[-1]['count'] = tmp[-1].get('count', 1) + 1
             else:
                 e['count'] = 1
                 tmp.append(e)
+
         entries = tmp
+
 
         # final sort ------------------------------------------------
         entries.sort(key=lambda e: e.get('clock_sec', e.get('time', 0)))
