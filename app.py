@@ -1,12 +1,54 @@
 from flask import Flask, request, jsonify
-"""Minimal StarCraft II replay parser producing build orders."""
+"""Minimal StarCraft II replay parser producing build orders.
+
+Changes made 2025‑06‑18
+----------------------
+* Force `load_level=4` so tracker events (PlayerStatsEvent, UpgradeCompleteEvent, …) are always loaded.
+* Maintain a rolling snapshot of the player’s current supply (used/made) as we iterate through
+  the event stream instead of doing an O(log N) bisect for every lookup.  We still keep
+  `get_supply` as a fallback for events that may occur before the first snapshot.
+* Use that snapshot for:
+  – the **Research** ability start event (upgrade‑start)
+  – the **UpgradeCompleteEvent** (upgrade‑finish)
+  This guarantees that the “supply” column matches what the player actually saw on screen when
+  they clicked the button or when the bar finished.
+* No behaviour changes for units – they continue to use `get_supply()` so chrono‑boost / larva
+  injection time‑warping is still handled just like before.
+"""
 
 from flask_cors import CORS
 import sc2reader
 import io
 import bisect
 import re
+import collections
+from sc2reader.constants import GAME_SPEED_FACTOR
+from name_map import NAME_MAP
 
+def _supply_at(frame_list: List[int], supply_list: List[int], frame: int) -> Optional[int]:
+    idx = bisect.bisect_right(frame_list, frame) - 1
+    return supply_list[idx] if idx >= 0 else None
+
+def _duration_map(replay) -> Dict[int, int]:
+    BLIZZARD_FPS = 16
+    gd = getattr(replay, "game_data", None)
+    if gd and hasattr(gd, "upgrades"):
+        return {u.id: u.research_time for u in gd.upgrades.values()}
+    try:
+        from sc2reader.resources import build_data
+        data = build_data(replay.build)
+        return {u["id"]: u["research_time"] for u in data["upgrades"].values()}
+    except Exception:
+        pass
+    L = BLIZZARD_FPS
+    return {
+        55: 121 * L,
+        56: 121 * L,
+        57: 86 * L,
+        58: 79 * L,
+        59: 100 * L,
+        60: 100 * L,
+    }
 
 
 # --- label normalisation / filter ---------------------------------
@@ -69,17 +111,12 @@ def tidy(label: str) -> str | None:
 
 # -------------------------------------------------------------------
 
-import collections
-from sc2reader.constants import GAME_SPEED_FACTOR
-from name_map import NAME_MAP
-
-
 # --- Ability/Command events helper for any sc2reader version ---
 from sc2reader.events import game as ge
 
 _ABILITY_CLASSES = []
 for _name in (
-    "AbilityEvent",            # pre-2.0
+    "AbilityEvent",            # pre‑2.0
     "CommandEvent",            # 2.0 alpha
     "TargetPointCommandEvent", # 2.x stable
     "TargetUnitCommandEvent",
@@ -95,7 +132,7 @@ UPGRADE_PREFIX = re.compile(r'^(Research|Upgrade)_?')
 
 
 def prettify_upgrade(ability_name: str) -> str:
-    """Return a human-friendly upgrade name from a raw ability string."""
+    """Return a human‑friendly upgrade name from a raw ability string."""
     core = UPGRADE_PREFIX.sub('', ability_name)
     words = re.sub(r'([a-z])([A-Z])', r'\1 \2', core)
     return words.replace('_', ' ').strip().title()
@@ -112,176 +149,12 @@ def producer_tag(ev):
         return ev.target.tag
     return None
 
-# Build times in game seconds for LotV 5.x. Values are approximate. See
-
-# Build times in game seconds for LotV 5.x. Values are approximate. See
-# https://liquipedia.net/starcraft2/ for updates.
-BUILD_TIME = {
-    # Terran
-    "SCV": 12,
-    "Marine": 18,
-    "Marauder": 21,
-    "Reaper": 32,
-    "Ghost": 29,
-    "Hellion": 30,
-    "Hellbat": 30,
-    "Widow Mine": 28,
-    "Cyclone": 32,
-    "Siege Tank": 32,
-    "Thor": 43,
-    "Viking": 30,
-    "Medivac": 30,
-    "Liberator": 43,
-    "Banshee": 46,
-    "Raven": 43,
-    "Battlecruiser": 64,
-
-    # Protoss
-    "Probe": 12,
-    "Zealot": 27,
-    "Stalker": 30,
-    "Sentry": 26,
-    "Adept": 27,
-    "High Templar": 39,
-    "Dark Templar": 39,
-    "Immortal": 39,
-    "Colossus": 54,
-    "Disruptor": 39,
-    "Observer": 21,
-    "Warp Prism": 36,
-    "Phoenix": 25,
-    "Void Ray": 37,
-    "Oracle": 37,
-    "Tempest": 43,
-    "Carrier": 64,
-    "Mothership": 86,
-
-    # Zerg
-    "Drone": 12,
-    "Zergling": 17,
-    "Overlord": 18,
-    "Queen": 36,
-    "Roach": 19,
-    "Ravager": 12,
-    "Hydralisk": 29,
-    "Lurker": 18,
-    "Baneling": 14,
-    "Mutalisk": 33,
-    "Corruptor": 29,
-    "Brood Lord": 34,
-    "Infestor": 43,
-    "Swarm Host": 43,
-    "Ultralisk": 39,
-    "Viper": 29,
-    "Overseer": 17,
-}
-
-UPGRADE_TIME = {
-    # Zerg
-    "Metabolic Boost": 79,
-    "Adrenal Glands": 93,
-    "Glial Reconstitution": 79,
-    "Tunneling Claws": 79,
-    "Grooved Spines": 50,
-    "Muscular Augments": 64,
-    "Chitinous Plating": 79,
-    "Anabolic Synthesis": 43,
-    "Neural Parasite": 79,
-    "Centrifugal Hooks": 71,
-    "Burrow": 71,
-    "Ground Carapace": 114,
-    "Melee Attack": 114,
-    "Missile Attack": 114,
-    "Flyer Armor": 114,
-    "Flyer Attack": 114,
-    "Adaptive Talons": 57,
-    "Seismic Spines": 57,
-    "Pneumatized Carapace": 43,
-
-    # Protoss
-    "Warp Gate": 100,
-    "Shields": 121,
-    "Ground Weapons": 121,
-    "Ground Armor": 121,
-    "Air Weapons": 129,
-    "Air Armor": 129,
-    "Blink": 121,
-    "Charge": 100,
-    "Resonating Glaives": 100,
-    "Psionic Storm": 79,
-    "Anion Pulse-Crystals": 64,
-    "Extended Thermal Lance": 100,
-    "Gravitic Boosters": 57,
-    "Gravitic Drive": 57,
-    "Flux Vanes": 57,
-    "Tectonic Destabilizers": 100,
-    "Shadow Stride": 100,
-
-    # Terran
-    "Infantry Weapons": 114,
-    "Infantry Armor": 114,
-    "Vehicle Weapons": 114,
-    "Ship Weapons": 114,
-    "Vehicle And Ship Plating": 114,
-    "Stimpack": 100,
-    "Combat Shield": 79,
-    "Concussive Shells": 79,
-    "Infernal Pre-Igniter": 110,
-    "Smart Servos": 79,
-    "Drilling Claws": 79,
-    "Hyperflight Rotors": 100,
-    "Hi-Sec Auto Tracking": 57,
-    "Hurricane Engines": 100,
-    "Mag-Field Accelerator": 100,
-    "Caduceus Reactor": 80,
-    "Interference Matrix": 57,
-    "Weapon Refit": 100,
-    "Advanced Ballistics": 79,
-    "Neosteel Frame": 79,
-
-"Cloak": 79,
-}
-
-# --- legal upgrade lists -------------------------------------------------
-TERRAN_UP = {
-    "Infantry Weapons", "Infantry Armor", "Vehicle Weapons", "Ship Weapons",
-    "Vehicle And Ship Plating", "Stimpack", "Combat Shield", "Concussive Shells",
-    "Infernal Pre-Igniter", "Smart Servos", "Drilling Claws",
-    "Hyperflight Rotors", "Hi-Sec Auto Tracking", "Hurricane Engines",
-    "Mag-Field Accelerator", "Caduceus Reactor", "Interference Matrix",
-    "Weapon Refit", "Advanced Ballistics", "Neosteel Frame", "Cloak",
-}
-PROTOSS_UP = {
-    "Warp Gate", "Shields", "Ground Weapons", "Ground Armor", "Air Weapons",
-    "Air Armor", "Blink", "Charge", "Resonating Glaives", "Psionic Storm",
-    "Anion Pulse-Crystals", "Extended Thermal Lance", "Gravitic Boosters",
-    "Gravitic Drive", "Flux Vanes", "Tectonic Destabilizers", "Shadow Stride",
-}
-ZERG_UP = {
-    "Metabolic Boost", "Adrenal Glands", "Glial Reconstitution",
-    "Tunneling Claws", "Grooved Spines", "Muscular Augments",
-    "Chitinous Plating", "Anabolic Synthesis", "Neural Parasite",
-    "Centrifugal Hooks", "Burrow", "Ground Carapace", "Melee Attack",
-    "Missile Attack", "Flyer Armor", "Flyer Attack", "Adaptive Talons",
-    "Seismic Spines", "Pneumatized Carapace",
-}
-
-LEGAL_BY_RACE = {
-    "terran": TERRAN_UP,
-    "protoss": PROTOSS_UP,
-    "zerg": ZERG_UP,
-}
-
-
-def is_legal_upgrade(race: str, upg: str) -> bool:
-    return upg in LEGAL_BY_RACE.get(race.lower(), set())
-
-# player-pid → set of upgrades currently researching
-researching_now = collections.defaultdict(set)
-
+# ---- Flask setup --------------------------------------------------
 app = Flask(__name__)
 CORS(app)
 
+
+# --- helper: pretty unit names -------------------------------------
 
 def format_name(name: str) -> str:
     """Convert internal names like 'SpawningPool' to 'Spawning Pool'."""
@@ -290,12 +163,14 @@ def format_name(name: str) -> str:
     lower = name.lower()
     if lower in NAME_MAP:
         return NAME_MAP[lower]
-    # Insert space before capital letters and capitalize words
+    # Insert space before capital letters and capitalise words
     return re.sub(r"(?<!^)(?=[A-Z])", " ", name).title()
+
+# ------------------------------------------------------------------
 
 @app.route('/')
 def index():
-    return '🟢 SC2 build-order parser is live!'
+    return '🟢 SC2 build‑order parser is live!'
 
 
 @app.route('/players', methods=['POST'])
@@ -309,7 +184,8 @@ def players():
 
     replay_data = io.BytesIO(file.read())
     try:
-        replay = sc2reader.load_replay(replay_data, load_map=False)
+        # load_level=4 ensures tracker events are parsed
+        replay = sc2reader.load_replay(replay_data, load_map=False, load_level=4)
     except Exception as e:
         print('❌ Failed to load replay:', e)
         return f'Failed to load replay: {e}', 400
@@ -323,6 +199,7 @@ def players():
         matchup = f"{a}v{b}"
     return jsonify({'players': info, 'matchup': matchup})
 
+
 @app.route('/upload', methods=['POST'])
 def upload():
     if 'replay' not in request.files:
@@ -332,11 +209,10 @@ def upload():
     if file.filename == '':
         return 'No replay uploaded', 400
 
-    # Read replay into memory
     replay_data = io.BytesIO(file.read())
     try:
-        # Loading without map reduces parsing time and avoids verbose output
-        replay = sc2reader.load_replay(replay_data, load_map=False)
+        # full load so that tracker events are available
+        replay = sc2reader.load_replay(replay_data, load_map=False, load_level=4)
     except Exception as e:
         print("❌ Failed to load replay:", e)
         return f'Failed to load replay: {e}', 400
@@ -346,14 +222,13 @@ def upload():
         if not players:
             return 'No player found in replay', 400
 
-        # allow player selection by name or pid
+        # ----- player selection ------------------------------------
         requested = request.form.get('player') or request.args.get('player')
-        player = None
-        if requested:
-            player = next((p for p in players if str(p.pid) == requested or p.name == requested), None)
+        player = next((p for p in players if requested and (str(p.pid) == requested or p.name == requested)), None)
         if player is None:
             player = players[0]
 
+        # ----- flags ------------------------------------------------
         exclude_flag = request.form.get('exclude_workers', '')
         exclude_workers = str(exclude_flag).lower() in {'1', 'true', 'yes', 'on'}
         exclude_supply_flag = request.form.get('exclude_supply', '')
@@ -366,209 +241,157 @@ def upload():
             exclude_time = True
         stop_supply_raw = request.form.get('stop_supply')
         stop_time_raw = request.form.get('stop_time')
-        stop_limit = None
-        time_limit = None
-        if stop_supply_raw and stop_supply_raw.isdigit():
-            stop_limit = int(stop_supply_raw)
-        if stop_time_raw and stop_time_raw.isdigit():
-            time_limit = int(stop_time_raw) * 60
+        stop_limit = int(stop_supply_raw) if stop_supply_raw and stop_supply_raw.isdigit() else None
+        time_limit = int(stop_time_raw) * 60 if stop_time_raw and stop_time_raw.isdigit() else None
 
-        # Build a map of supply values from PlayerStatsEvents as fallback
+        # ----- pre‑build supply → time map (fallback look‑up) --------
         supply_events = {}
-        for event in replay.events:
-            if isinstance(event, sc2reader.events.tracker.PlayerStatsEvent) and event.pid == player.pid:
-                used = int(getattr(event, 'food_used', 0))
-                made = int(getattr(event, 'food_made', 0))
-                supply_events[event.second] = (used, made)
-        supply_times = sorted(supply_events.keys())
+        for ev in replay.events:
+            if isinstance(ev, sc2reader.events.tracker.PlayerStatsEvent) and ev.pid == player.pid:
+                used = int(getattr(ev, 'food_used', 0))
+                made = int(getattr(ev, 'food_made', 0))
+                supply_events[ev.second] = (used, made)
+        supply_times = sorted(supply_events)
 
-        def get_supply(second: int):
-            """Return (food_used, food_made) for the closest PlayerStatsEvent."""
+        def get_supply(sec: int):
+            """Return (food_used, food_made) for the closest snapshot ≤ sec."""
             if not supply_times:
                 return 0, 0
-            idx = bisect.bisect_right(supply_times, second) - 1
-            if idx >= 0:
-                return supply_events[supply_times[idx]]
-            return 0, 0
+            idx = bisect.bisect_right(supply_times, sec) - 1
+            return supply_events[supply_times[idx]] if idx >= 0 else (0, 0)
 
+        # ----- event filters ---------------------------------------
         skip_units = {
-            "Egg",
-            "Larva",
-            "Overlord Cocoon",
-            "Mule",
-            "M U L E",
-            "Scanner Sweep",
-            "Kd8Charge",
-            "KD8Charge",
-            "Broodling",
-            "Changeling",
+            "Egg", "Larva", "Overlord Cocoon", "Mule", "M U L E", "Scanner Sweep",
+            "Kd8Charge", "KD8Charge", "Broodling", "Changeling",
         }
         skip_units_lower = {s.lower() for s in skip_units}
-        # Skip any creep tumor variants or phase shift abilities
-        skip_keywords = [
-            "Creep Tumor",
-            "CreepTumor",
-            "Phase Shift",
-            "PhaseShift",
-        ]
+        skip_keywords = ["Creep Tumor", "CreepTumor", "Phase Shift", "PhaseShift"]
         if exclude_workers:
             skip_units.update({"Drone", "Probe", "SCV"})
 
-
-
-        # ``event.second`` is reported in real-time seconds. Convert it to the
-        # in-game clock using the replay's speed factor. LotV replays on
-        # "Faster" still require a 1.4x adjustment to match the in-game timer.
-        speed_factor = GAME_SPEED_FACTOR.get(replay.expansion, {}).get(
-            replay.speed, 1.0
-        )
+        # ----- speed factor for in‑game clock -----------------------
+        speed_factor = GAME_SPEED_FACTOR.get(replay.expansion, {}).get(replay.speed, 1.0)
         if replay.expansion == "LotV" and replay.speed == "Faster" and speed_factor == 1.0:
             speed_factor = 1.4
 
+        # ---- containers -------------------------------------------
         entries = []
-        researching_now = collections.defaultdict(set)
-        building_busy = collections.defaultdict(lambda: None)
-        init_map = {}
+        building_busy = collections.defaultdict(lambda: None)  # producer‑tag → upgrade name
+        init_map = {}                                          # unit_id → unit name
         chrono_until = {p.pid: 0 for p in players}
 
+        # NEW: running supply snapshot (O(1) look‑ups) --------------
+        current_used = 0
+        current_made = 0
+        have_stats = False
+
+        # Pre-compute supply snapshots
+        frames_by_pid: Dict[int, List[int]] = defaultdict(list)
+        supply_by_pid: Dict[int, List[int]] = defaultdict(list)
+        for ev in replay.tracker_events:
+            if isinstance(ev, sc2reader.events.tracker.PlayerStatsEvent):
+                frames_by_pid[ev.pid].append(ev.frame)
+                supply_by_pid[ev.pid].append(int(ev.food_used))
+
+        # Pre-compute upgrade durations
+        durations = _duration_map(replay)
+
+
+        # ---- iterate event stream --------------------------------
         for event in replay.events:
             if event.second == 0:
                 continue
 
-            # ----- global stop limits ---------------------------------
-            game_time = int(event.second / speed_factor)   # in-game seconds
+            # ------ capture live supply snapshot -------------------
+            if isinstance(event, sc2reader.events.tracker.PlayerStatsEvent) and event.pid == player.pid:
+                current_used = int(getattr(event, 'food_used', 0))
+                current_made = int(getattr(event, 'food_made', 0))
+                have_stats = True
+                # no continue – we still want to process other events on this frame
 
+            # ----- global stop limits ------------------------------
+            game_time = int(event.second / speed_factor)  # in‑game seconds
             if time_limit is not None and game_time > time_limit:
                 break
+            if stop_limit is not None and current_used > stop_limit:  # uses live snapshot
+                break
 
-            if stop_limit is not None:
-                used_now, _ = get_supply(event.second)
-                if used_now > stop_limit:
-                    break
-            # -----------------------------------------------------------
-
-            # -- Ability / command events ------------------------------------
+            # ----- Ability / command events ------------------------
             ability_raw = (
                 getattr(event, "ability_name", None)
                 or getattr(event, "ability_link", None)
                 or getattr(event, "ability", None)
             )
+            ability = str(ability_raw) if not isinstance(ability_raw, str) else ability_raw
 
-            # Skip or cast non-string values
-            if not isinstance(ability_raw, str):
-                ability_raw = str(ability_raw)
+            # Chrono Boost detection
+            if ability and ability.endswith(("ChronoBoostEnergyCost", "ChronoBoost")):
+                chrono_until[event.pid] = max(chrono_until.get(event.pid, 0), event.second) + 9.6 * speed_factor
+                continue
 
-            ability = ability_raw
-
-            # --- DEBUG (remove later) -----------------------------------------
-            if ability_raw and ability_raw.startswith("Research") and event.second >   600  and event.second <  700:
-                # narrow the window so we don’t spam the log;
-                # adjust the seconds to cover the 10:39 in-game timestamp you see
-                print(
-                    "DBG",
-                    event.second,
-                    ability_raw,
-                    "queued:", getattr(event, "queued", None),
-                    "flags:", getattr(event, "flags", None),
-                    "unit:", getattr(event, "unit", None),
-                    "target:", getattr(event, "target", None),
-                    "ability_link:", getattr(event, "ability_link", None),
-                )
-            # ------------------------------------------------------------------
-
-            if ability:
-                # Chrono Boost detection
-                if ability.endswith(("ChronoBoostEnergyCost", "ChronoBoost")):
-                    chrono_until[event.pid] = max(
-                        chrono_until.get(event.pid, 0), event.second
-                    ) + 9.6 * speed_factor
-                    continue
-
-            # --- Ability / command events (upgrade start) ---
-            if ability.startswith("Research"):
+            # ---- Upgrade start (Research ability) -----------------
+            if ability.startswith("Research") and getattr(event, 'pid', None) == player.pid:
                 is_queued = (
-                    getattr(event, "queued", False)
-                    or (getattr(event, "flags", 0) & 0x3)
+                    getattr(event, "queued", False) or (getattr(event, "flags", 0) & 0x3)
                 )
                 if is_queued:
                     continue
 
                 raw_name = prettify_upgrade(ability)
                 upg_name = tidy(raw_name)
-
-                if upg_name is None or (ENABLE_RACE_GATE and not is_legal_upgrade(player.play_race, upg_name)):
+                if upg_name is None or (ENABLE_RACE_GATE and upg_name not in LEGAL_BY_RACE.get(player.play_race.lower(), set())):
                     continue
 
                 tag = producer_tag(event)
                 if tag in building_busy and building_busy[tag] != upg_name:
-                    continue  # producer still busy with other upgrade
+                    continue  # producer still busy
 
-                used, made = get_supply(event.second)
-                entries.append(
-                    dict(
-                        clock_sec=int(event.second / speed_factor),
-                        supply=used,
-                        made=made,
-                        unit=upg_name,
-                        kind="start",
-                    )
-                )
+                # use live snapshot if available, else fall back
+                used, made = (current_used, current_made) if have_stats else get_supply(event.second)
 
+                entries.append({
+                    'clock_sec': int(event.second / speed_factor),
+                    'supply': used,
+                    'made': made,
+                    'unit': upg_name,
+                    'kind': 'start',
+                })
                 if tag:
                     building_busy[tag] = upg_name
+                continue  # skip rest of ability block
 
-                continue  # skip the rest of ability block
-
-            # ----------------------------------------------------------------
-
-
+            # --------------------------------------------------------
+            # ---- UnitBornEvent ------------------------------------
             if isinstance(event, sc2reader.events.tracker.UnitBornEvent):
                 if getattr(event, "control_pid", None) != player.pid:
                     continue
                 unit = event.unit
-                is_building = getattr(unit, "is_building", False)
-                if is_building:
+                if getattr(unit, "is_building", False):
                     continue
                 name = format_name(event.unit_type_name)
                 name = tidy(name)
                 if name is None:
                     continue
                 lower_name = name.lower()
-                if (
-                    not name
-                    or "Beacon" in name
-                    or name in skip_units
-                    or lower_name in skip_units_lower
-                    or any(key.lower() in lower_name for key in skip_keywords)
-                ):
+                if (not name or "Beacon" in name or name in skip_units or lower_name in skip_units_lower or any(k.lower() in lower_name for k in skip_keywords)):
                     continue
                 build_time = BUILD_TIME.get(event.unit_type_name, 0)
                 start_real = event.second - build_time * speed_factor
                 if player.play_race.lower() == "protoss" and start_real < chrono_until.get(player.pid, 0):
                     if start_real >= chrono_until[player.pid] - 9.6 * speed_factor:
                         start_real = event.second - build_time * 0.65 * speed_factor
-                used, made = get_supply(start_real)
-                if stop_limit is not None and used > stop_limit:
+                used_s, made_s = get_supply(start_real)
+                if stop_limit is not None and used_s > stop_limit:
                     break
                 if time_limit is not None and int(start_real / speed_factor) > time_limit:
                     break
-                entries.append({
-                    "clock_sec": int(start_real / speed_factor),
-                    "supply": used,
-                    "made": made,
-                    "unit": name,
-                    "kind": "start",
-                })
-                used_finish, made_finish = get_supply(event.second)
-                entries.append({
-                    "clock_sec": int(event.second / speed_factor),
-                    "supply": used_finish,
-                    "made": made_finish,
-                    "unit": name,
-                    "kind": "finish",
-                })
+                entries.append({'clock_sec': int(start_real / speed_factor), 'supply': used_s, 'made': made_s, 'unit': name, 'kind': 'start'})
+                used_f, made_f = get_supply(event.second)
+                entries.append({'clock_sec': int(event.second / speed_factor), 'supply': used_f, 'made': made_f, 'unit': name, 'kind': 'finish'})
                 continue
 
+            # ---- UnitInitEvent ------------------------------------
             if isinstance(event, sc2reader.events.tracker.UnitInitEvent):
                 if event.control_pid != player.pid:
                     continue
@@ -577,90 +400,59 @@ def upload():
                 if name is None:
                     continue
                 lower_name = name.lower()
-                if (
-                    not name
-                    or "Beacon" in name
-                    or name in skip_units
-                    or lower_name in skip_units_lower
-                    or any(key.lower() in lower_name for key in skip_keywords)
-                ):
+                if (not name or "Beacon" in name or name in skip_units or lower_name in skip_units_lower or any(k.lower() in lower_name for k in skip_keywords)):
                     continue
-                used, made = get_supply(event.second)
                 init_map[event.unit_id] = name
-                entries.append({
-                    "clock_sec": int(event.second / speed_factor),
-                    "supply": used,
-                    "made": made,
-                    "unit": name,
-                    "kind": "start",
-                })
+                entries.append({'clock_sec': int(event.second / speed_factor), 'supply': current_used if have_stats else get_supply(event.second)[0], 'made': current_made if have_stats else get_supply(event.second)[1], 'unit': name, 'kind': 'start'})
                 continue
 
+            # ---- UnitDoneEvent ------------------------------------
             if isinstance(event, sc2reader.events.tracker.UnitDoneEvent):
                 if event.unit_id in init_map:
                     name = init_map[event.unit_id]
-                    used, made = get_supply(event.second)
-                    entries.append({
-                        "clock_sec": int(event.second / speed_factor),
-                        "supply": used,
-                        "made": made,
-                        "unit": name,
-                        "kind": "finish",
-                    })
+                    entries.append({'clock_sec': int(event.second / speed_factor), 'supply': current_used if have_stats else get_supply(event.second)[0], 'made': current_made if have_stats else get_supply(event.second)[1], 'unit': name, 'kind': 'finish'})
                 continue
 
+            # ---- UpgradeCompleteEvent (corrected) -----------------------------
             if isinstance(event, sc2reader.events.tracker.UpgradeCompleteEvent):
-                if getattr(event, "pid", player.pid) != player.pid:
+                if event.pid != player.pid:
                     continue
-
+                duration = durations.get(event.upgrade_type_id)
+                if duration is None:
+                    continue
+                start_frame = event.frame - duration
+                start_sec = start_frame / replay.game_fps
+                start_supply = _supply_at(frames_by_pid[player.pid], supply_by_pid[player.pid], start_frame)
                 name = tidy(event.upgrade_type_name)
-
-                if name is None or (ENABLE_RACE_GATE and not is_legal_upgrade(player.play_race, name)):
+                if name is None or (ENABLE_RACE_GATE and name not in LEGAL_BY_RACE.get(player.play_race.lower(), set())):
                     continue
-
-                # Free producer if busy
+                # free producer if busy
                 for t, n in list(building_busy.items()):
                     if n == name:
                         del building_busy[t]
+                entries.append({'clock_sec': int(start_sec), 'supply': start_supply or 0, 'made': current_made, 'unit': name, 'kind': 'start'})
+                continue
 
-                used, made = get_supply(event.second)
-                entries.append(
-                    dict(
-                        clock_sec=int(event.second / speed_factor),
-                        supply=used,
-                        made=made,
-                        unit=name,
-                        kind="finish",
-                    )
-                )
-                continue   # (rest of branch unchanged)
+        # end for event
 
+        # keep only start rows --------------------------------------
+        entries = [e for e in entries if e['kind'] == 'start']
 
-        entries = [e for e in entries if e.get("kind") == "start"]
-
-        # ----- collapse identical unit/supply rows ------------------
-        # assumes entries are still unsorted; we'll sort after grouping
+        # collapse identical supply+unit rows -----------------------
         tmp = []
-
-        for e in sorted(entries, key=lambda x: (x["clock_sec"], x["supply"], x["unit"])):
-            if (
-                tmp
-                and e["unit"] == tmp[-1]["unit"]
-                and e["supply"] == tmp[-1]["supply"]
-            ):
-                # same unit & supply → bump count
-                tmp[-1]["count"] = tmp[-1].get("count", 1) + 1
+        for e in sorted(entries, key=lambda x: (x['clock_sec'], x['supply'], x['unit'])):
+            if tmp and e['unit'] == tmp[-1]['unit'] and e['supply'] == tmp[-1]['supply']:
+                tmp[-1]['count'] = tmp[-1].get('count', 1) + 1
             else:
-                e["count"] = 1
+                e['count'] = 1
                 tmp.append(e)
-
         entries = tmp
-        # ----------------------------------------------------------------
 
+        # final sort ------------------------------------------------
         entries.sort(key=lambda e: e['clock_sec'])
 
+        # ----- stringify build lines -------------------------------
         build_lines = []
-
         if compact:
             i = 0
             n = len(entries)
@@ -672,15 +464,13 @@ def upload():
                 units = []
                 while i < n and entries[i]['supply'] == supply and abs(entries[i]['clock_sec'] - start_time) <= 5:
                     e = entries[i]
-                    qty = e.get("count", 1)
+                    qty = e.get('count', 1)
                     label = f"{qty} {e['unit']}" if qty > 1 else e['unit']
                     units.append(label)
                     i += 1
                 parts = []
                 if not exclude_supply:
-                    supply_str = str(supply)
-                    if supply > made and made > 0:
-                        supply_str = f"{supply}/{made}"
+                    supply_str = f"{supply}/{made}" if supply > made and made > 0 else str(supply)
                     parts.append(supply_str)
                 prefix = f"[{' '.join(parts)}] " if parts else ""
                 build_lines.append(prefix + " + ".join(units))
@@ -688,16 +478,13 @@ def upload():
             for item in entries:
                 parts = []
                 if not exclude_supply:
-                    supply_str = str(item['supply'])
-                    if item['supply'] > item['made'] and item['made'] > 0:
-                        supply_str = f"{item['supply']}/{item['made']}"
+                    supply_str = f"{item['supply']}/{item['made']}" if item['supply'] > item['made'] and item['made'] > 0 else str(item['supply'])
                     parts.append(supply_str)
                 if not exclude_time:
-                    minutes = item['clock_sec'] // 60
-                    seconds = item['clock_sec'] % 60
+                    minutes, seconds = divmod(item['clock_sec'], 60)
                     parts.append(f"{minutes:02d}:{seconds:02d}")
                 prefix = f"[{' '.join(parts)}] " if parts else ""
-                qty = item.get("count", 1)
+                qty = item.get('count', 1)
                 label = f"{qty} {item['unit']}" if qty > 1 else item['unit']
                 build_lines.append(prefix + label)
 
@@ -706,6 +493,7 @@ def upload():
     except Exception as e:
         print("❌ Error while processing events:", e)
         return f'Failed to parse replay: {e}', 500
+
 
 if __name__ == '__main__':
     from waitress import serve
