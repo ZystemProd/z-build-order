@@ -472,12 +472,11 @@ def upload():
                 if name is None:
                     continue
                 entries.append({
-                    "clock_sec": int(start_sec),
-                    "supply": start_supply or 0,
-                    "made": current_made,
-                    "unit": name,
-                    "kind": "upgrade"
+                    "time": int(start_sec),
+                    "label": name,
+                    "type": "upgrade"
                 })
+
                 upgrade_starts.pop(name, None)
 
         # add any unmatched upgrade starts ---------------------------
