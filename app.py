@@ -23,6 +23,7 @@ import bisect
 import re
 from collections import defaultdict
 from sc2reader.constants import GAME_SPEED_FACTOR
+from sc2reader.events import game as ge
 from name_map import NAME_MAP
 from typing import List, Dict, Any, Optional
 
@@ -480,7 +481,7 @@ def upload():
                 # no continue – we still want to process other events on this frame
 
             # --- capture upgrade start (CommandEvent only — CORRECT!) ---
-            if isinstance(event, sc2reader.events.game.CommandEvent):
+            if isinstance(event, ABILITY_EVENTS):
                 ability_raw = getattr(event, "ability_name", None)
                 if ability_raw and ability_raw.startswith("Research") and getattr(event, "pid", None) == player.pid:
                     name = prettify_upgrade(ability_raw)
