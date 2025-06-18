@@ -24,6 +24,7 @@ import re
 import collections
 from sc2reader.constants import GAME_SPEED_FACTOR
 from name_map import NAME_MAP
+from typing import List, Dict, Any, Optional
 
 def _supply_at(frame_list: List[int], supply_list: List[int], frame: int) -> Optional[int]:
     idx = bisect.bisect_right(frame_list, frame) - 1
