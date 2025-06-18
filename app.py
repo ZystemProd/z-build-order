@@ -457,7 +457,10 @@ def upload():
 
 
         # keep only start rows --------------------------------------
-        entries = [e for e in entries if e['kind'] in {'start', 'upgrade'}]
+        entries = [
+            e for e in entries
+            if (e.get('kind') == 'start') or (e.get('type') == 'upgrade')
+        ]
 
         # collapse identical supply+unit rows (units only) ----------
         tmp = []
