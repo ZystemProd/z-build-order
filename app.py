@@ -460,6 +460,22 @@ def upload():
 
             ability = ability_raw
 
+            # --- DEBUG (remove later) -----------------------------------------
+            if ability_raw and ability_raw.startswith("Research") and event.second >   600  and event.second <  700:
+                # narrow the window so we don’t spam the log;
+                # adjust the seconds to cover the 10:39 in-game timestamp you see
+                print(
+                    "DBG",
+                    event.second,
+                    ability_raw,
+                    "queued:", getattr(event, "queued", None),
+                    "flags:", getattr(event, "flags", None),
+                    "unit:", getattr(event, "unit", None),
+                    "target:", getattr(event, "target", None),
+                    "ability_link:", getattr(event, "ability_link", None),
+                )
+            # ------------------------------------------------------------------
+
             if ability:
                 # Chrono Boost detection
                 if ability.endswith(("ChronoBoostEnergyCost", "ChronoBoost")):
