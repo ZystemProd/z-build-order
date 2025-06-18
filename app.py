@@ -479,7 +479,8 @@ def upload():
         entries = tmp
 
         # final sort ------------------------------------------------
-        entries.sort(key=lambda e: e['clock_sec'])
+        entries.sort(key=lambda e: e.get('clock_sec', e.get('time', 0)))
+
 
         # ----- stringify build lines -------------------------------
         build_lines = []
