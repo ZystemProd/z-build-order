@@ -478,10 +478,14 @@ def upload():
             if isinstance(event, sc2reader.events.tracker.UpgradeCompleteEvent):
                 if event.pid != player.pid:
                     continue
-                duration = durations.get(event.upgrade_type_id)
+                upgrade_id = getattr(event, "upgrade_type_id", None)
+                duration = durations.get(upgrade_id)
                 if duration is None:
-                    continue
-                start_frame = event.frame - duration
+                    duration = durations.get(event.upgrade_type_name)
+                if duration is None:
+                    continue  # still unknown, skip politely
+
+                start_frame = event.frame - duration   # <— this line was missing
                 start_sec = start_frame / replay.game_fps
                 start_supply = _supply_at(frames_by_pid[player.pid], supply_by_pid[player.pid], start_frame)
                 name = tidy(event.upgrade_type_name)
@@ -491,8 +495,15 @@ def upload():
                 for t, n in list(building_busy.items()):
                     if n == name:
                         del building_busy[t]
-                entries.append({'clock_sec': int(start_sec), 'supply': start_supply or 0, 'made': current_made, 'unit': name, 'kind': 'start'})
+                entries.append({
+                    'clock_sec': int(start_sec),
+                    'supply': start_supply or 0,
+                    'made': current_made,
+                    'unit': name,
+                    'kind': 'start'
+                })
                 continue
+
 
         # end for event
 
