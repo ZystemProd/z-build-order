@@ -71,6 +71,55 @@ upgrade_name_map = {
     "AnabolicSynthesis": "Anabolic Synthesis"
 }
 
+upgrade_times = {
+    # Terran
+    "Infernal Pre-Igniter": 100,
+    "Mag-Field Accelerator": 100,
+    "Drilling Claws": 79,
+    "Smart Servos": 100,
+    "Hi-Sec Auto Tracking": 100,
+    "Combat Shield": 100,
+    "Concussive Shells": 43,
+    "Hyperflight Rotors": 100,
+    "Interference Matrix": 57,
+    "Weapon Refit": 100,
+    "Neosteel Armor": 100,
+    "Advanced Ballistics": 100,
+    "Infantry Weapons L1": 100,
+    "Ship Weapons L1": 100,
+    "Cloaking Field": 100,
+    "Caduceus Reactor": 0,  # Removed
+    "Lift Off (ability)": 0,  # No research
+    # Zerg
+    "Metabolic Boost": 79,
+    "Adrenal Glands": 93,
+    "Glial Reconstitution": 79,
+    "Tunneling Claws": 79,
+    "Grooved Spines": 50,
+    "Muscular Augments": 64,
+    "Chitinous Plating": 79,
+    "Anabolic Synthesis": 42.9,
+    "Neural Parasite": 79,
+    "Centrifugal Hooks": 71,
+    "Burrow": 71,
+    "Nanomuscular Swell": 64,
+    "Seismic Spines": 57,
+    "Adaptive Talons": 57,
+    # Protoss
+    "Warp Gate Research": 100,
+    "Psionic Storm": 100,
+    "Blink": 100,
+    "Shadow Stride": 100,
+    "Gravitic Boosters": 100,
+    "Resonating Glaives": 100,
+    "Anion Pulse-Crystals": 100,
+    "Gravitic Drive": 57,
+    "Extended Thermal Lance": 100,
+    "Flux Vanes": 57,
+    "Tectonic Destabilizers": 100
+}
+
+
 
 def _supply_at(frame_list: List[int], supply_list: List[int], frame: int) -> Optional[int]:
     idx = bisect.bisect_right(frame_list, frame) - 1
@@ -490,18 +539,21 @@ def upload():
                 if event.pid != player.pid:
                     continue
 
-                name = tidy(event.upgrade_type_name)
-                if name is None:
-                    continue
+            name = tidy(event.upgrade_type_name)
+            if name is None:
+                continue
 
-                mapped_name = upgrade_name_map.get(name, name)
+            mapped_name = upgrade_name_map.get(name, name)
+            research_time = upgrade_times.get(mapped_name)
 
-                entries.append({
-                    "time": int(event.second / speed_factor),
-                    "label": mapped_name,
-                    "type": "upgrade"
-                })
+            start_time_sec = int((event.second - research_time) / speed_factor) if research_time else int(event.second / speed_factor)
 
+            entries.append({
+                "time": start_time_sec,
+                "label": mapped_name,
+                "type": "upgrade",
+                "research_time": research_time
+            })
 
 
         # keep only start rows --------------------------------------
