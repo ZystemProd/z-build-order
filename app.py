@@ -7,6 +7,8 @@ import io
 import bisect
 import re
 
+
+
 # --- label normalisation / filter ---------------------------------
 _DROP = {
     "k d8 charge",
@@ -24,6 +26,10 @@ _ALIAS = {
     "shadow strides": "Shadow Stride",      # add this
     "resonatingglaives": "Resonating Glaives",  # add this
 }
+
+# ─── feature flags ───────────────────────────────────────
+ENABLE_RACE_GATE = False        # ← set to False to disable
+# ─────────────────────────────────────────────────────────
 
 _RE_TERRAN = re.compile(r"^terran\s+", re.I)
 _RE_EVOLVE = re.compile(r"^evolve\s+", re.I)
@@ -472,8 +478,9 @@ def upload():
                     # 5-b race-gate
                     raw_name = prettify_upgrade(ability)
                     upg_name = tidy(raw_name)
-                    if upg_name is None or not is_legal_upgrade(player.play_race, upg_name):
+                    if upg_name is None or (ENABLE_RACE_GATE and not is_legal_upgrade(player.play_race, upg_name)):
                         continue
+
 
                     # 5-c skip if building is busy
                     tag = producer_tag(event)        # producer_tag() defined below
@@ -587,8 +594,9 @@ def upload():
 
             if isinstance(event, sc2reader.events.tracker.UpgradeCompleteEvent):
                 name = tidy(format_name(event.upgrade_type_name))
-                if name is None or not is_legal_upgrade(player.play_race, name):
+                if name is None or (ENABLE_RACE_GATE and not is_legal_upgrade(player.play_race, name)):
                     continue
+
 
                 # skip if we never logged a start
                 if name not in researching_now[player.pid]:
