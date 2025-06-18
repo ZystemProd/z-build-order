@@ -30,7 +30,11 @@ _ALIAS = {
     "hi sec auto tracking":"Hi-Sec Auto Tracking",
     "banshee speed":"Hyperflight Rotors",
     "vehicle and ship armors":"Vehicle And Ship Plaiting",
-    "adept piercing attack":"Resonating Glaives"
+    "adept piercing attack":"Resonating Glaives",
+    "anion pulse crystals": "Anion Pulse-Crystals",
+    "bosonic core": "Flux Vanes",
+    "gravity sling": "Tectonic Destabilizers"
+
 }
 
 # ─── feature flags ───────────────────────────────────────
