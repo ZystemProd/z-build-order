@@ -489,10 +489,16 @@ def upload():
         # keep only start rows --------------------------------------
         entries = [e for e in entries if e['kind'] in {'start', 'upgrade'}]
 
-        # collapse identical supply+unit rows -----------------------
+        # collapse identical supply+unit rows (units only) ----------
         tmp = []
         for e in sorted(entries, key=lambda x: (x['clock_sec'], x['supply'], x['unit'])):
-            if tmp and e['unit'] == tmp[-1]['unit'] and e['supply'] == tmp[-1]['supply']:
+            if (
+                tmp
+                and e['kind'] == 'start'
+                and tmp[-1]['kind'] == 'start'
+                and e['unit'] == tmp[-1]['unit']
+                and e['supply'] == tmp[-1]['supply']
+            ):
                 tmp[-1]['count'] = tmp[-1].get('count', 1) + 1
             else:
                 e['count'] = 1
