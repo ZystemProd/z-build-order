@@ -489,6 +489,10 @@ def upload():
                         continue
                     mapped_name = upgrade_name_map.get(name, name)
                     upgrade_starts[mapped_name] = int(event.frame / replay.game_fps)
+
+            # ------ GET ability name for Chrono Boost -------------------
+            ability_raw = getattr(event, "ability_name", None)
+            ability = str(ability_raw) if ability_raw else ""
     
 
             # ----- global stop limits ------------------------------
@@ -499,8 +503,9 @@ def upload():
                 break
 
 
+
             # Chrono Boost detection
-            if ability and ability.endswith(("ChronoBoostEnergyCost", "ChronoBoost")):
+            if ability.endswith(("ChronoBoostEnergyCost", "ChronoBoost")) and getattr(event, "pid", None) == player.pid:
                 chrono_until[event.pid] = max(chrono_until.get(event.pid, 0), event.second) + 9.6 * speed_factor
                 continue
 
