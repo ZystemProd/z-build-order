@@ -21,11 +21,10 @@ import sc2reader
 import io
 import bisect
 import re
-import collections
-from collections import defaultdict   # ← ADD THIS LINE
+from collections import defaultdict
 from sc2reader.constants import GAME_SPEED_FACTOR
 from name_map import NAME_MAP
-from typing import List, Dict, Any, Optional   # ← also add this line
+from typing import List, Dict, Any, Optional
 
 
 def _supply_at(frame_list: List[int], supply_list: List[int], frame: int) -> Optional[int]:
@@ -338,7 +337,6 @@ def upload():
 
         # ---- containers -------------------------------------------
         entries = []
-        building_busy = collections.defaultdict(lambda: None)  # producer‑tag → upgrade name
         init_map = {}                                          # unit_id → unit name
         chrono_until = {p.pid: 0 for p in players}
 
@@ -459,32 +457,19 @@ def upload():
                 if duration is None:
                     continue  # still unknown, skip politely
 
-                start_frame = event.frame - duration   # <— this line was missing
+                start_frame = event.frame - duration
                 start_sec = start_frame / replay.game_fps
                 start_supply = _supply_at(frames_by_pid[player.pid], supply_by_pid[player.pid], start_frame)
                 name = tidy(event.upgrade_type_name)
                 if name is None or (ENABLE_RACE_GATE and name not in LEGAL_BY_RACE.get(player.play_race.lower(), set())):
                     continue
-                # free producer if busy
-                for t, n in list(building_busy.items()):
-                    if n == name:
-                        del building_busy[t]
                 entries.append({
-                    'clock_sec': int(start_sec),
-                    'supply': start_supply or 0,
-                    'made': current_made,
-                    'unit': name,
-                    'kind': 'upgrade'   # <— fix here
+                    "clock_sec": int(start_sec),
+                    "supply": start_supply or 0,
+                    "made": current_made,
+                    "unit": name,
+                    "kind": "upgrade"
                 })
-
-
-                # remember producer is now busy with this upgrade
-                building_busy[name] = name
-
-                continue
-
-
-        # end for event
 
         # keep only start rows --------------------------------------
         entries = [e for e in entries if e['kind'] in {'start', 'upgrade'}]
