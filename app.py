@@ -26,9 +26,9 @@ _ALIAS = {
     "shadow strides": "Shadow Stride",
     "resonatingglaives": "Resonating Glaives",
     "Infernal Pre Igniter": "Infernal Pre-Igniter",
-    "Cyclonecyclone Lock On Damage": "Mag-Field Accelerator"
-    "Hi Sec Auto Tracking":"Hi-Sec Auto Tracking"
-    "Banshee Speed":"Hyperflight Rotors"
+    "Cyclonecyclone Lock On Damage": "Mag-Field Accelerator",
+    "Hi Sec Auto Tracking":"Hi-Sec Auto Tracking",
+    "Banshee Speed":"Hyperflight Rotors",
 }
 
 # ─── feature flags ───────────────────────────────────────
