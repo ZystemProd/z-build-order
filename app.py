@@ -27,6 +27,51 @@ from name_map import NAME_MAP
 from typing import List, Dict, Any, Optional
 
 
+upgrade_name_map = {
+    "HighCapacityBarrels": "Infernal Pre-Igniter",
+    "InterferenceMatrix": "Interference Matrix",
+    "ShieldWall": "Combat Shield",
+    "CycloneLockOnDamageUpgrade": "Mag-Field Accelerator",
+    "PersonalCloaking": "Personal Cloaking",
+    "BansheeSpeed": "Hyperflight Rotors",
+    "PunisherGrenades": "Concussive Shells",
+    "BansheeCloak": "Cloaking Field",
+    "DrillClaws": "Drilling Claws",
+    "HiSecAutoTracking": "Hi-Sec Auto Tracking",
+    "SmartServos": "Smart Servos",
+    "BattlecruiserEnableSpecializations": "Weapon Refit",
+    "TerranBuildingArmor": "Neosteel Armor",
+    "MedivacCaduceusReactor": "Caduceus Reactor",
+    "TerranShipWeaponsLevel1": "Ship Weapons L1",
+    "LiberatorAGRangeUpgrade": "Advanced Ballistics",
+    "TerranInfantryWeaponsLevel1": "Infantry Weapons L1",
+    "WarpGateResearch": "Research Warp Gate",
+    "PsiStormTech": "Psionic Storm",
+    "BlinkTech": "Blink",
+    "DarkTemplarBlinkUpgrade": "Shadow Stride",
+    "ObserverGraviticBooster": "Gravitic Boosters",
+    "AdeptPiercingAttack": "Resonating Glaives",
+    "GraviticDrive": "Gravitic Drive",
+    "PhoenixRangeUpgrade": "Anion Pulse-Crystals",
+    "ExtendedThermalLance": "Extended Thermal Lance",
+    "VoidRaySpeedUpgrade": "Flux Vanes",
+    "TempestGroundAttackUpgrade": "Tectonic Destabilizers",
+    "Zerglingmovementspeed": "Metabolic Boost",
+    "GlialReconstitution": "Glial Reconstitution",
+    "TunnelingClaws": "Tunneling Claws",
+    "EvolveGroovedSpines": "Grooved Spines",
+    "NeuralParasite": "Neural Parasite",
+    "EvolveMuscularAugments": "Muscular Augments",
+    "Frenzy": "Nanomuscular Swell",
+    "LurkerRange": "Seismic Spines",
+    "CentrificalHooks": "Centrifugal Hooks",
+    "Zerglingattackspeed": "Adrenal Glands",
+    "ChitinousPlating": "Chitinous Plating",
+    "DiggingClaws": "Adaptive Talons",
+    "AnabolicSynthesis": "Anabolic Synthesis"
+}
+
+
 def _supply_at(frame_list: List[int], supply_list: List[int], frame: int) -> Optional[int]:
     idx = bisect.bisect_right(frame_list, frame) - 1
     return supply_list[idx] if idx >= 0 else None
@@ -449,11 +494,14 @@ def upload():
                 if name is None:
                     continue
 
+                mapped_name = upgrade_name_map.get(name, name)
+
                 entries.append({
-                    "time": int(event.second / speed_factor),  # just current in-game time
-                    "label": name,
+                    "time": int(event.second / speed_factor),
+                    "label": mapped_name,
                     "type": "upgrade"
                 })
+
 
 
         # keep only start rows --------------------------------------
