@@ -23,8 +23,12 @@ _ALIAS = {
     "templar archive": "Templar Archives",
     "psi storm tech": "Psionic Storm",
     "medivac caduceus reactor": "Caduceus reactor",
-    "shadow strides": "Shadow Stride",      # add this
-    "resonatingglaives": "Resonating Glaives",  # add this
+    "shadow strides": "Shadow Stride",
+    "resonatingglaives": "Resonating Glaives",
+    "Infernal Pre Igniter": "Infernal Pre-Igniter",
+    "Cyclonecyclone Lock On Damage": "Mag-Field Accelerator"
+    "Hi Sec Auto Tracking":"Hi-Sec Auto Tracking"
+    "Banshee Speed":"Hyperflight Rotors"
 }
 
 # ─── feature flags ───────────────────────────────────────
