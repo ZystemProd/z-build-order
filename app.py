@@ -562,7 +562,9 @@ def upload():
                 mapped_name = upgrade_name_map.get(name, name)
                 research_time = upgrade_times.get(mapped_name)
 
-                start_time_sec = int((event.second - research_time) / speed_factor) if research_time else int(event.second / speed_factor)
+                frame_sec = event.frame / replay.game_fps
+                start_time_sec = int(frame_sec - research_time) if research_time else int(frame_sec)
+
 
                 entries.append({
                     "time": start_time_sec,
