@@ -539,21 +539,21 @@ def upload():
                 if event.pid != player.pid:
                     continue
 
-            name = tidy(event.upgrade_type_name)
-            if name is None:
-                continue
+                name = tidy(event.upgrade_type_name)
+                if name is None:
+                    continue
 
-            mapped_name = upgrade_name_map.get(name, name)
-            research_time = upgrade_times.get(mapped_name)
+                mapped_name = upgrade_name_map.get(name, name)
+                research_time = upgrade_times.get(mapped_name)
 
-            start_time_sec = int((event.second - research_time) / speed_factor) if research_time else int(event.second / speed_factor)
+                start_time_sec = int((event.second - research_time) / speed_factor) if research_time else int(event.second / speed_factor)
 
-            entries.append({
-                "time": start_time_sec,
-                "label": mapped_name,
-                "type": "upgrade",
-                "research_time": research_time
-            })
+                entries.append({
+                    "time": start_time_sec,
+                    "label": mapped_name,
+                    "type": "upgrade",
+                    "research_time": research_time
+                })
 
 
         # keep only start rows --------------------------------------
