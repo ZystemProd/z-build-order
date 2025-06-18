@@ -7,7 +7,120 @@ import io
 import bisect
 import re
 
-
+# --- TEMP ability_id → upgrade_id map ---
+ABILITY_ID_TO_UPGRADE_ID = {
+    80949: 59,
+    80950: 59,
+    2346: 60,
+    3708: 61,
+    3707: 61,
+    3705: 54,
+    3706: 54,
+    3762: 62,
+    3763: 62,
+    1591: 56,
+    1592: 56,
+    3781: 55,
+    3782: 55,
+    3709: 63,
+    3710: 63,
+    80954: 64,
+    80955: 64,
+    80952: 65,
+    80953: 65,
+    80951: 66,
+    80956: 66,
+    3747: 67,
+    3748: 67,
+    3749: 68,
+    3750: 68,
+    80958: 69,
+    80959: 69,
+    3711: 70,
+    3712: 70,
+    80960: 71,
+    80961: 71,
+    3733: 72,
+    3734: 72,
+    80963: 73,
+    80964: 73,
+    3735: 74,
+    3736: 74,
+    3737: 75,
+    3738: 75,
+    3713: 76,
+    3714: 76,
+    3715: 77,
+    3716: 77,
+    3725: 78,
+    3726: 78,
+    3727: 79,
+    3728: 79,
+    3745: 80,
+    3746: 80,
+    3775: 81,
+    3776: 81,
+    80972: 82,
+    80973: 82,
+    2345: 83,
+    2350: 84,
+    2351: 85,
+    2352: 86,
+    2353: 87,
+    2354: 88,
+    3704: 89,
+    3717: 90,
+    3718: 91,
+    3752: 92,
+    3753: 93,
+    2355: 94,
+    2356: 95,
+    2357: 96,
+    2358: 97,
+    2359: 98,
+    2360: 99,
+    80978: 100,
+    80979: 101,
+    80980: 102,
+    80981: 103,
+    2361: 104,
+    2362: 105,
+    2363: 106,
+    2364: 107,
+    2365: 108,
+    2366: 109,
+    3766: 110,
+    3767: 111,
+    3768: 112,
+    3769: 113,
+    2367: 114,
+    2368: 115,
+    2369: 116,
+    2370: 117,
+    2371: 118,
+    2372: 119,
+    2373: 120,
+    2374: 121,
+    2375: 122,
+    2376: 123,
+    3772: 124,
+    3773: 125,
+    3774: 126,
+    3777: 127,
+    3778: 128,
+    80983: 129,
+    80984: 130,
+    80985: 131,
+    80986: 132,
+    4096: 133,
+    4097: 134,
+    4098: 135,
+    4099: 136,
+    4100: 137,
+    4101: 138,
+    4102: 139,
+    4103: 140
+}
 
 # --- label normalisation / filter ---------------------------------
 _DROP = {
@@ -33,8 +146,7 @@ _ALIAS = {
     "adept piercing attack":"Resonating Glaives",
     "anion pulse crystals": "Anion Pulse-Crystals",
     "bosonic core": "Flux Vanes",
-    "gravity sling": "Tectonic Destabilizers"
-
+    "gravity sling": "Tectonic Destabilizers",
 }
 
 # ─── feature flags ───────────────────────────────────────
@@ -469,7 +581,7 @@ def upload():
                     ) + 9.6 * speed_factor
                     continue
 
-                # Upgrade research start
+            # --- Ability / command events (upgrade start) ---
             if ability.startswith("Research"):
                 is_queued = (
                     getattr(event, "queued", False)
@@ -478,33 +590,31 @@ def upload():
                 if is_queued:
                     continue
 
-                raw_name = prettify_upgrade(ability)
-                upg_name = tidy(raw_name)
-                if upg_name is None or (ENABLE_RACE_GATE and not is_legal_upgrade(player.play_race, upg_name)):
-                    continue
+                upgrade_id = ABILITY_ID_TO_UPGRADE_ID.get(event.ability_link)
+                if upgrade_id is None:
+                    continue  # unknown — skip
 
                 tag = producer_tag(event)
-                if tag and building_busy.get(tag) is not None:
-                    continue    # producer is still busy
+                if tag in building_busy and building_busy[tag] != upgrade_id:
+                    continue  # producer still busy with other upgrade
 
-                # append start row
                 used, made = get_supply(event.second)
                 entries.append(
                     dict(
                         clock_sec=int(event.second / speed_factor),
                         supply=used,
                         made=made,
-                        unit=upg_name,
+                        unit=tidy(prettify_upgrade(ability)),
                         kind="start",
                     )
                 )
-                researching_now[player.pid].add(upg_name)
 
                 if tag:
-                    building_busy[tag] = upg_name
+                    building_busy[tag] = upgrade_id
 
-                    continue
+                continue
             # ----------------------------------------------------------------
+
 
             if isinstance(event, sc2reader.events.tracker.UnitBornEvent):
                 if getattr(event, "control_pid", None) != player.pid:
@@ -594,22 +704,21 @@ def upload():
                 continue
 
             if isinstance(event, sc2reader.events.tracker.UpgradeCompleteEvent):
-                name = tidy(format_name(event.upgrade_type_name))
+                if getattr(event, "pid", player.pid) != player.pid:
+                    continue
+
+                upgrade_id = event.upgrade_type_id
+                name = tidy(event.upgrade_type_name)
+
+                # Race-gate (keep!)
                 if name is None or (ENABLE_RACE_GATE and not is_legal_upgrade(player.play_race, name)):
                     continue
 
-
-                # skip if we never logged a start
-                if name not in researching_now[player.pid]:
-                    continue
-                # free whichever building was researching this upgrade
-                for t, up in list(building_busy.items()):
-                    if up == name:
+                # Free producer
+                for t, upg_id in list(building_busy.items()):
+                    if upg_id == upgrade_id:
                         del building_busy[t]
 
-                researching_now[player.pid].discard(name)
-
-                # optional finish row (kept for debug, later filtered)
                 used, made = get_supply(event.second)
                 entries.append(
                     dict(
@@ -620,6 +729,7 @@ def upload():
                         kind="finish",
                     )
                 )
+
                 continue   # (rest of branch unchanged)
 
 
