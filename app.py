@@ -21,7 +21,8 @@ _ALIAS = {
     "templar archive": "Templar Archives",
     "psi storm tech": "Psionic Storm",
     "medivac caduceus reactor": "Caduceus reactor",
-    "shadow strides": "Shadow Stride",
+    "shadow strides": "Shadow Stride",      # add this
+    "resonatingglaives": "Resonating Glaives",  # add this
 }
 
 _RE_TERRAN = re.compile(r"^terran\s+", re.I)
@@ -87,13 +88,12 @@ def prettify_upgrade(ability_name: str) -> str:
 
 def producer_tag(ev):
     """
-    Return the tag of the structure that will perform this research.
-    For TargetUnitCommandEvent / AbilityEvent the *unit* is the producer;
-    .target is usually None.
+    Return the tag of the structure that performs the research.
+    For almost all Research orders, ev.unit is the producer.
     """
-    if getattr(ev, "unit", None):        # primary
+    if getattr(ev, "unit", None):      # AbilityEvent / TargetUnitCommandEvent
         return ev.unit.tag
-    if getattr(ev, "target", None):      # fallback
+    if getattr(ev, "target", None):    # very old replays
         return ev.target.tag
     return None
 
@@ -460,10 +460,10 @@ def upload():
                     tag = producer_tag(event)
                     building_already_busy = tag and building_busy.get(tag) is not None
 
+                    # 1) skip queued copies: either explicit flag or legacy bit-0/1
                     is_queued = (
-                        getattr(event, "queued", False)          # modern flag
-                        or (getattr(event, "flags", 0) & 0x1)    # legacy queued bit
-                        or building_already_busy                 # producer busy
+                        getattr(event, "queued", False)          # modern SC2 patches
+                        or (getattr(event, "flags", 0) & 0x3)    # older patches (bit 0 or 1)
                     )
                     if is_queued:
                         continue
@@ -476,9 +476,10 @@ def upload():
                         continue
 
                     # 5-c skip if building is busy
-                    tag = producer_tag(event)
-                    if tag and building_busy[tag] is not None:
-                        continue
+                    tag = producer_tag(event)        # producer_tag() defined below
+                    if tag and building_busy.get(tag) is not None:
+                        continue    # the structure is still researching the previous upgrade
+
 
                     # 5-d record start row
                     used, made = get_supply(event.second)
@@ -584,33 +585,33 @@ def upload():
                     })
                 continue
 
-                if isinstance(event, sc2reader.events.tracker.UpgradeCompleteEvent):
-                    name = tidy(format_name(event.upgrade_type_name))
-                    if name is None or not is_legal_upgrade(player.play_race, name):
-                        continue
+            if isinstance(event, sc2reader.events.tracker.UpgradeCompleteEvent):
+                name = tidy(format_name(event.upgrade_type_name))
+                if name is None or not is_legal_upgrade(player.play_race, name):
+                    continue
 
-                    # skip if we never logged a start
-                    if name not in researching_now[player.pid]:
-                        continue
-                    # free whichever building was researching this upgrade
-                    for t, up in list(building_busy.items()):
-                        if up == name:
-                            del building_busy[t]
+                # skip if we never logged a start
+                if name not in researching_now[player.pid]:
+                    continue
+                # free whichever building was researching this upgrade
+                for t, up in list(building_busy.items()):
+                    if up == name:
+                        del building_busy[t]
 
-                    researching_now[player.pid].discard(name)
+                researching_now[player.pid].discard(name)
 
-                    # optional finish row (kept for debug, later filtered)
-                    used, made = get_supply(event.second)
-                    entries.append(
-                        dict(
-                            clock_sec=int(event.second / speed_factor),
-                            supply=used,
-                            made=made,
-                            unit=name,
-                            kind="finish",
-                        )
+                # optional finish row (kept for debug, later filtered)
+                used, made = get_supply(event.second)
+                entries.append(
+                    dict(
+                        clock_sec=int(event.second / speed_factor),
+                        supply=used,
+                        made=made,
+                        unit=name,
+                        kind="finish",
                     )
-                    continue   # (rest of branch unchanged)
+                )
+                continue   # (rest of branch unchanged)
 
 
         entries = [e for e in entries if e.get("kind") == "start"]
