@@ -476,6 +476,10 @@ def upload():
                     'unit': name,
                     'kind': 'start'
                 })
+
+                # remember producer is now busy with this upgrade
+                building_busy[name] = name
+
                 continue
 
 
