@@ -620,8 +620,8 @@ def upload():
                     if not exclude_supply:
                         supply_str = f"{first['supply']}/{first['made']}" if first['supply'] > first['made'] and first['made'] > 0 else str(first['supply'])
                         parts.append(supply_str)
-
-                    parts.append(f"{minutes:02d}:{seconds:02d}")
+                    if not exclude_time:    
+                        parts.append(f"{minutes:02d}:{seconds:02d}")
 
                     prefix = f"[{' '.join(parts)}] " if parts else ""
 
