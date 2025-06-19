@@ -164,6 +164,21 @@ def _duration_map(replay) -> Dict[int, int]:
         60: 100 * L,
     }
 
+def frame_to_ingame_seconds(frame: int, replay) -> float:
+    """
+    Convert frame number to in-game seconds, corrected for SC2 speed.
+    Example: event.frame → seconds in-game.
+    """
+    fps = replay.game_fps
+    # Get SC2 in-game speed factor
+    speed_factor = GAME_SPEED_FACTOR.get(replay.expansion, {}).get(replay.speed, 1.0)
+    if replay.expansion == "LotV" and replay.speed == "Faster" and speed_factor == 1.0:
+        speed_factor = 1.4
+
+    real_seconds = frame / fps
+    in_game_seconds = real_seconds / speed_factor
+    return in_game_seconds
+
 # --- approximate build times (in seconds) for units --------------
 BUILD_TIME = {
     "SCV": 12,
@@ -451,7 +466,6 @@ def upload():
         entries = []
         init_map = {}                                          # unit_id → unit name
         chrono_until = {p.pid: 0 for p in players}
-        upgrade_starts = {}
 
         # NEW: running supply snapshot (O(1) look‑ups) --------------
         current_used = 0
@@ -481,17 +495,6 @@ def upload():
                 current_made = int(getattr(event, 'food_made', 0))
                 have_stats = True
                 # no continue – we still want to process other events on this frame
-
-            # --- capture upgrade start (ALL Command / TargetCommand / Ability events) ---
-            if isinstance(event, ABILITY_EVENTS):
-                ability_raw = getattr(event, "ability_name", None) or getattr(event, "ability_link", None)
-                if ability_raw and str(ability_raw).startswith("Research") and getattr(event, "pid", None) == player.pid:
-                    name = prettify_upgrade(str(ability_raw))
-                    name = tidy(name)
-                    if name is None:
-                        continue
-                    mapped_name = upgrade_name_map.get(name, name)
-                    upgrade_starts[mapped_name] = int(event.frame / replay.game_fps)
 
 
 
@@ -577,23 +580,26 @@ def upload():
                     continue
 
                 mapped_name = upgrade_name_map.get(name, name)
-                research_time = upgrade_times.get(mapped_name)
+                duration_frames = durations.get(event.upgrade_type_id)
+                frame_sec = frame_to_ingame_seconds(event.frame, replay)
 
-                frame_sec = event.frame / replay.game_fps
-
-                if mapped_name in upgrade_starts:
-                    start_time_sec = upgrade_starts[mapped_name]
+                if duration_frames:
+                    start_real = (event.frame - duration_frames) / replay.game_fps / speed_factor
                 else:
-                    start_time_sec = int(frame_sec - research_time) if research_time else int(frame_sec)
+                    # fallback if unknown duration
+                    start_real = frame_sec / speed_factor
+
+                used_s, made_s = get_supply(start_real)
 
                 entries.append({
-                    "clock_sec": start_time_sec,
-                    "label": mapped_name,
-                    "type": "upgrade",
-                    "research_time": research_time
+                    'clock_sec': int(start_real),
+                    'supply': used_s,
+                    'made': made_s,
+                    'unit': mapped_name,
+                    'kind': 'start',
                 })
 
-
+    
 
         # keep only start rows --------------------------------------
         entries = [
