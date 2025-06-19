@@ -28,6 +28,8 @@ from name_map import NAME_MAP
 from typing import List, Dict, Any, Optional
 
 UPGRADE_PREFIX = re.compile(r'^(Research|ResearchTech|Upgrade)_?')
+CHRONO_SPEED_FACTOR = 1 / 1.35  # ≈ 0.74074
+CHRONO_BOOST_SECONDS = 9.6  # duration of one chrono boost
 
 upgrade_name_map = {
     "HighCapacityBarrels": "Infernal Pre-Igniter",
@@ -123,7 +125,7 @@ upgrade_times = {
     "Ground Shields L1": 121,
     "Air Armor L1": 129,
     "Air Shields L1": 129,            
-    "Warp Gate Research": 100,
+    "Research warp gate": 100,
     "Psionic Storm": 79,
     "Blink": 121,
     "Charge": 100,
@@ -143,26 +145,6 @@ def _supply_at(frame_list: List[int], supply_list: List[int], frame: int) -> Opt
     idx = bisect.bisect_right(frame_list, frame) - 1
     return supply_list[idx] if idx >= 0 else None
 
-def _duration_map(replay) -> Dict[int, int]:
-    BLIZZARD_FPS = 16
-    gd = getattr(replay, "game_data", None)
-    if gd and hasattr(gd, "upgrades"):
-        return {u.id: u.research_time for u in gd.upgrades.values()}
-    try:
-        from sc2reader.resources import build_data
-        data = build_data(replay.build)
-        return {u["id"]: u["research_time"] for u in data["upgrades"].values()}
-    except Exception:
-        pass
-    L = BLIZZARD_FPS
-    return {
-        55: 121 * L,
-        56: 121 * L,
-        57: 86 * L,
-        58: 79 * L,
-        59: 100 * L,
-        60: 100 * L,
-    }
 
 def frame_to_ingame_seconds(frame: int, replay) -> float:
     """
@@ -241,9 +223,9 @@ BUILD_TIME = {
 # --- label normalisation / filter ---------------------------------
 _DROP = {
     "k d8 charge",
-    "spray terran",
-    "spray zerg",
-    "spray protoss",
+    "sprayterran",
+    "sprayzerg",
+    "sprayprotoss",
     "interceptor",          # drop Carrier interceptor rows
 }
 
@@ -299,24 +281,8 @@ def tidy(label: str) -> str | None:
 # --- Ability/Command events helper for any sc2reader version ---
 from sc2reader.events import game as ge
 
-
-_ABILITY_CLASSES = []
-for _name in (
-    "AbilityEvent",            # pre‑2.0
-    "CommandEvent",            # 2.0 alpha
-    "TargetPointCommandEvent", # 2.x stable
-    "TargetUnitCommandEvent",
-):
-    _cls = getattr(ge, _name, None)
-    if _cls:
-        _ABILITY_CLASSES.append(_cls)
-
-ABILITY_EVENTS = tuple(_ABILITY_CLASSES)
-
 # Helper for parsing upgrade ability names
 UPGRADE_PREFIX = re.compile(r'^(Research|ResearchTech|Upgrade)_?')
-
-
 
 def prettify_upgrade(ability_name: str) -> str:
     """Return a human‑friendly upgrade name from a raw ability string."""
@@ -536,8 +502,8 @@ def upload():
                 build_time = BUILD_TIME.get(event.unit_type_name, 0)
                 start_real = event.second - build_time * speed_factor
                 if player.play_race.lower() == "protoss" and start_real < chrono_until.get(player.pid, 0):
-                    if start_real >= chrono_until[player.pid] - 9.6 * speed_factor:
-                        start_real = event.second - build_time * 0.65 * speed_factor
+                    if start_real >= chrono_until[player.pid] - CHRONO_BOOST_SECONDS * speed_factor:
+                        start_real = event.second - build_time * CHRONO_SPEED_FACTOR * speed_factor
                 used_s, made_s = get_supply(start_real)
                 if stop_limit is not None and used_s > stop_limit:
                     break
@@ -570,7 +536,7 @@ def upload():
                     entries.append({'clock_sec': int(event.second / speed_factor), 'supply': current_used if have_stats else get_supply(event.second)[0], 'made': current_made if have_stats else get_supply(event.second)[1], 'unit': name, 'kind': 'finish'})
                 continue
 
-            # ---- UpgradeCompleteEvent (corrected) -----------------------------
+            # ---- UpgradeCompleteEvent (with chrono) -----------------------------
             if isinstance(event, sc2reader.events.tracker.UpgradeCompleteEvent):
                 if event.pid != player.pid:
                     continue
@@ -581,7 +547,6 @@ def upload():
 
                 mapped_name = upgrade_name_map.get(name, name)
 
-                # Get duration in SECONDS (not frames!)
                 duration_secs = upgrade_times.get(mapped_name)
 
                 frame_sec = frame_to_ingame_seconds(event.frame, replay)
@@ -589,8 +554,13 @@ def upload():
                 if duration_secs:
                     start_real = frame_sec - duration_secs
                 else:
-                    # fallback if unknown duration
                     start_real = frame_sec
+
+                # Apply chrono boost if Protoss
+                if player.play_race.lower() == "protoss" and start_real < chrono_until.get(player.pid, 0):
+                    if start_real >= chrono_until[player.pid] - CHRONO_BOOST_SECONDS * speed_factor:
+                        if duration_secs:
+                            start_real = frame_sec - duration_secs * CHRONO_SPEED_FACTOR
 
                 used_s, made_s = get_supply(start_real)
 
@@ -603,6 +573,7 @@ def upload():
                     'type': 'upgrade',
                     'label': mapped_name
                 })
+
 
 
 
