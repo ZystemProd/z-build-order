@@ -583,7 +583,7 @@ def upload():
                     start_time_sec = int(frame_sec - research_time) if research_time else int(frame_sec)
 
                 entries.append({
-                    "time": start_time_sec,
+                    "clock_sec": start_time_sec,
                     "label": mapped_name,
                     "type": "upgrade",
                     "research_time": research_time
