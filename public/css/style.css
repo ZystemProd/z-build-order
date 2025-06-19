@@ -4668,3 +4668,9 @@ optgroup[label="Terran"] { color: #ff3a30; }
 #optionsLoadingWrapper { display: none; justify-content: center; }
 #cookieBanner { display: none; }
 #privacyModal { display: none; }
+
+.addon-sup {
+  color: #f0a500;
+  font-weight: bold;
+  margin-left: 4px;
+}
