@@ -484,14 +484,15 @@ def upload():
 
             # --- capture upgrade start (ALL Command / TargetCommand / Ability events) ---
             if isinstance(event, ABILITY_EVENTS):
-                ability_raw = getattr(event, "ability_name", None)
-                if ability_raw and ability_raw.startswith("Research") and getattr(event, "pid", None) == player.pid:
-                    name = prettify_upgrade(ability_raw)
+                ability_raw = getattr(event, "ability_name", None) or getattr(event, "ability_link", None)
+                if ability_raw and str(ability_raw).startswith("Research") and getattr(event, "pid", None) == player.pid:
+                    name = prettify_upgrade(str(ability_raw))
                     name = tidy(name)
                     if name is None:
                         continue
                     mapped_name = upgrade_name_map.get(name, name)
                     upgrade_starts[mapped_name] = int(event.frame / replay.game_fps)
+
 
 
 
