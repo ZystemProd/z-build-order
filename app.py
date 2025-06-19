@@ -580,14 +580,17 @@ def upload():
                     continue
 
                 mapped_name = upgrade_name_map.get(name, name)
-                duration_frames = durations.get(event.upgrade_type_id)
+
+                # Get duration in SECONDS (not frames!)
+                duration_secs = upgrade_times.get(mapped_name)
+
                 frame_sec = frame_to_ingame_seconds(event.frame, replay)
 
-                if duration_frames:
-                    start_real = (event.frame - duration_frames) / replay.game_fps / speed_factor
+                if duration_secs:
+                    start_real = frame_sec - duration_secs
                 else:
                     # fallback if unknown duration
-                    start_real = frame_sec / speed_factor
+                    start_real = frame_sec
 
                 used_s, made_s = get_supply(start_real)
 
@@ -597,9 +600,12 @@ def upload():
                     'made': made_s,
                     'unit': mapped_name,
                     'kind': 'start',
+                    'type': 'upgrade',
+                    'label': mapped_name
                 })
 
-    
+
+
 
         # keep only start rows --------------------------------------
         entries = [
