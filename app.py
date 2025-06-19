@@ -19,7 +19,7 @@ Changes made 2025‑06‑18
 from flask_cors import CORS
 import sc2reader
 import io
-import bisect
+import bisect 
 import re
 from collections import defaultdict
 from sc2reader.constants import GAME_SPEED_FACTOR
@@ -299,7 +299,8 @@ for _name in (
 ABILITY_EVENTS = tuple(_ABILITY_CLASSES)
 
 # Helper for parsing upgrade ability names
-UPGRADE_PREFIX = re.compile(r'^(Research|Upgrade)_?')
+UPGRADE_PREFIX = re.compile(r'^(Research|ResearchTech|Upgrade)_?')
+
 
 
 def prettify_upgrade(ability_name: str) -> str:
