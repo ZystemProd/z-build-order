@@ -27,6 +27,7 @@ from sc2reader.events import game as ge
 from name_map import NAME_MAP
 from typing import List, Dict, Any, Optional
 
+UPGRADE_PREFIX = re.compile(r'^(Research|ResearchTech|Upgrade)_?')
 
 upgrade_name_map = {
     "HighCapacityBarrels": "Infernal Pre-Igniter",
@@ -480,7 +481,7 @@ def upload():
                 have_stats = True
                 # no continue – we still want to process other events on this frame
 
-            # --- capture upgrade start (CommandEvent only — CORRECT!) ---
+            # --- capture upgrade start (ALL Command / TargetCommand / Ability events) ---
             if isinstance(event, ABILITY_EVENTS):
                 ability_raw = getattr(event, "ability_name", None)
                 if ability_raw and ability_raw.startswith("Research") and getattr(event, "pid", None) == player.pid:
@@ -490,6 +491,7 @@ def upload():
                         continue
                     mapped_name = upgrade_name_map.get(name, name)
                     upgrade_starts[mapped_name] = int(event.frame / replay.game_fps)
+
 
 
             # ------ GET ability name for Chrono Boost -------------------
