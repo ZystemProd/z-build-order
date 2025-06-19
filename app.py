@@ -19,39 +19,147 @@ Changes made 2025‑06‑18
 from flask_cors import CORS
 import sc2reader
 import io
-import bisect
+import bisect 
 import re
-import collections
-from collections import defaultdict   # ← ADD THIS LINE
+from collections import defaultdict
 from sc2reader.constants import GAME_SPEED_FACTOR
+from sc2reader.events import game as ge
 from name_map import NAME_MAP
-from typing import List, Dict, Any, Optional   # ← also add this line
+from typing import List, Dict, Any, Optional
+
+UPGRADE_PREFIX = re.compile(r'^(Research|ResearchTech|Upgrade)_?')
+CHRONO_SPEED_FACTOR = 1 / 1.35  # ≈ 0.74074
+CHRONO_BOOST_SECONDS = 9.6  # duration of one chrono boost
+
+upgrade_name_map = {
+    "HighCapacityBarrels": "Infernal Pre-Igniter",
+    "InterferenceMatrix": "Interference Matrix",
+    "ShieldWall": "Combat Shield",
+    "CycloneLockOnDamageUpgrade": "Mag-Field Accelerator",
+    "PersonalCloaking": "Personal Cloaking",
+    "BansheeSpeed": "Hyperflight Rotors",
+    "PunisherGrenades": "Concussive Shells",
+    "BansheeCloak": "Cloaking Field",
+    "DrillClaws": "Drilling Claws",
+    "HiSecAutoTracking": "Hi-Sec Auto Tracking",
+    "SmartServos": "Smart Servos",
+    "BattlecruiserEnableSpecializations": "Weapon Refit",
+    "TerranBuildingArmor": "Neosteel Armor",
+    "MedivacCaduceusReactor": "Caduceus Reactor",
+    "TerranShipWeaponsLevel1": "Ship Weapons L1",
+    "LiberatorAGRangeUpgrade": "Advanced Ballistics",
+    "TerranInfantryWeaponsLevel1": "Infantry Weapons L1",
+    "WarpGateResearch": "Research Warp Gate",
+    "PsiStormTech": "Psionic Storm",
+    "BlinkTech": "Blink",
+    "DarkTemplarBlinkUpgrade": "Shadow Stride",
+    "ObserverGraviticBooster": "Gravitic Boosters",
+    "AdeptPiercingAttack": "Resonating Glaives",
+    "GraviticDrive": "Gravitic Drive",
+    "PhoenixRangeUpgrade": "Anion Pulse-Crystals",
+    "ExtendedThermalLance": "Extended Thermal Lance",
+    "VoidRaySpeedUpgrade": "Flux Vanes",
+    "TempestGroundAttackUpgrade": "Tectonic Destabilizers",
+    "Zerglingmovementspeed": "Metabolic Boost",
+    "GlialReconstitution": "Glial Reconstitution",
+    "TunnelingClaws": "Tunneling Claws",
+    "EvolveGroovedSpines": "Grooved Spines",
+    "NeuralParasite": "Neural Parasite",
+    "EvolveMuscularAugments": "Muscular Augments",
+    "Frenzy": "Nanomuscular Swell",
+    "LurkerRange": "Seismic Spines",
+    "CentrificalHooks": "Centrifugal Hooks",
+    "Zerglingattackspeed": "Adrenal Glands",
+    "ChitinousPlating": "Chitinous Plating",
+    "DiggingClaws": "Adaptive Talons",
+    "AnabolicSynthesis": "Anabolic Synthesis"
+}
+
+upgrade_times = {
+    # Terran
+    "Stimpack": 100,
+    "Infernal Pre-Igniter": 79,
+    "Mag-Field Accelerator": 100,
+    "Drilling Claws": 79,
+    "Smart Servos": 100,
+    "Hi-Sec Auto Tracking": 57,
+    "Combat Shield": 79,
+    "Concussive Shells": 43,
+    "Hyperflight Rotors": 100,
+    "Interference Matrix": 57,
+    "Weapon Refit": 100,
+    "Neosteel Armor": 100,
+    "Advanced Ballistics": 79,
+    "Infantry Weapons L1": 114,
+    "Infantry Armor L1": 114,
+    "Ship Weapons L1": 114,
+    "Vehicle And Ship Plaiting L1": 114,
+    "Vehicle Weapons L1": 114,
+    "Cloaking Field": 79,
+    "Personal Cloaking": 86,
+    "Caduceus Reactor": 50,
+    # Zerg
+    "Melee Attack L1": 114, 
+    "Missle Attack L1": 114,
+    "Carapace L1": 114,
+    "Flyer Armor L1": 114,
+    "Flyer Attack L1": 114,
+    "Overlord Speed": 43,
+    "Metabolic Boost": 79,
+    "Adrenal Glands": 93,
+    "Glial Reconstitution": 79,
+    "Tunneling Claws": 79,
+    "Grooved Spines": 50,
+    "Muscular Augments": 64,
+    "Chitinous Plating": 43,
+    "Anabolic Synthesis": 79,
+    "Neural Parasite": 79,
+    "Centrifugal Hooks": 71,
+    "Burrow": 71,
+    "Nanomuscular Swell": 64,
+    "Seismic Spines": 57,
+    "Adaptive Talons": 57,
+    # Protoss
+    "Ground Weapons L1": 121,
+    "Ground Armor L1": 121,
+    "Ground Shields L1": 121,
+    "Air Armor L1": 129,
+    "Air Shields L1": 129,            
+    "Research warp gate": 100,
+    "Psionic Storm": 79,
+    "Blink": 121,
+    "Charge": 100,
+    "Shadow Stride": 100,
+    "Gravitic Boosters": 57,
+    "Resonating Glaives": 100,
+    "Anion Pulse-Crystals": 64,
+    "Gravitic Drive": 57,
+    "Extended Thermal Lance": 100,
+    "Flux Vanes": 57,
+    "Tectonic Destabilizers": 100
+}
+
 
 
 def _supply_at(frame_list: List[int], supply_list: List[int], frame: int) -> Optional[int]:
     idx = bisect.bisect_right(frame_list, frame) - 1
     return supply_list[idx] if idx >= 0 else None
 
-def _duration_map(replay) -> Dict[int, int]:
-    BLIZZARD_FPS = 16
-    gd = getattr(replay, "game_data", None)
-    if gd and hasattr(gd, "upgrades"):
-        return {u.id: u.research_time for u in gd.upgrades.values()}
-    try:
-        from sc2reader.resources import build_data
-        data = build_data(replay.build)
-        return {u["id"]: u["research_time"] for u in data["upgrades"].values()}
-    except Exception:
-        pass
-    L = BLIZZARD_FPS
-    return {
-        55: 121 * L,
-        56: 121 * L,
-        57: 86 * L,
-        58: 79 * L,
-        59: 100 * L,
-        60: 100 * L,
-    }
+
+def frame_to_ingame_seconds(frame: int, replay) -> float:
+    """
+    Convert frame number to in-game seconds, corrected for SC2 speed.
+    Example: event.frame → seconds in-game.
+    """
+    fps = replay.game_fps
+    # Get SC2 in-game speed factor
+    speed_factor = GAME_SPEED_FACTOR.get(replay.expansion, {}).get(replay.speed, 1.0)
+    if replay.expansion == "LotV" and replay.speed == "Faster" and speed_factor == 1.0:
+        speed_factor = 1.4
+
+    real_seconds = frame / fps
+    in_game_seconds = real_seconds / speed_factor
+    return in_game_seconds
 
 # --- approximate build times (in seconds) for units --------------
 BUILD_TIME = {
@@ -115,9 +223,9 @@ BUILD_TIME = {
 # --- label normalisation / filter ---------------------------------
 _DROP = {
     "k d8 charge",
-    "spray terran",
-    "spray zerg",
-    "spray protoss",
+    "sprayterran",
+    "sprayzerg",
+    "sprayprotoss",
     "interceptor",          # drop Carrier interceptor rows
 }
 
@@ -139,9 +247,7 @@ _ALIAS = {
     "gravity sling": "Tectonic Destabilizers",
 }
 
-# ─── feature flags ───────────────────────────────────────
-ENABLE_RACE_GATE = False        # ← set to False to disable
-# ─────────────────────────────────────────────────────────
+
 
 _RE_TERRAN = re.compile(r"^terran\s+", re.I)
 _RE_EVOLVE = re.compile(r"^evolve\s+", re.I)
@@ -175,22 +281,8 @@ def tidy(label: str) -> str | None:
 # --- Ability/Command events helper for any sc2reader version ---
 from sc2reader.events import game as ge
 
-_ABILITY_CLASSES = []
-for _name in (
-    "AbilityEvent",            # pre‑2.0
-    "CommandEvent",            # 2.0 alpha
-    "TargetPointCommandEvent", # 2.x stable
-    "TargetUnitCommandEvent",
-):
-    _cls = getattr(ge, _name, None)
-    if _cls:
-        _ABILITY_CLASSES.append(_cls)
-
-ABILITY_EVENTS = tuple(_ABILITY_CLASSES)
-
 # Helper for parsing upgrade ability names
-UPGRADE_PREFIX = re.compile(r'^(Research|Upgrade)_?')
-
+UPGRADE_PREFIX = re.compile(r'^(Research|ResearchTech|Upgrade)_?')
 
 def prettify_upgrade(ability_name: str) -> str:
     """Return a human‑friendly upgrade name from a raw ability string."""
@@ -338,7 +430,6 @@ def upload():
 
         # ---- containers -------------------------------------------
         entries = []
-        building_busy = collections.defaultdict(lambda: None)  # producer‑tag → upgrade name
         init_map = {}                                          # unit_id → unit name
         chrono_until = {p.pid: 0 for p in players}
 
@@ -355,9 +446,6 @@ def upload():
                 frames_by_pid[ev.pid].append(ev.frame)
                 supply_by_pid[ev.pid].append(int(ev.food_used))
 
-        # Pre-compute upgrade durations
-        durations = _duration_map(replay)
-
 
         # ---- iterate event stream --------------------------------
         for event in replay.events:
@@ -371,6 +459,12 @@ def upload():
                 have_stats = True
                 # no continue – we still want to process other events on this frame
 
+
+            # ------ GET ability name for Chrono Boost -------------------
+            ability_raw = getattr(event, "ability_name", None)
+            ability = str(ability_raw) if ability_raw else ""
+    
+
             # ----- global stop limits ------------------------------
             game_time = int(event.second / speed_factor)  # in‑game seconds
             if time_limit is not None and game_time > time_limit:
@@ -378,22 +472,10 @@ def upload():
             if stop_limit is not None and current_used > stop_limit:  # uses live snapshot
                 break
 
-            # ----- Ability / command events ------------------------
-            ability_raw = (
-                getattr(event, "ability_name", None)
-                or getattr(event, "ability_link", None)
-                or getattr(event, "ability", None)
-            )
-            ability = str(ability_raw) if not isinstance(ability_raw, str) else ability_raw
 
             # Chrono Boost detection
-            if ability and ability.endswith(("ChronoBoostEnergyCost", "ChronoBoost")):
+            if ability.endswith(("ChronoBoostEnergyCost", "ChronoBoost")) and getattr(event, "pid", None) == player.pid:
                 chrono_until[event.pid] = max(chrono_until.get(event.pid, 0), event.second) + 9.6 * speed_factor
-                continue
-
-            # ---- Upgrade start (Research ability) -----------------
-            if ability.startswith("Research") and getattr(event, 'pid', None) == player.pid:
-                # Skip — UpgradeCompleteEvent now handles upgrades correctly
                 continue
 
 
@@ -414,8 +496,8 @@ def upload():
                 build_time = BUILD_TIME.get(event.unit_type_name, 0)
                 start_real = event.second - build_time * speed_factor
                 if player.play_race.lower() == "protoss" and start_real < chrono_until.get(player.pid, 0):
-                    if start_real >= chrono_until[player.pid] - 9.6 * speed_factor:
-                        start_real = event.second - build_time * 0.65 * speed_factor
+                    if start_real >= chrono_until[player.pid] - CHRONO_BOOST_SECONDS * speed_factor:
+                        start_real = event.second - build_time * CHRONO_SPEED_FACTOR * speed_factor
                 used_s, made_s = get_supply(start_real)
                 if stop_limit is not None and used_s > stop_limit:
                     break
@@ -448,59 +530,80 @@ def upload():
                     entries.append({'clock_sec': int(event.second / speed_factor), 'supply': current_used if have_stats else get_supply(event.second)[0], 'made': current_made if have_stats else get_supply(event.second)[1], 'unit': name, 'kind': 'finish'})
                 continue
 
-            # ---- UpgradeCompleteEvent (corrected) -----------------------------
+            # ---- UpgradeCompleteEvent (with chrono) -----------------------------
             if isinstance(event, sc2reader.events.tracker.UpgradeCompleteEvent):
                 if event.pid != player.pid:
                     continue
-                upgrade_id = getattr(event, "upgrade_type_id", None)
-                duration = durations.get(upgrade_id)
-                if duration is None:
-                    duration = durations.get(event.upgrade_type_name)
-                if duration is None:
-                    continue  # still unknown, skip politely
 
-                start_frame = event.frame - duration   # <— this line was missing
-                start_sec = start_frame / replay.game_fps
-                start_supply = _supply_at(frames_by_pid[player.pid], supply_by_pid[player.pid], start_frame)
                 name = tidy(event.upgrade_type_name)
-                if name is None or (ENABLE_RACE_GATE and name not in LEGAL_BY_RACE.get(player.play_race.lower(), set())):
+                if name is None:
                     continue
-                # free producer if busy
-                for t, n in list(building_busy.items()):
-                    if n == name:
-                        del building_busy[t]
+
+                mapped_name = upgrade_name_map.get(name, name)
+
+                duration_secs = upgrade_times.get(mapped_name)
+
+                frame_sec = frame_to_ingame_seconds(event.frame, replay)
+
+                if duration_secs:
+                    start_real = frame_sec - duration_secs
+                else:
+                    start_real = frame_sec
+
+                # Apply chrono boost if Protoss
+                if player.play_race.lower() == "protoss" and start_real < chrono_until.get(player.pid, 0):
+                    if start_real >= chrono_until[player.pid] - CHRONO_BOOST_SECONDS * speed_factor:
+                        if duration_secs:
+                            start_real = frame_sec - duration_secs * CHRONO_SPEED_FACTOR
+
+                used_s, made_s = get_supply(start_real)
+
                 entries.append({
-                    'clock_sec': int(start_sec),
-                    'supply': start_supply or 0,
-                    'made': current_made,
-                    'unit': name,
-                    'kind': 'upgrade'   # <— fix here
+                    'clock_sec': int(start_real),
+                    'supply': used_s,
+                    'made': made_s,
+                    'unit': mapped_name,
+                    'kind': 'start',
+                    'type': 'upgrade',
+                    'label': mapped_name
                 })
 
 
-                # remember producer is now busy with this upgrade
-                building_busy[name] = name
+        # keep only start rows --------------------------------------
+        entries = [
+            e for e in entries
+            if (e.get('kind') == 'start') or (e.get('type') == 'upgrade')
+        ]
 
+        # collapse identical supply+unit rows (units only) ----------
+        tmp = []
+        for e in sorted(entries, key=lambda x: (
+            x.get('clock_sec', x.get('time', 0)),
+            x.get('supply', 0),
+            x.get('unit', x.get('label', ''))
+        )):
+            if e.get('kind') != 'start':
+                # do not collapse upgrades — just add
+                tmp.append(e)
                 continue
 
-
-        # end for event
-
-        # keep only start rows --------------------------------------
-        entries = [e for e in entries if e['kind'] in {'start', 'upgrade'}]
-
-        # collapse identical supply+unit rows -----------------------
-        tmp = []
-        for e in sorted(entries, key=lambda x: (x['clock_sec'], x['supply'], x['unit'])):
-            if tmp and e['unit'] == tmp[-1]['unit'] and e['supply'] == tmp[-1]['supply']:
+            if (
+                tmp
+                and tmp[-1].get('kind') == 'start'
+                and e.get('unit') == tmp[-1].get('unit')
+                and e.get('supply') == tmp[-1].get('supply')
+            ):
                 tmp[-1]['count'] = tmp[-1].get('count', 1) + 1
             else:
                 e['count'] = 1
                 tmp.append(e)
+
         entries = tmp
 
+
         # final sort ------------------------------------------------
-        entries.sort(key=lambda e: e['clock_sec'])
+        entries.sort(key=lambda e: e.get('clock_sec', e.get('time', 0)))
+
 
         # ----- stringify build lines -------------------------------
         build_lines = []
@@ -509,11 +612,34 @@ def upload():
             n = len(entries)
             while i < n:
                 first = entries[i]
+                if first.get('type') == 'upgrade':
+                    minutes, seconds = divmod(first.get('clock_sec', first.get('time', 0)), 60)
+                    label = first.get('label', 'Unknown')
+
+                    parts = []
+                    if not exclude_supply:
+                        supply_str = f"{first['supply']}/{first['made']}" if first['supply'] > first['made'] and first['made'] > 0 else str(first['supply'])
+                        parts.append(supply_str)
+                    if not exclude_time:    
+                        parts.append(f"{minutes:02d}:{seconds:02d}")
+
+                    prefix = f"[{' '.join(parts)}] " if parts else ""
+
+                    build_lines.append(prefix + label)
+                    i += 1
+                    continue
+
+
                 supply = first['supply']
                 made = first['made']
                 start_time = first['clock_sec']
                 units = []
-                while i < n and entries[i]['supply'] == supply and abs(entries[i]['clock_sec'] - start_time) <= 5:
+                while (
+                    i < n
+                    and entries[i]['kind'] == 'start'
+                    and entries[i]['supply'] == supply
+                    and abs(entries[i]['clock_sec'] - start_time) <= 5
+                ):
                     e = entries[i]
                     qty = e.get('count', 1)
                     label = f"{qty} {e['unit']}" if qty > 1 else e['unit']
@@ -521,23 +647,43 @@ def upload():
                     i += 1
                 parts = []
                 if not exclude_supply:
-                    supply_str = f"{supply}/{made}" if supply > made and made > 0 else str(supply)
+                    supply_str = (
+                        f"{supply}/{made}" if supply > made and made > 0 else str(supply)
+                    )
                     parts.append(supply_str)
                 prefix = f"[{' '.join(parts)}] " if parts else ""
                 build_lines.append(prefix + " + ".join(units))
         else:
             for item in entries:
+                if item.get('type') == 'upgrade':
+                    minutes, seconds = divmod(item.get('clock_sec', item.get('time', 0)), 60)
+                    label = item.get('label', 'Unknown')
+
+                    parts = []
+                    if not exclude_supply:
+                        supply_str = f"{item['supply']}/{item['made']}" if item['supply'] > item['made'] and item['made'] > 0 else str(item['supply'])
+                        parts.append(supply_str)
+
+                    if not exclude_time:
+                        parts.append(f"{minutes:02d}:{seconds:02d}")
+
+                    prefix = f"[{' '.join(parts)}] " if parts else ""
+
+                    build_lines.append(prefix + label)
+                    continue
+
                 parts = []
                 if not exclude_supply:
                     supply_str = f"{item['supply']}/{item['made']}" if item['supply'] > item['made'] and item['made'] > 0 else str(item['supply'])
                     parts.append(supply_str)
                 if not exclude_time:
-                    minutes, seconds = divmod(item['clock_sec'], 60)
+                    minutes, seconds = divmod(item.get('clock_sec', item.get('time', 0)), 60)
                     parts.append(f"{minutes:02d}:{seconds:02d}")
                 prefix = f"[{' '.join(parts)}] " if parts else ""
                 qty = item.get('count', 1)
                 label = f"{qty} {item['unit']}" if qty > 1 else item['unit']
                 build_lines.append(prefix + label)
+
 
         return '\n'.join(build_lines)
 
