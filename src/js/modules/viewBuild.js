@@ -1,5 +1,12 @@
 import { auth, db, initializeAuthUI } from "../../app.js"; // ✅ Reuse Firebase app
-import { collection, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  increment,
+} from "firebase/firestore";
 import { formatActionText } from "../modules/textFormatters.js"; // ✅ Format build steps
 import {
   MapAnnotations,
@@ -10,43 +17,76 @@ import {
 initializeAuthUI();
 
 const backButton = document.getElementById("backButton");
+const pageBackButton = document.getElementById("pageBackButton");
+const ratingItem = document.getElementById("ratingItem");
+const infoGrid = document.querySelector(".build-info-grid");
+const mainLayout = document.querySelector(".main-layout");
+
+function adjustRatingPosition() {
+  if (!ratingItem || !infoGrid || !mainLayout) return;
+  if (window.innerWidth <= 768) {
+    if (ratingItem.parentElement !== mainLayout.parentNode) {
+      mainLayout.insertAdjacentElement("afterend", ratingItem);
+    }
+  } else {
+    if (!infoGrid.contains(ratingItem)) {
+      infoGrid.appendChild(ratingItem);
+    }
+  }
+}
+
+function handleBackClick(e) {
+  e.preventDefault();
+
+  localStorage.setItem("restoreCommunityModal", "true");
+
+  // Save search input
+  const searchInput = document.getElementById("communitySearchBar");
+  if (searchInput && searchInput.value.trim()) {
+    localStorage.setItem("communitySearchQuery", searchInput.value.trim());
+  } else {
+    localStorage.removeItem("communitySearchQuery");
+  }
+
+  // Save active filter
+  const activeCategory = document
+    .querySelector("#communityModal .filter-category.active")
+    ?.getAttribute("data-category");
+
+  const activeSubcategory = document
+    .querySelector("#communityModal .subcategory.active")
+    ?.getAttribute("data-subcategory");
+
+  if (activeSubcategory) {
+    localStorage.setItem("communityFilterType", "subcategory");
+    localStorage.setItem("communityFilterValue", activeSubcategory);
+  } else if (activeCategory && activeCategory !== "all") {
+    localStorage.setItem("communityFilterType", "category");
+    localStorage.setItem("communityFilterValue", activeCategory);
+  } else {
+    localStorage.removeItem("communityFilterType");
+    localStorage.removeItem("communityFilterValue");
+  }
+
+  window.location.href = "index.html";
+}
 
 if (backButton) {
-  backButton.addEventListener("click", (e) => {
-    e.preventDefault();
+  backButton.addEventListener("click", handleBackClick);
+}
 
-    localStorage.setItem("restoreCommunityModal", "true");
+if (pageBackButton) {
+  pageBackButton.addEventListener("click", handleBackClick);
+}
 
-    // Save search input
-    const searchInput = document.getElementById("communitySearchBar");
-    if (searchInput && searchInput.value.trim()) {
-      localStorage.setItem("communitySearchQuery", searchInput.value.trim());
-    } else {
-      localStorage.removeItem("communitySearchQuery");
-    }
-
-    // Save active filter
-    const activeCategory = document
-      .querySelector("#communityModal .filter-category.active")
-      ?.getAttribute("data-category");
-
-    const activeSubcategory = document
-      .querySelector("#communityModal .subcategory.active")
-      ?.getAttribute("data-subcategory");
-
-    if (activeSubcategory) {
-      localStorage.setItem("communityFilterType", "subcategory");
-      localStorage.setItem("communityFilterValue", activeSubcategory);
-    } else if (activeCategory && activeCategory !== "all") {
-      localStorage.setItem("communityFilterType", "category");
-      localStorage.setItem("communityFilterValue", activeCategory);
-    } else {
-      localStorage.removeItem("communityFilterType");
-      localStorage.removeItem("communityFilterValue");
-    }
-
-    window.location.href = "index.html";
-  });
+async function incrementBuildViews(buildId) {
+  try {
+    const buildRef = doc(db, "publishedBuilds", buildId);
+    await updateDoc(buildRef, { views: increment(1) });
+    console.log(`👀 View count updated for Build ID: ${buildId}`);
+  } catch (error) {
+    console.error("❌ Error updating view count:", error);
+  }
 }
 
 async function loadBuild() {
@@ -61,24 +101,46 @@ async function loadBuild() {
 
   console.log("🔍 Loading build with ID:", buildId);
 
+  // Clear existing map annotations and image before loading new build
+  const existingMapImage = document.getElementById("map-preview-image");
+  const existingAnnotations = document.getElementById("map-annotations");
+  if (existingMapImage) existingMapImage.removeAttribute("src");
+  if (existingAnnotations) existingAnnotations.innerHTML = "";
+
   const buildRef = doc(db, "publishedBuilds", buildId);
   const buildSnapshot = await getDoc(buildRef);
 
   if (buildSnapshot.exists()) {
     const build = buildSnapshot.data();
+    await incrementBuildViews(buildId);
     console.log("✅ Build Loaded:", build);
 
     // Set basic build info
     document.getElementById("buildTitle").innerText =
       build.title || "Untitled Build";
-    document.getElementById("buildCategory").innerText =
-      build.category || "Unknown";
-    document.getElementById("buildMatchup").innerText = (build.subcategory && build.subcategory.length === 3 ? build.subcategory.charAt(0).toUpperCase() + build.subcategory.charAt(1) + build.subcategory.charAt(2).toUpperCase() : build.subcategory || "Unknown");
-    document.getElementById("buildPublisher").innerText =
-      build.username || "Anonymous";
-    document.getElementById("buildDate").innerText = new Date(
-      build.datePublished
-    ).toLocaleDateString();
+    const categoryText = build.category || "Unknown";
+    const matchupText =
+      build.subcategory && build.subcategory.length === 3
+        ? build.subcategory.charAt(0).toUpperCase() +
+          build.subcategory.charAt(1) +
+          build.subcategory.charAt(2).toUpperCase()
+        : build.subcategory || "Unknown";
+    const publisherText = build.username || "Anonymous";
+    const dateText = new Date(build.datePublished).toLocaleDateString();
+
+    document.getElementById("buildCategory").innerText = categoryText;
+    document.getElementById("buildMatchup").innerText = matchupText;
+    document.getElementById("buildPublisher").innerText = publisherText;
+    document.getElementById("buildDate").innerText = dateText;
+
+    const mobileCat = document.getElementById("buildCategoryMobile");
+    if (mobileCat) mobileCat.innerText = categoryText;
+    const mobileMatch = document.getElementById("buildMatchupMobile");
+    if (mobileMatch) mobileMatch.innerText = matchupText;
+    const mobilePub = document.getElementById("buildPublisherMobile");
+    if (mobilePub) mobilePub.innerText = publisherText;
+    const mobileDate = document.getElementById("buildDateMobile");
+    if (mobileDate) mobileDate.innerText = dateText;
 
     // Set build order
     const buildOrderContainer = document.getElementById("buildOrder");
@@ -183,6 +245,20 @@ async function loadBuild() {
       mapContainerWrapper.style.display = mapExists ? "block" : "none";
     }
 
+    // Ensure additional section is visible before rendering annotations
+    if (mapExists) {
+      const secondRow = document.getElementById("secondRow");
+      const secondRowHeader = document.querySelector('[data-section="secondRow"]');
+      if (secondRow) {
+        secondRow.classList.remove("hidden");
+        secondRow.classList.add("visible");
+      }
+      if (secondRowHeader) {
+        const arrowIcon = secondRowHeader.querySelector(".arrow");
+        if (arrowIcon) arrowIcon.classList.add("open");
+      }
+    }
+
     // Setup map and annotations
     const mapContainer = document.getElementById("map-preview-image");
     const annotationsContainer = document.getElementById("map-annotations");
@@ -211,73 +287,60 @@ async function loadBuild() {
         viewMapAnnotations.handleMouseLeave
       );
 
-      // 🔥 Load saved circles
-      // After creating circles from build
-      if (build.interactiveMap && Array.isArray(build.interactiveMap.circles)) {
-        build.interactiveMap.circles.forEach((circle) => {
-          if (circle.x !== undefined && circle.y !== undefined) {
-            viewMapAnnotations.createCircle(circle.x, circle.y);
-          }
-        });
+      const renderAnnotations = () => {
+        // 🔥 Load saved circles
+        if (build.interactiveMap && Array.isArray(build.interactiveMap.circles)) {
+          build.interactiveMap.circles.forEach((circle) => {
+            if (circle.x !== undefined && circle.y !== undefined) {
+              viewMapAnnotations.createCircle(circle.x, circle.y);
+            }
+          });
 
-        // 🛡 Disable click delete by replacing circles
-        viewMapAnnotations.circles.forEach((circleData, index) => {
-          const cleanClone = circleData.element.cloneNode(true);
-          circleData.element.parentNode.replaceChild(
-            cleanClone,
-            circleData.element
-          );
-          viewMapAnnotations.circles[index].element = cleanClone;
-        });
+          // 🛡 Disable click delete by replacing circles
+          viewMapAnnotations.circles.forEach((circleData, index) => {
+            const cleanClone = circleData.element.cloneNode(true);
+            circleData.element.parentNode.replaceChild(
+              cleanClone,
+              circleData.element
+            );
+            viewMapAnnotations.circles[index].element = cleanClone;
+          });
+        }
+
+        // 🔥 Load saved arrows
+        if (build.interactiveMap && Array.isArray(build.interactiveMap.arrows)) {
+          build.interactiveMap.arrows.forEach((arrow) => {
+            if (
+              arrow.startX !== undefined &&
+              arrow.startY !== undefined &&
+              arrow.endX !== undefined &&
+              arrow.endY !== undefined
+            ) {
+              viewMapAnnotations.createArrow(
+                arrow.startX,
+                arrow.startY,
+                arrow.endX,
+                arrow.endY
+              );
+              const last =
+                viewMapAnnotations.arrows[viewMapAnnotations.arrows.length - 1];
+              if (last && last.element) {
+                const clone = last.element.cloneNode(true);
+                last.element.parentNode.replaceChild(clone, last.element);
+                last.element = clone;
+              }
+            }
+          });
+        }
+
+        annotationsContainer.style.pointerEvents = "none";
+      };
+
+      if (mapImage.complete && mapImage.naturalWidth > 0) {
+        renderAnnotations();
+      } else {
+        mapImage.addEventListener("load", renderAnnotations, { once: true });
       }
-
-      // 🔥 Load saved arrows
-      if (build.interactiveMap && Array.isArray(build.interactiveMap.arrows)) {
-        build.interactiveMap.arrows.forEach((arrow) => {
-          if (
-            arrow.startX !== undefined &&
-            arrow.startY !== undefined &&
-            arrow.endX !== undefined &&
-            arrow.endY !== undefined
-          ) {
-            // Create an arrow manually
-            const newArrow = document.createElement("div");
-            newArrow.classList.add("annotation-arrow");
-
-            // Calculate placement
-            const rect = mapContainer.getBoundingClientRect();
-            const mapWidth = rect.width;
-            const mapHeight = rect.height;
-
-            const startXPixels = (arrow.startX / 100) * mapWidth;
-            const startYPixels = (arrow.startY / 100) * mapHeight;
-            const endXPixels = (arrow.endX / 100) * mapWidth;
-            const endYPixels = (arrow.endY / 100) * mapHeight;
-
-            const deltaX = endXPixels - startXPixels;
-            const deltaY = endYPixels - startYPixels;
-            const angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
-            const length = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-
-            // Style the arrow
-            newArrow.style.position = "absolute";
-            newArrow.style.left = `${startXPixels}px`;
-            newArrow.style.top = `${startYPixels}px`;
-            newArrow.style.width = `${length}px`;
-            newArrow.style.height = "2px"; // thin line
-            newArrow.style.background = "#00bcd4"; // arrow color
-            newArrow.style.transform = `rotate(${angle}deg)`;
-            newArrow.style.transformOrigin = "0 0";
-
-            annotationsContainer.appendChild(newArrow);
-          }
-        });
-
-        // No onclick events needed for arrows (since they are manually added)
-      }
-
-      // Disable all interaction with annotations
-      annotationsContainer.style.pointerEvents = "none"; // block any user interaction over the annotations
     }
     const additionalHeader = document.getElementById("additionalSettingsHeader");
     const mainLayout = document.querySelector(".main-layout");
@@ -447,6 +510,9 @@ function updateVoteUI(buildId, upvotes, downvotes, userVote) {
 
 document.addEventListener("DOMContentLoaded", async () => {
   if (!window.location.pathname.includes("viewBuild.html")) return;
+
+  adjustRatingPosition();
+  window.addEventListener("resize", adjustRatingPosition);
 
   const importBtn = document.getElementById("importBuildButton");
 

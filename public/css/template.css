@@ -629,7 +629,8 @@
     padding-left: 10px;
   }
   .template-card {
-    width: 120px;
+    width: 150px;
+    height: 150px;
   }
   #buildHeaderControls {
     display: grid;

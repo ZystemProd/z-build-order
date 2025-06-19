@@ -1,4 +1,6 @@
 import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+import { initAnalytics } from "./js/modules/analyticsHelper.js";
 import {
   getAuth,
   GoogleAuthProvider,
@@ -51,6 +53,48 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
+
+
+function initCookieConsent() {
+  const banner = document.getElementById("cookieBanner");
+  const acceptBtn = document.getElementById("cookieAccept");
+  const declineBtn = document.getElementById("cookieDecline");
+
+  const consent = localStorage.getItem("analyticsConsent");
+
+  if (consent === "accepted") {
+    getAnalytics(app);
+    initAnalytics(app);
+    if (banner) banner.style.display = "none";
+    return;
+  }
+
+  if (consent === "declined") {
+    if (banner) banner.style.display = "none";
+    return;
+  }
+
+  if (!banner) return;
+
+  banner.style.display = "block";
+  if (acceptBtn) {
+    acceptBtn.addEventListener("click", () => {
+      localStorage.setItem("analyticsConsent", "accepted");
+      banner.style.display = "none";
+      getAnalytics(app);
+      initAnalytics(app);
+    });
+  }
+  if (declineBtn) {
+    declineBtn.addEventListener("click", () => {
+      localStorage.setItem("analyticsConsent", "declined");
+      banner.style.display = "none";
+    });
+  }
+}
+
+initCookieConsent();
+
 /*
 // If testing locally, you can enable Firebase emulators by importing
 // connectAuthEmulator and connectFirestoreEmulator from the relevant
@@ -442,7 +486,7 @@ async function handleCancelUsername() {
   await signOut(auth);
 }
 
-export { auth, db };
+export { app, auth, db };
 window.handleSignIn = handleSignIn;
 window.handleSignOut = handleSignOut;
 window.handleSwitchAccount = handleSwitchAccount;

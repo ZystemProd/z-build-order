@@ -22,6 +22,7 @@ import { filterBuilds } from "./modal.js";
 import { parseBuildOrder } from "./utils.js";
 import { mapAnnotations } from "./interactive_map.js";
 import { checkPublishButtonVisibility } from "./community.js";
+import { logAnalyticsEvent } from "./analyticsHelper.js";
 
 import DOMPurify from "dompurify";
 
@@ -98,7 +99,7 @@ export async function saveCurrentBuild() {
     field.addEventListener("focus", () => field.classList.remove("highlight"));
     field.addEventListener("change", () => field.classList.remove("highlight"));
   }
-  removeHighlightOnFocus(titleInput);
+  // Allow title highlight to remain even when input is focused
   removeHighlightOnFocus(categoryDropdown);
 
   if (!title) {
@@ -165,6 +166,21 @@ export async function saveCurrentBuild() {
     return null;
   }
 
+  const existingBuilds = await fetchUserBuilds();
+  setSavedBuilds(existingBuilds);
+  saveSavedBuildsToLocalStorage();
+  const lower = title.toLowerCase();
+  if (
+    existingBuilds.some(
+      (b) => !b.imported && b.title.toLowerCase() === lower
+    )
+  ) {
+    showToast("A build with this title already exists.", "error");
+    highlightField(titleInput);
+    highlightField(titleText);
+    return null;
+  }
+
   const db = getFirestore();
   const userRef = doc(db, "users", user.uid);
 
@@ -226,6 +242,10 @@ export async function saveCurrentBuild() {
 
   try {
     await setDoc(buildDoc, newBuild);
+    logAnalyticsEvent("build_saved", {
+      race: newBuild.category,
+      matchup: newBuild.subcategory,
+    });
     showToast("✅ Build saved successfully!", "success");
     console.log("✅ Build saved with title:", title);
     checkPublishButtonVisibility();
@@ -283,6 +303,9 @@ export async function loadBuildAnnotations(buildId) {
       mapAnnotations.arrows.forEach(({ startX, startY, endX, endY }) =>
         mapAnnotations.createArrow(startX, startY, endX, endY)
       );
+
+      const clearBtn = document.querySelector('.clear-annotations-button');
+      if (clearBtn) clearBtn.style.display = 'inline-block';
     }
   } else {
     console.error("Build not found!");
@@ -335,6 +358,15 @@ export async function updateCurrentBuild(buildId) {
   }
 
   await setDoc(buildDocRef, updatedData, { merge: true });
+  const matchup = updatedData.subcategory || "";
+  const race = matchup.startsWith("Zv")
+    ? "Zerg"
+    : matchup.startsWith("Pv")
+    ? "Protoss"
+    : matchup.startsWith("Tv")
+    ? "Terran"
+    : "Unknown";
+  logAnalyticsEvent("build_updated", { race, matchup });
 
   const localBuilds = getSavedBuilds();
   const localIndex = localBuilds.findIndex((b) => b.encodedTitle === buildId);

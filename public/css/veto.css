@@ -196,7 +196,7 @@ button {
   bottom: 0; /* Align to the bottom of the page */
   left: 0;
   width: 100%; /* Full width of the page */
-  height: 50px; /* Fixed height for the footer */
+  height: 60px; /* Fixed height for the footer */
   display: flex;
   justify-content: center; /* Center the text horizontally */
   align-items: center; /* Center the text vertically within the footer */
@@ -930,7 +930,7 @@ html {
   .mobile-action-buttons {
     display: flex;
     position: fixed;
-    bottom: 60px;
+    bottom: 110px;
     width: 70%;
     max-width: 420px;
     left: 50%;

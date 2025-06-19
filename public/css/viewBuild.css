@@ -6,8 +6,10 @@ body {
 }
 
 .view-build-container {
+  width: 100%;
+  height: 100%;
   max-width: 1200px;
-  margin-top: 80px;
+  margin: 80px auto 0;
   padding: 20px;
   background: #1e1e1e;
   border-radius: 12px;
@@ -15,17 +17,17 @@ body {
 
 /* Back Button */
 #backButton {
+  display: none;
+}
+
+#pageBackButton {
+  position: fixed;
+  top: 10px;
+  left: 10px;
   width: 65px;
-  margin: 10px 0 20px 0;
   padding: 10px 20px;
-  background: transparent;
-  color: #00bcd4;
-  border: 1px solid #00bcd4;
-  border-radius: 6px;
-  text-decoration: none;
-  font-weight: 500;
-  transition: 0.2s;
-  z-index: 2; /* Keep back button clickable */
+  margin: 0;
+  z-index: 1000;
 }
 
 .back-button:hover img {
@@ -49,39 +51,58 @@ input[type="text"]:disabled {
 
 /* Title */
 #buildTitle {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  margin: 0;
-  font-size: 2rem;
+  position: relative;
+  margin: 0 auto;
+  font-size: clamp(1.5rem, 4vw, 2rem);
   color: #ffffff;
+  text-align: center;
 }
 
 /* Build Info Grid */
 .build-info-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 15px;
-  margin-bottom: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
 }
 
 .build-info-item {
   background: #1a1a1a;
-  padding: 10px 16px;
+  padding: 6px 10px;
   border-radius: 8px;
   text-align: center;
+  font-size: 0.9rem;
 }
 
 .build-info-item label {
   color: #888888;
-  font-size: 0.75rem;
-  margin-bottom: 4px;
+  font-size: 0.65rem;
+  margin-bottom: 2px;
 }
 
 .build-info-item span {
-  font-size: 1rem;
+  font-size: 0.9rem;
   color: #ffffff;
   font-weight: 600;
+}
+
+.desktop-info {
+  display: block;
+}
+
+.mobile-info {
+  display: none;
+}
+
+.mobile-info .info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.mobile-info .info-row:last-child {
+  margin-bottom: 0;
 }
 
 /* Build Order */
@@ -120,6 +141,7 @@ input[type="text"]:disabled {
   position: relative; /* 🔥 Important */
   display: flex;
   align-items: center;
+  justify-content: center;
   height: 60px; /* or whatever you want for row height */
   margin-bottom: 30px;
 }
@@ -245,6 +267,13 @@ input[type="text"]:disabled {
   color: #ccc;
 }
 
+.rating-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
 .back-button img {
   width: 24px;
   height: 24px;
@@ -252,14 +281,11 @@ input[type="text"]:disabled {
 }
 
 #importBuildButton {
-  position: absolute;
-  top: 0;
-  right: 0;
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 8px 16px;
-  margin-top: 0;
+  margin-top: 8px;
   width: auto;
 }
 
@@ -279,6 +305,45 @@ input[type="text"]:disabled {
   #youtubeEmbed {
     max-width: 100%;
   }
+
+  /* single-column build info layout */
+  .build-info-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .desktop-info {
+    display: none;
+  }
+
+  .mobile-info {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-column: 1 / -1;
+    text-align: left;
+    font-size: 0.8rem;
+    gap: 4px 10px;
+  }
+
+  .mobile-info .info-row {
+    margin-bottom: 0;
+  }
+
+  .mobile-info label {
+    font-size: 0.6rem;
+  }
+
+  .mobile-info span {
+    font-size: 0.8rem;
+  }
+
+  .rating-item {
+    grid-column: 1 / -1;
+    width: 100%;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
 }
 
 /* Optional: Responsive adjustment */
@@ -292,6 +357,10 @@ input[type="text"]:disabled {
   #buildTitle {
     width: 100%;
     text-align: center;
+  }
+
+  #buildTitle {
+    margin-top: 10px;
   }
 }
 

@@ -4,11 +4,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Detailed StarCraft build order and strategy information" />
   <title>View Build</title>
   <link rel="icon" type="image/x-icon" href="/img/favicon.ico" />
   <link rel="stylesheet" type="text/css" href="public/css/style.css" />
   <link rel="stylesheet" type="text/css" href="public/css/viewBuild.css" />
-  <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.3/purify.min.js"></script>-->
   <script type="module" src="./src/app.js"></script>
   <script type="module" src="./src/js/modules/viewBuild.js"></script>
   <script type="module" src="./src/js/modules/init/viewBuildPageInit.js"></script>
@@ -16,6 +16,9 @@
 </head>
 
 <body>
+  <a href="index.html" id="pageBackButton" data-return-community="true" class="back-button">
+    <img src="./img/SVG/back.svg" alt="Back" />
+  </a>
   <!-- Auth Container -->
   <div id="auth-container">
     <div class="auth-info" style="display: flex; align-items: center; gap: 10px;">
@@ -73,31 +76,47 @@
         <img src="./img/SVG/back.svg" alt="Back" />
       </a>
       <h1 id="buildTitle">Loading...</h1>
-      <button id="importBuildButton" style="display: none">
-        <img src="./img/SVG/import2.svg" alt="Import" />
-        Import
-      </button>
     </div>
 
     <!-- Build Info Grid -->
     <div class="build-info-grid">
-      <div class="build-info-item">
+      <div class="build-info-item desktop-info">
         <label>Category</label>
         <span id="buildCategory">Loading...</span>
       </div>
-      <div class="build-info-item">
+      <div class="build-info-item desktop-info">
         <label>Matchup</label>
         <span id="buildMatchup">Loading...</span>
       </div>
-      <div class="build-info-item">
+      <div class="build-info-item desktop-info">
         <label>Publisher</label>
-        <span class="meta-chip publisher-chip"><img src="./img/SVG/user-svgrepo-com.svg" alt="Publisher" class="meta-icon" /> <span id="buildPublisher">Loading...</span></span>
+        <span class="meta-chip publisher-chip"><img src="./img/SVG/user-svgrepo-com.svg" alt="Publisher"
+            class="meta-icon" /> <span id="buildPublisher">Loading...</span></span>
       </div>
-      <div class="build-info-item">
+      <div class="build-info-item desktop-info">
         <label>Date Published</label>
         <span id="buildDate">Loading...</span>
       </div>
-      <div class="build-info-item">
+      <div class="build-info-item mobile-info">
+        <div class="info-row">
+          <label>Category</label>
+          <span id="buildCategoryMobile">Loading...</span>
+        </div>
+        <div class="info-row">
+          <label>Matchup</label>
+          <span id="buildMatchupMobile">Loading...</span>
+        </div>
+        <div class="info-row">
+          <label>Publisher</label>
+          <span class="meta-chip publisher-chip"><img src="./img/SVG/user-svgrepo-com.svg" alt="Publisher"
+              class="meta-icon" /> <span id="buildPublisherMobile">Loading...</span></span>
+        </div>
+        <div class="info-row">
+          <label>Date</label>
+          <span id="buildDateMobile">Loading...</span>
+        </div>
+      </div>
+      <div class="build-info-item rating-item" id="ratingItem">
         <label>Rating</label>
         <div id="votingSection" class="vote-section">
           <div class="vote-buttons">
@@ -113,6 +132,10 @@
             <span class="vote-count" id="vote-count-text">0 votes</span>
           </div>
         </div>
+        <button id="importBuildButton" style="display: none">
+          <img src="./img/SVG/import2.svg" alt="Import" />
+          Import
+        </button>
       </div>
     </div>
 

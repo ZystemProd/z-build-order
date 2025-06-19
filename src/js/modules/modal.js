@@ -346,21 +346,43 @@ export async function viewBuild(buildId) {
 
       if (mapImage) mapImage.src = mapUrl;
       if (selectedMapText) selectedMapText.innerText = formattedMapName;
+
+      const clearBtn = document.querySelector('.clear-annotations-button');
+      if (clearBtn) clearBtn.style.display = 'inline-block';
+
+      const secondRow = document.getElementById("secondRow");
+      const secondRowHeader = document.querySelector('[data-section="secondRow"]');
+      if (secondRow) {
+        secondRow.classList.remove("hidden");
+        secondRow.classList.add("visible");
+      }
+      if (secondRowHeader) {
+        const arrowIcon = secondRowHeader.querySelector(".arrow");
+        if (arrowIcon) arrowIcon.classList.add("open");
+      }
     } else if (selectedMapText) {
       selectedMapText.innerText = "No map selected";
     }
 
     // Annotations
-    if (build.interactiveMap) {
-      mapAnnotations.circles = [];
-      mapAnnotations.annotationsContainer.innerHTML = "";
-      build.interactiveMap.circles?.forEach(({ x, y }) =>
-        mapAnnotations.createCircle(x, y)
-      );
-      build.interactiveMap.arrows?.forEach(({ startX, startY, endX, endY }) =>
-        mapAnnotations.createArrow(startX, startY, endX, endY)
-      );
-      mapAnnotations.updateCircleNumbers();
+    const loadAnnotations = () => {
+      if (build.interactiveMap) {
+        mapAnnotations.circles = [];
+        mapAnnotations.annotationsContainer.innerHTML = "";
+        build.interactiveMap.circles?.forEach(({ x, y }) =>
+          mapAnnotations.createCircle(x, y)
+        );
+        build.interactiveMap.arrows?.forEach(({ startX, startY, endX, endY }) =>
+          mapAnnotations.createArrow(startX, startY, endX, endY)
+        );
+        mapAnnotations.updateCircleNumbers();
+      }
+    };
+
+    if (mapImage && mapImage.complete && mapImage.naturalWidth > 0) {
+      loadAnnotations();
+    } else if (mapImage) {
+      mapImage.addEventListener("load", loadAnnotations, { once: true });
     }
 
     // Title

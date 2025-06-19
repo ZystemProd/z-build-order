@@ -26,6 +26,7 @@ import { showToast } from "./toastHandler.js";
 import { db } from "../../app.js";
 import { checkForJoinRequestNotifications } from "./utils/notificationHelpers.js";
 import DOMPurify from "dompurify";
+import { logAnalyticsEvent } from "./analyticsHelper.js";
 
 const storage = getStorage();
 
@@ -99,6 +100,8 @@ export async function createClan({
     const logoUrl = await uploadClanLogo(logoFile, clanDoc.id);
     await updateDoc(clanDoc, { logoUrl });
   }
+
+  logAnalyticsEvent("clan_created", { name });
 
   return clanDoc.id;
 }

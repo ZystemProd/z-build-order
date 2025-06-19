@@ -47,7 +47,12 @@ import {
   searchTemplates,
   previewTemplate,
 } from "../template.js";
-import { initializeTooltips } from "../tooltip.js";
+import {
+  initializeTooltips,
+  updateTooltips,
+  forceShowTooltip,
+  forceHideTooltip,
+} from "../tooltip.js";
 import {
   populateCommunityBuilds,
   checkPublishButtonVisibility,
@@ -68,6 +73,7 @@ import {
 } from "../interactive_map.js";
 import {
   getSavedBuilds,
+  setSavedBuilds,
   saveSavedBuildsToLocalStorage,
 } from "../buildStorage.js";
 import { setupCatActivationOnInput } from "../helpers/companion.js";
@@ -91,6 +97,7 @@ import {
   loadUserSettings,
 } from "../settings.js";
 import { checkForJoinRequestNotifications } from "../utils/notificationHelpers.js";
+import { logAnalyticsEvent } from "../analyticsHelper.js";
 
 function updateSupplyColumnVisibility() {
   const table = document.getElementById("buildOrderTable");
@@ -108,7 +115,19 @@ function updateBuildInputVisibility() {
   section.style.display = isBuildInputShown() ? "block" : "none";
 }
 
+function updateBuildInputPlaceholder() {
+  const textarea = document.getElementById("buildOrderInput");
+  if (!textarea) return;
+  textarea.placeholder = isBracketInputEnabled()
+    ? "[12] Spawning Pool"
+    : "Spawning Pool";
+}
+
 setupTemplateModal(); // Always call early
+
+// — replay meta, filled by populateReplayOptions —
+let replayPlayers = [];
+let pendingMatchup = null;
 
 let currentClanView = null;
 let allBuilds = [];
@@ -150,10 +169,10 @@ export async function initializeIndexPage() {
       }
 
       // ✅ Apply filter + search after build list loads
-      await populateCommunityBuilds();
-
       if (filterType && filterValue) {
-        filterCommunityBuilds(filterValue);
+        await filterCommunityBuilds(filterValue); // Only do filtered call
+      } else {
+        await populateCommunityBuilds(); // Only do full list if no filter
       }
 
       if (searchQuery) {
@@ -328,6 +347,9 @@ export async function initializeIndexPage() {
       await checkForJoinRequestNotifications();
       initializeUserData(user);
       await loadUserSettings();
+      const builds = await fetchUserBuilds();
+      setSavedBuilds(builds);
+      saveSavedBuildsToLocalStorage();
       const toggle = document.getElementById("bracketInputToggle");
       if (toggle) {
         toggle.checked = isBracketInputEnabled();
@@ -338,6 +360,7 @@ export async function initializeIndexPage() {
       }
       updateSupplyColumnVisibility();
       updateBuildInputVisibility();
+      updateBuildInputPlaceholder();
     }
   });
 
@@ -411,8 +434,12 @@ export async function initializeIndexPage() {
     if (input) input.value = "";
 
     // ✅ Load builds and setup filters
-    await populateCommunityBuilds();
-    attachCommunityCategoryClicks();
+    const storedFilter = localStorage.getItem("communityFilterValue") || "all";
+    if (storedFilter && storedFilter !== "all") {
+      await filterCommunityBuilds(storedFilter);
+    } else {
+      await populateCommunityBuilds();
+    }
 
     const heading = document.querySelector("#communityModal h3");
     if (heading) heading.textContent = "Community Builds";
@@ -474,13 +501,8 @@ export async function initializeIndexPage() {
         select.appendChild(opt);
       });
       const matchup = data.matchup;
-      if (matchup) {
-        const dropdown = document.getElementById("buildCategoryDropdown");
-        if (dropdown) {
-          dropdown.value = matchup;
-          updateDropdownColor();
-        }
-      }
+      replayPlayers = players; // save for Confirm-click
+      pendingMatchup = matchup; // e.g. "zvp"
     } catch (err) {
       console.error("Failed to fetch players", err);
       select.innerHTML = "<option value='1'>Player 1</option>";
@@ -491,6 +513,12 @@ export async function initializeIndexPage() {
   safeAdd("replayFileInput", "change", async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".sc2replay")) {
+      alert("Please select a .SC2Replay file");
+      e.target.value = "";
+      return;
+    }
+
     selectedReplayFile = file;
     e.target.value = "";
 
@@ -544,17 +572,41 @@ export async function initializeIndexPage() {
       const buildInput = document.getElementById("buildOrderInput");
       if (buildInput) buildInput.value = text;
       analyzeBuildOrder(text);
+      logAnalyticsEvent("replay_uploaded", {
+        fileName: selectedReplayFile.name,
+        sizeKB: Math.round(selectedReplayFile.size / 1024),
+      });
     } catch (err) {
       console.error("Replay upload failed", err);
       alert(
         "Could not parse the replay. Make sure the Python backend is running."
       );
+      logAnalyticsEvent("replay_upload_failed", { error: err.message });
     }
 
     btn.disabled = false;
     btn.innerText = "Parse Replay";
     const modal = document.getElementById("replayOptionsModal");
     if (modal) modal.style.display = "none";
+
+    // —–––– update build-category dropdown AFTER parsing —––––
+    const dd = document.getElementById("buildCategoryDropdown");
+    if (dd && replayPlayers.length >= 2) {
+      const chosenPid = Number(playerSelect.value);
+      const me = replayPlayers.find((p) => p.pid === chosenPid);
+      const foe = replayPlayers.find((p) => p.pid !== chosenPid);
+
+      if (me && foe) {
+        const abbrev = (r) => r[0].toUpperCase();
+        const match = `${abbrev(me.race)}v${abbrev(foe.race)}`; // "ZvP"
+        dd.value = match.toLowerCase();
+        updateDropdownColor();
+      } else if (pendingMatchup) {
+        dd.value = pendingMatchup;
+        updateDropdownColor();
+      }
+    }
+    // —–––––––––––––––––––––––––––––––––––––––––––––––––––––––
   });
 
   safeAdd("closeReplayOptionsModal", "click", () => {
@@ -616,6 +668,7 @@ export async function initializeIndexPage() {
 
   safeAdd("buildOrderTitleText", "click", () => toggleTitleInput(true));
   safeAdd("buildOrderTitleText", "focus", () => toggleTitleInput(true));
+  safeAdd("buildOrderTitleInput", "blur", () => toggleTitleInput(false));
 
   // --- Dropdown Color Change
   safeChange("buildCategoryDropdown", updateDropdownColor);
@@ -686,6 +739,11 @@ export async function initializeIndexPage() {
     if (modal) modal.style.display = "block";
   });
 
+  safeAdd("cookiePolicyLink", "click", () => {
+    const modal = document.getElementById("privacyModal");
+    if (modal) modal.style.display = "block";
+  });
+
   safeAdd("closeSettingsModal", "click", () => {
     const modal = document.getElementById("settingsModal");
     if (modal) modal.style.display = "none";
@@ -704,6 +762,7 @@ export async function initializeIndexPage() {
     bracketToggle.addEventListener("change", () => {
       setBracketInputEnabled(bracketToggle.checked);
       updateSupplyColumnVisibility();
+      updateBuildInputPlaceholder();
     });
   }
 
@@ -715,7 +774,6 @@ export async function initializeIndexPage() {
       updateBuildInputVisibility();
     });
   }
-
 
   safeAdd("closePrivacyModal", "click", () => {
     const modal = document.getElementById("privacyModal");
@@ -793,6 +851,12 @@ export async function initializeIndexPage() {
     };
 
     await setDoc(publishedBuildRef, publishedData);
+    if (publishToCommunity || checkedClans.length > 0) {
+      logAnalyticsEvent("build_published", {
+        race: buildData.category,
+        matchup: buildData.subcategory,
+      });
+    }
 
     // ✅ Delete if fully unpublished (optional)
     if (!publishToCommunity && checkedClans.length === 0) {
@@ -840,6 +904,7 @@ export async function initializeIndexPage() {
   initializeAutoCorrect();
   updateSupplyColumnVisibility();
   updateBuildInputVisibility();
+  updateBuildInputPlaceholder();
   initializeTooltips();
   setupCatActivationOnInput();
   checkPublishButtonVisibility();
@@ -851,7 +916,6 @@ export async function initializeIndexPage() {
   // attachCategoryClicks();
   attachMyBuildsCategoryClicks();
   attachSubcategoryClicks();
-  attachCommunityCategoryClicks();
 
   const replayUrl = document.getElementById("replayLinkInput")?.value.trim();
   const replayWrapper = document.getElementById("replayInputWrapper");
@@ -1012,32 +1076,37 @@ export async function initializeIndexPage() {
     if (dropdown) {
       const selectedOption = dropdown.options[dropdown.selectedIndex];
       const optgroup = selectedOption.parentElement;
-      if (optgroup && optgroup.style.color) {
-        dropdown.style.color = optgroup.style.color;
+      if (optgroup) {
+        const color = window.getComputedStyle(optgroup).color;
+        dropdown.style.color = color || "";
       }
     }
   }
 
   function attachMyBuildsCategoryClicks() {
-    const heading = document.querySelector("#buildsModal .template-header h3");
-    const categoryButtons = document.querySelectorAll(
-      "#buildsModal .filter-category, #communityModal .filter-category"
+    const buildsCategories = document.querySelectorAll(
+      "#buildsModal .filter-category"
     );
-    const subcategoryButtons = document.querySelectorAll(
-      "#buildsModal .subcategory, #communityModal .subcategory"
+    const communityCategories = document.querySelectorAll(
+      "#communityModal .filter-category"
+    );
+    const buildsSubcategories = document.querySelectorAll(
+      "#buildsModal .subcategory"
+    );
+    const communitySubcategories = document.querySelectorAll(
+      "#communityModal .subcategory"
     );
 
-    categoryButtons.forEach((el) => {
-      el.addEventListener("click", async () => {
+    buildsCategories.forEach((el) => {
+      el.addEventListener("click", async (e) => {
+        if (e.target.closest(".subcategory")) return;
         const category = el.getAttribute("data-category");
         if (!category) return;
 
         if (window.innerWidth <= 768) {
           const wasOpen = el.classList.contains("show-submenu");
           document
-            .querySelectorAll(
-              "#buildsModal .filter-category.show-submenu, #communityModal .filter-category.show-submenu"
-            )
+            .querySelectorAll("#buildsModal .filter-category.show-submenu")
             .forEach((c) => {
               if (c !== el) c.classList.remove("show-submenu");
             });
@@ -1051,16 +1120,12 @@ export async function initializeIndexPage() {
           }
         }
 
-        // 🔄 UI
-        categoryButtons.forEach((btn) => btn.classList.remove("active"));
-        subcategoryButtons.forEach((btn) => btn.classList.remove("active"));
+        buildsCategories.forEach((btn) => btn.classList.remove("active"));
+        buildsSubcategories.forEach((btn) => btn.classList.remove("active"));
         el.classList.add("active");
 
-        // 🔄 Clear search
         document.getElementById("buildSearchBar").value = "";
-        document.getElementById("communitySearchBar").value = "";
 
-        // 🔎 Apply filter
         const isPublishedTabActive = document
           .getElementById("publishedBuildsTab")
           ?.classList.contains("active");
@@ -1069,25 +1134,55 @@ export async function initializeIndexPage() {
           const publishedBuilds = await fetchPublishedUserBuilds(category);
           populateBuildList(publishedBuilds);
         } else {
-          filterBuilds(category); // My Builds
+          filterBuilds(category);
         }
-        await filterCommunityBuilds(category); // Community
 
-        // 📝 Headings
-        const buildsHeading = document.querySelector(
+        const heading = document.querySelector(
           "#buildsModal .template-header h3"
         );
-        const communityHeading = document.querySelector("#communityModal h3");
-
-        if (buildsHeading) {
-          buildsHeading.textContent =
+        if (heading) {
+          heading.textContent =
             category.toLowerCase() === "all"
               ? "Build Orders"
               : `Build Orders - ${capitalize(category)}`;
         }
+      });
+    });
 
-        if (communityHeading) {
-          communityHeading.textContent =
+    communityCategories.forEach((el) => {
+      el.addEventListener("click", async (e) => {
+        if (e.target.closest(".subcategory")) return;
+        const category = el.getAttribute("data-category");
+        if (!category) return;
+
+        if (window.innerWidth <= 768) {
+          const wasOpen = el.classList.contains("show-submenu");
+          document
+            .querySelectorAll("#communityModal .filter-category.show-submenu")
+            .forEach((c) => {
+              if (c !== el) c.classList.remove("show-submenu");
+            });
+          const submenu = el.querySelector(".submenu");
+          if (submenu) {
+            if (wasOpen) {
+              el.classList.remove("show-submenu");
+            } else {
+              el.classList.add("show-submenu");
+            }
+          }
+        }
+
+        communityCategories.forEach((btn) => btn.classList.remove("active"));
+        communitySubcategories.forEach((btn) => btn.classList.remove("active"));
+        el.classList.add("active");
+
+        document.getElementById("communitySearchBar").value = "";
+
+        await filterCommunityBuilds(category);
+
+        const heading = document.querySelector("#communityModal h3");
+        if (heading) {
+          heading.textContent =
             category.toLowerCase() === "all"
               ? "Community Builds"
               : `Community Builds - ${capitalize(category)}`;
@@ -1097,47 +1192,64 @@ export async function initializeIndexPage() {
   }
 
   function attachSubcategoryClicks() {
-    const allCategories = document.querySelectorAll(
-      "#buildsModal .filter-category, #communityModal .filter-category"
-    );
-    const allSubcategories = document.querySelectorAll(
-      "#buildsModal .subcategory, #communityModal .subcategory"
+    const buildSubcats = document.querySelectorAll("#buildsModal .subcategory");
+    const communitySubcats = document.querySelectorAll(
+      "#communityModal .subcategory"
     );
 
-    allSubcategories.forEach((el) => {
+    buildSubcats.forEach((el) => {
       el.addEventListener("click", async (e) => {
         e.stopPropagation();
         const subcat = el.getAttribute("data-subcategory");
         if (!subcat) return;
 
-        allCategories.forEach((btn) => btn.classList.remove("active"));
-        allSubcategories.forEach((btn) => btn.classList.remove("active"));
+        document
+          .querySelectorAll("#buildsModal .filter-category")
+          .forEach((btn) => btn.classList.remove("active"));
+        buildSubcats.forEach((btn) => btn.classList.remove("active"));
         el.classList.add("active");
 
         const parent = el.closest(".filter-category");
         if (parent) parent.classList.add("active");
 
         document.getElementById("buildSearchBar").value = "";
-        document.getElementById("communitySearchBar").value = "";
 
-        // ✅ Always use the new unified filterBuilds logic
         await filterBuilds(subcat);
 
-        // ✅ Also filter community builds if needed
-        await filterCommunityBuilds(subcat);
-
-        // ✅ Update headings
-        const buildsHeading = document.querySelector(
+        const heading = document.querySelector(
           "#buildsModal .template-header h3"
         );
-        const communityHeading = document.querySelector("#communityModal h3");
+        if (heading)
+          heading.textContent = `Build Orders - ${capitalize(subcat)}`;
 
-        if (buildsHeading)
-          buildsHeading.textContent = `Build Orders - ${capitalize(subcat)}`;
-        if (communityHeading)
-          communityHeading.textContent = `Community Builds - ${capitalize(
-            subcat
-          )}`;
+        if (window.innerWidth <= 768) {
+          const parent = el.closest(".filter-category");
+          if (parent) parent.classList.remove("show-submenu");
+        }
+      });
+    });
+
+    communitySubcats.forEach((el) => {
+      el.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const subcat = el.getAttribute("data-subcategory");
+        if (!subcat) return;
+
+        document
+          .querySelectorAll("#communityModal .filter-category")
+          .forEach((btn) => btn.classList.remove("active"));
+        communitySubcats.forEach((btn) => btn.classList.remove("active"));
+        el.classList.add("active");
+        const parent = el.closest(".filter-category");
+        if (parent) parent.classList.add("active");
+
+        document.getElementById("communitySearchBar").value = "";
+
+        await filterCommunityBuilds(subcat);
+
+        const heading = document.querySelector("#communityModal h3");
+        if (heading)
+          heading.textContent = `Community Builds - ${capitalize(subcat)}`;
 
         if (window.innerWidth <= 768) {
           const parent = el.closest(".filter-category");
@@ -1177,16 +1289,15 @@ export async function initializeIndexPage() {
     );
 
     categoryButtons.forEach((el) => {
-      el.addEventListener("click", async () => {
+      el.addEventListener("click", async (e) => {
+        if (e.target.closest(".subcategory")) return;
         const category = el.getAttribute("data-category");
         if (!category) return;
 
         if (window.innerWidth <= 768) {
           const wasOpen = el.classList.contains("show-submenu");
           document
-            .querySelectorAll(
-              "#communityModal .filter-category.show-submenu"
-            )
+            .querySelectorAll("#communityModal .filter-category.show-submenu")
             .forEach((c) => {
               if (c !== el) c.classList.remove("show-submenu");
             });
@@ -1273,10 +1384,11 @@ export async function initializeIndexPage() {
 
     if (!mapPreview || !mapModal) return;
 
-    let isMapSelected = false;
+    const mapPreviewImage = document.getElementById("map-preview-image");
 
     mapPreview.addEventListener("click", () => {
-      if (!isMapSelected) {
+      const hasMap = mapPreviewImage && mapPreviewImage.getAttribute("src");
+      if (!hasMap) {
         mapModal.style.display = "block";
       }
     });
@@ -1299,7 +1411,6 @@ export async function initializeIndexPage() {
           if (mapPreviewImage) mapPreviewImage.src = mapImageSrc;
           if (selectedMapText) selectedMapText.innerText = mapName;
 
-          isMapSelected = true;
           mapModal.style.display = "none";
         }
       });
@@ -1326,6 +1437,41 @@ export async function initializeIndexPage() {
         el.addEventListener("input", () => {
           saveBuildButton.disabled = false;
           saveBuildButton.style.backgroundColor = "#963325";
+
+          if (id === "buildOrderTitleInput") {
+            const titleText = document.getElementById("buildOrderTitleText");
+            const titleInput = document.getElementById("buildOrderTitleInput");
+            const title = el.value.trim().toLowerCase();
+            const savedBuilds = getSavedBuilds();
+            const currentId = getCurrentBuildId();
+            const duplicate = savedBuilds.some(
+              (b) =>
+                !b.imported &&
+                b.title.toLowerCase() === title &&
+                b.encodedTitle !== currentId
+            );
+            if (duplicate) {
+              saveBuildButton.disabled = true;
+              if (titleText) titleText.classList.add("highlight");
+              if (titleInput) {
+                titleInput.classList.add("highlight");
+                titleInput.setAttribute(
+                  "data-tooltip",
+                  "Title cannot match an existing build in My Builds"
+                );
+                updateTooltips();
+                forceShowTooltip(titleInput);
+              }
+            } else {
+              if (titleText) titleText.classList.remove("highlight");
+              if (titleInput) {
+                titleInput.classList.remove("highlight");
+                titleInput.removeAttribute("data-tooltip");
+                updateTooltips();
+                forceHideTooltip(titleInput);
+              }
+            }
+          }
         });
         el.dataset.monitorAttached = "true";
       }

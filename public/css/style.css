@@ -20,6 +20,7 @@
   --bg-color-subcategory: #2a2a2a;
   --hover-color: #504f4f;
   --active-color: #963325;
+  --link-color: #fc0;
 }
 
 /* Dark mode for the main application */
@@ -119,7 +120,7 @@ body {
   display: flex;
   min-height: 50px;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   justify-content: center; /* Center horizontally if you want */
 }
 
@@ -128,7 +129,7 @@ body {
   position: fixed;
   top: 10px;
   right: 10px;
-  background: rgba(44, 44, 44, 0.9);
+  background-color: #37373780;
   padding: 8px 15px;
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
@@ -137,7 +138,7 @@ body {
   gap: 12px;
   z-index: 1000;
   justify-content: end;
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(5px);
   border: 2px solid transparent;
 }
 
@@ -278,7 +279,7 @@ body {
   display: flex;
   min-height: 50px;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 /* Avatar */
@@ -353,17 +354,14 @@ body {
   0% {
     border-color: red;
     box-shadow: 0 0 10px red;
-    transform: scale(1);
   }
   50% {
     border-color: orange;
     box-shadow: 0 0 20px orange;
-    transform: scale(1.02);
   }
   100% {
     border-color: red;
     box-shadow: 0 0 10px red;
-    transform: scale(1);
   }
 }
 
@@ -586,7 +584,7 @@ button:hover {
   display: flex;
   align-items: center; /* Aligns items in center of the container */
   font-size: 1.1em;
-  max-width: 200px;
+  max-width: 210px;
   color: #e0e0e0;
   cursor: pointer;
   margin-top: 15px;
@@ -601,12 +599,12 @@ button:hover {
   align-items: self-end;
   flex-wrap: wrap;
   margin-bottom: 5px;
-  gap: 10px;
+  gap: 8px;
 }
 
 .toggle-header-right {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   margin-left: auto; /* Push to right */
   align-items: center;
 }
@@ -1061,7 +1059,7 @@ textarea::-webkit-scrollbar-thumb:hover {
   margin-top: 12px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
 }
 .publish-checkbox-row label {
@@ -1395,7 +1393,7 @@ textarea::-webkit-scrollbar-thumb:hover {
   display: grid;
   grid-template-columns: 1fr 2fr 1fr; /* Three-column layout */
   align-items: center; /* Center vertically */
-  gap: 10px; /* Space between columns */
+  gap: 8px; /* Space between columns */
   margin: 20px 0; /* Vertical spacing */
 }
 
@@ -1473,7 +1471,7 @@ textarea::-webkit-scrollbar-thumb:hover {
   top: 10px;
   right: 10px;
   display: flex;
-  gap: 10px;
+  gap: 8px;
   z-index: 900;
 }
 
@@ -1498,7 +1496,7 @@ textarea::-webkit-scrollbar-thumb:hover {
 
 .map-folder-toggle {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   margin-bottom: 10px;
 }
 
@@ -1682,12 +1680,12 @@ textarea::-webkit-scrollbar-thumb:hover {
 
 #map-title-bar .title-bar-left {
   display: flex;
-  gap: 10px;
+  gap: 8px;
 }
 
 #map-title-bar .title-bar-right {
   display: flex;
-  gap: 10px; /* Add spacing between buttons */
+  gap: 8px; /* Add spacing between buttons */
 }
 
 .map-preview {
@@ -1870,7 +1868,7 @@ textarea::-webkit-scrollbar-thumb:hover {
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 10px; /* Space between text and image */
+  gap: 8px; /* Space between text and image */
   font-size: 14px; /* Adjust text size */
   font-family: "Roboto", Arial, sans-serif; /* Ensure font consistency */
   color: #f0f0f0; /* Lighter text for dark background */
@@ -1958,7 +1956,7 @@ textarea::-webkit-scrollbar-thumb:hover {
 #map-controls {
   display: flex;
   justify-content: center; /* Center controls under the map */
-  gap: 10px; /* Space between buttons */
+  gap: 8px; /* Space between buttons */
 }
 
 /* Comment and Video Container (Second Column) */
@@ -1967,7 +1965,7 @@ textarea::-webkit-scrollbar-thumb:hover {
   max-width: 50%; /* Limit width */
   display: flex;
   flex-direction: column; /* Stack comment and video sections */
-  gap: 10px; /* Space between comment & video */
+  gap: 8px; /* Space between comment & video */
 }
 
 .comment-video-container h3 {
@@ -2338,6 +2336,7 @@ td {
 }
 
 .community-layout {
+  position: relative;
   display: grid;
   grid-template-columns: 1fr 3fr; /* Allocate more space for table */
   gap: 20px;
@@ -2403,9 +2402,9 @@ td {
 .view-build-container {
   display: flex;
   flex-direction: column;
-  width: 60%;
-  height: 90%;
-  margin: 40px auto;
+  width: 100%;
+  height: 100%;
+  margin: 80px auto 0;
   padding: 20px;
   background-color: #2c2c2c;
   border-radius: 10px;
@@ -2523,9 +2522,6 @@ td {
 }
 
 #importBuildButton {
-  position: absolute;
-  top: 0;
-  right: 0;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -2713,9 +2709,10 @@ td {
   text-align: center;
   background-color: #151515;
   color: #fff;
-  padding: 10px 20px;
+  padding: 16px 20px;
   width: 100vw;
   left: 0px;
+  min-height: 60px;
 }
 
 .footer img {
@@ -2876,12 +2873,27 @@ td {
   flex-direction: column;
   gap: 0px;
   padding: 10px;
+  position: relative;
   max-height: 78vh; /* Or whatever fits well inside your modal */
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 10px; /* Prevent text from going under scrollbar */
   scrollbar-width: thin;
   scrollbar-color: #444 #222; /* Firefox */
+}
+
+#buildCount {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background-color: #212121;
+  box-shadow: rgba(0, 0, 0, 0.2) 0px 10px 15px -3px;
+  border-bottom-left-radius: 12px;
+  color: #e0e0e0;
+  padding: 4px 8px;
+  font-size: 14px;
+  z-index: 3;
+  width: fit-content;
 }
 
 /* Chrome, Safari */
@@ -2927,7 +2939,6 @@ td {
   bottom: 8px;
   right: 8px;
 }
-
 
 /* Each build entry */
 .build-entry {
@@ -3048,6 +3059,13 @@ td {
   height: 14px;
 }
 
+@media (max-width: 768px) {
+  /* Hide publisher icon on small screens */
+  .publisher-chip .meta-icon {
+    display: none;
+  }
+}
+
 /* Voting section */
 .build-voting {
   display: flex;
@@ -3077,7 +3095,7 @@ td {
 /* Action buttons (preview, import, view) */
 .build-actions {
   display: flex;
-  gap: 10px;
+  gap: 8px;
 }
 
 .build-actions button {
@@ -3125,8 +3143,12 @@ td {
   background-color: var(--active-color);
   border-color: var(--active-color);
 }
-.view-btn.active img { filter: brightness(1.8); }
-.view-btn:not(.active) { opacity: 0.5; }
+.view-btn.active img {
+  filter: brightness(1.8);
+}
+.view-btn:not(.active) {
+  opacity: 0.5;
+}
 
 .help-circle.animated-help {
   width: 30px;
@@ -3213,7 +3235,7 @@ td {
 .abbreviation-list {
   display: flex;
   flex-wrap: wrap; /* Allow rows to wrap */
-  gap: 10px; /* Space between rows */
+  gap: 8px; /* Space between rows */
   margin-top: 10px;
   margin-bottom: 20px;
 }
@@ -3371,7 +3393,7 @@ td {
   margin: 20px 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   text-align: left;
 }
 
@@ -3864,7 +3886,7 @@ td {
   max-width: 400px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .clan-banner-title {
@@ -4299,6 +4321,7 @@ button.btn-small {
   .footer {
     font-size: 12px; /* Slightly smaller text for small screens */
     padding: 16px 10px;
+    min-height: 60px;
   }
 
   #secondRow {
@@ -4332,6 +4355,7 @@ button.btn-small {
   }
 
   .community-layout {
+    position: relative;
     grid-template-columns: 1fr; /* Stack the preview and builds list in one column */
   }
 
@@ -4350,8 +4374,17 @@ button.btn-small {
     max-width: 100%;
   }
 
+  #buildOrderHelpModal .modal-content {
+    height: 90%;
+    font-size: 16px;
+  }
+
+  #buildOrderHelpModal .modal-content h5 {
+    font-size: 1em;
+  }
+
   #buildOrderHelpContent {
-    font-size: 10px;
+    font-size: 16px;
     padding: 10px;
     max-height: none;
     overflow-y: auto;
@@ -4446,8 +4479,6 @@ button.btn-small {
   align-items: center;
   gap: 4px;
 }
-
-
 
 @media (max-width: 768px) {
   #auth-container {
@@ -4547,6 +4578,93 @@ button.btn-small {
   #communityHeaderControls {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 10px;
+    gap: 8px;
   }
 }
+.cookie-banner {
+  position: fixed;
+
+  bottom: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 420px;
+  background-color: rgba(30, 30, 30, 0.95);
+  color: #fff;
+  padding: 15px 20px;
+  text-align: center;
+  z-index: 2000;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(255, 59, 48, 0.6);
+  animation: cookie-pulse 3s ease-in-out infinite;
+}
+@keyframes cookie-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 10px rgba(255, 59, 48, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(255, 59, 48, 0.7);
+  }
+}
+.cookie-banner button {
+  margin-left: 10px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.cookie-banner button.cookie-btn {
+  background-color: #555;
+  color: #fff;
+}
+.cookie-banner button.cookie-btn:hover {
+  background-color: #777;
+}
+
+#cookieAccept {
+  background-color: #ff3b30;
+}
+#cookieAccept:hover {
+  background-color: #ff6458;
+}
+
+#cookiePolicyLink {
+  color: var(--link-color);
+}
+/* Inline styles moved from HTML */
+.hidden { display: none !important; }
+
+#authLoadingText { color: #555; }
+#userPhoto { width: 40px; height: 40px; display: none; }
+#userMenu { display: none; }
+#userNameMenu { display: none; }
+#usernameModal { display: none; }
+#closeUsernameModal { position: absolute; top: 10px; right: 15px; font-size: 24px; cursor: pointer; }
+.username-input-wrapper { position: relative; display: inline-block; width: 100%; }
+#usernameInput { width: 100%; }
+#usernameSpinner { display: none; }
+#buildOrderInputField { display: block; }
+optgroup[label="Zerg"] { color: #c07aeb; }
+optgroup[label="Protoss"] { color: #5fe5ff; }
+optgroup[label="Terran"] { color: #ff3a30; }
+#buildOrderTitleInput { display: none; }
+#newBuildButton { display: none; }
+.icon-20 { width: 20px; height: 20px; }
+#replayInputWrapper { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+#replayLinkInput { flex: 1; }
+.margin-bottom-10 { margin-bottom: 10px; }
+#replayFileInput { display: none; }
+#replayViewWrapper { display: none; }
+#videoIframe { display: block; }
+#saveTemplateModal { display: none; }
+#buildsLoadingWrapper { display: none; justify-content: center; }
+#createClanView, #manageClanView, #chooseManageClanView,
+#clan-requests-tab, #clan-settings-tab, #findClanView,
+#viewClanPage { display: none; }
+#publishModal { display: none; }
+#settingsModal { display: none; }
+#replayOptionsModal { display: none; }
+#stopUnitLabel { display: none; }
+#optionsLoadingWrapper { display: none; justify-content: center; }
+#cookieBanner { display: none; }
+#privacyModal { display: none; }

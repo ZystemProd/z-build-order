@@ -123,7 +123,9 @@ export async function initializeIndexPage() {
       await populateCommunityBuilds();
 
       if (filterType && filterValue) {
-        filterCommunityBuilds(filterValue);
+        filterCommunityBuilds(filterValue); // Only do filtered call
+      } else {
+        await populateCommunityBuilds(); // Only do full list if no filter
       }
 
       if (searchQuery) {
