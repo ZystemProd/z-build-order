@@ -446,8 +446,7 @@ def upload():
                 frames_by_pid[ev.pid].append(ev.frame)
                 supply_by_pid[ev.pid].append(int(ev.food_used))
 
-        # Pre-compute upgrade durations
-        durations = _duration_map(replay)
+
 
 
         # ---- iterate event stream --------------------------------
