@@ -447,8 +447,6 @@ def upload():
                 supply_by_pid[ev.pid].append(int(ev.food_used))
 
 
-
-
         # ---- iterate event stream --------------------------------
         for event in replay.events:
             if event.second == 0:
@@ -462,8 +460,6 @@ def upload():
                 # no continue – we still want to process other events on this frame
 
 
-
-
             # ------ GET ability name for Chrono Boost -------------------
             ability_raw = getattr(event, "ability_name", None)
             ability = str(ability_raw) if ability_raw else ""
@@ -475,7 +471,6 @@ def upload():
                 break
             if stop_limit is not None and current_used > stop_limit:  # uses live snapshot
                 break
-
 
 
             # Chrono Boost detection
@@ -574,9 +569,6 @@ def upload():
                 })
 
 
-
-
-
         # keep only start rows --------------------------------------
         entries = [
             e for e in entries
@@ -623,9 +615,20 @@ def upload():
                 if first.get('type') == 'upgrade':
                     minutes, seconds = divmod(first.get('clock_sec', first.get('time', 0)), 60)
                     label = first.get('label', 'Unknown')
-                    build_lines.append(f"[{minutes:02d}:{seconds:02d}] {label}")
+
+                    parts = []
+                    if not exclude_supply:
+                        supply_str = f"{first['supply']}/{first['made']}" if first['supply'] > first['made'] and first['made'] > 0 else str(first['supply'])
+                        parts.append(supply_str)
+
+                    parts.append(f"{minutes:02d}:{seconds:02d}")
+
+                    prefix = f"[{' '.join(parts)}] " if parts else ""
+
+                    build_lines.append(prefix + label)
                     i += 1
                     continue
+
 
                 supply = first['supply']
                 made = first['made']
@@ -655,7 +658,18 @@ def upload():
                 if item.get('type') == 'upgrade':
                     minutes, seconds = divmod(item.get('clock_sec', item.get('time', 0)), 60)
                     label = item.get('label', 'Unknown')
-                    build_lines.append(f"[{minutes:02d}:{seconds:02d}] {label}")
+
+                    parts = []
+                    if not exclude_supply:
+                        supply_str = f"{item['supply']}/{item['made']}" if item['supply'] > item['made'] and item['made'] > 0 else str(item['supply'])
+                        parts.append(supply_str)
+
+                    if not exclude_time:
+                        parts.append(f"{minutes:02d}:{seconds:02d}")
+
+                    prefix = f"[{' '.join(parts)}] " if parts else ""
+
+                    build_lines.append(prefix + label)
                     continue
 
                 parts = []
