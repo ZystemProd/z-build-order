@@ -148,10 +148,20 @@
   font-size: 35px;
   border: 1px solid #555;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+  transition: all 0.3s ease; /* smooth resize */
   pointer-events: auto;
   opacity: 0;
-  transition: opacity 0.4s ease;
-  pointer-events: none;
+}
+.cat-tip-bubble span {
+  display: inline-block;
+  opacity: 1;
+  transition: opacity 0.5s ease;
+}
+
+.cat-tip-bubble .inline-icon {
+  width: 1.2em;
+  height: 1.2em;
+  vertical-align: middle;
 }
 
 .cat-sleep-indicator {
@@ -234,4 +244,8 @@
   98% {
     height: 0px;
   }
+}
+
+#catTipBubble {
+  transition: opacity 0.5s ease;
 }

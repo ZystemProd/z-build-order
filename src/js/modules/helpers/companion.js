@@ -1,3 +1,5 @@
+import { formatActionText } from "../textFormatters.js";
+
 let catHelpShown = false;
 let catIsActive = true; // <- new flag
 
@@ -5,12 +7,33 @@ export function setupCatActivationOnInput() {
   const input = document.getElementById("buildOrderInput");
   const cat = document.querySelector(".cat");
   const bubble = document.getElementById("catTipBubble");
+  const textElement = document.getElementById("catTipBubbleText"); // NEW
 
-  if (!input || !cat || !bubble) return;
+  if (!input || !cat || !bubble || !textElement) return;
 
   let animationTimeout;
+  let tipInterval;
+  let currentTipIndex = 0;
 
-  bubble.classList.remove("visible");
+  const tips = [
+    "Tip: Write supply inside [brackets] and the action after",
+    "Tip: Use Shift + Enter to insert a row in the middle",
+    "Tip: Write 'Swap' swap to indicate swapping Terran addons",
+  ];
+
+  textElement.innerHTML = formatActionText(tips[0]);
+
+  // Show/hide bubble based on input focus
+  input.addEventListener("focus", () => {
+    if (catIsActive) {
+      bubble.classList.add("visible");
+    }
+  });
+
+  input.addEventListener("blur", () => {
+    bubble.classList.remove("visible");
+  });
+
   cat.classList.remove("alert-pose", "tail-wiggle");
 
   input.addEventListener("click", () => {
@@ -18,23 +41,36 @@ export function setupCatActivationOnInput() {
     catHelpShown = true;
 
     clearTimeout(animationTimeout);
-    cat.classList.remove("reset", "tail-wiggle");
+    clearInterval(tipInterval);
 
+    cat.classList.remove("reset", "tail-wiggle");
     cat.classList.add("alert-pose");
-    bubble.textContent =
-      "Tip: Write supply inside [brackets] and the action after";
-    bubble.classList.add("visible");
+
+    // Start with first tip
+    textElement.textContent = tips[0];
 
     animationTimeout = setTimeout(() => {
       cat.classList.add("tail-wiggle");
     }, 1000);
+
+    // Start interval rotation (every 30s)
+    tipInterval = setInterval(() => {
+      // Fade out text
+      textElement.style.opacity = 0;
+
+      setTimeout(() => {
+        currentTipIndex = (currentTipIndex + 1) % tips.length;
+        textElement.innerHTML = formatActionText(tips[currentTipIndex]);
+        textElement.style.opacity = 1;
+      }, 500); // match transition duration
+    }, 3000);
   });
 
   document.addEventListener("click", (e) => {
     if (!input.contains(e.target) && !cat.contains(e.target)) {
       clearTimeout(animationTimeout);
+      clearInterval(tipInterval);
       cat.classList.remove("alert-pose", "tail-wiggle");
-      bubble.classList.remove("visible");
       catHelpShown = false;
     }
   });
@@ -44,8 +80,8 @@ export function setupCatActivationOnInput() {
 
     if (!catIsActive) {
       clearTimeout(animationTimeout);
+      clearInterval(tipInterval);
       cat.classList.remove("alert-pose", "tail-wiggle");
-      bubble.classList.remove("visible");
       catHelpShown = false;
       cat.classList.add("inactive");
     } else {
