@@ -170,9 +170,6 @@ export function initializeAutoCorrect() {
       inputField.selectionStart = inputField.selectionEnd = bracketEnd + 2;
       return;
     }
-    
-
-
 
     // 2️⃣ Check if cursor is **right after** brackets like `[13]|`, `[4:00]|`, `[100 gas]|`, or `[100 minerals]|`
     const afterBracketsMatch = textBeforeCaret.match(
@@ -183,7 +180,11 @@ export function initializeAutoCorrect() {
       // ✅ Create a **new row** and move cursor inside `[|]`
       event.preventDefault();
       inputField.focus();
-      insertTextRange("\n[]", inputField.selectionStart, inputField.selectionEnd);
+      insertTextRange(
+        "\n[]",
+        inputField.selectionStart,
+        inputField.selectionEnd
+      );
 
       // Move cursor **inside** the new brackets `[|]`
       inputField.selectionStart = inputField.selectionEnd = cursorPosition + 2;
@@ -214,7 +215,7 @@ export function initializeAutoCorrect() {
   inputField.addEventListener("input", () => {
     const text = inputField.value;
     const cursorPosition = inputField.selectionStart;
-  
+
     // 🚫 Disable autocomplete if inside brackets like [|]
     const bracketStart = text.lastIndexOf("[", cursorPosition);
     const bracketEnd = text.indexOf("]", cursorPosition);
@@ -227,16 +228,16 @@ export function initializeAutoCorrect() {
       popup.style.visibility = "hidden";
       return;
     }
-  
+
     const wordBoundaryRegex = /\b(\w+)$/; // Match the last word before the cursor
-  
+
     // Get the current word being typed
     const match = text.substring(0, cursorPosition).match(wordBoundaryRegex);
     if (!match) {
       popup.style.visibility = "hidden";
       return;
     }
-  
+
     const currentWord = match[1].toLowerCase();
     const matches = suggestions.filter((item) =>
       item.name.toLowerCase().includes(currentWord)
@@ -250,48 +251,58 @@ export function initializeAutoCorrect() {
       popup.style.visibility = "hidden";
       return;
     }
-  
+
     if (matches.length === 0) {
       popup.style.visibility = "hidden";
       return;
     }
-  
+
     // Populate popup with matches
     popup.innerHTML = "";
     matches.forEach((match, index) => {
       const suggestion = document.createElement("div");
       suggestion.classList.add("suggestion");
-  
+
       if (index === 0) suggestion.classList.add("active");
-  
+
       const img = document.createElement("img");
       img.src = `img/${DOMPurify.sanitize(match.type)}/${DOMPurify.sanitize(
         match.name.toLowerCase().replace(/ /g, "_")
       )}.webp`;
       img.alt = DOMPurify.sanitize(match.name);
-  
+
       const textEl = document.createElement("span");
       textEl.textContent = DOMPurify.sanitize(match.name);
-  
+
       suggestion.appendChild(img);
       suggestion.appendChild(textEl);
-  
+
       suggestion.addEventListener("click", () => {
         inputField.selectionStart = inputField.selectionEnd = cursorPosition;
         replaceCurrentWordWith(match.name);
       });
-  
+
       popup.appendChild(suggestion);
     });
-  
+
     activeIndex = 0;
     positionPopupAtCaret(inputField, popup);
     popup.style.visibility = "visible";
   });
-  
 
   inputField.addEventListener("keydown", (event) => {
     const allSuggestions = popup.querySelectorAll(".suggestion");
+
+    // 🟢 Shift+Enter → always insert new []
+    if (event.shiftKey && event.key === "Enter") {
+      event.preventDefault();
+      const pos = inputField.selectionStart;
+      insertTextRange("\n[]", pos, pos);
+      inputField.selectionStart = inputField.selectionEnd = pos + 3;
+      inputField.scrollTop = inputField.scrollHeight;
+      analyzeBuildOrder(inputField.value);
+      return;
+    }
 
     if (!popup.style.visibility || popup.style.visibility === "hidden") {
       if (event.key === "Enter") {

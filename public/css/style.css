@@ -1783,6 +1783,7 @@ textarea::-webkit-scrollbar-thumb:hover {
   height: 30px;
   vertical-align: middle;
   margin-left: 5px;
+  margin-right: 5px;
 }
 
 .preview-arrow {
@@ -1996,6 +1997,45 @@ textarea::-webkit-scrollbar-thumb:hover {
   transform: translateX(-50%);
   border: 5px solid transparent;
   border-top-color: #333; /* Arrow color matches tooltip */
+}
+
+#buildOrderTable [data-tooltip] {
+  position: relative; /* REQUIRED to position ::after */
+  display: inline-block; /* Make it hoverable */
+}
+
+#buildOrderTable [data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #333;
+  color: #fff;
+  padding: 5px 10px;
+  font-size: 12px;
+  border-radius: 5px;
+  white-space: nowrap;
+  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.2);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+  z-index: 1000;
+}
+
+#buildOrderTable [data-tooltip]::before {
+  content: "";
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #333;
+}
+
+#buildOrderTable [data-tooltip]:hover::after {
+  opacity: 1;
+  visibility: visible;
 }
 
 /* Map Modal Styles */
@@ -4632,39 +4672,129 @@ button.btn-small {
   color: var(--link-color);
 }
 /* Inline styles moved from HTML */
-.hidden { display: none !important; }
+.hidden {
+  display: none !important;
+}
 
-#authLoadingText { color: #555; }
-#userPhoto { width: 40px; height: 40px; display: none; }
-#userMenu { display: none; }
-#userNameMenu { display: none; }
-#usernameModal { display: none; }
-#closeUsernameModal { position: absolute; top: 10px; right: 15px; font-size: 24px; cursor: pointer; }
-.username-input-wrapper { position: relative; display: inline-block; width: 100%; }
-#usernameInput { width: 100%; }
-#usernameSpinner { display: none; }
-#buildOrderInputField { display: block; }
-optgroup[label="Zerg"] { color: #c07aeb; }
-optgroup[label="Protoss"] { color: #5fe5ff; }
-optgroup[label="Terran"] { color: #ff3a30; }
-#buildOrderTitleInput { display: none; }
-#newBuildButton { display: none; }
-.icon-20 { width: 20px; height: 20px; }
-#replayInputWrapper { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-#replayLinkInput { flex: 1; }
-.margin-bottom-10 { margin-bottom: 10px; }
-#replayFileInput { display: none; }
-#replayViewWrapper { display: none; }
-#videoIframe { display: block; }
-#saveTemplateModal { display: none; }
-#buildsLoadingWrapper { display: none; justify-content: center; }
-#createClanView, #manageClanView, #chooseManageClanView,
-#clan-requests-tab, #clan-settings-tab, #findClanView,
-#viewClanPage { display: none; }
-#publishModal { display: none; }
-#settingsModal { display: none; }
-#replayOptionsModal { display: none; }
-#stopUnitLabel { display: none; }
-#optionsLoadingWrapper { display: none; justify-content: center; }
-#cookieBanner { display: none; }
-#privacyModal { display: none; }
+#authLoadingText {
+  color: #555;
+}
+#userPhoto {
+  width: 40px;
+  height: 40px;
+  display: none;
+}
+#userMenu {
+  display: none;
+}
+#userNameMenu {
+  display: none;
+}
+#usernameModal {
+  display: none;
+}
+#closeUsernameModal {
+  position: absolute;
+  top: 10px;
+  right: 15px;
+  font-size: 24px;
+  cursor: pointer;
+}
+.username-input-wrapper {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+}
+#usernameInput {
+  width: 100%;
+}
+#usernameSpinner {
+  display: none;
+}
+#buildOrderInputField {
+  display: block;
+}
+optgroup[label="Zerg"] {
+  color: #c07aeb;
+}
+optgroup[label="Protoss"] {
+  color: #5fe5ff;
+}
+optgroup[label="Terran"] {
+  color: #ff3a30;
+}
+#buildOrderTitleInput {
+  display: none;
+}
+#newBuildButton {
+  display: none;
+}
+.icon-20 {
+  width: 20px;
+  height: 20px;
+}
+#replayInputWrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+#replayLinkInput {
+  flex: 1;
+}
+.margin-bottom-10 {
+  margin-bottom: 10px;
+}
+#replayFileInput {
+  display: none;
+}
+#replayViewWrapper {
+  display: none;
+}
+#videoIframe {
+  display: block;
+}
+#saveTemplateModal {
+  display: none;
+}
+#buildsLoadingWrapper {
+  display: none;
+  justify-content: center;
+}
+#createClanView,
+#manageClanView,
+#chooseManageClanView,
+#clan-requests-tab,
+#clan-settings-tab,
+#findClanView,
+#viewClanPage {
+  display: none;
+}
+#publishModal {
+  display: none;
+}
+#settingsModal {
+  display: none;
+}
+#replayOptionsModal {
+  display: none;
+}
+#stopUnitLabel {
+  display: none;
+}
+#optionsLoadingWrapper {
+  display: none;
+  justify-content: center;
+}
+#cookieBanner {
+  display: none;
+}
+#privacyModal {
+  display: none;
+}
+
+.addon-sup {
+  color: #f0a500;
+  font-weight: bold;
+  margin-left: 4px;
+}
