@@ -239,6 +239,15 @@ function preprocessAbbreviations(actionText) {
   return actionText;
 }
 
+// Format addon actions like "Tech Lab on Barracks"
+export function formatAddonInAction(text) {
+  const match = text.match(/^(Tech Lab|Reactor) on (Barracks|Factory|Starport)$/i);
+  if (!match) return text;
+  const addon = DOMPurify.sanitize(match[1]);
+  const structure = DOMPurify.sanitize(match[2]);
+  return `${addon} <sup class="addon-sup">(${structure})</sup>`;
+}
+
 // Main function to format action text
 export function formatActionText(actionText) {
   const actorData = [
@@ -257,8 +266,9 @@ export function formatActionText(actionText) {
 
   const actorTrie = buildActorTrie(actorData);
 
-  // Preprocess abbreviations first
+  // Preprocess abbreviations and addon formatting first
   actionText = preprocessAbbreviations(actionText);
+  actionText = formatAddonInAction(actionText);
 
   // Match actors with the Trie
   actionText = matchActorsWithTrie(actionText, actorTrie);
