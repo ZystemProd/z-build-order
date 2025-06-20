@@ -222,7 +222,6 @@ export function formatWorkersOrTimestamp(
 // Function to analyze and update the build order table automatically
 export function analyzeBuildOrder(inputText) {
   requestAnimationFrame(() => {
-
     const lines = inputText.split("\n");
     const table = document.getElementById("buildOrderTable");
 
@@ -244,8 +243,6 @@ export function analyzeBuildOrder(inputText) {
         workersOrTimestamp = "";
         actionText = line;
       }
-
-      actionText = actionText.replace(/->/g, "→").replace(/<-/g, "←");
 
       // Format using Trie-based formatting
       actionText = formatActionText(actionText);
