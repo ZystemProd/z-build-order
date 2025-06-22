@@ -143,8 +143,10 @@ export function initializeAutoCorrect() {
     if (trimmedAfterCaret.startsWith("[")) {
       event.preventDefault();
       inputField.focus();
-      insertTextRange("\n", inputField.selectionStart, inputField.selectionEnd);
-      inputField.selectionStart = inputField.selectionEnd = cursorPosition + 1;
+      insertTextRange("\n[] ", inputField.selectionStart, inputField.selectionEnd);
+
+      // Place caret inside the new brackets `[|]`
+      inputField.selectionStart = inputField.selectionEnd = cursorPosition + 2;
       inputField.scrollTop = inputField.scrollHeight;
       analyzeBuildOrder(inputField.value);
       return;
