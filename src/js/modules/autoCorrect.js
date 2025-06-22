@@ -311,8 +311,19 @@ export function initializeAutoCorrect() {
     popup.style.visibility = "visible";
   });
 
+  inputField.addEventListener("click", () => {
+    popup.style.visibility = "hidden";
+  });
+
   inputField.addEventListener("keydown", (event) => {
     const allSuggestions = popup.querySelectorAll(".suggestion");
+
+    if (popup.style.visibility && popup.style.visibility !== "hidden") {
+      if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
+        popup.style.visibility = "hidden";
+        return;
+      }
+    }
 
     if (!popup.style.visibility || popup.style.visibility === "hidden") {
       if (event.key === "Enter") {
