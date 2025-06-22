@@ -138,6 +138,18 @@ export function initializeAutoCorrect() {
     const textBeforeCaret = text.substring(0, cursorPosition);
     const textAfterCaret = text.substring(cursorPosition);
 
+    const trimmedAfterCaret = textAfterCaret.trimStart();
+
+    if (trimmedAfterCaret.startsWith("[")) {
+      event.preventDefault();
+      inputField.focus();
+      insertTextRange("\n", inputField.selectionStart, inputField.selectionEnd);
+      inputField.selectionStart = inputField.selectionEnd = cursorPosition + 1;
+      inputField.scrollTop = inputField.scrollHeight;
+      analyzeBuildOrder(inputField.value);
+      return;
+    }
+
     if (!isBracketInputEnabled()) {
       event.preventDefault();
       inputField.focus();
@@ -181,7 +193,7 @@ export function initializeAutoCorrect() {
       event.preventDefault();
       inputField.focus();
       insertTextRange(
-        "\n[]",
+        "\n[] ",
         inputField.selectionStart,
         inputField.selectionEnd
       );
@@ -200,7 +212,7 @@ export function initializeAutoCorrect() {
     // 3️⃣ Default behavior: Create new row and move cursor inside `[|]`
     event.preventDefault();
     inputField.focus();
-    insertTextRange("\n[]", inputField.selectionStart, inputField.selectionEnd);
+    insertTextRange("\n[] ", inputField.selectionStart, inputField.selectionEnd);
 
     // Move cursor inside the new brackets `[|]`
     inputField.selectionStart = inputField.selectionEnd = cursorPosition + 2;
@@ -297,7 +309,7 @@ export function initializeAutoCorrect() {
     if (event.shiftKey && event.key === "Enter") {
       event.preventDefault();
       const pos = inputField.selectionStart;
-      insertTextRange("\n[]", pos, pos);
+        insertTextRange("\n[] ", pos, pos);
       inputField.selectionStart = inputField.selectionEnd = pos + 3;
       inputField.scrollTop = inputField.scrollHeight;
       analyzeBuildOrder(inputField.value);
