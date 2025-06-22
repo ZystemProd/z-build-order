@@ -147,24 +147,8 @@ export function initializeAutoCorrect() {
       prevScrollTop + inputField.clientHeight >=
       inputField.scrollHeight - 1;
 
-    const trimmedAfterCaret = textAfterCaret.trimStart();
-
-    if (trimmedAfterCaret.startsWith("[")) {
-      event.preventDefault();
-      popup.style.visibility = "hidden";
-      inputField.focus();
-      insertTextRange("\n", inputField.selectionStart, inputField.selectionEnd);
-      inputField.selectionStart = inputField.selectionEnd = cursorPosition + 1;
-      inputField.scrollTop = wasAtBottom
-        ? inputField.scrollHeight
-        : prevScrollTop;
-      analyzeBuildOrder(inputField.value);
-      return;
-    }
-
     if (!isBracketInputEnabled()) {
       event.preventDefault();
-      popup.style.visibility = "hidden";
       inputField.focus();
       insertTextRange("\n", inputField.selectionStart, inputField.selectionEnd);
       inputField.scrollTop = wasAtBottom
@@ -195,7 +179,6 @@ export function initializeAutoCorrect() {
 
       // Move cursor right after the inserted space
       inputField.selectionStart = inputField.selectionEnd = bracketEnd + 2;
-      popup.style.visibility = "hidden";
       return;
     }
 
@@ -207,10 +190,9 @@ export function initializeAutoCorrect() {
     if (afterBracketsMatch) {
       // ✅ Create a **new row** and move cursor inside `[|]`
       event.preventDefault();
-      popup.style.visibility = "hidden";
       inputField.focus();
       insertTextRange(
-        "\n[] ",
+        "\n[]",
         inputField.selectionStart,
         inputField.selectionEnd
       );
@@ -230,9 +212,8 @@ export function initializeAutoCorrect() {
 
     // 3️⃣ Default behavior: Create new row and move cursor inside `[|]`
     event.preventDefault();
-    popup.style.visibility = "hidden";
     inputField.focus();
-    insertTextRange("\n[] ", inputField.selectionStart, inputField.selectionEnd);
+    insertTextRange("\n[]", inputField.selectionStart, inputField.selectionEnd);
 
     // Move cursor inside the new brackets `[|]`
     inputField.selectionStart = inputField.selectionEnd = cursorPosition + 2;
