@@ -307,17 +307,6 @@ export function initializeAutoCorrect() {
   inputField.addEventListener("keydown", (event) => {
     const allSuggestions = popup.querySelectorAll(".suggestion");
 
-    // 🟢 Shift+Enter → always insert new []
-    if (event.shiftKey && event.key === "Enter") {
-      event.preventDefault();
-      const pos = inputField.selectionStart;
-        insertTextRange("\n[] ", pos, pos);
-      inputField.selectionStart = inputField.selectionEnd = pos + 3;
-      inputField.scrollTop = inputField.scrollHeight;
-      analyzeBuildOrder(inputField.value);
-      return;
-    }
-
     if (!popup.style.visibility || popup.style.visibility === "hidden") {
       if (event.key === "Enter") {
         event.preventDefault(); // Prevent default new-line behavior
