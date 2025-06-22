@@ -46,6 +46,10 @@ function positionPopupAtCaret(inputField, popup) {
   markerSpan.textContent = "|"; // Placeholder character for caret
   tempDiv.appendChild(markerSpan);
 
+  // Keep scroll position so the caret location is accurate
+  tempDiv.scrollTop = inputField.scrollTop;
+  tempDiv.scrollLeft = inputField.scrollLeft;
+
   // Append the temporary div to the document
   document.body.appendChild(tempDiv);
 
@@ -138,25 +142,18 @@ export function initializeAutoCorrect() {
     const textBeforeCaret = text.substring(0, cursorPosition);
     const textAfterCaret = text.substring(cursorPosition);
 
-    const trimmedAfterCaret = textAfterCaret.trimStart();
-
-    if (trimmedAfterCaret.startsWith("[")) {
-      event.preventDefault();
-      inputField.focus();
-      insertTextRange("\n[] ", inputField.selectionStart, inputField.selectionEnd);
-
-      // Place caret inside the new brackets `[|]`
-      inputField.selectionStart = inputField.selectionEnd = cursorPosition + 2;
-      inputField.scrollTop = inputField.scrollHeight;
-      analyzeBuildOrder(inputField.value);
-      return;
-    }
+    const prevScrollTop = inputField.scrollTop;
+    const wasAtBottom =
+      prevScrollTop + inputField.clientHeight >=
+      inputField.scrollHeight - 1;
 
     if (!isBracketInputEnabled()) {
       event.preventDefault();
       inputField.focus();
       insertTextRange("\n", inputField.selectionStart, inputField.selectionEnd);
-      inputField.scrollTop = inputField.scrollHeight;
+      inputField.scrollTop = wasAtBottom
+        ? inputField.scrollHeight
+        : prevScrollTop;
       analyzeBuildOrder(inputField.value);
       return;
     }
@@ -195,7 +192,7 @@ export function initializeAutoCorrect() {
       event.preventDefault();
       inputField.focus();
       insertTextRange(
-        "\n[] ",
+        "\n[]",
         inputField.selectionStart,
         inputField.selectionEnd
       );
@@ -204,7 +201,9 @@ export function initializeAutoCorrect() {
       inputField.selectionStart = inputField.selectionEnd = cursorPosition + 2;
 
       // Scroll to ensure visibility
-      inputField.scrollTop = inputField.scrollHeight;
+      inputField.scrollTop = wasAtBottom
+        ? inputField.scrollHeight
+        : prevScrollTop;
 
       // Update build order
       analyzeBuildOrder(inputField.value);
@@ -214,13 +213,15 @@ export function initializeAutoCorrect() {
     // 3️⃣ Default behavior: Create new row and move cursor inside `[|]`
     event.preventDefault();
     inputField.focus();
-    insertTextRange("\n[] ", inputField.selectionStart, inputField.selectionEnd);
+    insertTextRange("\n[]", inputField.selectionStart, inputField.selectionEnd);
 
     // Move cursor inside the new brackets `[|]`
     inputField.selectionStart = inputField.selectionEnd = cursorPosition + 2;
 
     // Scroll to ensure cursor visibility
-    inputField.scrollTop = inputField.scrollHeight;
+    inputField.scrollTop = wasAtBottom
+      ? inputField.scrollHeight
+      : prevScrollTop;
 
     // Update build order
     analyzeBuildOrder(inputField.value);
