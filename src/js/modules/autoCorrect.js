@@ -46,6 +46,10 @@ function positionPopupAtCaret(inputField, popup) {
   markerSpan.textContent = "|"; // Placeholder character for caret
   tempDiv.appendChild(markerSpan);
 
+  // Keep scroll position so the caret location is accurate
+  tempDiv.scrollTop = inputField.scrollTop;
+  tempDiv.scrollLeft = inputField.scrollLeft;
+
   // Append the temporary div to the document
   document.body.appendChild(tempDiv);
 
