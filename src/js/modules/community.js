@@ -833,6 +833,7 @@ function renderCommunityBuildBatch(builds) {
         <div class="build-title">${DOMPurify.sanitize(build.title)}</div>
         <div class="build-meta">
           <span class="meta-chip matchup-chip">${formatMatchup(matchup)}</span>
+          ${clanChip}
           <span class="meta-chip publisher-chip">
             <img src="./img/SVG/user-svgrepo-com.svg" alt="Publisher" class="meta-icon">
             ${DOMPurify.sanitize(build.publisher)}
@@ -841,7 +842,6 @@ function renderCommunityBuildBatch(builds) {
             <img src="./img/SVG/time.svg" alt="Date" class="meta-icon">
             ${formatShortDate(build.datePublished)}
           </span>
-          ${clanChip}
           <span class="meta-chip view-chip" data-id="${build.id}">
             <img src="./img/SVG/preview.svg" alt="Views" class="meta-icon">
             <span class="view-count">${build.views}</span> Views
