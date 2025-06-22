@@ -231,11 +231,18 @@ export function initializeAutoCorrect() {
     const cursorPosition = inputField.selectionStart;
 
     // 🚫 Disable autocomplete if inside brackets like [|]
-    const bracketStart = text.lastIndexOf("[", cursorPosition);
+    const bracketStart = text.lastIndexOf("[", cursorPosition - 1);
     const bracketEnd = text.indexOf("]", cursorPosition);
+    const lastNewline = text.lastIndexOf("\n", cursorPosition - 1);
+    const nextNewlineIndex = text.indexOf("\n", cursorPosition);
+    const isSameLine =
+      bracketStart > lastNewline &&
+      (nextNewlineIndex === -1 || bracketEnd < nextNewlineIndex);
+
     if (
       bracketStart !== -1 &&
       bracketEnd !== -1 &&
+      isSameLine &&
       bracketStart < cursorPosition &&
       cursorPosition <= bracketEnd
     ) {
