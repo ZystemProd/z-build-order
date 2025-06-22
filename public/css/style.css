@@ -3085,6 +3085,12 @@ td {
   font-weight: bold;
 }
 
+/* Clan chip */
+.meta-chip.clan-chip {
+  background-color: #355454;
+  color: #a8e6e6;
+}
+
 /* Vote info */
 .vote-info {
   display: flex;
