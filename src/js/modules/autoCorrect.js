@@ -142,6 +142,11 @@ export function initializeAutoCorrect() {
     const textBeforeCaret = text.substring(0, cursorPosition);
     const textAfterCaret = text.substring(cursorPosition);
 
+    const prevScrollTop = inputField.scrollTop;
+    const wasAtBottom =
+      prevScrollTop + inputField.clientHeight >=
+      inputField.scrollHeight - 1;
+
     const trimmedAfterCaret = textAfterCaret.trimStart();
 
     if (trimmedAfterCaret.startsWith("[")) {
@@ -151,7 +156,9 @@ export function initializeAutoCorrect() {
 
       // Place caret inside the new brackets `[|]`
       inputField.selectionStart = inputField.selectionEnd = cursorPosition + 2;
-      inputField.scrollTop = inputField.scrollHeight;
+      inputField.scrollTop = wasAtBottom
+        ? inputField.scrollHeight
+        : prevScrollTop;
       analyzeBuildOrder(inputField.value);
       return;
     }
@@ -160,7 +167,9 @@ export function initializeAutoCorrect() {
       event.preventDefault();
       inputField.focus();
       insertTextRange("\n", inputField.selectionStart, inputField.selectionEnd);
-      inputField.scrollTop = inputField.scrollHeight;
+      inputField.scrollTop = wasAtBottom
+        ? inputField.scrollHeight
+        : prevScrollTop;
       analyzeBuildOrder(inputField.value);
       return;
     }
@@ -208,7 +217,9 @@ export function initializeAutoCorrect() {
       inputField.selectionStart = inputField.selectionEnd = cursorPosition + 2;
 
       // Scroll to ensure visibility
-      inputField.scrollTop = inputField.scrollHeight;
+      inputField.scrollTop = wasAtBottom
+        ? inputField.scrollHeight
+        : prevScrollTop;
 
       // Update build order
       analyzeBuildOrder(inputField.value);
@@ -224,7 +235,9 @@ export function initializeAutoCorrect() {
     inputField.selectionStart = inputField.selectionEnd = cursorPosition + 2;
 
     // Scroll to ensure cursor visibility
-    inputField.scrollTop = inputField.scrollHeight;
+    inputField.scrollTop = wasAtBottom
+      ? inputField.scrollHeight
+      : prevScrollTop;
 
     // Update build order
     analyzeBuildOrder(inputField.value);
