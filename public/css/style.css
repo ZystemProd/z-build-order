@@ -3078,6 +3078,12 @@ td {
   color: #dd5252 !important; /* Ensuring text stays visible */
 }
 
+/* Hover state for clickable publisher chip */
+.meta-chip.publisher-chip:hover {
+  cursor: pointer;
+  text-decoration: underline;
+}
+
 /* ✅ Matchup chip (Custom Styling) */
 .meta-chip.matchup-chip {
   background-color: #444 !important;

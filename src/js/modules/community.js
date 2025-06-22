@@ -855,6 +855,16 @@ function renderCommunityBuildBatch(builds) {
     `;
 
     container.appendChild(buildEntry);
+
+    const publisherChip = buildEntry.querySelector('.publisher-chip');
+    if (publisherChip) {
+      publisherChip.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        const searchInput = document.getElementById('communitySearchBar');
+        if (searchInput) searchInput.value = build.publisher;
+        searchCommunityBuilds(build.publisher);
+      });
+    }
   });
 
   updateTooltips();
