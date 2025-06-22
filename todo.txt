@@ -21,7 +21,7 @@ Sc2Pulse on username- mmr/ at login reg
 - App Check - recasha
 
 ----------- comunnity ----------
-
+- Show which clan the build comes from, green meta tag
 
 ----------- Clan ----------
 - "Settings" looking bad.
@@ -45,4 +45,12 @@ Let me know if you'd like a toast warning before exiting edit mode if unsaved ch
 **Urgent** the build is published in clan but shown as publish tag and on a different user it don't show up. shows only yourself.
 
 
-- updateing a build only works once.
+
+add nuke
+add Cloaking Field
+add Personal Cloaking
+add Mag-Field Accelerator
+banshee cloak = "Cloaking Field"
+
+
+Check for Terran Vehicle And Ship plating
