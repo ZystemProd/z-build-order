@@ -1,4 +1,9 @@
-import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { auth, db } from "../../app.js";
 import { showToast } from "./toastHandler.js";
 
@@ -18,7 +23,7 @@ export async function fetchUserStats() {
     // Published builds
     const pubQuery = query(
       collection(db, "publishedBuilds"),
-      where("publisherId", "==", user.uid)
+      where("publisherUid", "==", user.uid)
     );
     const pubSnap = await getDocs(pubQuery);
 
@@ -67,13 +72,20 @@ export async function showUserStats() {
   const stats = await fetchUserStats();
   if (!stats) return;
 
+  const makeLine = (label, value) => {
+    const dots = ".".repeat(Math.max(1, 45 - label.length));
+    return `${label} ${dots} (${value})`;
+  };
+
   contentEl.innerHTML = `
-    <p>Total Builds Created: ${stats.totalBuilds}</p>
-    <p>Total Published Builds: ${stats.totalPublished}</p>
-    <p>Total Imported Builds: ${stats.totalImported}</p>
-    <p>Total Views on Published Builds: ${stats.totalViews}</p>
-    <p>Total Upvotes on Published Builds: ${stats.totalUpvotes}</p>
-    <p>Most Popular Build: ${stats.mostPopularTitle || "N/A"}</p>
+    <ul class="stats-list">
+      <li>${makeLine("Total Builds Created", stats.totalBuilds)}</li>
+      <li>${makeLine("Total Published Builds", stats.totalPublished)}</li>
+      <li>${makeLine("Total Imported Builds", stats.totalImported)}</li>
+      <li>${makeLine("Total Views on Published Builds", stats.totalViews)}</li>
+      <li>${makeLine("Total Upvotes on Published Builds", stats.totalUpvotes)}</li>
+      <li>${makeLine("Most Popular Build", stats.mostPopularTitle || "N/A")}</li>
+    </ul>
   `;
 }
 
