@@ -3078,11 +3078,23 @@ td {
   color: #dd5252 !important; /* Ensuring text stays visible */
 }
 
+/* Hover state for clickable publisher chip */
+.meta-chip.publisher-chip:hover {
+  cursor: pointer;
+  text-decoration: underline;
+}
+
 /* ✅ Matchup chip (Custom Styling) */
 .meta-chip.matchup-chip {
   background-color: #444 !important;
   color: #ffcc00 !important;
   font-weight: bold;
+}
+
+/* Clan chip */
+.meta-chip.clan-chip {
+  background-color: #355454;
+  color: #a8e6e6;
 }
 
 /* Vote info */
