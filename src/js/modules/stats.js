@@ -35,8 +35,8 @@ export async function fetchUserStats() {
     pubSnap.forEach((doc) => {
       totalPublished++;
       const data = doc.data();
-      const views = data.views || 0;
-      const upvotes = data.upvotes || 0;
+      const views = Number(data.views || 0);
+      const upvotes = Number(data.upvotes || 0);
       totalViews += views;
       totalUpvotes += upvotes;
       const score = views + upvotes;
@@ -72,14 +72,16 @@ export async function showUserStats() {
   const stats = await fetchUserStats();
   if (!stats) return;
 
+  const popularTitleDisplay = stats.totalPublished ? stats.mostPopularTitle : "N/A";
+
   contentEl.innerHTML = `
     <ul class="stats-list">
       <li><span class="stat-label">Total Builds Created</span><span class="stat-value">${stats.totalBuilds}</span></li>
       <li><span class="stat-label">Total Published Builds</span><span class="stat-value">${stats.totalPublished}</span></li>
-      <li><span class="stat-label">Total Imported Builds</span><span class="stat-value">${stats.totalImported}</span></li>
+      <li class="section-break"><span class="stat-label">Total Imported Builds</span><span class="stat-value">${stats.totalImported}</span></li>
       <li><span class="stat-label">Total Views on Published Builds</span><span class="stat-value">${stats.totalViews}</span></li>
       <li><span class="stat-label">Total Upvotes on Published Builds</span><span class="stat-value">${stats.totalUpvotes}</span></li>
-      <li><span class="stat-label">Most Popular Build</span><span class="stat-value">${stats.mostPopularTitle || "N/A"}</span></li>
+      <li><span class="stat-label">Most Popular Build</span><span class="stat-value">${popularTitleDisplay}</span></li>
     </ul>
   `;
 }
