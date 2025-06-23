@@ -436,6 +436,12 @@ export function showBuildOrderHelpModal() {
         "This format showcases two types: one for time-based actions (e.g., [01:10] for timestamp) and one for supply-based actions (e.g., [24] for worker supply).",
     },
     {
+      title: "Quick Typing",
+      image: "./img/info/quick_typing.webp",
+      description:
+        "Press <kbd>Enter</kbd> while inside the brackets to automatically jump outside and continue typing the action.",
+    },
+    {
       title: "Completed Upgrade with Percent",
       input: "@100% stimpack push opponent third base",
       description:
@@ -464,12 +470,6 @@ export function showBuildOrderHelpModal() {
       • To erase a marker or arrow, simply click on it again.<br><br>
       <img src="./img/info/minimap-positions (1).webp" alt="Minimap Example" class="example-image">
     `,
-    },
-    {
-      title: "Quick Typing",
-      image: "./img/info/quick_typing.webp",
-      description:
-        "Press <kbd>Enter</kbd> while inside the brackets to automatically jump outside and continue typing the action.",
     },
   ];
 
