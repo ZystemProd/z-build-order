@@ -57,6 +57,8 @@
             <img src="img/SVG/clan.svg" class="menu-icon" /> Clans
           </button>
           <hr class="menu-divider" />
+          <button id="showStatsButton" class="user-menu-button">📊 My Stats</button>
+          <hr class="menu-divider" />
           <button class="menu-item" id="settingsBtn">
             <img src="img/SVG/settings.svg" class="menu-icon" /> Settings
           </button>
@@ -676,6 +678,14 @@
       </div>
     </div>
 
+    <div id="userStatsModal" class="modal">
+      <div class="modal-content small-modal">
+        <span class="close-modal" id="closeUserStatsModal">&times;</span>
+        <h3>My Stats</h3>
+        <div id="userStatsContent">Loading...</div>
+      </div>
+    </div>
+
     <!-- Modal for delete notification -->
     <div id="deleteConfirmationModal" class="modal">
       <div class="modal-content">
@@ -797,7 +807,7 @@
 
 
 
-      <p>Version 0.5.8030</p>
+      <p>Version 0.5.8034</p>
 
 
 

@@ -4894,3 +4894,27 @@ optgroup[label="Terran"] {
   font-weight: bold;
   margin-left: 4px;
 }
+
+/* User Stats Modal List */
+.stats-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.stats-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid #333;
+}
+.stats-list li.section-break {
+  margin-bottom: 10px;
+}
+.stats-list li:last-child {
+  border-bottom: none;
+}
+.stat-value {
+  font-weight: bold;
+  color: #f0a500;
+}
