@@ -4450,10 +4450,18 @@ button.btn-small {
     position: relative;
   }
 
-  /* Slightly reduce meta-chip and publish-info size */
-  .meta-chip,
+  /* Reduce meta-chip size and scale publish info for mobile */
+  .meta-chip {
+    font-size: 0.75em;
+  }
+
   .build-publish-info {
-    font-size: 0.85em;
+    transform: scale(0.75);
+    transform-origin: bottom right;
+  }
+
+  .build-publish-info:hover {
+    transform: scale(0.8);
   }
 
   .tag.public::after {
