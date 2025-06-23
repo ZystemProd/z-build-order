@@ -441,6 +441,12 @@ export function showBuildOrderHelpModal() {
       <img src="./img/info/minimap-positions (1).webp" alt="Minimap Example" class="example-image">
     `,
     },
+    {
+      title: "Quick Typing",
+      input: "[12]\nOverlord",
+      description:
+        "Press <kbd>Enter</kbd> while inside brackets to automatically move the cursor outside for faster typing.",
+    },
   ];
 
   const manualHTML = ` 
