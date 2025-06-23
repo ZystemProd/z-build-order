@@ -4443,6 +4443,23 @@ button.btn-small {
     width: 100%;
   }
 
+  /* Abbreviate publish tags for extra-small screens */
+  .tag.public,
+  .tag.clan {
+    font-size: 0;
+    position: relative;
+  }
+
+  .tag.public::after {
+    content: "P";
+    font-size: 0.7rem;
+  }
+
+  .tag.clan::after {
+    content: "C";
+    font-size: 0.7rem;
+  }
+
   .footer-left {
     max-width: 100px;
   }
