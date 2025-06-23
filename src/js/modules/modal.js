@@ -27,7 +27,11 @@ import {
   clearEditingPublishedBuild,
 } from "./states/buildState.js";
 import { loadBuilds } from "./buildService.js";
-import { fetchUserBuilds, fetchPublishedUserBuilds } from "./buildManagement.js";
+import {
+  fetchUserBuilds,
+  fetchPublishedUserBuilds,
+  updateBuildFavorite,
+} from "./buildManagement.js";
 import { setSavedBuilds } from "./buildStorage.js";
 import DOMPurify from "dompurify";
 import { updateTooltips } from "./tooltip.js";
@@ -788,6 +792,22 @@ export async function populateBuildList(
         <div class="build-publish-info"></div>
       `;
     }
+
+    const favBtn = document.createElement("button");
+    favBtn.classList.add("favorite-btn");
+    const favImg = document.createElement("img");
+    favImg.src = build.favorite ? "./img/SVG/star_filled.svg" : "./img/SVG/star.svg";
+    favImg.alt = "Favorite";
+    favBtn.appendChild(favImg);
+    favBtn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const newState = !build.favorite;
+      build.favorite = newState;
+      favImg.src = newState ? "./img/SVG/star_filled.svg" : "./img/SVG/star.svg";
+      await updateBuildFavorite(build.id, newState);
+      await filterBuilds(getCurrentBuildFilter());
+    });
+    buildEl.prepend(favBtn);
 
     // Color styles
     const sub = build.subcategory?.toUpperCase() || "";
