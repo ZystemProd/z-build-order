@@ -368,6 +368,28 @@ async function loadBuild() {
 
       const anyVisible = commentVisible || videoVisible || mapVisible || replayVisible;
 
+      const secondRow = document.getElementById("secondRow");
+      const secondRowHeader = document.querySelector('[data-section="secondRow"]');
+      if (secondRow) {
+        if (anyVisible) {
+          secondRow.classList.remove("hidden");
+          secondRow.classList.add("visible");
+        } else {
+          secondRow.classList.add("hidden");
+          secondRow.classList.remove("visible");
+        }
+      }
+      if (secondRowHeader) {
+        const arrowIcon = secondRowHeader.querySelector(".arrow");
+        if (arrowIcon) {
+          if (anyVisible) {
+            arrowIcon.classList.add("open");
+          } else {
+            arrowIcon.classList.remove("open");
+          }
+        }
+      }
+
       if (additionalHeader) {
         additionalHeader.style.display = anyVisible ? "block" : "none";
       }
