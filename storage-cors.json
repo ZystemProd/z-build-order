@@ -2,7 +2,9 @@
   {
     "origin": [
       "https://z-build-order--dev-48d2kuqu.web.app",
-      "https://zbuildorder.com"
+      "https://zbuildorder.com",
+      "https://z-build-order.web.app",
+      "https://z-build-order.firebaseapp.com"
     ],
     "method": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     "responseHeader": [
