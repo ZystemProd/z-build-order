@@ -72,19 +72,14 @@ export async function showUserStats() {
   const stats = await fetchUserStats();
   if (!stats) return;
 
-  const makeLine = (label, value) => {
-    const dots = ".".repeat(Math.max(1, 45 - label.length));
-    return `${label} ${dots} (${value})`;
-  };
-
   contentEl.innerHTML = `
     <ul class="stats-list">
-      <li>${makeLine("Total Builds Created", stats.totalBuilds)}</li>
-      <li>${makeLine("Total Published Builds", stats.totalPublished)}</li>
-      <li>${makeLine("Total Imported Builds", stats.totalImported)}</li>
-      <li>${makeLine("Total Views on Published Builds", stats.totalViews)}</li>
-      <li>${makeLine("Total Upvotes on Published Builds", stats.totalUpvotes)}</li>
-      <li>${makeLine("Most Popular Build", stats.mostPopularTitle || "N/A")}</li>
+      <li><span class="stat-label">Total Builds Created</span><span class="stat-value">${stats.totalBuilds}</span></li>
+      <li><span class="stat-label">Total Published Builds</span><span class="stat-value">${stats.totalPublished}</span></li>
+      <li><span class="stat-label">Total Imported Builds</span><span class="stat-value">${stats.totalImported}</span></li>
+      <li><span class="stat-label">Total Views on Published Builds</span><span class="stat-value">${stats.totalViews}</span></li>
+      <li><span class="stat-label">Total Upvotes on Published Builds</span><span class="stat-value">${stats.totalUpvotes}</span></li>
+      <li><span class="stat-label">Most Popular Build</span><span class="stat-value">${stats.mostPopularTitle || "N/A"}</span></li>
     </ul>
   `;
 }

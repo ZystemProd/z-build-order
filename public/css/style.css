@@ -4900,8 +4900,18 @@ optgroup[label="Terran"] {
   list-style: none;
   padding: 0;
   margin: 0;
-  font-family: monospace;
 }
 .stats-list li {
-  margin: 6px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid #333;
+}
+.stats-list li:last-child {
+  border-bottom: none;
+}
+.stat-value {
+  font-weight: bold;
+  color: #f0a500;
 }
