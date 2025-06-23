@@ -53,7 +53,7 @@ export async function loadBuilds({
   q = query(q, limit(batchSize));
 
   const snap = await getDocs(q);
-  let builds = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  let builds = snap.docs.map((doc) => ({ id: doc.id, favorite: false, ...doc.data() }));
 
   if (type === "my") {
     const publishedRef = collection(db, "publishedBuilds");
@@ -66,6 +66,12 @@ export async function loadBuilds({
       isPublished: b.isPublished || publishedIds.has(b.id),
     }));
   }
+
+  builds.sort((a, b) => {
+    const favDiff = (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0);
+    if (favDiff !== 0) return favDiff;
+    return (b.timestamp || 0) - (a.timestamp || 0);
+  });
 
   return {
     builds,

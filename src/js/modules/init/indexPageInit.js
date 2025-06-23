@@ -378,8 +378,8 @@ export async function initializeIndexPage() {
     showBuildsModal(); // ✅ when logged in
   });
 
-  safeAdd("gridViewBtn", "click", () => setBuildViewMode("grid"));
-  safeAdd("listViewBtn", "click", () => setBuildViewMode("list"));
+  // safeAdd("gridViewBtn", "click", () => setBuildViewMode("grid"));
+  // safeAdd("listViewBtn", "click", () => setBuildViewMode("list"));
 
   safeAdd("filterPublicBtn", "click", () => {
     document.getElementById("filterPublicBtn").classList.add("active");

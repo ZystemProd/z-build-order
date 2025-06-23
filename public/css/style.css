@@ -908,6 +908,10 @@ textarea::-webkit-scrollbar-thumb:hover {
   overflow: hidden; /* ✅ prevent internal shifts */
   transition: box-shadow 0.3s, transform 0.3s; /* ✅ only transition shadow or transform, not size */
 }
+.build-card .favorite-btn {
+  top: 8px;
+  transform: none;
+}
 
 .build-card::before {
   content: "";
@@ -933,7 +937,7 @@ textarea::-webkit-scrollbar-thumb:hover {
 }
 
 .build-card:hover {
-  transform: translateY(-3px); /* ✅ optional hover lift */
+  /* removed hover lift */
 }
 
 .build-card:hover::before {
@@ -980,6 +984,29 @@ textarea::-webkit-scrollbar-thumb:hover {
   cursor: pointer;
   transition: color 0.3s;
 }
+
+.favorite-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 0;
+  color: #cccccc;
+}
+
+.favorite-btn:hover {
+  transform: translateY(-50%); /* prevent button hover scaling */
+}
+
+.favorite-btn img {
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+}
+
 
 .delete-build-btn:hover {
   color: #ff5252;
@@ -1083,7 +1110,6 @@ textarea::-webkit-scrollbar-thumb:hover {
 }
 */
 .build-card:hover {
-  transform: scale(1.1, 1.1);
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.6);
 }
 
@@ -2984,13 +3010,13 @@ td {
 .build-entry {
   display: flex;
   align-items: center; /* ✅ Aligns image and content */
-  padding: 12px;
+  padding: 12px 12px 12px 36px; /* space for favorite icon */
   background-color: #2c2c2c;
   border-bottom: 1px solid #444;
   font-size: 16px;
   color: white;
   cursor: pointer; /* ✅ Make div clickable */
-  transition: background-color 0.2s ease, transform 0.1s ease;
+  transition: background-color 0.2s ease;
   position: relative;
 }
 
@@ -3031,7 +3057,6 @@ td {
 /* Hover effect */
 .build-entry:hover {
   background-color: #3a3a3a;
-  transform: scale(1.02);
 }
 
 /* Title row */
