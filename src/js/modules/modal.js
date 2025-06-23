@@ -42,7 +42,7 @@ let isLoadingMoreBuilds = false;
 let currentBuildFilter = "all";
 
 // --- View Mode State
-const storedViewMode = localStorage.getItem("buildViewMode") || "grid";
+const storedViewMode = localStorage.getItem("buildViewMode") || "list";
 let buildViewMode = storedViewMode;
 
 export function getBuildViewMode() {

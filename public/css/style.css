@@ -997,6 +997,10 @@ textarea::-webkit-scrollbar-thumb:hover {
   color: #cccccc;
 }
 
+.favorite-btn:hover {
+  transform: translateY(-50%); /* prevent button hover scaling */
+}
+
 .favorite-btn img {
   width: 16px;
   height: 16px;
