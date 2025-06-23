@@ -7,8 +7,8 @@ import {
   limit,
   getDocs,
   startAfter,
-} from "firebase/firestore";
-import { getAuth } from "firebase/auth";
+} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
 import { capitalize } from "./helpers/sharedEventUtils.js";
 
 export async function loadBuilds({

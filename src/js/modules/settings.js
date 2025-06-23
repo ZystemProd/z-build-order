@@ -1,5 +1,5 @@
-import { getFirestore, doc, getDoc, updateDoc } from "firebase/firestore";
-import { getAuth } from "firebase/auth";
+import { getFirestore, doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
 
 const BRACKET_KEY = "enableBracketInput";
 const INPUT_KEY = "showBuildInput";

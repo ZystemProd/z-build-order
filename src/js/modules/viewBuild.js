@@ -6,7 +6,7 @@ import {
   setDoc,
   updateDoc,
   increment,
-} from "firebase/firestore";
+} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { formatActionText } from "../modules/textFormatters.js"; // ✅ Format build steps
 import {
   MapAnnotations,
