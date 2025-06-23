@@ -76,6 +76,7 @@ import {
   setSavedBuilds,
   saveSavedBuildsToLocalStorage,
 } from "../buildStorage.js";
+import { showUserStats, closeUserStats } from "../stats.js";
 import { setupCatActivationOnInput } from "../helpers/companion.js";
 import {
   getCurrentBuildId,
@@ -960,6 +961,23 @@ export async function initializeIndexPage() {
 
   document.getElementById("mapVetoBtn")?.addEventListener("click", () => {
     window.location.href = "/veto.html";
+  });
+
+  document.getElementById("showStatsButton")?.addEventListener("click", () => {
+    const userMenu = document.getElementById("userMenu");
+    if (userMenu) userMenu.style.display = "none";
+    showUserStats();
+  });
+
+  document
+    .getElementById("closeUserStatsModal")
+    ?.addEventListener("click", closeUserStats);
+
+  window.addEventListener("mousedown", (event) => {
+    const modal = document.getElementById("userStatsModal");
+    if (modal && event.target === modal) {
+      closeUserStats();
+    }
   });
 
   // Close the avatar submenu after selecting any menu item

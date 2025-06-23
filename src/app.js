@@ -214,6 +214,7 @@ export function initializeAuthUI() {
   const showClanBtn = document.getElementById("showClanModalButton");
   const mapVetoBtn = document.getElementById("mapVetoBtn");
   const settingsMenuItem = document.getElementById("settingsBtn");
+  const statsMenuItem = document.getElementById("showStatsButton");
   const switchAccountMenuItem = document.getElementById("switchAccountBtn");
   const signOutMenuItem = document.getElementById("signOutBtn");
   const deleteAccountMenuItem = document.getElementById("deleteAccountBtn");
@@ -252,6 +253,7 @@ export function initializeAuthUI() {
       if (mapVetoBtn) mapVetoBtn.style.display = "block";
       if (showClanBtn) showClanBtn.style.display = "block";
       if (settingsMenuItem) settingsMenuItem.style.display = "block";
+      if (statsMenuItem) statsMenuItem.style.display = "block";
       if (switchAccountMenuItem) switchAccountMenuItem.style.display = "block";
       if (signOutMenuItem) signOutMenuItem.style.display = "block";
       if (deleteAccountMenuItem) deleteAccountMenuItem.style.display = "block";
@@ -266,6 +268,7 @@ export function initializeAuthUI() {
       if (mapVetoBtn) mapVetoBtn.style.display = "block";
       if (showClanBtn) showClanBtn.style.display = "none";
       if (settingsMenuItem) settingsMenuItem.style.display = "none";
+      if (statsMenuItem) statsMenuItem.style.display = "none";
       if (switchAccountMenuItem) switchAccountMenuItem.style.display = "none";
       if (signOutMenuItem) signOutMenuItem.style.display = "none";
       if (deleteAccountMenuItem) deleteAccountMenuItem.style.display = "none";
