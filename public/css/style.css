@@ -4547,6 +4547,10 @@ button.btn-small {
   gap: 4px;
 }
 
+#supplyHeader .short-text {
+  display: none;
+}
+
 @media (max-width: 768px) {
   #auth-container {
     position: fixed;

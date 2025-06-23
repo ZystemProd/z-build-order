@@ -17,7 +17,6 @@ export function setupCatActivationOnInput() {
 
   const tips = [
     "Tip: Write supply inside [brackets] and the action after",
-    "Tip: Use Shift + Enter to insert a row in the middle",
     "Tip: Write 'Swap' swap to indicate swapping Terran addons",
   ];
 
@@ -63,7 +62,7 @@ export function setupCatActivationOnInput() {
         textElement.innerHTML = formatActionText(tips[currentTipIndex]);
         textElement.style.opacity = 1;
       }, 500); // match transition duration
-    }, 3000);
+    }, 30000);
   });
 
   document.addEventListener("click", (e) => {
