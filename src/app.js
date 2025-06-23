@@ -1,5 +1,9 @@
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
+import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-analytics.js";
+import {
+  initializeAppCheck,
+  ReCaptchaV3Provider,
+} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app-check.js";
 import { initAnalytics } from "./js/modules/analyticsHelper.js";
 import {
   getAuth,
@@ -10,7 +14,7 @@ import {
   onAuthStateChanged,
   setPersistence,
   browserLocalPersistence,
-} from "firebase/auth";
+} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
 import {
   getFirestore,
   getDocs,
@@ -19,7 +23,7 @@ import {
   getDoc,
   setDoc,
   deleteDoc,
-} from "firebase/firestore";
+} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { bannedWords } from "./js/data/bannedWords.js";
 import { showToast } from "./js/modules/toastHandler.js";
 import { resetBuildInputs } from "./js/modules/utils.js";
@@ -54,6 +58,10 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
 
+const appCheck = initializeAppCheck(app, {
+  provider: new ReCaptchaV3Provider("6LcBBWsrAAAAALLmBNIhl-zKPa8KRj8mXMldoKbN"),
+  isTokenAutoRefreshEnabled: true, // auto refresh recommended
+});
 
 function initCookieConsent() {
   const banner = document.getElementById("cookieBanner");

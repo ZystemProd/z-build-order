@@ -88,7 +88,9 @@ export async function setBuildViewMode(mode) {
 }
 
 function isPublishedBuildsTabActive() {
-  return document.getElementById("publishedBuildsTab")?.classList.contains("active");
+  return document
+    .getElementById("publishedBuildsTab")
+    ?.classList.contains("active");
 }
 
 export function formatMatchup(matchup) {
@@ -351,11 +353,13 @@ export async function viewBuild(buildId) {
       if (mapImage) mapImage.src = mapUrl;
       if (selectedMapText) selectedMapText.innerText = formattedMapName;
 
-      const clearBtn = document.querySelector('.clear-annotations-button');
-      if (clearBtn) clearBtn.style.display = 'inline-block';
+      const clearBtn = document.querySelector(".clear-annotations-button");
+      if (clearBtn) clearBtn.style.display = "inline-block";
 
       const secondRow = document.getElementById("secondRow");
-      const secondRowHeader = document.querySelector('[data-section="secondRow"]');
+      const secondRowHeader = document.querySelector(
+        '[data-section="secondRow"]'
+      );
       if (secondRow) {
         secondRow.classList.remove("hidden");
         secondRow.classList.add("visible");
@@ -456,7 +460,9 @@ export async function viewBuild(buildId) {
 
     const editBanner = document.getElementById("editModeBanner");
     if (editBanner) {
-      editBanner.innerHTML = `[Edit Mode] <strong>${DOMPurify.sanitize(build.title)}</strong>`;
+      editBanner.innerHTML = `[Edit Mode] <strong>${DOMPurify.sanitize(
+        build.title
+      )}</strong>`;
       editBanner.style.display = "block";
     }
 
@@ -572,8 +578,8 @@ export async function openPublishModal(buildId) {
         <div class="checkbox-wrapper-59">
           <label class="switch">
             <input type="checkbox" class="clanPublishCheckbox" value="${cid}" ${
-              isShared ? "checked" : ""
-            } />
+        isShared ? "checked" : ""
+      } />
             <span class="slider"></span>
           </label>
         </div>
@@ -738,6 +744,9 @@ export async function populateBuildList(
     buildEl.dataset.source = build.source || "user";
     buildEl.dataset.clanid = build.clanId || "";
 
+    // ✅ Make tab-focusable
+    buildEl.tabIndex = 0;
+
     if (build.isPublished) buildEl.classList.add("published");
 
     const [playerRace, opponentRace] = getRaceIcons(
@@ -765,7 +774,9 @@ export async function populateBuildList(
         <div class="build-right">
           <div class="build-title">${DOMPurify.sanitize(build.title)}</div>
           <div class="build-meta">
-            <span class="meta-chip matchup-chip">${formatMatchup(build.subcategory || "")}</span>
+            <span class="meta-chip matchup-chip">${formatMatchup(
+              build.subcategory || ""
+            )}</span>
             <span class="meta-chip publisher-chip">
               <img src="./img/SVG/user-svgrepo-com.svg" alt="Publisher" class="meta-icon">
               ${DOMPurify.sanitize(build.publisher || "You")}
@@ -795,15 +806,23 @@ export async function populateBuildList(
 
     const favBtn = document.createElement("button");
     favBtn.classList.add("favorite-btn");
+    favBtn.dataset.tooltip = build.favorite
+      ? "Remove from favorites"
+      : "Add to favorites";
+
     const favImg = document.createElement("img");
-    favImg.src = build.favorite ? "./img/SVG/star_filled.svg" : "./img/SVG/star.svg";
+    favImg.src = build.favorite
+      ? "./img/SVG/star_filled.svg"
+      : "./img/SVG/star.svg";
     favImg.alt = "Favorite";
     favBtn.appendChild(favImg);
     favBtn.addEventListener("click", async (e) => {
       e.stopPropagation();
       const newState = !build.favorite;
       build.favorite = newState;
-      favImg.src = newState ? "./img/SVG/star_filled.svg" : "./img/SVG/star.svg";
+      favImg.src = newState
+        ? "./img/SVG/star_filled.svg"
+        : "./img/SVG/star.svg";
       await updateBuildFavorite(build.id, newState);
       await filterBuilds(getCurrentBuildFilter());
     });
@@ -849,6 +868,13 @@ export async function populateBuildList(
       }
     });
 
+    buildEl.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        buildEl.click();
+      }
+    });
+
     // Handle delete button
     if (build.source !== "community" && build.source !== "clan") {
       const deleteButton = buildEl.querySelector(".delete-build-btn");
@@ -882,7 +908,9 @@ export async function populateBuildList(
     if (publishInfo) {
       const publishedTab = isPublishedBuildsTabActive();
       const isBuildPublished =
-        build.isPublished || build.isPublic || (build.sharedToClans?.length ?? 0) > 0;
+        build.isPublished ||
+        build.isPublic ||
+        (build.sharedToClans?.length ?? 0) > 0;
 
       if (build.imported) {
         publishInfo.classList.add("publish-imported");
