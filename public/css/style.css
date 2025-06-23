@@ -4443,6 +4443,37 @@ button.btn-small {
     width: 100%;
   }
 
+  /* Abbreviate publish tags for extra-small screens */
+  .tag.public,
+  .tag.clan {
+    font-size: 0;
+    position: relative;
+  }
+
+  /* Reduce meta-chip size and scale publish info for mobile */
+  .meta-chip {
+    font-size: 0.75em;
+  }
+
+  .build-publish-info {
+    transform: scale(0.75);
+    transform-origin: bottom right;
+  }
+
+  .build-publish-info:hover {
+    transform: scale(0.8);
+  }
+
+  .tag.public::after {
+    content: "P";
+    font-size: 0.7rem;
+  }
+
+  .tag.clan::after {
+    content: "C";
+    font-size: 0.7rem;
+  }
+
   .footer-left {
     max-width: 100px;
   }
