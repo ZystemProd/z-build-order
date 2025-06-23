@@ -316,12 +316,20 @@ function refreshBuildList(lastViewedBuild) {
 }
 
 // Helper text examples
+function slugify(text) {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
 function createExample(example) {
   let formattedHTML;
 
   if (example.image) {
+    const id = slugify(example.title);
     return `
-    <div class="example-block">
+    <div class="example-block" id="${id}">
       <h4 class="example-subtitle">${example.title}</h4>
       <div class="example-flex">
         <img src="${example.image}" alt="${example.title} example" class="example-image" />
@@ -370,8 +378,9 @@ function createExample(example) {
   }
 
   // Return the complete example block with subtitle and description
+  const id = slugify(example.title);
   return `
-  <div class="example-block">
+  <div class="example-block" id="${id}">
     <h4 class="example-subtitle">${example.title}</h4>
     <div class="example-flex">
       <div class="example-left">
@@ -464,30 +473,35 @@ export function showBuildOrderHelpModal() {
     },
   ];
 
-  const manualHTML = ` 
-    <p>You can enter build steps like this:</p>
-    <ul>
-      <li><strong>Supply/Time Column:</strong> Writing inside brackets like <code>[12]</code> or <code>[01:23]</code> will show up in the left column.</li>
-      <li><strong>Quick Typing:</strong> Pressing <kbd>Enter</kbd> while inside brackets automatically moves the cursor outside for faster typing.</li>
-      <li><strong>Abbreviations:</strong> Short forms like <code>RW</code> or <code>cc</code> are automatically expanded to their full terms.</li>
-      <li><strong>Done Formatting:</strong> Writing <code>100%</code>, <code>@100%</code>, or <code>@100</code> will format the next action to show it’s completed.</li>
-      <li><strong>Progress Formatting:</strong> Typing <code>40%</code> (or any percent) will format the next action as being in progress.</li>
-      <li><strong>Map Markers:</strong> Writing <code>pos1</code> to <code>pos9</code> inserts indicators to highlight locations on the map (like expansion order).</li>
-      <li><strong>Resources:</strong> Writing <code>100 gas</code> or <code>150 minerals</code> will format and show icons. The number can be anything.</li>
+  const tocHTML = `
+    <ul class="helper-toc">
+      ${examples
+        .map(
+          (ex) =>
+            `<li><a href="#" class="toc-link" data-target="${slugify(ex.title)}">${ex.title}</a></li>`
+        )
+        .join("")}
+      <li><a href="#" class="toc-link" data-target="abbr-ref">Abbreviations Reference</a></li>
     </ul>
   `;
 
-  const abbreviationGridHTML = ` 
-    <h4>Abbreviations Reference:</h4>
+  const abbreviationGridHTML = `
+    <h4 id="abbr-ref">Abbreviations Reference:</h4>
     ${generateAbbrSection("Structures", abbreviationMap.Structures)}
     ${generateAbbrSection("Units", abbreviationMap.Units)}
     ${generateAbbrSection("Upgrades", abbreviationMap.Upgrades)}
-        <hr />
-    <h4>Examples:</h4>
   `;
 
   contentDiv.innerHTML =
-    manualHTML + abbreviationGridHTML + examples.map(createExample).join("");
+    tocHTML + examples.map(createExample).join("") + abbreviationGridHTML;
+
+  contentDiv.querySelectorAll(".toc-link").forEach((link) => {
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      const target = contentDiv.querySelector(`#${link.dataset.target}`);
+      if (target) target.scrollIntoView({ behavior: "smooth" });
+    });
+  });
 
   modal.style.display = "block";
 }

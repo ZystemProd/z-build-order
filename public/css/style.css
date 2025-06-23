@@ -3247,6 +3247,22 @@ td {
   margin-bottom: 50px;
 }
 
+.helper-toc {
+  list-style: none;
+  padding-left: 20px;
+  margin-bottom: 20px;
+}
+
+.helper-toc li {
+  margin-bottom: 5px;
+}
+
+.helper-toc a {
+  color: #6ba8ff;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
 .example-input {
   background-color: #222;
   padding: 10px;
