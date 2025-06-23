@@ -4450,6 +4450,12 @@ button.btn-small {
     position: relative;
   }
 
+  /* Slightly reduce meta-chip and publish-info size */
+  .meta-chip,
+  .build-publish-info {
+    font-size: 0.85em;
+  }
+
   .tag.public::after {
     content: "P";
     font-size: 0.7rem;
