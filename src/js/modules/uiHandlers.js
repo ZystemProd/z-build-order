@@ -319,6 +319,21 @@ function refreshBuildList(lastViewedBuild) {
 function createExample(example) {
   let formattedHTML;
 
+  if (example.image) {
+    return `
+    <div class="example-block">
+      <h4 class="example-subtitle">${example.title}</h4>
+      <div class="example-flex">
+        <img src="${example.image}" alt="${example.title} example" class="example-image" />
+        <div class="example-right">
+          <p class="example-description"><em>${example.description}</em></p>
+        </div>
+      </div>
+    </div>
+    <hr />
+    `;
+  }
+
   // Handle the special case for Time/Worker Supply Format
   if (example.title === "Time/Worker Supply Format") {
     const timeInput = example.inputTime || ""; // Default to empty string if undefined
@@ -443,9 +458,9 @@ export function showBuildOrderHelpModal() {
     },
     {
       title: "Quick Typing",
-      input: "[12]\nOverlord",
+      image: "./img/info/quick_typing.webp",
       description:
-        "Press <kbd>Enter</kbd> while inside brackets to automatically move the cursor outside for faster typing.",
+        "Press <kbd>Enter</kbd> while inside the brackets to automatically jump outside and continue typing the action.",
     },
   ];
 
