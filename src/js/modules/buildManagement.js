@@ -9,9 +9,9 @@ import {
   query,
   where,
   orderBy,
-} from "firebase/firestore";
+} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 
-import { getAuth } from "firebase/auth";
+import { getAuth } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
 import { db, auth } from "../../app.js";
 import {
   getSavedBuilds,

@@ -11,9 +11,9 @@ import {
   orderBy,
   limit,
   startAfter,
-} from "firebase/firestore";
-import { getAuth } from "firebase/auth";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-storage.js";
 import { auth, db } from "../../app.js";
 import { showToast } from "./toastHandler.js";
 import { updateYouTubeEmbed, clearYouTubeEmbed } from "./youtube.js";

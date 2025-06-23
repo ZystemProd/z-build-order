@@ -9,7 +9,7 @@ import {
   query,
   where,
   Timestamp,
-} from "firebase/firestore";
+} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { auth, db } from "../../../app.js";
 import DOMPurify from "dompurify";
 import {

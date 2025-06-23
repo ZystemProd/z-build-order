@@ -14,7 +14,7 @@ import {
   updateDoc,
   increment,
   startAfter,
-} from "firebase/firestore";
+} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { formatActionText } from "./textFormatters.js";
 import { showToast } from "./toastHandler.js";
 import { formatMatchup, formatShortDate } from "./modal.js";
@@ -543,8 +543,8 @@ export async function publishBuildToCommunity(buildId) {
 
 window.publishBuildToCommunity = async function (buildId) {
   const { getFirestore, doc, getDoc, collection, addDoc, setDoc } =
-    await import("firebase/firestore");
-  const { getAuth } = await import("firebase/auth");
+    await import("https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js");
+  const { getAuth } = await import("https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js");
 
   const db = getFirestore();
   const auth = getAuth();
