@@ -10,8 +10,8 @@ import {
   arrayUnion,
   arrayRemove,
   deleteDoc,
-} from "firebase/firestore";
-import { getAuth } from "firebase/auth";
+} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
 import {
   getStorage,
   ref,
@@ -19,8 +19,8 @@ import {
   getDownloadURL,
   deleteObject,
   ref as storageRef,
-} from "firebase/storage";
-import { initializeApp } from "firebase/app";
+} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-storage.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
 import { createNotificationDot } from "./uiHandlers.js";
 import { showToast } from "./toastHandler.js";
 import { db } from "../../app.js";

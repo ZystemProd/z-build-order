@@ -1,4 +1,4 @@
-import { getAnalytics, logEvent } from "firebase/analytics";
+import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-analytics.js";
 
 let analyticsInstance = null;
 
