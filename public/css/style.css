@@ -2828,13 +2828,15 @@ td {
 
 /* Common link styling */
 #legalNoticeLink,
-#discordLink {
+#discordLink,
+#patreonLink {
   color: #ffcc00;
   text-decoration: none;
 }
 
 #legalNoticeLink:hover,
-#discordLink:hover {
+#discordLink:hover,
+#patreonLink:hover {
   text-decoration: underline;
 }
 
