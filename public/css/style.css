@@ -4918,3 +4918,11 @@ optgroup[label="Terran"] {
   font-weight: bold;
   color: #f0a500;
 }
+
+.popular-build {
+  display: inline-block;
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
