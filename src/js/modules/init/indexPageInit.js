@@ -64,6 +64,7 @@ import {
   renderCreateClanUI,
   renderChooseManageClanUI,
   renderFindClanUI,
+  getUserClans,
 } from "../clan.js";
 import {
   MapAnnotations,
@@ -96,6 +97,8 @@ import {
   isBuildInputShown,
   setBuildInputShown,
   loadUserSettings,
+  getMainClanId,
+  setMainClanId,
 } from "../settings.js";
 import { checkForJoinRequestNotifications } from "../utils/notificationHelpers.js";
 import { logAnalyticsEvent } from "../analyticsHelper.js";
@@ -122,6 +125,26 @@ function updateBuildInputPlaceholder() {
   textarea.placeholder = isBracketInputEnabled()
     ? "[12] Spawning Pool"
     : "Spawning Pool";
+}
+
+async function populateMainClanDropdown() {
+  const select = document.getElementById("mainClanSelect");
+  if (!select) return;
+  const user = auth.currentUser;
+  if (!user) return;
+  select.innerHTML = "";
+  const clans = await getUserClans(user.uid);
+  const noneOpt = document.createElement("option");
+  noneOpt.value = "";
+  noneOpt.textContent = "None";
+  select.appendChild(noneOpt);
+  clans.forEach((c) => {
+    const opt = document.createElement("option");
+    opt.value = c.id;
+    opt.textContent = c.name;
+    select.appendChild(opt);
+  });
+  select.value = getMainClanId();
 }
 
 setupTemplateModal(); // Always call early
@@ -348,6 +371,7 @@ export async function initializeIndexPage() {
       await checkForJoinRequestNotifications();
       initializeUserData(user);
       await loadUserSettings();
+      await populateMainClanDropdown();
       const builds = await fetchUserBuilds();
       setSavedBuilds(builds);
       saveSavedBuildsToLocalStorage();
@@ -776,6 +800,13 @@ export async function initializeIndexPage() {
     });
   }
 
+  const mainClanSelect = document.getElementById("mainClanSelect");
+  if (mainClanSelect) {
+    mainClanSelect.addEventListener("change", () => {
+      setMainClanId(mainClanSelect.value);
+    });
+  }
+
   safeAdd("closePrivacyModal", "click", () => {
     const modal = document.getElementById("privacyModal");
     if (modal) modal.style.display = "none";
@@ -998,6 +1029,7 @@ export async function initializeIndexPage() {
       modal.style.display = "block";
       const toggle = document.getElementById("bracketInputToggle");
       if (toggle) toggle.checked = isBracketInputEnabled();
+      populateMainClanDropdown();
     }
   });
 
