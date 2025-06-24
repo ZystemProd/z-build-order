@@ -59,7 +59,7 @@ import {
   searchCommunityBuilds,
   filterCommunityBuilds,
 } from "../community.js";
-import { resetBuildInputs } from "../utils.js";
+import { resetBuildInputs, enableSaveButton } from "../utils.js";
 import {
   renderCreateClanUI,
   renderChooseManageClanUI,
@@ -1478,6 +1478,7 @@ export async function initializeIndexPage() {
           if (mapPreviewImage) mapPreviewImage.src = mapImageSrc;
           if (selectedMapText) selectedMapText.innerText = mapName;
 
+          enableSaveButton();
           mapModal.style.display = "none";
         }
       });
