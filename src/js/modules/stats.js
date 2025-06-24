@@ -6,6 +6,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { auth, db } from "../../app.js";
 import { showToast } from "./toastHandler.js";
+import { updateTooltips } from "./tooltip.js";
 
 export async function fetchUserStats() {
   const user = auth.currentUser;
@@ -74,6 +75,7 @@ export async function showUserStats() {
   if (!stats) return;
 
   const popularTitleDisplay = stats.totalPublished ? stats.mostPopularTitle : "N/A";
+  const tooltipAttr = stats.totalPublished ? ` data-tooltip="${stats.mostPopularTitle}"` : "";
 
   contentEl.innerHTML = `
     <ul class="stats-list">
@@ -82,9 +84,10 @@ export async function showUserStats() {
       <li class="section-break"><span class="stat-label">Total Imported Builds</span><span class="stat-value">${stats.totalImported}</span></li>
       <li><span class="stat-label">Total Views on Published Builds</span><span class="stat-value">${stats.totalViews}</span></li>
       <li><span class="stat-label">Total Upvotes on Published Builds</span><span class="stat-value">${stats.totalUpvotes}</span></li>
-      <li><span class="stat-label">Most Popular Build</span><span class="stat-value">${popularTitleDisplay}</span></li>
+      <li><span class="stat-label">Most Popular Build</span><span class="stat-value popular-build"${tooltipAttr}>${popularTitleDisplay}</span></li>
     </ul>
   `;
+  updateTooltips();
 }
 
 export function closeUserStats() {
