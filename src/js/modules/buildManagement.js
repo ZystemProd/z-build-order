@@ -155,8 +155,16 @@ export async function saveCurrentBuild() {
     // optionally keep the default "No map selected"
   }
 
-  let mapFolder = "current";
-  if (mapImage?.src) {
+  if (
+    !mapImage?.src ||
+    mapName.toLowerCase() === "index" ||
+    mapName.toLowerCase() === "no map selected"
+  ) {
+    mapName = "";
+  }
+
+  let mapFolder = mapName ? "current" : "";
+  if (mapImage?.src && mapName) {
     try {
       const url = new URL(mapImage.src);
       const folderMatch = url.pathname.match(/\/maps\/([^/]+)\//);

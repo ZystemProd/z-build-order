@@ -226,11 +226,16 @@ async function loadBuild() {
     const mapImage = document.getElementById("map-preview-image");
     const selectedMapText = document.getElementById("selected-map-text");
 
+    const mapName = (build.map || "").trim();
+    const isValidMap =
+      mapName &&
+      mapName.toLowerCase() !== "index" &&
+      mapName.toLowerCase() !== "no map selected";
+
     let mapExists = false;
     // Map display for view-only
     if (mapImage) {
-      if (build.map) {
-        const mapName = build.map;
+      if (isValidMap) {
         let mapPath = "";
         try {
           const response = await fetch("/data/maps.json");
@@ -260,7 +265,7 @@ async function loadBuild() {
     }
 
     if (selectedMapText) {
-      selectedMapText.innerText = build.map && mapExists ? build.map : "";
+      selectedMapText.innerText = isValidMap && mapExists ? mapName : "";
     }
 
     const mapContainerWrapper = document.getElementById("map-container");

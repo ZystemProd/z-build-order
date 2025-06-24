@@ -371,7 +371,7 @@ export async function viewBuild(buildId) {
         if (arrowIcon) arrowIcon.classList.add("open");
       }
     } else {
-      if (mapImage) mapImage.src = "";
+      if (mapImage) mapImage.removeAttribute("src");
       if (selectedMapText) selectedMapText.innerText = "No map selected";
     }
 
