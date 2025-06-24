@@ -16,7 +16,6 @@ import {
   getStorage,
   ref,
   uploadBytes,
-  getDownloadURL,
   deleteObject,
   ref as storageRef,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-storage.js";

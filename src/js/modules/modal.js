@@ -234,8 +234,8 @@ async function uploadReplayFile(file) {
   const uniqueFileName = `replays/${timestamp}_${file.name}`; // Avoid overwriting files
   const storageRef = ref(storage, uniqueFileName);
   await uploadBytes(storageRef, file);
-  const downloadURL = await getDownloadURL(storageRef);
-  return downloadURL;
+  // Return manual URL to avoid firebase default domain
+  return `https://z-build-order.firebasestorage.app/${uniqueFileName}`;
 }
 
 export async function deleteBuildFromFirestore(buildId) {
