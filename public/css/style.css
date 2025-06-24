@@ -2829,14 +2829,16 @@ td {
 /* Common link styling */
 #legalNoticeLink,
 #discordLink,
-#patreonLink {
+#patreonLink,
+#supportersLink {
   color: #ffcc00;
   text-decoration: none;
 }
 
 #legalNoticeLink:hover,
 #discordLink:hover,
-#patreonLink:hover {
+#patreonLink:hover,
+#supportersLink:hover {
   text-decoration: underline;
 }
 
