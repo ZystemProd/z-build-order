@@ -987,7 +987,6 @@ export async function initializeIndexPage() {
   // --- Load Community Builds
   document.addEventListener("DOMContentLoaded", async () => {
     await populateCommunityBuilds();
-    await populateBuildsModal();
   });
 
   // This will load the necessary user data after successful authentication

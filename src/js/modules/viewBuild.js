@@ -92,8 +92,8 @@ async function incrementBuildViews(buildId) {
 }
 
 async function loadBuild() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const buildId = urlParams.get("id");
+  const pathParts = window.location.pathname.split("/");
+  const buildId = pathParts[2]; // because URL is /build/abc123
 
   if (!buildId) {
     document.getElementById("buildTitle").innerText = "Build not found.";
@@ -276,7 +276,9 @@ async function loadBuild() {
     // Ensure additional section is visible before rendering annotations
     if (mapExists) {
       const secondRow = document.getElementById("secondRow");
-      const secondRowHeader = document.querySelector('[data-section="secondRow"]');
+      const secondRowHeader = document.querySelector(
+        '[data-section="secondRow"]'
+      );
       if (secondRow) {
         secondRow.classList.remove("hidden");
         secondRow.classList.add("visible");
@@ -317,7 +319,10 @@ async function loadBuild() {
 
       const renderAnnotations = () => {
         // 🔥 Load saved circles
-        if (build.interactiveMap && Array.isArray(build.interactiveMap.circles)) {
+        if (
+          build.interactiveMap &&
+          Array.isArray(build.interactiveMap.circles)
+        ) {
           build.interactiveMap.circles.forEach((circle) => {
             if (circle.x !== undefined && circle.y !== undefined) {
               viewMapAnnotations.createCircle(circle.x, circle.y);
@@ -336,7 +341,10 @@ async function loadBuild() {
         }
 
         // 🔥 Load saved arrows
-        if (build.interactiveMap && Array.isArray(build.interactiveMap.arrows)) {
+        if (
+          build.interactiveMap &&
+          Array.isArray(build.interactiveMap.arrows)
+        ) {
           build.interactiveMap.arrows.forEach((arrow) => {
             if (
               arrow.startX !== undefined &&
@@ -370,18 +378,27 @@ async function loadBuild() {
         mapImage.addEventListener("load", renderAnnotations, { once: true });
       }
     }
-    const additionalHeader = document.getElementById("additionalSettingsHeader");
+    const additionalHeader = document.getElementById(
+      "additionalSettingsHeader"
+    );
     const mainLayout = document.querySelector(".main-layout");
     if (additionalHeader || mainLayout) {
-      const commentVisible = commentElement && commentElement.style.display !== "none";
-      const videoVisible = youtubeEmbed && youtubeEmbed.style.display !== "none";
-      const mapVisible = mapContainerWrapper && mapContainerWrapper.style.display !== "none";
-      const replayVisible = replayWrapper && replayWrapper.style.display !== "none";
+      const commentVisible =
+        commentElement && commentElement.style.display !== "none";
+      const videoVisible =
+        youtubeEmbed && youtubeEmbed.style.display !== "none";
+      const mapVisible =
+        mapContainerWrapper && mapContainerWrapper.style.display !== "none";
+      const replayVisible =
+        replayWrapper && replayWrapper.style.display !== "none";
 
-      const anyVisible = commentVisible || videoVisible || mapVisible || replayVisible;
+      const anyVisible =
+        commentVisible || videoVisible || mapVisible || replayVisible;
 
       const secondRow = document.getElementById("secondRow");
-      const secondRowHeader = document.querySelector('[data-section="secondRow"]');
+      const secondRowHeader = document.querySelector(
+        '[data-section="secondRow"]'
+      );
       if (secondRow) {
         if (anyVisible) {
           secondRow.classList.remove("hidden");
@@ -429,6 +446,7 @@ async function loadBuild() {
     });
   });
 
+  injectSchemaMarkup(build);
   // ✅ Initial icon + count state
   updateVoteButtonIcons(buildId);
 }
@@ -580,8 +598,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Don't show the button until we know the status
       importBtn.style.display = "none";
 
-      const urlParams = new URLSearchParams(window.location.search);
-      const buildId = urlParams.get("id");
+      const pathParts = window.location.pathname.split("/");
+      const buildId = pathParts[2]; // because URL is /build/abc123
       if (!buildId) return;
 
       const buildRef = doc(db, "publishedBuilds", buildId);
@@ -624,6 +642,48 @@ document.addEventListener("DOMContentLoaded", async () => {
     annotationsContainer.style.pointerEvents = "none"; // 🔥 Disable interaction
   }
 });
+
+function injectSchemaMarkup(build) {
+  const steps = (build.buildOrder || []).map((step) => {
+    const bracket = step.workersOrTimestamp
+      ? `[${step.workersOrTimestamp}]`
+      : "";
+    const action = typeof step === "string" ? step : step.action || "";
+    return {
+      "@type": "HowToStep",
+      text: `${bracket} ${action}`.trim(),
+    };
+  });
+
+  const schema = {
+    "@context": "https://schema.org/",
+    "@type": "HowTo",
+    name: build.title || "StarCraft 2 Build Order",
+    author: {
+      "@type": "Person",
+      name: build.username || "Unknown",
+    },
+    datePublished: build.datePublished
+      ? new Date(build.datePublished).toISOString().split("T")[0]
+      : new Date().toISOString().split("T")[0],
+    description: `StarCraft 2 build order for ${
+      build.subcategory || "Unknown"
+    } matchup.`,
+    step: steps,
+  };
+
+  // Remove existing schema if present
+  const oldSchema = document.querySelector(
+    'script[type="application/ld+json"]'
+  );
+  if (oldSchema) oldSchema.remove();
+
+  // Inject new schema
+  const script = document.createElement("script");
+  script.type = "application/ld+json";
+  script.textContent = JSON.stringify(schema, null, 2);
+  document.head.appendChild(script);
+}
 
 window.addEventListener("popstate", () => {
   loadBuild();

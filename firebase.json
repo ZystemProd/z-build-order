@@ -16,6 +16,12 @@
           }
         ]
       }
+    ],
+    "rewrites": [
+      {
+        "source": "/build/**",
+        "destination": "/viewBuild.html"
+      }
     ]
   },
   "emulators": {

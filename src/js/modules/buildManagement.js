@@ -187,9 +187,7 @@ export async function saveCurrentBuild() {
   saveSavedBuildsToLocalStorage();
   const lower = title.toLowerCase();
   if (
-    existingBuilds.some(
-      (b) => !b.imported && b.title.toLowerCase() === lower
-    )
+    existingBuilds.some((b) => !b.imported && b.title.toLowerCase() === lower)
   ) {
     showToast("A build with this title already exists.", "error");
     highlightField(titleInput);
@@ -321,8 +319,8 @@ export async function loadBuildAnnotations(buildId) {
         mapAnnotations.createArrow(startX, startY, endX, endY)
       );
 
-      const clearBtn = document.querySelector('.clear-annotations-button');
-      if (clearBtn) clearBtn.style.display = 'inline-block';
+      const clearBtn = document.querySelector(".clear-annotations-button");
+      if (clearBtn) clearBtn.style.display = "inline-block";
     }
   } else {
     console.error("Build not found!");
@@ -416,48 +414,6 @@ export async function updateBuildFavorite(buildId, favorite) {
   await updateDoc(buildRef, { favorite });
 }
 
-function getYouTubeVideoID(url) {
-  const regex =
-    /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
-  const match = url.match(regex);
-  return match ? match[1] : null;
-}
-
-export async function populateBuildsModal() {
-  const auth = getAuth();
-  if (!auth.currentUser) return;
-
-  const userId = auth.currentUser.uid;
-  const buildsRef = collection(getFirestore(), `users/${userId}/builds`);
-  const snapshot = await getDocs(buildsRef);
-
-  const tableBody = document.getElementById("buildList");
-  if (!tableBody) return;
-
-  tableBody.innerHTML = ""; // Clear existing builds
-
-  snapshot.docs.forEach((doc) => {
-    const build = doc.data();
-    const row = document.createElement("tr");
-    row.innerHTML = `
-      <td>${build.title}</td>
-      <td>${build.category}</td>
-      <td>${
-        build.timestamp ? new Date(build.timestamp).toLocaleString() : "Unknown"
-      }</td>
-      <td>
-        <button class="view-build-button" data-id="${doc.id}">🔍 View</button>
-      </td>
-    `;
-    tableBody.appendChild(row);
-  });
-
-  console.log("✅ User's builds updated in modal.");
-}
-
-/**
- * Load builds shared to the user's clan
- */
 export async function loadClanBuilds() {
   const user = auth.currentUser;
   if (!user) return [];

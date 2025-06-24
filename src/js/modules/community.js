@@ -155,34 +155,34 @@ async function fetchNextCommunityBuilds(batchSize = 20) {
       const upvotes = data.upvotes || 0;
       const downvotes = data.downvotes || 0;
 
-    let datePublishedRaw = now;
-    let datePublished = "Unknown";
+      let datePublishedRaw = now;
+      let datePublished = "Unknown";
 
-    try {
-      let timestampValue = data.datePublished;
+      try {
+        let timestampValue = data.datePublished;
 
-      // Handle Firestore Timestamp object
-      if (timestampValue && typeof timestampValue.toMillis === "function") {
-        timestampValue = timestampValue.toMillis();
-      }
-
-      // Handle numeric timestamp
-      if (typeof timestampValue === "number") {
-        const parsedDate = new Date(timestampValue);
-        if (!isNaN(parsedDate.getTime())) {
-          datePublishedRaw = timestampValue;
-          datePublished = formatShortDate(parsedDate);
+        // Handle Firestore Timestamp object
+        if (timestampValue && typeof timestampValue.toMillis === "function") {
+          timestampValue = timestampValue.toMillis();
         }
+
+        // Handle numeric timestamp
+        if (typeof timestampValue === "number") {
+          const parsedDate = new Date(timestampValue);
+          if (!isNaN(parsedDate.getTime())) {
+            datePublishedRaw = timestampValue;
+            datePublished = formatShortDate(parsedDate);
+          }
+        }
+      } catch (err) {
+        console.warn("❌ Failed to parse datePublished:", data.datePublished);
       }
-    } catch (err) {
-      console.warn("❌ Failed to parse datePublished:", data.datePublished);
-    }
 
-    const ageInHours = (now - datePublishedRaw) / (1000 * 60 * 60);
-    const gravity = 1.5;
+      const ageInHours = (now - datePublishedRaw) / (1000 * 60 * 60);
+      const gravity = 1.5;
 
-    const hotnessScore =
-      (upvotes - downvotes) / Math.pow(ageInHours + 2, gravity);
+      const hotnessScore =
+        (upvotes - downvotes) / Math.pow(ageInHours + 2, gravity);
 
       const publisherClan = await getPublisherClanInfo(data.publisherId);
       return {
@@ -190,15 +190,15 @@ async function fetchNextCommunityBuilds(batchSize = 20) {
         title: data.title || "Untitled Build",
         publisher: data.username || "Anonymous",
         matchup: formatMatchup(data.subcategory),
-      category: data.category || "Unknown",
-      subcategory: data.subcategory || "Unknown",
-      datePublishedRaw,
-      datePublished,
-      views: data.views || 0,
-      upvotes,
-      downvotes,
-      userVotes: data.userVotes || {},
-      buildOrder: data.buildOrder || [],
+        category: data.category || "Unknown",
+        subcategory: data.subcategory || "Unknown",
+        datePublishedRaw,
+        datePublished,
+        views: data.views || 0,
+        upvotes,
+        downvotes,
+        userVotes: data.userVotes || {},
+        buildOrder: data.buildOrder || [],
         hotnessScore,
         publisherClan,
       };
@@ -570,8 +570,12 @@ export async function publishBuildToCommunity(buildId) {
 
 window.publishBuildToCommunity = async function (buildId) {
   const { getFirestore, doc, getDoc, collection, addDoc, setDoc } =
-    await import("https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js");
-  const { getAuth } = await import("https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js");
+    await import(
+      "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js"
+    );
+  const { getAuth } = await import(
+    "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js"
+  );
 
   const db = getFirestore();
   const auth = getAuth();
@@ -841,15 +845,20 @@ function renderCommunityBuildBatch(builds) {
 
     buildEntry.addEventListener("click", async () => {
       await incrementBuildViews(db, build.id);
-      window.location.href = `viewBuild.html?id=${build.id}`;
+      window.location.href = `/build/${build.id}`;
     });
 
     buildEntry.addEventListener("mouseover", () => showBuildPreview(build));
 
     const clanChip =
       localStorage.getItem("communityBuildType") === "clan" && build.clanInfo
-        ? `<span class="meta-chip clan-chip"><img src="${build.clanInfo.logoUrl ||
-            './img/clan/logo.webp'}" alt="${build.clanInfo.name}" class="meta-icon" style="width:16px;height:16px;">${DOMPurify.sanitize(build.clanInfo.name)}</span>`
+        ? `<span class="meta-chip clan-chip"><img src="${
+            build.clanInfo.logoUrl || "./img/clan/logo.webp"
+          }" alt="${
+            build.clanInfo.name
+          }" class="meta-icon" style="width:16px;height:16px;">${DOMPurify.sanitize(
+            build.clanInfo.name
+          )}</span>`
         : "";
 
     buildEntry.innerHTML = `
@@ -863,7 +872,7 @@ function renderCommunityBuildBatch(builds) {
           ${clanChip}
           <span class="meta-chip publisher-chip">
             <img src="${
-              build.publisherClan?.logoUrl || './img/SVG/user-svgrepo-com.svg'
+              build.publisherClan?.logoUrl || "./img/SVG/user-svgrepo-com.svg"
             }" alt="Publisher" class="meta-icon" style="width:16px;height:16px;">
             ${DOMPurify.sanitize(build.publisher)}
           </span>
@@ -885,11 +894,11 @@ function renderCommunityBuildBatch(builds) {
 
     container.appendChild(buildEntry);
 
-    const publisherChip = buildEntry.querySelector('.publisher-chip');
+    const publisherChip = buildEntry.querySelector(".publisher-chip");
     if (publisherChip) {
-      publisherChip.addEventListener('click', (ev) => {
+      publisherChip.addEventListener("click", (ev) => {
         ev.stopPropagation();
-        const searchInput = document.getElementById('communitySearchBar');
+        const searchInput = document.getElementById("communitySearchBar");
         if (searchInput) searchInput.value = build.publisher;
         searchCommunityBuilds(build.publisher);
       });
@@ -977,26 +986,26 @@ export async function filterCommunityBuilds(filter = "all") {
       snap.docs.map(async (doc) => {
         const data = doc.data();
 
-      let datePublishedRaw = Date.now();
-      let datePublished = "Unknown";
+        let datePublishedRaw = Date.now();
+        let datePublished = "Unknown";
 
-      try {
-        let timestampValue = data.datePublished;
+        try {
+          let timestampValue = data.datePublished;
 
-        if (timestampValue && typeof timestampValue.toMillis === "function") {
-          timestampValue = timestampValue.toMillis();
-        }
-
-        if (typeof timestampValue === "number") {
-          const parsed = new Date(timestampValue);
-          if (!isNaN(parsed.getTime())) {
-            datePublishedRaw = timestampValue;
-            datePublished = formatShortDate(parsed);
+          if (timestampValue && typeof timestampValue.toMillis === "function") {
+            timestampValue = timestampValue.toMillis();
           }
+
+          if (typeof timestampValue === "number") {
+            const parsed = new Date(timestampValue);
+            if (!isNaN(parsed.getTime())) {
+              datePublishedRaw = timestampValue;
+              datePublished = formatShortDate(parsed);
+            }
+          }
+        } catch (err) {
+          console.warn("❌ Failed to parse datePublished:", data.datePublished);
         }
-      } catch (err) {
-        console.warn("❌ Failed to parse datePublished:", data.datePublished);
-      }
 
         const clanId = (data.sharedToClans || []).find((id) => userClanMap[id]);
         const clanInfo = clanId ? userClanMap[clanId] : null;

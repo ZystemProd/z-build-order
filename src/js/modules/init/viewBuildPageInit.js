@@ -2,7 +2,12 @@ import { auth, db } from "../../../app.js";
 import { safeAdd } from "../helpers/sharedEventUtils.js";
 import { initializeSectionToggles } from "../uiHandlers.js";
 // Import Firestore methods from local Firebase SDK
-import { doc, getDoc, setDoc, collection } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+import {
+  doc,
+  getDoc,
+  setDoc,
+  collection,
+} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { populateBuildsModal } from "../buildManagement.js";
 import { logAnalyticsEvent } from "../analyticsHelper.js";
 
@@ -15,8 +20,8 @@ export function initializeViewBuildPage() {
 }
 
 async function importBuildHandler() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const buildId = urlParams.get("id");
+  const pathParts = window.location.pathname.split("/");
+  const buildId = pathParts[2]; // because URL is /build/abc123
 
   if (!buildId) {
     alert("Build ID not found.");
@@ -62,7 +67,6 @@ async function importBuildHandler() {
     document.getElementById("importBuildButton").textContent = "Imported";
 
     alert("✅ Build imported successfully!");
-    populateBuildsModal();
   } catch (error) {
     console.error(error);
     alert("❌ Failed to import build.");
