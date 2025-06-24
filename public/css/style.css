@@ -2957,6 +2957,10 @@ td {
   scrollbar-color: #444 #222; /* Firefox */
 }
 
+#communityBuildsContainer .build-entry {
+  padding-left: 20px;
+}
+
 #buildCount {
   position: absolute;
   top: 0;
