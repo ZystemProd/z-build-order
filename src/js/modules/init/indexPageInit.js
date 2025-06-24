@@ -819,6 +819,23 @@ export async function initializeIndexPage() {
     }
   });
 
+  safeAdd("supportersLink", "click", () => {
+    const modal = document.getElementById("supportersModal");
+    if (modal) modal.style.display = "block";
+  });
+
+  safeAdd("closeSupportersModal", "click", () => {
+    const modal = document.getElementById("supportersModal");
+    if (modal) modal.style.display = "none";
+  });
+
+  window.addEventListener("mousedown", (event) => {
+    const modal = document.getElementById("supportersModal");
+    if (modal && event.target === modal) {
+      modal.style.display = "none";
+    }
+  });
+
   window.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       const openModals = document.querySelectorAll(".modal");
