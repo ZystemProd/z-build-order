@@ -23,7 +23,8 @@ export async function fetchUserStats() {
     // Published builds
     const pubQuery = query(
       collection(db, "publishedBuilds"),
-      where("publisherUid", "==", user.uid)
+      // publisherId is the field set when publishing a build
+      where("publisherId", "==", user.uid)
     );
     const pubSnap = await getDocs(pubQuery);
 
