@@ -31,6 +31,29 @@ let lastVisibleDoc = null;
 let isLoadingMoreBuilds = false;
 let hasMoreBuilds = true;
 
+const publisherClanCache = {};
+async function getPublisherClanInfo(uid) {
+  if (uid in publisherClanCache) return publisherClanCache[uid];
+  try {
+    const userSnap = await getDoc(doc(db, "users", uid));
+    const clanId = userSnap.exists()
+      ? userSnap.data().settings?.mainClanId
+      : null;
+    if (clanId) {
+      const clanSnap = await getDoc(doc(db, "clans", clanId));
+      if (clanSnap.exists()) {
+        const info = { id: clanId, ...clanSnap.data() };
+        publisherClanCache[uid] = info;
+        return info;
+      }
+    }
+  } catch (e) {
+    console.error("Failed to fetch clan info", e);
+  }
+  publisherClanCache[uid] = null;
+  return null;
+}
+
 async function getUserClansMap() {
   const map = {};
   const user = auth.currentUser;
@@ -126,10 +149,11 @@ async function fetchNextCommunityBuilds(batchSize = 20) {
 
   const now = Date.now();
 
-  const builds = docs.map((doc) => {
-    const data = doc.data();
-    const upvotes = data.upvotes || 0;
-    const downvotes = data.downvotes || 0;
+  const builds = await Promise.all(
+    docs.map(async (doc) => {
+      const data = doc.data();
+      const upvotes = data.upvotes || 0;
+      const downvotes = data.downvotes || 0;
 
     let datePublishedRaw = now;
     let datePublished = "Unknown";
@@ -160,11 +184,12 @@ async function fetchNextCommunityBuilds(batchSize = 20) {
     const hotnessScore =
       (upvotes - downvotes) / Math.pow(ageInHours + 2, gravity);
 
-    return {
-      id: doc.id,
-      title: data.title || "Untitled Build",
-      publisher: data.username || "Anonymous",
-      matchup: formatMatchup(data.subcategory),
+      const publisherClan = await getPublisherClanInfo(data.publisherId);
+      return {
+        id: doc.id,
+        title: data.title || "Untitled Build",
+        publisher: data.username || "Anonymous",
+        matchup: formatMatchup(data.subcategory),
       category: data.category || "Unknown",
       subcategory: data.subcategory || "Unknown",
       datePublishedRaw,
@@ -174,9 +199,11 @@ async function fetchNextCommunityBuilds(batchSize = 20) {
       downvotes,
       userVotes: data.userVotes || {},
       buildOrder: data.buildOrder || [],
-      hotnessScore,
-    };
-  });
+        hotnessScore,
+        publisherClan,
+      };
+    })
+  );
 
   // ✅ Sort after fetch (client-side sort only)
   if (sortMode === "top") {
@@ -835,7 +862,9 @@ function renderCommunityBuildBatch(builds) {
           <span class="meta-chip matchup-chip">${formatMatchup(matchup)}</span>
           ${clanChip}
           <span class="meta-chip publisher-chip">
-            <img src="./img/SVG/user-svgrepo-com.svg" alt="Publisher" class="meta-icon">
+            <img src="${
+              build.publisherClan?.logoUrl || './img/SVG/user-svgrepo-com.svg'
+            }" alt="Publisher" class="meta-icon" style="width:16px;height:16px;">
             ${DOMPurify.sanitize(build.publisher)}
           </span>
           <span class="meta-chip">
@@ -944,8 +973,9 @@ export async function filterCommunityBuilds(filter = "all") {
   try {
     const snap = await getDocs(q);
 
-    const builds = snap.docs.map((doc) => {
-      const data = doc.data();
+    const builds = await Promise.all(
+      snap.docs.map(async (doc) => {
+        const data = doc.data();
 
       let datePublishedRaw = Date.now();
       let datePublished = "Unknown";
@@ -968,22 +998,25 @@ export async function filterCommunityBuilds(filter = "all") {
         console.warn("❌ Failed to parse datePublished:", data.datePublished);
       }
 
-      const clanId = (data.sharedToClans || []).find((id) => userClanMap[id]);
-      const clanInfo = clanId ? userClanMap[clanId] : null;
+        const clanId = (data.sharedToClans || []).find((id) => userClanMap[id]);
+        const clanInfo = clanId ? userClanMap[clanId] : null;
+        const publisherClan = await getPublisherClanInfo(data.publisherId);
 
-      return {
-        id: doc.id,
-        ...data,
-        matchup: formatMatchup(
-          data.subcategoryLowercase || data.subcategory || ""
-        ),
-        datePublished,
-        views: data.views || 0,
-        upvotes: data.upvotes || 0,
-        downvotes: data.downvotes || 0,
-        clanInfo,
-      };
-    });
+        return {
+          id: doc.id,
+          ...data,
+          matchup: formatMatchup(
+            data.subcategoryLowercase || data.subcategory || ""
+          ),
+          datePublished,
+          views: data.views || 0,
+          upvotes: data.upvotes || 0,
+          downvotes: data.downvotes || 0,
+          clanInfo,
+          publisherClan,
+        };
+      })
+    );
 
     renderCommunityBuildBatch(builds);
 

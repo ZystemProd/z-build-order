@@ -35,6 +35,8 @@ import {
 import { setSavedBuilds } from "./buildStorage.js";
 import DOMPurify from "dompurify";
 import { updateTooltips } from "./tooltip.js";
+import { getMainClanId } from "./settings.js";
+import { getClanInfo } from "./clan.js";
 
 // --- Firestore Pagination State
 let lastVisibleBuild = null;
@@ -789,6 +791,13 @@ export async function populateBuildList(
         </div>
         <button class="delete-build-btn" title="Delete Build">×</button>
         <div class="build-publish-info"></div>`;
+      const pubImg = buildEl.querySelector('.publisher-chip img');
+      const mainId = getMainClanId();
+      if (pubImg && mainId) {
+        getClanInfo(mainId).then((info) => {
+          if (info?.logoUrl) pubImg.src = info.logoUrl;
+        });
+      }
     } else {
       buildEl.innerHTML = `
         <div class="build-card-header">

@@ -137,6 +137,34 @@ export async function acceptRequest(clanId, requestUid) {
   });
 }
 
+export async function getUserClans(uid) {
+  const snap = await getDocs(collection(db, "clans"));
+  const clans = [];
+  snap.forEach((d) => {
+    const data = d.data();
+    if (data.members?.includes(uid)) {
+      clans.push({ id: d.id, name: data.name, logoUrl: data.logoUrl });
+    }
+  });
+  return clans;
+}
+
+export async function getClanInfo(clanId) {
+  const snap = await getDoc(doc(db, "clans", clanId));
+  return snap.exists() ? { id: clanId, ...snap.data() } : null;
+}
+
+export async function getUserMainClanInfo(uid) {
+  const userSnap = await getDoc(doc(db, "users", uid));
+  const mainClanId = userSnap.exists()
+    ? userSnap.data().settings?.mainClanId
+    : null;
+  if (mainClanId) {
+    return await getClanInfo(mainClanId);
+  }
+  return null;
+}
+
 export function setupClanViewSwitching() {
   const views = {
     create: document.getElementById("createClanView"),
