@@ -325,8 +325,13 @@ export async function viewBuild(buildId) {
     }
 
     // ✅ Map Preview Logic (async fetch of maps.json)
-    if (build.map) {
-      const mapName = build.map;
+    const mapName = (build.map || "").trim();
+    const isValidMap =
+      mapName &&
+      mapName.toLowerCase() !== "index" &&
+      mapName.toLowerCase() !== "no map selected";
+
+    if (isValidMap) {
       const formattedMapName = capitalizeWords(mapName);
       let mapUrl = "";
 
@@ -365,8 +370,9 @@ export async function viewBuild(buildId) {
         const arrowIcon = secondRowHeader.querySelector(".arrow");
         if (arrowIcon) arrowIcon.classList.add("open");
       }
-    } else if (selectedMapText) {
-      selectedMapText.innerText = "No map selected";
+    } else {
+      if (mapImage) mapImage.src = "";
+      if (selectedMapText) selectedMapText.innerText = "No map selected";
     }
 
     // Annotations
