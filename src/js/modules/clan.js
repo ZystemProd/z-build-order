@@ -10,6 +10,8 @@ import {
   arrayUnion,
   arrayRemove,
   deleteDoc,
+  query,
+  where,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
 import {
@@ -17,6 +19,7 @@ import {
   ref,
   uploadBytes,
   deleteObject,
+  getDownloadURL,
   ref as storageRef,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-storage.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
@@ -55,8 +58,9 @@ export async function uploadClanLogo(file, clanId) {
 
   await uploadBytes(storageRef, file, { contentType: "image/webp" });
 
-  // ✅ Return manual URL (no CORS)
-  return `https://z-build-order.firebasestorage.app/clanLogos/${clanId}/logo.webp`;
+  // ✅ Get real download URL
+  const url = await getDownloadURL(storageRef);
+  return url;
 }
 
 export async function createClan({
@@ -1071,6 +1075,20 @@ async function renderManageTab(tab, clan) {
       try {
         // Delete Firestore document
         await deleteDoc(doc(db, "clans", clan.id));
+
+        // Clean up any related notifications
+        const notifQuery = query(
+          collection(db, "notifications"),
+          where("clanId", "==", clan.id)
+        );
+        try {
+          const notifSnap = await getDocs(notifQuery);
+          notifSnap.forEach(async (docSnap) => {
+            await deleteDoc(docSnap.ref).catch(() => {});
+          });
+        } catch (err) {
+          console.warn("Skipping notification cleanup:", err.message);
+        }
 
         // Clean up storage if a logo was uploaded
         if (clan.logoUrl && clan.logoUrl.includes("clanLogos")) {

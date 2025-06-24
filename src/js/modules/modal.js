@@ -13,7 +13,12 @@ import {
   startAfter,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-storage.js";
+import {
+  getStorage,
+  ref,
+  uploadBytes,
+  getDownloadURL,
+} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-storage.js";
 import { auth, db } from "../../app.js";
 import { showToast } from "./toastHandler.js";
 import { updateYouTubeEmbed, clearYouTubeEmbed } from "./youtube.js";
@@ -226,16 +231,6 @@ async function handleScroll() {
 
     isLoadingMoreBuilds = false;
   }
-}
-
-async function uploadReplayFile(file) {
-  const storage = getStorage();
-  const timestamp = Date.now();
-  const uniqueFileName = `replays/${timestamp}_${file.name}`; // Avoid overwriting files
-  const storageRef = ref(storage, uniqueFileName);
-  await uploadBytes(storageRef, file);
-  // Return manual URL to avoid firebase default domain
-  return `https://z-build-order.firebasestorage.app/${uniqueFileName}`;
 }
 
 export async function deleteBuildFromFirestore(buildId) {
@@ -791,7 +786,7 @@ export async function populateBuildList(
         </div>
         <button class="delete-build-btn" title="Delete Build">×</button>
         <div class="build-publish-info"></div>`;
-      const pubImg = buildEl.querySelector('.publisher-chip img');
+      const pubImg = buildEl.querySelector(".publisher-chip img");
       const mainId = getMainClanId();
       if (pubImg && mainId) {
         getClanInfo(mainId).then((info) => {
