@@ -54,8 +54,10 @@ export async function uploadClanLogo(file, clanId) {
   const filePath = `clanLogos/${clanId}/logo.webp`;
   const storageRef = ref(storage, filePath);
 
-  await uploadBytes(storageRef, file);
-  return getDownloadURL(storageRef);
+  await uploadBytes(storageRef, file, { contentType: "image/webp" });
+
+  // ✅ Return manual URL (no CORS)
+  return `https://z-build-order.firebasestorage.app/clanLogos/${clanId}/logo.webp`;
 }
 
 export async function createClan({

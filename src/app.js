@@ -33,7 +33,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyBBLnneYwLDfIp-Oep2MvExGnVk_EvDQoo",
   authDomain: "z-build-order.firebaseapp.com",
   projectId: "z-build-order",
-  storageBucket: "z-build-order.appspot.com",
+  storageBucket: "z-build-order.firebasestorage.app",
   messagingSenderId: "22023941178",
   appId: "1:22023941178:web:ba417e9a52332a8e055903",
   measurementId: "G-LBDMKMG1W9",
