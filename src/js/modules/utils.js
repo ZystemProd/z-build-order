@@ -96,3 +96,11 @@ export function resetBuildInputs() {
 
   console.log("✅ All inputs reset.");
 }
+
+export function enableSaveButton() {
+  const btn = document.getElementById("saveBuildButton");
+  if (btn) {
+    btn.disabled = false;
+    btn.style.backgroundColor = "#963325";
+  }
+}

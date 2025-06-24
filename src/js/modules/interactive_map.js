@@ -1,4 +1,5 @@
 import DOMPurify from "dompurify";
+import { enableSaveButton } from "./utils.js";
 
 // interactive_map.js (FINAL VERSION ✅)
 
@@ -95,12 +96,15 @@ export class MapAnnotations {
     container.appendChild(circle);
     this.annotationsContainer.appendChild(container);
 
+    enableSaveButton();
+
     container.addEventListener("click", (e) => {
       e.stopPropagation();
       this.annotationsContainer.removeChild(container);
       const index = this.circles.findIndex((c) => c.element === container);
       if (index !== -1) this.circles.splice(index, 1);
       this.updateCircleNumbers();
+      enableSaveButton();
     });
 
     this.circles.push({ x, y, element: container });
@@ -125,10 +129,13 @@ export class MapAnnotations {
       this.annotationsContainer.removeChild(arrow);
       const index = this.arrows.findIndex((a) => a.element === arrow);
       if (index !== -1) this.arrows.splice(index, 1);
+      enableSaveButton();
     });
 
     this.annotationsContainer.appendChild(arrow);
     this.arrows.push({ startX, startY, endX, endY, element: arrow });
+
+    enableSaveButton();
   }
 
   updateArrow(arrow, startX, startY, endX, endY) {
@@ -225,6 +232,7 @@ export function initializeMapControls(mapAnnotations) {
       }
       mapAnnotations.circles = [];
       mapAnnotations.arrows = [];
+      enableSaveButton();
     });
   }
 }
