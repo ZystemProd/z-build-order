@@ -138,6 +138,20 @@ export function initializeAutoCorrect() {
     const textBeforeCaret = text.substring(0, cursorPosition);
     const textAfterCaret = text.substring(cursorPosition);
 
+    const trimmedAfterCaret = textAfterCaret.trimStart();
+
+    if (trimmedAfterCaret.startsWith("[")) {
+      event.preventDefault();
+      inputField.focus();
+      insertTextRange("\n[] ", inputField.selectionStart, inputField.selectionEnd);
+
+      // Place caret inside the new brackets `[|]`
+      inputField.selectionStart = inputField.selectionEnd = cursorPosition + 2;
+      inputField.scrollTop = inputField.scrollHeight;
+      analyzeBuildOrder(inputField.value);
+      return;
+    }
+
     if (!isBracketInputEnabled()) {
       event.preventDefault();
       inputField.focus();
@@ -181,7 +195,7 @@ export function initializeAutoCorrect() {
       event.preventDefault();
       inputField.focus();
       insertTextRange(
-        "\n[]",
+        "\n[] ",
         inputField.selectionStart,
         inputField.selectionEnd
       );
@@ -200,7 +214,7 @@ export function initializeAutoCorrect() {
     // 3️⃣ Default behavior: Create new row and move cursor inside `[|]`
     event.preventDefault();
     inputField.focus();
-    insertTextRange("\n[]", inputField.selectionStart, inputField.selectionEnd);
+    insertTextRange("\n[] ", inputField.selectionStart, inputField.selectionEnd);
 
     // Move cursor inside the new brackets `[|]`
     inputField.selectionStart = inputField.selectionEnd = cursorPosition + 2;
@@ -217,11 +231,18 @@ export function initializeAutoCorrect() {
     const cursorPosition = inputField.selectionStart;
 
     // 🚫 Disable autocomplete if inside brackets like [|]
-    const bracketStart = text.lastIndexOf("[", cursorPosition);
+    const bracketStart = text.lastIndexOf("[", cursorPosition - 1);
     const bracketEnd = text.indexOf("]", cursorPosition);
+    const lastNewline = text.lastIndexOf("\n", cursorPosition - 1);
+    const nextNewlineIndex = text.indexOf("\n", cursorPosition);
+    const isSameLine =
+      bracketStart > lastNewline &&
+      (nextNewlineIndex === -1 || bracketEnd < nextNewlineIndex);
+
     if (
       bracketStart !== -1 &&
       bracketEnd !== -1 &&
+      isSameLine &&
       bracketStart < cursorPosition &&
       cursorPosition <= bracketEnd
     ) {
@@ -290,18 +311,18 @@ export function initializeAutoCorrect() {
     popup.style.visibility = "visible";
   });
 
+  inputField.addEventListener("click", () => {
+    popup.style.visibility = "hidden";
+  });
+
   inputField.addEventListener("keydown", (event) => {
     const allSuggestions = popup.querySelectorAll(".suggestion");
 
-    // 🟢 Shift+Enter → always insert new []
-    if (event.shiftKey && event.key === "Enter") {
-      event.preventDefault();
-      const pos = inputField.selectionStart;
-      insertTextRange("\n[]", pos, pos);
-      inputField.selectionStart = inputField.selectionEnd = pos + 3;
-      inputField.scrollTop = inputField.scrollHeight;
-      analyzeBuildOrder(inputField.value);
-      return;
+    if (popup.style.visibility && popup.style.visibility !== "hidden") {
+      if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
+        popup.style.visibility = "hidden";
+        return;
+      }
     }
 
     if (!popup.style.visibility || popup.style.visibility === "hidden") {

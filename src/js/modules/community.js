@@ -14,7 +14,7 @@ import {
   updateDoc,
   increment,
   startAfter,
-} from "firebase/firestore";
+} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { formatActionText } from "./textFormatters.js";
 import { showToast } from "./toastHandler.js";
 import { formatMatchup, formatShortDate } from "./modal.js";
@@ -30,6 +30,44 @@ const batchSize = 13;
 let lastVisibleDoc = null;
 let isLoadingMoreBuilds = false;
 let hasMoreBuilds = true;
+
+const publisherClanCache = {};
+async function getPublisherClanInfo(uid) {
+  if (uid in publisherClanCache) return publisherClanCache[uid];
+  try {
+    const userSnap = await getDoc(doc(db, "users", uid));
+    const clanId = userSnap.exists()
+      ? userSnap.data().settings?.mainClanId
+      : null;
+    if (clanId) {
+      const clanSnap = await getDoc(doc(db, "clans", clanId));
+      if (clanSnap.exists()) {
+        const info = { id: clanId, ...clanSnap.data() };
+        publisherClanCache[uid] = info;
+        return info;
+      }
+    }
+  } catch (e) {
+    console.error("Failed to fetch clan info", e);
+  }
+  publisherClanCache[uid] = null;
+  return null;
+}
+
+async function getUserClansMap() {
+  const map = {};
+  const user = auth.currentUser;
+  if (!user) return map;
+
+  const clansSnap = await getDocs(collection(db, "clans"));
+  clansSnap.forEach((doc) => {
+    const clan = doc.data();
+    if (clan.members?.includes(user.uid)) {
+      map[doc.id] = { name: clan.name, logoUrl: clan.logoUrl };
+    }
+  });
+  return map;
+}
 
 async function updateTotalBuildCount(filter = "all") {
   const db = getFirestore();
@@ -111,10 +149,11 @@ async function fetchNextCommunityBuilds(batchSize = 20) {
 
   const now = Date.now();
 
-  const builds = docs.map((doc) => {
-    const data = doc.data();
-    const upvotes = data.upvotes || 0;
-    const downvotes = data.downvotes || 0;
+  const builds = await Promise.all(
+    docs.map(async (doc) => {
+      const data = doc.data();
+      const upvotes = data.upvotes || 0;
+      const downvotes = data.downvotes || 0;
 
     let datePublishedRaw = now;
     let datePublished = "Unknown";
@@ -145,11 +184,12 @@ async function fetchNextCommunityBuilds(batchSize = 20) {
     const hotnessScore =
       (upvotes - downvotes) / Math.pow(ageInHours + 2, gravity);
 
-    return {
-      id: doc.id,
-      title: data.title || "Untitled Build",
-      publisher: data.username || "Anonymous",
-      matchup: formatMatchup(data.subcategory),
+      const publisherClan = await getPublisherClanInfo(data.publisherId);
+      return {
+        id: doc.id,
+        title: data.title || "Untitled Build",
+        publisher: data.username || "Anonymous",
+        matchup: formatMatchup(data.subcategory),
       category: data.category || "Unknown",
       subcategory: data.subcategory || "Unknown",
       datePublishedRaw,
@@ -159,9 +199,11 @@ async function fetchNextCommunityBuilds(batchSize = 20) {
       downvotes,
       userVotes: data.userVotes || {},
       buildOrder: data.buildOrder || [],
-      hotnessScore,
-    };
-  });
+        hotnessScore,
+        publisherClan,
+      };
+    })
+  );
 
   // ✅ Sort after fetch (client-side sort only)
   if (sortMode === "top") {
@@ -528,8 +570,8 @@ export async function publishBuildToCommunity(buildId) {
 
 window.publishBuildToCommunity = async function (buildId) {
   const { getFirestore, doc, getDoc, collection, addDoc, setDoc } =
-    await import("firebase/firestore");
-  const { getAuth } = await import("firebase/auth");
+    await import("https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js");
+  const { getAuth } = await import("https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js");
 
   const db = getFirestore();
   const auth = getAuth();
@@ -634,19 +676,13 @@ export async function searchCommunityBuilds(searchTerm) {
   const db = getFirestore();
   const type = localStorage.getItem("communityBuildType") || "public";
   const constraints = [orderBy("datePublished", "desc"), limit(50)];
+  let userClanMap = {};
 
   if (type === "public") {
     constraints.push(where("isPublic", "==", true));
   } else if (type === "clan") {
-    const user = auth.currentUser;
-    if (!user) return;
-
-    const clansSnap = await getDocs(collection(db, "clans"));
-    const clanIds = [];
-    clansSnap.forEach((doc) => {
-      const clan = doc.data();
-      if (clan.members?.includes(user.uid)) clanIds.push(doc.id);
-    });
+    userClanMap = await getUserClansMap();
+    const clanIds = Object.keys(userClanMap);
 
     if (clanIds.length === 0) {
       renderCommunityBuildBatch([]);
@@ -688,6 +724,9 @@ export async function searchCommunityBuilds(searchTerm) {
     const hotnessScore =
       (upvotes - downvotes) / Math.pow(ageInHours + 2, gravity);
 
+    const clanId = (data.sharedToClans || []).find((cid) => userClanMap[cid]);
+    const clanInfo = clanId ? userClanMap[clanId] : null;
+
     return {
       id: doc.id,
       title: data.title || "Untitled Build",
@@ -703,6 +742,7 @@ export async function searchCommunityBuilds(searchTerm) {
       upvotes,
       downvotes,
       hotnessScore,
+      clanInfo,
     };
   });
 
@@ -806,6 +846,12 @@ function renderCommunityBuildBatch(builds) {
 
     buildEntry.addEventListener("mouseover", () => showBuildPreview(build));
 
+    const clanChip =
+      localStorage.getItem("communityBuildType") === "clan" && build.clanInfo
+        ? `<span class="meta-chip clan-chip"><img src="${build.clanInfo.logoUrl ||
+            './img/clan/logo.webp'}" alt="${build.clanInfo.name}" class="meta-icon" style="width:16px;height:16px;">${DOMPurify.sanitize(build.clanInfo.name)}</span>`
+        : "";
+
     buildEntry.innerHTML = `
       <div class="build-left ${matchupClass}">
         <img src="${matchupImage}" alt="${matchup}" class="matchup-icon">
@@ -814,8 +860,11 @@ function renderCommunityBuildBatch(builds) {
         <div class="build-title">${DOMPurify.sanitize(build.title)}</div>
         <div class="build-meta">
           <span class="meta-chip matchup-chip">${formatMatchup(matchup)}</span>
+          ${clanChip}
           <span class="meta-chip publisher-chip">
-            <img src="./img/SVG/user-svgrepo-com.svg" alt="Publisher" class="meta-icon">
+            <img src="${
+              build.publisherClan?.logoUrl || './img/SVG/user-svgrepo-com.svg'
+            }" alt="Publisher" class="meta-icon" style="width:16px;height:16px;">
             ${DOMPurify.sanitize(build.publisher)}
           </span>
           <span class="meta-chip">
@@ -835,6 +884,16 @@ function renderCommunityBuildBatch(builds) {
     `;
 
     container.appendChild(buildEntry);
+
+    const publisherChip = buildEntry.querySelector('.publisher-chip');
+    if (publisherChip) {
+      publisherChip.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        const searchInput = document.getElementById('communitySearchBar');
+        if (searchInput) searchInput.value = build.publisher;
+        searchCommunityBuilds(build.publisher);
+      });
+    }
   });
 
   updateTooltips();
@@ -873,6 +932,7 @@ export async function filterCommunityBuilds(filter = "all") {
 
   let baseQuery = collection(db, "publishedBuilds");
   const constraints = [];
+  let userClanMap = {};
 
   // ✅ Public builds
   if (type === "public") {
@@ -881,18 +941,8 @@ export async function filterCommunityBuilds(filter = "all") {
 
   // ✅ Clan builds
   else if (type === "clan") {
-    const user = auth.currentUser;
-    if (!user) return;
-
-    const clansSnap = await getDocs(collection(db, "clans"));
-    const userClanIds = [];
-
-    clansSnap.forEach((doc) => {
-      const clan = doc.data();
-      if (clan.members?.includes(user.uid)) {
-        userClanIds.push(doc.id);
-      }
-    });
+    userClanMap = await getUserClansMap();
+    const userClanIds = Object.keys(userClanMap);
 
     if (userClanIds.length === 0) {
       renderCommunityBuildBatch([]); // No clan access = no builds
@@ -923,8 +973,9 @@ export async function filterCommunityBuilds(filter = "all") {
   try {
     const snap = await getDocs(q);
 
-    const builds = snap.docs.map((doc) => {
-      const data = doc.data();
+    const builds = await Promise.all(
+      snap.docs.map(async (doc) => {
+        const data = doc.data();
 
       let datePublishedRaw = Date.now();
       let datePublished = "Unknown";
@@ -947,18 +998,25 @@ export async function filterCommunityBuilds(filter = "all") {
         console.warn("❌ Failed to parse datePublished:", data.datePublished);
       }
 
-      return {
-        id: doc.id,
-        ...data,
-        matchup: formatMatchup(
-          data.subcategoryLowercase || data.subcategory || ""
-        ),
-        datePublished,
-        views: data.views || 0,
-        upvotes: data.upvotes || 0,
-        downvotes: data.downvotes || 0,
-      };
-    });
+        const clanId = (data.sharedToClans || []).find((id) => userClanMap[id]);
+        const clanInfo = clanId ? userClanMap[clanId] : null;
+        const publisherClan = await getPublisherClanInfo(data.publisherId);
+
+        return {
+          id: doc.id,
+          ...data,
+          matchup: formatMatchup(
+            data.subcategoryLowercase || data.subcategory || ""
+          ),
+          datePublished,
+          views: data.views || 0,
+          upvotes: data.upvotes || 0,
+          downvotes: data.downvotes || 0,
+          clanInfo,
+          publisherClan,
+        };
+      })
+    );
 
     renderCommunityBuildBatch(builds);
 

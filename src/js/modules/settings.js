@@ -1,8 +1,9 @@
-import { getFirestore, doc, getDoc, updateDoc } from "firebase/firestore";
-import { getAuth } from "firebase/auth";
+import { getFirestore, doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
 
 const BRACKET_KEY = "enableBracketInput";
 const INPUT_KEY = "showBuildInput";
+const MAIN_CLAN_KEY = "mainClanId";
 export function isBracketInputEnabled() {
   const value = localStorage.getItem(BRACKET_KEY);
   return value === null ? true : value === "true";
@@ -37,6 +38,26 @@ export function setBuildInputShown(shown) {
   }
 }
 
+export function getMainClanId() {
+  return localStorage.getItem(MAIN_CLAN_KEY) || "";
+}
+
+export function setMainClanId(clanId) {
+  if (clanId) {
+    localStorage.setItem(MAIN_CLAN_KEY, clanId);
+  } else {
+    localStorage.removeItem(MAIN_CLAN_KEY);
+  }
+
+  const user = getAuth().currentUser;
+  if (user) {
+    const db = getFirestore();
+    updateDoc(doc(db, "users", user.uid), {
+      "settings.mainClanId": clanId || "",
+    }).catch((err) => console.error("Failed to save main clan setting", err));
+  }
+}
+
 
 
 export async function loadUserSettings() {
@@ -57,6 +78,13 @@ export async function loadUserSettings() {
         INPUT_KEY,
         data.showBuildInput ? "true" : "false"
       );
+    }
+    if (data.mainClanId !== undefined) {
+      if (data.mainClanId) {
+        localStorage.setItem(MAIN_CLAN_KEY, data.mainClanId);
+      } else {
+        localStorage.removeItem(MAIN_CLAN_KEY);
+      }
     }
   } catch (err) {
     console.error("Failed to load user settings", err);

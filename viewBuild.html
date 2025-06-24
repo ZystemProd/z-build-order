@@ -90,7 +90,7 @@
       </div>
       <div class="build-info-item desktop-info">
         <label>Publisher</label>
-        <span class="meta-chip publisher-chip"><img src="./img/SVG/user-svgrepo-com.svg" alt="Publisher"
+        <span class="meta-chip publisher-chip"><img id="buildPublisherIcon" src="./img/SVG/user-svgrepo-com.svg" alt="Publisher"
             class="meta-icon" /> <span id="buildPublisher">Loading...</span></span>
       </div>
       <div class="build-info-item desktop-info">
@@ -108,7 +108,7 @@
         </div>
         <div class="info-row">
           <label>Publisher</label>
-          <span class="meta-chip publisher-chip"><img src="./img/SVG/user-svgrepo-com.svg" alt="Publisher"
+          <span class="meta-chip publisher-chip"><img id="buildPublisherIconMobile" src="./img/SVG/user-svgrepo-com.svg" alt="Publisher"
               class="meta-icon" /> <span id="buildPublisherMobile">Loading...</span></span>
         </div>
         <div class="info-row">
@@ -169,6 +169,13 @@
 
         <!-- RIGHT COLUMN: Comment & Video Container -->
         <div class="comment-video-container">
+          <h3 id="replayHeader" class="toggle-title" style="display: none">Replay</h3>
+          <div id="replayViewWrapper" style="display: none;">
+            <a id="replayDownloadBtn" href="#" target="_blank" class="download-replay-link">
+              Download Replay on Drop.sc
+            </a>
+          </div>
+
           <h3 id="commentHeader" class="toggle-title" style="display: none">Comment</h3>
           <p id="buildComment" class="comment-display" style="display: none"></p>
 

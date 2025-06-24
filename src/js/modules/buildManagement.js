@@ -3,14 +3,15 @@ import {
   collection,
   doc,
   setDoc,
+  updateDoc,
   getDocs,
   getDoc,
   query,
   where,
   orderBy,
-} from "firebase/firestore";
+} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 
-import { getAuth } from "firebase/auth";
+import { getAuth } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
 import { db, auth } from "../../app.js";
 import {
   getSavedBuilds,
@@ -46,6 +47,7 @@ export async function fetchUserBuilds() {
     return {
       id: doc.id,
       title: decodedTitle,
+      favorite: data.favorite || false,
       ...data,
       isPublished: false, // default
     };
@@ -64,6 +66,12 @@ export async function fetchUserBuilds() {
     if (publishedTitles.has(build.title)) {
       build.isPublished = true;
     }
+  });
+
+  builds.sort((a, b) => {
+    const favDiff = (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0);
+    if (favDiff !== 0) return favDiff;
+    return (b.timestamp || 0) - (a.timestamp || 0);
   });
 
   return builds;
@@ -234,6 +242,7 @@ export async function saveCurrentBuild() {
       })),
     },
     isPublished: false,
+    favorite: false,
     publisher: username,
   };
 
@@ -389,6 +398,14 @@ export async function updateCurrentBuild(buildId) {
 
   checkPublishButtonVisibility();
   return true;
+}
+
+export async function updateBuildFavorite(buildId, favorite) {
+  const user = getAuth().currentUser;
+  if (!user) return;
+  const db = getFirestore();
+  const buildRef = doc(db, `users/${user.uid}/builds/${buildId}`);
+  await updateDoc(buildRef, { favorite });
 }
 
 function getYouTubeVideoID(url) {

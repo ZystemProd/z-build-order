@@ -11,9 +11,9 @@ import {
   orderBy,
   limit,
   startAfter,
-} from "firebase/firestore";
-import { getAuth } from "firebase/auth";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-storage.js";
 import { auth, db } from "../../app.js";
 import { showToast } from "./toastHandler.js";
 import { updateYouTubeEmbed, clearYouTubeEmbed } from "./youtube.js";
@@ -27,10 +27,16 @@ import {
   clearEditingPublishedBuild,
 } from "./states/buildState.js";
 import { loadBuilds } from "./buildService.js";
-import { fetchUserBuilds, fetchPublishedUserBuilds } from "./buildManagement.js";
+import {
+  fetchUserBuilds,
+  fetchPublishedUserBuilds,
+  updateBuildFavorite,
+} from "./buildManagement.js";
 import { setSavedBuilds } from "./buildStorage.js";
 import DOMPurify from "dompurify";
 import { updateTooltips } from "./tooltip.js";
+import { getMainClanId } from "./settings.js";
+import { getClanInfo } from "./clan.js";
 
 // --- Firestore Pagination State
 let lastVisibleBuild = null;
@@ -38,7 +44,7 @@ let isLoadingMoreBuilds = false;
 let currentBuildFilter = "all";
 
 // --- View Mode State
-const storedViewMode = localStorage.getItem("buildViewMode") || "grid";
+const storedViewMode = localStorage.getItem("buildViewMode") || "list";
 let buildViewMode = storedViewMode;
 
 export function getBuildViewMode() {
@@ -84,7 +90,9 @@ export async function setBuildViewMode(mode) {
 }
 
 function isPublishedBuildsTabActive() {
-  return document.getElementById("publishedBuildsTab")?.classList.contains("active");
+  return document
+    .getElementById("publishedBuildsTab")
+    ?.classList.contains("active");
 }
 
 export function formatMatchup(matchup) {
@@ -347,11 +355,13 @@ export async function viewBuild(buildId) {
       if (mapImage) mapImage.src = mapUrl;
       if (selectedMapText) selectedMapText.innerText = formattedMapName;
 
-      const clearBtn = document.querySelector('.clear-annotations-button');
-      if (clearBtn) clearBtn.style.display = 'inline-block';
+      const clearBtn = document.querySelector(".clear-annotations-button");
+      if (clearBtn) clearBtn.style.display = "inline-block";
 
       const secondRow = document.getElementById("secondRow");
-      const secondRowHeader = document.querySelector('[data-section="secondRow"]');
+      const secondRowHeader = document.querySelector(
+        '[data-section="secondRow"]'
+      );
       if (secondRow) {
         secondRow.classList.remove("hidden");
         secondRow.classList.add("visible");
@@ -452,7 +462,9 @@ export async function viewBuild(buildId) {
 
     const editBanner = document.getElementById("editModeBanner");
     if (editBanner) {
-      editBanner.innerHTML = `[Edit Mode] <strong>${DOMPurify.sanitize(build.title)}</strong>`;
+      editBanner.innerHTML = `[Edit Mode] <strong>${DOMPurify.sanitize(
+        build.title
+      )}</strong>`;
       editBanner.style.display = "block";
     }
 
@@ -568,8 +580,8 @@ export async function openPublishModal(buildId) {
         <div class="checkbox-wrapper-59">
           <label class="switch">
             <input type="checkbox" class="clanPublishCheckbox" value="${cid}" ${
-              isShared ? "checked" : ""
-            } />
+        isShared ? "checked" : ""
+      } />
             <span class="slider"></span>
           </label>
         </div>
@@ -734,6 +746,9 @@ export async function populateBuildList(
     buildEl.dataset.source = build.source || "user";
     buildEl.dataset.clanid = build.clanId || "";
 
+    // ✅ Make tab-focusable
+    buildEl.tabIndex = 0;
+
     if (build.isPublished) buildEl.classList.add("published");
 
     const [playerRace, opponentRace] = getRaceIcons(
@@ -761,7 +776,9 @@ export async function populateBuildList(
         <div class="build-right">
           <div class="build-title">${DOMPurify.sanitize(build.title)}</div>
           <div class="build-meta">
-            <span class="meta-chip matchup-chip">${formatMatchup(build.subcategory || "")}</span>
+            <span class="meta-chip matchup-chip">${formatMatchup(
+              build.subcategory || ""
+            )}</span>
             <span class="meta-chip publisher-chip">
               <img src="./img/SVG/user-svgrepo-com.svg" alt="Publisher" class="meta-icon">
               ${DOMPurify.sanitize(build.publisher || "You")}
@@ -774,6 +791,13 @@ export async function populateBuildList(
         </div>
         <button class="delete-build-btn" title="Delete Build">×</button>
         <div class="build-publish-info"></div>`;
+      const pubImg = buildEl.querySelector('.publisher-chip img');
+      const mainId = getMainClanId();
+      if (pubImg && mainId) {
+        getClanInfo(mainId).then((info) => {
+          if (info?.logoUrl) pubImg.src = info.logoUrl;
+        });
+      }
     } else {
       buildEl.innerHTML = `
         <div class="build-card-header">
@@ -788,6 +812,30 @@ export async function populateBuildList(
         <div class="build-publish-info"></div>
       `;
     }
+
+    const favBtn = document.createElement("button");
+    favBtn.classList.add("favorite-btn");
+    favBtn.dataset.tooltip = build.favorite
+      ? "Remove from favorites"
+      : "Add to favorites";
+
+    const favImg = document.createElement("img");
+    favImg.src = build.favorite
+      ? "./img/SVG/star_filled.svg"
+      : "./img/SVG/star.svg";
+    favImg.alt = "Favorite";
+    favBtn.appendChild(favImg);
+    favBtn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const newState = !build.favorite;
+      build.favorite = newState;
+      favImg.src = newState
+        ? "./img/SVG/star_filled.svg"
+        : "./img/SVG/star.svg";
+      await updateBuildFavorite(build.id, newState);
+      await filterBuilds(getCurrentBuildFilter());
+    });
+    buildEl.prepend(favBtn);
 
     // Color styles
     const sub = build.subcategory?.toUpperCase() || "";
@@ -829,6 +877,13 @@ export async function populateBuildList(
       }
     });
 
+    buildEl.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        buildEl.click();
+      }
+    });
+
     // Handle delete button
     if (build.source !== "community" && build.source !== "clan") {
       const deleteButton = buildEl.querySelector(".delete-build-btn");
@@ -862,7 +917,9 @@ export async function populateBuildList(
     if (publishInfo) {
       const publishedTab = isPublishedBuildsTabActive();
       const isBuildPublished =
-        build.isPublished || build.isPublic || (build.sharedToClans?.length ?? 0) > 0;
+        build.isPublished ||
+        build.isPublic ||
+        (build.sharedToClans?.length ?? 0) > 0;
 
       if (build.imported) {
         publishInfo.classList.add("publish-imported");

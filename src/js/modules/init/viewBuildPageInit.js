@@ -2,7 +2,7 @@ import { auth, db } from "../../../app.js";
 import { safeAdd } from "../helpers/sharedEventUtils.js";
 import { initializeSectionToggles } from "../uiHandlers.js";
 // Import Firestore methods from local Firebase SDK
-import { doc, getDoc, setDoc, collection } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { populateBuildsModal } from "../buildManagement.js";
 import { logAnalyticsEvent } from "../analyticsHelper.js";
 

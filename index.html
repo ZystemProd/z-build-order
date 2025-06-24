@@ -7,10 +7,6 @@
     content="Plan and save your StarCraft 2 build orders with Z-Build Order. Supports custom builds, categories, and templates.">
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy"
-    content="default-src 'self'; script-src 'self' https://www.googletagmanager.com https://www.gstatic.com https://apis.google.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firebase.googleapis.com https://www.google-analytics.com https://region1.google-analytics.com https://z-build-order.onrender.com; img-src 'self' data: https://www.google.com https://*.googleusercontent.com; frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://z-build-order.firebaseapp.com;">
-  <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin-allow-popups" />
-
   <link rel="icon" type="image/x-icon" href="/img/favicon.ico" />
 
 
@@ -59,6 +55,10 @@
           <hr class="menu-divider" />
           <button class="menu-item" id="showClanModalButton">
             <img src="img/SVG/clan.svg" class="menu-icon" /> Clans
+          </button>
+          <hr class="menu-divider" />
+          <button id="showStatsButton" class="user-menu-button">
+            <img src="img/SVG/stats.svg" class="menu-icon" />My Stats
           </button>
           <hr class="menu-divider" />
           <button class="menu-item" id="settingsBtn">
@@ -293,12 +293,15 @@
           <!-- Map preview and controls -->
           <div id="map-controls-row">
             <span id="selected-map-text">No map selected</span>
+
             <button id="openMapModalButton" class="menu-button" data-tooltip="Map Selection">
               <img src="img/SVG/map-solid.svg" alt="Map Icon" class="svg-icon icon-20">
             </button>
             <button class="clear-annotations-button" data-tooltip="Erase All">
               <img src="img/SVG/eraser-solid.svg" alt="Eraser Icon" class="svg-icon icon-20">
             </button>
+            <span class="info-icon map-helper-icon"
+              data-tooltip="Click on map to add circles (position).&#10;Hold Left-click and drag to draw arrows.">?</span>
           </div>
 
           <div id="map-preview-container" class="map-preview">
@@ -481,12 +484,14 @@
                 </div>
               </div>
             </div>
+            <!--
             <div class="view-toggle-buttons">
               <button id="gridViewBtn" class="view-btn active" data-tooltip="Grid"><img src="./img/SVG/grid.svg"
                   alt="Grid"></button>
               <button id="listViewBtn" class="view-btn" data-tooltip="List"><img src="./img/SVG/list.svg"
                   alt="List"></button>
             </div>
+            -->
           </div>
         </div>
         <div class="template-content-container">
@@ -672,6 +677,18 @@
             </label>
           </div>
         </div>
+        <div class="publish-checkbox-row">
+          <span>Main Clan</span>
+          <select id="mainClanSelect" class="styled-dropdown"></select>
+        </div>
+      </div>
+    </div>
+
+    <div id="userStatsModal" class="modal">
+      <div class="modal-content small-modal">
+        <span class="close-modal" id="closeUserStatsModal">&times;</span>
+        <h3>My Stats</h3>
+        <div id="userStatsContent">Loading...</div>
       </div>
     </div>
 
@@ -796,7 +813,7 @@
 
 
 
-      <p>Version 0.5.8011</p>
+      <p>Version 0.5.8036</p>
 
 
 

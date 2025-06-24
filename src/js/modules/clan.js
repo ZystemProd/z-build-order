@@ -10,8 +10,8 @@ import {
   arrayUnion,
   arrayRemove,
   deleteDoc,
-} from "firebase/firestore";
-import { getAuth } from "firebase/auth";
+} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
 import {
   getStorage,
   ref,
@@ -19,8 +19,8 @@ import {
   getDownloadURL,
   deleteObject,
   ref as storageRef,
-} from "firebase/storage";
-import { initializeApp } from "firebase/app";
+} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-storage.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
 import { createNotificationDot } from "./uiHandlers.js";
 import { showToast } from "./toastHandler.js";
 import { db } from "../../app.js";
@@ -135,6 +135,34 @@ export async function acceptRequest(clanId, requestUid) {
       role: "Player",
     },
   });
+}
+
+export async function getUserClans(uid) {
+  const snap = await getDocs(collection(db, "clans"));
+  const clans = [];
+  snap.forEach((d) => {
+    const data = d.data();
+    if (data.members?.includes(uid)) {
+      clans.push({ id: d.id, name: data.name, logoUrl: data.logoUrl });
+    }
+  });
+  return clans;
+}
+
+export async function getClanInfo(clanId) {
+  const snap = await getDoc(doc(db, "clans", clanId));
+  return snap.exists() ? { id: clanId, ...snap.data() } : null;
+}
+
+export async function getUserMainClanInfo(uid) {
+  const userSnap = await getDoc(doc(db, "users", uid));
+  const mainClanId = userSnap.exists()
+    ? userSnap.data().settings?.mainClanId
+    : null;
+  if (mainClanId) {
+    return await getClanInfo(mainClanId);
+  }
+  return null;
 }
 
 export function setupClanViewSwitching() {

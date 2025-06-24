@@ -908,6 +908,20 @@ textarea::-webkit-scrollbar-thumb:hover {
   overflow: hidden; /* ✅ prevent internal shifts */
   transition: box-shadow 0.3s, transform 0.3s; /* ✅ only transition shadow or transform, not size */
 }
+.build-card .favorite-btn {
+  top: 8px;
+  transform: none;
+}
+
+.favorite-btn {
+  background-color: transparent !important;
+  margin: 0px !important;
+  padding: 7px !important;
+}
+
+.favorite-btn:hover {
+  background-color: transparent;
+}
 
 .build-card::before {
   content: "";
@@ -933,7 +947,7 @@ textarea::-webkit-scrollbar-thumb:hover {
 }
 
 .build-card:hover {
-  transform: translateY(-3px); /* ✅ optional hover lift */
+  /* removed hover lift */
 }
 
 .build-card:hover::before {
@@ -979,6 +993,28 @@ textarea::-webkit-scrollbar-thumb:hover {
   color: #cccccc;
   cursor: pointer;
   transition: color 0.3s;
+}
+
+.favorite-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 0;
+  color: #cccccc;
+}
+
+.favorite-btn:hover {
+  transform: translateY(-50%); /* prevent button hover scaling */
+}
+
+.favorite-btn img {
+  width: 20px;
+  height: 20px;
+  pointer-events: none;
 }
 
 .delete-build-btn:hover {
@@ -1083,7 +1119,6 @@ textarea::-webkit-scrollbar-thumb:hover {
 }
 */
 .build-card:hover {
-  transform: scale(1.1, 1.1);
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.6);
 }
 
@@ -2922,6 +2957,10 @@ td {
   scrollbar-color: #444 #222; /* Firefox */
 }
 
+#communityBuildsContainer .build-entry {
+  padding-left: 20px;
+}
+
 #buildCount {
   position: absolute;
   top: 0;
@@ -2955,13 +2994,13 @@ td {
   flex-direction: column;
   gap: 0px;
   padding: 10px;
+  padding-left: 20px;
+  padding-right: 20px;
   max-height: 78vh;
   overflow-y: auto;
   overflow-x: hidden;
-  padding-right: 10px;
   scrollbar-width: thin;
   scrollbar-color: #444 #222;
-  padding-left: 30px;
 }
 #buildList.list-view::-webkit-scrollbar {
   width: 10px;
@@ -2984,13 +3023,13 @@ td {
 .build-entry {
   display: flex;
   align-items: center; /* ✅ Aligns image and content */
-  padding: 12px;
+  padding: 12px 12px 12px 50px; /* space for favorite icon */
   background-color: #2c2c2c;
   border-bottom: 1px solid #444;
   font-size: 16px;
   color: white;
   cursor: pointer; /* ✅ Make div clickable */
-  transition: background-color 0.2s ease, transform 0.1s ease;
+  transition: background-color 0.2s ease;
   position: relative;
 }
 
@@ -3031,7 +3070,6 @@ td {
 /* Hover effect */
 .build-entry:hover {
   background-color: #3a3a3a;
-  transform: scale(1.02);
 }
 
 /* Title row */
@@ -3078,11 +3116,23 @@ td {
   color: #dd5252 !important; /* Ensuring text stays visible */
 }
 
+/* Hover state for clickable publisher chip */
+.meta-chip.publisher-chip:hover {
+  cursor: pointer;
+  text-decoration: underline;
+}
+
 /* ✅ Matchup chip (Custom Styling) */
 .meta-chip.matchup-chip {
   background-color: #444 !important;
   color: #ffcc00 !important;
   font-weight: bold;
+}
+
+/* Clan chip */
+.meta-chip.clan-chip {
+  background-color: #355454;
+  color: #a8e6e6;
 }
 
 /* Vote info */
@@ -4431,6 +4481,37 @@ button.btn-small {
     width: 100%;
   }
 
+  /* Abbreviate publish tags for extra-small screens */
+  .tag.public,
+  .tag.clan {
+    font-size: 0;
+    position: relative;
+  }
+
+  /* Reduce meta-chip size and scale publish info for mobile */
+  .meta-chip {
+    font-size: 0.75em;
+  }
+
+  .build-publish-info {
+    transform: scale(0.75);
+    transform-origin: bottom right;
+  }
+
+  .build-publish-info:hover {
+    transform: scale(0.8);
+  }
+
+  .tag.public::after {
+    content: "P";
+    font-size: 0.7rem;
+  }
+
+  .tag.clan::after {
+    content: "C";
+    font-size: 0.7rem;
+  }
+
   .footer-left {
     max-width: 100px;
   }
@@ -4497,6 +4578,21 @@ button.btn-small {
 }
 
 /* Info icon for tooltips */
+.map-helper-icon {
+  display: none; /* Hidden by default */
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+  text-align: center;
+  border-radius: 50%;
+  background-color: #555;
+  color: white;
+  font-size: 12px;
+  margin-left: 4px;
+  cursor: help;
+}
+
+/* Info icon for tooltips */
 .info-icon {
   display: inline-block;
   width: 16px;
@@ -4518,6 +4614,10 @@ button.btn-small {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+}
+
+#supplyHeader .short-text {
+  display: none;
 }
 
 @media (max-width: 768px) {
@@ -4797,4 +4897,36 @@ optgroup[label="Terran"] {
   color: #f0a500;
   font-weight: bold;
   margin-left: 4px;
+}
+
+/* User Stats Modal List */
+.stats-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.stats-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid #333;
+}
+.stats-list li.section-break {
+  margin-bottom: 10px;
+}
+.stats-list li:last-child {
+  border-bottom: none;
+}
+.stat-value {
+  font-weight: bold;
+  color: #f0a500;
+}
+
+.popular-build {
+  display: inline-block;
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

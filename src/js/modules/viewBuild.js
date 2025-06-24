@@ -6,13 +6,15 @@ import {
   setDoc,
   updateDoc,
   increment,
-} from "firebase/firestore";
+} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { formatActionText } from "../modules/textFormatters.js"; // ✅ Format build steps
 import {
   MapAnnotations,
   renderMapCards,
   loadMapsOnDemand,
 } from "./interactive_map.js"; // ✅ Map support
+import { updateYouTubeEmbed, clearYouTubeEmbed } from "./youtube.js";
+import { getUserMainClanInfo } from "./clan.js";
 
 initializeAuthUI();
 
@@ -128,6 +130,12 @@ async function loadBuild() {
     const publisherText = build.username || "Anonymous";
     const dateText = new Date(build.datePublished).toLocaleDateString();
 
+    const clanInfo = await getUserMainClanInfo(build.publisherId);
+    const iconEl = document.getElementById("buildPublisherIcon");
+    if (iconEl && clanInfo?.logoUrl) iconEl.src = clanInfo.logoUrl;
+    const iconElMob = document.getElementById("buildPublisherIconMobile");
+    if (iconElMob && clanInfo?.logoUrl) iconElMob.src = clanInfo.logoUrl;
+
     document.getElementById("buildCategory").innerText = categoryText;
     document.getElementById("buildMatchup").innerText = matchupText;
     document.getElementById("buildPublisher").innerText = publisherText;
@@ -172,6 +180,21 @@ async function loadBuild() {
       buildOrderContainer.innerHTML = "<p>No build order available.</p>";
     }
 
+    // Set replay link
+    const replayWrapper = document.getElementById("replayViewWrapper");
+    const replayHeader = document.getElementById("replayHeader");
+    const replayBtn = document.getElementById("replayDownloadBtn");
+    if (replayWrapper && replayHeader && replayBtn) {
+      if (build.replayUrl && build.replayUrl.trim() !== "") {
+        replayBtn.href = build.replayUrl;
+        replayWrapper.style.display = "block";
+        replayHeader.style.display = "block";
+      } else {
+        replayWrapper.style.display = "none";
+        replayHeader.style.display = "none";
+      }
+    }
+
     // Set comment
     const commentElement = document.getElementById("buildComment");
     const commentHeader = document.getElementById("commentHeader");
@@ -190,12 +213,12 @@ async function loadBuild() {
     const youtubeEmbed = document.getElementById("videoIframe");
     const videoHeader = document.getElementById("videoHeader");
     if (youtubeEmbed && videoHeader) {
-      if (build.youtube && build.youtube.trim() !== "") {
-        youtubeEmbed.src = build.youtube;
-        youtubeEmbed.style.display = "block";
+      const link = build.videoLink || build.youtube;
+      if (link && link.trim() !== "") {
+        updateYouTubeEmbed(link);
         videoHeader.style.display = "block";
       } else {
-        youtubeEmbed.style.display = "none";
+        clearYouTubeEmbed();
         videoHeader.style.display = "none";
       }
     }
@@ -348,8 +371,31 @@ async function loadBuild() {
       const commentVisible = commentElement && commentElement.style.display !== "none";
       const videoVisible = youtubeEmbed && youtubeEmbed.style.display !== "none";
       const mapVisible = mapContainerWrapper && mapContainerWrapper.style.display !== "none";
+      const replayVisible = replayWrapper && replayWrapper.style.display !== "none";
 
-      const anyVisible = commentVisible || videoVisible || mapVisible;
+      const anyVisible = commentVisible || videoVisible || mapVisible || replayVisible;
+
+      const secondRow = document.getElementById("secondRow");
+      const secondRowHeader = document.querySelector('[data-section="secondRow"]');
+      if (secondRow) {
+        if (anyVisible) {
+          secondRow.classList.remove("hidden");
+          secondRow.classList.add("visible");
+        } else {
+          secondRow.classList.add("hidden");
+          secondRow.classList.remove("visible");
+        }
+      }
+      if (secondRowHeader) {
+        const arrowIcon = secondRowHeader.querySelector(".arrow");
+        if (arrowIcon) {
+          if (anyVisible) {
+            arrowIcon.classList.add("open");
+          } else {
+            arrowIcon.classList.remove("open");
+          }
+        }
+      }
 
       if (additionalHeader) {
         additionalHeader.style.display = anyVisible ? "block" : "none";

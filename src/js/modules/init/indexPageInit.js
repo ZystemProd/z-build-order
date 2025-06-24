@@ -9,7 +9,7 @@ import {
   query,
   where,
   Timestamp,
-} from "firebase/firestore";
+} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { auth, db } from "../../../app.js";
 import DOMPurify from "dompurify";
 import {
@@ -64,6 +64,7 @@ import {
   renderCreateClanUI,
   renderChooseManageClanUI,
   renderFindClanUI,
+  getUserClans,
 } from "../clan.js";
 import {
   MapAnnotations,
@@ -76,6 +77,7 @@ import {
   setSavedBuilds,
   saveSavedBuildsToLocalStorage,
 } from "../buildStorage.js";
+import { showUserStats, closeUserStats } from "../stats.js";
 import { setupCatActivationOnInput } from "../helpers/companion.js";
 import {
   getCurrentBuildId,
@@ -95,6 +97,8 @@ import {
   isBuildInputShown,
   setBuildInputShown,
   loadUserSettings,
+  getMainClanId,
+  setMainClanId,
 } from "../settings.js";
 import { checkForJoinRequestNotifications } from "../utils/notificationHelpers.js";
 import { logAnalyticsEvent } from "../analyticsHelper.js";
@@ -121,6 +125,26 @@ function updateBuildInputPlaceholder() {
   textarea.placeholder = isBracketInputEnabled()
     ? "[12] Spawning Pool"
     : "Spawning Pool";
+}
+
+async function populateMainClanDropdown() {
+  const select = document.getElementById("mainClanSelect");
+  if (!select) return;
+  const user = auth.currentUser;
+  if (!user) return;
+  select.innerHTML = "";
+  const clans = await getUserClans(user.uid);
+  const noneOpt = document.createElement("option");
+  noneOpt.value = "";
+  noneOpt.textContent = "None";
+  select.appendChild(noneOpt);
+  clans.forEach((c) => {
+    const opt = document.createElement("option");
+    opt.value = c.id;
+    opt.textContent = c.name;
+    select.appendChild(opt);
+  });
+  select.value = getMainClanId();
 }
 
 setupTemplateModal(); // Always call early
@@ -347,6 +371,7 @@ export async function initializeIndexPage() {
       await checkForJoinRequestNotifications();
       initializeUserData(user);
       await loadUserSettings();
+      await populateMainClanDropdown();
       const builds = await fetchUserBuilds();
       setSavedBuilds(builds);
       saveSavedBuildsToLocalStorage();
@@ -378,8 +403,8 @@ export async function initializeIndexPage() {
     showBuildsModal(); // ✅ when logged in
   });
 
-  safeAdd("gridViewBtn", "click", () => setBuildViewMode("grid"));
-  safeAdd("listViewBtn", "click", () => setBuildViewMode("list"));
+  // safeAdd("gridViewBtn", "click", () => setBuildViewMode("grid"));
+  // safeAdd("listViewBtn", "click", () => setBuildViewMode("list"));
 
   safeAdd("filterPublicBtn", "click", () => {
     document.getElementById("filterPublicBtn").classList.add("active");
@@ -775,6 +800,13 @@ export async function initializeIndexPage() {
     });
   }
 
+  const mainClanSelect = document.getElementById("mainClanSelect");
+  if (mainClanSelect) {
+    mainClanSelect.addEventListener("change", () => {
+      setMainClanId(mainClanSelect.value);
+    });
+  }
+
   safeAdd("closePrivacyModal", "click", () => {
     const modal = document.getElementById("privacyModal");
     if (modal) modal.style.display = "none";
@@ -962,6 +994,23 @@ export async function initializeIndexPage() {
     window.location.href = "/veto.html";
   });
 
+  document.getElementById("showStatsButton")?.addEventListener("click", () => {
+    const userMenu = document.getElementById("userMenu");
+    if (userMenu) userMenu.style.display = "none";
+    showUserStats();
+  });
+
+  document
+    .getElementById("closeUserStatsModal")
+    ?.addEventListener("click", closeUserStats);
+
+  window.addEventListener("mousedown", (event) => {
+    const modal = document.getElementById("userStatsModal");
+    if (modal && event.target === modal) {
+      closeUserStats();
+    }
+  });
+
   // Close the avatar submenu after selecting any menu item
   const userMenuEl = document.getElementById("userMenu");
   if (userMenuEl) {
@@ -980,6 +1029,7 @@ export async function initializeIndexPage() {
       modal.style.display = "block";
       const toggle = document.getElementById("bracketInputToggle");
       if (toggle) toggle.checked = isBracketInputEnabled();
+      populateMainClanDropdown();
     }
   });
 
