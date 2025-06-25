@@ -35,12 +35,31 @@ let hasMoreBuilds = true;
 const publisherClanCache = {};
 //
 // Clan info for the publisher is stored directly on each published build.
-// Older builds might not have it, but reading other users' documents is
-// disallowed by Firestore rules. To avoid permission errors we simply
-// return null when the info is missing.
+// Older builds might not have it. To provide a fallback without violating
+// Firestore security rules, we query the public `clans` collection and
+// return the first clan that lists the user as a member.
 //
-async function getPublisherClanInfo(uid) {
+export async function getPublisherClanInfo(uid) {
   if (uid in publisherClanCache) return publisherClanCache[uid];
+
+  try {
+    const db = getFirestore();
+    const q = query(
+      collection(db, "clans"),
+      where("members", "array-contains", uid),
+      limit(1)
+    );
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      const clanDoc = snap.docs[0];
+      const info = { id: clanDoc.id, ...clanDoc.data() };
+      publisherClanCache[uid] = info;
+      return info;
+    }
+  } catch (e) {
+    console.error("Failed to fetch clan info", e);
+  }
+
   publisherClanCache[uid] = null;
   return null;
 }
