@@ -907,6 +907,9 @@ export async function initializeIndexPage() {
     // ✅ Close modal
     const modal = document.getElementById("publishModal");
     if (modal) modal.style.display = "none";
+
+    // 🔄 Refresh build list to reflect new publish tags
+    await filterBuilds(getCurrentBuildFilter());
   });
 
   window.addEventListener("mousedown", (event) => {
