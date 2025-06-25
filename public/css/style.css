@@ -1773,6 +1773,7 @@ textarea::-webkit-scrollbar-thumb:hover {
   font-size: 16px;
   color: red;
   text-shadow: black 0px 2px 4px;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
   pointer-events: none; /* Prevent interfering with click events */
 }
 

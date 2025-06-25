@@ -79,22 +79,35 @@ export class MapAnnotations {
     return { x, y };
   }
 
+  nearestPointOnSegment(px, py, x1, y1, x2, y2) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    if (dx === 0 && dy === 0) return { x: x1, y: y1 };
+    const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy)));
+    return { x: x1 + t * dx, y: y1 + t * dy };
+  }
+
   snapToNearbyPoint(x, y, threshold = 2) {
     let snapped = { x, y };
     let minDist = threshold;
-    const points = [];
-    this.circles.forEach((c) => points.push({ x: c.x, y: c.y }));
-    this.arrows.forEach((a) => {
-      points.push({ x: a.startX, y: a.startY });
-      points.push({ x: a.endX, y: a.endY });
-    });
-    points.forEach((p) => {
-      const dist = Math.hypot(x - p.x, y - p.y);
+
+    const checkPoint = (px, py) => {
+      const dist = Math.hypot(x - px, y - py);
       if (dist < minDist) {
-        snapped = { ...p };
+        snapped = { x: px, y: py };
         minDist = dist;
       }
+    };
+
+    this.circles.forEach((c) => checkPoint(c.x, c.y));
+
+    this.arrows.forEach((a) => {
+      checkPoint(a.startX, a.startY);
+      checkPoint(a.endX, a.endY);
+      const nearest = this.nearestPointOnSegment(x, y, a.startX, a.startY, a.endX, a.endY);
+      checkPoint(nearest.x, nearest.y);
     });
+
     return snapped;
   }
 
