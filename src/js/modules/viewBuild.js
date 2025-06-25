@@ -578,7 +578,7 @@ function updateVoteUI(buildId, upvotes, downvotes, userVote) {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
-  if (!window.location.pathname.includes("viewBuild.html")) return;
+  if (!window.location.pathname.startsWith("/build/")) return;
 
   adjustRatingPosition();
   window.addEventListener("resize", adjustRatingPosition);
