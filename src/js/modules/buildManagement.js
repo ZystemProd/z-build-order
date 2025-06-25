@@ -27,6 +27,7 @@ import { parseBuildOrder } from "./utils.js";
 import { mapAnnotations } from "./interactive_map.js";
 import { checkPublishButtonVisibility } from "./community.js";
 import { logAnalyticsEvent } from "./analyticsHelper.js";
+import { getUserMainClanInfo } from "./clan.js";
 
 import DOMPurify from "dompurify";
 
@@ -477,12 +478,27 @@ export async function syncToPublishedBuild(buildId, buildData) {
         }
       : { views: 0, upvotes: 0, downvotes: 0, userVotes: {}, datePublished: Timestamp.now() };
 
+    let publisherClan = null;
+    try {
+      const clan = await getUserMainClanInfo(user.uid);
+      if (clan) {
+        publisherClan = {
+          name: clan.name,
+          tag: clan.abbreviation || clan.tag || "",
+          logoUrl: clan.logoUrl || null,
+        };
+      }
+    } catch (e) {
+      console.error("Failed to fetch main clan info", e);
+    }
+
     await setDoc(
       publishedRef,
       {
         ...buildData,
         publisherId: user.uid,
         username: buildData.publisher || buildData.username || "Unknown",
+        publisherClan,
         ...metrics,
       },
       { merge: true }
