@@ -227,7 +227,13 @@ export class MapAnnotations {
           this.previewArrow = null;
         }
       } else {
-        this.createCircle(x, y);
+        const clickedArrow = event.target.closest(".annotation-arrow");
+        const clickedCircle = event.target.closest(
+          ".annotation-circle-container"
+        );
+        if (!clickedArrow && !clickedCircle) {
+          this.createCircle(x, y);
+        }
       }
     };
 
