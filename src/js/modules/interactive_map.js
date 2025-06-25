@@ -275,7 +275,7 @@ export function initializeMapControls(mapAnnotations) {
 
 export function initializeInteractiveMap() {
   const mapAnnotations = new MapAnnotations(
-    "map-preview-image",
+    "map-preview-container",
     "map-annotations"
   );
   initializeMapControls(mapAnnotations);
@@ -384,9 +384,9 @@ toggleButtons.forEach((btn) => {
 
 // Safe export default mapAnnotations
 export const mapAnnotations =
-  document.getElementById("map-preview-image") &&
+  document.getElementById("map-preview-container") &&
   document.getElementById("map-annotations")
-    ? new MapAnnotations("map-preview-image", "map-annotations")
+    ? new MapAnnotations("map-preview-container", "map-annotations")
     : null;
 
 if (mapAnnotations) {
