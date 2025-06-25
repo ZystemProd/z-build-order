@@ -79,7 +79,27 @@ export class MapAnnotations {
     return { x, y };
   }
 
+  snapToNearbyPoint(x, y, threshold = 2) {
+    let snapped = { x, y };
+    let minDist = threshold;
+    const points = [];
+    this.circles.forEach((c) => points.push({ x: c.x, y: c.y }));
+    this.arrows.forEach((a) => {
+      points.push({ x: a.startX, y: a.startY });
+      points.push({ x: a.endX, y: a.endY });
+    });
+    points.forEach((p) => {
+      const dist = Math.hypot(x - p.x, y - p.y);
+      if (dist < minDist) {
+        snapped = { ...p };
+        minDist = dist;
+      }
+    });
+    return snapped;
+  }
+
   createCircle(x, y) {
+    ({ x, y } = this.snapToNearbyPoint(x, y));
     const container = document.createElement("div");
     container.classList.add("annotation-circle-container");
     container.style.left = `${x}%`;
@@ -157,7 +177,7 @@ export class MapAnnotations {
     arrow.style.top = `${startYPixels}px`;
     arrow.style.width = `${length}px`;
     arrow.style.transform = `rotate(${angle}deg)`;
-    arrow.style.transformOrigin = "0 0";
+    arrow.style.transformOrigin = "0 50%";
   }
 
   initializeEventListeners() {
@@ -169,7 +189,8 @@ export class MapAnnotations {
     this.mapContainer.removeEventListener("mouseleave", this.handleMouseLeave);
 
     this.handleMouseDown = (event) => {
-      const { x, y } = this.calculateCoordinates(event);
+      let { x, y } = this.calculateCoordinates(event);
+      ({ x, y } = this.snapToNearbyPoint(x, y));
       this.mousedownTimer = setTimeout(() => {
         this.isDrawingArrow = true;
         this.startX = x;
@@ -182,7 +203,8 @@ export class MapAnnotations {
 
     this.handleMouseUp = (event) => {
       clearTimeout(this.mousedownTimer);
-      const { x, y } = this.calculateCoordinates(event);
+      let { x, y } = this.calculateCoordinates(event);
+      ({ x, y } = this.snapToNearbyPoint(x, y));
 
       if (this.isDrawingArrow) {
         this.createArrow(this.startX, this.startY, x, y);
@@ -198,7 +220,8 @@ export class MapAnnotations {
 
     this.handleMouseMove = (event) => {
       if (this.isDrawingArrow && this.previewArrow) {
-        const { x, y } = this.calculateCoordinates(event);
+        let { x, y } = this.calculateCoordinates(event);
+        ({ x, y } = this.snapToNearbyPoint(x, y));
         this.updateArrow(this.previewArrow, this.startX, this.startY, x, y);
       }
     };
