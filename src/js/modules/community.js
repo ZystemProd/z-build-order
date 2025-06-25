@@ -22,6 +22,7 @@ import { formatMatchup, formatShortDate } from "./modal.js";
 import { auth, db } from "../../app.js"; // ✅ Ensure auth and db are imported correctly
 import DOMPurify from "dompurify";
 import { updateTooltips } from "./tooltip.js";
+import { getUserMainClanInfo } from "./clan.js";
 
 let communitySortMode = "hot"; // default sort mode
 
@@ -515,11 +516,25 @@ export async function publishBuildToCommunity(buildId) {
       ...buildData,
       publisherId: user.uid,
       username: username,
+      publisherClan: null,
       isPublished: true,
       datePublished: new Date().toISOString(),
       subcategory: formattedSubcategory, // for display ("ZvP")
       subcategoryLowercase: subcategoryLowercase, // for query ("zvp")
     };
+
+    try {
+      const clan = await getUserMainClanInfo(user.uid);
+      if (clan) {
+        newBuildData.publisherClan = {
+          name: clan.name,
+          tag: clan.abbreviation || clan.tag || "",
+          logoUrl: clan.logoUrl || null,
+        };
+      }
+    } catch (e) {
+      console.error("Failed to fetch main clan info", e);
+    }
 
     await addDoc(publishedBuildsRef, newBuildData);
     console.log(`✅ Published build ID ${buildId} to community`);
@@ -599,12 +614,27 @@ window.publishBuildToCommunity = async function (
   buildToPublish.subcategory = build.subcategory || "ZvP";
   buildToPublish.publisherId = user.uid;
   buildToPublish.username = build.publisher || "Anonymous";
+  buildToPublish.publisherClan = null;
   buildToPublish.isPublished = true;
   buildToPublish.datePublished = new Date().toISOString();
 
   // NEW: Publish Settings
   buildToPublish.isPublic = isPublic;
   buildToPublish.sharedToClans = sharedToClans;
+
+  try {
+    const { getUserMainClanInfo } = await import("./clan.js");
+    const clan = await getUserMainClanInfo(user.uid);
+    if (clan) {
+      buildToPublish.publisherClan = {
+        name: clan.name,
+        tag: clan.abbreviation || clan.tag || "",
+        logoUrl: clan.logoUrl || null,
+      };
+    }
+  } catch (e) {
+    console.error("Failed to fetch main clan info", e);
+  }
 
   // Analytics
   buildToPublish.views = 0;
