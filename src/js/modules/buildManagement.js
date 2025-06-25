@@ -41,16 +41,32 @@ export async function fetchUserBuilds() {
   const buildsRef = collection(db, `users/${user.uid}/builds`);
   const snapshot = await getDocs(buildsRef);
 
-  const builds = snapshot.docs.map((doc) => {
-    const data = doc.data();
-    const decodedTitle = doc.id.replace(/__SLASH__/g, "/");
+  const builds = await Promise.all(
+    snapshot.docs.map(async (docSnap) => {
+      const data = docSnap.data();
+      const decodedTitle = docSnap.id.replace(/__SLASH__/g, "/");
 
-    return {
-      id: doc.id,
-      title: decodedTitle,
-      ...data, // keep isPublished as stored
-    };
-  });
+      let isPublished = false;
+      try {
+        const pubSnap = await getDoc(doc(db, "publishedBuilds", docSnap.id));
+        if (pubSnap.exists()) {
+          isPublished = true;
+          const pubData = pubSnap.data() || {};
+          data.isPublic = pubData.isPublic ?? data.isPublic;
+          data.sharedToClans = pubData.sharedToClans ?? data.sharedToClans;
+        }
+      } catch (err) {
+        console.warn("Failed to verify published status:", err);
+      }
+
+      return {
+        id: docSnap.id,
+        title: decodedTitle,
+        ...data,
+        isPublished,
+      };
+    })
+  );
 
   return builds;
 }
