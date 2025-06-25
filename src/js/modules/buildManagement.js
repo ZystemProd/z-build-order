@@ -1,6 +1,7 @@
 import {
   getFirestore,
   collection,
+  addDoc,
   doc,
   setDoc,
   updateDoc,
@@ -253,10 +254,9 @@ export async function saveCurrentBuild() {
   };
 
   const buildsRef = collection(db, `users/${user.uid}/builds`);
-  const buildDoc = doc(buildsRef, encodedTitle);
 
   try {
-    await setDoc(buildDoc, newBuild);
+    const docRef = await addDoc(buildsRef, newBuild);
     logAnalyticsEvent("build_saved", {
       race: newBuild.category,
       matchup: newBuild.subcategory,
@@ -274,7 +274,7 @@ export async function saveCurrentBuild() {
     }
 
     filterBuilds("all");
-    return encodedTitle;
+    return docRef.id;
   } catch (error) {
     console.error("Error saving to Firestore:", error);
     showToast("❌ Failed to save build.", "error");
@@ -384,7 +384,7 @@ export async function updateCurrentBuild(buildId) {
   logAnalyticsEvent("build_updated", { race, matchup });
 
   const localBuilds = getSavedBuilds();
-  const localIndex = localBuilds.findIndex((b) => b.encodedTitle === buildId);
+  const localIndex = localBuilds.findIndex((b) => b.id === buildId);
   if (localIndex !== -1) {
     localBuilds[localIndex] = {
       ...localBuilds[localIndex],

@@ -74,7 +74,7 @@ export function populateBuildDetails(index) {
   const savedBuilds = getSavedBuilds();
   const build = savedBuilds[index];
 
-  setCurrentBuildId(build.encodedTitle); // or build.id if that's how you're storing it
+  setCurrentBuildId(build.id);
 
   const saveBuildButton = document.getElementById("saveBuildButton");
   if (saveBuildButton) {

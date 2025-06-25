@@ -258,7 +258,7 @@ export async function initializeIndexPage() {
         );
         if (updatedDoc.exists()) {
           const builds = getSavedBuilds();
-          const idx = builds.findIndex((b) => b.encodedTitle === buildId);
+          const idx = builds.findIndex((b) => b.id === buildId);
           if (idx !== -1) {
             builds[idx] = { ...builds[idx], ...updatedDoc.data() };
             saveSavedBuildsToLocalStorage();
@@ -1515,7 +1515,7 @@ export async function initializeIndexPage() {
               (b) =>
                 !b.imported &&
                 b.title.toLowerCase() === title &&
-                b.encodedTitle !== currentId
+                b.id !== currentId
             );
             if (duplicate) {
               saveBuildButton.disabled = true;

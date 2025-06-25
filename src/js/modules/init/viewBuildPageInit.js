@@ -5,8 +5,11 @@ import { initializeSectionToggles } from "../uiHandlers.js";
 import {
   doc,
   getDoc,
-  setDoc,
+  addDoc,
+  getDocs,
   collection,
+  query,
+  where,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { populateBuildsModal } from "../buildManagement.js";
 import { logAnalyticsEvent } from "../analyticsHelper.js";
@@ -46,15 +49,15 @@ async function importBuildHandler() {
 
     const buildData = buildDoc.data();
     const encodedTitle = buildData.title.replace(/\//g, "__SLASH__");
-    const userBuildDocRef = doc(userBuildsRef, encodedTitle);
-    const existingDoc = await getDoc(userBuildDocRef);
+    const q = query(userBuildsRef, where("encodedTitle", "==", encodedTitle));
+    const existingSnap = await getDocs(q);
 
-    if (existingDoc.exists()) {
+    if (!existingSnap.empty) {
       alert("⚠️ This build is already in your library.");
       return;
     }
 
-    await setDoc(userBuildDocRef, {
+    const docRef = await addDoc(userBuildsRef, {
       ...buildData,
       publisher: buildData.username || buildData.publisher || "Unknown",
       imported: true,

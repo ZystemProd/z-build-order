@@ -2,10 +2,14 @@ import { auth, db, initializeAuthUI } from "../../app.js"; // ✅ Reuse Firebase
 import {
   collection,
   doc,
+  addDoc,
   getDoc,
+  getDocs,
   setDoc,
   updateDoc,
   increment,
+  query,
+  where,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { formatActionText } from "../modules/textFormatters.js"; // ✅ Format build steps
 import {
@@ -608,10 +612,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       const buildData = buildSnap.data();
       const encodedTitle = buildData.title.replace(/\//g, "__SLASH__");
-      const userBuildRef = doc(db, `users/${user.uid}/builds/${encodedTitle}`);
-      const userBuildSnap = await getDoc(userBuildRef);
+      const userBuildsRef = collection(db, `users/${user.uid}/builds`);
+      const q = query(userBuildsRef, where("encodedTitle", "==", encodedTitle));
+      const existingSnap = await getDocs(q);
 
-      if (userBuildSnap.exists()) {
+      if (!existingSnap.empty) {
         importBtn.disabled = true;
         importBtn.textContent = "Imported";
         importBtn.classList.add("imported");
