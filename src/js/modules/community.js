@@ -184,7 +184,8 @@ async function fetchNextCommunityBuilds(batchSize = 20) {
       const hotnessScore =
         (upvotes - downvotes) / Math.pow(ageInHours + 2, gravity);
 
-      const publisherClan = await getPublisherClanInfo(data.publisherId);
+      const publisherClan =
+        data.publisherClan || (await getPublisherClanInfo(data.publisherId));
       return {
         id: doc.id,
         title: data.title || "Untitled Build",
@@ -996,7 +997,8 @@ export async function filterCommunityBuilds(filter = "all") {
 
         const clanId = (data.sharedToClans || []).find((id) => userClanMap[id]);
         const clanInfo = clanId ? userClanMap[clanId] : null;
-        const publisherClan = await getPublisherClanInfo(data.publisherId);
+        const publisherClan =
+          data.publisherClan || (await getPublisherClanInfo(data.publisherId));
 
         return {
           id: doc.id,
