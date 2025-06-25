@@ -2,14 +2,11 @@ import {
   getDoc,
   getDocs,
   doc,
-  addDoc,
   collection,
   updateDoc,
-  deleteDoc,
   setDoc,
   query,
   where,
-  Timestamp,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { auth, db } from "../../../app.js";
 import DOMPurify from "dompurify";
@@ -19,6 +16,7 @@ import {
   loadClanBuilds,
   fetchUserBuilds,
   fetchPublishedUserBuilds,
+  syncToPublishedBuild,
 } from "../buildManagement.js";
 import { initializeAutoCorrect } from "../autoCorrect.js";
 import { populateBuildDetails, analyzeBuildOrder } from "../uiHandlers.js";
@@ -720,8 +718,8 @@ export async function initializeIndexPage() {
     spinnerWrapper.style.display = "flex";
 
     try {
-      document.getElementById("myBuildsTab").classList.add("active");
-      document.getElementById("publishedBuildsTab").classList.remove("active");
+      document.getElementById("myBuildsTab")?.classList.add("active");
+      document.getElementById("publishedBuildsTab")?.classList.remove("active");
       await filterBuilds(getCurrentBuildFilter());
     } catch (err) {
       console.error("Error loading My Builds:", err);
@@ -738,8 +736,8 @@ export async function initializeIndexPage() {
     spinnerWrapper.style.display = "flex";
 
     try {
-      document.getElementById("publishedBuildsTab").classList.add("active");
-      document.getElementById("myBuildsTab").classList.remove("active");
+      document.getElementById("publishedBuildsTab")?.classList.add("active");
+      document.getElementById("myBuildsTab")?.classList.remove("active");
       await filterBuilds(getCurrentBuildFilter());
     } catch (err) {
       console.error("Error loading Published Builds:", err);
@@ -885,21 +883,18 @@ export async function initializeIndexPage() {
     const usernameSnap = await getDocs(usernameQuery);
     const username = !usernameSnap.empty ? usernameSnap.docs[0].id : "Unknown";
 
-    // ✅ Create/Update the published version
-    const publishedBuildRef = doc(db, "publishedBuilds", buildId);
-    const publishedData = {
+    const updatedData = {
       ...buildData,
       publisherId: user.uid,
       username,
       isPublic: publishToCommunity,
       sharedToClans: checkedClans,
-      datePublished: Timestamp.now(), // ✅ Firestore-native timestamp
-      views: 0,
-      upvotes: 0,
-      downvotes: 0,
+      isPublished: publishToCommunity || checkedClans.length > 0,
     };
 
-    await setDoc(publishedBuildRef, publishedData);
+    await setDoc(userBuildRef, updatedData, { merge: true });
+    await syncToPublishedBuild(buildId, { id: buildId, ...updatedData });
+
     if (publishToCommunity || checkedClans.length > 0) {
       logAnalyticsEvent("build_published", {
         race: buildData.category,
@@ -907,44 +902,11 @@ export async function initializeIndexPage() {
       });
     }
 
-    // ✅ Delete if fully unpublished (optional)
-    if (!publishToCommunity && checkedClans.length === 0) {
-      await deleteDoc(publishedBuildRef);
-      await updateDoc(userBuildRef, {
-        isPublished: false,
-        isPublic: false,
-        sharedToClans: [],
-      });
-    } else {
-      await updateDoc(userBuildRef, {
-        isPublished: true,
-        isPublic: publishToCommunity,
-        sharedToClans: checkedClans,
-      });
-    }
-
     showToast("✅ Publish settings updated!", "success");
-
-    // 🔄 Reload Published Builds list
-    if (
-      document
-        .getElementById("publishedBuildsTab")
-        ?.classList.contains("active")
-    ) {
-      localStorage.setItem("communityBuildType", "all");
-
-      const publishedBuilds = await fetchPublishedUserBuilds(
-        getCurrentBuildFilter()
-      );
-      populateBuildList(publishedBuilds);
-    }
 
     // ✅ Close modal
     const modal = document.getElementById("publishModal");
     if (modal) modal.style.display = "none";
-
-    // ✅ Trigger the "Published Builds" tab to refresh view
-    document.getElementById("publishedBuildsTab")?.click();
   });
 
   window.addEventListener("mousedown", (event) => {

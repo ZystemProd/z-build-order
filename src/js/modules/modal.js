@@ -95,9 +95,8 @@ export async function setBuildViewMode(mode) {
 }
 
 function isPublishedBuildsTabActive() {
-  return document
-    .getElementById("publishedBuildsTab")
-    ?.classList.contains("active");
+  const tab = document.getElementById("publishedBuildsTab");
+  return tab ? tab.classList.contains("active") : false;
 }
 
 export function formatMatchup(matchup) {

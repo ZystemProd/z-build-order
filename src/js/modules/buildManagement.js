@@ -5,11 +5,13 @@ import {
   doc,
   setDoc,
   updateDoc,
+  deleteDoc,
   getDocs,
   getDoc,
   query,
   where,
   orderBy,
+  Timestamp,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 
 import { getAuth } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
@@ -370,13 +372,10 @@ export async function updateCurrentBuild(buildId) {
     saveSavedBuildsToLocalStorage();
   }
 
-  // 🔄 Also update community version if published
-  const publishedRef = doc(db, "publishedBuilds", buildId);
-  const communitySnap = await getDoc(publishedRef);
-
-  if (communitySnap.exists()) {
-    await setDoc(publishedRef, updatedData, { merge: true });
-    console.log("🌍 Community build updated as well.");
+  // 🔄 Sync to published copy if needed
+  const updatedSnap = await getDoc(buildDocRef);
+  if (updatedSnap.exists()) {
+    await syncToPublishedBuild(buildId, updatedSnap.data());
   }
 
   checkPublishButtonVisibility();
@@ -453,4 +452,42 @@ export async function fetchPublishedUserBuilds(filter = "all") {
 
   const snapshot = await getDocs(q);
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+}
+
+export async function syncToPublishedBuild(buildId, buildData) {
+  const db = getFirestore();
+  const user = getAuth().currentUser;
+  if (!user) return;
+
+  const publishedRef = doc(db, "publishedBuilds", buildId);
+  const existingSnap = await getDoc(publishedRef);
+
+  const shouldPublish =
+    buildData.isPublic || (buildData.sharedToClans || []).length > 0;
+
+  if (shouldPublish) {
+    const metrics = existingSnap.exists()
+      ? {
+          views: existingSnap.data().views || 0,
+          upvotes: existingSnap.data().upvotes || 0,
+          downvotes: existingSnap.data().downvotes || 0,
+          userVotes: existingSnap.data().userVotes || {},
+          datePublished:
+            existingSnap.data().datePublished || Timestamp.now(),
+        }
+      : { views: 0, upvotes: 0, downvotes: 0, userVotes: {}, datePublished: Timestamp.now() };
+
+    await setDoc(
+      publishedRef,
+      {
+        ...buildData,
+        publisherId: user.uid,
+        username: buildData.publisher || buildData.username || "Unknown",
+        ...metrics,
+      },
+      { merge: true }
+    );
+  } else if (existingSnap.exists()) {
+    await deleteDoc(publishedRef);
+  }
 }
