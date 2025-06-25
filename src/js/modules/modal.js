@@ -917,7 +917,8 @@ export async function populateBuildList(
     const publishInfo = buildEl.querySelector(".build-publish-info");
     if (publishInfo) {
       const publishedTab = isPublishedBuildsTabActive();
-      const isBuildPublished = !!build.isPublished || !!build.isPublic;
+      const isBuildPublished =
+        !!build.isPublished || !!build.isPublic || build.sharedToClans?.length > 0;
 
       if (build.imported) {
         publishInfo.classList.add("publish-imported");
