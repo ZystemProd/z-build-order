@@ -79,7 +79,40 @@ export class MapAnnotations {
     return { x, y };
   }
 
+  nearestPointOnSegment(px, py, x1, y1, x2, y2) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    if (dx === 0 && dy === 0) return { x: x1, y: y1 };
+    const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy)));
+    return { x: x1 + t * dx, y: y1 + t * dy };
+  }
+
+  snapToNearbyPoint(x, y, threshold = 2) {
+    let snapped = { x, y };
+    let minDist = threshold;
+
+    const checkPoint = (px, py) => {
+      const dist = Math.hypot(x - px, y - py);
+      if (dist < minDist) {
+        snapped = { x: px, y: py };
+        minDist = dist;
+      }
+    };
+
+    this.circles.forEach((c) => checkPoint(c.x, c.y));
+
+    this.arrows.forEach((a) => {
+      checkPoint(a.startX, a.startY);
+      checkPoint(a.endX, a.endY);
+      const nearest = this.nearestPointOnSegment(x, y, a.startX, a.startY, a.endX, a.endY);
+      checkPoint(nearest.x, nearest.y);
+    });
+
+    return snapped;
+  }
+
   createCircle(x, y) {
+    ({ x, y } = this.snapToNearbyPoint(x, y));
     const container = document.createElement("div");
     container.classList.add("annotation-circle-container");
     container.style.left = `${x}%`;
@@ -157,7 +190,7 @@ export class MapAnnotations {
     arrow.style.top = `${startYPixels}px`;
     arrow.style.width = `${length}px`;
     arrow.style.transform = `rotate(${angle}deg)`;
-    arrow.style.transformOrigin = "0 0";
+    arrow.style.transformOrigin = "0 50%";
   }
 
   initializeEventListeners() {
@@ -169,11 +202,12 @@ export class MapAnnotations {
     this.mapContainer.removeEventListener("mouseleave", this.handleMouseLeave);
 
     this.handleMouseDown = (event) => {
-      const { x, y } = this.calculateCoordinates(event);
+      let { x, y } = this.calculateCoordinates(event);
+      ({ x, y } = this.snapToNearbyPoint(x, y));
+      this.startX = x;
+      this.startY = y;
       this.mousedownTimer = setTimeout(() => {
         this.isDrawingArrow = true;
-        this.startX = x;
-        this.startY = y;
         this.previewArrow = document.createElement("div");
         this.previewArrow.classList.add("annotation-arrow", "preview-arrow");
         this.annotationsContainer.appendChild(this.previewArrow);
@@ -182,7 +216,8 @@ export class MapAnnotations {
 
     this.handleMouseUp = (event) => {
       clearTimeout(this.mousedownTimer);
-      const { x, y } = this.calculateCoordinates(event);
+      let { x, y } = this.calculateCoordinates(event);
+      ({ x, y } = this.snapToNearbyPoint(x, y));
 
       if (this.isDrawingArrow) {
         this.createArrow(this.startX, this.startY, x, y);
@@ -192,13 +227,20 @@ export class MapAnnotations {
           this.previewArrow = null;
         }
       } else {
-        this.createCircle(x, y);
+        const clickedArrow = event.target.closest(".annotation-arrow");
+        const clickedCircle = event.target.closest(
+          ".annotation-circle-container"
+        );
+        if (!clickedArrow && !clickedCircle) {
+          this.createCircle(x, y);
+        }
       }
     };
 
     this.handleMouseMove = (event) => {
       if (this.isDrawingArrow && this.previewArrow) {
-        const { x, y } = this.calculateCoordinates(event);
+        let { x, y } = this.calculateCoordinates(event);
+        ({ x, y } = this.snapToNearbyPoint(x, y));
         this.updateArrow(this.previewArrow, this.startX, this.startY, x, y);
       }
     };
@@ -239,7 +281,7 @@ export function initializeMapControls(mapAnnotations) {
 
 export function initializeInteractiveMap() {
   const mapAnnotations = new MapAnnotations(
-    "map-preview-image",
+    "map-preview-container",
     "map-annotations"
   );
   initializeMapControls(mapAnnotations);
@@ -348,9 +390,9 @@ toggleButtons.forEach((btn) => {
 
 // Safe export default mapAnnotations
 export const mapAnnotations =
-  document.getElementById("map-preview-image") &&
+  document.getElementById("map-preview-container") &&
   document.getElementById("map-annotations")
-    ? new MapAnnotations("map-preview-image", "map-annotations")
+    ? new MapAnnotations("map-preview-container", "map-annotations")
     : null;
 
 if (mapAnnotations) {
