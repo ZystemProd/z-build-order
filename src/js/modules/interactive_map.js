@@ -204,10 +204,10 @@ export class MapAnnotations {
     this.handleMouseDown = (event) => {
       let { x, y } = this.calculateCoordinates(event);
       ({ x, y } = this.snapToNearbyPoint(x, y));
+      this.startX = x;
+      this.startY = y;
       this.mousedownTimer = setTimeout(() => {
         this.isDrawingArrow = true;
-        this.startX = x;
-        this.startY = y;
         this.previewArrow = document.createElement("div");
         this.previewArrow.classList.add("annotation-arrow", "preview-arrow");
         this.annotationsContainer.appendChild(this.previewArrow);
