@@ -95,9 +95,8 @@ export async function setBuildViewMode(mode) {
 }
 
 function isPublishedBuildsTabActive() {
-  return document
-    .getElementById("publishedBuildsTab")
-    ?.classList.contains("active");
+  const tab = document.getElementById("publishedBuildsTab");
+  return tab ? tab.classList.contains("active") : false;
 }
 
 export function formatMatchup(matchup) {
@@ -916,7 +915,6 @@ export async function populateBuildList(
 
     const publishInfo = buildEl.querySelector(".build-publish-info");
     if (publishInfo) {
-      const publishedTab = isPublishedBuildsTabActive();
       const isBuildPublished = !!build.isPublished || !!build.isPublic;
 
       if (build.imported) {
@@ -928,21 +926,16 @@ export async function populateBuildList(
         publishInfo.classList.add("publish-published");
         publishInfo.dataset.tooltip = "published";
         publishInfo.innerHTML = `<img src="./img/SVG/checkmark2.svg" class="publish-icon" alt="Published">`;
-        if (publishedTab) {
-          if (build.isPublic)
-            publishInfo.innerHTML += `<span class="tag public">Public</span>`;
-          if (build.sharedToClans?.length > 0)
-            publishInfo.innerHTML += `<span class="tag clan">Clan</span>`;
-          publishInfo.style.pointerEvents = "auto";
-          publishInfo.classList.remove("no-border");
-          publishInfo.addEventListener("click", (e) => {
-            e.stopPropagation();
-            openPublishModal(build.id);
-          });
-        } else {
-          publishInfo.style.pointerEvents = "auto";
-          publishInfo.classList.add("no-border");
-        }
+        if (build.isPublic)
+          publishInfo.innerHTML += `<span class="tag public">Public</span>`;
+        if (build.sharedToClans?.length > 0)
+          publishInfo.innerHTML += `<span class="tag clan">Clan</span>`;
+        publishInfo.style.pointerEvents = "auto";
+        publishInfo.classList.remove("no-border");
+        publishInfo.addEventListener("click", (e) => {
+          e.stopPropagation();
+          openPublishModal(build.id);
+        });
       } else {
         publishInfo.classList.add("publish-unpublished");
         publishInfo.dataset.tooltip = "publish";

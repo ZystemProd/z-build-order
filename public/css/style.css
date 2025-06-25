@@ -1038,7 +1038,7 @@ textarea::-webkit-scrollbar-thumb:hover {
   padding: 4px 8px;
   border-radius: 8px;
   cursor: pointer;
-  transition: background 0.3s, color 0.3s, transform 0.3s;
+  transition: background 0.3s, color 0.3s, border-color 0.3s;
   color: var(--race-color, #5fe5ff);
   background: rgba(95, 229, 255, 0.08); /* Softer background */
   border: 1px solid var(--race-color, #5fe5ff);
@@ -1047,7 +1047,8 @@ textarea::-webkit-scrollbar-thumb:hover {
 .build-publish-info:hover {
   background: rgba(95, 229, 255, 0.2); /* Just a little brighter, not solid */
   color: #ffffff; /* Keep text white */
-  transform: scale(1.05); /* Slight grow effect */
+  border-color: #ffffff;
+  transform: none; /* Remove grow effect */
 }
 
 /* Disable hover effects for read-only publish states */
@@ -1059,8 +1060,11 @@ textarea::-webkit-scrollbar-thumb:hover {
 
 .publish-published:hover,
 .publish-imported:hover {
-  background: inherit;
   transform: none;
+}
+
+.publish-published:hover {
+  border-color: #ffffff;
 }
 
 .publish-unpublished {
@@ -4510,7 +4514,7 @@ button.btn-small {
   }
 
   .build-publish-info:hover {
-    transform: scale(0.8);
+    border-color: #ffffff;
   }
 
   .tag.public::after {
