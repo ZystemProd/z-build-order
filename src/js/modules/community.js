@@ -18,7 +18,7 @@ import {
 import { formatActionText } from "./textFormatters.js";
 import { showToast } from "./toastHandler.js";
 import { formatMatchup, formatShortDate } from "./modal.js";
-import { populateBuildsModal } from "./buildManagement.js"; // ✅ Corrected import
+
 import { auth, db } from "../../app.js"; // ✅ Ensure auth and db are imported correctly
 import DOMPurify from "dompurify";
 import { updateTooltips } from "./tooltip.js";
@@ -568,7 +568,10 @@ export async function publishBuildToCommunity(buildId) {
   }
 }
 
-window.publishBuildToCommunity = async function (buildId) {
+window.publishBuildToCommunity = async function (
+  buildId,
+  { isPublic, sharedToClans }
+) {
   const { getFirestore, doc, getDoc, collection, addDoc, setDoc } =
     await import(
       "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js"
@@ -599,7 +602,7 @@ window.publishBuildToCommunity = async function (buildId) {
   const { encodedTitle, isPublished, timestamp, imported, ...buildToPublish } =
     build;
 
-  // Required for Firestore rule compliance
+  // Required fields
   buildToPublish.title = build.title || "Untitled Build";
   buildToPublish.category = build.category || "Zerg";
   buildToPublish.subcategory = build.subcategory || "ZvP";
@@ -608,7 +611,11 @@ window.publishBuildToCommunity = async function (buildId) {
   buildToPublish.isPublished = true;
   buildToPublish.datePublished = new Date().toISOString();
 
-  // Analytics fields
+  // NEW: Publish Settings
+  buildToPublish.isPublic = isPublic;
+  buildToPublish.sharedToClans = sharedToClans;
+
+  // Analytics
   buildToPublish.views = 0;
   buildToPublish.upvotes = 0;
   buildToPublish.downvotes = 0;
@@ -624,31 +631,6 @@ window.publishBuildToCommunity = async function (buildId) {
       { merge: true }
     );
 
-    // ✅ Update publish icon in build card
-    const buildCard = document.querySelector(
-      `.build-card[data-id="${buildId}"]`
-    );
-    if (buildCard) {
-      const publishInfo = buildCard.querySelector(".build-publish-info");
-      if (publishInfo) {
-        publishInfo.innerHTML = `<img src="./img/SVG/checkmark2.svg" alt="Published" class="publish-icon">`;
-        publishInfo.dataset.tooltip = "published";
-        publishInfo.classList.remove("publish-unpublished");
-        publishInfo.classList.add("publish-published");
-        publishInfo.onclick = (event) => {
-          event.stopPropagation();
-          openPublishSettingsModal(buildId); // Optional: if you support publish settings
-        };
-      }
-    }
-
-    // ✅ Close modal if open
-    const modal = document.querySelector(
-      ".modal-content.small-modal"
-    )?.parentElement;
-    if (modal) modal.style.display = "none";
-
-    // ✅ Show toast
     showToast("✅ Build published to community!", "success");
   } catch (err) {
     console.error("❌ Failed to publish:", err);
@@ -961,6 +943,11 @@ export async function filterCommunityBuilds(filter = "all") {
     constraints.push(where("sharedToClans", "array-contains-any", userClanIds));
   }
 
+  // ✅ All builds — load user clans so clan tag can show
+  else if (type === "all") {
+    userClanMap = await getUserClansMap();
+  }
+
   // ✅ Subcategory filter (e.g., ZvP, TvT)
   if (
     ["zvp", "zvt", "zvz", "pvp", "pvt", "pvz", "tvp", "tvt", "tvz"].includes(
@@ -1033,7 +1020,7 @@ export async function filterCommunityBuilds(filter = "all") {
 
     // 📝 Update heading
     const heading = document.querySelector("#communityModal h3");
-    let displayLabel = capitalize(type); // Public or Clan
+    let displayLabel = capitalize(type); // Public, Clan, All
     if (
       ["zvp", "zvt", "zvz", "pvp", "pvt", "pvz", "tvp", "tvt", "tvz"].includes(
         lowerFilter
@@ -1048,6 +1035,7 @@ export async function filterCommunityBuilds(filter = "all") {
   } catch (err) {
     console.error("Error filtering community builds:", err);
   }
+
   localStorage.removeItem("communityFilterValue");
 }
 

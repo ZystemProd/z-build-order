@@ -2,6 +2,7 @@ import {
   getDoc,
   getDocs,
   doc,
+  addDoc,
   collection,
   updateDoc,
   deleteDoc,
@@ -14,7 +15,6 @@ import { auth, db } from "../../../app.js";
 import DOMPurify from "dompurify";
 import {
   saveCurrentBuild,
-  populateBuildsModal,
   updateCurrentBuild,
   loadClanBuilds,
   fetchUserBuilds,
@@ -924,6 +924,20 @@ export async function initializeIndexPage() {
     }
 
     showToast("✅ Publish settings updated!", "success");
+
+    // 🔄 Reload Published Builds list
+    if (
+      document
+        .getElementById("publishedBuildsTab")
+        ?.classList.contains("active")
+    ) {
+      localStorage.setItem("communityBuildType", "all");
+
+      const publishedBuilds = await fetchPublishedUserBuilds(
+        getCurrentBuildFilter()
+      );
+      populateBuildList(publishedBuilds);
+    }
 
     // ✅ Close modal
     const modal = document.getElementById("publishModal");

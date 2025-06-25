@@ -11,7 +11,6 @@ import {
   query,
   where,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
-import { populateBuildsModal } from "../buildManagement.js";
 import { logAnalyticsEvent } from "../analyticsHelper.js";
 
 export function initializeViewBuildPage() {

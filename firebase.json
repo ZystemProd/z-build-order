@@ -19,6 +19,10 @@
     ],
     "rewrites": [
       {
+        "source": "/sitemap.xml",
+        "function": "sitemap"
+      },
+      {
         "source": "/build/**",
         "destination": "/viewBuild.html"
       }
@@ -39,5 +43,18 @@
       "port": 5000
     }
   },
-  "singleProjectMode": true
+  "singleProjectMode": true,
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ]
+    }
+  ]
 }

@@ -430,6 +430,10 @@ async function loadBuild() {
         mainLayout.style.display = anyVisible ? "block" : "none";
       }
     }
+    injectSchemaMarkup(build);
+    // ✅ Initial icon + count state
+    updateVoteButtonIcons(buildId);
+    injectMetaTags(buildId, build);
   } else {
     console.error("❌ Build not found in Firestore:", buildId);
     document.getElementById("buildTitle").innerText = "Build not found.";
@@ -449,10 +453,6 @@ async function loadBuild() {
       }
     });
   });
-
-  injectSchemaMarkup(build);
-  // ✅ Initial icon + count state
-  updateVoteButtonIcons(buildId);
 }
 
 async function handleVote(buildId, voteType) {
@@ -688,6 +688,43 @@ function injectSchemaMarkup(build) {
   script.type = "application/ld+json";
   script.textContent = JSON.stringify(schema, null, 2);
   document.head.appendChild(script);
+}
+
+function injectMetaTags(buildId, build) {
+  const title = `${build.title || "StarCraft 2 Build"} - Z-Build Order`;
+  const description = `StarCraft 2 build order for ${
+    build.subcategory || "Unknown"
+  } matchup.`;
+  const url = `https://zbuildorder.com/build/${buildId}`;
+  const ogImage = "https://zbuildorder.com/img/og-image.webp"; // <-- You can customize this!
+
+  // Update <title>
+  document.title = title;
+
+  // Helper to set or create meta tag
+  function setMeta(property, content) {
+    let tag = document.querySelector(`meta[property="${property}"]`);
+    if (!tag) {
+      tag = document.createElement("meta");
+      tag.setAttribute("property", property);
+      document.head.appendChild(tag);
+    }
+    tag.setAttribute("content", content);
+  }
+
+  setMeta("og:title", title);
+  setMeta("og:description", description);
+  setMeta("og:url", url);
+  setMeta("og:image", ogImage);
+
+  // Optional: canonical tag
+  let canonical = document.querySelector('link[rel="canonical"]');
+  if (!canonical) {
+    canonical = document.createElement("link");
+    canonical.setAttribute("rel", "canonical");
+    document.head.appendChild(canonical);
+  }
+  canonical.setAttribute("href", url);
 }
 
 window.addEventListener("popstate", () => {

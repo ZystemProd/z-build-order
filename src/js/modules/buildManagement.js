@@ -48,31 +48,8 @@ export async function fetchUserBuilds() {
     return {
       id: doc.id,
       title: decodedTitle,
-      favorite: data.favorite || false,
-      ...data,
-      isPublished: false, // default
+      ...data, // keep isPublished as stored
     };
-  });
-
-  // 🔍 Now fetch community builds by this user
-  const publishedRef = collection(db, "publishedBuilds");
-  const q = query(publishedRef, where("publisherId", "==", user.uid));
-  const communitySnapshot = await getDocs(q);
-  const publishedTitles = new Set(
-    communitySnapshot.docs.map((doc) => doc.data().title)
-  );
-
-  // ✅ Update each build with actual publish status
-  builds.forEach((build) => {
-    if (publishedTitles.has(build.title)) {
-      build.isPublished = true;
-    }
-  });
-
-  builds.sort((a, b) => {
-    const favDiff = (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0);
-    if (favDiff !== 0) return favDiff;
-    return (b.timestamp || 0) - (a.timestamp || 0);
   });
 
   return builds;
