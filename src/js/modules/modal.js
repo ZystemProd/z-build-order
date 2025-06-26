@@ -32,11 +32,7 @@ import {
   clearEditingPublishedBuild,
 } from "./states/buildState.js";
 import { loadBuilds } from "./buildService.js";
-import {
-  fetchUserBuilds,
-  fetchPublishedUserBuilds,
-  updateBuildFavorite,
-} from "./buildManagement.js";
+import { fetchUserBuilds, updateBuildFavorite } from "./buildManagement.js";
 import { setSavedBuilds } from "./buildStorage.js";
 import DOMPurify from "dompurify";
 import { updateTooltips } from "./tooltip.js";
@@ -94,10 +90,6 @@ export async function setBuildViewMode(mode) {
   }
 }
 
-function isPublishedBuildsTabActive() {
-  const tab = document.getElementById("publishedBuildsTab");
-  return tab ? tab.classList.contains("active") : false;
-}
 
 export function formatMatchup(matchup) {
   if (!matchup) return "Unknown Match-Up";
@@ -129,16 +121,11 @@ export async function filterBuilds(categoryOrSubcategory = "all") {
   const buildListEl = document.getElementById("buildList");
   if (buildListEl) buildListEl.innerHTML = "";
 
-  const isPublishedTabActive = document
-    .getElementById("publishedBuildsTab")
-    ?.classList.contains("active");
-
   console.log("🧪 Filtering builds...");
   console.log("➡️ Filter:", currentBuildFilter);
-  console.log("📦 Tab:", isPublishedTabActive ? "Published" : "My Builds");
 
   const { builds, lastDoc } = await loadBuilds({
-    type: isPublishedTabActive ? "published" : "my",
+    type: "my",
     filter: currentBuildFilter,
     batchSize: 20,
   });
@@ -147,8 +134,8 @@ export async function filterBuilds(categoryOrSubcategory = "all") {
 
   const label =
     currentBuildFilter === "all"
-      ? `Build Orders${isPublishedTabActive ? " - Published Builds" : ""}`
-      : `Build Orders${isPublishedTabActive ? " - Published Builds" : ""} - ${
+      ? `Build Orders`
+      : `Build Orders - ${
           [
             "zvp",
             "zvt",
@@ -180,7 +167,7 @@ export async function loadMoreBuilds() {
   if (!user || !lastVisibleBuild) return;
 
   const newBuilds = await loadBuilds({
-    type: isPublishedBuildsTabActive() ? "published" : "my",
+    type: "my",
     filter: currentBuildFilter,
     batchSize: 20,
     after: lastVisibleBuild,
@@ -217,7 +204,7 @@ async function handleScroll() {
     isLoadingMoreBuilds = true;
 
     const more = await loadBuilds({
-      type: isPublishedBuildsTabActive() ? "published" : "my",
+      type: "my",
       filter: currentBuildFilter,
       batchSize: 20,
       startAfter: lastVisibleBuild,
@@ -649,14 +636,6 @@ export async function showBuildsModal() {
     }
   });
 
-  // ✅ Activate the "My Builds" tab
-  const myTab = document.getElementById("myBuildsTab");
-  const pubTab = document.getElementById("publishedBuildsTab");
-  if (myTab && pubTab) {
-    myTab.classList.add("active");
-    pubTab.classList.remove("active");
-  }
-
   // ✅ Activate "All" category filter
   const allTab = document.querySelector(
     '#buildsModal .filter-category[data-category="all"]'
@@ -666,25 +645,18 @@ export async function showBuildsModal() {
   if (allTab) allTab.classList.add("active");
 
   // ✅ Update heading
-  if (heading) heading.textContent = "Build Orders - My Builds";
+  if (heading) heading.textContent = "Build Orders";
 
   // ✅ Load My Builds
   try {
-    // 🔁 Only fetch when My Builds tab is active
-    const myTabActive = document
-      .getElementById("myBuildsTab")
-      ?.classList.contains("active");
+    const activeCategory =
+      document.querySelector("#buildsModal .filter-category.active")?.dataset
+        .category ||
+      document.querySelector("#buildsModal .subcategory.active")?.dataset
+        .subcategory ||
+      "all";
 
-    if (myTabActive) {
-      const activeCategory =
-        document.querySelector("#buildsModal .filter-category.active")?.dataset
-          .category ||
-        document.querySelector("#buildsModal .subcategory.active")?.dataset
-          .subcategory ||
-        "all";
-
-      await filterBuilds(activeCategory);
-    }
+    await filterBuilds(activeCategory);
   } catch (err) {
     console.error("Error loading My Builds:", err);
   }
@@ -1127,17 +1099,8 @@ export async function searchBuilds(query) {
   );
   if (allBtn) allBtn.classList.add("active");
 
-  // Determine which tab is active and fetch builds accordingly
-  const isPublishedTabActive = document
-    .getElementById("publishedBuildsTab")
-    ?.classList.contains("active");
-
-  let builds = [];
-  if (isPublishedTabActive) {
-    builds = await fetchPublishedUserBuilds("all");
-  } else {
-    builds = await fetchUserBuilds();
-  }
+  // Fetch all of the user's builds
+  const builds = await fetchUserBuilds();
 
   // Filter builds by title
   const filteredBuilds = builds.filter((build) =>
