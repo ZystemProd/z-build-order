@@ -602,6 +602,11 @@ button:hover {
   gap: 8px;
 }
 
+.toggle-header-left {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
 .toggle-header-right {
   display: flex;
   gap: 8px;
@@ -706,9 +711,6 @@ button:hover {
 }
 
 .template-buttons {
-  position: absolute;
-  top: -28px;
-  left: 0;
   display: flex;
 }
 
