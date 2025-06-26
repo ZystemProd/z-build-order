@@ -498,6 +498,11 @@ export async function initializeIndexPage() {
     if (input) input.click();
   });
 
+  safeAdd("replayButton", "click", () => {
+    const input = document.getElementById("replayFileInput");
+    if (input) input.click();
+  });
+
   async function populateReplayOptions(file) {
     const loader = document.getElementById("optionsLoadingWrapper");
     if (loader) loader.style.display = "flex";

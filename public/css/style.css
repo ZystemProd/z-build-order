@@ -705,6 +705,29 @@ button:hover {
   width: 100%;
 }
 
+.template-buttons {
+  position: absolute;
+  top: -28px;
+  left: 0;
+  display: flex;
+}
+
+.template-buttons .template-btn {
+  background-color: #383838;
+  color: #fff;
+  border: 1px solid #444;
+  border-bottom: none;
+  padding: 4px 8px;
+  cursor: pointer;
+  margin: 0;
+  height: 26px;
+  line-height: 18px;
+}
+
+.template-buttons .template-btn + .template-btn {
+  border-left: none;
+}
+
 .template-icon-button {
   position: absolute;
   top: -22px;

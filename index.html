@@ -201,18 +201,11 @@
       <div id="buildOrderInputField" class="hideable-section">
         <div class="template-wrapper">
           <div class="dropdown">
-            <svg id="templateMenuButton" class="template-icon-button" data-tooltip="Template & Replay" width="60"
-              height="26" viewBox="0 0 60 26" xmlns="http://www.w3.org/2000/svg">
-              <polygon points="0,0 33,0 60,26 0,26"></polygon>
-              <path d="M0,0 L33,0" />
-              <path d="M33,0 L60,26" />
-              <path d="M60,26 L0,26" />
-              <path d="M0,26 L0,0" />
-              <text x="10" y="20">+</text>
-            </svg>
+            <div class="template-buttons">
+              <button id="templateMenuButton" class="template-btn" data-tooltip="Template">Template</button>
+              <button id="replayButton" class="template-btn" data-tooltip="Replay">Replay</button>
+            </div>
             <div id="templateDropdown" class="dropdown-content">
-              <button id="parseReplayButton" class="btn">Upload From Replay</button>
-              <hr class="dropdown-divider" />
               <button id="openTemplatesButton">Open Templates</button>
               <button id="saveTemplateButton">Save Template</button>
             </div>
@@ -818,7 +811,7 @@
 
 
 
-      <p>Version 0.5.8067</p>
+      <p>Version 0.5.8068</p>
 
 
 
