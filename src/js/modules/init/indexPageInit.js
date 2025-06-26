@@ -493,7 +493,8 @@ export async function initializeIndexPage() {
 
   let selectedReplayFile = null;
 
-  safeAdd("parseReplayButton", "click", () => {
+
+  safeAdd("replayButton", "click", () => {
     const input = document.getElementById("replayFileInput");
     if (input) input.click();
   });
