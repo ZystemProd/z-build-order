@@ -4408,11 +4408,6 @@ button.btn-small {
   background-color: #3949ab; /* blue */
 }
 
-#myBuildsTab.active,
-#publishedBuildsTab.active {
-  background-color: var(--active-color);
-  color: white;
-}
 
 @media screen and (max-width: 768px) {
   html #content {

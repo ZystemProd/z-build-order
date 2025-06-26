@@ -15,7 +15,6 @@ import {
   updateCurrentBuild,
   loadClanBuilds,
   fetchUserBuilds,
-  fetchPublishedUserBuilds,
   syncToPublishedBuild,
 } from "../buildManagement.js";
 import { initializeAutoCorrect } from "../autoCorrect.js";
@@ -710,41 +709,6 @@ export async function initializeIndexPage() {
     }
   });
 
-  safeAdd("myBuildsTab", "click", async () => {
-    const spinnerWrapper = document.getElementById("buildsLoadingWrapper");
-    const buildList = document.getElementById("buildList");
-
-    buildList.innerHTML = "";
-    spinnerWrapper.style.display = "flex";
-
-    try {
-      document.getElementById("myBuildsTab")?.classList.add("active");
-      document.getElementById("publishedBuildsTab")?.classList.remove("active");
-      await filterBuilds(getCurrentBuildFilter());
-    } catch (err) {
-      console.error("Error loading My Builds:", err);
-    } finally {
-      spinnerWrapper.style.display = "none";
-    }
-  });
-
-  safeAdd("publishedBuildsTab", "click", async () => {
-    const spinnerWrapper = document.getElementById("buildsLoadingWrapper");
-    const buildList = document.getElementById("buildList");
-
-    buildList.innerHTML = "";
-    spinnerWrapper.style.display = "flex";
-
-    try {
-      document.getElementById("publishedBuildsTab")?.classList.add("active");
-      document.getElementById("myBuildsTab")?.classList.remove("active");
-      await filterBuilds(getCurrentBuildFilter());
-    } catch (err) {
-      console.error("Error loading Published Builds:", err);
-    } finally {
-      spinnerWrapper.style.display = "none";
-    }
-  });
 
   // --- Template Preview Hover (NEW! ✅)
   safeAdd("templateList", "mouseover", (event) => {
@@ -1171,16 +1135,7 @@ export async function initializeIndexPage() {
 
         document.getElementById("buildSearchBar").value = "";
 
-        const isPublishedTabActive = document
-          .getElementById("publishedBuildsTab")
-          ?.classList.contains("active");
-
-        if (isPublishedTabActive) {
-          const publishedBuilds = await fetchPublishedUserBuilds(category);
-          populateBuildList(publishedBuilds);
-        } else {
-          filterBuilds(category);
-        }
+        filterBuilds(category);
 
         const heading = document.querySelector(
           "#buildsModal .template-header h3"
@@ -1405,22 +1360,6 @@ export async function initializeIndexPage() {
         }
       });
     });
-  }
-
-  function updateBuildsTabUI(activeTabId, headingText) {
-    const myTab = document.getElementById("myBuildsTab");
-    const pubTab = document.getElementById("publishedBuildsTab");
-
-    if (myTab && pubTab) {
-      myTab.classList.remove("active");
-      pubTab.classList.remove("active");
-
-      const activeTab = document.getElementById(activeTabId);
-      if (activeTab) activeTab.classList.add("active");
-    }
-
-    const heading = document.querySelector("#buildsModal .template-header h3");
-    if (heading) heading.textContent = headingText;
   }
 
   function setupMapModalListeners() {
