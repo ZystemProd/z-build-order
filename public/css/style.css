@@ -712,25 +712,32 @@ button:hover {
   display: flex;
 }
 
+
 .template-buttons .template-btn {
-  background: linear-gradient(to bottom, #4a4a4a, #2d2d2d);
+  background: #3a3a3a;
   color: #fff;
   border: 1px solid #555;
   border-bottom: none;
-  padding: 6px 10px;
+  padding: 4px 8px;
   cursor: pointer;
   margin: 0;
   height: 30px;
-  line-height: 20px;
-  font-size: 14px;
+  display: flex;
+  align-items: center;
 }
 
 .template-buttons .template-btn:hover {
-  background: linear-gradient(to bottom, #5a5a5a, #3a3a3a);
+  background: #4a4a4a;
 }
 
 .template-buttons .template-btn + .template-btn {
   border-left: none;
+}
+
+.template-buttons .template-btn img {
+  width: 20px;
+  height: 20px;
+  filter: brightness(0) invert(1);
 }
 
 
