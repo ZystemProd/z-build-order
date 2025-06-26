@@ -87,6 +87,19 @@ window.addEventListener("DOMContentLoaded", () => {
     .getElementById("advancedToggle")
     .addEventListener("click", toggleAdvancedView);
 
+  const startSel = document.getElementById("startingPlayerSelect");
+  if (startSel) {
+    startSel.addEventListener("change", (e) => {
+      currentAdvancedPlayer = e.target.value;
+      updateStageIndicator();
+    });
+  }
+
+  const startWrapper = document.getElementById("startPlayerWrapper");
+  const nameInputs = document.querySelector(".name-inputs");
+  if (startWrapper) startWrapper.classList.add("hidden");
+  if (nameInputs) nameInputs.classList.add("hidden");
+
   const p1Input = document.getElementById("player1NameInput");
   const p2Input = document.getElementById("player2NameInput");
   if (p1Input) p1Input.addEventListener("input", updateStageIndicator);
@@ -249,6 +262,8 @@ function resetAll() {
   const p1 = document.getElementById("player1-list");
   const p2 = document.getElementById("player2-list");
   const picks = document.getElementById("picked-maps");
+  const startWrapper = document.getElementById("startPlayerWrapper");
+  const nameInputs = document.querySelector(".name-inputs");
   if (advList && p1 && p2 && picks) {
     advList.innerHTML = "";
     p1.innerHTML = "";
@@ -257,8 +272,12 @@ function resetAll() {
     const adv = document.getElementById("advanced-view");
     if (adv && adv.classList.contains("hidden")) {
       picks.style.display = "none";
+      if (startWrapper) startWrapper.classList.add("hidden");
+      if (nameInputs) nameInputs.classList.add("hidden");
     } else {
       picks.style.display = "flex";
+      if (startWrapper) startWrapper.classList.remove("hidden");
+      if (nameInputs) nameInputs.classList.remove("hidden");
     }
     const startSel = document.getElementById("startingPlayerSelect");
     if (startSel) currentAdvancedPlayer = startSel.value;
@@ -453,6 +472,8 @@ function toggleAdvancedView() {
   const list = document.getElementById("map-list");
   const preview = document.querySelector(".map-preview");
   const toggleBtn = document.getElementById("advancedToggle");
+  const startWrapper = document.getElementById("startPlayerWrapper");
+  const nameInputs = document.querySelector(".name-inputs");
   if (!adv || !list) return;
 
   if (adv.classList.contains("hidden")) {
@@ -471,6 +492,8 @@ function toggleAdvancedView() {
     if (preview) preview.style.display = "none";
     const picks = document.getElementById("picked-maps");
     if (picks) picks.style.display = "flex";
+    if (startWrapper) startWrapper.classList.remove("hidden");
+    if (nameInputs) nameInputs.classList.remove("hidden");
     if (toggleBtn) toggleBtn.textContent = "Basic Mode";
     updateStageIndicator();
   } else {
@@ -480,6 +503,8 @@ function toggleAdvancedView() {
     if (preview) preview.style.display = "block";
     const picks = document.getElementById("picked-maps");
     if (picks) picks.style.display = "none";
+    if (startWrapper) startWrapper.classList.add("hidden");
+    if (nameInputs) nameInputs.classList.add("hidden");
     if (toggleBtn) toggleBtn.textContent = "Advanced Mode";
   }
 }
