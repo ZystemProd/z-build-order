@@ -72,7 +72,8 @@ upgrade_name_map = {
     "Zerglingattackspeed": "Adrenal Glands",
     "ChitinousPlating": "Chitinous Plating",
     "DiggingClaws": "Adaptive Talons",
-    "AnabolicSynthesis": "Anabolic Synthesis"
+    "AnabolicSynthesis": "Anabolic Synthesis",
+    "TerranInfantryArmorsLevel1": "infantry armor L1"
 }
 
 upgrade_times = {

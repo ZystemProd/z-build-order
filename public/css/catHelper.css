@@ -40,7 +40,7 @@
 .cat {
   margin-top: 50px;
   height: 136px;
-  top: 14px;
+  top: -10px;
   transform: scale(0.35);
   transform-origin: top right;
   cursor: pointer;
