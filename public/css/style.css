@@ -1755,7 +1755,7 @@ textarea::-webkit-scrollbar-thumb:hover {
   width: 30px;
   height: 30px;
   border: 2px solid red;
-  background-color: rgba(255, 0, 0, 0.24);
+  background-color: #ff000029;
   border-radius: 50%;
   box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.5);
 }
