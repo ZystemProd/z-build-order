@@ -246,6 +246,10 @@ export async function deleteBuildFromFirestore(buildId) {
   try {
     const buildRef = doc(db, `users/${user.uid}/builds/${buildId}`);
     await deleteDoc(buildRef);
+    // Also remove from published builds to ensure it disappears
+    // from community and clan sections if it was previously shared
+    const publishedRef = doc(db, "publishedBuilds", buildId);
+    await deleteDoc(publishedRef);
     showToast("Build deleted successfully!", "success");
 
     // Refresh the build list
