@@ -46,7 +46,6 @@ upgrade_name_map = {
     "BattlecruiserEnableSpecializations": "Weapon Refit",
     "TerranBuildingArmor": "Neosteel Armor",
     "MedivacCaduceusReactor": "Caduceus Reactor",
-    "TerranShipWeaponsLevel1": "Ship Weapons L1",
     "LiberatorAGRangeUpgrade": "Advanced Ballistics",
     "TerranInfantryWeaponsLevel1": "Infantry Weapons L1",
     "WarpGateResearch": "Research Warp Gate",
@@ -73,7 +72,21 @@ upgrade_name_map = {
     "ChitinousPlating": "Chitinous Plating",
     "DiggingClaws": "Adaptive Talons",
     "AnabolicSynthesis": "Anabolic Synthesis",
-    "TerranInfantryArmorsLevel1": "infantry armor L1"
+    "TerranShipWeaponsLevel1": "Ship Weapons L1",    
+    "TerranShipWeaponsLevel2": "Ship Weapons L2", 
+    "TerranShipWeaponsLevel3": "Ship Weapons L3",         
+    "TerranInfantryArmorsLevel1": "Infantry Armor L1",
+    "TerranInfantryArmorsLevel2": "Infantry Armor L2",
+    "TerranInfantryArmorsLevel3": "Infantry Armor L3",        
+    "ZergGroundArmorsLevel1": "Ground Carapace L1",
+    "ZergGroundArmorsLevel2": "Ground Carapace L2",
+    "ZergGroundArmorsLevel3": "Ground Carapace L3",        
+    "ProtossGroundWeaponsLevel1": "Ground Weapons L1",
+    "ProtossGroundWeaponsLevel2": "Ground Weapons L2",
+    "ProtossGroundWeaponsLevel3": "Ground Weapons L3",
+    "ProtossGroundArmorsLevel1": "Ground Armors L1",
+    "ProtossGroundArmorsLevel2": "Ground Armors L2",
+    "ProtossGroundArmorsLevel3": "Ground Armors L3",
 }
 
 upgrade_times = {
@@ -102,7 +115,7 @@ upgrade_times = {
     # Zerg
     "Melee Attack L1": 114, 
     "Missle Attack L1": 114,
-    "Carapace L1": 114,
+    "Ground Carapace L1": 114,
     "Flyer Armor L1": 114,
     "Flyer Attack L1": 114,
     "Overlord Speed": 43,
@@ -227,7 +240,9 @@ _DROP = {
     "sprayterran",
     "sprayzerg",
     "sprayprotoss",
-    "interceptor",          # drop Carrier interceptor rows
+    "interceptor",   
+    "Stasis Trap",
+    "Phased",       
 }
 
 _ALIAS = {
