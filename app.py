@@ -77,7 +77,22 @@ upgrade_name_map = {
     "TerranShipWeaponsLevel3": "Ship Weapons L3",         
     "TerranInfantryArmorsLevel1": "Infantry Armor L1",
     "TerranInfantryArmorsLevel2": "Infantry Armor L2",
-    "TerranInfantryArmorsLevel3": "Infantry Armor L3",        
+    "TerranInfantryArmorsLevel3": "Infantry Armor L3",
+    "TerranInfantryWeaponsLevel1": "Infantry Weapons L1",
+    "TerranInfantryWeaponsLevel2": "Infantry Weapons L2",
+    "TerranInfantryWeaponsLevel3": "Infantry Weapons L3",
+    "ZergMissileWeaponsLevel1": "Missile Weapons L1",
+    "ZergMissileWeaponsLevel2": "Missile Weapons L2", 
+    "ZergMissileWeaponsLevel3": "Missile Weapons L3", 
+    "ZergMeleeWeaponsLevel1": "Melee Weapons L1",
+    "ZergMeleeWeaponsLevel2": "Melee Weapons L2",
+    "ZergMeleeWeaponsLevel3": "Melee Weapons L3", 
+    "ZergFlyerWeaponsLevel1": "Flyer Weapons L1",
+    "ZergFlyerWeaponsLevel2": "Flyer Weapons L2",
+    "ZergFlyerWeaponsLevel3": "Flyer Weapons L3",
+    "FlyerCarapaceLevel1": "Flyer Carapace L1",
+    "FlyerCarapaceLevel2": "Flyer Carapace L2",
+    "FlyerCarapaceLevel3": "Flyer Carapace L3",                  
     "ZergGroundArmorsLevel1": "Ground Carapace L1",
     "ZergGroundArmorsLevel2": "Ground Carapace L2",
     "ZergGroundArmorsLevel3": "Ground Carapace L3",        
@@ -87,6 +102,9 @@ upgrade_name_map = {
     "ProtossGroundArmorsLevel1": "Ground Armors L1",
     "ProtossGroundArmorsLevel2": "Ground Armors L2",
     "ProtossGroundArmorsLevel3": "Ground Armors L3",
+    "ProtossShieldsLevel1": "Shields L1",
+    "ProtossShieldsLevel2": "Shields L2",
+    "ProtossShieldsLevel3": "Shields L3",        
 }
 
 upgrade_times = {
@@ -242,7 +260,9 @@ _DROP = {
     "sprayprotoss",
     "interceptor",   
     "Stasis Trap",
-    "Phased",       
+    "Phased",   
+    "Wings",  
+    "Shield",  
 }
 
 _ALIAS = {
