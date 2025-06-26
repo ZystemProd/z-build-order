@@ -734,10 +734,10 @@ export async function searchCommunityBuilds(searchTerm) {
     try {
       let ts = data.datePublished;
       if (ts && typeof ts.toMillis === "function") ts = ts.toMillis();
-      if (typeof ts === "number") {
+      if (typeof ts === "number" || typeof ts === "string") {
         const d = new Date(ts);
         if (!isNaN(d.getTime())) {
-          datePublishedRaw = ts;
+          datePublishedRaw = d.getTime();
           datePublished = formatShortDate(d);
         }
       }
@@ -900,7 +900,7 @@ function renderCommunityBuildBatch(builds) {
           </span>
           <span class="meta-chip">
             <img src="./img/SVG/time.svg" alt="Date" class="meta-icon">
-            ${formatShortDate(build.datePublished)}
+            ${build.datePublished}
           </span>
           <span class="meta-chip view-chip" data-id="${build.id}">
             <img src="./img/SVG/preview.svg" alt="Views" class="meta-icon">
@@ -1023,10 +1023,10 @@ export async function filterCommunityBuilds(filter = "all") {
             timestampValue = timestampValue.toMillis();
           }
 
-          if (typeof timestampValue === "number") {
+          if (typeof timestampValue === "number" || typeof timestampValue === "string") {
             const parsed = new Date(timestampValue);
             if (!isNaN(parsed.getTime())) {
-              datePublishedRaw = timestampValue;
+              datePublishedRaw = parsed.getTime();
               datePublished = formatShortDate(parsed);
             }
           }

@@ -19,6 +19,7 @@ import {
 } from "./interactive_map.js"; // ✅ Map support
 import { updateYouTubeEmbed, clearYouTubeEmbed } from "./youtube.js";
 import { getPublisherClanInfo } from "./community.js";
+import { formatShortDate } from "./modal.js";
 
 initializeAuthUI();
 
@@ -132,7 +133,19 @@ async function loadBuild() {
           build.subcategory.charAt(2).toUpperCase()
         : build.subcategory || "Unknown";
     const publisherText = build.username || "Anonymous";
-    const dateText = new Date(build.datePublished).toLocaleDateString();
+    let dateText = "Unknown";
+    try {
+      let ts = build.datePublished;
+      if (ts && typeof ts.toMillis === "function") ts = ts.toMillis();
+      if (typeof ts === "number" || typeof ts === "string") {
+        const d = new Date(ts);
+        if (!isNaN(d.getTime())) {
+          dateText = formatShortDate(d);
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to parse datePublished:", build.datePublished);
+    }
 
     let clanInfo = build.publisherClan || null;
     if (!clanInfo && build.publisherId) {
