@@ -81,6 +81,10 @@ body {
   user-select: none; /* Standard syntax */
 }
 
+.map-list li:hover {
+  border-color: #fff;
+}
+
 #previewImage {
   width: 100%;
   max-width: 400px; /* Max width for preview image */
@@ -635,6 +639,10 @@ label {
   width: 100%;
 }
 
+.advanced-map-list li:hover {
+  border-color: #fff;
+}
+
 .advanced-map-list img,
 .player-list img {
   width: 100%;
@@ -814,6 +822,10 @@ label {
   grid-template-columns: 1fr 1fr;
   gap: 8px;
   margin-top: 10px;
+}
+
+.name-inputs.hidden {
+  display: none;
 }
 
 .name-field {
