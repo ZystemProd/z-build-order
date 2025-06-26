@@ -10,6 +10,7 @@ import {
   arrayUnion,
   arrayRemove,
   deleteDoc,
+  deleteField,
   query,
   where,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
@@ -593,27 +594,24 @@ export async function renderManageClanUI(clanId) {
   membersBtn.textContent = "Members";
   tabs.appendChild(membersBtn);
 
-  const requestsBtn = document.createElement("button");
-  requestsBtn.className = "clan-tab-button";
-  requestsBtn.dataset.tab = "requests";
-  requestsBtn.textContent = "Requests";
-  tabs.appendChild(requestsBtn);
+  if (myRole === "Captain" || myRole === "Co-Captain") {
+    const requestsBtn = document.createElement("button");
+    requestsBtn.className = "clan-tab-button";
+    requestsBtn.dataset.tab = "requests";
+    requestsBtn.textContent = "Requests";
+    tabs.appendChild(requestsBtn);
 
-  if (
-    clan.joinRequests?.length > 0 &&
-    (myRole === "Captain" || myRole === "Co-Captain")
-  ) {
-    requestsBtn.style.position = "relative";
-    requestsBtn.appendChild(createNotificationDot());
+    if (clan.joinRequests?.length > 0) {
+      requestsBtn.style.position = "relative";
+      requestsBtn.appendChild(createNotificationDot());
+    }
   }
 
-  if (myRole === "Captain") {
-    const settingsBtn = document.createElement("button");
-    settingsBtn.className = "clan-tab-button";
-    settingsBtn.dataset.tab = "settings";
-    settingsBtn.textContent = "Settings";
-    tabs.appendChild(settingsBtn);
-  }
+  const settingsBtn = document.createElement("button");
+  settingsBtn.className = "clan-tab-button";
+  settingsBtn.dataset.tab = "settings";
+  settingsBtn.textContent = "Settings";
+  tabs.appendChild(settingsBtn);
 
   container.appendChild(tabs);
 
@@ -949,6 +947,62 @@ async function renderManageTab(tab, clan) {
 
     banner.append(logo, name);
     settingsTab.appendChild(banner);
+
+    if (myRole === "Player") {
+      const leaveBtn = document.createElement("button");
+      leaveBtn.textContent = "Leave Clan";
+      leaveBtn.style.backgroundColor = "#444";
+      leaveBtn.style.marginTop = "12px";
+      leaveBtn.style.alignSelf = "flex-start";
+
+      leaveBtn.onclick = async () => {
+        const uid = auth.currentUser?.uid;
+        const isCaptain = myRole === "Captain";
+        const onlyMember = clan.members.length === 1;
+
+        try {
+          if (isCaptain && onlyMember) {
+            const confirmed = confirm(
+              "You are the last Captain and the only member. Leaving will delete the entire clan. Are you sure?"
+            );
+            if (!confirmed) return;
+
+            await deleteDoc(doc(db, "clans", clan.id));
+
+            if (clan.logoUrl?.includes("clanLogos")) {
+              const logoPath = `clanLogos/${clan.id}/logo.webp`;
+              const logoRef = ref(storage, logoPath);
+              await deleteObject(logoRef).catch(() => {});
+            }
+
+            showToast("Clan disbanded.", "success");
+            renderChooseManageClanUI();
+            return;
+          }
+
+          if (isCaptain) {
+            alert("⚠️ You must assign a new Captain before leaving.");
+            return;
+          }
+
+          const confirmed = confirm("Are you sure you want to leave this clan?");
+          if (!confirmed) return;
+
+          await updateDoc(doc(db, "clans", clan.id), {
+            members: arrayRemove(uid),
+            [`memberInfo.${uid}`]: deleteField(),
+          });
+
+          showToast("You have left the clan.", "success");
+          renderChooseManageClanUI();
+        } catch (err) {
+          showToast("Error leaving clan: " + err.message, "error");
+        }
+      };
+
+      settingsTab.appendChild(leaveBtn);
+      return;
+    }
 
     // --- Settings form ---
     const form = document.createElement("div");
