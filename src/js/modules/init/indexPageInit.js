@@ -1421,7 +1421,6 @@ export async function initializeIndexPage() {
       if (el && !el.dataset.monitorAttached) {
         el.addEventListener("input", () => {
           saveBuildButton.disabled = false;
-          saveBuildButton.style.backgroundColor = "#963325";
 
           if (id === "buildOrderTitleInput") {
             const titleText = document.getElementById("buildOrderTitleText");
@@ -1466,7 +1465,6 @@ export async function initializeIndexPage() {
     if (categoryDropdown && !categoryDropdown.dataset.monitorAttached) {
       categoryDropdown.addEventListener("change", () => {
         saveBuildButton.disabled = false;
-        saveBuildButton.style.backgroundColor = "#963325";
       });
       categoryDropdown.dataset.monitorAttached = "true";
     }
