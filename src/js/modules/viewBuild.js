@@ -676,6 +676,20 @@ function injectSchemaMarkup(build) {
     };
   });
 
+  let publishedDate = new Date();
+  try {
+    let ts = build.datePublished;
+    if (ts && typeof ts.toMillis === "function") ts = ts.toMillis();
+    if (typeof ts === "number" || typeof ts === "string") {
+      const d = new Date(ts);
+      if (!isNaN(d.getTime())) {
+        publishedDate = d;
+      }
+    }
+  } catch (err) {
+    console.warn("Failed to parse datePublished for schema:", build.datePublished);
+  }
+
   const schema = {
     "@context": "https://schema.org/",
     "@type": "HowTo",
@@ -684,9 +698,7 @@ function injectSchemaMarkup(build) {
       "@type": "Person",
       name: build.username || "Unknown",
     },
-    datePublished: build.datePublished
-      ? new Date(build.datePublished).toISOString().split("T")[0]
-      : new Date().toISOString().split("T")[0],
+    datePublished: publishedDate.toISOString().split("T")[0],
     description: `StarCraft 2 build order for ${
       build.subcategory || "Unknown"
     } matchup.`,
