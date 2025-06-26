@@ -90,9 +90,9 @@ upgrade_name_map = {
     "ZergFlyerWeaponsLevel1": "Flyer Attacks L1",
     "ZergFlyerWeaponsLevel2": "Flyer Attacks L2",
     "ZergFlyerWeaponsLevel3": "Flyer Attacks L3",
-    "FlyerCarapaceLevel1": "Flyer Carapace L1",
-    "FlyerCarapaceLevel2": "Flyer Carapace L2",
-    "FlyerCarapaceLevel3": "Flyer Carapace L3",                  
+    "ZergFlyerArmorsLevel1": "Flyer Carapace L1",
+    "ZergFlyerArmorsLevel2": "Flyer Carapace L2",
+    "ZergFlyerArmorsLevel3": "Flyer Carapace L3",                  
     "ZergGroundArmorsLevel1": "Ground Carapace L1",
     "ZergGroundArmorsLevel2": "Ground Carapace L2",
     "ZergGroundArmorsLevel3": "Ground Carapace L3",        
@@ -259,13 +259,16 @@ _DROP = {
     "sprayzerg",
     "sprayprotoss",
     "interceptor",   
-    "Stasis Trap",
-    "Phased",   
-    "Wings",  
-    "Shield", 
-    "Auto Turret",
-    "Fighter", 
-    "Invisible Target Dummy"
+    "stasis trap",
+    "phased",   
+    "wings",  
+    "shield", 
+    "auto turret",
+    "fighter", 
+    "invisible target dummy",
+    "broodling escort",
+    "parasitic bomb relay dummy",
+    "parasitic bomb dummy"
 }
 
 _ALIAS = {
