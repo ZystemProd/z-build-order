@@ -10,6 +10,7 @@ import {
   arrayUnion,
   arrayRemove,
   deleteDoc,
+  deleteField,
   query,
   where,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
