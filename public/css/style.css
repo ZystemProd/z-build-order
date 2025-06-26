@@ -1755,7 +1755,7 @@ textarea::-webkit-scrollbar-thumb:hover {
   width: 30px;
   height: 30px;
   border: 2px solid red;
-  background-color: #ff000029;
+  background-color: #0000006e;
   border-radius: 50%;
   box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.5);
 }
@@ -3271,6 +3271,7 @@ td {
   padding: 0;
   box-sizing: border-box;
   line-height: 1;
+  margin-bottom: 2px;
 }
 
 .help-circle.animated-help:hover {
@@ -4407,7 +4408,6 @@ button.btn-small {
 .tag.clan {
   background-color: #3949ab; /* blue */
 }
-
 
 @media screen and (max-width: 768px) {
   html #content {
