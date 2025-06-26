@@ -602,6 +602,11 @@ button:hover {
   gap: 8px;
 }
 
+.toggle-header-left {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
 .toggle-header-right {
   display: flex;
   gap: 8px;
