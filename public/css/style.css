@@ -713,50 +713,26 @@ button:hover {
 }
 
 .template-buttons .template-btn {
-  background-color: #383838;
+  background: linear-gradient(to bottom, #4a4a4a, #2d2d2d);
   color: #fff;
-  border: 1px solid #444;
+  border: 1px solid #555;
   border-bottom: none;
-  padding: 4px 8px;
+  padding: 6px 10px;
   cursor: pointer;
   margin: 0;
-  height: 26px;
-  line-height: 18px;
+  height: 30px;
+  line-height: 20px;
+  font-size: 14px;
+}
+
+.template-buttons .template-btn:hover {
+  background: linear-gradient(to bottom, #5a5a5a, #3a3a3a);
 }
 
 .template-buttons .template-btn + .template-btn {
   border-left: none;
 }
 
-.template-icon-button {
-  position: absolute;
-  top: -22px;
-  left: -5px;
-  width: 80px;
-  height: 30px;
-  cursor: pointer;
-}
-
-.template-icon-button polygon {
-  fill: #383838;
-}
-
-.template-icon-button path {
-  stroke: #444;
-  stroke-width: 1px;
-}
-
-.template-icon-button text {
-  font-size: 22px;
-  fill: white;
-  font-family: Arial, sans-serif;
-  font-weight: bold;
-  pointer-events: none;
-}
-
-.template-icon-button:hover polygon {
-  fill: #444;
-}
 
 .buildOrderOutput {
   margin-top: 15px;
