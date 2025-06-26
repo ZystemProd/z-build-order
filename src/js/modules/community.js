@@ -900,7 +900,7 @@ function renderCommunityBuildBatch(builds) {
           </span>
           <span class="meta-chip">
             <img src="./img/SVG/time.svg" alt="Date" class="meta-icon">
-            ${formatShortDate(build.datePublished)}
+            ${build.datePublished}
           </span>
           <span class="meta-chip view-chip" data-id="${build.id}">
             <img src="./img/SVG/preview.svg" alt="Views" class="meta-icon">
