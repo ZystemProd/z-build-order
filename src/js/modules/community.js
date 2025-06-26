@@ -22,6 +22,7 @@ import { formatMatchup, formatShortDate } from "./modal.js";
 import { auth, db } from "../../app.js"; // ✅ Ensure auth and db are imported correctly
 import DOMPurify from "dompurify";
 import { updateTooltips } from "./tooltip.js";
+import { getUserMainClanInfo } from "./clan.js";
 
 let communitySortMode = "hot"; // default sort mode
 
@@ -32,24 +33,33 @@ let isLoadingMoreBuilds = false;
 let hasMoreBuilds = true;
 
 const publisherClanCache = {};
-async function getPublisherClanInfo(uid) {
+//
+// Clan info for the publisher is stored directly on each published build.
+// Older builds might not have it. To provide a fallback without violating
+// Firestore security rules, we query the public `clans` collection and
+// return the first clan that lists the user as a member.
+//
+export async function getPublisherClanInfo(uid) {
   if (uid in publisherClanCache) return publisherClanCache[uid];
+
   try {
-    const userSnap = await getDoc(doc(db, "users", uid));
-    const clanId = userSnap.exists()
-      ? userSnap.data().settings?.mainClanId
-      : null;
-    if (clanId) {
-      const clanSnap = await getDoc(doc(db, "clans", clanId));
-      if (clanSnap.exists()) {
-        const info = { id: clanId, ...clanSnap.data() };
-        publisherClanCache[uid] = info;
-        return info;
-      }
+    const db = getFirestore();
+    const q = query(
+      collection(db, "clans"),
+      where("members", "array-contains", uid),
+      limit(1)
+    );
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      const clanDoc = snap.docs[0];
+      const info = { id: clanDoc.id, ...clanDoc.data() };
+      publisherClanCache[uid] = info;
+      return info;
     }
   } catch (e) {
     console.error("Failed to fetch clan info", e);
   }
+
   publisherClanCache[uid] = null;
   return null;
 }
@@ -525,11 +535,25 @@ export async function publishBuildToCommunity(buildId) {
       ...buildData,
       publisherId: user.uid,
       username: username,
+      publisherClan: null,
       isPublished: true,
       datePublished: new Date().toISOString(),
       subcategory: formattedSubcategory, // for display ("ZvP")
       subcategoryLowercase: subcategoryLowercase, // for query ("zvp")
     };
+
+    try {
+      const clan = await getUserMainClanInfo(user.uid);
+      if (clan) {
+        newBuildData.publisherClan = {
+          name: clan.name,
+          tag: clan.abbreviation || clan.tag || "",
+          logoUrl: clan.logoUrl || null,
+        };
+      }
+    } catch (e) {
+      console.error("Failed to fetch main clan info", e);
+    }
 
     await addDoc(publishedBuildsRef, newBuildData);
     console.log(`✅ Published build ID ${buildId} to community`);
@@ -609,12 +633,27 @@ window.publishBuildToCommunity = async function (
   buildToPublish.subcategory = build.subcategory || "ZvP";
   buildToPublish.publisherId = user.uid;
   buildToPublish.username = build.publisher || "Anonymous";
+  buildToPublish.publisherClan = null;
   buildToPublish.isPublished = true;
   buildToPublish.datePublished = new Date().toISOString();
 
   // NEW: Publish Settings
   buildToPublish.isPublic = isPublic;
   buildToPublish.sharedToClans = sharedToClans;
+
+  try {
+    const { getUserMainClanInfo } = await import("./clan.js");
+    const clan = await getUserMainClanInfo(user.uid);
+    if (clan) {
+      buildToPublish.publisherClan = {
+        name: clan.name,
+        tag: clan.abbreviation || clan.tag || "",
+        logoUrl: clan.logoUrl || null,
+      };
+    }
+  } catch (e) {
+    console.error("Failed to fetch main clan info", e);
+  }
 
   // Analytics
   buildToPublish.views = 0;

@@ -18,7 +18,7 @@ import {
   loadMapsOnDemand,
 } from "./interactive_map.js"; // ✅ Map support
 import { updateYouTubeEmbed, clearYouTubeEmbed } from "./youtube.js";
-import { getUserMainClanInfo } from "./clan.js";
+import { getPublisherClanInfo } from "./community.js";
 
 initializeAuthUI();
 
@@ -134,7 +134,10 @@ async function loadBuild() {
     const publisherText = build.username || "Anonymous";
     const dateText = new Date(build.datePublished).toLocaleDateString();
 
-    const clanInfo = await getUserMainClanInfo(build.publisherId);
+    let clanInfo = build.publisherClan || null;
+    if (!clanInfo && build.publisherId) {
+      clanInfo = await getPublisherClanInfo(build.publisherId);
+    }
     const iconEl = document.getElementById("buildPublisherIcon");
     if (iconEl && clanInfo?.logoUrl) iconEl.src = clanInfo.logoUrl;
     const iconElMob = document.getElementById("buildPublisherIconMobile");
