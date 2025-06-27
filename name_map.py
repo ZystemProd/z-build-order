@@ -51,6 +51,10 @@ NAME_MAP = {
     "zerggroundarmorlevel1": "carapace",
     "zerggroundarmorlevel2": "carapace",
     "zerggroundarmorlevel3": "carapace",
+    "vikingfighter": "Viking",
+    "viking fighter": "Viking",
+    "vikingassault": "Viking",
+    "viking assault": "Viking",
     # Protoss upgrades
     "templar archive": "Templar Archives",
     "templararchives": "Templar Archives",
