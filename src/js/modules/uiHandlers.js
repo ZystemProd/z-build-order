@@ -173,9 +173,12 @@ export function displayBuildOrder(buildOrderText) {
 
   // Now, format the text from buildOrderInput into a table format
   const steps = buildOrderText.split("\n").map((step) => {
-    const [timestamp, ...actionParts] = step.split(" ");
-    const action = actionParts.join(" ");
-    return { workersOrTimestamp: timestamp.replace(/[\[\]]/g, ""), action }; // Clean the timestamp
+    const match = step.match(/\[(.*?)\]\s*(.*)/);
+    if (match) {
+      return { workersOrTimestamp: match[1], action: match[2] };
+    }
+    // Fallback for lines without brackets
+    return { workersOrTimestamp: "", action: step };
   });
 
   // Iterate over the steps and create table rows
