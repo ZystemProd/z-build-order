@@ -14,7 +14,7 @@ export const upgrades = [
   "ground carapace",
   "melee attacks",
   "missile attacks",
-  "flyer armor",
+  "flyer carapace",
   "flyer attacks",
   "adaptive talons",
   "seismic spines",

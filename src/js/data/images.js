@@ -10,7 +10,7 @@ export const upgradeImages = {
   burrow: "img/upgrade/burrow.webp",
   anabolic_synthesis: "img/upgrade/anabolic_synthesis.webp",
   flyer_attacks: "img/upgrade/flyer_attacks.webp",
-  flyer_armor: "img/upgrade/flyer_armor.webp",
+  flyer_carapace: "img/upgrade/flyer_carapace.webp",
   melee_attacks: "img/upgrade/melee_attacks.webp",
   ground_carapace: "img/upgrade/ground_carapace.webp",
   missile_attacks: "img/upgrade/missile_attacks.webp",
