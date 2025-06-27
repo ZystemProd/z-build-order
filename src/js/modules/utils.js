@@ -11,7 +11,7 @@ export function parseBuildOrder(buildOrderText) {
   return buildOrderText
     .split("\n")
     .map((line) => {
-      const match = line.match(/\[(\S+)\]\s*(.*)/); // Example: [01:00] Build structure
+      const match = line.match(/\[(.*?)\]\s*(.*)/); // Example: [01:00] Build structure
       if (match) {
         return {
           workersOrTimestamp: match[1],
@@ -25,7 +25,6 @@ export function parseBuildOrder(buildOrderText) {
     })
     .filter((step) => step !== null); // Filter out invalid steps
 }
-
 
 export function resetBuildInputs() {
   console.log("🔄 Resetting inputs..."); // Debugging log
