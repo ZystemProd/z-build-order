@@ -59,6 +59,8 @@ export const upgradeImages = {
   personal_cloaking: "img/upgrade/cloak.webp",
   advanced_ballistics: "img/upgrade/advanced_ballistics.webp",
   caduceus_reactor: "img/upgrade/caduceus_reactor.webp",
+  "mag-field_accelerator": "img/upgrade/mag-field_accelerator.webp",
+  nuke: "img/upgrade/nuke.webp",
   lift_off: "img/abilities/lift_off.webp",
 };
 

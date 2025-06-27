@@ -1,56 +1,21 @@
-Fix inline style in index.html
-
-check if your build has been changed from you "my build". shoule say
-"Saved" if not -> Save Build.
-- Check if the build is published
-
-- fix so that no supply get saved in "my Builds" Fixed?
-
-- Be able to edit publieshed builds from your "myBuilds"
-- ToS for database storage?
-
-
 ----------- User ----------
 Sc2Pulse on username- mmr/ at login reg
 
 ----------- Fun ----------
 - Border Custom - Founder, Admin, achievement  
-- Animated cat
 
 ----------- Security ----------
-- App Check - recasha
 
 ----------- comunnity ----------
-- Show which clan the build comes from, green meta tag
 
 ----------- Clan ----------
 - "Settings" looking bad.
 
 ----------- Build Order ----------
 
-- upload replay through https://drop.sc/upload
-check https://api.sc2replaystats.com/docs/index.html
-
-- add sc2reader from ggtracker. needs to use a server to run python (Render) backend
-
 ----------- View Build ----------
 
 ----------- veto ----------
 
 ----------- My Builds ----------
-
-
 Let me know if you'd like a toast warning before exiting edit mode if unsaved changes exist.
-
-**Urgent** the build is published in clan but shown as publish tag and on a different user it don't show up. shows only yourself.
-
-
-
-add nuke
-add Cloaking Field
-add Personal Cloaking
-add Mag-Field Accelerator
-banshee cloak = "Cloaking Field"
-
-
-Check for Terran Vehicle And Ship plating

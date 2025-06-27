@@ -1,6 +1,7 @@
 import { units } from "../data/units.js";
 import { structures } from "../data/structures.js";
 import { upgrades } from "../data/upgrades.js";
+import { upgradeImages, unitImages, structureImages } from "../data/images.js";
 import { analyzeBuildOrder } from "./uiHandlers.js";
 import { isBracketInputEnabled } from "./settings.js";
 import DOMPurify from "dompurify";
@@ -143,7 +144,11 @@ export function initializeAutoCorrect() {
     if (trimmedAfterCaret.startsWith("[")) {
       event.preventDefault();
       inputField.focus();
-      insertTextRange("\n[] ", inputField.selectionStart, inputField.selectionEnd);
+      insertTextRange(
+        "\n[] ",
+        inputField.selectionStart,
+        inputField.selectionEnd
+      );
 
       // Place caret inside the new brackets `[|]`
       inputField.selectionStart = inputField.selectionEnd = cursorPosition + 2;
@@ -214,7 +219,11 @@ export function initializeAutoCorrect() {
     // 3️⃣ Default behavior: Create new row and move cursor inside `[|]`
     event.preventDefault();
     inputField.focus();
-    insertTextRange("\n[] ", inputField.selectionStart, inputField.selectionEnd);
+    insertTextRange(
+      "\n[] ",
+      inputField.selectionStart,
+      inputField.selectionEnd
+    );
 
     // Move cursor inside the new brackets `[|]`
     inputField.selectionStart = inputField.selectionEnd = cursorPosition + 2;
@@ -287,9 +296,21 @@ export function initializeAutoCorrect() {
       if (index === 0) suggestion.classList.add("active");
 
       const img = document.createElement("img");
-      img.src = `img/${DOMPurify.sanitize(match.type)}/${DOMPurify.sanitize(
-        match.name.toLowerCase().replace(/ /g, "_")
-      )}.webp`;
+
+      const key = match.name.toLowerCase().replace(/ /g, "_");
+
+      let imagePath = "";
+
+      if (match.type === "unit") {
+        imagePath = unitImages[key];
+      } else if (match.type === "structure") {
+        imagePath = structureImages[key];
+      } else if (match.type === "upgrade") {
+        imagePath = upgradeImages[key];
+      }
+
+      img.src = DOMPurify.sanitize(imagePath || "img/missing.webp");
+
       img.alt = DOMPurify.sanitize(match.name);
 
       const textEl = document.createElement("span");

@@ -61,5 +61,7 @@ export const upgrades = [
   "personal cloaking",
   "advanced ballistics",
   "caduceus reactor",
+  "mag-field accelerator",
+  "nuke",
   "lift off",
 ];
