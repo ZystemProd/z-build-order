@@ -304,7 +304,10 @@ _DROP = {
     "invisible target dummy",
     "broodling escort",
     "parasitic bomb relay dummy",
-    "parasitic bomb dummy"
+    "parasitic bomb dummy",
+    "changeling zealot",
+    "changeling zergling",
+    "changeling marine",
 }
 
 _ALIAS = {
