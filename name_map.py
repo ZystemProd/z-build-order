@@ -10,6 +10,12 @@ NAME_MAP = {
     "centrificalhooks": "centrifugal hooks",
     "combatshield": "Combat Shield",
     "stimpack": "Stimpack",
+    "barracks tech lab": "Tech Lab on Barracks",
+    "barracks reactor": "Reactor on Barracks",
+    "factory tech lab": "Tech Lab on Factory",
+    "factory reactor": "Reactor on Factory",
+    "starport tech lab": "Tech Lab on Starport",
+    "starport reactor": "Reactor on Starport",
     # Additional mappings from unusual names
     "shieldwall": "Combat Shield",
     "punishergrenades": "Concussive Shells",
