@@ -72,6 +72,8 @@ upgrade_name_map = {
     "ChitinousPlating": "Chitinous Plating",
     "DiggingClaws": "Adaptive Talons",
     "AnabolicSynthesis": "Anabolic Synthesis",
+    "Barracks Tech Lab": "Tech Lab on Barracks",
+    "Barracks Reactor": "Reactor on Barracks",
     "TerranShipWeaponsLevel1": "Ship Weapons L1",    
     "TerranShipWeaponsLevel2": "Ship Weapons L2", 
     "TerranShipWeaponsLevel3": "Ship Weapons L3",         
