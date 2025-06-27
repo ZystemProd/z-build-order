@@ -295,7 +295,7 @@ _DROP = {
     "sprayzerg",
     "sprayprotoss",
     "interceptor",   
-    "Stasis Trap",
+    "oracle stasis trap",
     "phased",   
     "wings",  
     "shield", 
