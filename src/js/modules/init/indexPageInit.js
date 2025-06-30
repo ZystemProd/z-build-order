@@ -894,7 +894,7 @@ export async function initializeIndexPage() {
   // --- Other Initializations
   initializeSectionToggles();
   initializeTextareaClickHandler();
-  initializeAutoCorrect();
+  await initializeAutoCorrect();
   updateSupplyColumnVisibility();
   updateBuildInputVisibility();
   updateBuildInputPlaceholder();

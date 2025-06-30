@@ -37,6 +37,11 @@
   <div id="top-logo-container">
     <img src="img/toplogo.webp" alt="Z-Build Order Logo" class="top-logo" />
   </div>
+  <div id="game-select-container">
+    <select id="gameSelect">
+      <option value="stormgate">Stormgate</option>
+    </select>
+  </div>
   <div id="toast-container"></div>
 
   <!-- Auth Container -->
@@ -816,7 +821,7 @@
     <div class="footer-center" id="site-info">
 
 
-      <p>Version 0.5.8072</p>
+      <p>Version 0.5.8074</p>
 
 
 
@@ -922,6 +927,16 @@
         <p id="supportersList">No supporters yet.</p>
       </div>
     </div>
+    <script>
+      const gameSelectEl = document.getElementById('gameSelect');
+      if (gameSelectEl) {
+        gameSelectEl.value = localStorage.getItem('selectedGame') || 'stormgate';
+        gameSelectEl.addEventListener('change', () => {
+          localStorage.setItem('selectedGame', gameSelectEl.value);
+          location.reload();
+        });
+      }
+    </script>
     <script type="module" src="./src/initMain.js"></script>
 
 
