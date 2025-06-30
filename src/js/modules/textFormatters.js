@@ -1,8 +1,12 @@
 // Import required data and utilities
-import { units } from "../data/units.js";
-import { structures } from "../data/structures.js";
-import { upgrades } from "../data/upgrades.js";
-import { unitImages, structureImages, upgradeImages } from "../data/images.js";
+import {
+  units,
+  structures,
+  upgrades,
+  unitImages,
+  structureImages,
+  upgradeImages,
+} from "../data/gameData.js";
 import { abbreviationMap } from "../data/abbreviationMap.js";
 import DOMPurify from "dompurify";
 

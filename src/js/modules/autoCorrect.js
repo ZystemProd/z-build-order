@@ -1,7 +1,11 @@
-import { units } from "../data/units.js";
-import { structures } from "../data/structures.js";
-import { upgrades } from "../data/upgrades.js";
-import { upgradeImages, unitImages, structureImages } from "../data/images.js";
+import {
+  units,
+  structures,
+  upgrades,
+  unitImages,
+  structureImages,
+  upgradeImages,
+} from "../data/gameData.js";
 import { analyzeBuildOrder } from "./uiHandlers.js";
 import { isBracketInputEnabled } from "./settings.js";
 import DOMPurify from "dompurify";
