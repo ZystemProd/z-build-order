@@ -1,11 +1,15 @@
+
 import { loadGameData } from "../data/getGameData.js";
 
 let units,
+
   structures,
   upgrades,
   unitImages,
   structureImages,
+
   upgradeImages;
+
 import { analyzeBuildOrder } from "./uiHandlers.js";
 import { isBracketInputEnabled } from "./settings.js";
 import DOMPurify from "dompurify";

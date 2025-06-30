@@ -1,5 +1,7 @@
 // Import required data and utilities
+
 import { loadGameData } from "../data/getGameData.js";
+
 import DOMPurify from "dompurify";
 
 const {
