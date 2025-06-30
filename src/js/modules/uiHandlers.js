@@ -7,7 +7,7 @@ import {
   formatActionText,
   formatWorkersOrTimestampText,
 } from "./textFormatters.js";
-import { abbreviationMap } from "../data/abbreviationMap.js";
+import { loadGameData } from "../data/getGameData.js";
 import { setCurrentBuildId } from "./states/buildState.js";
 import { parseBuildOrder } from "./utils.js";
 import { isBracketInputEnabled } from "./settings.js";
@@ -415,7 +415,8 @@ function generateAbbrSection(title, abbrObj) {
   `;
 }
 
-export function showBuildOrderHelpModal() {
+export async function showBuildOrderHelpModal() {
+  const { abbreviationMap } = await loadGameData();
   const modal = document.getElementById("buildOrderHelpModal");
   const contentDiv = document.getElementById("buildOrderHelpContent");
 
