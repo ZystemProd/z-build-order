@@ -4953,12 +4953,8 @@ optgroup[label="Terran"] {
 }
 
 /* Focus Modal Styles */
-.fullscreen-modal .modal-content {
-  margin: 0;
-  max-width: none;
-  width: 100%;
-  height: 100%;
-  background: #1e1e1e;
+#focusModal .modal-content {
+  position: relative;
   display: flex;
   flex-direction: column;
 }
@@ -4967,7 +4963,7 @@ optgroup[label="Terran"] {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  margin-bottom: 10px;
+  margin: 20px 0 10px 0;
 }
 
 .font-controls button {
@@ -4988,10 +4984,18 @@ optgroup[label="Terran"] {
   background: none;
   border: none;
   cursor: pointer;
-  margin-left: 10px;
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .focus-btn img {
   width: 24px;
   height: 24px;
+  filter: invert(1);
+}
+
+.action-header {
+  position: relative;
 }
