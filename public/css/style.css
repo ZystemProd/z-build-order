@@ -741,6 +741,14 @@ button:hover {
   filter: brightness(0) invert(1);
 }
 
+#templateMenuButton {
+  margin-right: 5px;
+}
+
+#replayButton {
+  margin-left: 5px;
+}
+
 .buildOrderOutput {
   margin-top: 15px;
 }
@@ -5043,7 +5051,6 @@ optgroup[label="Terran"] {
 
   width: 16px; /* Example size, adjust as needed */
   height: 16px;
-  background: #333; /* Optional: style background */
   border-radius: 4px; /* Optional: rounded corners */
 }
 
