@@ -174,8 +174,8 @@ function matchActorsWithTrie(actionText, actorTrie) {
         continue;
       }
 
-      // NEW: Arrow Right image for "-->"
-      if (rawWord === "-->") {
+      // NEW: Arrow Right image for "->"
+      if (rawWord === "->") {
         result.push(
           `<img src="img/SVG/arrow_right.svg" alt="arrow" class="inline-icon">`
         );
@@ -183,8 +183,8 @@ function matchActorsWithTrie(actionText, actorTrie) {
         continue;
       }
 
-      // NEW: Arrow Right image for "-->"
-      if (rawWord === "<--") {
+      // NEW: Arrow Right image for "->"
+      if (rawWord === "<-") {
         result.push(
           `<img src="img/SVG/arrow_left.svg" alt="arrow" class="inline-icon">`
         );

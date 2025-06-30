@@ -714,7 +714,6 @@ button:hover {
   display: flex;
 }
 
-
 .template-buttons .template-btn {
   background: #3a3a3a;
   color: #fff;
@@ -741,7 +740,6 @@ button:hover {
   height: 20px;
   filter: brightness(0) invert(1);
 }
-
 
 .buildOrderOutput {
   margin-top: 15px;
@@ -4973,7 +4971,6 @@ optgroup[label="Terran"] {
 .font-controls {
   position: absolute;
   top: 10px;
-  left: 10px;
   display: flex;
   justify-content: flex-start;
   gap: 8px;
@@ -5015,7 +5012,6 @@ optgroup[label="Terran"] {
 }
 
 .focus-btn {
-  background: none;
   border: none;
   cursor: pointer;
   position: absolute;
