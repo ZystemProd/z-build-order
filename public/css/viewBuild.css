@@ -385,10 +385,13 @@ input[type="text"]:disabled {
 }
 
 .font-controls {
+  position: absolute;
+  top: 10px;
+  left: 10px;
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 8px;
-  margin: 20px 0 10px 0;
+  margin: 0;
 }
 
 .font-controls button {
@@ -421,6 +424,7 @@ input[type="text"]:disabled {
   right: 4px;
   top: 50%;
   transform: translateY(-50%);
+  margin: 0;
 }
 
 .focus-btn:hover {

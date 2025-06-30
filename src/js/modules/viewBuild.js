@@ -54,6 +54,8 @@ function openFocusModal() {
   const buildOrder = document.getElementById("buildOrder");
   if (buildOrder) {
     focusContent.innerHTML = buildOrder.innerHTML;
+    const btn = focusContent.querySelector("#openFocusModal");
+    if (btn) btn.remove();
     focusContent.style.fontSize = `${focusFontSize}rem`;
   }
   focusModal.style.display = "block";

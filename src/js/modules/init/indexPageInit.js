@@ -254,6 +254,8 @@ export async function initializeIndexPage() {
     const table = document.getElementById("buildOrderTable");
     if (table) {
       focusContent.innerHTML = table.outerHTML;
+      const btn = focusContent.querySelector("#openFocusModal");
+      if (btn) btn.remove();
       focusContent.style.fontSize = `${focusFontSize}rem`;
     }
     focusModal.style.display = "block";
