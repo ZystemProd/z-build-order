@@ -12,6 +12,7 @@ import {
   where,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { formatActionText } from "../modules/textFormatters.js"; // ✅ Format build steps
+import { loadGameData } from "../data/getGameData.js";
 import {
   MapAnnotations,
   renderMapCards,
@@ -97,6 +98,7 @@ async function incrementBuildViews(buildId) {
 }
 
 async function loadBuild() {
+  await loadGameData();
   const pathParts = window.location.pathname.split("/");
   const buildId = pathParts[2]; // because URL is /build/abc123
 

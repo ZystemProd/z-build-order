@@ -18,6 +18,7 @@ import {
   syncToPublishedBuild,
 } from "../buildManagement.js";
 import { initializeAutoCorrect } from "../autoCorrect.js";
+import { loadGameData } from "../../data/getGameData.js";
 import { populateBuildDetails, analyzeBuildOrder } from "../uiHandlers.js";
 import { showToast } from "../toastHandler.js";
 import { updateYouTubeEmbed } from "../youtube.js";
@@ -159,6 +160,8 @@ let currentBuildFilter = "all";
  ----------------- */
 export async function initializeIndexPage() {
   console.log("🛠 Initializing Index Page");
+
+  await loadGameData();
 
   const restoreCommunity = localStorage.getItem("restoreCommunityModal");
   const filterType = localStorage.getItem("communityFilterType");

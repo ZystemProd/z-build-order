@@ -1,14 +1,18 @@
 // Import required data and utilities
-import {
+
+import { loadGameData } from "../data/getGameData.js";
+
+import DOMPurify from "dompurify";
+
+const {
   units,
   structures,
   upgrades,
   unitImages,
   structureImages,
   upgradeImages,
-} from "../data/gameData.js";
-import { abbreviationMap } from "../data/abbreviationMap.js";
-import DOMPurify from "dompurify";
+  abbreviationMap,
+} = await loadGameData();
 
 // Utility: Capitalize the first letter of a string
 export function capitalizeFirstLetter(text) {

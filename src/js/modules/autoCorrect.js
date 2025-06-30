@@ -1,11 +1,15 @@
-import {
-  units,
+
+import { loadGameData } from "../data/getGameData.js";
+
+let units,
+
   structures,
   upgrades,
   unitImages,
   structureImages,
-  upgradeImages,
-} from "../data/gameData.js";
+
+  upgradeImages;
+
 import { analyzeBuildOrder } from "./uiHandlers.js";
 import { isBracketInputEnabled } from "./settings.js";
 import DOMPurify from "dompurify";
@@ -66,7 +70,15 @@ function positionPopupAtCaret(inputField, popup) {
 }
 
 // Function to initialize the autocomplete feature
-export function initializeAutoCorrect() {
+export async function initializeAutoCorrect() {
+  ({
+    units,
+    structures,
+    upgrades,
+    unitImages,
+    structureImages,
+    upgradeImages,
+  } = await loadGameData());
   const inputField = document.getElementById("buildOrderInput");
   const popup = document.getElementById("autocomplete-popup");
 
