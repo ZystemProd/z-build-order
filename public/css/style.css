@@ -5044,3 +5044,40 @@ optgroup[label="Terran"] {
 .action-header {
   position: relative;
 }
+
+/* === Clan Role Dropdown === */
+.role-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.role-gear-icon {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  filter: invert(1) brightness(0.8);
+}
+
+.role-gear-icon.disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.role-select {
+  background-color: #1a1a1a;
+  color: #eee;
+  border: 1px solid #444;
+  border-radius: 4px;
+  padding: 4px 6px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .role-gear-icon {
+    visibility: hidden;
+  }
+
+  .clan-member-table tr:hover .role-gear-icon {
+    visibility: visible;
+  }
+}

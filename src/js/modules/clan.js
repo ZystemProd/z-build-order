@@ -781,7 +781,21 @@ async function renderManageTab(tab, clan) {
       nameCell.textContent = member.username;
 
       const roleCell = document.createElement("td");
+      const roleWrapper = document.createElement("div");
+      roleWrapper.className = "role-wrapper";
+
+      const roleText = document.createElement("span");
+      roleText.textContent = member.role;
+      roleText.className = "role-text";
+
+      const gearIcon = document.createElement("img");
+      gearIcon.src = "img/SVG/settings.svg";
+      gearIcon.alt = "Change Role";
+      gearIcon.className = "role-gear-icon";
+
       const roleSelect = document.createElement("select");
+      roleSelect.className = "role-select";
+      roleSelect.style.display = "none";
 
       ["Player", "Co-Captain", "Captain"].forEach((opt) => {
         const option = document.createElement("option");
@@ -795,59 +809,78 @@ async function renderManageTab(tab, clan) {
       const isTargetCaptain =
         member.role === "Captain" || member.uid === clan.adminUid;
 
-      if (
-        myRole !== "Captain" ||
-        isSelf ||
-        (myRole === "Co-Captain" && isTargetCaptain)
-      ) {
-        roleSelect.disabled = true;
-        roleSelect.title = "You cannot change this user's role.";
-      }
+      const canChangeRole =
+        (myRole === "Captain" && !isSelf) ||
+        (myRole === "Co-Captain" && !isSelf && !isTargetCaptain);
 
-      roleSelect.onchange = async () => {
-        const newRole = roleSelect.value;
+      if (!canChangeRole) {
+        roleWrapper.appendChild(roleText);
+      } else {
+        roleWrapper.append(roleText, gearIcon, roleSelect);
 
-        if (newRole === "Captain" && auth.currentUser?.uid !== clan.adminUid) {
-          showToast("Only the admin can assign Captain role.", "error");
-          roleSelect.value = member.role;
-          return;
-        }
+        roleSelect.onchange = async () => {
+          const newRole = roleSelect.value;
 
-        if (newRole === "Captain") {
-          const confirmChange = confirm(
-            "Are you sure you want to assign a new Captain? The current Captain will become a Co-Captain."
-          );
-          if (!confirmChange) {
+          if (newRole === "Captain" && auth.currentUser?.uid !== clan.adminUid) {
+            showToast("Only the admin can assign Captain role.", "error");
             roleSelect.value = member.role;
             return;
           }
 
-          const updates = {
-            [`memberInfo.${member.uid}.role`]: "Captain",
-          };
-
-          for (const other of membersWithRoles) {
-            if (
-              other.uid !== member.uid &&
-              (other.role === "Captain" || other.uid === clan.adminUid)
-            ) {
-              updates[`memberInfo.${other.uid}.role`] = "Co-Captain";
+          if (newRole === "Captain") {
+            const confirmChange = confirm(
+              "Are you sure you want to assign a new Captain? The current Captain will become a Co-Captain."
+            );
+            if (!confirmChange) {
+              roleSelect.value = member.role;
+              return;
             }
+
+            const updates = {
+              [`memberInfo.${member.uid}.role`]: "Captain",
+            };
+
+            for (const other of membersWithRoles) {
+              if (
+                other.uid !== member.uid &&
+                (other.role === "Captain" || other.uid === clan.adminUid)
+              ) {
+                updates[`memberInfo.${other.uid}.role`] = "Co-Captain";
+              }
+            }
+
+            await updateDoc(doc(db, "clans", clan.id), updates);
+            showToast("Captain reassigned", "success");
+            await renderManageClanUI(clan.id);
+            return;
           }
 
-          await updateDoc(doc(db, "clans", clan.id), updates);
-          showToast("Captain reassigned", "success");
+          await updateDoc(doc(db, "clans", clan.id), {
+            [`memberInfo.${member.uid}.role`]: newRole,
+          });
+          showToast("Role updated", "success");
           await renderManageClanUI(clan.id);
-          return;
-        }
+        };
 
-        await updateDoc(doc(db, "clans", clan.id), {
-          [`memberInfo.${member.uid}.role`]: newRole,
+        roleSelect.addEventListener("blur", () => {
+          setTimeout(() => {
+            if (roleSelect.style.display !== "none") {
+              roleSelect.style.display = "none";
+              roleText.style.display = "";
+              gearIcon.style.display = "";
+            }
+          }, 100);
         });
-        showToast("Role updated", "success");
-      };
 
-      roleCell.appendChild(roleSelect);
+        gearIcon.addEventListener("click", () => {
+          roleText.style.display = "none";
+          gearIcon.style.display = "none";
+          roleSelect.style.display = "inline-block";
+          roleSelect.focus();
+        });
+      }
+
+      roleCell.appendChild(roleWrapper);
 
       const joinedCell = document.createElement("td");
       joinedCell.textContent = member.joined;
