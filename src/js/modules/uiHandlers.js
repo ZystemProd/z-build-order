@@ -324,7 +324,7 @@ function createExample(example) {
 
   if (example.image) {
     return `
-    <div class="example-block">
+    <div class="example-block" id="${example.id}">
       <h4 class="example-subtitle">${example.title}</h4>
       <div class="example-flex">
         <img src="${example.image}" alt="${example.title} example" class="example-image" />
@@ -374,7 +374,7 @@ function createExample(example) {
 
   // Return the complete example block with subtitle and description
   return `
-  <div class="example-block">
+  <div class="example-block" id="${example.id}">
     <h4 class="example-subtitle">${example.title}</h4>
     <div class="example-flex">
       <div class="example-left">
@@ -392,6 +392,18 @@ ${example.input || `${example.inputTime || ""}\n${example.inputSupply || ""}`}
   </div>
   <hr />
 `;
+}
+
+function generateTableOfContents(items) {
+  return `
+    <p>Table of Contents:</p>
+    <ul class="help-toc">
+      ${items
+        .map((ex) => `<li><a href="#${ex.id}" class="toc-link">${ex.title}</a></li>`)
+        .join("")}
+      <li><a href="#abbr-section" class="toc-link">Abbreviations Reference</a></li>
+    </ul>
+  `;
 }
 
 // Function to generate abbreviation sections for structures, units, and upgrades
@@ -421,6 +433,7 @@ export function showBuildOrderHelpModal() {
 
   const examples = [
     {
+      id: "time-supply-format",
       title: "Time/Worker Supply Format",
       inputTime: "[01:10] Overlord",
       inputSupply: "[24] Hatchery",
@@ -430,24 +443,28 @@ export function showBuildOrderHelpModal() {
         "This format showcases two types: one for time-based actions (e.g., [01:10] for timestamp) and one for supply-based actions (e.g., [24] for worker supply).",
     },
     {
+      id: "completed-upgrade",
       title: "Completed Upgrade with Percent",
       input: "@100% stimpack push opponent third base",
       description:
         "Using <code><u>@100%</u>, <u>@100</u> or <u>100%</u></code> marks the action as fully completed and visually emphasizes the upgrade status.",
     },
     {
+      id: "progress-indicator",
       title: "Progress Indicator",
       input: "75% hatchery",
       description:
         "Typing <code>75%</code> before a structure or unit marks it as partially built or in progress.",
     },
     {
+      id: "resource-cost",
       title: "Resource Cost Notation",
       input: "100 gas, 150 minerals",
       description:
         "Typing gas or mineral amounts will format them into icons and place them next to the build action.",
     },
     {
+      id: "map-markers",
       title: "Map Position Markers",
       input: "Make hatchery at pos1 then attack at pos2",
       description: `
@@ -460,6 +477,7 @@ export function showBuildOrderHelpModal() {
     `,
     },
     {
+      id: "quick-typing",
       title: "Quick Typing",
       image: "./img/info/quick_typing.webp",
       description:
@@ -467,30 +485,23 @@ export function showBuildOrderHelpModal() {
     },
   ];
 
-  const manualHTML = ` 
-    <p>You can enter build steps like this:</p>
-    <ul>
-      <li><strong>Supply/Time Column:</strong> Writing inside brackets like <code>[12]</code> or <code>[01:23]</code> will show up in the left column.</li>
-      <li><strong>Quick Typing:</strong> Pressing <kbd>Enter</kbd> while inside brackets automatically moves the cursor outside for faster typing.</li>
-      <li><strong>Abbreviations:</strong> Short forms like <code>RW</code> or <code>cc</code> are automatically expanded to their full terms.</li>
-      <li><strong>Done Formatting:</strong> Writing <code>100%</code>, <code>@100%</code>, or <code>@100</code> will format the next action to show it’s completed.</li>
-      <li><strong>Progress Formatting:</strong> Typing <code>40%</code> (or any percent) will format the next action as being in progress.</li>
-      <li><strong>Map Markers:</strong> Writing <code>pos1</code> to <code>pos9</code> inserts indicators to highlight locations on the map (like expansion order).</li>
-      <li><strong>Resources:</strong> Writing <code>100 gas</code> or <code>150 minerals</code> will format and show icons. The number can be anything.</li>
-    </ul>
-  `;
+  const manualHTML = generateTableOfContents(examples);
 
-  const abbreviationGridHTML = ` 
-    <h4>Abbreviations Reference:</h4>
+  const abbreviationGridHTML = `
+    <h4 id="abbr-section">Abbreviations Reference:</h4>
     ${generateAbbrSection("Structures", abbreviationMap.Structures)}
     ${generateAbbrSection("Units", abbreviationMap.Units)}
     ${generateAbbrSection("Upgrades", abbreviationMap.Upgrades)}
-        <hr />
-    <h4>Examples:</h4>
   `;
 
+  const examplesHeader = `<h4>Examples:</h4>`;
+
   contentDiv.innerHTML =
-    manualHTML + abbreviationGridHTML + examples.map(createExample).join("");
+    manualHTML +
+    examplesHeader +
+    examples.map(createExample).join("") +
+    `<hr />` +
+    abbreviationGridHTML;
 
   modal.style.display = "block";
 }
