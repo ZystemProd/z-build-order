@@ -241,6 +241,50 @@ export async function initializeIndexPage() {
   const saveBuildButton = document.getElementById("saveBuildButton");
   const newBuildButton = document.getElementById("newBuildButton");
 
+  const focusBtn = document.getElementById("openFocusModal");
+  const focusModal = document.getElementById("focusModal");
+  const closeFocusBtn = document.getElementById("closeFocusModal");
+  const increaseFontBtn = document.getElementById("increaseFontBtn");
+  const decreaseFontBtn = document.getElementById("decreaseFontBtn");
+  const focusContent = document.getElementById("focusContent");
+  let focusFontSize = 1;
+
+  const openFocusModal = () => {
+    if (!focusModal || !focusContent) return;
+    const table = document.getElementById("buildOrderTable");
+    if (table) {
+      focusContent.innerHTML = table.outerHTML;
+      focusContent.style.fontSize = `${focusFontSize}rem`;
+    }
+    focusModal.style.display = "block";
+  };
+
+  const closeFocusModal = () => {
+    if (focusModal) focusModal.style.display = "none";
+  };
+
+  const increaseFont = () => {
+    focusFontSize = Math.min(3, focusFontSize + 0.1);
+    if (focusContent) focusContent.style.fontSize = `${focusFontSize}rem`;
+  };
+
+  const decreaseFont = () => {
+    focusFontSize = Math.max(0.5, focusFontSize - 0.1);
+    if (focusContent) focusContent.style.fontSize = `${focusFontSize}rem`;
+  };
+
+  if (focusBtn) focusBtn.addEventListener("click", openFocusModal);
+  if (closeFocusBtn) closeFocusBtn.addEventListener("click", closeFocusModal);
+  if (increaseFontBtn) increaseFontBtn.addEventListener("click", increaseFont);
+  if (decreaseFontBtn) decreaseFontBtn.addEventListener("click", decreaseFont);
+  if (focusModal)
+    window.addEventListener("click", (e) => {
+      if (e.target === focusModal) closeFocusModal();
+    });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeFocusModal();
+  });
+
   // Save or update build depending on context
   safeAdd("saveBuildButton", "click", async () => {
     const buildId = getCurrentBuildId();

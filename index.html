@@ -275,7 +275,11 @@
       <table id="buildOrderTable">
         <tr>
           <th id="supplyHeader"><span class="full-text">Supply/Time</span><span class="short-text">S/T</span></th>
-          <th>Action</th>
+          <th class="action-header">Action
+            <button id="openFocusModal" class="focus-btn" title="Focus Mode">
+              <img src="img/SVG/expand-top-right-svgrepo-com.svg" alt="Focus">
+            </button>
+          </th>
         </tr>
       </table>
     </div>
@@ -816,7 +820,7 @@
     <div class="footer-center" id="site-info">
 
 
-      <p>Version 0.5.8073</p>
+      <p>Version 0.5.8074</p>
 
 
 
@@ -920,6 +924,18 @@
         <span class="close-modal" id="closeSupportersModal">×</span>
         <h3>Patreon Supporters</h3>
         <p id="supportersList">No supporters yet.</p>
+      </div>
+    </div>
+
+    <!-- Focus Modal for build output -->
+    <div id="focusModal" class="modal fullscreen-modal">
+      <div class="modal-content">
+        <span class="close-modal" id="closeFocusModal">&times;</span>
+        <div class="font-controls">
+          <button id="increaseFontBtn">A+</button>
+          <button id="decreaseFontBtn">A-</button>
+        </div>
+        <div id="focusContent" class="focus-content"></div>
       </div>
     </div>
     <script type="module" src="./src/initMain.js"></script>

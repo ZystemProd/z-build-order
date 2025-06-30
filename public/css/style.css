@@ -4951,3 +4951,47 @@ optgroup[label="Terran"] {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* Focus Modal Styles */
+.fullscreen-modal .modal-content {
+  margin: 0;
+  max-width: none;
+  width: 100%;
+  height: 100%;
+  background: #1e1e1e;
+  display: flex;
+  flex-direction: column;
+}
+
+.font-controls {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.font-controls button {
+  background: #333;
+  color: #fff;
+  border: none;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+#focusContent {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.focus-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  margin-left: 10px;
+}
+
+.focus-btn img {
+  width: 24px;
+  height: 24px;
+}
