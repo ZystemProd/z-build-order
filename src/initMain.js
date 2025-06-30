@@ -5,7 +5,7 @@ import { setSelectedGame } from './js/modules/gameSettings.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   if (!localStorage.getItem('selectedGame')) {
-    setSelectedGame('sc2');
+    setSelectedGame('stormgate');
   }
   initializeAuthUI();
   initializeIndexPage();

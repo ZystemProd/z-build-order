@@ -39,8 +39,7 @@
   </div>
   <div id="game-select-container">
     <select id="gameSelect">
-      <option value="sc2">StarCraft 2</option>
-      <option value="aoe2">Age of Empires 2</option>
+      <option value="stormgate">Stormgate</option>
     </select>
   </div>
   <div id="toast-container"></div>
@@ -822,7 +821,7 @@
     <div class="footer-center" id="site-info">
 
 
-      <p>Version 0.5.8073</p>
+      <p>Version 0.5.8074</p>
 
 
 
@@ -931,7 +930,7 @@
     <script>
       const gameSelectEl = document.getElementById('gameSelect');
       if (gameSelectEl) {
-        gameSelectEl.value = localStorage.getItem('selectedGame') || 'sc2';
+        gameSelectEl.value = localStorage.getItem('selectedGame') || 'stormgate';
         gameSelectEl.addEventListener('change', () => {
           localStorage.setItem('selectedGame', gameSelectEl.value);
           location.reload();
