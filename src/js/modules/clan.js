@@ -781,7 +781,21 @@ async function renderManageTab(tab, clan) {
       nameCell.textContent = member.username;
 
       const roleCell = document.createElement("td");
+      const roleWrapper = document.createElement("div");
+      roleWrapper.className = "role-wrapper";
+
+      const roleText = document.createElement("span");
+      roleText.textContent = member.role;
+      roleText.className = "role-text";
+
+      const gearIcon = document.createElement("img");
+      gearIcon.src = "img/SVG/settings.svg";
+      gearIcon.alt = "Change Role";
+      gearIcon.className = "role-gear-icon";
+
       const roleSelect = document.createElement("select");
+      roleSelect.className = "role-select";
+      roleSelect.style.display = "none";
 
       ["Player", "Co-Captain", "Captain"].forEach((opt) => {
         const option = document.createElement("option");
@@ -802,6 +816,7 @@ async function renderManageTab(tab, clan) {
       ) {
         roleSelect.disabled = true;
         roleSelect.title = "You cannot change this user's role.";
+        gearIcon.classList.add("disabled");
       }
 
       roleSelect.onchange = async () => {
@@ -845,9 +860,33 @@ async function renderManageTab(tab, clan) {
           [`memberInfo.${member.uid}.role`]: newRole,
         });
         showToast("Role updated", "success");
+        roleText.textContent = newRole;
+        roleSelect.style.display = "none";
+        roleText.style.display = "";
+        gearIcon.style.display = "";
       };
 
-      roleCell.appendChild(roleSelect);
+      roleSelect.addEventListener("blur", () => {
+        setTimeout(() => {
+          if (roleSelect.style.display !== "none") {
+            roleSelect.style.display = "none";
+            roleText.style.display = "";
+            gearIcon.style.display = "";
+          }
+        }, 100);
+      });
+
+      if (!roleSelect.disabled) {
+        gearIcon.addEventListener("click", () => {
+          roleText.style.display = "none";
+          gearIcon.style.display = "none";
+          roleSelect.style.display = "inline-block";
+          roleSelect.focus();
+        });
+      }
+
+      roleWrapper.append(roleText, gearIcon, roleSelect);
+      roleCell.appendChild(roleWrapper);
 
       const joinedCell = document.createElement("td");
       joinedCell.textContent = member.joined;
