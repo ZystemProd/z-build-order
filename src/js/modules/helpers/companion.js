@@ -17,8 +17,10 @@ export function setupCatActivationOnInput() {
 
   const tips = [
     "Tip: Write supply inside [brackets] and the action after",
-    "Tip: Use Shift + Enter to insert a row in the middle",
     "Tip: Write 'Swap' swap to indicate swapping Terran addons",
+    "Tip: Write '-> Hatchery' to indicate a planned transition or next step.",
+    "Tip: Add 100% or @100% to mark when something is done — it shows a green check.",
+    "Tip: Write 50% or @50% to show progress — it gets an orange underline.",
   ];
 
   textElement.innerHTML = formatActionText(tips[0]);

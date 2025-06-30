@@ -5019,6 +5019,16 @@ optgroup[label="Terran"] {
   top: 50%;
   transform: translateY(-50%);
   margin: 0;
+  padding: 20px;
+
+  display: flex; /* 🗸 Use flex to center contents */
+  align-items: center; /* 🗸 Vertical centering */
+  justify-content: center; /* 🗸 Horizontal centering */
+
+  width: 16px; /* Example size, adjust as needed */
+  height: 16px;
+  background: #333; /* Optional: style background */
+  border-radius: 4px; /* Optional: rounded corners */
 }
 
 .focus-btn:hover {
