@@ -258,11 +258,13 @@ export async function initializeIndexPage() {
       if (btn) btn.remove();
       focusContent.style.fontSize = `${focusFontSize}rem`;
     }
+    document.body.classList.add("modal-open");
     focusModal.style.display = "block";
   };
 
   const closeFocusModal = () => {
     if (focusModal) focusModal.style.display = "none";
+    document.body.classList.remove("modal-open");
   };
 
   const increaseFont = () => {

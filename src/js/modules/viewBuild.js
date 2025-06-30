@@ -58,11 +58,13 @@ function openFocusModal() {
     if (btn) btn.remove();
     focusContent.style.fontSize = `${focusFontSize}rem`;
   }
+  document.body.classList.add("modal-open");
   focusModal.style.display = "block";
 }
 
 function closeFocusModal() {
   if (focusModal) focusModal.style.display = "none";
+  document.body.classList.remove("modal-open");
 }
 
 function increaseFont() {

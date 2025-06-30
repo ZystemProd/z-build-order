@@ -478,6 +478,7 @@ export function closeModal() {
   if (!modal) return;
 
   modal.style.display = "none";
+  document.body.classList.remove("modal-open");
 
   // 🔄 Reset filters
   const allCategories = document.querySelectorAll(
@@ -512,6 +513,7 @@ export function openModal(modalId) {
   const modal = document.getElementById(modalId);
   if (modal) {
     modal.style.display = "block";
+    document.body.classList.add("modal-open");
   } else {
     console.error(`Modal with ID "${modalId}" not found.`);
   }

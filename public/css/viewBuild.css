@@ -418,6 +418,16 @@ input[type="text"]:disabled {
   max-width: 1200px;
 }
 
+/* Scale images with font size inside focus modal */
+#focusContent .term-image,
+#focusContent .unit-image,
+#focusContent .structure-image,
+#focusContent .ability-image,
+#focusContent .upgrade-image {
+  width: 1.875em;
+  height: 1.875em;
+}
+
 .focus-btn {
   background: none;
   border: none;
@@ -441,5 +451,9 @@ input[type="text"]:disabled {
 
 .action-header {
   position: relative;
+}
+
+body.modal-open {
+  overflow: hidden;
 }
 
