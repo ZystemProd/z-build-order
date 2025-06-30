@@ -77,6 +77,9 @@
         <img src="./img/SVG/back.svg" alt="Back" />
       </a>
       <h1 id="buildTitle">Loading...</h1>
+      <button id="openFocusModal" class="focus-btn" title="Focus Mode">
+        <img src="./img/SVG/expand-top-right-svgrepo-com.svg" alt="Focus" />
+      </button>
     </div>
 
     <!-- Build Info Grid -->
@@ -192,6 +195,17 @@
 
   </div>
 
+  <!-- Focus Modal for build output -->
+  <div id="focusModal" class="modal fullscreen-modal">
+    <div class="modal-content">
+      <span class="close-modal" id="closeFocusModal">&times;</span>
+      <div class="font-controls">
+        <button id="increaseFontBtn">A+</button>
+        <button id="decreaseFontBtn">A-</button>
+      </div>
+      <div id="focusContent" class="focus-content"></div>
+    </div>
+  </div>
 
   <script type="module">
     import { initializeAuthUI } from './src/app.js';

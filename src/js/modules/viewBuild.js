@@ -28,6 +28,13 @@ const pageBackButton = document.getElementById("pageBackButton");
 const ratingItem = document.getElementById("ratingItem");
 const infoGrid = document.querySelector(".build-info-grid");
 const mainLayout = document.querySelector(".main-layout");
+let focusBtn = document.getElementById("openFocusModal");
+let focusModal = document.getElementById("focusModal");
+let closeFocusBtn = document.getElementById("closeFocusModal");
+let increaseFontBtn = document.getElementById("increaseFontBtn");
+let decreaseFontBtn = document.getElementById("decreaseFontBtn");
+let focusContent = document.getElementById("focusContent");
+let focusFontSize = 1;
 
 function adjustRatingPosition() {
   if (!ratingItem || !infoGrid || !mainLayout) return;
@@ -40,6 +47,30 @@ function adjustRatingPosition() {
       infoGrid.appendChild(ratingItem);
     }
   }
+}
+
+function openFocusModal() {
+  if (!focusModal || !focusContent) return;
+  const buildOrder = document.getElementById("buildOrder");
+  if (buildOrder) {
+    focusContent.innerHTML = buildOrder.innerHTML;
+    focusContent.style.fontSize = `${focusFontSize}rem`;
+  }
+  focusModal.style.display = "block";
+}
+
+function closeFocusModal() {
+  if (focusModal) focusModal.style.display = "none";
+}
+
+function increaseFont() {
+  focusFontSize = Math.min(3, focusFontSize + 0.1);
+  if (focusContent) focusContent.style.fontSize = `${focusFontSize}rem`;
+}
+
+function decreaseFont() {
+  focusFontSize = Math.max(0.5, focusFontSize - 0.1);
+  if (focusContent) focusContent.style.fontSize = `${focusFontSize}rem`;
 }
 
 function handleBackClick(e) {
@@ -602,6 +633,25 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   adjustRatingPosition();
   window.addEventListener("resize", adjustRatingPosition);
+
+  focusBtn = document.getElementById("openFocusModal");
+  focusModal = document.getElementById("focusModal");
+  closeFocusBtn = document.getElementById("closeFocusModal");
+  increaseFontBtn = document.getElementById("increaseFontBtn");
+  decreaseFontBtn = document.getElementById("decreaseFontBtn");
+  focusContent = document.getElementById("focusContent");
+
+  if (focusBtn) focusBtn.addEventListener("click", openFocusModal);
+  if (closeFocusBtn) closeFocusBtn.addEventListener("click", closeFocusModal);
+  if (increaseFontBtn) increaseFontBtn.addEventListener("click", increaseFont);
+  if (decreaseFontBtn) decreaseFontBtn.addEventListener("click", decreaseFont);
+  if (focusModal)
+    window.addEventListener("click", (e) => {
+      if (e.target === focusModal) closeFocusModal();
+    });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeFocusModal();
+  });
 
   const importBtn = document.getElementById("importBuildButton");
 
