@@ -809,9 +809,9 @@ textarea::-webkit-scrollbar-thumb:hover {
 .structure-image {
   width: 30px; /* Adjust as necessary */
   height: 30px;
-  display: block;
-  margin: 0 auto 4px;
+  margin-left: 5px;
   border-radius: 7px; /* Rounded corners */
+  vertical-align: middle; /* Align the image properly with the text */
   object-fit: cover;
 }
 
