@@ -39,6 +39,14 @@
   </div>
   <div id="toast-container"></div>
 
+  <!-- Game Selector Dropdown -->
+  <div id="game-selector">
+    <select id="game-dropdown">
+      <option value="sc2" data-logo="img/game-logos/sc2_placeholder.png" selected>StarCraft 2</option>
+      <option value="sg" data-logo="img/game-logos/sg_placeholder.png" disabled>Stormgate (Coming Soon)</option>
+    </select>
+  </div>
+
   <!-- Auth Container -->
   <div id="auth-container">
     <div class="auth-info">
@@ -821,7 +829,7 @@
     <div class="footer-center" id="site-info">
 
 
-      <p>Version 0.5.8085</p>
+      <p>Version 0.5.8089</p>
 
 
 
@@ -943,6 +951,15 @@
     </div>
   </div>
   <script type="module" src="./src/initMain.js"></script>
+  <script>
+    const dropdown = document.getElementById('game-dropdown');
+    function updateGameLogo() {
+      const logo = dropdown.selectedOptions[0].dataset.logo;
+      dropdown.style.backgroundImage = `url(${logo})`;
+    }
+    updateGameLogo();
+    dropdown.addEventListener('change', updateGameLogo);
+  </script>
 
 
 </body>
