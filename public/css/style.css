@@ -810,6 +810,7 @@ textarea::-webkit-scrollbar-thumb:hover {
   width: 30px; /* Adjust as necessary */
   height: 30px;
   margin-left: 5px;
+  display: inline-flex;
   border-radius: 7px; /* Rounded corners */
   vertical-align: middle; /* Align the image properly with the text */
   object-fit: cover;
@@ -4994,7 +4995,9 @@ optgroup[label="Terran"] {
 }
 
 #focusModal #buildOrderTable {
-  margin: 0 20px;
+  margin: 0 auto;
+  padding: 0 20px;
+  max-width: 1200px;
 }
 
 .focus-btn {
