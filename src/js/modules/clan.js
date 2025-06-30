@@ -852,9 +852,6 @@ async function renderManageTab(tab, clan) {
             await updateDoc(doc(db, "clans", clan.id), updates);
             showToast("Captain reassigned", "success");
             await renderManageClanUI(clan.id);
-            document
-              .querySelector('.clan-tab-button[data-tab="members"]')
-              ?.click();
             return;
           }
 
@@ -863,9 +860,6 @@ async function renderManageTab(tab, clan) {
           });
           showToast("Role updated", "success");
           await renderManageClanUI(clan.id);
-          document
-            .querySelector('.clan-tab-button[data-tab="members"]')
-            ?.click();
         };
 
         roleSelect.addEventListener("blur", () => {

@@ -5063,11 +5063,11 @@ optgroup[label="Terran"] {
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .role-wrapper .role-gear-icon {
+  .role-gear-icon {
     visibility: hidden;
   }
 
-  .role-wrapper:hover .role-gear-icon {
+  .clan-member-table tr:hover .role-gear-icon {
     visibility: visible;
   }
 }
