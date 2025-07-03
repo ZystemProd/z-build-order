@@ -541,6 +541,19 @@ export async function initializeIndexPage() {
 
   let selectedReplayFile = null;
 
+  function initializeGameSwitcher() {
+    const dropdown = document.getElementById("game-dropdown");
+    if (!dropdown) return;
+
+    function updateGameLogo() {
+      const logo = dropdown.selectedOptions[0].dataset.logo;
+      dropdown.style.backgroundImage = `url(${logo})`;
+    }
+
+    updateGameLogo();
+    dropdown.addEventListener("change", updateGameLogo);
+  }
+
   safeAdd("replayButton", "click", () => {
     const input = document.getElementById("replayFileInput");
     if (input) input.click();
@@ -1425,19 +1438,6 @@ export async function initializeIndexPage() {
         mapModal.style.display = "block";
       }
     });
-
-    function initializeGameSwitcher() {
-      const dropdown = document.getElementById("game-dropdown");
-      if (!dropdown) return;
-
-      function updateGameLogo() {
-        const logo = dropdown.selectedOptions[0].dataset.logo;
-        dropdown.style.backgroundImage = `url(${logo})`;
-      }
-
-      updateGameLogo();
-      dropdown.addEventListener("change", updateGameLogo);
-    }
 
     document
       .querySelector(".builds-container")
