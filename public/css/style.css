@@ -161,7 +161,9 @@ body {
 #game-select {
   position: fixed;
   top: 10px;
-  right: 120px;
+  right: 250px;
+  padding: 10px;
+  height: 80px;
   background-color: #37373780;
   border-radius: 8px;
   display: flex;
@@ -181,7 +183,7 @@ body {
 #game-select .game-dropdown {
   display: none;
   position: absolute;
-  top: 48px;
+  top: 80px;
   left: 0;
   background-color: #37373780;
   padding: 5px;
@@ -190,7 +192,15 @@ body {
   white-space: nowrap;
 }
 
-#game-select:hover .game-dropdown {
+#game-select .game-dropdown {
+  display: none;
+}
+
+#game-select .game-dropdown {
+  display: none;
+}
+
+#game-select .game-dropdown.open {
   display: block;
 }
 
@@ -602,9 +612,10 @@ button:hover {
 }
 
 #userName {
-  display: inline-block;
-  min-width: 100px; /* or whatever expected size */
-  text-align: left;
+  max-width: 150px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 #buildOrderTitleText.dimmed {

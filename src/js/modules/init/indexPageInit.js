@@ -541,7 +541,6 @@ export async function initializeIndexPage() {
 
   let selectedReplayFile = null;
 
-
   safeAdd("replayButton", "click", () => {
     const input = document.getElementById("replayFileInput");
     if (input) input.click();
@@ -758,7 +757,6 @@ export async function initializeIndexPage() {
     }
   });
 
-
   // --- Template Preview Hover (NEW! ✅)
   safeAdd("templateList", "mouseover", (event) => {
     const templateCard = event.target.closest(".template-card");
@@ -937,6 +935,24 @@ export async function initializeIndexPage() {
     ) {
       modal.style.display = "none";
     }
+  });
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const gameSelect = document.getElementById("game-select");
+    const selectedGame = gameSelect.querySelector(".selected-game");
+    const dropdown = gameSelect.querySelector(".game-dropdown");
+
+    selectedGame.addEventListener("click", (e) => {
+      e.stopPropagation(); // Prevent click from bubbling
+      dropdown.classList.toggle("open");
+    });
+
+    // Optional: close when clicking outside
+    document.addEventListener("click", (e) => {
+      if (!gameSelect.contains(e.target)) {
+        dropdown.classList.remove("open");
+      }
+    });
   });
 
   // --- Other Initializations
