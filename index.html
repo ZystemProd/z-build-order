@@ -829,7 +829,7 @@
     <div class="footer-center" id="site-info">
 
 
-      <p>Version 0.5.8089</p>
+      <p>Version 0.5.8090</p>
 
 
 
@@ -951,17 +951,5 @@
     </div>
   </div>
   <script type="module" src="./src/initMain.js"></script>
-  <script>
-    const dropdown = document.getElementById('game-dropdown');
-    function updateGameLogo() {
-      const logo = dropdown.selectedOptions[0].dataset.logo;
-      dropdown.style.backgroundImage = `url(${logo})`;
-    }
-    updateGameLogo();
-    dropdown.addEventListener('change', updateGameLogo);
-  </script>
-
-
 </body>
-
 </html>

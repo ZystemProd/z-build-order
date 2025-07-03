@@ -21,6 +21,21 @@ import { initializeAutoCorrect } from "../autoCorrect.js";
 import { populateBuildDetails, analyzeBuildOrder } from "../uiHandlers.js";
 import { showToast } from "../toastHandler.js";
 import { updateYouTubeEmbed } from "../youtube.js";
+
+function initializeGameSelector() {
+  const dropdown = document.getElementById("game-dropdown");
+  if (!dropdown) return;
+
+  const updateGameLogo = () => {
+    const logo = dropdown.selectedOptions[0]?.dataset.logo;
+    if (logo) {
+      dropdown.style.backgroundImage = `url(${logo})`;
+    }
+  };
+
+  updateGameLogo();
+  dropdown.addEventListener("change", updateGameLogo);
+}
 import {
   closeModal,
   showSubcategories,
@@ -159,6 +174,8 @@ let currentBuildFilter = "all";
  ----------------- */
 export async function initializeIndexPage() {
   console.log("🛠 Initializing Index Page");
+
+  initializeGameSelector();
 
   const restoreCommunity = localStorage.getItem("restoreCommunityModal");
   const filterType = localStorage.getItem("communityFilterType");
