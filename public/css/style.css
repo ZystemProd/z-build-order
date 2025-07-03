@@ -159,7 +159,7 @@ body {
 
 /* Game Selector */
 #game-select {
-  position: fixed;
+  position: absolute;
   top: 10px;
   right: 250px;
   padding: 10px;
@@ -220,6 +220,10 @@ body {
 #game-select .game-option.disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+#game-select:hover {
+  background-color: #6b6b6b80;
 }
 
 .dropdown {

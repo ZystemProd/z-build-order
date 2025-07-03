@@ -937,8 +937,8 @@ export async function initializeIndexPage() {
     }
   });
 
-  document.addEventListener("DOMContentLoaded", () => {
-    const gameSelect = document.getElementById("game-select");
+  const gameSelect = document.getElementById("game-select");
+  if (gameSelect) {
     const selectedGame = gameSelect.querySelector(".selected-game");
     const dropdown = gameSelect.querySelector(".game-dropdown");
 
@@ -953,7 +953,7 @@ export async function initializeIndexPage() {
         dropdown.classList.remove("open");
       }
     });
-  });
+  }
 
   // --- Other Initializations
   initializeSectionToggles();
