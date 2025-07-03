@@ -42,8 +42,8 @@
   <!-- Game Selector Dropdown -->
   <div id="game-selector">
     <select id="game-dropdown">
-      <option value="sc2" data-logo="img/game-logos/sc2_placeholder.png" selected>StarCraft 2</option>
-      <option value="sg" data-logo="img/game-logos/sg_placeholder.png" disabled>Stormgate (Coming Soon)</option>
+      <option value="sc2" selected>StarCraft 2</option>
+      <option value="sg" disabled>Stormgate (Coming Soon)</option>
     </select>
   </div>
 
@@ -950,16 +950,7 @@
       <div id="focusContent" class="focus-content"></div>
     </div>
   </div>
-  <script type="module" src="./src/initMain.js"></script>
-  <script>
-    const dropdown = document.getElementById('game-dropdown');
-    function updateGameLogo() {
-      const logo = dropdown.selectedOptions[0].dataset.logo;
-      dropdown.style.backgroundImage = `url(${logo})`;
-    }
-    updateGameLogo();
-    dropdown.addEventListener('change', updateGameLogo);
-  </script>
+
 
 
 </body>
