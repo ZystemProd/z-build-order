@@ -231,6 +231,11 @@ body {
   display: inline-block;
 }
 
+#game-select .game-dropdown .game-option:hover {
+  background-color: #f0f0f02b; /* or your highlight color */
+  cursor: pointer;
+}
+
 /* Dropdown button */
 .dropdown-btn {
   background-color: #444;

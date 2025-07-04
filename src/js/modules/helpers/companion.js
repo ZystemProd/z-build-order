@@ -65,7 +65,7 @@ export function setupCatActivationOnInput() {
         textElement.innerHTML = formatActionText(tips[currentTipIndex]);
         textElement.style.opacity = 1;
       }, 500); // match transition duration
-    }, 3000);
+    }, 10000);
   });
 
   document.addEventListener("click", (e) => {
