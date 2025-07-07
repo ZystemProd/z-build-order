@@ -599,7 +599,9 @@ def upload():
                 if getattr(unit, "is_building", False):
                     continue
                 name = format_name(event.unit_type_name)
-                name = tidy(name)
+                if getattr(unit, "is_hallucination", False):
+                    name += " (Hallucinated)"
+                    name = tidy(name)
                 if name is None:
                     continue
                 lower_name = name.lower()
@@ -658,6 +660,8 @@ def upload():
                 if event.control_pid != player.pid:
                     continue
                 name = format_name(event.unit_type_name)
+                if getattr(event.unit, "is_hallucination", False):
+                    name += " (Hallucinated)"
                 name = tidy(name)
                 if name is None:
                     continue
