@@ -74,9 +74,9 @@ with the parsed results.
 
 `app.py` exposes two helpers for dealing with Chrono Boost.
 
-* `calculate_chrono_overlap(start, end, chrono_windows)` –
-  return how many seconds of the window were boosted.
-* `adjusted_start_time(end, base_duration, chrono_windows)` –
+* `calculate_chrono_overlap(start, end, chrono_windows, producer_tag=None)` –
+  return boosted/unboosted seconds for a specific structure.
+* `adjusted_start_time(end, base_duration, chrono_windows, producer_tag=None)` –
   compute the real start time given the unmodified duration.
 
 Example:
@@ -85,8 +85,8 @@ Example:
 end_time = 380
 base_duration = 100
 
-chrono = [(300, 309.6), (310, 319.6)]
-real_start = adjusted_start_time(end_time, base_duration, chrono)
+chrono = [(300, 309.6, core_tag)]
+real_start = adjusted_start_time(end_time, base_duration, chrono, producer_tag=core_tag)
 ```
 
 Overlapping Chrono Boost casts are merged automatically so time is not counted

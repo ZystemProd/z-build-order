@@ -241,7 +241,12 @@ def frame_to_ingame_seconds(frame: int, replay) -> float:
     in_game_seconds = real_seconds / speed_factor
     return in_game_seconds
 
-def calculate_chrono_overlap(upgrade_start: float, upgrade_end: float, chrono_windows):
+def calculate_chrono_overlap(
+    upgrade_start: float,
+    upgrade_end: float,
+    chrono_windows,
+    producer_tag: Optional[int] = None,
+):
     """Return how many seconds of the window were Chrono Boosted.
 
     Parameters
@@ -264,7 +269,10 @@ def calculate_chrono_overlap(upgrade_start: float, upgrade_end: float, chrono_wi
 
     # Collect only the relevant parts of chrono windows that overlap the upgrade
     intervals = []
-    for cs, ce in chrono_windows:
+    for entry in chrono_windows:
+        cs, ce, tag = entry if len(entry) == 3 else (*entry, None)
+        if producer_tag is not None and tag != producer_tag:
+            continue
         if ce <= upgrade_start or cs >= upgrade_end:
             continue
         intervals.append((max(cs, upgrade_start), min(ce, upgrade_end)))
@@ -289,7 +297,12 @@ def calculate_chrono_overlap(upgrade_start: float, upgrade_end: float, chrono_wi
     return boosted, unboosted
 
 
-def adjusted_start_time(end_time: float, base_duration: float, chrono_windows) -> float:
+def adjusted_start_time(
+    end_time: float,
+    base_duration: float,
+    chrono_windows,
+    producer_tag: Optional[int] = None,
+) -> float:
     """Return the Chrono-adjusted start time for a build window.
 
     Parameters
@@ -309,7 +322,9 @@ def adjusted_start_time(end_time: float, base_duration: float, chrono_windows) -
 
     start_guess = end_time - base_duration
     for _ in range(5):
-        boosted, unboosted = calculate_chrono_overlap(start_guess, end_time, chrono_windows)
+        boosted, unboosted = calculate_chrono_overlap(
+            start_guess, end_time, chrono_windows, producer_tag
+        )
         adjusted = boosted * CHRONO_SPEED_FACTOR + unboosted
         new_start = end_time - adjusted
         if abs(new_start - start_guess) < 0.01:
@@ -667,8 +682,9 @@ def upload():
             # Chrono Boost detection
             if ability.endswith(("ChronoBoostEnergyCost", "ChronoBoost")) and getattr(event, "pid", None) == player.pid:
                 start_in_game = event.second / speed_factor
-                end_in_game = start_in_game + 9.6
-                chrono_windows[event.pid].append((start_in_game, end_in_game))
+                end_in_game = start_in_game + CHRONO_BOOST_SECONDS
+                tag = producer_tag(event)
+                chrono_windows[event.pid].append((start_in_game, end_in_game, tag))
                 continue
 
 
@@ -721,7 +737,10 @@ def upload():
                 end_in_game = event.second / speed_factor
                 base_duration = build_time / speed_factor
                 start_in_game = adjusted_start_time(
-                    end_in_game, base_duration, chrono_windows[player.pid]
+                    end_in_game,
+                    base_duration,
+                    chrono_windows[player.pid],
+                    producer_tag=None,
                 )
 
                 start_frame = int(start_in_game * replay.game_fps * speed_factor)
@@ -831,7 +850,10 @@ def upload():
 
                 if duration_secs:
                     start_real = adjusted_start_time(
-                        frame_sec, duration_secs, chrono_windows[player.pid]
+                        frame_sec,
+                        duration_secs,
+                        chrono_windows[player.pid],
+                        producer_tag=None,
                     )
                 else:
                     start_real = frame_sec
