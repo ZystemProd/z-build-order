@@ -539,9 +539,12 @@ def upload():
             speed_factor = 1.4
 
         # ---- containers -------------------------------------------
+        # Containers
         entries = []
-        init_map = {}                                          # unit_id → unit name
-        chrono_until = {p.pid: 0 for p in players}
+        init_map = {}
+        chrono_windows = defaultdict(list)   # ✅ <-- You must declare this!
+
+
 
         # NEW: running supply snapshot (O(1) look‑ups) --------------
         current_used = 0
@@ -605,17 +608,31 @@ def upload():
                 if name is None:
                     continue
                 lower_name = name.lower()
-                if (not name or "Beacon" in name or name in skip_units or lower_name in skip_units_lower or any(k.lower() in lower_name for k in skip_keywords)):
+                if (
+                    not name
+                    or "Beacon" in name
+                    or name in skip_units
+                    or lower_name in skip_units_lower
+                    or any(k.lower() in lower_name for k in skip_keywords)
+                ):
                     continue
+
                 build_time = BUILD_TIME.get(event.unit_type_name, 0)
                 start_real = event.second - build_time * speed_factor
-                if player.play_race.lower() == "protoss" and start_real < chrono_until.get(player.pid, 0):
-                    if start_real >= chrono_until[player.pid] - CHRONO_BOOST_SECONDS * speed_factor:
-                        start_real = event.second - build_time * CHRONO_SPEED_FACTOR * speed_factor
+
+                # ✅ NEW: Use chrono_windows overlap for units too!
+                boosted_secs, unboosted_secs = calculate_chrono_overlap(
+                    start_real,
+                    event.second,
+                    chrono_windows[player.pid]
+                )
+                adjusted = boosted_secs * CHRONO_SPEED_FACTOR * speed_factor + unboosted_secs * speed_factor
+                start_real = event.second - adjusted
+
                 idx = bisect.bisect_right(frames_by_pid[player.pid], event.frame) - 1
                 if idx >= 0 and (event.frame - frames_by_pid[player.pid][idx]) <= 4:
                     used_s = supply_by_pid[player.pid][idx]
-                    made_s = 0  # or your known 'made' value
+                    made_s = 0
                 else:
                     used_s, made_s = get_supply(start_real)
 
@@ -623,10 +640,24 @@ def upload():
                     break
                 if time_limit is not None and int(start_real / speed_factor) > time_limit:
                     break
-                entries.append({'clock_sec': int(start_real / speed_factor), 'supply': used_s, 'made': made_s, 'unit': name, 'kind': 'start'})
+
+                entries.append({
+                    'clock_sec': int(start_real / speed_factor),
+                    'supply': used_s,
+                    'made': made_s,
+                    'unit': name,
+                    'kind': 'start'
+                })
                 used_f, made_f = get_supply(event.second)
-                entries.append({'clock_sec': int(event.second / speed_factor), 'supply': used_f, 'made': made_f, 'unit': name, 'kind': 'finish'})
+                entries.append({
+                    'clock_sec': int(event.second / speed_factor),
+                    'supply': used_f,
+                    'made': made_f,
+                    'unit': name,
+                    'kind': 'finish'
+                })
                 continue
+
 
             # ---- UnitInitEvent ------------------------------------
             if isinstance(event, sc2reader.events.tracker.UnitInitEvent):
