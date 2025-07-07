@@ -619,7 +619,7 @@ def upload():
                 build_time = BUILD_TIME.get(event.unit_type_name, 0)
                 start_real = event.second - build_time * speed_factor
 
-                # ✅ NEW: Use chrono_windows overlap for units too!
+                # NEW: Use chrono overlap for units too!
                 boosted_secs, unboosted_secs = calculate_chrono_overlap(
                     start_real,
                     event.second,
@@ -628,12 +628,16 @@ def upload():
                 adjusted = boosted_secs * CHRONO_SPEED_FACTOR * speed_factor + unboosted_secs * speed_factor
                 start_real = event.second - adjusted
 
-                idx = bisect.bisect_right(frames_by_pid[player.pid], event.frame) - 1
+                # ✅ Now calculate start_frame for units too!
+                start_frame = int(start_real * replay.game_fps * speed_factor)
+
+                idx = bisect.bisect_right(frames_by_pid[player.pid], start_frame) - 1
                 if idx >= 0 and (start_frame - frames_by_pid[player.pid][idx]) <= 4:
                     used_s = supply_by_pid[player.pid][idx]
                     made_s = 0
                 else:
-                    used_s, made_s = get_supply(start_real)
+                    real_sec = start_real * speed_factor
+                    used_s, made_s = get_supply(real_sec)
 
                 if stop_limit is not None and used_s > stop_limit:
                     break
