@@ -241,20 +241,51 @@ def frame_to_ingame_seconds(frame: int, replay) -> float:
     in_game_seconds = real_seconds / speed_factor
     return in_game_seconds
 
-def calculate_chrono_overlap(upgrade_start, upgrade_end, chrono_windows):
+def calculate_chrono_overlap(upgrade_start: float, upgrade_end: float, chrono_windows):
+    """Return how many seconds of the window were Chrono Boosted.
+
+    Parameters
+    ----------
+    upgrade_start : float
+        In-game seconds when the research or unit started.
+    upgrade_end : float
+        In-game seconds when it finished.
+    chrono_windows : Iterable[tuple[float, float]]
+        List of Chrono Boost windows for the player.
+
+    Returns
+    -------
+    tuple[float, float]
+        ``(boosted_seconds, unboosted_seconds)``
     """
-    Calculate how many in-game seconds of the upgrade or unit build window
-    overlap with any Chrono Boost windows.
-    Returns (boosted_seconds, unboosted_seconds).
-    """
-    boosted = 0.0
-    for (chrono_start, chrono_end) in chrono_windows:
-        overlap_start = max(upgrade_start, chrono_start)
-        overlap_end = min(upgrade_end, chrono_end)
-        if overlap_start < overlap_end:
-            boosted += (overlap_end - overlap_start)
+
+    if upgrade_end <= upgrade_start:
+        return 0.0, 0.0
+
+    # Collect only the relevant parts of chrono windows that overlap the upgrade
+    intervals = []
+    for cs, ce in chrono_windows:
+        if ce <= upgrade_start or cs >= upgrade_end:
+            continue
+        intervals.append((max(cs, upgrade_start), min(ce, upgrade_end)))
+
+    if not intervals:
+        total = upgrade_end - upgrade_start
+        return 0.0, total
+
+    # Merge overlapping chrono segments to avoid double counting
+    intervals.sort()
+    merged = [list(intervals[0])]
+    for start, end in intervals[1:]:
+        last = merged[-1]
+        if start <= last[1]:
+            last[1] = max(last[1], end)
+        else:
+            merged.append([start, end])
+
+    boosted = sum(end - start for start, end in merged)
     total = upgrade_end - upgrade_start
-    unboosted = max(total - boosted, 0)
+    unboosted = max(total - boosted, 0.0)
     return boosted, unboosted
 
 
