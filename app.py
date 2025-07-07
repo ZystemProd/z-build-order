@@ -556,11 +556,23 @@ def upload():
                 frames_by_pid[ev.pid].append(ev.frame)
                 supply_by_pid[ev.pid].append(int(ev.food_used))
 
+        # Track known hallucinated unit tags
+        known_hallucination_tags = set()
 
         # ---- iterate event stream --------------------------------
         for event in replay.events:
             if event.second == 0:
                 continue
+
+            # ✅ Robust hallucination cast detection
+            if isinstance(event, (sc2reader.events.game.AbilityEvent, sc2reader.events.game.TargetUnitCommandEvent)):
+                if hasattr(event, "ability_name") and event.ability_name:
+                    ability_name = event.ability_name.lower()
+                    if "hallucination" in ability_name:
+                        last_hallucination_frame = event.frame
+                        last_hallucination_pid = event.pid
+                        print(f"Hallucination cast at frame {last_hallucination_frame} by player {last_hallucination_pid}")
+
 
             # ------ capture live supply snapshot -------------------
             if isinstance(event, sc2reader.events.tracker.PlayerStatsEvent) and event.pid == player.pid:
@@ -604,15 +616,14 @@ def upload():
                 # ✅ Robust hallucination detection
                 hallucinated = getattr(unit, "is_hallucination", False)
 
+                # Cast-tracking fallback
                 if not hallucinated:
-                    if "hallucination" in getattr(unit, "name", "").lower():
+                    if (
+                        'last_hallucination_frame' in locals()
+                        and event.frame - last_hallucination_frame <= 5
+                        and event.control_pid == last_hallucination_pid
+                    ):
                         hallucinated = True
-                    if hasattr(unit, "owner") and getattr(unit.owner, "name", "").lower() == "neutral":
-                        hallucinated = True
-
-                # Optional: you can add custom logic here for known illusions
-                # For example: if name.lower() in ["phoenix", "archon", "colossus", ...]
-                # and spawned by a sentry (if you track that ability)
 
                 if hallucinated:
                     name += " (Hallucinated)"
@@ -673,6 +684,7 @@ def upload():
 
 
 
+
             # ---- UnitInitEvent ------------------------------------
             if isinstance(event, sc2reader.events.tracker.UnitInitEvent):
                 if event.control_pid != player.pid:
@@ -680,13 +692,15 @@ def upload():
 
                 name = format_name(event.unit_type_name)
 
-                # ✅ Robust hallucination check
-                hallucinated = getattr(unit, "is_hallucination", False)
+                hallucinated = getattr(event.unit, "is_hallucination", False)
 
+                # Cast-tracking fallback
                 if not hallucinated:
-                    if "hallucination" in getattr(unit, "name", "").lower():
-                        hallucinated = True
-                    if hasattr(unit, "owner") and getattr(unit.owner, "name", "").lower() == "neutral":
+                    if (
+                        'last_hallucination_frame' in locals()
+                        and event.frame - last_hallucination_frame <= 5
+                        and event.control_pid == last_hallucination_pid
+                    ):
                         hallucinated = True
 
                 if hallucinated:
@@ -715,6 +729,7 @@ def upload():
                     'kind': 'start'
                 })
                 continue
+
 
             # ---- UnitDoneEvent ------------------------------------
             if isinstance(event, sc2reader.events.tracker.UnitDoneEvent):
