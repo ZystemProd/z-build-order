@@ -371,23 +371,6 @@ def tidy(label: str) -> str | None:
 
 # -------------------------------------------------------------------
 
-def calculate_chrono_overlap(upgrade_start, upgrade_end, chrono_windows):
-    """
-    Calculate how many in-game seconds of the upgrade window overlap with any Chrono Boost windows.
-    Returns (boosted_seconds, unboosted_seconds).
-    """
-    boosted = 0.0
-    for (chrono_start, chrono_end) in chrono_windows:
-        # Find overlap between upgrade window and this Chrono window
-        overlap_start = max(upgrade_start, chrono_start)
-        overlap_end = min(upgrade_end, chrono_end)
-        if overlap_start < overlap_end:
-            boosted += (overlap_end - overlap_start)
-    total = upgrade_end - upgrade_start
-    unboosted = max(total - boosted, 0)
-    return boosted, unboosted
-
-
 # --- Ability/Command events helper for any sc2reader version ---
 from sc2reader.events import game as ge
 
@@ -539,12 +522,9 @@ def upload():
             speed_factor = 1.4
 
         # ---- containers -------------------------------------------
-        # Containers
         entries = []
-        init_map = {}
-        chrono_windows = defaultdict(list)   # ✅ <-- You must declare this!
-
-
+        init_map = {}                                          # unit_id → unit name
+        chrono_until = {p.pid: 0 for p in players}
 
         # NEW: running supply snapshot (O(1) look‑ups) --------------
         current_used = 0
@@ -586,13 +566,10 @@ def upload():
                 break
 
 
-            # Chrono Boost detection — fix this:
+            # Chrono Boost detection
             if ability.endswith(("ChronoBoostEnergyCost", "ChronoBoost")) and getattr(event, "pid", None) == player.pid:
-                start_in_game = event.second / speed_factor
-                end_in_game = start_in_game + 9.6
-                chrono_windows[event.pid].append((start_in_game, end_in_game))
+                chrono_until[event.pid] = max(chrono_until.get(event.pid, 0), event.second) + 9.6 * speed_factor
                 continue
-
 
 
             # ---- UnitBornEvent ------------------------------------
@@ -607,30 +584,25 @@ def upload():
                 if name is None:
                     continue
                 lower_name = name.lower()
-                if (
-                    not name
-                    or "Beacon" in name
-                    or name in skip_units
-                    or lower_name in skip_units_lower
-                    or any(k.lower() in lower_name for k in skip_keywords)
-                ):
+                if (not name or "Beacon" in name or name in skip_units or lower_name in skip_units_lower or any(k.lower() in lower_name for k in skip_keywords)):
                     continue
 
                 build_time = BUILD_TIME.get(event.unit_type_name, 0)
-                start_real = event.second - build_time * speed_factor
 
-                # NEW: Use chrono overlap for units too!
+                # ✅ Treat build_time as real-world seconds → convert to in-game
+                start_real = event.second - build_time
+                start_in_game = start_real / speed_factor
+                end_in_game = event.second / speed_factor
+
+                # ✅ Use chrono_windows for overlap
                 boosted_secs, unboosted_secs = calculate_chrono_overlap(
-                    start_real,
-                    event.second,
-                    chrono_windows[player.pid]
+                    start_in_game, end_in_game, chrono_windows[player.pid]
                 )
-                adjusted = boosted_secs * CHRONO_SPEED_FACTOR * speed_factor + unboosted_secs * speed_factor
-                start_real = event.second - adjusted
+                adjusted = boosted_secs * CHRONO_SPEED_FACTOR + unboosted_secs
+                start_in_game = end_in_game - adjusted
 
-                # ✅ Now calculate start_frame for units too!
-                start_frame = int(start_real * replay.game_fps * speed_factor)
-
+                # ✅ Map back to frames for bisect
+                start_frame = int(start_in_game * replay.game_fps * speed_factor)
                 idx = bisect.bisect_right(frames_by_pid[player.pid], start_frame) - 1
                 if idx >= 0 and (start_frame - frames_by_pid[player.pid][idx]) <= 4:
                     used_s = supply_by_pid[player.pid][idx]
@@ -639,13 +611,14 @@ def upload():
                     real_sec = start_real * speed_factor
                     used_s, made_s = get_supply(real_sec)
 
+
                 if stop_limit is not None and used_s > stop_limit:
                     break
-                if time_limit is not None and int(start_real / speed_factor) > time_limit:
+                if time_limit is not None and int(start_in_game) > time_limit:
                     break
 
                 entries.append({
-                    'clock_sec': int(start_real / speed_factor),
+                    'clock_sec': int(start_in_game),
                     'supply': used_s,
                     'made': made_s,
                     'unit': name,
@@ -653,7 +626,7 @@ def upload():
                 })
                 used_f, made_f = get_supply(event.second)
                 entries.append({
-                    'clock_sec': int(event.second / speed_factor),
+                    'clock_sec': int(end_in_game),
                     'supply': used_f,
                     'made': made_f,
                     'unit': name,
@@ -711,24 +684,18 @@ def upload():
                     adjusted = boosted_secs * CHRONO_SPEED_FACTOR + unboosted_secs
                     start_real = upgrade_end - adjusted
 
-                    print(
-                        f"⏱️ {mapped_name} boosted={boosted_secs:.2f}s "
-                        f"unboosted={unboosted_secs:.2f}s adjusted_duration={adjusted:.2f}"
-                    )
+                    print(f"⏱️ {mapped_name} boosted={boosted_secs:.2f}s unboosted={unboosted_secs:.2f}s adjusted={adjusted:.2f}")
                 else:
                     start_real = frame_sec
 
-                # ✅ Always calculate start_frame here!
-                start_frame = int(start_real * replay.game_fps * speed_factor)
 
-                # ✅ Use start_frame in your snapshot check!
+                start_frame = int(start_real * replay.game_fps * speed_factor)
                 idx = bisect.bisect_right(frames_by_pid[player.pid], start_frame) - 1
 
                 if idx >= 0 and (start_frame - frames_by_pid[player.pid][idx]) <= 4:
                     used_s = supply_by_pid[player.pid][idx]
                     made_s = 0
                 else:
-                    # ✅ Fallback: convert start_real back to real seconds for supply lookup
                     real_sec = start_real * speed_factor
                     used_s, made_s = get_supply(real_sec)
 
@@ -813,7 +780,7 @@ def upload():
                     i < n
                     and entries[i]['kind'] == 'start'
                     and entries[i]['supply'] == supply
-                    and abs(entries[i]['clock_sec'] - start_time) <= 5
+                    and entries[i]['clock_sec'] == start_time
                 ):
                     e = entries[i]
                     qty = e.get('count', 1)
