@@ -25,6 +25,7 @@ export const abbreviationMap = {
     ovie: "overlord",
     hydra: "hydralisk",
     bc: "battlecruiser",
+    mama: "mothership",
   },
   Upgrades: {
     "baneling speed": "centrifugal hooks",
@@ -44,5 +45,8 @@ export const abbreviationMap = {
     "lib range": "advanced ballistics",
     "liberator range": "advanced ballistics",
     stim: "stimpack",
+    "ghost cloak": "personal cloaking",
+    "banshee cloak": "cloaking field",
+    "medivac upgrade": "caduceus reactor",
   },
 };

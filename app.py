@@ -205,7 +205,7 @@ upgrade_times = {
     "Air Weapons L1": 129,
     "Air Weapons L2": 154, 
     "Air Weapons L3": 179,            
-    "Research warp gate": 100,
+    "Research Warp Gate": 100,
     "Psionic Storm": 79,
     "Blink": 121,
     "Charge": 100,

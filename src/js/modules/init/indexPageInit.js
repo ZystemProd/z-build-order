@@ -470,14 +470,6 @@ export async function initializeIndexPage() {
   });
 
   safeAdd("showCommunityModalButton", "click", async () => {
-    if (!auth.currentUser) {
-      const authBox = document.getElementById("auth-container");
-      authBox.classList.add("highlight");
-      authBox.scrollIntoView({ behavior: "smooth", block: "center" });
-      setTimeout(() => authBox.classList.remove("highlight"), 1500);
-      return;
-    }
-
     const modal = document.getElementById("communityModal");
     if (!modal) return;
     modal.style.display = "block";
