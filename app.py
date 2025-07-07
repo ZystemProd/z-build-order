@@ -477,14 +477,11 @@ def prettify_upgrade(ability_name: str) -> str:
 
 
 def producer_tag(ev):
-    """
-    Return the tag of the structure that performs the research.
-    For almost all Research orders, ev.unit is the producer.
-    """
-    if getattr(ev, "unit", None):      # AbilityEvent / TargetUnitCommandEvent
-        return ev.unit.tag
-    if getattr(ev, "target", None):    # very old replays
+    """Return the tag of the relevant structure for an event."""
+    if getattr(ev, "target", None):  # e.g. Chrono Boost cast
         return ev.target.tag
+    if getattr(ev, "unit", None):    # Research or upgrade complete
+        return ev.unit.tag
     return None
 
 # ---- Flask setup --------------------------------------------------
