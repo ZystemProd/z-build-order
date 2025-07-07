@@ -623,19 +623,22 @@ def upload():
                 name = format_name(event.unit_type_name)
 
                 # Robust fallback: match known pending illusions
+                unit_type_name = format_name(event.unit_type_name)
+
                 hallucinated = getattr(event.unit, "is_hallucination", False)
 
                 if not hallucinated:
                     for pending in pending_hallucinations:
                         frame_diff = event.frame - pending["frame"]
                         if (
-                            frame_diff >= 0 and frame_diff <= 50
+                            frame_diff >= 0 and frame_diff <= 100
                             and event.control_pid == pending["pid"]
-                            and name.lower() == pending["type"].lower()
+                            and unit_type_name.lower() == pending["type"].lower()
                         ):
                             hallucinated = True
                             pending_hallucinations.remove(pending)
                             break
+
                 if hallucinated:
                     name += " (hallucination)"
 
@@ -704,19 +707,22 @@ def upload():
                 name = format_name(event.unit_type_name)
 
                 # Robust fallback: match known pending illusions
+                unit_type_name = format_name(event.unit_type_name)
+
                 hallucinated = getattr(event.unit, "is_hallucination", False)
 
                 if not hallucinated:
                     for pending in pending_hallucinations:
                         frame_diff = event.frame - pending["frame"]
                         if (
-                            frame_diff >= 0 and frame_diff <= 50
+                            frame_diff >= 0 and frame_diff <= 100
                             and event.control_pid == pending["pid"]
-                            and name.lower() == pending["type"].lower()
+                            and unit_type_name.lower() == pending["type"].lower()
                         ):
                             hallucinated = True
                             pending_hallucinations.remove(pending)
                             break
+
                 if hallucinated:
                     name += " (hallucination)"
 
