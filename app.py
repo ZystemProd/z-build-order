@@ -601,13 +601,27 @@ def upload():
 
                 name = format_name(event.unit_type_name)
 
-                if getattr(unit, "is_hallucination", False):
+                # ✅ Robust hallucination detection
+                hallucinated = getattr(unit, "is_hallucination", False)
+
+                # Fallback: check neutral owner or weird known flags
+                if not hallucinated:
+                    if "hallucination" in getattr(unit, "name", "").lower():
+                        hallucinated = True
+                    if hasattr(unit, "owner") and getattr(unit.owner, "name", "").lower() == "neutral":
+                        hallucinated = True
+
+                # Optional: you can add custom logic here for known illusions
+                # For example: if name.lower() in ["phoenix", "archon", "colossus", ...]
+                # and spawned by a sentry (if you track that ability)
+
+                if hallucinated:
                     name += " (Hallucinated)"
 
                 name = tidy(name)
                 if name is None:
                     continue
-                
+
                 lower_name = name.lower()
                 if (
                     not name
@@ -659,21 +673,48 @@ def upload():
 
 
 
+
             # ---- UnitInitEvent ------------------------------------
             if isinstance(event, sc2reader.events.tracker.UnitInitEvent):
                 if event.control_pid != player.pid:
                     continue
+
                 name = format_name(event.unit_type_name)
-                if getattr(event.unit, "is_hallucination", False):
+
+                # ✅ Robust hallucination check
+                hallucinated = getattr(event.unit, "is_hallucination", False)
+
+                if not hallucinated:
+                    if "hallucination" in getattr(event.unit, "name", "").lower():
+                        hallucinated = True
+                    if hasattr(event.unit, "owner") and getattr(event.unit.owner, "name", "").lower() == "neutral":
+                        hallucinated = True
+
+                if hallucinated:
                     name += " (Hallucinated)"
+
                 name = tidy(name)
                 if name is None:
                     continue
+
                 lower_name = name.lower()
-                if (not name or "Beacon" in name or name in skip_units or lower_name in skip_units_lower or any(k.lower() in lower_name for k in skip_keywords)):
+                if (
+                    not name
+                    or "Beacon" in name
+                    or name in skip_units
+                    or lower_name in skip_units_lower
+                    or any(k.lower() in lower_name for k in skip_keywords)
+                ):
                     continue
+
                 init_map[event.unit_id] = name
-                entries.append({'clock_sec': int(event.second / speed_factor), 'supply': current_used if have_stats else get_supply(event.second)[0], 'made': current_made if have_stats else get_supply(event.second)[1], 'unit': name, 'kind': 'start'})
+                entries.append({
+                    'clock_sec': int(event.second / speed_factor),
+                    'supply': current_used if have_stats else get_supply(event.second)[0],
+                    'made': current_made if have_stats else get_supply(event.second)[1],
+                    'unit': name,
+                    'kind': 'start'
+                })
                 continue
 
             # ---- UnitDoneEvent ------------------------------------
