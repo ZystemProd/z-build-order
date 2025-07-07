@@ -241,6 +241,23 @@ def frame_to_ingame_seconds(frame: int, replay) -> float:
     in_game_seconds = real_seconds / speed_factor
     return in_game_seconds
 
+def calculate_chrono_overlap(upgrade_start, upgrade_end, chrono_windows):
+    """
+    Calculate how many in-game seconds of the upgrade or unit build window
+    overlap with any Chrono Boost windows.
+    Returns (boosted_seconds, unboosted_seconds).
+    """
+    boosted = 0.0
+    for (chrono_start, chrono_end) in chrono_windows:
+        overlap_start = max(upgrade_start, chrono_start)
+        overlap_end = min(upgrade_end, chrono_end)
+        if overlap_start < overlap_end:
+            boosted += (overlap_end - overlap_start)
+    total = upgrade_end - upgrade_start
+    unboosted = max(total - boosted, 0)
+    return boosted, unboosted
+
+
 # --- approximate build times (in seconds) for units --------------
 BUILD_TIME = {
     "SCV": 12,
