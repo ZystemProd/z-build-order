@@ -24,7 +24,6 @@ import re
 from collections import defaultdict
 from sc2reader.constants import GAME_SPEED_FACTOR
 from sc2reader.events import game as ge
-from sc2reader.events.game import AbilityEvent, TargetUnitCommandEvent
 from name_map import NAME_MAP
 from typing import List, Dict, Any, Optional
 
@@ -558,22 +557,25 @@ def upload():
                 frames_by_pid[ev.pid].append(ev.frame)
                 supply_by_pid[ev.pid].append(int(ev.food_used))
 
-        # Track known hallucinated unit tags
-        known_hallucination_tags = set()
+
+        last_hallucination_frame = -9999
+        last_hallucination_pid = None
 
         # ---- iterate event stream --------------------------------
         for event in replay.events:
             if event.second == 0:
                 continue
 
-            # ✅ Robust hallucination cast detection
-            if isinstance(event, (AbilityEvent, TargetUnitCommandEvent)):
+            # ✅ Safe hallucination cast detection
+            if isinstance(event, (ge.AbilityEvent, ge.TargetUnitCommandEvent)):
                 if hasattr(event, "ability_name") and event.ability_name:
                     ability_name = event.ability_name.lower()
                     if "hallucination" in ability_name:
                         last_hallucination_frame = event.frame
                         last_hallucination_pid = event.pid
-                        print(f"Hallucination cast at frame {last_hallucination_frame} by player {last_hallucination_pid}")
+                        # Optional: print for debug
+                        # print(f"Hallucination cast at frame {last_hallucination_frame} by player {last_hallucination_pid}")
+
 
 
             # ------ capture live supply snapshot -------------------
@@ -618,11 +620,9 @@ def upload():
                 # ✅ Robust hallucination detection
                 hallucinated = getattr(unit, "is_hallucination", False)
 
-                # Cast-tracking fallback
                 if not hallucinated:
                     if (
-                        'last_hallucination_frame' in locals()
-                        and event.frame - last_hallucination_frame <= 5
+                        event.frame - last_hallucination_frame <= 5
                         and event.control_pid == last_hallucination_pid
                     ):
                         hallucinated = True
