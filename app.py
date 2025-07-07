@@ -322,11 +322,11 @@ def adjusted_start_time(
 
     start_guess = end_time - base_duration
     for _ in range(5):
-        boosted, unboosted = calculate_chrono_overlap(
+        boosted, _ = calculate_chrono_overlap(
             start_guess, end_time, chrono_windows, producer_tag
         )
-        adjusted = boosted * CHRONO_SPEED_FACTOR + unboosted
-        new_start = end_time - adjusted
+        new_duration = base_duration - 0.35 * boosted
+        new_start = end_time - new_duration
         if abs(new_start - start_guess) < 0.01:
             return new_start
         start_guess = new_start
