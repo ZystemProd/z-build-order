@@ -591,7 +591,13 @@ def upload():
                 if player.play_race.lower() == "protoss" and start_real < chrono_until.get(player.pid, 0):
                     if start_real >= chrono_until[player.pid] - CHRONO_BOOST_SECONDS * speed_factor:
                         start_real = event.second - build_time * CHRONO_SPEED_FACTOR * speed_factor
-                used_s, made_s = get_supply(start_real)
+                idx = bisect.bisect_right(frames_by_pid[player.pid], event.frame) - 1
+                if idx >= 0 and (event.frame - frames_by_pid[player.pid][idx]) <= 4:
+                    used_s = supply_by_pid[player.pid][idx]
+                    made_s = 0  # or your known 'made' value
+                else:
+                    used_s, made_s = get_supply(start_real)
+
                 if stop_limit is not None and used_s > stop_limit:
                     break
                 if time_limit is not None and int(start_real / speed_factor) > time_limit:
@@ -649,7 +655,12 @@ def upload():
                         if duration_secs:
                             start_real = frame_sec - duration_secs * CHRONO_SPEED_FACTOR
 
-                used_s, made_s = get_supply(start_real)
+                idx = bisect.bisect_right(frames_by_pid[player.pid], event.frame) - 1
+                if idx >= 0 and (event.frame - frames_by_pid[player.pid][idx]) <= 4:
+                    used_s = supply_by_pid[player.pid][idx]
+                    made_s = 0
+                else:
+                    used_s, made_s = get_supply(start_real)
 
                 entries.append({
                     'clock_sec': int(start_real),
