@@ -30,6 +30,20 @@ from typing import List, Dict, Any, Optional
 UPGRADE_PREFIX = re.compile(r'^(Research|ResearchTech|Upgrade)_?')
 CHRONO_SPEED_FACTOR = 1 / 1.35  # ≈ 0.74074
 CHRONO_BOOST_SECONDS = 9.6  # duration of one chrono boost
+HALLUCINATION_WINDOW_FRAMES = 100  # tolerance for matching spawned illusions
+HALLUCINATED_TYPES = {
+    "Archon",
+    "Colossus",
+    "Immortal",
+    "Phoenix",
+    "Void Ray",
+    "Stalker",
+    "Zealot",
+    "High Templar",
+    "Sentry",
+    "Warp Prism",
+    "Oracle",
+}
 
 upgrade_name_map = {
     "HighCapacityBarrels": "Infernal Pre-Igniter",
@@ -557,6 +571,27 @@ def upload():
                 supply_by_pid[ev.pid].append(int(ev.food_used))
 
 
+        def supply_at_frame(pid: int, frame: int) -> int:
+            """Return food_used for the last snapshot at or before frame."""
+            frames = frames_by_pid.get(pid)
+            supplies = supply_by_pid.get(pid)
+            if not frames:
+                return 0
+            idx = bisect.bisect_right(frames, frame) - 1
+            return supplies[idx] if idx >= 0 else 0
+
+        def supply_after_frame(pid: int, frame: int) -> int:
+            """Return food_used for the first snapshot strictly after frame."""
+            frames = frames_by_pid.get(pid)
+            supplies = supply_by_pid.get(pid)
+            if not frames:
+                return 0
+            idx = bisect.bisect_right(frames, frame)
+            if idx < len(supplies):
+                return supplies[idx]
+            return supplies[-1]
+
+
         last_hallucination_frame = -9999
         last_hallucination_pid = None
         pending_hallucinations = []
@@ -568,18 +603,47 @@ def upload():
 
             # ✅ Safe hallucination cast detection
             if hasattr(event, "ability_name") and event.ability_name:
-                ability_name = event.ability_name.lower()
-                if "hallucination" in ability_name:
+                ability_name = event.ability_name
+                ability_lower = ability_name.lower()
+                if "hallucination" in ability_lower or "hallucinate" in ability_lower:
                     last_hallucination_frame = event.frame
                     last_hallucination_pid = event.pid
 
-                    # NEW: push expected illusion type(s)
-                    if "phoenix" in ability_name:
-                        pending_hallucinations.append({
-                            "type": "Phoenix",
-                            "frame": event.frame,
-                            "pid": event.pid
-                        })
+                    # try regex first
+                    unit_raw = None
+                    m = re.search(
+                        r"hallucinat(?:e|ion)[^A-Za-z]*([A-Za-z]+)", ability_name, re.I
+                    )
+                    if m:
+                        unit_raw = m.group(1)
+                    else:
+                        flat = re.sub(r"[^a-zA-Z]+", "", ability_lower)
+                        for u in [
+                            "archon",
+                            "immortal",
+                            "phoenix",
+                            "colossus",
+                            "voidray",
+                            "stalker",
+                            "zealot",
+                            "hightemplar",
+                            "sentry",
+                            "warpprism",
+                            "oracle",
+                        ]:
+                            if u in flat:
+                                unit_raw = u
+                                break
+
+                    if unit_raw:
+                        unit_formatted = format_name(unit_raw)
+                        count = 2 if unit_formatted.lower() == "phoenix" else 1
+                        for _ in range(count):
+                            pending_hallucinations.append({
+                                "type": unit_formatted,
+                                "frame": event.frame,
+                                "pid": event.pid,
+                            })
 
 
 
@@ -624,6 +688,7 @@ def upload():
 
                 # Robust fallback: match known pending illusions
                 unit_type_name = format_name(event.unit_type_name)
+                base_type_name = re.sub(r'^Hallucinated\s+', '', unit_type_name, flags=re.I)
 
                 hallucinated = getattr(event.unit, "is_hallucination", False)
 
@@ -631,16 +696,25 @@ def upload():
                     for pending in pending_hallucinations:
                         frame_diff = event.frame - pending["frame"]
                         if (
-                            frame_diff >= 0 and frame_diff <= 100
+                        frame_diff >= 0 and frame_diff <= HALLUCINATION_WINDOW_FRAMES
                             and event.control_pid == pending["pid"]
-                            and unit_type_name.lower() == pending["type"].lower()
+                            and base_type_name.lower() == pending["type"].lower()
                         ):
                             hallucinated = True
                             pending_hallucinations.remove(pending)
                             break
 
+                if (
+                    not hallucinated
+                    and base_type_name in HALLUCINATED_TYPES
+                    and supply_at_frame(event.control_pid, event.frame - 1)
+                    == supply_after_frame(event.control_pid, event.frame)
+                ):
+                    hallucinated = True
+
                 if hallucinated:
-                    name += " (hallucination)"
+                    event.unit.is_hallucination = True
+                    continue
 
                 name = tidy(name)
                 if name is None:
@@ -708,6 +782,7 @@ def upload():
 
                 # Robust fallback: match known pending illusions
                 unit_type_name = format_name(event.unit_type_name)
+                base_type_name = re.sub(r'^Hallucinated\s+', '', unit_type_name, flags=re.I)
 
                 hallucinated = getattr(event.unit, "is_hallucination", False)
 
@@ -715,16 +790,25 @@ def upload():
                     for pending in pending_hallucinations:
                         frame_diff = event.frame - pending["frame"]
                         if (
-                            frame_diff >= 0 and frame_diff <= 100
+                        frame_diff >= 0 and frame_diff <= HALLUCINATION_WINDOW_FRAMES
                             and event.control_pid == pending["pid"]
-                            and unit_type_name.lower() == pending["type"].lower()
+                            and base_type_name.lower() == pending["type"].lower()
                         ):
                             hallucinated = True
                             pending_hallucinations.remove(pending)
                             break
 
+                if (
+                    not hallucinated
+                    and base_type_name in HALLUCINATED_TYPES
+                    and supply_at_frame(event.control_pid, event.frame - 1)
+                    == supply_after_frame(event.control_pid, event.frame)
+                ):
+                    hallucinated = True
+
                 if hallucinated:
-                    name += " (hallucination)"
+                    event.unit.is_hallucination = True
+                    continue
 
                 name = tidy(name)
                 if name is None:
