@@ -714,17 +714,20 @@ def upload():
                 else:
                     start_real = frame_sec
 
-
-
-
+                # ✅ Always calculate start_frame here!
                 start_frame = int(start_real * replay.game_fps * speed_factor)
+
+                # ✅ Use start_frame in your snapshot check!
                 idx = bisect.bisect_right(frames_by_pid[player.pid], start_frame) - 1
 
-                if idx >= 0 and (event.frame - frames_by_pid[player.pid][idx]) <= 4:
+                if idx >= 0 and (start_frame - frames_by_pid[player.pid][idx]) <= 4:
                     used_s = supply_by_pid[player.pid][idx]
                     made_s = 0
                 else:
-                    used_s, made_s = get_supply(start_real)
+                    # ✅ Fallback: convert start_real back to real seconds for supply lookup
+                    real_sec = start_real * speed_factor
+                    used_s, made_s = get_supply(real_sec)
+
 
                 entries.append({
                     'clock_sec': int(start_real),
