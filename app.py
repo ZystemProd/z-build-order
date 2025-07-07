@@ -371,6 +371,23 @@ def tidy(label: str) -> str | None:
 
 # -------------------------------------------------------------------
 
+def calculate_chrono_overlap(upgrade_start, upgrade_end, chrono_windows):
+    """
+    Calculate how many in-game seconds of the upgrade window overlap with any Chrono Boost windows.
+    Returns (boosted_seconds, unboosted_seconds).
+    """
+    boosted = 0.0
+    for (chrono_start, chrono_end) in chrono_windows:
+        # Find overlap between upgrade window and this Chrono window
+        overlap_start = max(upgrade_start, chrono_start)
+        overlap_end = min(upgrade_end, chrono_end)
+        if overlap_start < overlap_end:
+            boosted += (overlap_end - overlap_start)
+    total = upgrade_end - upgrade_start
+    unboosted = max(total - boosted, 0)
+    return boosted, unboosted
+
+
 # --- Ability/Command events helper for any sc2reader version ---
 from sc2reader.events import game as ge
 
@@ -567,8 +584,12 @@ def upload():
 
 
             # Chrono Boost detection
+            # NEW: multiple Chrono Boost windows
             if ability.endswith(("ChronoBoostEnergyCost", "ChronoBoost")) and getattr(event, "pid", None) == player.pid:
-                chrono_until[event.pid] = max(chrono_until.get(event.pid, 0), event.second) + 9.6 * speed_factor
+                start = event.second
+                end = start + 9.6 * speed_factor
+                chrono_windows[event.pid].append((start, end))
+                chrono_until[event.pid] = end  # Keep your old single-window for legacy fallback if needed
                 continue
 
 
@@ -646,14 +667,25 @@ def upload():
 
                 if duration_secs:
                     start_real = frame_sec - duration_secs
+                    upgrade_start = start_real
+                    upgrade_end = frame_sec
+
+                    boosted_secs, unboosted_secs = calculate_chrono_overlap(
+                        upgrade_start, upgrade_end, chrono_windows[player.pid]
+                    )
+
+                    adjusted = boosted_secs * CHRONO_SPEED_FACTOR + unboosted_secs
+                    start_real = upgrade_end - adjusted
+
+                    print(
+                        f"⏱️ {mapped_name} boosted={boosted_secs:.2f}s "
+                        f"unboosted={unboosted_secs:.2f}s adjusted_duration={adjusted:.2f}"
+                    )
                 else:
                     start_real = frame_sec
 
-                # Apply chrono boost if Protoss
-                if player.play_race.lower() == "protoss" and start_real < chrono_until.get(player.pid, 0):
-                    if start_real >= chrono_until[player.pid] - CHRONO_BOOST_SECONDS * speed_factor:
-                        if duration_secs:
-                            start_real = frame_sec - duration_secs * CHRONO_SPEED_FACTOR
+
+
 
                 idx = bisect.bisect_right(frames_by_pid[player.pid], event.frame) - 1
                 if idx >= 0 and (event.frame - frames_by_pid[player.pid][idx]) <= 4:
