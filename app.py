@@ -30,6 +30,7 @@ from typing import List, Dict, Any, Optional
 UPGRADE_PREFIX = re.compile(r'^(Research|ResearchTech|Upgrade)_?')
 CHRONO_SPEED_FACTOR = 1 / 1.35  # ≈ 0.74074
 CHRONO_BOOST_SECONDS = 9.6  # duration of one chrono boost
+HALLUCINATION_WINDOW_FRAMES = 200  # tolerance for matching spawned illusions
 
 upgrade_name_map = {
     "HighCapacityBarrels": "Infernal Pre-Igniter",
@@ -653,6 +654,7 @@ def upload():
 
                 # Robust fallback: match known pending illusions
                 unit_type_name = format_name(event.unit_type_name)
+                base_type_name = re.sub(r'^Hallucinated\s+', '', unit_type_name, flags=re.I)
 
                 hallucinated = getattr(event.unit, "is_hallucination", False)
 
@@ -660,9 +662,9 @@ def upload():
                     for pending in pending_hallucinations:
                         frame_diff = event.frame - pending["frame"]
                         if (
-                            frame_diff >= 0 and frame_diff <= 160
+                        frame_diff >= 0 and frame_diff <= HALLUCINATION_WINDOW_FRAMES
                             and event.control_pid == pending["pid"]
-                            and unit_type_name.lower() == pending["type"].lower()
+                            and base_type_name.lower() == pending["type"].lower()
                         ):
                             hallucinated = True
                             pending_hallucinations.remove(pending)
@@ -738,6 +740,7 @@ def upload():
 
                 # Robust fallback: match known pending illusions
                 unit_type_name = format_name(event.unit_type_name)
+                base_type_name = re.sub(r'^Hallucinated\s+', '', unit_type_name, flags=re.I)
 
                 hallucinated = getattr(event.unit, "is_hallucination", False)
 
@@ -745,9 +748,9 @@ def upload():
                     for pending in pending_hallucinations:
                         frame_diff = event.frame - pending["frame"]
                         if (
-                            frame_diff >= 0 and frame_diff <= 160
+                        frame_diff >= 0 and frame_diff <= HALLUCINATION_WINDOW_FRAMES
                             and event.control_pid == pending["pid"]
-                            and unit_type_name.lower() == pending["type"].lower()
+                            and base_type_name.lower() == pending["type"].lower()
                         ):
                             hallucinated = True
                             pending_hallucinations.remove(pending)
