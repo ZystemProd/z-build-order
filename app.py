@@ -629,7 +629,7 @@ def upload():
                 start_real = event.second - adjusted
 
                 idx = bisect.bisect_right(frames_by_pid[player.pid], event.frame) - 1
-                if idx >= 0 and (event.frame - frames_by_pid[player.pid][idx]) <= 4:
+                if idx >= 0 and (start_frame - frames_by_pid[player.pid][idx]) <= 4:
                     used_s = supply_by_pid[player.pid][idx]
                     made_s = 0
                 else:
