@@ -586,14 +586,13 @@ def upload():
                 break
 
 
-            # Chrono Boost detection
-            # NEW: multiple Chrono Boost windows
+            # Chrono Boost detection — fix this:
             if ability.endswith(("ChronoBoostEnergyCost", "ChronoBoost")) and getattr(event, "pid", None) == player.pid:
-                start = event.second
-                end = start + 9.6 * speed_factor
-                chrono_windows[event.pid].append((start, end))
-                chrono_until[event.pid] = end  # Keep your old single-window for legacy fallback if needed
+                start_in_game = event.second / speed_factor
+                end_in_game = start_in_game + 9.6
+                chrono_windows[event.pid].append((start_in_game, end_in_game))
                 continue
+
 
 
             # ---- UnitBornEvent ------------------------------------
