@@ -618,7 +618,7 @@ def upload():
 
                 if not hallucinated:
                     if (
-                        event.frame - last_hallucination_frame <= 5
+                        0 <= event.frame - last_hallucination_frame <= 10
                         and event.control_pid == last_hallucination_pid
                     ):
                         hallucinated = True
