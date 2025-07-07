@@ -23,7 +23,6 @@ import bisect
 import re
 from collections import defaultdict
 from sc2reader.constants import GAME_SPEED_FACTOR
-from sc2reader.events import game as ge
 from name_map import NAME_MAP
 from typing import List, Dict, Any, Optional
 
@@ -567,14 +566,11 @@ def upload():
                 continue
 
             # ✅ Safe hallucination cast detection
-            if isinstance(event, (ge.AbilityEvent, ge.TargetUnitCommandEvent)):
-                if hasattr(event, "ability_name") and event.ability_name:
-                    ability_name = event.ability_name.lower()
-                    if "hallucination" in ability_name:
-                        last_hallucination_frame = event.frame
-                        last_hallucination_pid = event.pid
-                        # Optional: print for debug
-                        # print(f"Hallucination cast at frame {last_hallucination_frame} by player {last_hallucination_pid}")
+            if hasattr(event, "ability_name") and getattr(event, "pid", None) == player.pid:
+                ability_name = event.ability_name.lower()
+                if "hallucination" in ability_name:
+                    last_hallucination_frame = event.frame
+                    last_hallucination_pid = event.pid
 
 
 
