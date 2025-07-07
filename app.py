@@ -559,6 +559,7 @@ def upload():
 
         last_hallucination_frame = -9999
         last_hallucination_pid = None
+        pending_hallucinations = []
 
         # ---- iterate event stream --------------------------------
         for event in replay.events:
@@ -566,11 +567,19 @@ def upload():
                 continue
 
             # ✅ Safe hallucination cast detection
-            if hasattr(event, "ability_name") and getattr(event, "pid", None) == player.pid:
+            if hasattr(event, "ability_name") and event.ability_name:
                 ability_name = event.ability_name.lower()
                 if "hallucination" in ability_name:
                     last_hallucination_frame = event.frame
                     last_hallucination_pid = event.pid
+
+                    # NEW: push expected illusion type(s)
+                    if "phoenix" in ability_name:
+                        pending_hallucinations.append({
+                            "type": "Phoenix",
+                            "frame": event.frame,
+                            "pid": event.pid
+                        })
 
 
 
@@ -613,18 +622,22 @@ def upload():
 
                 name = format_name(event.unit_type_name)
 
-                # ✅ Robust hallucination detection
-                hallucinated = getattr(unit, "is_hallucination", False)
+                # Robust fallback: match known pending illusions
+                hallucinated = getattr(event.unit, "is_hallucination", False)
 
                 if not hallucinated:
-                    if (
-                        0 <= event.frame - last_hallucination_frame <= 10
-                        and event.control_pid == last_hallucination_pid
-                    ):
-                        hallucinated = True
-
+                    for pending in pending_hallucinations:
+                        frame_diff = event.frame - pending["frame"]
+                        if (
+                            frame_diff >= 0 and frame_diff <= 50
+                            and event.control_pid == pending["pid"]
+                            and name.lower() == pending["type"].lower()
+                        ):
+                            hallucinated = True
+                            pending_hallucinations.remove(pending)
+                            break
                 if hallucinated:
-                    name += " (Hallucinated)"
+                    name += " (hallucination)"
 
                 name = tidy(name)
                 if name is None:
@@ -690,19 +703,22 @@ def upload():
 
                 name = format_name(event.unit_type_name)
 
+                # Robust fallback: match known pending illusions
                 hallucinated = getattr(event.unit, "is_hallucination", False)
 
-                # Cast-tracking fallback
                 if not hallucinated:
-                    if (
-                        'last_hallucination_frame' in locals()
-                        and event.frame - last_hallucination_frame <= 5
-                        and event.control_pid == last_hallucination_pid
-                    ):
-                        hallucinated = True
-
+                    for pending in pending_hallucinations:
+                        frame_diff = event.frame - pending["frame"]
+                        if (
+                            frame_diff >= 0 and frame_diff <= 50
+                            and event.control_pid == pending["pid"]
+                            and name.lower() == pending["type"].lower()
+                        ):
+                            hallucinated = True
+                            pending_hallucinations.remove(pending)
+                            break
                 if hallucinated:
-                    name += " (Hallucinated)"
+                    name += " (hallucination)"
 
                 name = tidy(name)
                 if name is None:
