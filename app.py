@@ -30,7 +30,7 @@ from typing import List, Dict, Any, Optional
 UPGRADE_PREFIX = re.compile(r'^(Research|ResearchTech|Upgrade)_?')
 CHRONO_SPEED_FACTOR = 1 / 1.35  # ≈ 0.74074
 CHRONO_BOOST_SECONDS = 9.6  # duration of one chrono boost
-HALLUCINATION_WINDOW_FRAMES = 200  # tolerance for matching spawned illusions
+HALLUCINATION_WINDOW_FRAMES = 100  # tolerance for matching spawned illusions
 
 upgrade_name_map = {
     "HighCapacityBarrels": "Infernal Pre-Igniter",
@@ -672,7 +672,7 @@ def upload():
 
                 if hallucinated:
                     event.unit.is_hallucination = True
-                    name += " (hallucination)"
+                    continue
 
                 name = tidy(name)
                 if name is None:
@@ -758,7 +758,7 @@ def upload():
 
                 if hallucinated:
                     event.unit.is_hallucination = True
-                    name += " (hallucination)"
+                    continue
 
                 name = tidy(name)
                 if name is None:
