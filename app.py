@@ -580,6 +580,17 @@ def upload():
             idx = bisect.bisect_right(frames, frame) - 1
             return supplies[idx] if idx >= 0 else 0
 
+        def supply_after_frame(pid: int, frame: int) -> int:
+            """Return food_used for the first snapshot strictly after frame."""
+            frames = frames_by_pid.get(pid)
+            supplies = supply_by_pid.get(pid)
+            if not frames:
+                return 0
+            idx = bisect.bisect_right(frames, frame)
+            if idx < len(supplies):
+                return supplies[idx]
+            return supplies[-1]
+
 
         last_hallucination_frame = -9999
         last_hallucination_pid = None
@@ -697,7 +708,7 @@ def upload():
                     not hallucinated
                     and base_type_name in HALLUCINATED_TYPES
                     and supply_at_frame(event.control_pid, event.frame - 1)
-                    == supply_at_frame(event.control_pid, event.frame)
+                    == supply_after_frame(event.control_pid, event.frame)
                 ):
                     hallucinated = True
 
@@ -791,7 +802,7 @@ def upload():
                     not hallucinated
                     and base_type_name in HALLUCINATED_TYPES
                     and supply_at_frame(event.control_pid, event.frame - 1)
-                    == supply_at_frame(event.control_pid, event.frame)
+                    == supply_after_frame(event.control_pid, event.frame)
                 ):
                     hallucinated = True
 
