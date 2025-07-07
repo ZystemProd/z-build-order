@@ -31,6 +31,19 @@ UPGRADE_PREFIX = re.compile(r'^(Research|ResearchTech|Upgrade)_?')
 CHRONO_SPEED_FACTOR = 1 / 1.35  # ≈ 0.74074
 CHRONO_BOOST_SECONDS = 9.6  # duration of one chrono boost
 HALLUCINATION_WINDOW_FRAMES = 100  # tolerance for matching spawned illusions
+HALLUCINATED_TYPES = {
+    "Archon",
+    "Colossus",
+    "Immortal",
+    "Phoenix",
+    "Void Ray",
+    "Stalker",
+    "Zealot",
+    "High Templar",
+    "Sentry",
+    "Warp Prism",
+    "Oracle",
+}
 
 upgrade_name_map = {
     "HighCapacityBarrels": "Infernal Pre-Igniter",
@@ -558,6 +571,16 @@ def upload():
                 supply_by_pid[ev.pid].append(int(ev.food_used))
 
 
+        def supply_at_frame(pid: int, frame: int) -> int:
+            """Return food_used for the last snapshot at or before frame."""
+            frames = frames_by_pid.get(pid)
+            supplies = supply_by_pid.get(pid)
+            if not frames:
+                return 0
+            idx = bisect.bisect_right(frames, frame) - 1
+            return supplies[idx] if idx >= 0 else 0
+
+
         last_hallucination_frame = -9999
         last_hallucination_pid = None
         pending_hallucinations = []
@@ -670,6 +693,14 @@ def upload():
                             pending_hallucinations.remove(pending)
                             break
 
+                if (
+                    not hallucinated
+                    and base_type_name in HALLUCINATED_TYPES
+                    and supply_at_frame(event.control_pid, event.frame - 1)
+                    == supply_at_frame(event.control_pid, event.frame)
+                ):
+                    hallucinated = True
+
                 if hallucinated:
                     event.unit.is_hallucination = True
                     continue
@@ -755,6 +786,14 @@ def upload():
                             hallucinated = True
                             pending_hallucinations.remove(pending)
                             break
+
+                if (
+                    not hallucinated
+                    and base_type_name in HALLUCINATED_TYPES
+                    and supply_at_frame(event.control_pid, event.frame - 1)
+                    == supply_at_frame(event.control_pid, event.frame)
+                ):
+                    hallucinated = True
 
                 if hallucinated:
                     event.unit.is_hallucination = True
