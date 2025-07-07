@@ -849,11 +849,12 @@ def upload():
                 frame_sec = frame_to_ingame_seconds(event.frame, replay)
 
                 if duration_secs:
+                    tag = producer_tag(event)
                     start_real = adjusted_start_time(
                         frame_sec,
                         duration_secs,
                         chrono_windows[player.pid],
-                        producer_tag=None,
+                        producer_tag=tag,
                     )
                 else:
                     start_real = frame_sec

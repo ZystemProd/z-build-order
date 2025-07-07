@@ -89,6 +89,9 @@ chrono = [(300, 309.6, core_tag)]
 real_start = adjusted_start_time(end_time, base_duration, chrono, producer_tag=core_tag)
 ```
 
+Pass the building's tag as ``producer_tag`` so that only boosts on that structure
+affect the result.
+
 Overlapping Chrono Boost casts are merged automatically so time is not counted
 twice.  The same helper is used for unit build times with the appropriate
 `BUILD_TIME` values.
