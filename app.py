@@ -24,8 +24,10 @@ import re
 from collections import defaultdict
 from sc2reader.constants import GAME_SPEED_FACTOR
 from sc2reader.events import game as ge
+from sc2reader.events.game import AbilityEvent, TargetUnitCommandEvent
 from name_map import NAME_MAP
 from typing import List, Dict, Any, Optional
+
 
 UPGRADE_PREFIX = re.compile(r'^(Research|ResearchTech|Upgrade)_?')
 CHRONO_SPEED_FACTOR = 1 / 1.35  # ≈ 0.74074
@@ -565,7 +567,7 @@ def upload():
                 continue
 
             # ✅ Robust hallucination cast detection
-            if isinstance(event, (sc2reader.events.game.AbilityEvent, sc2reader.events.game.TargetUnitCommandEvent)):
+            if isinstance(event, (AbilityEvent, TargetUnitCommandEvent)):
                 if hasattr(event, "ability_name") and event.ability_name:
                     ability_name = event.ability_name.lower()
                     if "hallucination" in ability_name:
