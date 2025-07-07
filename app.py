@@ -540,8 +540,8 @@ def upload():
 
         # ---- containers -------------------------------------------
         entries = []
-        init_map = {}                                          # unit_id → unit name
-        chrono_until = {p.pid: 0 for p in players}
+        init_map = {} 
+        chrono_windows = defaultdict(list)  # ✅ Correct version
 
         # NEW: running supply snapshot (O(1) look‑ups) --------------
         current_used = 0
@@ -585,7 +585,9 @@ def upload():
 
             # Chrono Boost detection
             if ability.endswith(("ChronoBoostEnergyCost", "ChronoBoost")) and getattr(event, "pid", None) == player.pid:
-                chrono_until[event.pid] = max(chrono_until.get(event.pid, 0), event.second) + 9.6 * speed_factor
+                start_in_game = event.second / speed_factor
+                end_in_game = start_in_game + 9.6
+                chrono_windows[event.pid].append((start_in_game, end_in_game))
                 continue
 
 
@@ -601,38 +603,36 @@ def upload():
                 if name is None:
                     continue
                 lower_name = name.lower()
-                if (not name or "Beacon" in name or name in skip_units or lower_name in skip_units_lower or any(k.lower() in lower_name for k in skip_keywords)):
+                if (
+                    not name
+                    or "Beacon" in name
+                    or name in skip_units
+                    or lower_name in skip_units_lower
+                    or any(k.lower() in lower_name for k in skip_keywords)
+                ):
                     continue
 
                 build_time = BUILD_TIME.get(event.unit_type_name, 0)
-
-                # ✅ Treat build_time as real-world seconds → convert to in-game
                 start_real = event.second - build_time
+
                 start_in_game = start_real / speed_factor
                 end_in_game = event.second / speed_factor
 
-                # ✅ Use chrono_windows for overlap
                 boosted_secs, unboosted_secs = calculate_chrono_overlap(
                     start_in_game, end_in_game, chrono_windows[player.pid]
                 )
                 adjusted = boosted_secs * CHRONO_SPEED_FACTOR + unboosted_secs
                 start_in_game = end_in_game - adjusted
 
-                # ✅ Map back to frames for bisect
                 start_frame = int(start_in_game * replay.game_fps * speed_factor)
                 idx = bisect.bisect_right(frames_by_pid[player.pid], start_frame) - 1
+
                 if idx >= 0 and (start_frame - frames_by_pid[player.pid][idx]) <= 4:
                     used_s = supply_by_pid[player.pid][idx]
                     made_s = 0
                 else:
-                    real_sec = start_real * speed_factor
+                    real_sec = start_in_game * speed_factor
                     used_s, made_s = get_supply(real_sec)
-
-
-                if stop_limit is not None and used_s > stop_limit:
-                    break
-                if time_limit is not None and int(start_in_game) > time_limit:
-                    break
 
                 entries.append({
                     'clock_sec': int(start_in_game),
@@ -650,6 +650,7 @@ def upload():
                     'kind': 'finish'
                 })
                 continue
+
 
 
             # ---- UnitInitEvent ------------------------------------
