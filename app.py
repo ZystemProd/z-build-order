@@ -598,12 +598,16 @@ def upload():
                 unit = event.unit
                 if getattr(unit, "is_building", False):
                     continue
+
                 name = format_name(event.unit_type_name)
+
                 if getattr(unit, "is_hallucination", False):
                     name += " (Hallucinated)"
-                    name = tidy(name)
+
+                name = tidy(name)
                 if name is None:
                     continue
+                
                 lower_name = name.lower()
                 if (
                     not name
