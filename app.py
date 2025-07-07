@@ -574,11 +574,33 @@ def upload():
                     last_hallucination_frame = event.frame
                     last_hallucination_pid = event.pid
 
+                    # try regex first
+                    unit_raw = None
                     m = re.search(
                         r"hallucinat(?:e|ion)[^A-Za-z]*([A-Za-z]+)", ability_name, re.I
                     )
                     if m:
                         unit_raw = m.group(1)
+                    else:
+                        flat = re.sub(r"[^a-zA-Z]+", "", ability_lower)
+                        for u in [
+                            "archon",
+                            "immortal",
+                            "phoenix",
+                            "colossus",
+                            "voidray",
+                            "stalker",
+                            "zealot",
+                            "hightemplar",
+                            "sentry",
+                            "warpprism",
+                            "oracle",
+                        ]:
+                            if u in flat:
+                                unit_raw = u
+                                break
+
+                    if unit_raw:
                         unit_formatted = format_name(unit_raw)
                         count = 2 if unit_formatted.lower() == "phoenix" else 1
                         for _ in range(count):
@@ -638,7 +660,7 @@ def upload():
                     for pending in pending_hallucinations:
                         frame_diff = event.frame - pending["frame"]
                         if (
-                            frame_diff >= 0 and frame_diff <= 100
+                            frame_diff >= 0 and frame_diff <= 160
                             and event.control_pid == pending["pid"]
                             and unit_type_name.lower() == pending["type"].lower()
                         ):
@@ -723,7 +745,7 @@ def upload():
                     for pending in pending_hallucinations:
                         frame_diff = event.frame - pending["frame"]
                         if (
-                            frame_diff >= 0 and frame_diff <= 100
+                            frame_diff >= 0 and frame_diff <= 160
                             and event.control_pid == pending["pid"]
                             and unit_type_name.lower() == pending["type"].lower()
                         ):
