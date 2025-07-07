@@ -289,6 +289,35 @@ def calculate_chrono_overlap(upgrade_start: float, upgrade_end: float, chrono_wi
     return boosted, unboosted
 
 
+def adjusted_start_time(end_time: float, base_duration: float, chrono_windows) -> float:
+    """Return the Chrono-adjusted start time for a build window.
+
+    Parameters
+    ----------
+    end_time : float
+        In-game seconds when the research or unit finished.
+    base_duration : float
+        Unmodified build or research time in in-game seconds.
+    chrono_windows : Iterable[tuple[float, float]]
+        Chrono Boost windows for the player.
+
+    Notes
+    -----
+    The exact overlap depends on when the build actually started.  We iteratively
+    refine the start time until the adjustment converges.
+    """
+
+    start_guess = end_time - base_duration
+    for _ in range(5):
+        boosted, unboosted = calculate_chrono_overlap(start_guess, end_time, chrono_windows)
+        adjusted = boosted * CHRONO_SPEED_FACTOR + unboosted
+        new_start = end_time - adjusted
+        if abs(new_start - start_guess) < 0.01:
+            return new_start
+        start_guess = new_start
+    return start_guess
+
+
 # --- approximate build times (in seconds) for units --------------
 BUILD_TIME = {
     "SCV": 12,
@@ -688,16 +717,12 @@ def upload():
                     continue
 
                 build_time = BUILD_TIME.get(event.unit_type_name, 0)
-                start_real = event.second - build_time
 
-                start_in_game = start_real / speed_factor
                 end_in_game = event.second / speed_factor
-
-                boosted_secs, unboosted_secs = calculate_chrono_overlap(
-                    start_in_game, end_in_game, chrono_windows[player.pid]
+                base_duration = build_time / speed_factor
+                start_in_game = adjusted_start_time(
+                    end_in_game, base_duration, chrono_windows[player.pid]
                 )
-                adjusted = boosted_secs * CHRONO_SPEED_FACTOR + unboosted_secs
-                start_in_game = end_in_game - adjusted
 
                 start_frame = int(start_in_game * replay.game_fps * speed_factor)
                 idx = bisect.bisect_right(frames_by_pid[player.pid], start_frame) - 1
@@ -805,18 +830,9 @@ def upload():
                 frame_sec = frame_to_ingame_seconds(event.frame, replay)
 
                 if duration_secs:
-                    start_real = frame_sec - duration_secs
-                    upgrade_start = start_real
-                    upgrade_end = frame_sec
-
-                    boosted_secs, unboosted_secs = calculate_chrono_overlap(
-                        upgrade_start, upgrade_end, chrono_windows[player.pid]
+                    start_real = adjusted_start_time(
+                        frame_sec, duration_secs, chrono_windows[player.pid]
                     )
-
-                    adjusted = boosted_secs * CHRONO_SPEED_FACTOR + unboosted_secs
-                    start_real = upgrade_end - adjusted
-
-                    print(f"⏱️ {mapped_name} boosted={boosted_secs:.2f}s unboosted={unboosted_secs:.2f}s adjusted={adjusted:.2f}")
                 else:
                     start_real = frame_sec
 

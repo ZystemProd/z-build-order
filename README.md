@@ -72,19 +72,21 @@ with the parsed results.
 
 ### Chrono Boost Timing Helper
 
-`app.py` exposes `calculate_chrono_overlap(start, end, chrono_windows)` to
-account for Chrono Boost when determining build start times.  It returns the
-number of seconds boosted and unboosted within the given window.  Example:
+`app.py` exposes two helpers for dealing with Chrono Boost.
+
+* `calculate_chrono_overlap(start, end, chrono_windows)` –
+  return how many seconds of the window were boosted.
+* `adjusted_start_time(end, base_duration, chrono_windows)` –
+  compute the real start time given the unmodified duration.
+
+Example:
 
 ```python
 end_time = 380
 base_duration = 100
-start_guess = end_time - base_duration
 
 chrono = [(300, 309.6), (310, 319.6)]
-boosted, unboosted = calculate_chrono_overlap(start_guess, end_time, chrono)
-adjusted = boosted * CHRONO_SPEED_FACTOR + unboosted
-real_start = end_time - adjusted
+real_start = adjusted_start_time(end_time, base_duration, chrono)
 ```
 
 Overlapping Chrono Boost casts are merged automatically so time is not counted
