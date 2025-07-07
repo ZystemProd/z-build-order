@@ -190,7 +190,7 @@ upgrade_times = {
     "Seismic Spines": 57,
     "Adaptive Talons": 57,
     # Protoss
-    "Ground Weapons L1": 321,
+    "Ground Weapons L1": 121,
     "Ground Weapons L2": 145,
     "Ground Weapons L3": 168,
     "Ground Armor L1": 121,
