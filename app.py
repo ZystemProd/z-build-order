@@ -605,10 +605,16 @@ def upload():
                 hallucinated = getattr(unit, "is_hallucination", False)
 
                 # Fallback: check neutral owner or weird known flags
+                # Existing checks...
                 if not hallucinated:
                     if "hallucination" in getattr(unit, "name", "").lower():
                         hallucinated = True
                     if hasattr(unit, "owner") and getattr(unit.owner, "name", "").lower() == "neutral":
+                        hallucinated = True
+
+                # ✅ Final fallback
+                if not hallucinated:
+                    if name.lower() in ["phoenix", "archon", "colossus", "zealot", "stalker"]:
                         hallucinated = True
 
                 # Optional: you can add custom logic here for known illusions
@@ -684,10 +690,16 @@ def upload():
                 # ✅ Robust hallucination check
                 hallucinated = getattr(event.unit, "is_hallucination", False)
 
+                # Existing checks...
                 if not hallucinated:
-                    if "hallucination" in getattr(event.unit, "name", "").lower():
+                    if "hallucination" in getattr(unit, "name", "").lower():
                         hallucinated = True
-                    if hasattr(event.unit, "owner") and getattr(event.unit.owner, "name", "").lower() == "neutral":
+                    if hasattr(unit, "owner") and getattr(unit.owner, "name", "").lower() == "neutral":
+                        hallucinated = True
+
+                # ✅ Final fallback
+                if not hallucinated:
+                    if name.lower() in ["phoenix", "archon", "colossus", "zealot", "stalker"]:
                         hallucinated = True
 
                 if hallucinated:
