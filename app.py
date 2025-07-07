@@ -568,18 +568,25 @@ def upload():
 
             # ✅ Safe hallucination cast detection
             if hasattr(event, "ability_name") and event.ability_name:
-                ability_name = event.ability_name.lower()
-                if "hallucination" in ability_name:
+                ability_name = event.ability_name
+                ability_lower = ability_name.lower()
+                if "hallucination" in ability_lower or "hallucinate" in ability_lower:
                     last_hallucination_frame = event.frame
                     last_hallucination_pid = event.pid
 
-                    # NEW: push expected illusion type(s)
-                    if "phoenix" in ability_name:
-                        pending_hallucinations.append({
-                            "type": "Phoenix",
-                            "frame": event.frame,
-                            "pid": event.pid
-                        })
+                    m = re.search(
+                        r"hallucinat(?:e|ion)[^A-Za-z]*([A-Za-z]+)", ability_name, re.I
+                    )
+                    if m:
+                        unit_raw = m.group(1)
+                        unit_formatted = format_name(unit_raw)
+                        count = 2 if unit_formatted.lower() == "phoenix" else 1
+                        for _ in range(count):
+                            pending_hallucinations.append({
+                                "type": unit_formatted,
+                                "frame": event.frame,
+                                "pid": event.pid,
+                            })
 
 
 
@@ -640,6 +647,7 @@ def upload():
                             break
 
                 if hallucinated:
+                    event.unit.is_hallucination = True
                     name += " (hallucination)"
 
                 name = tidy(name)
@@ -724,6 +732,7 @@ def upload():
                             break
 
                 if hallucinated:
+                    event.unit.is_hallucination = True
                     name += " (hallucination)"
 
                 name = tidy(name)
