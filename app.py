@@ -29,8 +29,6 @@ from sc2reader.events.tracker import UnitBornEvent, UnitInitEvent
 
 
 UPGRADE_PREFIX = re.compile(r'^(Research|ResearchTech|Upgrade)_?')
-CHRONO_SPEED_FACTOR = 1 / 1.35  # ≈ 0.74074
-CHRONO_BOOST_SECONDS = 9.6  # duration of one chrono boost
 
 upgrade_name_map = {
     "HighCapacityBarrels": "Infernal Pre-Igniter",
@@ -253,135 +251,6 @@ def frame_to_ingame_seconds(frame: int, replay) -> float:
     in_game_seconds = real_seconds / speed_factor
     return in_game_seconds
 
-def calculate_chrono_overlap(
-    upgrade_start: float,
-    upgrade_end: float,
-    chrono_windows,
-    producer_tag: Optional[int] = None,
-):
-    """Return how many seconds of the window were Chrono Boosted.
-
-    Parameters
-    ----------
-    upgrade_start : float
-        In-game seconds when the research or unit started.
-    upgrade_end : float
-        In-game seconds when it finished.
-    chrono_windows : Iterable[tuple[float, float]]
-        List of Chrono Boost windows for the player.
-
-    Returns
-    -------
-    tuple[float, float]
-        ``(boosted_seconds, unboosted_seconds)``
-    """
-
-    if upgrade_end <= upgrade_start:
-        return 0.0, 0.0
-
-    # Collect only the relevant parts of chrono windows that overlap the upgrade
-    intervals = []
-    for entry in chrono_windows:
-        cs, ce, tag = entry if len(entry) == 3 else (*entry, None)
-        if producer_tag is not None and tag != producer_tag:
-            continue
-        if ce <= upgrade_start or cs >= upgrade_end:
-            continue
-        intervals.append((max(cs, upgrade_start), min(ce, upgrade_end)))
-
-    if not intervals:
-        total = upgrade_end - upgrade_start
-        return 0.0, total
-
-    # Merge overlapping chrono segments to avoid double counting
-    intervals.sort()
-    merged = [list(intervals[0])]
-    for start, end in intervals[1:]:
-        last = merged[-1]
-        if start <= last[1]:
-            last[1] = max(last[1], end)
-        else:
-            merged.append([start, end])
-
-    boosted = sum(end - start for start, end in merged)
-    total = upgrade_end - upgrade_start
-    unboosted = max(total - boosted, 0.0)
-    return boosted, unboosted
-
-
-def adjusted_start_time(
-    end_time: float,
-    base_duration: float,
-    chrono_windows,
-    producer_tag: Optional[int] = None,
-    
-) -> float:
-    """Return the Chrono-adjusted start time for a build window.
-
-    Parameters
-    ----------
-    end_time : float
-        In-game seconds when the research or unit finished.
-    base_duration : float
-        Unmodified build or research time in in-game seconds.
-    chrono_windows : Iterable[tuple[float, float]]
-        Chrono Boost windows for the player.
-
-    Notes
-    -----
-    The exact overlap depends on when the build actually started.  We iteratively
-    refine the start time until the adjustment converges.
-    """
-
-    start_guess = end_time - base_duration
-    for _ in range(5):
-        boosted, _ = calculate_chrono_overlap(
-            start_guess, end_time, chrono_windows, producer_tag
-        )
-        new_duration = base_duration - 0.35 * boosted
-        new_start = end_time - new_duration
-        print(f"✅ AdjustedStart: boosted={boosted:.2f} new_duration={new_duration:.2f} new_start={new_start:.2f}")
-        if abs(new_start - start_guess) < 0.01:
-            return new_start
-        start_guess = new_start
-    return start_guess
-
-
-
-def chrono_adjusted_build_time(
-    start_time: float,
-    end_time: float,
-    chrono_windows,
-    base_build_time: float,
-    boost_rate: float = 1.5,
-) -> float:
-    """Return the build duration after applying Chrono Boost.
-
-    Parameters
-    ----------
-    start_time : float
-        In-game seconds when the unit or upgrade began.
-    end_time : float
-        In-game seconds when it completed.
-    chrono_windows : Iterable[tuple[float, float]]
-        Chrono Boost windows for the relevant structure.
-    base_build_time : float
-        Expected build time without Chrono Boost (in seconds).
-    boost_rate : float, optional
-        Rate multiplier during Chrono Boost (default ``1.5``).
-
-    Returns
-    -------
-    float
-        Adjusted build duration in seconds.
-    """
-
-    if end_time <= start_time or base_build_time <= 0 or boost_rate <= 1.0:
-        return base_build_time
-
-    boosted, _ = calculate_chrono_overlap(start_time, end_time, chrono_windows)
-    saved = boosted * (boost_rate - 1)
-    return max(base_build_time - saved, 0.0)
 
 
 # --- approximate build times (in seconds) for units --------------
@@ -696,7 +565,6 @@ def upload():
         # ---- containers -------------------------------------------
         entries = []
         init_map = {}
-        chrono_windows = defaultdict(list)  # ✅ Correct version
         upgrade_sources = defaultdict(dict)
         known_buildings = defaultdict(lambda: defaultdict(list))
         # NEW: running supply snapshot (O(1) look‑ups) --------------
@@ -739,8 +607,6 @@ def upload():
                         })
 
 
-            if hasattr(event, "ability_name") and "Chrono" in event.ability_name and getattr(event, "pid", None) == player.pid:
-                print(f"✅ AbilityEvent: {getattr(event, 'ability_name', None)} pid={getattr(event, 'pid', None)}")
 
             # Inside the loop:
             if isinstance(event, (UnitBornEvent, UnitInitEvent)):
@@ -776,39 +642,6 @@ def upload():
                 break
 
 
-            # Chrono Boost detection
-            if hasattr(event, "ability_name") and "Chrono" in event.ability_name and getattr(event, "pid", None) == player.pid:
-                ability = getattr(event, "ability_name", "")
-                if "Chrono" in ability and getattr(event, "pid", None) == player.pid:
-                    start_in_game = event.second / speed_factor
-                    end_in_game = start_in_game + CHRONO_BOOST_SECONDS
-
-                    tag = producer_tag(event)
-                    print(f"✅ ChronoBoost: pid={event.pid} tag={tag} window=({start_in_game:.2f}-{end_in_game:.2f})")
-
-                    if tag is None:
-                        label = ability_upgrade_label(ability)
-                        fallback_building = UPGRADE_BUILDING_MAP.get(label, "Forge")
-                        print(f"✅ ability_upgrade_label: {label} → Fallback building: {fallback_building}")
-                        fallback = known_buildings.get(event.pid, {}).get(fallback_building, [])
-                        if fallback:
-                            tag = fallback[-1]
-                            print(f"✅ Fallback ChronoBoost tag used: {tag} ({fallback_building})")
-
-                    # ✅ Always store for the player
-                    chrono_windows[event.pid].append((start_in_game, end_in_game, tag))
-
-                    # ✅ If you have a tag, ALSO store for that structure
-                    if tag is not None:
-                        chrono_windows[tag].append((start_in_game, end_in_game, tag))
-                        print(f"✅ Stored ChronoBoost window for tag {tag}: ({start_in_game:.2f}-{end_in_game:.2f})")
-                    else:
-                        print(f"✅ Stored ChronoBoost window for player only: ({start_in_game:.2f}-{end_in_game:.2f})")
-
-                    print(f"✅ chrono_windows now: {dict(chrono_windows)}")
-
-
-                    continue
 
 
             # Research ability tracking
@@ -870,24 +703,8 @@ def upload():
                 end_in_game = event.second / speed_factor
                 base_duration = build_time / speed_factor
 
-                # Filter Chrono windows by the producing structure if known
-                tag = producer_tag(event)
-                print(f"✅ producer_tag(event) for Research: {tag}")
-                windows = chrono_windows.get(tag, chrono_windows.get(player.pid, []))
-
-                # Calculate how many seconds of this build were boosted
-                # using the final start time below
-
-                start_in_game = adjusted_start_time(
-                    end_in_game,
-                    base_duration,
-                    windows,
-                    producer_tag=tag,
-                )
-
-                boosted_secs, _ = calculate_chrono_overlap(
-                    start_in_game, end_in_game, windows, producer_tag=tag
-                )
+                start_in_game = end_in_game - base_duration
+                boosted_secs = 0.0
 
                 start_frame = int(start_in_game * replay.game_fps * speed_factor)
                 idx = bisect.bisect_right(frames_by_pid[player.pid], start_frame) - 1
@@ -1010,29 +827,15 @@ def upload():
 
 
 
-                    windows = chrono_windows.get(tag, chrono_windows.get(player.pid, []))
-                    start_real = adjusted_start_time(
-                        frame_sec,
-                        duration_secs,
-                        windows,
-                        producer_tag=tag,
-                    )
-                    boosted_secs, _ = calculate_chrono_overlap(
-                        start_real,
-                        frame_sec,
-                        windows,
-                        producer_tag=tag,
-                    )
+                    start_real = frame_sec - duration_secs
+                    boosted_secs = 0.0
                     upgrade_sources[player.pid].pop(mapped_name, None)
                 else:
                     start_real = frame_sec
                     boosted_secs = 0.0
                     tag = None                  # ✅ safe fallback!
-                    windows = []                # ✅ safe fallback!
 
                 print(f"✅ UpgradeComplete: mapped_name='{mapped_name}' tag={tag}")
-                print(f"✅ Using windows: {windows}")
-                print(f"✅ Calculated overlap: boosted={boosted_secs:.2f}")
 
 
                 start_frame = int(start_real * replay.game_fps * speed_factor)
