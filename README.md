@@ -85,7 +85,7 @@ Example:
 end_time = 380
 base_duration = 100
 
-chrono = [(300, 309.6, core_tag)]
+chrono = [(300, 309.6)]  # stored under the core's tag
 real_start = adjusted_start_time(end_time, base_duration, chrono, producer_tag=core_tag)
 ```
 
@@ -95,6 +95,25 @@ affect the result.
 Overlapping Chrono Boost casts are merged automatically so time is not counted
 twice.  The same helper is used for unit build times with the appropriate
 `BUILD_TIME` values.
+
+To record Chrono Boost usage in your event loop:
+
+```python
+if ability.endswith("ChronoBoostEnergyCost"):
+    start = event.second / speed_factor
+    end = start + CHRONO_BOOST_SECONDS
+    tag = producer_tag(event)
+    if tag is not None:
+        chrono_windows[tag].append((start, end))
+    else:
+        chrono_windows[event.pid].append((start, end))  # fallback
+```
+
+When processing an upgrade you can then compute the overlap for that building:
+
+```python
+boosted, unboosted = calculate_chrono_overlap(start, end, chrono_windows[tag])
+```
 
 ### Tracking upgrade structures
 
@@ -110,7 +129,8 @@ if UPGRADE_PREFIX.match(event.ability_name):
 
 # ... later when the upgrade finishes ...
 tag = upgrade_sources[player.pid].pop(mapped_name, None)
-start = adjusted_start_time(frame_sec, duration, chrono_windows[player.pid], tag)
+windows = chrono_windows.get(tag, [])
+start = adjusted_start_time(frame_sec, duration, windows, producer_tag=tag)
 ```
 
 If you already know the build window, compute the boosted duration directly:

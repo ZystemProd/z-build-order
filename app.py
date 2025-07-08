@@ -722,10 +722,17 @@ def upload():
 
             # Chrono Boost detection
             if ability.endswith(("ChronoBoostEnergyCost", "ChronoBoost")) and getattr(event, "pid", None) == player.pid:
+                # Convert the frame number to in-game seconds
                 start_in_game = event.second / speed_factor
                 end_in_game = start_in_game + CHRONO_BOOST_SECONDS
+
                 tag = producer_tag(event)
-                chrono_windows[event.pid].append((start_in_game, end_in_game, tag))
+                if tag is not None:
+                    # Store boosts by the structure's tag
+                    chrono_windows[tag].append((start_in_game, end_in_game))
+                else:
+                    # Fallback: key by player id if the tag is missing
+                    chrono_windows[event.pid].append((start_in_game, end_in_game))
                 continue
 
             # Research ability tracking
@@ -784,10 +791,13 @@ def upload():
 
                 end_in_game = event.second / speed_factor
                 base_duration = build_time / speed_factor
+                # UnitBornEvent does not always include the producing structure
+                # so we fall back to the player's windows when the tag is unknown
+                windows = chrono_windows.get(player.pid, [])
                 start_in_game = adjusted_start_time(
                     end_in_game,
                     base_duration,
-                    chrono_windows[player.pid],
+                    windows,
                     producer_tag=None,
                 )
 
@@ -900,10 +910,12 @@ def upload():
                     tag = producer_tag(event)
                     if tag is None:
                         tag = upgrade_sources[player.pid].get(mapped_name)
+
+                    windows = chrono_windows.get(tag, chrono_windows.get(player.pid, []))
                     start_real = adjusted_start_time(
                         frame_sec,
                         duration_secs,
-                        chrono_windows[player.pid],
+                        windows,
                         producer_tag=tag,
                     )
                     upgrade_sources[player.pid].pop(mapped_name, None)
