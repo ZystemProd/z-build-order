@@ -681,7 +681,7 @@ def upload():
 
                 if hallucinated:
                     event.unit.is_hallucination = True
-                    continue
+                    name += " (hallucination)"
 
                 name = tidy(name)
                 if name is None:
@@ -773,7 +773,7 @@ def upload():
 
                 if hallucinated:
                     event.unit.is_hallucination = True
-                    continue
+                    name += " (hallucination)"
 
                 name = tidy(name)
                 if name is None:
