@@ -113,3 +113,14 @@ tag = upgrade_sources[player.pid].pop(mapped_name, None)
 start = adjusted_start_time(frame_sec, duration, chrono_windows[player.pid], tag)
 ```
 
+If you already know the build window, compute the boosted duration directly:
+
+```python
+start = 100
+end = 160
+base_time = 60
+chrono = [(110, 125)]  # in-game seconds
+
+adjusted = chrono_adjusted_build_time(start, end, chrono, base_time, boost_rate=1.5)
+```
+

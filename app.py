@@ -333,6 +333,42 @@ def adjusted_start_time(
     return start_guess
 
 
+def chrono_adjusted_build_time(
+    start_time: float,
+    end_time: float,
+    chrono_windows,
+    base_build_time: float,
+    boost_rate: float = 1.5,
+) -> float:
+    """Return the build duration after applying Chrono Boost.
+
+    Parameters
+    ----------
+    start_time : float
+        In-game seconds when the unit or upgrade began.
+    end_time : float
+        In-game seconds when it completed.
+    chrono_windows : Iterable[tuple[float, float]]
+        Chrono Boost windows for the relevant structure.
+    base_build_time : float
+        Expected build time without Chrono Boost (in seconds).
+    boost_rate : float, optional
+        Rate multiplier during Chrono Boost (default ``1.5``).
+
+    Returns
+    -------
+    float
+        Adjusted build duration in seconds.
+    """
+
+    if end_time <= start_time or base_build_time <= 0 or boost_rate <= 1.0:
+        return base_build_time
+
+    boosted, _ = calculate_chrono_overlap(start_time, end_time, chrono_windows)
+    saved = boosted * (boost_rate - 1)
+    return max(base_build_time - saved, 0.0)
+
+
 # --- approximate build times (in seconds) for units --------------
 BUILD_TIME = {
     "SCV": 12,
