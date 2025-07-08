@@ -385,6 +385,9 @@ export async function initializeIndexPage() {
   safeAdd("newBuildButton", "click", () => {
     setCurrentBuildId(null); // ✅ Correct
     resetBuildInputs();
+    window.lastReplayFile = null;
+    const reparseBtn = document.getElementById("reparseLastReplayButton");
+    if (reparseBtn) reparseBtn.style.display = "none";
     clearEditingPublishedBuild();
 
     const editBanner = document.getElementById("editModeBanner");
@@ -533,6 +536,7 @@ export async function initializeIndexPage() {
   safeInput("videoInput", (val) => updateYouTubeEmbed(val));
 
   let selectedReplayFile = null;
+  window.lastReplayFile = null; // remembers the most recently uploaded replay
 
   safeAdd("replayButton", "click", () => {
     const input = document.getElementById("replayFileInput");
@@ -600,36 +604,14 @@ export async function initializeIndexPage() {
         }
         wrapper.appendChild(btn);
       });
-    }
-    if (loader) loader.style.display = "none";
+  }
+  if (loader) loader.style.display = "none";
   }
 
-  safeAdd("replayFileInput", "change", async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    if (!file.name.toLowerCase().endsWith(".sc2replay")) {
-      alert("Please select a .SC2Replay file");
-      e.target.value = "";
-      return;
-    }
-
-    selectedReplayFile = file;
-    e.target.value = "";
-
-    await populateReplayOptions(file);
-    updateChronoWarning();
-    const modal = document.getElementById("replayOptionsModal");
-    if (modal) modal.style.display = "block";
-  });
-
-  safeAdd("confirmReplayOptionsButton", "click", async () => {
-    if (!selectedReplayFile) return;
-    const btn = document.getElementById("confirmReplayOptionsButton");
-    btn.disabled = true;
-    btn.innerText = "⏳ Parsing...";
-
+  // Handle the actual replay upload and parsing
+  async function handleReplayUpload(file) {
     const formData = new FormData();
-    formData.append("replay", selectedReplayFile);
+    formData.append("replay", file);
     if (selectedPlayerPid !== null) {
       formData.append("player", selectedPlayerPid);
     }
@@ -672,8 +654,8 @@ export async function initializeIndexPage() {
       if (buildInput) buildInput.value = text;
       analyzeBuildOrder(text);
       logAnalyticsEvent("replay_uploaded", {
-        fileName: selectedReplayFile.name,
-        sizeKB: Math.round(selectedReplayFile.size / 1024),
+        fileName: file.name,
+        sizeKB: Math.round(file.size / 1024),
       });
     } catch (err) {
       console.error("Replay upload failed", err);
@@ -683,12 +665,9 @@ export async function initializeIndexPage() {
       logAnalyticsEvent("replay_upload_failed", { error: err.message });
     }
 
-    btn.disabled = false;
-    btn.innerText = "Parse Replay";
     const modal = document.getElementById("replayOptionsModal");
     if (modal) modal.style.display = "none";
 
-    // —–––– update build-category dropdown AFTER parsing —––––
     const dd = document.getElementById("buildCategoryDropdown");
     if (dd && replayPlayers.length >= 2) {
       const chosenPid = Number(selectedPlayerPid);
@@ -697,7 +676,7 @@ export async function initializeIndexPage() {
 
       if (me && foe) {
         const abbrev = (r) => r[0].toUpperCase();
-        const match = `${abbrev(me.race)}v${abbrev(foe.race)}`; // "ZvP"
+        const match = `${abbrev(me.race)}v${abbrev(foe.race)}`;
         dd.value = match.toLowerCase();
         updateDropdownColor();
       } else if (pendingMatchup) {
@@ -705,7 +684,51 @@ export async function initializeIndexPage() {
         updateDropdownColor();
       }
     }
-    // —–––––––––––––––––––––––––––––––––––––––––––––––––––––––
+  }
+
+  safeAdd("replayFileInput", "change", async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".sc2replay")) {
+      alert("Please select a .SC2Replay file");
+      e.target.value = "";
+      return;
+    }
+
+    selectedReplayFile = file;
+    window.lastReplayFile = file; // save for reparse button
+    const reparseBtn = document.getElementById("reparseLastReplayButton");
+    if (reparseBtn) reparseBtn.style.display = "inline-block";
+    e.target.value = "";
+
+    await populateReplayOptions(file);
+    updateChronoWarning();
+    const modal = document.getElementById("replayOptionsModal");
+    if (modal) modal.style.display = "block";
+  });
+
+  safeAdd("confirmReplayOptionsButton", "click", async () => {
+    if (!selectedReplayFile) return;
+    const btn = document.getElementById("confirmReplayOptionsButton");
+    btn.disabled = true;
+    btn.innerText = "⏳ Parsing...";
+
+    await handleReplayUpload(selectedReplayFile);
+    window.lastReplayFile = selectedReplayFile;
+    const reparseBtn = document.getElementById("reparseLastReplayButton");
+    if (reparseBtn) reparseBtn.style.display = "inline-block";
+
+    btn.disabled = false;
+    btn.innerText = "Parse Replay";
+  });
+
+  // Reparse last uploaded replay if available
+  safeAdd("reparseLastReplayButton", "click", () => {
+    if (window.lastReplayFile) {
+      handleReplayUpload(window.lastReplayFile);
+    } else {
+      alert("No replay file saved yet.");
+    }
   });
 
   safeAdd("closeReplayOptionsModal", "click", () => {

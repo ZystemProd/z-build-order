@@ -824,6 +824,11 @@ button:hover {
   margin-left: 5px;
 }
 
+#reparseLastReplayButton {
+  margin-left: 5px;
+  display: none;
+}
+
 .buildOrderOutput {
   margin-top: 15px;
 }

@@ -93,6 +93,10 @@ export function resetBuildInputs() {
     saveBtn.style.backgroundColor = "";
   }
 
+  const reparseBtn = document.getElementById("reparseLastReplayButton");
+  if (reparseBtn) reparseBtn.style.display = "none";
+  if (typeof window !== "undefined") window.lastReplayFile = null;
+
   console.log("✅ All inputs reset.");
 }
 
