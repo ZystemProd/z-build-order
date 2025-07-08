@@ -520,11 +520,25 @@ def ability_upgrade_label(ability_name: str) -> str:
 
 
 def producer_tag(ev):
-    """Return the tag of the relevant structure for an event."""
-    if getattr(ev, "target", None):  # e.g. Chrono Boost cast
-        return ev.target.tag
-    if getattr(ev, "unit", None):    # Research or upgrade complete
-        return ev.unit.tag
+    """Return the tag of the structure associated with an event.
+
+    Works for AbilityEvent, CommandEvent, or TargetUnitCommandEvent. The
+    function first checks ``event.unit`` then falls back to ``event.target``
+    for older replays. ``None`` is returned when no valid tag is found.
+    """
+
+    # Many events include the building in ``event.unit``. Ensure the object
+    # exists and actually exposes a ``tag`` attribute before using it.
+    unit = getattr(ev, "unit", None)
+    if unit is not None and hasattr(unit, "tag"):
+        return unit.tag
+
+    # Some older replays store the targeted structure in ``event.target``
+    target = getattr(ev, "target", None)
+    if target is not None and hasattr(target, "tag"):
+        return target.tag
+
+    # When neither ``unit`` nor ``target`` yields a tag, signal failure
     return None
 
 # ---- Flask setup --------------------------------------------------
