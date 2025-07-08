@@ -5029,6 +5029,24 @@ optgroup[label="Terran"] {
 #replayOptionsModal {
   display: none;
 }
+#replayOptionsModal h3.replay-options-title {
+  text-align: center;
+}
+.stop-limit-row {
+  display: flex;
+  align-items: center;
+}
+#stopLimitInput {
+  width: 25%;
+  margin: 0 10px;
+}
+.replay-options-footer {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
 #stopUnitLabel {
   display: none;
 }
