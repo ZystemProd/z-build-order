@@ -585,6 +585,7 @@ export async function initializeIndexPage() {
     e.target.value = "";
 
     await populateReplayOptions(file);
+    updateChronoWarning();
     const modal = document.getElementById("replayOptionsModal");
     if (modal) modal.style.display = "block";
   });
@@ -734,6 +735,7 @@ export async function initializeIndexPage() {
 
   // --- Dropdown Color Change
   safeChange("buildCategoryDropdown", updateDropdownColor);
+  safeChange("playerSelect", updateChronoWarning);
 
   // --- Help Modal
   safeAdd("buildOrderHelpBtn", "click", showBuildOrderHelpModal);
@@ -1146,6 +1148,19 @@ export async function initializeIndexPage() {
         const color = window.getComputedStyle(optgroup).color;
         dropdown.style.color = color || "";
       }
+    }
+  }
+
+  function updateChronoWarning() {
+    const select = document.getElementById("playerSelect");
+    const warning = document.getElementById("chronoBoostWarning");
+    if (!select || !warning) return;
+    const pid = Number(select.value);
+    const player = replayPlayers.find((p) => p.pid === pid);
+    if (player && player.race && player.race.toLowerCase() === "protoss") {
+      warning.style.display = "inline";
+    } else {
+      warning.style.display = "none";
     }
   }
 

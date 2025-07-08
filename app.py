@@ -23,13 +23,25 @@ import bisect
 import re
 from collections import defaultdict
 from sc2reader.constants import GAME_SPEED_FACTOR
-from sc2reader.events import game as ge
 from name_map import NAME_MAP
 from typing import List, Dict, Any, Optional
 
+
 UPGRADE_PREFIX = re.compile(r'^(Research|ResearchTech|Upgrade)_?')
-CHRONO_SPEED_FACTOR = 1 / 1.35  # ≈ 0.74074
-CHRONO_BOOST_SECONDS = 9.6  # duration of one chrono boost
+HALLUCINATION_WINDOW_FRAMES = 100  # tolerance for matching spawned illusions
+HALLUCINATED_TYPES = {
+    "Archon",
+    "Colossus",
+    "Immortal",
+    "Phoenix",
+    "Void Ray",
+    "Stalker",
+    "Zealot",
+    "High Templar",
+    "Sentry",
+    "Warp Prism",
+    "Oracle",
+}
 
 upgrade_name_map = {
     "HighCapacityBarrels": "Infernal Pre-Igniter",
@@ -384,17 +396,6 @@ def prettify_upgrade(ability_name: str) -> str:
     return words.replace('_', ' ').strip().title()
 
 
-def producer_tag(ev):
-    """
-    Return the tag of the structure that performs the research.
-    For almost all Research orders, ev.unit is the producer.
-    """
-    if getattr(ev, "unit", None):      # AbilityEvent / TargetUnitCommandEvent
-        return ev.unit.tag
-    if getattr(ev, "target", None):    # very old replays
-        return ev.target.tag
-    return None
-
 # ---- Flask setup --------------------------------------------------
 app = Flask(__name__)
 CORS(app)
@@ -523,8 +524,7 @@ def upload():
 
         # ---- containers -------------------------------------------
         entries = []
-        init_map = {}                                          # unit_id → unit name
-        chrono_until = {p.pid: 0 for p in players}
+        init_map = {}
 
         # NEW: running supply snapshot (O(1) look‑ups) --------------
         current_used = 0
@@ -540,10 +540,81 @@ def upload():
                 supply_by_pid[ev.pid].append(int(ev.food_used))
 
 
+        def supply_at_frame(pid: int, frame: int) -> int:
+            """Return food_used for the last snapshot at or before frame."""
+            frames = frames_by_pid.get(pid)
+            supplies = supply_by_pid.get(pid)
+            if not frames:
+                return 0
+            idx = bisect.bisect_right(frames, frame) - 1
+            return supplies[idx] if idx >= 0 else 0
+
+        def supply_after_frame(pid: int, frame: int) -> int:
+            """Return food_used for the first snapshot strictly after frame."""
+            frames = frames_by_pid.get(pid)
+            supplies = supply_by_pid.get(pid)
+            if not frames:
+                return 0
+            idx = bisect.bisect_right(frames, frame)
+            if idx < len(supplies):
+                return supplies[idx]
+            return supplies[-1]
+
+
+        last_hallucination_frame = -9999
+        last_hallucination_pid = None
+        pending_hallucinations = []
+
         # ---- iterate event stream --------------------------------
         for event in replay.events:
             if event.second == 0:
                 continue
+
+            # ✅ Safe hallucination cast detection
+            if hasattr(event, "ability_name") and event.ability_name:
+                ability_name = event.ability_name
+                ability_lower = ability_name.lower()
+                if "hallucination" in ability_lower or "hallucinate" in ability_lower:
+                    last_hallucination_frame = event.frame
+                    last_hallucination_pid = event.pid
+
+                    # try regex first
+                    unit_raw = None
+                    m = re.search(
+                        r"hallucinat(?:e|ion)[^A-Za-z]*([A-Za-z]+)", ability_name, re.I
+                    )
+                    if m:
+                        unit_raw = m.group(1)
+                    else:
+                        flat = re.sub(r"[^a-zA-Z]+", "", ability_lower)
+                        for u in [
+                            "archon",
+                            "immortal",
+                            "phoenix",
+                            "colossus",
+                            "voidray",
+                            "stalker",
+                            "zealot",
+                            "hightemplar",
+                            "sentry",
+                            "warpprism",
+                            "oracle",
+                        ]:
+                            if u in flat:
+                                unit_raw = u
+                                break
+
+                    if unit_raw:
+                        unit_formatted = format_name(unit_raw)
+                        count = 2 if unit_formatted.lower() == "phoenix" else 1
+                        for _ in range(count):
+                            pending_hallucinations.append({
+                                "type": unit_formatted,
+                                "frame": event.frame,
+                                "pid": event.pid,
+                            })
+
+
 
             # ------ capture live supply snapshot -------------------
             if isinstance(event, sc2reader.events.tracker.PlayerStatsEvent) and event.pid == player.pid:
@@ -566,10 +637,6 @@ def upload():
                 break
 
 
-            # Chrono Boost detection
-            if ability.endswith(("ChronoBoostEnergyCost", "ChronoBoost")) and getattr(event, "pid", None) == player.pid:
-                chrono_until[event.pid] = max(chrono_until.get(event.pid, 0), event.second) + 9.6 * speed_factor
-                continue
 
 
             # ---- UnitBornEvent ------------------------------------
@@ -579,42 +646,151 @@ def upload():
                 unit = event.unit
                 if getattr(unit, "is_building", False):
                     continue
+
                 name = format_name(event.unit_type_name)
+
+                # Robust fallback: match known pending illusions
+                unit_type_name = format_name(event.unit_type_name)
+                base_type_name = re.sub(r'^Hallucinated\s+', '', unit_type_name, flags=re.I)
+
+                hallucinated = getattr(event.unit, "is_hallucination", False)
+
+                if not hallucinated:
+                    for pending in pending_hallucinations:
+                        frame_diff = event.frame - pending["frame"]
+                        if (
+                        frame_diff >= 0 and frame_diff <= HALLUCINATION_WINDOW_FRAMES
+                            and event.control_pid == pending["pid"]
+                            and base_type_name.lower() == pending["type"].lower()
+                        ):
+                            hallucinated = True
+                            pending_hallucinations.remove(pending)
+                            break
+
+                if (
+                    not hallucinated
+                    and base_type_name in HALLUCINATED_TYPES
+                    and supply_at_frame(event.control_pid, event.frame - 1)
+                    == supply_after_frame(event.control_pid, event.frame)
+                ):
+                    hallucinated = True
+
+                if hallucinated:
+                    event.unit.is_hallucination = True
+                    continue
+
                 name = tidy(name)
                 if name is None:
                     continue
+
                 lower_name = name.lower()
-                if (not name or "Beacon" in name or name in skip_units or lower_name in skip_units_lower or any(k.lower() in lower_name for k in skip_keywords)):
+                if (
+                    not name
+                    or "Beacon" in name
+                    or name in skip_units
+                    or lower_name in skip_units_lower
+                    or any(k.lower() in lower_name for k in skip_keywords)
+                ):
                     continue
+
                 build_time = BUILD_TIME.get(event.unit_type_name, 0)
-                start_real = event.second - build_time * speed_factor
-                if player.play_race.lower() == "protoss" and start_real < chrono_until.get(player.pid, 0):
-                    if start_real >= chrono_until[player.pid] - CHRONO_BOOST_SECONDS * speed_factor:
-                        start_real = event.second - build_time * CHRONO_SPEED_FACTOR * speed_factor
-                used_s, made_s = get_supply(start_real)
-                if stop_limit is not None and used_s > stop_limit:
-                    break
-                if time_limit is not None and int(start_real / speed_factor) > time_limit:
-                    break
-                entries.append({'clock_sec': int(start_real / speed_factor), 'supply': used_s, 'made': made_s, 'unit': name, 'kind': 'start'})
+                start_real = event.second - build_time
+
+                start_in_game = start_real / speed_factor
+                end_in_game = event.second / speed_factor
+
+                start_frame = int(start_in_game * replay.game_fps * speed_factor)
+                idx = bisect.bisect_right(frames_by_pid[player.pid], start_frame) - 1
+
+                if idx >= 0 and (start_frame - frames_by_pid[player.pid][idx]) <= 4:
+                    used_s = supply_by_pid[player.pid][idx]
+                    made_s = 0
+                else:
+                    real_sec = start_in_game * speed_factor
+                    used_s, made_s = get_supply(real_sec)
+
+                entries.append({
+                    'clock_sec': int(start_in_game),
+                    'supply': used_s,
+                    'made': made_s,
+                    'unit': name,
+                    'kind': 'start'
+                })
                 used_f, made_f = get_supply(event.second)
-                entries.append({'clock_sec': int(event.second / speed_factor), 'supply': used_f, 'made': made_f, 'unit': name, 'kind': 'finish'})
+                entries.append({
+                    'clock_sec': int(end_in_game),
+                    'supply': used_f,
+                    'made': made_f,
+                    'unit': name,
+                    'kind': 'finish'
+                })
                 continue
+
+
+
+
 
             # ---- UnitInitEvent ------------------------------------
             if isinstance(event, sc2reader.events.tracker.UnitInitEvent):
                 if event.control_pid != player.pid:
                     continue
+
                 name = format_name(event.unit_type_name)
+
+                # Robust fallback: match known pending illusions
+                unit_type_name = format_name(event.unit_type_name)
+                base_type_name = re.sub(r'^Hallucinated\s+', '', unit_type_name, flags=re.I)
+
+                hallucinated = getattr(event.unit, "is_hallucination", False)
+
+                if not hallucinated:
+                    for pending in pending_hallucinations:
+                        frame_diff = event.frame - pending["frame"]
+                        if (
+                        frame_diff >= 0 and frame_diff <= HALLUCINATION_WINDOW_FRAMES
+                            and event.control_pid == pending["pid"]
+                            and base_type_name.lower() == pending["type"].lower()
+                        ):
+                            hallucinated = True
+                            pending_hallucinations.remove(pending)
+                            break
+
+                if (
+                    not hallucinated
+                    and base_type_name in HALLUCINATED_TYPES
+                    and supply_at_frame(event.control_pid, event.frame - 1)
+                    == supply_after_frame(event.control_pid, event.frame)
+                ):
+                    hallucinated = True
+
+                if hallucinated:
+                    event.unit.is_hallucination = True
+                    continue
+
                 name = tidy(name)
                 if name is None:
                     continue
+
                 lower_name = name.lower()
-                if (not name or "Beacon" in name or name in skip_units or lower_name in skip_units_lower or any(k.lower() in lower_name for k in skip_keywords)):
+                if (
+                    not name
+                    or "Beacon" in name
+                    or name in skip_units
+                    or lower_name in skip_units_lower
+                    or any(k.lower() in lower_name for k in skip_keywords)
+                ):
                     continue
+
                 init_map[event.unit_id] = name
-                entries.append({'clock_sec': int(event.second / speed_factor), 'supply': current_used if have_stats else get_supply(event.second)[0], 'made': current_made if have_stats else get_supply(event.second)[1], 'unit': name, 'kind': 'start'})
+                entries.append({
+                    'clock_sec': int(event.second / speed_factor),
+                    'supply': current_used if have_stats else get_supply(event.second)[0],
+                    'made': current_made if have_stats else get_supply(event.second)[1],
+                    'unit': name,
+                    'kind': 'start'
+                })
                 continue
+
 
             # ---- UnitDoneEvent ------------------------------------
             if isinstance(event, sc2reader.events.tracker.UnitDoneEvent):
@@ -623,7 +799,7 @@ def upload():
                     entries.append({'clock_sec': int(event.second / speed_factor), 'supply': current_used if have_stats else get_supply(event.second)[0], 'made': current_made if have_stats else get_supply(event.second)[1], 'unit': name, 'kind': 'finish'})
                 continue
 
-            # ---- UpgradeCompleteEvent (with chrono) -----------------------------
+            # ---- UpgradeCompleteEvent -----------------------------------------
             if isinstance(event, sc2reader.events.tracker.UpgradeCompleteEvent):
                 if event.pid != player.pid:
                     continue
@@ -640,16 +816,21 @@ def upload():
 
                 if duration_secs:
                     start_real = frame_sec - duration_secs
+                    boosted_secs = 0.0
                 else:
                     start_real = frame_sec
 
-                # Apply chrono boost if Protoss
-                if player.play_race.lower() == "protoss" and start_real < chrono_until.get(player.pid, 0):
-                    if start_real >= chrono_until[player.pid] - CHRONO_BOOST_SECONDS * speed_factor:
-                        if duration_secs:
-                            start_real = frame_sec - duration_secs * CHRONO_SPEED_FACTOR
 
-                used_s, made_s = get_supply(start_real)
+                start_frame = int(start_real * replay.game_fps * speed_factor)
+                idx = bisect.bisect_right(frames_by_pid[player.pid], start_frame) - 1
+
+                if idx >= 0 and (start_frame - frames_by_pid[player.pid][idx]) <= 4:
+                    used_s = supply_by_pid[player.pid][idx]
+                    made_s = 0
+                else:
+                    real_sec = start_real * speed_factor
+                    used_s, made_s = get_supply(real_sec)
+
 
                 entries.append({
                     'clock_sec': int(start_real),
@@ -731,7 +912,7 @@ def upload():
                     i < n
                     and entries[i]['kind'] == 'start'
                     and entries[i]['supply'] == supply
-                    and abs(entries[i]['clock_sec'] - start_time) <= 5
+                    and entries[i]['clock_sec'] == start_time
                 ):
                     e = entries[i]
                     qty = e.get('count', 1)
