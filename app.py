@@ -478,6 +478,8 @@ def upload():
         # ----- flags ------------------------------------------------
         exclude_flag = request.form.get('exclude_workers', '')
         exclude_workers = str(exclude_flag).lower() in {'1', 'true', 'yes', 'on'}
+        exclude_units_flag = request.form.get('exclude_units', '')
+        exclude_units = str(exclude_units_flag).lower() in {'1', 'true', 'yes', 'on'}
         exclude_supply_flag = request.form.get('exclude_supply', '')
         exclude_supply = str(exclude_supply_flag).lower() in {'1', 'true', 'yes', 'on'}
         exclude_time_flag = request.form.get('exclude_time', '')
@@ -645,6 +647,8 @@ def upload():
                     continue
                 unit = event.unit
                 if getattr(unit, "is_building", False):
+                    continue
+                if exclude_units:
                     continue
 
                 name = format_name(event.unit_type_name)
