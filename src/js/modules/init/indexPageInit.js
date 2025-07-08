@@ -533,6 +533,19 @@ export async function initializeIndexPage() {
 
   let selectedReplayFile = null;
 
+  function updateChronoWarning() {
+    const warning = document.getElementById("chronoBoostWarning");
+    const select = document.getElementById("playerSelect");
+    if (!warning || !select) return;
+    const pid = Number(select.value);
+    const p = replayPlayers.find((pl) => pl.pid === pid);
+    if (p && p.race && p.race.toLowerCase() === "protoss") {
+      warning.style.display = "inline";
+    } else {
+      warning.style.display = "none";
+    }
+  }
+
   safeAdd("replayButton", "click", () => {
     const input = document.getElementById("replayFileInput");
     if (input) input.click();
@@ -570,6 +583,7 @@ export async function initializeIndexPage() {
       select.innerHTML = "<option value='1'>Player 1</option>";
     }
     if (loader) loader.style.display = "none";
+    updateChronoWarning();
   }
 
   safeAdd("replayFileInput", "change", async (e) => {
@@ -588,6 +602,8 @@ export async function initializeIndexPage() {
     const modal = document.getElementById("replayOptionsModal");
     if (modal) modal.style.display = "block";
   });
+
+  safeChange("playerSelect", updateChronoWarning);
 
   safeAdd("confirmReplayOptionsButton", "click", async () => {
     if (!selectedReplayFile) return;
