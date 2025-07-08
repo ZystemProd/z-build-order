@@ -636,6 +636,9 @@ export async function initializeIndexPage() {
     if (document.getElementById("excludeWorkersCheckbox")?.checked) {
       formData.append("exclude_workers", "1");
     }
+    if (document.getElementById("excludeUnitsCheckbox")?.checked) {
+      formData.append("exclude_units", "1");
+    }
     if (document.getElementById("excludeSupplyCheckbox")?.checked) {
       formData.append("exclude_supply", "1");
     }
