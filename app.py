@@ -28,8 +28,6 @@ from typing import List, Dict, Any, Optional
 
 
 UPGRADE_PREFIX = re.compile(r'^(Research|ResearchTech|Upgrade)_?')
-CHRONO_SPEED_FACTOR = 1 / 1.35  # ≈ 0.74074
-CHRONO_BOOST_SECONDS = 9.6  # duration of one chrono boost
 HALLUCINATION_WINDOW_FRAMES = 100  # tolerance for matching spawned illusions
 HALLUCINATED_TYPES = {
     "Archon",
@@ -255,23 +253,6 @@ def frame_to_ingame_seconds(frame: int, replay) -> float:
     in_game_seconds = real_seconds / speed_factor
     return in_game_seconds
 
-def calculate_chrono_overlap(upgrade_start, upgrade_end, chrono_windows):
-    """
-    Calculate how many in-game seconds of the upgrade or unit build window
-    overlap with any Chrono Boost windows.
-    Returns (boosted_seconds, unboosted_seconds).
-    """
-    boosted = 0.0
-    for (chrono_start, chrono_end) in chrono_windows:
-        overlap_start = max(upgrade_start, chrono_start)
-        overlap_end = min(upgrade_end, chrono_end)
-        if overlap_start < overlap_end:
-            boosted += (overlap_end - overlap_start)
-    total = upgrade_end - upgrade_start
-    unboosted = max(total - boosted, 0)
-    return boosted, unboosted
-
-
 # --- approximate build times (in seconds) for units --------------
 BUILD_TIME = {
     "SCV": 12,
@@ -415,17 +396,6 @@ def prettify_upgrade(ability_name: str) -> str:
     return words.replace('_', ' ').strip().title()
 
 
-def producer_tag(ev):
-    """
-    Return the tag of the structure that performs the research.
-    For almost all Research orders, ev.unit is the producer.
-    """
-    if getattr(ev, "unit", None):      # AbilityEvent / TargetUnitCommandEvent
-        return ev.unit.tag
-    if getattr(ev, "target", None):    # very old replays
-        return ev.target.tag
-    return None
-
 # ---- Flask setup --------------------------------------------------
 app = Flask(__name__)
 CORS(app)
@@ -554,8 +524,7 @@ def upload():
 
         # ---- containers -------------------------------------------
         entries = []
-        init_map = {} 
-        chrono_windows = defaultdict(list)  # ✅ Correct version
+        init_map = {}
 
         # NEW: running supply snapshot (O(1) look‑ups) --------------
         current_used = 0
@@ -668,12 +637,6 @@ def upload():
                 break
 
 
-            # Chrono Boost detection
-            if ability.endswith(("ChronoBoostEnergyCost", "ChronoBoost")) and getattr(event, "pid", None) == player.pid:
-                start_in_game = event.second / speed_factor
-                end_in_game = start_in_game + 9.6
-                chrono_windows[event.pid].append((start_in_game, end_in_game))
-                continue
 
 
             # ---- UnitBornEvent ------------------------------------
@@ -735,12 +698,6 @@ def upload():
 
                 start_in_game = start_real / speed_factor
                 end_in_game = event.second / speed_factor
-
-                boosted_secs, unboosted_secs = calculate_chrono_overlap(
-                    start_in_game, end_in_game, chrono_windows[player.pid]
-                )
-                adjusted = boosted_secs * CHRONO_SPEED_FACTOR + unboosted_secs
-                start_in_game = end_in_game - adjusted
 
                 start_frame = int(start_in_game * replay.game_fps * speed_factor)
                 idx = bisect.bisect_right(frames_by_pid[player.pid], start_frame) - 1
@@ -842,7 +799,7 @@ def upload():
                     entries.append({'clock_sec': int(event.second / speed_factor), 'supply': current_used if have_stats else get_supply(event.second)[0], 'made': current_made if have_stats else get_supply(event.second)[1], 'unit': name, 'kind': 'finish'})
                 continue
 
-            # ---- UpgradeCompleteEvent (with chrono) -----------------------------
+            # ---- UpgradeCompleteEvent -----------------------------------------
             if isinstance(event, sc2reader.events.tracker.UpgradeCompleteEvent):
                 if event.pid != player.pid:
                     continue
@@ -859,17 +816,7 @@ def upload():
 
                 if duration_secs:
                     start_real = frame_sec - duration_secs
-                    upgrade_start = start_real
-                    upgrade_end = frame_sec
-
-                    boosted_secs, unboosted_secs = calculate_chrono_overlap(
-                        upgrade_start, upgrade_end, chrono_windows[player.pid]
-                    )
-
-                    adjusted = boosted_secs * CHRONO_SPEED_FACTOR + unboosted_secs
-                    start_real = upgrade_end - adjusted
-
-                    print(f"⏱️ {mapped_name} boosted={boosted_secs:.2f}s unboosted={unboosted_secs:.2f}s adjusted={adjusted:.2f}")
+                    boosted_secs = 0.0
                 else:
                     start_real = frame_sec
 
