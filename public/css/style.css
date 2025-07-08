@@ -822,7 +822,6 @@ button:hover {
 
 #replayButton {
   margin-left: 5px;
-  cursor: no-drop;
 }
 
 .buildOrderOutput {
