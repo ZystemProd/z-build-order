@@ -233,7 +233,43 @@ function matchActorsWithTrie(actionText, actorTrie) {
             `<span class="${supplyClass}">[${current}/${max}]</span>${punctuation}`
           );
         } else {
-          result.push(rawWord);
+          // Check for base marker like (b1), (b2), ...
+          const baseMatch = cleanWord.match(/^\(b(\d+)\)$/i);
+
+          if (baseMatch) {
+            // Parse the base number from the match
+            const baseNumber = parseInt(baseMatch[1], 10);
+
+            // Helper to get ordinal suffix for numbers
+            const getOrdinalSuffix = (n) => {
+              const mod100 = n % 100;
+              if (mod100 >= 11 && mod100 <= 13) return "th";
+              switch (n % 10) {
+                case 1:
+                  return "st";
+                case 2:
+                  return "nd";
+                case 3:
+                  return "rd";
+                default:
+                  return "th";
+              }
+            };
+
+            // Decide label: main base for first, ordinal for others
+            const label =
+              baseNumber === 1
+                ? "(main base)"
+                : `(${baseNumber}:${getOrdinalSuffix(baseNumber)} base)`;
+
+            // Output sanitized label wrapped in <sup>
+            result.push(
+              `<sup>${DOMPurify.sanitize(label)}</sup>${punctuation}`
+            );
+          } else {
+            // Default: push the raw word back
+            result.push(rawWord);
+          }
         }
         i++;
       }
