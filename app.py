@@ -739,6 +739,10 @@ def upload():
                 if event.control_pid != player.pid:
                     continue
 
+                unit = event.unit
+                if not getattr(unit, "is_building", False) and exclude_units:
+                    continue
+
                 name = format_name(event.unit_type_name)
 
                 # Robust fallback: match known pending illusions
