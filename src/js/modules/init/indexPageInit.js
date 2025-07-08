@@ -559,7 +559,8 @@ export async function initializeIndexPage() {
       wrapper.innerHTML = "";
       players.forEach((p, idx) => {
         const btn = document.createElement("button");
-        btn.textContent = `${p.name} (${p.race})`;
+        const raceLetter = p.race ? p.race.charAt(0).toUpperCase() : "?";
+        btn.textContent = `${p.name} (${raceLetter})`;
         btn.className = "player-toggle-btn";
         btn.dataset.pid = p.pid;
         btn.addEventListener("click", () => {

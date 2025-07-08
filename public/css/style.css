@@ -3360,6 +3360,8 @@ td {
 }
 
 .player-toggle-btn {
+  flex: 1;
+  min-width: 0;
   padding: 6px 12px;
   background: #2a2a2a;
   border: 1px solid var(--border-color);
@@ -3367,6 +3369,9 @@ td {
   border-radius: 4px;
   cursor: pointer;
   transition: background-color 0.2s, border-color 0.2s;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .player-toggle-btn.active {
