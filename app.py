@@ -722,16 +722,17 @@ def upload():
 
             # Chrono Boost detection
             if ability.endswith(("ChronoBoostEnergyCost", "ChronoBoost")) and getattr(event, "pid", None) == player.pid:
-                # Convert the frame number to in-game seconds
+                # Convert frame number to in-game seconds
                 start_in_game = event.second / speed_factor
                 end_in_game = start_in_game + CHRONO_BOOST_SECONDS
 
+                # Identify the building that was boosted
                 tag = producer_tag(event)
                 if tag is not None:
-                    # Store boosts by the structure's tag
+                    # Store windows keyed by the structure's tag
                     chrono_windows[tag].append((start_in_game, end_in_game))
                 else:
-                    # Fallback: key by player id if the tag is missing
+                    # Fallback to player id if tag is missing
                     chrono_windows[event.pid].append((start_in_game, end_in_game))
                 continue
 
@@ -791,14 +792,16 @@ def upload():
 
                 end_in_game = event.second / speed_factor
                 base_duration = build_time / speed_factor
-                # UnitBornEvent does not always include the producing structure
-                # so we fall back to the player's windows when the tag is unknown
-                windows = chrono_windows.get(player.pid, [])
+
+                # Filter Chrono windows by the producing structure if known
+                tag = producer_tag(event)
+                windows = chrono_windows.get(tag, chrono_windows.get(player.pid, []))
+
                 start_in_game = adjusted_start_time(
                     end_in_game,
                     base_duration,
                     windows,
-                    producer_tag=None,
+                    producer_tag=tag,
                 )
 
                 start_frame = int(start_in_game * replay.game_fps * speed_factor)

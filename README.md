@@ -129,7 +129,7 @@ if UPGRADE_PREFIX.match(event.ability_name):
 
 # ... later when the upgrade finishes ...
 tag = upgrade_sources[player.pid].pop(mapped_name, None)
-windows = chrono_windows.get(tag, [])
+windows = chrono_windows.get(tag, chrono_windows.get(player.pid, []))
 start = adjusted_start_time(frame_sec, duration, windows, producer_tag=tag)
 ```
 
