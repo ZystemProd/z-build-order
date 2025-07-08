@@ -165,10 +165,10 @@ function matchActorsWithTrie(actionText, actorTrie) {
       const cleanWord = rawWord.replace(/[.,;!?]+$/, "").toLowerCase();
       let punctuation = rawWord.slice(cleanWord.length);
 
-      // NEW: Swap image
+      // NEW: Swap text
       if (cleanWord === "swap") {
         result.push(
-          `<span data-tooltip="Swap"><img src="img/SVG/swap.svg" alt="swap" class="inline-icon"></span>`
+          `<span data-tooltip="Swap" style="color:#99f8fd;">swap</span>`
         );
         i++;
         continue;
