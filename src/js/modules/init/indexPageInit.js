@@ -149,6 +149,7 @@ setupTemplateModal(); // Always call early
 // — replay meta, filled by populateReplayOptions —
 let replayPlayers = [];
 let pendingMatchup = null;
+let selectedPlayerPid = null;
 
 let currentClanView = null;
 let allBuilds = [];
@@ -541,9 +542,9 @@ export async function initializeIndexPage() {
   async function populateReplayOptions(file) {
     const loader = document.getElementById("optionsLoadingWrapper");
     if (loader) loader.style.display = "flex";
-    const select = document.getElementById("playerSelect");
-    if (!select) return;
-    select.innerHTML = "<option>Loading...</option>";
+    const wrapper = document.getElementById("playerToggleWrapper");
+    if (!wrapper) return;
+    wrapper.textContent = "Loading...";
 
     const formData = new FormData();
     formData.append("replay", file);
@@ -555,19 +556,49 @@ export async function initializeIndexPage() {
       });
       const data = await res.json();
       const players = Array.isArray(data) ? data : data.players;
-      select.innerHTML = "";
-      players.forEach((p) => {
-        const opt = document.createElement("option");
-        opt.value = p.pid;
-        opt.textContent = `${p.name} (${p.race})`;
-        select.appendChild(opt);
+      wrapper.innerHTML = "";
+      players.forEach((p, idx) => {
+        const btn = document.createElement("button");
+        btn.textContent = `${p.name} (${p.race})`;
+        btn.className = "player-toggle-btn";
+        btn.dataset.pid = p.pid;
+        btn.addEventListener("click", () => {
+          selectedPlayerPid = p.pid;
+          Array.from(wrapper.children).forEach((b) =>
+            b.classList.remove("active")
+          );
+          btn.classList.add("active");
+          updateChronoWarning();
+        });
+        if (idx === 0) {
+          btn.classList.add("active");
+          selectedPlayerPid = p.pid;
+        }
+        wrapper.appendChild(btn);
       });
       const matchup = data.matchup;
       replayPlayers = players; // save for Confirm-click
       pendingMatchup = matchup; // e.g. "zvp"
     } catch (err) {
       console.error("Failed to fetch players", err);
-      select.innerHTML = "<option value='1'>Player 1</option>";
+      wrapper.textContent = "";
+      [1, 2].forEach((pid, idx) => {
+        const btn = document.createElement("button");
+        btn.textContent = `Player ${pid}`;
+        btn.className = "player-toggle-btn";
+        btn.dataset.pid = pid;
+        btn.addEventListener("click", () => {
+          selectedPlayerPid = pid;
+          Array.from(wrapper.children).forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          updateChronoWarning();
+        });
+        if (idx === 0) {
+          btn.classList.add("active");
+          selectedPlayerPid = pid;
+        }
+        wrapper.appendChild(btn);
+      });
     }
     if (loader) loader.style.display = "none";
   }
@@ -598,8 +629,9 @@ export async function initializeIndexPage() {
 
     const formData = new FormData();
     formData.append("replay", selectedReplayFile);
-    const player = document.getElementById("playerSelect")?.value;
-    if (player) formData.append("player", player);
+    if (selectedPlayerPid !== null) {
+      formData.append("player", selectedPlayerPid);
+    }
     if (document.getElementById("excludeWorkersCheckbox")?.checked) {
       formData.append("exclude_workers", "1");
     }
@@ -655,7 +687,7 @@ export async function initializeIndexPage() {
     // —–––– update build-category dropdown AFTER parsing —––––
     const dd = document.getElementById("buildCategoryDropdown");
     if (dd && replayPlayers.length >= 2) {
-      const chosenPid = Number(playerSelect.value);
+      const chosenPid = Number(selectedPlayerPid);
       const me = replayPlayers.find((p) => p.pid === chosenPid);
       const foe = replayPlayers.find((p) => p.pid !== chosenPid);
 
@@ -735,7 +767,6 @@ export async function initializeIndexPage() {
 
   // --- Dropdown Color Change
   safeChange("buildCategoryDropdown", updateDropdownColor);
-  safeChange("playerSelect", updateChronoWarning);
 
   // --- Help Modal
   safeAdd("buildOrderHelpBtn", "click", showBuildOrderHelpModal);
@@ -1152,10 +1183,9 @@ export async function initializeIndexPage() {
   }
 
   function updateChronoWarning() {
-    const select = document.getElementById("playerSelect");
     const warning = document.getElementById("chronoBoostWarning");
-    if (!select || !warning) return;
-    const pid = Number(select.value);
+    if (!warning) return;
+    const pid = Number(selectedPlayerPid);
     const player = replayPlayers.find((p) => p.pid === pid);
     if (player && player.race && player.race.toLowerCase() === "protoss") {
       warning.style.display = "inline";
