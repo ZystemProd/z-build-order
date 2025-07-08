@@ -811,11 +811,18 @@ def upload():
                 tag = producer_tag(event)
                 windows = chrono_windows.get(tag, chrono_windows.get(player.pid, []))
 
+                # Calculate how many seconds of this build were boosted
+                # using the final start time below
+
                 start_in_game = adjusted_start_time(
                     end_in_game,
                     base_duration,
                     windows,
                     producer_tag=tag,
+                )
+
+                boosted_secs, _ = calculate_chrono_overlap(
+                    start_in_game, end_in_game, windows, producer_tag=tag
                 )
 
                 start_frame = int(start_in_game * replay.game_fps * speed_factor)
@@ -833,7 +840,9 @@ def upload():
                     'supply': used_s,
                     'made': made_s,
                     'unit': name,
-                    'kind': 'start'
+                    'kind': 'start',
+                    # Record how many in-game seconds were sped up by Chrono Boost
+                    'boosted': round(boosted_secs, 2)
                 })
                 used_f, made_f = get_supply(event.second)
                 entries.append({
@@ -935,9 +944,16 @@ def upload():
                         windows,
                         producer_tag=tag,
                     )
+                    boosted_secs, _ = calculate_chrono_overlap(
+                        start_real,
+                        frame_sec,
+                        windows,
+                        producer_tag=tag,
+                    )
                     upgrade_sources[player.pid].pop(mapped_name, None)
                 else:
                     start_real = frame_sec
+                    boosted_secs = 0.0
 
 
                 start_frame = int(start_real * replay.game_fps * speed_factor)
@@ -958,7 +974,9 @@ def upload():
                     'unit': mapped_name,
                     'kind': 'start',
                     'type': 'upgrade',
-                    'label': mapped_name
+                    'label': mapped_name,
+                    # Include how many seconds were Chrono Boosted for visibility
+                    'boosted': round(boosted_secs, 2)
                 })
 
 
@@ -1009,6 +1027,10 @@ def upload():
                     minutes, seconds = divmod(first.get('clock_sec', first.get('time', 0)), 60)
                     label = first.get('label', 'Unknown')
 
+                    boosted = first.get('boosted', 0)
+                    if boosted > 0:
+                        label += f" (ChronoBoosted {boosted:.1f}s)"
+
                     parts = []
                     if not exclude_supply:
                         supply_str = f"{first['supply']}/{first['made']}" if first['supply'] > first['made'] and first['made'] > 0 else str(first['supply'])
@@ -1036,6 +1058,9 @@ def upload():
                     e = entries[i]
                     qty = e.get('count', 1)
                     label = f"{qty} {e['unit']}" if qty > 1 else e['unit']
+                    boost = e.get('boosted', 0)
+                    if boost > 0:
+                        label += f" (ChronoBoosted {boost:.1f}s)"
                     units.append(label)
                     i += 1
                 parts = []
@@ -1051,6 +1076,9 @@ def upload():
                 if item.get('type') == 'upgrade':
                     minutes, seconds = divmod(item.get('clock_sec', item.get('time', 0)), 60)
                     label = item.get('label', 'Unknown')
+                    boosted = item.get('boosted', 0)
+                    if boosted > 0:
+                        label += f" (ChronoBoosted {boosted:.1f}s)"
 
                     parts = []
                     if not exclude_supply:
@@ -1075,6 +1103,9 @@ def upload():
                 prefix = f"[{' '.join(parts)}] " if parts else ""
                 qty = item.get('count', 1)
                 label = f"{qty} {item['unit']}" if qty > 1 else item['unit']
+                boost = item.get('boosted', 0)
+                if boost > 0:
+                    label += f" (ChronoBoosted {boost:.1f}s)"
                 build_lines.append(prefix + label)
 
 
