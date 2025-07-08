@@ -96,3 +96,20 @@ Overlapping Chrono Boost casts are merged automatically so time is not counted
 twice.  The same helper is used for unit build times with the appropriate
 `BUILD_TIME` values.
 
+### Tracking upgrade structures
+
+When a research ability is issued, the parser records the producing structure's
+tag and associates it with the upgrade name. Later, if
+`UpgradeCompleteEvent` lacks the building reference, the stored tag is used so
+that Chrono Boost adjustments apply only to boosts on that structure.
+
+```python
+if UPGRADE_PREFIX.match(event.ability_name):
+    name = prettify_upgrade(event.ability_name)
+    upgrade_sources[event.pid][name] = event.unit.tag
+
+# ... later when the upgrade finishes ...
+tag = upgrade_sources[player.pid].pop(mapped_name, None)
+start = adjusted_start_time(frame_sec, duration, chrono_windows[player.pid], tag)
+```
+

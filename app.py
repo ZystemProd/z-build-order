@@ -612,8 +612,9 @@ def upload():
 
         # ---- containers -------------------------------------------
         entries = []
-        init_map = {} 
+        init_map = {}
         chrono_windows = defaultdict(list)  # ✅ Correct version
+        upgrade_sources = defaultdict(dict)
 
         # NEW: running supply snapshot (O(1) look‑ups) --------------
         current_used = 0
@@ -683,6 +684,14 @@ def upload():
                 tag = producer_tag(event)
                 chrono_windows[event.pid].append((start_in_game, end_in_game, tag))
                 continue
+
+            # Research ability tracking
+            if UPGRADE_PREFIX.match(ability) and getattr(event, "pid", None) == player.pid:
+                upg_name = prettify_upgrade(ability)
+                mapped = upgrade_name_map.get(upg_name, upg_name)
+                tag = producer_tag(event)
+                if tag is not None:
+                    upgrade_sources[event.pid][mapped] = tag
 
 
             # ---- UnitBornEvent ------------------------------------
@@ -847,12 +856,15 @@ def upload():
 
                 if duration_secs:
                     tag = producer_tag(event)
+                    if tag is None:
+                        tag = upgrade_sources[player.pid].get(mapped_name)
                     start_real = adjusted_start_time(
                         frame_sec,
                         duration_secs,
                         chrono_windows[player.pid],
                         producer_tag=tag,
                     )
+                    upgrade_sources[player.pid].pop(mapped_name, None)
                 else:
                     start_real = frame_sec
 
