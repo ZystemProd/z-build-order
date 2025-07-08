@@ -743,11 +743,13 @@ def upload():
                 # Identify the building that was boosted
                 tag = producer_tag(event)
                 if tag is not None:
-                    # Store windows keyed by the structure's tag
-                    chrono_windows[tag].append((start_in_game, end_in_game))
+                    # Store under both the tag and player ID so missing tags
+                    # later can fall back to the player bucket
+                    chrono_windows[tag].append((start_in_game, end_in_game, tag))
+                    chrono_windows[event.pid].append((start_in_game, end_in_game, tag))
                 else:
                     # Fallback to player id if tag is missing
-                    chrono_windows[event.pid].append((start_in_game, end_in_game))
+                    chrono_windows[event.pid].append((start_in_game, end_in_game, None))
                 continue
 
             # Research ability tracking

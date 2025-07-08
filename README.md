@@ -104,9 +104,12 @@ if ability.endswith("ChronoBoostEnergyCost"):
     end = start + CHRONO_BOOST_SECONDS
     tag = producer_tag(event)
     if tag is not None:
-        chrono_windows[tag].append((start, end))
+        # Store under both the structure tag and player ID so later lookups
+        # can fall back if the tag is missing
+        chrono_windows[tag].append((start, end, tag))
+        chrono_windows[event.pid].append((start, end, tag))  # fallback bucket
     else:
-        chrono_windows[event.pid].append((start, end))  # fallback
+        chrono_windows[event.pid].append((start, end, None))
 ```
 
 When processing an upgrade you can then compute the overlap for that building:
