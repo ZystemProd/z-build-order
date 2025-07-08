@@ -697,37 +697,33 @@ def upload():
                 ):
                     continue
 
+                # ✅ Better: use frame-based timing
                 build_time = BUILD_TIME.get(event.unit_type_name, 0)
-                start_real = event.second - build_time
+                if build_time == 0:
+                    continue  # skip unknown units
 
-                start_in_game = start_real / speed_factor
-                end_in_game = event.second / speed_factor
+                fps = replay.game_fps
+                born_frame = event.frame
+                build_frames = int(build_time * fps)
 
-                start_frame = int(start_in_game * replay.game_fps * speed_factor)
-                idx = bisect.bisect_right(frames_by_pid[player.pid], start_frame) - 1
+                # Accurate start frame
+                start_frame = born_frame - build_frames
 
-                if idx >= 0 and (start_frame - frames_by_pid[player.pid][idx]) <= 4:
-                    used_s = supply_by_pid[player.pid][idx]
-                    made_s = 0
-                else:
-                    real_sec = start_in_game * speed_factor
-                    used_s, made_s = get_supply(real_sec)
+                # Convert to in-game seconds using your helper
+                start_ingame_sec = frame_to_ingame_seconds(start_frame, replay)
 
+                # Take supply snapshot at that frame
+                used_s = supply_at_frame(player.pid, start_frame)
+
+                # ✅ Add only the start row — don't add a 'finish' row
                 entries.append({
-                    'clock_sec': int(start_in_game),
+                    'clock_sec': int(start_ingame_sec),
                     'supply': used_s,
-                    'made': made_s,
+                    'made': 0,
                     'unit': name,
                     'kind': 'start'
                 })
-                used_f, made_f = get_supply(event.second)
-                entries.append({
-                    'clock_sec': int(end_in_game),
-                    'supply': used_f,
-                    'made': made_f,
-                    'unit': name,
-                    'kind': 'finish'
-                })
+
                 continue
 
 
@@ -789,11 +785,21 @@ def upload():
                 ):
                     continue
 
+                # ✅ Use frame-based accurate time for when the structure started
+                init_frame = event.frame
+
+                # Convert to in-game seconds
+                init_ingame_sec = frame_to_ingame_seconds(init_frame, replay)
+
+                # Use supply snapshot at that frame
+                supply_at_start = supply_at_frame(player.pid, init_frame)
+
                 init_map[event.unit_id] = name
+
                 entries.append({
-                    'clock_sec': int(event.second / speed_factor),
-                    'supply': current_used if have_stats else get_supply(event.second)[0],
-                    'made': current_made if have_stats else get_supply(event.second)[1],
+                    'clock_sec': int(init_ingame_sec),
+                    'supply': supply_at_start,
+                    'made': 0,
                     'unit': name,
                     'kind': 'start'
                 })
