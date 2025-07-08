@@ -105,8 +105,8 @@ that Chrono Boost adjustments apply only to boosts on that structure.
 
 ```python
 if UPGRADE_PREFIX.match(event.ability_name):
-    name = prettify_upgrade(event.ability_name)
-    upgrade_sources[event.pid][name] = event.unit.tag
+    label = ability_upgrade_label(event.ability_name)
+    upgrade_sources[event.pid][label] = event.unit.tag
 
 # ... later when the upgrade finishes ...
 tag = upgrade_sources[player.pid].pop(mapped_name, None)

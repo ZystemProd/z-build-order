@@ -466,14 +466,21 @@ def tidy(label: str) -> str | None:
 # --- Ability/Command events helper for any sc2reader version ---
 from sc2reader.events import game as ge
 
-# Helper for parsing upgrade ability names
-UPGRADE_PREFIX = re.compile(r'^(Research|ResearchTech|Upgrade)_?')
 
 def prettify_upgrade(ability_name: str) -> str:
     """Return a human‑friendly upgrade name from a raw ability string."""
     core = UPGRADE_PREFIX.sub('', ability_name)
     words = re.sub(r'([a-z])([A-Z])', r'\1 \2', core)
     return words.replace('_', ' ').strip().title()
+
+
+def ability_upgrade_label(ability_name: str) -> str:
+    """Return the final upgrade label for a research ability."""
+    raw = UPGRADE_PREFIX.sub('', ability_name).replace('_', '')
+    guess = raw + 'Research'
+    if guess in upgrade_name_map:
+        return upgrade_name_map[guess]
+    return upgrade_name_map.get(raw, prettify_upgrade(ability_name))
 
 
 def producer_tag(ev):
@@ -687,11 +694,10 @@ def upload():
 
             # Research ability tracking
             if UPGRADE_PREFIX.match(ability) and getattr(event, "pid", None) == player.pid:
-                upg_name = prettify_upgrade(ability)
-                mapped = upgrade_name_map.get(upg_name, upg_name)
+                label = ability_upgrade_label(ability)
                 tag = producer_tag(event)
                 if tag is not None:
-                    upgrade_sources[event.pid][mapped] = tag
+                    upgrade_sources[event.pid][label] = tag
 
 
             # ---- UnitBornEvent ------------------------------------
