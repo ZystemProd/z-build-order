@@ -25,6 +25,7 @@ from collections import defaultdict
 from sc2reader.constants import GAME_SPEED_FACTOR
 from name_map import NAME_MAP
 from typing import List, Dict, Any, Optional
+from sc2reader.events.tracker import UnitBornEvent, UnitInitEvent
 
 
 UPGRADE_PREFIX = re.compile(r'^(Research|ResearchTech|Upgrade)_?')
@@ -124,6 +125,17 @@ upgrade_name_map = {
     "ProtossAirArmorsLevel2": "Air Armors L2", 
     "ProtossAirArmorsLevel3": "Air Armors L3",         
 }
+
+UPGRADE_BUILDING_MAP = {
+    "Blink": "TwilightCouncil",
+    "Charge": "TwilightCouncil",
+    "Ground Weapons L1": "Forge",
+    "Research Warp Gate": "CyberneticsCore"
+}
+
+
+
+
 
 upgrade_times = {
     # Terran
@@ -302,6 +314,7 @@ def adjusted_start_time(
     base_duration: float,
     chrono_windows,
     producer_tag: Optional[int] = None,
+    
 ) -> float:
     """Return the Chrono-adjusted start time for a build window.
 
@@ -327,10 +340,12 @@ def adjusted_start_time(
         )
         new_duration = base_duration - 0.35 * boosted
         new_start = end_time - new_duration
+        print(f"✅ AdjustedStart: boosted={boosted:.2f} new_duration={new_duration:.2f} new_start={new_start:.2f}")
         if abs(new_start - start_guess) < 0.01:
             return new_start
         start_guess = new_start
     return start_guess
+
 
 
 def chrono_adjusted_build_time(
@@ -499,9 +514,6 @@ def tidy(label: str) -> str | None:
 
 # -------------------------------------------------------------------
 
-# --- Ability/Command events helper for any sc2reader version ---
-from sc2reader.events import game as ge
-
 
 def prettify_upgrade(ability_name: str) -> str:
     """Return a human‑friendly upgrade name from a raw ability string."""
@@ -520,26 +532,15 @@ def ability_upgrade_label(ability_name: str) -> str:
 
 
 def producer_tag(ev):
-    """Return the tag of the structure associated with an event.
-
-    Works for AbilityEvent, CommandEvent, or TargetUnitCommandEvent. The
-    function first checks ``event.unit`` then falls back to ``event.target``
-    for older replays. ``None`` is returned when no valid tag is found.
-    """
-
-    # Many events include the building in ``event.unit``. Ensure the object
-    # exists and actually exposes a ``tag`` attribute before using it.
-    unit = getattr(ev, "unit", None)
-    if unit is not None and hasattr(unit, "tag"):
-        return unit.tag
-
-    # Some older replays store the targeted structure in ``event.target``
-    target = getattr(ev, "target", None)
-    if target is not None and hasattr(target, "tag"):
-        return target.tag
-
-    # When neither ``unit`` nor ``target`` yields a tag, signal failure
+    if hasattr(ev, "target") and hasattr(ev.target, "id"):
+        print(f"🔍 producer_tag: Using target.id = {ev.target.id}")
+        return ev.target.id
+    if hasattr(ev, "unit") and hasattr(ev.unit, "id"):
+        print(f"🔍 producer_tag: Using unit.id = {ev.unit.id}")
+        return ev.unit.id
+    print("🔍 producer_tag: No unit or target ID found — returning None")
     return None
+
 
 # ---- Flask setup --------------------------------------------------
 app = Flask(__name__)
@@ -559,6 +560,31 @@ def format_name(name: str) -> str:
     return re.sub(r"(?<!^)(?=[A-Z])", " ", name).title()
 
 # ------------------------------------------------------------------
+
+def find_possible_producer_tag(replay, upgrade_event, building_name="Forge"):
+    upgrade_frame = getattr(upgrade_event, "frame", None)
+    if upgrade_frame is None:
+        return None
+
+    for ev in reversed(replay.events):
+        if getattr(ev, "frame", 0) > upgrade_frame:
+            continue
+
+        if isinstance(ev, (UnitBornEvent, UnitInitEvent)):
+            event_pid = getattr(ev.unit.owner, "pid", None)
+            print(f"🔍 SCAN: {ev.unit.name} frame={ev.frame} pid={event_pid}")
+
+            # ✅ Exact unit name match
+            if ev.unit.name == building_name and event_pid == upgrade_event.pid:
+                print(f"🔍 Found {ev.unit.name} with id={ev.unit.id}")
+                return ev.unit.id
+
+    return None
+
+
+
+
+
 
 @app.route('/')
 def index():
@@ -672,7 +698,7 @@ def upload():
         init_map = {}
         chrono_windows = defaultdict(list)  # ✅ Correct version
         upgrade_sources = defaultdict(dict)
-
+        known_buildings = defaultdict(lambda: defaultdict(list))
         # NEW: running supply snapshot (O(1) look‑ups) --------------
         current_used = 0
         current_made = 0
@@ -690,6 +716,7 @@ def upload():
         last_hallucination_frame = -9999
         last_hallucination_pid = None
         pending_hallucinations = []
+
 
         # ---- iterate event stream --------------------------------
         for event in replay.events:
@@ -710,6 +737,21 @@ def upload():
                             "frame": event.frame,
                             "pid": event.pid
                         })
+
+
+            if hasattr(event, "ability_name") and "Chrono" in event.ability_name and getattr(event, "pid", None) == player.pid:
+                print(f"✅ AbilityEvent: {getattr(event, 'ability_name', None)} pid={getattr(event, 'pid', None)}")
+
+            # Inside the loop:
+            if isinstance(event, (UnitBornEvent, UnitInitEvent)):
+                if getattr(event.unit, "is_building", False):
+                    building = event.unit.name.replace(" ", "")
+                    if building in {"Forge", "TwilightCouncil"}:
+                        pid = getattr(event, "pid", getattr(event.unit.owner, "pid", None))
+                        if pid is not None:
+                            known_buildings[pid][building].append(event.unit.id)
+                            print(f"✅ Tracked {building} for player {pid}: id={event.unit.id}")
+
 
 
 
@@ -735,29 +777,48 @@ def upload():
 
 
             # Chrono Boost detection
-            if ability.endswith(("ChronoBoostEnergyCost", "ChronoBoost")) and getattr(event, "pid", None) == player.pid:
-                # Convert frame number to in-game seconds
-                start_in_game = event.second / speed_factor
-                end_in_game = start_in_game + CHRONO_BOOST_SECONDS
+            if hasattr(event, "ability_name") and "Chrono" in event.ability_name and getattr(event, "pid", None) == player.pid:
+                ability = getattr(event, "ability_name", "")
+                if "Chrono" in ability and getattr(event, "pid", None) == player.pid:
+                    start_in_game = event.second / speed_factor
+                    end_in_game = start_in_game + CHRONO_BOOST_SECONDS
 
-                # Identify the building that was boosted
-                tag = producer_tag(event)
-                if tag is not None:
-                    # Store under both the tag and player ID so missing tags
-                    # later can fall back to the player bucket
-                    chrono_windows[tag].append((start_in_game, end_in_game, tag))
+                    tag = producer_tag(event)
+                    print(f"✅ ChronoBoost: pid={event.pid} tag={tag} window=({start_in_game:.2f}-{end_in_game:.2f})")
+
+                    if tag is None:
+                        label = ability_upgrade_label(ability)
+                        fallback_building = UPGRADE_BUILDING_MAP.get(label, "Forge")
+                        print(f"✅ ability_upgrade_label: {label} → Fallback building: {fallback_building}")
+                        fallback = known_buildings.get(event.pid, {}).get(fallback_building, [])
+                        if fallback:
+                            tag = fallback[-1]
+                            print(f"✅ Fallback ChronoBoost tag used: {tag} ({fallback_building})")
+
+                    # ✅ Always store for the player
                     chrono_windows[event.pid].append((start_in_game, end_in_game, tag))
-                else:
-                    # Fallback to player id if tag is missing
-                    chrono_windows[event.pid].append((start_in_game, end_in_game, None))
-                continue
+
+                    # ✅ If you have a tag, ALSO store for that structure
+                    if tag is not None:
+                        chrono_windows[tag].append((start_in_game, end_in_game, tag))
+                        print(f"✅ Stored ChronoBoost window for tag {tag}: ({start_in_game:.2f}-{end_in_game:.2f})")
+                    else:
+                        print(f"✅ Stored ChronoBoost window for player only: ({start_in_game:.2f}-{end_in_game:.2f})")
+
+                    print(f"✅ chrono_windows now: {dict(chrono_windows)}")
+
+
+                    continue
+
 
             # Research ability tracking
             if UPGRADE_PREFIX.match(ability) and getattr(event, "pid", None) == player.pid:
                 label = ability_upgrade_label(ability)
                 tag = producer_tag(event)
+                print(f"✅ producer_tag(event) for Research: {tag}")
                 if tag is not None:
                     upgrade_sources[event.pid][label] = tag
+                print(f"✅ Research start: label='{label}' tag={tag}")
 
 
             # ---- UnitBornEvent ------------------------------------
@@ -811,6 +872,7 @@ def upload():
 
                 # Filter Chrono windows by the producing structure if known
                 tag = producer_tag(event)
+                print(f"✅ producer_tag(event) for Research: {tag}")
                 windows = chrono_windows.get(tag, chrono_windows.get(player.pid, []))
 
                 # Calculate how many seconds of this build were boosted
@@ -936,8 +998,17 @@ def upload():
 
                 if duration_secs:
                     tag = producer_tag(event)
+                    print(f"✅ producer_tag(event) for Research: {tag}")
                     if tag is None:
                         tag = upgrade_sources[player.pid].get(mapped_name)
+
+                        if tag is None:
+                            # ✅ Use your mapping to pick the right structure for this upgrade
+                            building_name = UPGRADE_BUILDING_MAP.get(mapped_name, "Forge")
+                            tag = find_possible_producer_tag(replay, event, building_name=building_name)
+                            print(f"✅ Fallback building: {building_name} tag found: {tag}")
+
+
 
                     windows = chrono_windows.get(tag, chrono_windows.get(player.pid, []))
                     start_real = adjusted_start_time(
@@ -956,6 +1027,12 @@ def upload():
                 else:
                     start_real = frame_sec
                     boosted_secs = 0.0
+                    tag = None                  # ✅ safe fallback!
+                    windows = []                # ✅ safe fallback!
+
+                print(f"✅ UpgradeComplete: mapped_name='{mapped_name}' tag={tag}")
+                print(f"✅ Using windows: {windows}")
+                print(f"✅ Calculated overlap: boosted={boosted_secs:.2f}")
 
 
                 start_frame = int(start_real * replay.game_fps * speed_factor)
@@ -980,6 +1057,7 @@ def upload():
                     # Include how many seconds were Chrono Boosted for visibility
                     'boosted': round(boosted_secs, 2)
                 })
+
 
 
         # keep only start rows --------------------------------------
