@@ -528,6 +528,23 @@ def upload():
         entries = []
         init_map = {}
 
+        # ✅ Add the starting workers row manually for standard starts
+        starting_workers = 12  # default for LotV
+        if player.play_race.lower() == "zerg":
+            starting_workers = 12
+        elif player.play_race.lower() == "protoss":
+            starting_workers = 12
+        elif player.play_race.lower() == "terran":
+            starting_workers = 12
+
+        entries.append({
+            'clock_sec': 0,
+            'supply': starting_workers,
+            'made': 0,
+            'unit': 'Starting Workers',
+            'kind': 'start'
+        })
+
         # NEW: running supply snapshot (O(1) look‑ups) --------------
         current_used = 0
         current_made = 0
@@ -651,7 +668,30 @@ def upload():
                 break
 
 
+            # ---- AbilityEvent for warp-ins ------------------------------------
+            if isinstance(event, ABILITY_EVENTS):
+                ability_name = getattr(event, "ability_name", "")
+                if not ability_name:
+                    continue
 
+                # Only handle Protoss warp-ins
+                if "Warp" in ability_name and ("Zealot" in ability_name or "Stalker" in ability_name or "Sentry" in ability_name or "Adept" in ability_name or "Dark Templar" in ability_name or "High Templar" in ability_name):
+                    name = format_name(ability_name)
+                    name = tidy(name)
+                    if name is None:
+                        continue
+
+                    # Snapshot supply at the moment the player clicked warp-in
+                    ingame_sec = frame_to_ingame_seconds(event.frame, replay)
+                    used_s = supply_at_frame(player.pid, event.frame)
+
+                    entries.append({
+                        'clock_sec': int(ingame_sec),
+                        'supply': used_s,
+                        'made': 0,
+                        'unit': name,
+                        'kind': 'start'
+                    })
 
             # ---- UnitBornEvent ------------------------------------
             if isinstance(event, sc2reader.events.tracker.UnitBornEvent):
@@ -709,14 +749,35 @@ def upload():
                 ):
                     continue
 
-                # ✅ Use simpler logic: only buildings use back-calc, units use born frame
+                # ✅ Classify unit type
                 unit_name_lower = name.lower()
-                if unit_name_lower in ["probe", "drone", "scv"] or not getattr(unit, "is_building", False):
-                    # Workers & army: just use born frame — no back-calc
-                    used_s = supply_at_frame(player.pid, event.frame)
-                    start_ingame_sec = frame_to_ingame_seconds(event.frame, replay)
+
+                if unit_name_lower in ["probe", "drone", "scv"]:
+                    # 🟢 Workers: no back-calc
+                    start_frame = event.frame
+                    start_ingame_sec = frame_to_ingame_seconds(start_frame, replay)
+                    used_s = supply_at_frame(player.pid, start_frame)
+
+                elif unit_name_lower in ["zealot", "stalker", "sentry", "adept", "dark templar", "high templar"]:
+                    # 🟢 Army unit: check if AbilityEvent already handled it
+                    # If so, skip this UnitBornEvent to avoid double-count
+                    fallback_ok = True
+                    born_ingame_sec = frame_to_ingame_seconds(event.frame, replay)
+                    for e in entries:
+                        if e['unit'] == name and abs(e['clock_sec'] - int(born_ingame_sec)) <= 2:
+                            fallback_ok = False
+                            break
+
+                    if fallback_ok:
+                        # Use born frame as fallback, no back-calc for army unit
+                        start_frame = event.frame
+                        start_ingame_sec = born_ingame_sec
+                        used_s = supply_at_frame(player.pid, start_frame)
+                    else:
+                        continue  # Skip adding duplicate
+
                 else:
-                    # Fallback (shouldn’t happen for UnitBornEvent): use build time
+                    # 🟢 Fallback: for any weird unit type, use back-calc
                     build_time = BUILD_TIME.get(event.unit_type_name, 0)
                     if build_time == 0:
                         continue
@@ -725,7 +786,6 @@ def upload():
                     born_frame = event.frame
                     build_frames = int(build_time * fps)
                     start_frame = max(born_frame - build_frames, 0)
-
                     start_ingame_sec = frame_to_ingame_seconds(start_frame, replay)
                     used_s = supply_at_frame(player.pid, start_frame)
 
@@ -737,6 +797,7 @@ def upload():
                     'unit': name,
                     'kind': 'start'
                 })
+
 
 
                 continue
