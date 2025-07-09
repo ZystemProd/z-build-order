@@ -26,14 +26,14 @@ from sc2reader.constants import GAME_SPEED_FACTOR
 from name_map import NAME_MAP
 from typing import List, Dict, Any, Optional
 
-from sc2reader.events.game import AbilityEvent, CommandEvent, TargetPointCommandEvent, TargetUnitCommandEvent, BasicCommandEvent
+import sc2reader.events.game as ge
 
 ABILITY_EVENTS = (
-    AbilityEvent,
-    TargetPointCommandEvent,
-    TargetUnitCommandEvent,
-    BasicCommandEvent,
-    CommandEvent
+    ge.AbilityEvent,
+    ge.CommandEvent,
+    ge.TargetPointCommandEvent,
+    ge.TargetUnitCommandEvent,
+    ge.BasicCommandEvent
 )
 
 
