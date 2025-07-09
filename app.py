@@ -536,22 +536,6 @@ def upload():
         entries = []
         init_map = {}
 
-        # ✅ Add the starting workers row manually for standard starts
-        starting_workers = 12  # default for LotV
-        if player.play_race.lower() == "zerg":
-            starting_workers = 12
-        elif player.play_race.lower() == "protoss":
-            starting_workers = 12
-        elif player.play_race.lower() == "terran":
-            starting_workers = 12
-
-        entries.append({
-            'clock_sec': 0,
-            'supply': starting_workers,
-            'made': 0,
-            'unit': 'Starting Workers',
-            'kind': 'start'
-        })
 
         # NEW: running supply snapshot (O(1) look‑ups) --------------
         current_used = 0
@@ -764,10 +748,18 @@ def upload():
                 unit_name_lower = name.lower()
 
                 if unit_name_lower in ["probe", "drone", "scv"]:
-                    # 🟢 Workers: no back-calc
-                    start_frame = event.frame
-                    start_ingame_sec = frame_to_ingame_seconds(start_frame, replay)
+                    build_time = BUILD_TIME.get(event.unit_type_name, 0)
+                    fps = replay.game_fps
+                    born_frame = event.frame
+                    build_frames = int(build_time * fps)
+                    start_frame = max(born_frame - build_frames, 0)
+
                     used_s = supply_at_frame(player.pid, start_frame)
+                    used_s -= 1  # Show “before reserved”
+                    if used_s < 0:
+                        used_s = 0
+
+                    start_ingame_sec = frame_to_ingame_seconds(start_frame, replay)
 
                 elif unit_name_lower in ["zealot", "stalker", "sentry", "adept", "dark templar", "high templar"]:
                     # 🟢 Army unit: check if AbilityEvent already handled it
