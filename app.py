@@ -709,26 +709,27 @@ def upload():
                 ):
                     continue
 
-                # ✅ Better: use frame-based timing
-                build_time = BUILD_TIME.get(event.unit_type_name, 0)
-                if build_time == 0:
-                    continue  # skip unknown units
+                # ✅ Use simpler logic: only buildings use back-calc, units use born frame
+                unit_name_lower = name.lower()
+                if unit_name_lower in ["probe", "drone", "scv"] or not getattr(unit, "is_building", False):
+                    # Workers & army: just use born frame — no back-calc
+                    used_s = supply_at_frame(player.pid, event.frame)
+                    start_ingame_sec = frame_to_ingame_seconds(event.frame, replay)
+                else:
+                    # Fallback (shouldn’t happen for UnitBornEvent): use build time
+                    build_time = BUILD_TIME.get(event.unit_type_name, 0)
+                    if build_time == 0:
+                        continue
 
-                fps = replay.game_fps
-                born_frame = event.frame
-                build_frames = int(build_time * fps)
+                    fps = replay.game_fps
+                    born_frame = event.frame
+                    build_frames = int(build_time * fps)
+                    start_frame = max(born_frame - build_frames, 0)
 
-                # Accurate start frame
-                start_frame = born_frame - build_frames
-                start_frame = max(start_frame, 0)
+                    start_ingame_sec = frame_to_ingame_seconds(start_frame, replay)
+                    used_s = supply_at_frame(player.pid, start_frame)
 
-                # Convert to in-game seconds using your helper
-                start_ingame_sec = frame_to_ingame_seconds(start_frame, replay)
-
-                # Take supply snapshot at that frame
-                used_s = supply_at_frame(player.pid, start_frame)
-
-                # ✅ Add only the start row — don't add a 'finish' row
+                # ✅ Add only the start row
                 entries.append({
                     'clock_sec': int(start_ingame_sec),
                     'supply': used_s,
@@ -736,6 +737,7 @@ def upload():
                     'unit': name,
                     'kind': 'start'
                 })
+
 
                 continue
 
