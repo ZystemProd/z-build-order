@@ -29,7 +29,6 @@ from typing import List, Dict, Any, Optional
 import sc2reader.events.game as ge
 
 ABILITY_EVENTS = (
-    ge.AbilityEvent,
     ge.CommandEvent,
     ge.TargetPointCommandEvent,
     ge.TargetUnitCommandEvent,
