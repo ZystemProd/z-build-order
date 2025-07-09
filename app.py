@@ -541,6 +541,14 @@ def upload():
                 frames_by_pid[ev.pid].append(ev.frame)
                 supply_by_pid[ev.pid].append(int(ev.food_used))
 
+        # ✅ Ensure every player has a starting snapshot at frame 0
+        for p in players:
+            frames = frames_by_pid[p.pid]
+            supplies = supply_by_pid[p.pid]
+            if not frames or frames[0] > 0:
+                frames.insert(0, 0)
+                supplies.insert(0, int(p.food_used))
+
 
         def supply_at_frame(pid: int, frame: int) -> int:
             """Return food_used for the last snapshot at or before frame."""
@@ -708,6 +716,7 @@ def upload():
 
                 # Accurate start frame
                 start_frame = born_frame - build_frames
+                start_frame = max(start_frame, 0)
 
                 # Convert to in-game seconds using your helper
                 start_ingame_sec = frame_to_ingame_seconds(start_frame, replay)
