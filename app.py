@@ -419,6 +419,8 @@ def format_name(name: str) -> str:
     # Insert space before capital letters and capitalise words
     return re.sub(r"(?<!^)(?=[A-Z])", " ", name).title()
 
+def base_unit_name(name: str) -> str:
+    return name.replace("Warp In ", "").strip()
 # ------------------------------------------------------------------
 
 @app.route('/')
@@ -686,6 +688,9 @@ def upload():
                     name = tidy(name)
                     if name is None:
                         continue
+
+                    # ✅ Normalize warp-in names
+                    name = base_unit_name(name)
 
                     # Snapshot supply at the moment the player clicked warp-in
                     ingame_sec = frame_to_ingame_seconds(event.frame, replay)
