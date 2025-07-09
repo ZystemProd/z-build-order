@@ -393,9 +393,6 @@ def tidy(label: str) -> str | None:
 
 # -------------------------------------------------------------------
 
-# --- Ability/Command events helper for any sc2reader version ---
-from sc2reader.events import game as ge
-
 # Helper for parsing upgrade ability names
 UPGRADE_PREFIX = re.compile(r'^(Research|ResearchTech|Upgrade)_?')
 
