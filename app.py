@@ -755,9 +755,10 @@ def upload():
                     start_frame = max(born_frame - build_frames, 0)
 
                     used_s = supply_at_frame(player.pid, start_frame)
-                    used_s -= 1  # Show “before reserved”
-                    if used_s < 0:
-                        used_s = 0
+
+                    # Only adjust if this is the very first probe in the timeline
+                    if used_s == 13:  # example
+                        used_s -= 1
 
                     start_ingame_sec = frame_to_ingame_seconds(start_frame, replay)
 
