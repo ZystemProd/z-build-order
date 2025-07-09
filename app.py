@@ -747,6 +747,10 @@ def upload():
                 # ✅ Classify unit type
                 unit_name_lower = name.lower()
 
+                # Before your loop:
+                first_worker_adjusted = False
+
+                # Inside UnitBornEvent:
                 if unit_name_lower in ["probe", "drone", "scv"]:
                     build_time = BUILD_TIME.get(event.unit_type_name, 0)
                     fps = replay.game_fps
@@ -756,9 +760,9 @@ def upload():
 
                     used_s = supply_at_frame(player.pid, start_frame)
 
-                    # Only adjust if this is the very first probe in the timeline
-                    if used_s == 13:  # example
-                        used_s -= 1
+                    if not first_worker_adjusted:
+                        used_s = max(used_s - 1, 0)
+                        first_worker_adjusted = True
 
                     start_ingame_sec = frame_to_ingame_seconds(start_frame, replay)
 
