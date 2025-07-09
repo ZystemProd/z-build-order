@@ -26,7 +26,7 @@ from sc2reader.constants import GAME_SPEED_FACTOR
 from name_map import NAME_MAP
 from typing import List, Dict, Any, Optional
 
-from sc2reader.events import AbilityEvent, CommandEvent, TargetPointCommandEvent, TargetUnitCommandEvent, BasicCommandEvent
+from sc2reader.events.game import AbilityEvent, CommandEvent, TargetPointCommandEvent, TargetUnitCommandEvent, BasicCommandEvent
 
 ABILITY_EVENTS = (
     AbilityEvent,
