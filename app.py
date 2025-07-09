@@ -546,8 +546,12 @@ def upload():
             frames = frames_by_pid[p.pid]
             supplies = supply_by_pid[p.pid]
             if not frames or frames[0] > 0:
+                # If no snapshot exists, assume standard starting supply: 12 for SC2 LotV
+                starting_supply = 12 if p.play_race in ['Protoss', 'Terran', 'Zerg'] else 6
+                initial_supply = supplies[0] if supplies else starting_supply
+
                 frames.insert(0, 0)
-                supplies.insert(0, int(p.food_used))
+                supplies.insert(0, initial_supply)
 
 
         def supply_at_frame(pid: int, frame: int) -> int:
