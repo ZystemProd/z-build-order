@@ -25,15 +25,17 @@ from collections import defaultdict
 from sc2reader.constants import GAME_SPEED_FACTOR
 from name_map import NAME_MAP
 from typing import List, Dict, Any, Optional
-from sc2reader.events import game as ge
+
+from sc2reader.events import AbilityEvent, CommandEvent, TargetPointCommandEvent, TargetUnitCommandEvent, BasicCommandEvent
 
 ABILITY_EVENTS = (
-    ge.AbilityEvent,
-    ge.TargetPointCommandEvent,
-    ge.TargetUnitCommandEvent,
-    ge.BasicCommandEvent,
-    ge.CommandEvent
+    AbilityEvent,
+    TargetPointCommandEvent,
+    TargetUnitCommandEvent,
+    BasicCommandEvent,
+    CommandEvent
 )
+
 
 UPGRADE_PREFIX = re.compile(r'^(Research|ResearchTech|Upgrade)_?')
 HALLUCINATION_WINDOW_FRAMES = 100  # tolerance for matching spawned illusions
