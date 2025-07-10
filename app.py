@@ -26,22 +26,29 @@ from sc2reader.constants import GAME_SPEED_FACTOR
 from name_map import NAME_MAP
 from typing import List, Dict, Any, Optional
 
+import sc2reader.events.game as ge
+
+ABILITY_EVENTS = (
+    ge.CommandEvent,
+    ge.TargetPointCommandEvent,
+    ge.TargetUnitCommandEvent,
+    ge.BasicCommandEvent
+)
+
 
 UPGRADE_PREFIX = re.compile(r'^(Research|ResearchTech|Upgrade)_?')
-HALLUCINATION_WINDOW_FRAMES = 100  # tolerance for matching spawned illusions
+HALLUCINATION_WINDOW_FRAMES = 60  # tolerance for matching spawned illusions
 HALLUCINATED_TYPES = {
-    "Archon",
-    "Colossus",
-    "Immortal",
     "Phoenix",
-    "Void Ray",
-    "Stalker",
-    "Zealot",
-    "High Templar",
-    "Sentry",
-    "Warp Prism",
-    "Oracle",
+    "Oracle"
 }
+
+HALLUCINATED_TYPE_COUNTS = {
+    "Phoenix": 1,
+    "Oracle": 1,
+}
+
+has_stargate = False
 
 upgrade_name_map = {
     "HighCapacityBarrels": "Infernal Pre-Igniter",
@@ -292,9 +299,9 @@ BUILD_TIME = {
     "Swarm Host": 43,
 
     "Zealot": 27,
-    "Adept": 27,
-    "Stalker": 30,
-    "Sentry": 26,
+    "Adept": 30,
+    "Stalker": 27,
+    "Sentry": 23,
     "Observer": 21,
     "Immortal": 39,
     "Colossus": 54,
@@ -383,9 +390,6 @@ def tidy(label: str) -> str | None:
 
 # -------------------------------------------------------------------
 
-# --- Ability/Command events helper for any sc2reader version ---
-from sc2reader.events import game as ge
-
 # Helper for parsing upgrade ability names
 UPGRADE_PREFIX = re.compile(r'^(Research|ResearchTech|Upgrade)_?')
 
@@ -413,6 +417,8 @@ def format_name(name: str) -> str:
     # Insert space before capital letters and capitalise words
     return re.sub(r"(?<!^)(?=[A-Z])", " ", name).title()
 
+def base_unit_name(name: str) -> str:
+    return name.replace("Warp In ", "").strip()
 # ------------------------------------------------------------------
 
 @app.route('/')
@@ -447,8 +453,11 @@ def players():
     return jsonify({'players': info, 'matchup': matchup})
 
 
+
 @app.route('/upload', methods=['POST'])
 def upload():
+    global has_stargate
+    has_stargate = False  # ✅ always reset for each replay
     if 'replay' not in request.files:
         return 'No replay uploaded', 400
 
@@ -528,6 +537,7 @@ def upload():
         entries = []
         init_map = {}
 
+
         # NEW: running supply snapshot (O(1) look‑ups) --------------
         current_used = 0
         current_made = 0
@@ -540,6 +550,18 @@ def upload():
             if isinstance(ev, sc2reader.events.tracker.PlayerStatsEvent):
                 frames_by_pid[ev.pid].append(ev.frame)
                 supply_by_pid[ev.pid].append(int(ev.food_used))
+
+        # ✅ Ensure every player has a starting snapshot at frame 0
+        for p in players:
+            frames = frames_by_pid[p.pid]
+            supplies = supply_by_pid[p.pid]
+            if not frames or frames[0] > 0:
+                # If no snapshot exists, assume standard starting supply: 12 for SC2 LotV
+                starting_supply = 12 if p.play_race in ['Protoss', 'Terran', 'Zerg'] else 6
+                initial_supply = supplies[0] if supplies else starting_supply
+
+                frames.insert(0, 0)
+                supplies.insert(0, initial_supply)
 
 
         def supply_at_frame(pid: int, frame: int) -> int:
@@ -572,51 +594,36 @@ def upload():
             if event.second == 0:
                 continue
 
-            # ✅ Safe hallucination cast detection
+            
+            # ---- AbilityEvent or CommandEvent (safe for all versions) ----
             if hasattr(event, "ability_name") and event.ability_name:
                 ability_name = event.ability_name
                 ability_lower = ability_name.lower()
-                if "hallucination" in ability_lower or "hallucinate" in ability_lower:
-                    last_hallucination_frame = event.frame
-                    last_hallucination_pid = event.pid
 
-                    # try regex first
+                if "hallucination" in ability_lower or "hallucinate" in ability_lower:
                     unit_raw = None
-                    m = re.search(
-                        r"hallucinat(?:e|ion)[^A-Za-z]*([A-Za-z]+)", ability_name, re.I
-                    )
+                    m = re.search(r"hallucinat(?:e|ion)[^A-Za-z]*([A-Za-z]+)", ability_name, re.I)
                     if m:
                         unit_raw = m.group(1)
                     else:
                         flat = re.sub(r"[^a-zA-Z]+", "", ability_lower)
-                        for u in [
-                            "archon",
-                            "immortal",
-                            "phoenix",
-                            "colossus",
-                            "voidray",
-                            "stalker",
-                            "zealot",
-                            "hightemplar",
-                            "sentry",
-                            "warpprism",
-                            "oracle",
-                        ]:
-                            if u in flat:
+                        for u in HALLUCINATED_TYPE_COUNTS.keys():
+                            if u.replace(" ", "").lower() in flat:
                                 unit_raw = u
                                 break
 
                     if unit_raw:
                         unit_formatted = format_name(unit_raw)
-                        count = 2 if unit_formatted.lower() == "phoenix" else 1
+                        unit_lower = unit_formatted.lower()
+                        count = HALLUCINATED_TYPE_COUNTS.get(unit_formatted, 1)
+
                         for _ in range(count):
                             pending_hallucinations.append({
                                 "type": unit_formatted,
                                 "frame": event.frame,
                                 "pid": event.pid,
+                                "expiry": event.frame + HALLUCINATION_WINDOW_FRAMES
                             })
-
-
 
             # ------ capture live supply snapshot -------------------
             if isinstance(event, sc2reader.events.tracker.PlayerStatsEvent) and event.pid == player.pid:
@@ -639,12 +646,40 @@ def upload():
                 break
 
 
+            # ---- AbilityEvent for warp-ins ------------------------------------
+            if isinstance(event, ABILITY_EVENTS):
+                ability_name = getattr(event, "ability_name", "")
+                if not ability_name:
+                    continue
 
+                # Only handle Protoss warp-ins
+                if "Warp" in ability_name and ("Zealot" in ability_name or "Stalker" in ability_name or "Sentry" in ability_name or "Adept" in ability_name or "Dark Templar" in ability_name or "High Templar" in ability_name):
+                    name = format_name(ability_name)
+                    name = tidy(name)
+                    if name is None:
+                        continue
+
+                    # ✅ Normalize warp-in names
+                    name = base_unit_name(name)
+
+                    # Snapshot supply at the moment the player clicked warp-in
+                    ingame_sec = frame_to_ingame_seconds(event.frame, replay)
+                    used_s = supply_at_frame(player.pid, event.frame)
+
+                    entries.append({
+                        'clock_sec': int(ingame_sec),
+                        'supply': used_s,
+                        'made': 0,
+                        'unit': name,
+                        'kind': 'start',
+                        'source': 'warp-in'  # new!
+                    })
 
             # ---- UnitBornEvent ------------------------------------
             if isinstance(event, sc2reader.events.tracker.UnitBornEvent):
                 if getattr(event, "control_pid", None) != player.pid:
                     continue
+
                 unit = event.unit
                 if getattr(unit, "is_building", False):
                     continue
@@ -652,36 +687,37 @@ def upload():
                     continue
 
                 name = format_name(event.unit_type_name)
-
-                # Robust fallback: match known pending illusions
-                unit_type_name = format_name(event.unit_type_name)
-                base_type_name = re.sub(r'^Hallucinated\s+', '', unit_type_name, flags=re.I)
+                base_type_name = re.sub(r'^Hallucinated\s+', '', name, flags=re.I)
 
                 hallucinated = getattr(event.unit, "is_hallucination", False)
+                slot_match_found = False
 
+                # ✅ Slot match for illusions
                 if not hallucinated:
                     for pending in pending_hallucinations:
                         frame_diff = event.frame - pending["frame"]
                         if (
-                        frame_diff >= 0 and frame_diff <= HALLUCINATION_WINDOW_FRAMES
+                            frame_diff >= 0 and frame_diff <= HALLUCINATION_WINDOW_FRAMES
                             and event.control_pid == pending["pid"]
                             and base_type_name.lower() == pending["type"].lower()
                         ):
                             hallucinated = True
+                            slot_match_found = True
                             pending_hallucinations.remove(pending)
                             break
 
-                if (
-                    not hallucinated
-                    and base_type_name in HALLUCINATED_TYPES
-                    and supply_at_frame(event.control_pid, event.frame - 1)
-                    == supply_after_frame(event.control_pid, event.frame)
-                ):
-                    hallucinated = True
+                # ✅ Fallback: Phoenix / Oracle only + Stargate logic
+                if not hallucinated and base_type_name in {"Phoenix", "Oracle"}:
+                    prev_supply = supply_at_frame(event.control_pid, event.frame - 32)
+                    next_supply = supply_after_frame(event.control_pid, event.frame + 32)
+                    print(f"Unit: {name}, Frame: {event.frame}, Prev: {prev_supply}, Next: {next_supply}")
+
+                    if prev_supply == next_supply or not has_stargate:
+                        hallucinated = True
 
                 if hallucinated:
                     event.unit.is_hallucination = True
-                    continue
+                    name += " (hallucination)"
 
                 name = tidy(name)
                 if name is None:
@@ -697,38 +733,71 @@ def upload():
                 ):
                     continue
 
-                build_time = BUILD_TIME.get(event.unit_type_name, 0)
-                start_real = event.second - build_time
+                # ✅ Normal supply logic
+                unit_name_lower = name.lower()
+                if unit_name_lower in ["probe", "drone", "scv"]:
+                    start_frame = event.frame
+                    start_ingame_sec = frame_to_ingame_seconds(start_frame, replay) - 12
+                    used_s = supply_at_frame(player.pid, start_frame) - 1
 
-                start_in_game = start_real / speed_factor
-                end_in_game = event.second / speed_factor
+                elif unit_name_lower in [
+                    "zealot", "stalker", "sentry", "adept", "dark templar", "high templar"
+                ]:
+                    fallback_ok = True
+                    born_ingame_sec = frame_to_ingame_seconds(event.frame, replay)
+                    for e in entries:
+                        if (
+                            e['unit'] == name
+                            and abs(e['clock_sec'] - int(born_ingame_sec)) <= 1
+                            and e.get('source') == 'warp-in'
+                        ):
+                            fallback_ok = False
+                            break
 
-                start_frame = int(start_in_game * replay.game_fps * speed_factor)
-                idx = bisect.bisect_right(frames_by_pid[player.pid], start_frame) - 1
+                    if fallback_ok:
+                        build_time = BUILD_TIME.get(event.unit_type_name, 0)
+                        fps = replay.game_fps
+                        born_frame = event.frame
+                        build_frames = int(build_time * fps)
+                        start_frame = max(born_frame - build_frames, 0)
 
-                if idx >= 0 and (start_frame - frames_by_pid[player.pid][idx]) <= 4:
-                    used_s = supply_by_pid[player.pid][idx]
-                    made_s = 0
+                        start_ingame_sec = frame_to_ingame_seconds(start_frame, replay) - 6
+                        used_s = supply_at_frame(player.pid, start_frame)
+
+                        if unit_name_lower in [
+                            "sentry", "stalker", "adept", "dark templar", "high templar"
+                        ]:
+                            used_s -= 2
+                        elif unit_name_lower == "zealot":
+                            used_s -= 1
+                    else:
+                        continue
+
                 else:
-                    real_sec = start_in_game * speed_factor
-                    used_s, made_s = get_supply(real_sec)
+                    build_time = BUILD_TIME.get(event.unit_type_name, 0)
+                    if build_time == 0:
+                        continue
+
+                    fps = replay.game_fps
+                    born_frame = event.frame
+                    build_frames = int(build_time * fps)
+                    start_frame = max(born_frame - build_frames, 0)
+                    start_ingame_sec = frame_to_ingame_seconds(start_frame, replay)
+                    used_s = supply_at_frame(player.pid, start_frame)
 
                 entries.append({
-                    'clock_sec': int(start_in_game),
+                    'clock_sec': int(start_ingame_sec),
                     'supply': used_s,
-                    'made': made_s,
+                    'made': 0,
                     'unit': name,
                     'kind': 'start'
                 })
-                used_f, made_f = get_supply(event.second)
-                entries.append({
-                    'clock_sec': int(end_in_game),
-                    'supply': used_f,
-                    'made': made_f,
-                    'unit': name,
-                    'kind': 'finish'
-                })
                 continue
+
+
+
+
+
 
 
 
@@ -740,40 +809,37 @@ def upload():
                     continue
 
                 unit = event.unit
+                name = format_name(event.unit_type_name)
+
+                # ✅ Track if a Stargate has been built
+                if "stargate" in name.lower():
+                    has_stargate = True
+
+                # --- skip workers & illusions for buildings ---
                 if not getattr(unit, "is_building", False) and exclude_units:
                     continue
 
-                name = format_name(event.unit_type_name)
-
-                # Robust fallback: match known pending illusions
                 unit_type_name = format_name(event.unit_type_name)
                 base_type_name = re.sub(r'^Hallucinated\s+', '', unit_type_name, flags=re.I)
 
                 hallucinated = getattr(event.unit, "is_hallucination", False)
+                pending_hallucinations = [p for p in pending_hallucinations if p["expiry"] >= event.frame]
 
+                unit_lower = base_type_name.lower()
+
+                # ✅ Slot match for illusions
                 if not hallucinated:
                     for pending in pending_hallucinations:
-                        frame_diff = event.frame - pending["frame"]
-                        if (
-                        frame_diff >= 0 and frame_diff <= HALLUCINATION_WINDOW_FRAMES
-                            and event.control_pid == pending["pid"]
-                            and base_type_name.lower() == pending["type"].lower()
-                        ):
+                        if pending["type"].lower() == unit_lower:
                             hallucinated = True
                             pending_hallucinations.remove(pending)
                             break
 
-                if (
-                    not hallucinated
-                    and base_type_name in HALLUCINATED_TYPES
-                    and supply_at_frame(event.control_pid, event.frame - 1)
-                    == supply_after_frame(event.control_pid, event.frame)
-                ):
-                    hallucinated = True
+                # ✅ Fallback (buildings rarely hallucinated — safe to skip fallback)
 
                 if hallucinated:
                     event.unit.is_hallucination = True
-                    continue
+                    name += " (hallucination)"
 
                 name = tidy(name)
                 if name is None:
@@ -789,15 +855,22 @@ def upload():
                 ):
                     continue
 
+                # ✅ Frame-based structure start
+                init_frame = event.frame
+                init_ingame_sec = frame_to_ingame_seconds(init_frame, replay)
+                supply_at_start = supply_at_frame(player.pid, init_frame)
+
                 init_map[event.unit_id] = name
+
                 entries.append({
-                    'clock_sec': int(event.second / speed_factor),
-                    'supply': current_used if have_stats else get_supply(event.second)[0],
-                    'made': current_made if have_stats else get_supply(event.second)[1],
+                    'clock_sec': int(init_ingame_sec),
+                    'supply': supply_at_start,
+                    'made': 0,
                     'unit': name,
                     'kind': 'start'
                 })
                 continue
+
 
 
             # ---- UnitDoneEvent ------------------------------------
