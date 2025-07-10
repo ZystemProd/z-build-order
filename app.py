@@ -588,11 +588,33 @@ def upload():
         last_hallucination_frame = -9999
         last_hallucination_pid = None
         pending_hallucinations = []
+        roach_deaths = []  # (frame, supply, unit_id)
 
         # ---- iterate event stream --------------------------------
         for event in replay.events:
             if event.second == 0:
                 continue
+
+            # 🔍 Test all UnitTypeChangeEvents
+            if isinstance(event, sc2reader.events.tracker.UnitTypeChangeEvent):
+                print(f"🟢 Seen UnitTypeChangeEvent: {event}")
+                if getattr(event, "unit", None):
+                    print(f"   unit={event.unit}")
+                    print(f"   type_history={getattr(event.unit, 'type_history', None)}")
+
+            # ---- UnitDiedEvent: fallback for Roach → Ravager morph ----
+            if isinstance(event, sc2reader.events.tracker.UnitDiedEvent):
+                if getattr(event.unit, "owner", None) and event.unit.owner.pid == player.pid:
+                    unit_name = format_name(event.unit.name)
+                    if unit_name.lower() == "roach":
+                        roach_deaths.append((
+                            event.frame,
+                            supply_at_frame(player.pid, event.frame),
+                            event.unit_id
+                        ))
+                        print(f"🐛 Fallback: Tracked Roach death at frame {event.frame}")
+
+
 
             
             # ---- AbilityEvent or CommandEvent (safe for all versions) ----
@@ -792,6 +814,26 @@ def upload():
                     'unit': name,
                     'kind': 'start'
                 })
+                # ✅ Fallback: match Ravager Cocoon births to Roach deaths
+                if isinstance(event, sc2reader.events.tracker.UnitBornEvent):
+                    if getattr(event, "control_pid", None) == player.pid:
+                        unit_name = format_name(event.unit_type_name)
+                        if unit_name.lower() == "ravager cocoon":
+                            cocoon_frame = event.frame
+                            for death_frame, death_supply, unit_id in roach_deaths:
+                                if abs(cocoon_frame - death_frame) <= 280:  # ~2 sec window
+                                    morph_supply = supply_at_frame(player.pid, cocoon_frame)
+                                    entries.append({
+                                        'clock_sec': int(frame_to_ingame_seconds(cocoon_frame, replay)),
+                                        'supply': morph_supply + 0.01,
+                                        'made': 0,
+                                        'unit': 'MORPH: Roach → Ravager',
+                                        'kind': 'start',
+                                    })
+                                    print(f"✅ Fallback: Matched Roach death → Cocoon at frame {cocoon_frame}")
+                                    roach_deaths.remove((death_frame, death_supply, unit_id))
+                                    break
+
                 continue
 
 
@@ -879,7 +921,7 @@ def upload():
                 and getattr(event, "pid", None) == player.pid
             ):
                 old_type = None
-                if getattr(event, "unit", None) is not None:
+                if getattr(event, "unit", None):
                     history = [
                         (f, t)
                         for f, t in event.unit.type_history.items()
@@ -888,15 +930,33 @@ def upload():
                     if history:
                         old_type = history[-1][1].name
 
-                if old_type == "Roach" and event.unit_type_name == "Ravager":
+                print(f"Checking morph: old_type={old_type}, new_type={event.unit_type_name}")
+
+                # 🟢 Only match Roach → RavagerCocoon
+                if old_type == "Roach" and "RavagerCocoon" in event.unit_type_name:
+                    before_supply = supply_at_frame(player.pid, event.frame)
+                    after_supply = supply_after_frame(player.pid, event.frame)
+                    print(f"Supply before: {before_supply} | after: {after_supply}")
+
+                    # Cocoon replaces Roach: Roach (-2), Cocoon (+3) → net +1
+                    morph_supply = max(before_supply, after_supply)
+                    if after_supply <= before_supply:
+                        morph_supply = before_supply + 1
+
                     entries.append({
                         "clock_sec": int(frame_to_ingame_seconds(event.frame, replay)),
-                        "supply": supply_at_frame(player.pid, event.frame),
+                        "supply": morph_supply + 0.01,  # offset to prevent merge
                         "made": 0,
-                        "unit": "Roach morphs to Ravager",
+                        "unit": "MORPH: Roach → Ravager",
                         "kind": "start",
                     })
+                    print(f"✅ Added Roach morph with supply {morph_supply + 0.01}")
                 continue
+
+
+
+
+
 
             # ---- UnitDoneEvent ------------------------------------
             if isinstance(event, sc2reader.events.tracker.UnitDoneEvent):
