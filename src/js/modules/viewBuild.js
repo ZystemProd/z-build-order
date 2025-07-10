@@ -673,20 +673,34 @@ document.addEventListener("DOMContentLoaded", async () => {
       importBtn.style.display = "none";
 
       const pathParts = window.location.pathname.split("/");
-      const buildId = pathParts[2]; // because URL is /build/abc123
-      if (!buildId) return;
+      let maybeTitleOrId = decodeURIComponent(pathParts[2]);
 
-      const buildRef = doc(db, "publishedBuilds", buildId);
+      if (!maybeTitleOrId) return;
+
+      let publishedId = maybeTitleOrId;
+
+      // 🟢 Fallback for title URL
+      if (publishedId.length < 15 || publishedId.includes(" ")) {
+        const publishedRef = collection(db, "publishedBuilds");
+        const q = query(publishedRef, where("title", "==", publishedId));
+        const snapshot = await getDocs(q);
+
+        if (snapshot.empty) return;
+
+        publishedId = snapshot.docs[0].id;
+      }
+
+      const buildRef = doc(db, "publishedBuilds", publishedId);
       const buildSnap = await getDoc(buildRef);
       if (!buildSnap.exists()) return;
 
-      const buildData = buildSnap.data();
-      const encodedTitle = buildData.title.replace(/\//g, "__SLASH__");
-      const userBuildsRef = collection(db, `users/${user.uid}/builds`);
-      const q = query(userBuildsRef, where("encodedTitle", "==", encodedTitle));
-      const existingSnap = await getDocs(q);
+      const userBuildDocRef = doc(
+        db,
+        `users/${user.uid}/builds/${publishedId}`
+      );
+      const userBuildSnap = await getDoc(userBuildDocRef);
 
-      if (!existingSnap.empty) {
+      if (userBuildSnap.exists()) {
         importBtn.disabled = true;
         importBtn.textContent = "Imported";
         importBtn.classList.add("imported");
@@ -694,8 +708,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         importBtn.disabled = false;
         importBtn.textContent = "Import";
       }
-
-      // ✅ Show the button only after the above logic
       importBtn.style.display = "inline-block";
     });
   } else {
@@ -741,7 +753,10 @@ function injectSchemaMarkup(build) {
       }
     }
   } catch (err) {
-    console.warn("Failed to parse datePublished for schema:", build.datePublished);
+    console.warn(
+      "Failed to parse datePublished for schema:",
+      build.datePublished
+    );
   }
 
   const schema = {

@@ -1,11 +1,10 @@
 import { auth, db } from "../../../app.js";
 import { safeAdd } from "../helpers/sharedEventUtils.js";
 import { initializeSectionToggles } from "../uiHandlers.js";
-// Import Firestore methods from local Firebase SDK
 import {
   doc,
   getDoc,
-  addDoc,
+  setDoc,
   getDocs,
   collection,
   query,
@@ -23,50 +22,73 @@ export function initializeViewBuildPage() {
 
 async function importBuildHandler() {
   const pathParts = window.location.pathname.split("/");
-  const buildId = pathParts[2]; // because URL is /build/abc123
+  let maybeTitleOrId = decodeURIComponent(pathParts[2]);
 
-  if (!buildId) {
-    alert("Build ID not found.");
+  if (!maybeTitleOrId) {
+    alert("❌ Build ID or title not found in URL.");
     return;
   }
 
   if (!auth.currentUser) {
-    alert("Please sign in first to import builds.");
+    alert("⚠️ Please sign in first to import builds.");
     return;
   }
 
   const userId = auth.currentUser.uid;
-  const communityBuildRef = doc(db, "publishedBuilds", buildId);
-  const userBuildsRef = collection(db, `users/${userId}/builds`);
 
-  try {
-    const buildDoc = await getDoc(communityBuildRef);
-    if (!buildDoc.exists()) {
-      alert("Build not found.");
+  // 🔑 Assume it is an ID, unless it's obviously not
+  let publishedId = maybeTitleOrId;
+
+  // ✅ If it looks like a title or slug, resolve to real published Firestore ID
+  if (publishedId.length < 15 || publishedId.includes(" ")) {
+    const publishedRef = collection(db, "publishedBuilds");
+    const q = query(publishedRef, where("title", "==", publishedId));
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) {
+      alert("❌ Build not found in published builds.");
       return;
     }
 
-    const buildData = buildDoc.data();
-    const encodedTitle = buildData.title.replace(/\//g, "__SLASH__");
-    const q = query(userBuildsRef, where("encodedTitle", "==", encodedTitle));
-    const existingSnap = await getDocs(q);
+    publishedId = snapshot.docs[0].id; // ✅ This is the real unique ID
+  }
 
-    if (!existingSnap.empty) {
+  // 🔑 Use the REAL ID when saving to user's builds
+  const userBuildDocRef = doc(db, `users/${userId}/builds/${publishedId}`);
+
+  try {
+    const communityBuildRef = doc(db, "publishedBuilds", publishedId);
+    const buildDoc = await getDoc(communityBuildRef);
+
+    if (!buildDoc.exists()) {
+      alert("❌ Build not found in published builds.");
+      return;
+    }
+
+    const userBuildDoc = await getDoc(userBuildDocRef);
+    if (userBuildDoc.exists()) {
       alert("⚠️ This build is already in your library.");
       return;
     }
 
-    const docRef = await addDoc(userBuildsRef, {
+    const buildData = buildDoc.data();
+
+    await setDoc(userBuildDocRef, {
       ...buildData,
       publisher: buildData.username || buildData.publisher || "Unknown",
       imported: true,
+      encodedTitle: publishedId, // optional — your real unique ID
+      datePublished: buildData.datePublished?.toMillis?.() || Date.now(),
       timestamp: Date.now(),
     });
 
     logAnalyticsEvent("build_imported", { source: "community" });
 
-    document.getElementById("importBuildButton").disabled = true;
-    document.getElementById("importBuildButton").textContent = "Imported";
+    const importBtn = document.getElementById("importBuildButton");
+    if (importBtn) {
+      importBtn.disabled = true;
+      importBtn.textContent = "Imported";
+    }
 
     alert("✅ Build imported successfully!");
   } catch (error) {
