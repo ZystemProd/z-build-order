@@ -488,7 +488,7 @@ async function loadBuild() {
     document.getElementById("buildTitle").innerText = "Build not found.";
   }
 
-  // ✅ Setup voting system (inject data-id and update icons)
+  // ✅ Setup voting buttons (unchanged)
   const votingButtons = document.querySelectorAll(".vote-button");
   votingButtons.forEach((btn) => {
     btn.setAttribute("data-id", buildId);
@@ -503,8 +503,10 @@ async function loadBuild() {
     });
   });
 
-  // ✅ Initial icon + count state after buttons are ready
-  updateVoteButtonIcons(buildId);
+  // ✅ Wait for auth state to initialize THEN show correct vote state
+  auth.onAuthStateChanged(() => {
+    updateVoteButtonIcons(buildId);
+  });
 }
 
 async function handleVote(buildId, voteType) {
@@ -747,7 +749,10 @@ function injectSchemaMarkup(build) {
       }
     }
   } catch (err) {
-    console.warn("Failed to parse datePublished for schema:", build.datePublished);
+    console.warn(
+      "Failed to parse datePublished for schema:",
+      build.datePublished
+    );
   }
 
   const schema = {
