@@ -722,12 +722,10 @@ export async function initializeIndexPage() {
     btn.innerText = "Parse Replay";
   });
 
-  // Reparse last replay: reopen options modal
-  safeAdd("reparseLastReplayButton", "click", async () => {
+  // Reparse last replay: quickly reopen options modal
+  safeAdd("reparseLastReplayButton", "click", () => {
     if (window.lastReplayFile) {
       selectedReplayFile = window.lastReplayFile;
-      await populateReplayOptions(window.lastReplayFile);
-      updateChronoWarning();
       const modal = document.getElementById("replayOptionsModal");
       if (modal) modal.style.display = "block";
     } else {
