@@ -722,10 +722,14 @@ export async function initializeIndexPage() {
     btn.innerText = "Parse Replay";
   });
 
-  // Reparse last uploaded replay if available
-  safeAdd("reparseLastReplayButton", "click", () => {
+  // Reparse last replay: reopen options modal
+  safeAdd("reparseLastReplayButton", "click", async () => {
     if (window.lastReplayFile) {
-      handleReplayUpload(window.lastReplayFile);
+      selectedReplayFile = window.lastReplayFile;
+      await populateReplayOptions(window.lastReplayFile);
+      updateChronoWarning();
+      const modal = document.getElementById("replayOptionsModal");
+      if (modal) modal.style.display = "block";
     } else {
       alert("No replay file saved yet.");
     }
