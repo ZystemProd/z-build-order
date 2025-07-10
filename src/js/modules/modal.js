@@ -90,7 +90,6 @@ export async function setBuildViewMode(mode) {
   }
 }
 
-
 export function formatMatchup(matchup) {
   if (!matchup) return "Unknown Match-Up";
   return (
@@ -101,6 +100,7 @@ export function formatMatchup(matchup) {
 }
 
 export function formatShortDate(dateValue) {
+  if (dateValue?.toMillis) dateValue = dateValue.toMillis();
   const d = new Date(dateValue);
   if (isNaN(d)) return "";
   const day = d.getDate();
@@ -231,18 +231,38 @@ export async function deleteBuildFromFirestore(buildId) {
   }
 
   try {
+    // ✅ Always remove your user copy
     const buildRef = doc(db, `users/${user.uid}/builds/${buildId}`);
     await deleteDoc(buildRef);
-    // Also remove from published builds to ensure it disappears
-    // from community and clan sections if it was previously shared
-    const publishedRef = doc(db, "publishedBuilds", buildId);
-    await deleteDoc(publishedRef);
-    showToast("Build deleted successfully!", "success");
+    console.log(`✅ User build deleted: ${buildId}`);
 
-    // Refresh the build list
+    // ✅ Try to remove from published builds only if you own it
+    const publishedRef = doc(db, "publishedBuilds", buildId);
+    const publishedSnap = await getDoc(publishedRef);
+
+    if (publishedSnap.exists()) {
+      const pubData = publishedSnap.data();
+      if (pubData.publisherId === user.uid) {
+        try {
+          await deleteDoc(publishedRef);
+          console.log(`✅ Also deleted from publishedBuilds: ${buildId}`);
+        } catch (err) {
+          console.warn(
+            `⚠️ Failed to delete from publishedBuilds (but user copy is gone):`,
+            err
+          );
+        }
+      } else {
+        console.log(
+          `ℹ️ Not the publisher (${pubData.publisherId}), skipping published delete`
+        );
+      }
+    }
+
+    showToast("Build deleted successfully!", "success");
     populateBuildList();
   } catch (error) {
-    console.error("Error deleting build:", error);
+    console.error("Error deleting user build:", error);
     showToast("Failed to delete the build. Please try again.", "error");
   }
 }
@@ -785,7 +805,9 @@ export async function populateBuildList(
         <h3 class="build-title">${DOMPurify.sanitize(build.title)}</h3>
         <div class="build-meta">
           <p>Publisher: ${DOMPurify.sanitize(build.publisher || "You")}</p>
-          <p>Date: ${formatShortDate(build.datePublished || build.timestamp)}</p>
+          <p>Date: ${formatShortDate(
+            build.datePublished || build.timestamp
+          )}</p>
         </div>
         <div class="build-publish-info"></div>
       `;
@@ -869,9 +891,15 @@ export async function populateBuildList(
         deleteButton.addEventListener("click", async (event) => {
           event.stopPropagation();
           if (!confirm(`Delete "${build.title}"?`)) return;
+
+          // ✅ Make sure you use the encoded ID!
+          const encodedId =
+            build.encodedTitle || build.id.replace(/\//g, "__SLASH__");
           await deleteBuildFromFirestore(build.id);
+
           const updatedBuilds = await fetchUserBuilds();
           setSavedBuilds(updatedBuilds);
+
           const activeFilter =
             document.querySelector("#buildsModal .filter-category.active")
               ?.dataset.category ||
@@ -879,8 +907,9 @@ export async function populateBuildList(
               .subcategory ||
             "all";
           filterBuilds(activeFilter);
+
           const preview = document.getElementById("buildPreview");
-          if (preview?.dataset.buildId === build.id) {
+          if (preview?.dataset.buildId === encodedId) {
             preview.innerHTML = `<h4>Build Preview</h4><p>Select a build to view details here.</p>`;
             delete preview.dataset.buildId;
           }

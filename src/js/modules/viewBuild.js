@@ -482,15 +482,13 @@ async function loadBuild() {
       }
     }
     injectSchemaMarkup(build);
-    // ✅ Initial icon + count state
-    updateVoteButtonIcons(buildId);
     injectMetaTags(buildId, build);
   } else {
     console.error("❌ Build not found in Firestore:", buildId);
     document.getElementById("buildTitle").innerText = "Build not found.";
   }
 
-  // ✅ Setup voting system (inject data-id and update icons)
+  // ✅ Setup voting buttons (unchanged)
   const votingButtons = document.querySelectorAll(".vote-button");
   votingButtons.forEach((btn) => {
     btn.setAttribute("data-id", buildId);
@@ -503,6 +501,11 @@ async function loadBuild() {
         console.error("❌ Vote error:", err);
       }
     });
+  });
+
+  // ✅ Wait for auth state to initialize THEN show correct vote state
+  auth.onAuthStateChanged(() => {
+    updateVoteButtonIcons(buildId);
   });
 }
 
@@ -573,11 +576,9 @@ function updateVoteButtonIcons(buildId) {
 
   getDoc(doc(db, "publishedBuilds", buildId)).then((buildDoc) => {
     if (buildDoc.exists()) {
-      const user = auth.currentUser;
-      if (!user) return;
-
       const buildData = buildDoc.data();
-      const userVote = buildData.userVotes?.[user.uid];
+      const user = auth.currentUser;
+      const userVote = user ? buildData.userVotes?.[user.uid] : null;
 
       // ✅ This must exist to update the percentage & vote count
       updateVoteUI(
@@ -673,20 +674,36 @@ document.addEventListener("DOMContentLoaded", async () => {
       importBtn.style.display = "none";
 
       const pathParts = window.location.pathname.split("/");
-      const buildId = pathParts[2]; // because URL is /build/abc123
-      if (!buildId) return;
+      let maybeTitleOrId = decodeURIComponent(pathParts[2]);
 
-      const buildRef = doc(db, "publishedBuilds", buildId);
+      if (!maybeTitleOrId) return;
+
+      let publishedId = maybeTitleOrId;
+
+      // 🟢 Fallback for title URL
+      if (publishedId.length < 15 || publishedId.includes(" ")) {
+        const publishedRef = collection(db, "publishedBuilds");
+        const q = query(publishedRef, where("title", "==", publishedId));
+        const snapshot = await getDocs(q);
+
+        if (snapshot.empty) return;
+
+        publishedId = snapshot.docs[0].id;
+      }
+
+      const buildRef = doc(db, "publishedBuilds", publishedId);
       const buildSnap = await getDoc(buildRef);
       if (!buildSnap.exists()) return;
 
-      const buildData = buildSnap.data();
-      const encodedTitle = buildData.title.replace(/\//g, "__SLASH__");
-      const userBuildsRef = collection(db, "users", user.uid, "builds");
-      const q = query(userBuildsRef, where("encodedTitle", "==", encodedTitle));
-      const existingSnap = await getDocs(q);
 
-      if (!existingSnap.empty) {
+      const userBuildDocRef = doc(
+        db,
+        `users/${user.uid}/builds/${publishedId}`
+      );
+      const userBuildSnap = await getDoc(userBuildDocRef);
+
+
+      if (userBuildSnap.exists()) {
         importBtn.disabled = true;
         importBtn.textContent = "Imported";
         importBtn.classList.add("imported");
@@ -694,8 +711,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         importBtn.disabled = false;
         importBtn.textContent = "Import";
       }
-
-      // ✅ Show the button only after the above logic
       importBtn.style.display = "inline-block";
     });
   } else {
@@ -704,6 +719,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ✅ Load build data after DOM ready
   await loadBuild();
+
+  // Update vote UI when auth state changes (e.g., after sign-in)
+  auth.onAuthStateChanged(() => {
+    const pathParts = window.location.pathname.split("/");
+    const buildId = pathParts[2];
+    if (buildId) updateVoteButtonIcons(buildId);
+  });
 
   // ✅ Initialize MapAnnotations readonly
   const mapContainer = document.getElementById("map-preview-image");
@@ -741,7 +763,10 @@ function injectSchemaMarkup(build) {
       }
     }
   } catch (err) {
-    console.warn("Failed to parse datePublished for schema:", build.datePublished);
+    console.warn(
+      "Failed to parse datePublished for schema:",
+      build.datePublished
+    );
   }
 
   const schema = {
