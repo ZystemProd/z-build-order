@@ -482,8 +482,6 @@ async function loadBuild() {
       }
     }
     injectSchemaMarkup(build);
-    // ✅ Initial icon + count state
-    updateVoteButtonIcons(buildId);
     injectMetaTags(buildId, build);
   } else {
     console.error("❌ Build not found in Firestore:", buildId);
@@ -504,6 +502,9 @@ async function loadBuild() {
       }
     });
   });
+
+  // ✅ Initial icon + count state after buttons are ready
+  updateVoteButtonIcons(buildId);
 }
 
 async function handleVote(buildId, voteType) {
