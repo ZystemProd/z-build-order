@@ -482,15 +482,13 @@ async function loadBuild() {
       }
     }
     injectSchemaMarkup(build);
-    // ✅ Initial icon + count state
-    updateVoteButtonIcons(buildId);
     injectMetaTags(buildId, build);
   } else {
     console.error("❌ Build not found in Firestore:", buildId);
     document.getElementById("buildTitle").innerText = "Build not found.";
   }
 
-  // ✅ Setup voting system (inject data-id and update icons)
+  // ✅ Setup voting buttons (unchanged)
   const votingButtons = document.querySelectorAll(".vote-button");
   votingButtons.forEach((btn) => {
     btn.setAttribute("data-id", buildId);
@@ -503,6 +501,11 @@ async function loadBuild() {
         console.error("❌ Vote error:", err);
       }
     });
+  });
+
+  // ✅ Wait for auth state to initialize THEN show correct vote state
+  auth.onAuthStateChanged(() => {
+    updateVoteButtonIcons(buildId);
   });
 }
 
@@ -573,11 +576,9 @@ function updateVoteButtonIcons(buildId) {
 
   getDoc(doc(db, "publishedBuilds", buildId)).then((buildDoc) => {
     if (buildDoc.exists()) {
-      const user = auth.currentUser;
-      if (!user) return;
-
       const buildData = buildDoc.data();
-      const userVote = buildData.userVotes?.[user.uid];
+      const user = auth.currentUser;
+      const userVote = user ? buildData.userVotes?.[user.uid] : null;
 
       // ✅ This must exist to update the percentage & vote count
       updateVoteUI(
@@ -716,6 +717,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ✅ Load build data after DOM ready
   await loadBuild();
+
+  // Update vote UI when auth state changes (e.g., after sign-in)
+  auth.onAuthStateChanged(() => {
+    const pathParts = window.location.pathname.split("/");
+    const buildId = pathParts[2];
+    if (buildId) updateVoteButtonIcons(buildId);
+  });
 
   // ✅ Initialize MapAnnotations readonly
   const mapContainer = document.getElementById("map-preview-image");
