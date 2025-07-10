@@ -573,11 +573,9 @@ function updateVoteButtonIcons(buildId) {
 
   getDoc(doc(db, "publishedBuilds", buildId)).then((buildDoc) => {
     if (buildDoc.exists()) {
-      const user = auth.currentUser;
-      if (!user) return;
-
       const buildData = buildDoc.data();
-      const userVote = buildData.userVotes?.[user.uid];
+      const user = auth.currentUser;
+      const userVote = user ? buildData.userVotes?.[user.uid] : null;
 
       // ✅ This must exist to update the percentage & vote count
       updateVoteUI(
@@ -704,6 +702,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ✅ Load build data after DOM ready
   await loadBuild();
+
+  // Update vote UI when auth state changes (e.g., after sign-in)
+  auth.onAuthStateChanged(() => {
+    const pathParts = window.location.pathname.split("/");
+    const buildId = pathParts[2];
+    if (buildId) updateVoteButtonIcons(buildId);
+  });
 
   // ✅ Initialize MapAnnotations readonly
   const mapContainer = document.getElementById("map-preview-image");
