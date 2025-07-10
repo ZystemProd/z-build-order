@@ -477,6 +477,13 @@ export function showBuildOrderHelpModal() {
     `,
     },
     {
+      id: "base-indicator",
+      title: "Base Production Indicator",
+      input: "queen (b1)",
+      description:
+        "Append <code>(b1)</code>, <code>(b2)</code>, and so on after a unit or structure to mark the base where it is produced.",
+    },
+    {
       id: "quick-typing",
       title: "Quick Typing",
       image: "./img/info/quick_typing.webp",
