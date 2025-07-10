@@ -873,6 +873,31 @@ def upload():
 
 
 
+            # ---- UnitTypeChangeEvent ------------------------------------
+            if (
+                isinstance(event, sc2reader.events.tracker.UnitTypeChangeEvent)
+                and getattr(event, "pid", None) == player.pid
+            ):
+                old_type = None
+                if getattr(event, "unit", None) is not None:
+                    history = [
+                        (f, t)
+                        for f, t in event.unit.type_history.items()
+                        if f < event.frame
+                    ]
+                    if history:
+                        old_type = history[-1][1].name
+
+                if old_type == "Roach" and event.unit_type_name == "Ravager":
+                    entries.append({
+                        "clock_sec": int(frame_to_ingame_seconds(event.frame, replay)),
+                        "supply": supply_at_frame(player.pid, event.frame),
+                        "made": 0,
+                        "unit": "Roach morphs to Ravager",
+                        "kind": "start",
+                    })
+                continue
+
             # ---- UnitDoneEvent ------------------------------------
             if isinstance(event, sc2reader.events.tracker.UnitDoneEvent):
                 if event.unit_id in init_map:
