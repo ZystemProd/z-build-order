@@ -1,6 +1,7 @@
 import { auth, db } from "../../../app.js";
 import { safeAdd } from "../helpers/sharedEventUtils.js";
 import { initializeSectionToggles } from "../uiHandlers.js";
+import { showToast } from "../toastHandler.js";
 // Import Firestore methods from local Firebase SDK
 import {
   doc,
@@ -26,12 +27,12 @@ async function importBuildHandler() {
   const buildId = pathParts[2]; // because URL is /build/abc123
 
   if (!buildId) {
-    alert("Build ID not found.");
+    showToast("Build ID not found.", "error");
     return;
   }
 
   if (!auth.currentUser) {
-    alert("Please sign in first to import builds.");
+    showToast("Please sign in first to import builds.", "error");
     return;
   }
 
@@ -42,7 +43,7 @@ async function importBuildHandler() {
   try {
     const buildDoc = await getDoc(communityBuildRef);
     if (!buildDoc.exists()) {
-      alert("Build not found.");
+      showToast("Build not found.", "error");
       return;
     }
 
@@ -52,7 +53,7 @@ async function importBuildHandler() {
     const existingSnap = await getDocs(q);
 
     if (!existingSnap.empty) {
-      alert("⚠️ This build is already in your library.");
+      showToast("⚠️ This build is already in your library.", "warning");
       return;
     }
 
@@ -68,10 +69,10 @@ async function importBuildHandler() {
     document.getElementById("importBuildButton").disabled = true;
     document.getElementById("importBuildButton").textContent = "Imported";
 
-    alert("✅ Build imported successfully!");
+    showToast("✅ Build imported successfully!", "success");
   } catch (error) {
     console.error(error);
-    alert("❌ Failed to import build.");
+    showToast("❌ Failed to import build.", "error");
     logAnalyticsEvent("build_import_failed", { reason: error.message });
   }
 }
