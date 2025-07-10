@@ -682,7 +682,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       const buildData = buildSnap.data();
       const encodedTitle = buildData.title.replace(/\//g, "__SLASH__");
-      const userBuildsRef = collection(db, `users/${user.uid}/builds`);
+      const userBuildsRef = collection(db, "users", user.uid, "builds");
       const q = query(userBuildsRef, where("encodedTitle", "==", encodedTitle));
       const existingSnap = await getDocs(q);
 

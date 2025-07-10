@@ -38,7 +38,7 @@ async function importBuildHandler() {
 
   const userId = auth.currentUser.uid;
   const communityBuildRef = doc(db, "publishedBuilds", buildId);
-  const userBuildsRef = collection(db, `users/${userId}/builds`);
+  const userBuildsRef = collection(db, "users", userId, "builds");
 
   try {
     const buildDoc = await getDoc(communityBuildRef);
