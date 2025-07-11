@@ -110,7 +110,7 @@ function handleBackClick(e) {
     localStorage.removeItem("communityFilterValue");
   }
 
-  window.location.href = "index.html";
+  window.location.href = "/";
 }
 
 if (backButton) {
@@ -131,9 +131,15 @@ async function incrementBuildViews(buildId) {
   }
 }
 
+function getBuildIdFromPath() {
+  const parts = window.location.pathname.split("/").filter(Boolean);
+  let id = parts[parts.length - 1] || "";
+  if (id.includes("-")) id = id.split("-").pop();
+  return decodeURIComponent(id);
+}
+
 async function loadBuild() {
-  const pathParts = window.location.pathname.split("/");
-  const buildId = pathParts[2]; // because URL is /build/abc123
+  const buildId = getBuildIdFromPath();
 
   if (!buildId) {
     document.getElementById("buildTitle").innerText = "Build not found.";
@@ -673,32 +679,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Don't show the button until we know the status
       importBtn.style.display = "none";
 
-      const pathParts = window.location.pathname.split("/");
-      let maybeTitleOrId = decodeURIComponent(pathParts[2]);
+      const buildId = getBuildIdFromPath();
+      if (!buildId) return;
 
-      if (!maybeTitleOrId) return;
-
-      let publishedId = maybeTitleOrId;
-
-      // 🟢 Fallback for title URL
-      if (publishedId.length < 15 || publishedId.includes(" ")) {
-        const publishedRef = collection(db, "publishedBuilds");
-        const q = query(publishedRef, where("title", "==", publishedId));
-        const snapshot = await getDocs(q);
-
-        if (snapshot.empty) return;
-
-        publishedId = snapshot.docs[0].id;
-      }
-
-      const buildRef = doc(db, "publishedBuilds", publishedId);
+      const buildRef = doc(db, "publishedBuilds", buildId);
       const buildSnap = await getDoc(buildRef);
       if (!buildSnap.exists()) return;
 
-      const userBuildDocRef = doc(
-        db,
-        `users/${user.uid}/builds/${publishedId}`
-      );
+      const userBuildDocRef = doc(db, `users/${user.uid}/builds/${buildId}`);
       const userBuildSnap = await getDoc(userBuildDocRef);
 
       if (userBuildSnap.exists()) {
@@ -718,10 +706,26 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ✅ Load build data after DOM ready
   await loadBuild();
 
+  // Redirect to community builds when clicking publisher name
+  document.querySelectorAll('.publisher-chip').forEach((chip) => {
+    chip.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const name =
+        document.getElementById('buildPublisher')?.innerText ||
+        document.getElementById('buildPublisherMobile')?.innerText ||
+        '';
+      if (!name) return;
+      localStorage.setItem('restoreCommunityModal', 'true');
+      localStorage.removeItem('communityFilterType');
+      localStorage.removeItem('communityFilterValue');
+      localStorage.setItem('communitySearchQuery', name);
+      window.location.href = 'index.html';
+    });
+  });
+
   // Update vote UI when auth state changes (e.g., after sign-in)
   auth.onAuthStateChanged(() => {
-    const pathParts = window.location.pathname.split("/");
-    const buildId = pathParts[2];
+    const buildId = getBuildIdFromPath();
     if (buildId) updateVoteButtonIcons(buildId);
   });
 
@@ -800,7 +804,16 @@ function injectMetaTags(buildId, build) {
   const description = `StarCraft 2 build order for ${
     build.subcategory || "Unknown"
   } matchup.`;
-  const url = `https://zbuildorder.com/build/${buildId}`;
+  const matchup = (build.subcategory || "unknown").toLowerCase();
+  const slug = build.title
+    ? build.title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)+/g, "")
+    : "untitled";
+
+  const url = `https://zbuildorder.com/build/${matchup}/${slug}/${buildId}`;
+
   const ogImage = "https://zbuildorder.com/img/og-image.webp"; // <-- You can customize this!
 
   // Update <title>
