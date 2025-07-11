@@ -706,6 +706,23 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ✅ Load build data after DOM ready
   await loadBuild();
 
+  // Redirect to community builds when clicking publisher name
+  document.querySelectorAll('.publisher-chip').forEach((chip) => {
+    chip.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const name =
+        document.getElementById('buildPublisher')?.innerText ||
+        document.getElementById('buildPublisherMobile')?.innerText ||
+        '';
+      if (!name) return;
+      localStorage.setItem('restoreCommunityModal', 'true');
+      localStorage.removeItem('communityFilterType');
+      localStorage.removeItem('communityFilterValue');
+      localStorage.setItem('communitySearchQuery', name);
+      window.location.href = 'index.html';
+    });
+  });
+
   // Update vote UI when auth state changes (e.g., after sign-in)
   auth.onAuthStateChanged(() => {
     const buildId = getBuildIdFromPath();

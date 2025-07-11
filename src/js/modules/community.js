@@ -723,10 +723,11 @@ export async function searchCommunityBuilds(searchTerm) {
 
   const now = Date.now();
 
-  const builds = snap.docs.map((doc) => {
-    const data = doc.data();
-    const upvotes = data.upvotes || 0;
-    const downvotes = data.downvotes || 0;
+  const builds = await Promise.all(
+    snap.docs.map(async (doc) => {
+      const data = doc.data();
+      const upvotes = data.upvotes || 0;
+      const downvotes = data.downvotes || 0;
 
     let datePublishedRaw = now;
     let datePublished = "Unknown";
@@ -751,26 +752,30 @@ export async function searchCommunityBuilds(searchTerm) {
       (upvotes - downvotes) / Math.pow(ageInHours + 2, gravity);
 
     const clanId = (data.sharedToClans || []).find((cid) => userClanMap[cid]);
-    const clanInfo = clanId ? userClanMap[clanId] : null;
+      const clanInfo = clanId ? userClanMap[clanId] : null;
+      const publisherClan =
+        data.publisherClan || (await getPublisherClanInfo(data.publisherId));
 
-    return {
-      id: doc.id,
-      title: data.title || "Untitled Build",
-      publisher: data.username || "Anonymous",
-      matchup: formatMatchup(
-        data.subcategoryLowercase || data.subcategory || ""
-      ),
-      category: data.category || "Unknown",
-      subcategory: data.subcategory || "Unknown",
-      datePublishedRaw,
-      datePublished,
-      views: data.views || 0,
-      upvotes,
-      downvotes,
-      hotnessScore,
-      clanInfo,
-    };
-  });
+      return {
+        id: doc.id,
+        title: data.title || "Untitled Build",
+        publisher: data.username || "Anonymous",
+        matchup: formatMatchup(
+          data.subcategoryLowercase || data.subcategory || ""
+        ),
+        category: data.category || "Unknown",
+        subcategory: data.subcategory || "Unknown",
+        datePublishedRaw,
+        datePublished,
+        views: data.views || 0,
+        upvotes,
+        downvotes,
+        hotnessScore,
+        clanInfo,
+        publisherClan,
+      };
+    })
+  );
 
   const filteredBuilds = builds.filter(
     (b) =>
