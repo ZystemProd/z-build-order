@@ -1,9 +1,9 @@
 export function setupMobileHeader() {
-  const mobileHeader = document.getElementById('mobile-header');
+  const mainHeader = document.getElementById('main-header');
   const authContainer = document.getElementById('auth-container');
   const gameSelect = document.getElementById('game-select');
 
-  if (!mobileHeader || !authContainer || !gameSelect) return;
+  if (!mainHeader || !authContainer || !gameSelect) return;
 
   const authParent = authContainer.parentNode;
   const authPlaceholder = document.createComment('auth-placeholder');
@@ -11,22 +11,22 @@ export function setupMobileHeader() {
   const gamePlaceholder = document.createComment('game-placeholder');
 
   function moveToHeader() {
-    if (!mobileHeader.contains(gameSelect)) {
+    if (!mainHeader.contains(gameSelect)) {
       gameParent.insertBefore(gamePlaceholder, gameSelect);
-      mobileHeader.appendChild(gameSelect);
+      mainHeader.appendChild(gameSelect);
     }
-    if (!mobileHeader.contains(authContainer)) {
+    if (!mainHeader.contains(authContainer)) {
       authParent.insertBefore(authPlaceholder, authContainer);
-      mobileHeader.appendChild(authContainer);
+      mainHeader.appendChild(authContainer);
     }
   }
 
   function restoreLayout() {
-    if (mobileHeader.contains(gameSelect) && gamePlaceholder.parentNode) {
+    if (mainHeader.contains(gameSelect) && gamePlaceholder.parentNode) {
       gamePlaceholder.parentNode.insertBefore(gameSelect, gamePlaceholder);
       gamePlaceholder.remove();
     }
-    if (mobileHeader.contains(authContainer) && authPlaceholder.parentNode) {
+    if (mainHeader.contains(authContainer) && authPlaceholder.parentNode) {
       authPlaceholder.parentNode.insertBefore(authContainer, authPlaceholder);
       authPlaceholder.remove();
     }

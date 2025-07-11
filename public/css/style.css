@@ -3032,7 +3032,7 @@ td {
   color: #fff;
   font-weight: bold;
 }
-#mobile-header {
+#main-header {
   display: none;
 }
 
@@ -5232,7 +5232,7 @@ optgroup[label="Terran"] {
   #top-logo-container {
     display: none;
   }
-  #mobile-header {
+  #main-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -5244,29 +5244,30 @@ optgroup[label="Terran"] {
     left: 0;
     z-index: 1000;
   }
-  #mobile-header .mobile-logo {
+  #main-header .main-logo {
     width: 120px;
   }
-  #mobile-header #auth-container {
+  #main-header #auth-container {
     position: static;
     background-color: transparent;
     box-shadow: none;
     padding: 0;
     border: none;
   }
-  #mobile-header #game-select {
-    position: static;
+  #main-header #game-select {
+    position: relative;
     background-color: transparent;
     padding: 0;
     height: auto;
     flex-direction: row;
   }
-  #mobile-header #game-select .selected-game img {
+  #main-header #game-select .selected-game img {
     width: 40px;
     height: 40px;
   }
-  #mobile-header #game-select .game-dropdown {
-    top: 40px;
+  #main-header #game-select .game-dropdown {
+    top: calc(100% + 5px);
+    right: 0;
   }
 }
 
