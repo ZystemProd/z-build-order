@@ -688,7 +688,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       const userBuildDocRef = doc(
         db,
-        `users/${user.uid}/builds/${publishedId}`
+        `users/${user.uid}/builds/${buildId}`
       );
       const userBuildSnap = await getDoc(userBuildDocRef);
 
