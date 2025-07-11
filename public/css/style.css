@@ -5254,6 +5254,20 @@ optgroup[label="Terran"] {
     padding: 0;
     border: none;
   }
+  #mobile-header #game-select {
+    position: static;
+    background-color: transparent;
+    padding: 0;
+    height: auto;
+    flex-direction: row;
+  }
+  #mobile-header #game-select .selected-game img {
+    width: 40px;
+    height: 40px;
+  }
+  #mobile-header #game-select .game-dropdown {
+    top: 40px;
+  }
 }
 
 @media (hover: hover) and (pointer: fine) {
