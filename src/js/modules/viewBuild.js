@@ -110,7 +110,7 @@ function handleBackClick(e) {
     localStorage.removeItem("communityFilterValue");
   }
 
-  window.location.href = "index.html";
+  window.location.href = "/";
 }
 
 if (backButton) {
@@ -686,10 +686,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const buildSnap = await getDoc(buildRef);
       if (!buildSnap.exists()) return;
 
-      const userBuildDocRef = doc(
-        db,
-        `users/${user.uid}/builds/${buildId}`
-      );
+      const userBuildDocRef = doc(db, `users/${user.uid}/builds/${buildId}`);
       const userBuildSnap = await getDoc(userBuildDocRef);
 
       if (userBuildSnap.exists()) {

@@ -110,9 +110,6 @@ input[type="text"]:disabled {
   background: #141414;
   padding: 20px;
   border-radius: 8px;
-  overflow-y: auto;
-  min-height: 700px;
-  max-height: 70vh;
 }
 
 .build-order-container p {
@@ -464,4 +461,3 @@ input[type="text"]:disabled {
 body.modal-open {
   overflow: hidden;
 }
-
