@@ -131,12 +131,15 @@ async function incrementBuildViews(buildId) {
   }
 }
 
-async function loadBuild() {
-  const pathParts = window.location.pathname.split("/");
-  const lastPart = pathParts[pathParts.length - 1]; // "stargate-opener-abc123"
+function getBuildIdFromPath() {
+  const parts = window.location.pathname.split("/").filter(Boolean);
+  let id = parts[parts.length - 1] || "";
+  if (id.includes("-")) id = id.split("-").pop();
+  return decodeURIComponent(id);
+}
 
-  // Extract the ID safely
-  const buildId = lastPart.split("-").pop();
+async function loadBuild() {
+  const buildId = getBuildIdFromPath();
 
   if (!buildId) {
     document.getElementById("buildTitle").innerText = "Build not found.";
@@ -676,25 +679,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Don't show the button until we know the status
       importBtn.style.display = "none";
 
-      const pathParts = window.location.pathname.split("/");
-      let maybeTitleOrId = decodeURIComponent(pathParts[2]);
+      const buildId = getBuildIdFromPath();
+      if (!buildId) return;
 
-      if (!maybeTitleOrId) return;
-
-      let publishedId = maybeTitleOrId;
-
-      // 🟢 Fallback for title URL
-      if (publishedId.length < 15 || publishedId.includes(" ")) {
-        const publishedRef = collection(db, "publishedBuilds");
-        const q = query(publishedRef, where("title", "==", publishedId));
-        const snapshot = await getDocs(q);
-
-        if (snapshot.empty) return;
-
-        publishedId = snapshot.docs[0].id;
-      }
-
-      const buildRef = doc(db, "publishedBuilds", publishedId);
+      const buildRef = doc(db, "publishedBuilds", buildId);
       const buildSnap = await getDoc(buildRef);
       if (!buildSnap.exists()) return;
 
@@ -723,8 +711,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Update vote UI when auth state changes (e.g., after sign-in)
   auth.onAuthStateChanged(() => {
-    const pathParts = window.location.pathname.split("/");
-    const buildId = pathParts[2];
+    const buildId = getBuildIdFromPath();
     if (buildId) updateVoteButtonIcons(buildId);
   });
 
@@ -811,7 +798,7 @@ function injectMetaTags(buildId, build) {
         .replace(/(^-|-$)+/g, "")
     : "untitled";
 
-  const url = `https://zbuildorder.com/build/${matchup}/${slug}-${buildId}`;
+  const url = `https://zbuildorder.com/build/${matchup}/${slug}/${buildId}`;
 
   const ogImage = "https://zbuildorder.com/img/og-image.webp"; // <-- You can customize this!
 
