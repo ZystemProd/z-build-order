@@ -753,7 +753,7 @@
     <div id="replayOptionsModal" class="modal">
       <div class="modal-content small-modal">
         <span class="close-modal" id="closeReplayOptionsModal">&times;</span>
-        <h3>Replay Options</h3>
+        <h3 class="replay-options-title">Replay Options</h3>
         <div class="player-select-container">
           <label>Select Player</label>
           <div id="playerToggleWrapper" class="player-toggle-wrapper"></div>
@@ -776,6 +776,7 @@
             </label>
           </div>
         </div>
+        <hr class="publish-divider" />
         <div class="publish-checkbox-row">
           <span>Exclude Supply</span>
           <div class="checkbox-wrapper-59">
@@ -794,6 +795,7 @@
             </label>
           </div>
         </div>
+        <hr class="publish-divider" />
         <div class="publish-checkbox-row">
           <span class="label-with-icon">Compact Mode <span class="info-icon"
               data-tooltip="Combines actions at same supply. Requires 'Exclude Time' checked">?</span></span>
@@ -804,16 +806,18 @@
             </label>
           </div>
         </div>
-        <div>
+        <div class="stop-limit-row">
           <label id="stopLimitLabel" for="stopLimitInput">Stop at supply:</label>
           <input type="number" id="stopLimitInput" min="0" value="50" placeholder="e.g. 50" />
           <span id="stopUnitLabel">min</span>
           <button type="button" id="toggleStopTypeBtn" class="btn-small" data-type="supply">Use Time</button>
         </div>
-        <button id="confirmReplayOptionsButton" class="btn">Parse Replay</button>
-        <span id="chronoBoostWarning" style="display:none; margin-left:10px; color:orange;">
-          ⚠️ Chrono Boost detection is not automatic — adjust times manually if needed.
-        </span>
+        <div class="replay-options-footer">
+          <button id="confirmReplayOptionsButton" class="btn">Parse Replay</button>
+          <span id="chronoBoostWarning" style="display:none; color:orange;">
+            ⚠️ Chrono Boost not auto-detected — adjust Supply/Time manually .
+          </span>
+        </div>
       </div>
     </div>
 
@@ -849,7 +853,7 @@
     </div>
     <div class="footer-center" id="site-info">
 
-      <p>Version 0.5.8099</p>
+      <p>Version 0.5.8105</p>
 
 
     </div>
