@@ -827,6 +827,13 @@ export function filterCommunityBuilds(categoryOrSubcat = "all") {
   populateCommunityBuilds(filtered);
 }
 */
+function slugify(text) {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
+}
+
 function renderCommunityBuildBatch(builds) {
   const container = document.getElementById("communityBuildsContainer");
   const nextBatch = builds;
@@ -867,7 +874,11 @@ function renderCommunityBuildBatch(builds) {
 
     buildEntry.addEventListener("click", async () => {
       await incrementBuildViews(db, build.id);
-      window.location.href = `/build/${build.id}`;
+
+      const matchup = build.subcategory?.toLowerCase() || "unknown";
+      const slug = slugify(build.title || "untitled");
+
+      window.location.href = `/build/${matchup}/${slug}-${build.id}`;
     });
 
     buildEntry.addEventListener("mouseover", () => showBuildPreview(build));
@@ -1023,7 +1034,10 @@ export async function filterCommunityBuilds(filter = "all") {
             timestampValue = timestampValue.toMillis();
           }
 
-          if (typeof timestampValue === "number" || typeof timestampValue === "string") {
+          if (
+            typeof timestampValue === "number" ||
+            typeof timestampValue === "string"
+          ) {
             const parsed = new Date(timestampValue);
             if (!isNaN(parsed.getTime())) {
               datePublishedRaw = parsed.getTime();

@@ -23,7 +23,11 @@
         "function": "sitemap"
       },
       {
-        "source": "/build/**",
+        "source": "/build/:matchup/:slug-:id",
+        "destination": "/viewBuild.html"
+      },
+      {
+        "source": "/build/:id",
         "destination": "/viewBuild.html"
       }
     ]

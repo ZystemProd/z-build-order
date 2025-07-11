@@ -133,7 +133,10 @@ async function incrementBuildViews(buildId) {
 
 async function loadBuild() {
   const pathParts = window.location.pathname.split("/");
-  const buildId = pathParts[2]; // because URL is /build/abc123
+  const lastPart = pathParts[pathParts.length - 1]; // "stargate-opener-abc123"
+
+  // Extract the ID safely
+  const buildId = lastPart.split("-").pop();
 
   if (!buildId) {
     document.getElementById("buildTitle").innerText = "Build not found.";
@@ -800,7 +803,16 @@ function injectMetaTags(buildId, build) {
   const description = `StarCraft 2 build order for ${
     build.subcategory || "Unknown"
   } matchup.`;
-  const url = `https://zbuildorder.com/build/${buildId}`;
+  const matchup = (build.subcategory || "unknown").toLowerCase();
+  const slug = build.title
+    ? build.title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)+/g, "")
+    : "untitled";
+
+  const url = `https://zbuildorder.com/build/${matchup}/${slug}-${buildId}`;
+
   const ogImage = "https://zbuildorder.com/img/og-image.webp"; // <-- You can customize this!
 
   // Update <title>
