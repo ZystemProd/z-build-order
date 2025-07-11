@@ -588,11 +588,34 @@ def upload():
         last_hallucination_frame = -9999
         last_hallucination_pid = None
         pending_hallucinations = []
+        roach_deaths = []  # (frame, supply, unit_id)
+        unit_supply_map = {}
 
         # ---- iterate event stream --------------------------------
         for event in replay.events:
             if event.second == 0:
                 continue
+
+            # 🔍 Test all UnitTypeChangeEvents
+            if isinstance(event, sc2reader.events.tracker.UnitTypeChangeEvent):
+                print(f"🟢 Seen UnitTypeChangeEvent: {event}")
+                if getattr(event, "unit", None):
+                    print(f"   unit={event.unit}")
+                    print(f"   type_history={getattr(event.unit, 'type_history', None)}")
+
+            # ---- UnitDiedEvent: fallback for Roach → Ravager morph ----
+            if isinstance(event, sc2reader.events.tracker.UnitDiedEvent):
+                if getattr(event.unit, "owner", None) and event.unit.owner.pid == player.pid:
+                    unit_name = format_name(event.unit.name)
+                    if unit_name.lower() == "roach":
+                        roach_deaths.append((
+                            event.frame,
+                            supply_at_frame(player.pid, event.frame),
+                            event.unit_id
+                        ))
+                        print(f"🐛 Fallback: Tracked Roach death at frame {event.frame}")
+
+
 
             
             # ---- AbilityEvent or CommandEvent (safe for all versions) ----
@@ -646,10 +669,27 @@ def upload():
                 break
 
 
-            # ---- AbilityEvent for warp-ins ------------------------------------
+            # ---- AbilityEvent for warp-ins and Zerg morphs --------------------
             if isinstance(event, ABILITY_EVENTS):
                 ability_name = getattr(event, "ability_name", "")
                 if not ability_name:
+                    continue
+
+                # Zerg morph abilities (Roach→Ravager, Hydra→Lurker)
+                if ability_name in {"MorphToRavager", "MorphToLurker"}:
+                    pid = getattr(event, "player", None).pid if getattr(event, "player", None) else event.pid
+                    if pid == player.pid:
+                        unit_name = "Ravager" if "Ravager" in ability_name else "Lurker"
+                        ingame_sec = frame_to_ingame_seconds(event.frame, replay)
+                        used_s = supply_at_frame(player.pid, event.frame) + 1
+                        entries.append({
+                            'clock_sec': int(ingame_sec),
+                            'supply': used_s,
+                            'made': 0,
+                            'unit': unit_name,
+                            'kind': 'start',
+                            'source': 'morph'
+                        })
                     continue
 
                 # Only handle Protoss warp-ins
@@ -688,6 +728,10 @@ def upload():
 
                 name = format_name(event.unit_type_name)
                 base_type_name = re.sub(r'^Hallucinated\s+', '', name, flags=re.I)
+
+                # Skip morph results handled via abilities
+                if base_type_name in {"Ravager", "Lurker"}:
+                    continue
 
                 hallucinated = getattr(event.unit, "is_hallucination", False)
                 slot_match_found = False
@@ -784,6 +828,10 @@ def upload():
                     start_frame = max(born_frame - build_frames, 0)
                     start_ingame_sec = frame_to_ingame_seconds(start_frame, replay)
                     used_s = supply_at_frame(player.pid, start_frame)
+                    # Normal Roach or other unit born logic:
+                    unit_id = event.unit_id
+                    supply_at = supply_at_frame(player.pid, event.frame)
+                    unit_supply_map[unit_id] = supply_at  # ✅ store exact supply for this unit
 
                 entries.append({
                     'clock_sec': int(start_ingame_sec),
@@ -792,7 +840,30 @@ def upload():
                     'unit': name,
                     'kind': 'start'
                 })
-                continue
+                # ✅ Fallback: match Ravager Cocoon births to Roach deaths
+                # ✅ Fallback: match Ravager Cocoon births to Roach deaths
+                if name.lower() == "ravager cocoon":
+                    cocoon_frame = event.frame
+                    match = None
+                    for death_frame, death_supply, unit_id in roach_deaths:
+                        if abs(cocoon_frame - death_frame) <= 280:
+                            match = (death_frame, death_supply, unit_id)
+                            break
+
+                    if match:
+                        roach_supply = match[1]
+                        ravager_supply = roach_supply + 1
+                        entries.append({
+                            'clock_sec': int(frame_to_ingame_seconds(cocoon_frame, replay)),
+                            'supply': ravager_supply,
+                            'made': 0,
+                            'unit': 'Ravager',
+                            'kind': 'start',
+                        })
+                        print(f"✅ Fallback: Added Ravager from Roach supply {roach_supply} → {ravager_supply}")
+                        roach_deaths.remove(match)
+
+
 
 
 

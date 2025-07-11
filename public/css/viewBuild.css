@@ -110,9 +110,6 @@ input[type="text"]:disabled {
   background: #141414;
   padding: 20px;
   border-radius: 8px;
-  overflow-y: auto;
-  min-height: 700px;
-  max-height: 70vh;
 }
 
 .build-order-container p {
@@ -144,6 +141,14 @@ input[type="text"]:disabled {
   justify-content: center;
   height: 60px; /* or whatever you want for row height */
   margin-bottom: 30px;
+}
+
+.build-header-row #importBuildButton {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-top: 0;
 }
 
 /* Map Section, YouTube Section, Comment Section Common */
@@ -456,4 +461,3 @@ input[type="text"]:disabled {
 body.modal-open {
   overflow: hidden;
 }
-
