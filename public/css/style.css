@@ -5228,6 +5228,7 @@ optgroup[label="Terran"] {
   border-radius: 4px;
   padding: 4px 6px;
 }
+@media (max-width: 768px) {
   #top-logo-container {
     display: none;
   }
@@ -5253,6 +5254,7 @@ optgroup[label="Terran"] {
     padding: 0;
     border: none;
   }
+}
 
 @media (hover: hover) and (pointer: fine) {
   .role-gear-icon {
