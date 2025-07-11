@@ -603,6 +603,26 @@ def upload():
                     print(f"   unit={event.unit}")
                     print(f"   type_history={getattr(event.unit, 'type_history', None)}")
 
+                new_type = event.unit_type_name
+                owner_pid = (
+                    event.unit.owner.pid
+                    if getattr(event, "unit", None) and getattr(event.unit, "owner", None)
+                    else None
+                )
+                if owner_pid == player.pid and new_type in {"RavagerCocoon", "LurkerMPEgg"}:
+                    ingame_sec = frame_to_ingame_seconds(event.frame, replay)
+                    used_s = supply_at_frame(player.pid, event.frame) + 1
+                    unit_name = "Ravager" if "Ravager" in new_type else "Lurker"
+                    entries.append({
+                        'clock_sec': int(ingame_sec),
+                        'supply': used_s,
+                        'made': 0,
+                        'unit': unit_name,
+                        'kind': 'start',
+                        'source': 'morph'
+                    })
+                    continue
+
             # ---- UnitDiedEvent: fallback for Roach → Ravager morph ----
             if isinstance(event, sc2reader.events.tracker.UnitDiedEvent):
                 if getattr(event.unit, "owner", None) and event.unit.owner.pid == player.pid:
