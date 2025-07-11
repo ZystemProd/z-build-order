@@ -11,6 +11,7 @@ import {
   where,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { logAnalyticsEvent } from "../analyticsHelper.js";
+import { showToast } from "../toastHandler.js"; // ✅ Make sure this is correct!
 
 export function initializeViewBuildPage() {
   safeAdd("signInBtn", "click", window.handleSignIn);
@@ -25,49 +26,46 @@ async function importBuildHandler() {
   let maybeTitleOrId = decodeURIComponent(pathParts[2]);
 
   if (!maybeTitleOrId) {
-    alert("❌ Build ID or title not found in URL.");
+    showToast("❌ Build ID or title not found in URL.", "error");
     return;
   }
 
   if (!auth.currentUser) {
-    alert("⚠️ Please sign in first to import builds.");
+    showToast("⚠️ Please sign in first to import builds.", "warning");
     return;
   }
 
   const userId = auth.currentUser.uid;
 
-  // 🔑 Assume it is an ID, unless it's obviously not
   let publishedId = maybeTitleOrId;
 
-  // ✅ If it looks like a title or slug, resolve to real published Firestore ID
+  // ✅ Fallback if your URL uses a title instead of the publishedId
   if (publishedId.length < 15 || publishedId.includes(" ")) {
     const publishedRef = collection(db, "publishedBuilds");
     const q = query(publishedRef, where("title", "==", publishedId));
     const snapshot = await getDocs(q);
 
     if (snapshot.empty) {
-      alert("❌ Build not found in published builds.");
+      showToast("❌ Build not found in published builds.", "error");
       return;
     }
 
-    publishedId = snapshot.docs[0].id; // ✅ This is the real unique ID
+    publishedId = snapshot.docs[0].id; // ✅ This is the unique Firestore ID!
   }
 
-  // 🔑 Use the REAL ID when saving to user's builds
-  const userBuildDocRef = doc(db, `users/${userId}/builds/${publishedId}`);
+  const communityBuildRef = doc(db, "publishedBuilds", publishedId);
+  const userBuildDocRef = doc(db, `users/${userId}/builds/${publishedId}`); // ✅ Always the publishedId!
 
   try {
-    const communityBuildRef = doc(db, "publishedBuilds", publishedId);
     const buildDoc = await getDoc(communityBuildRef);
-
     if (!buildDoc.exists()) {
-      alert("❌ Build not found in published builds.");
+      showToast("❌ Build not found in published builds.", "error");
       return;
     }
 
     const userBuildDoc = await getDoc(userBuildDocRef);
     if (userBuildDoc.exists()) {
-      alert("⚠️ This build is already in your library.");
+      showToast("⚠️ This build is already in your library.", "warning");
       return;
     }
 
@@ -77,7 +75,7 @@ async function importBuildHandler() {
       ...buildData,
       publisher: buildData.username || buildData.publisher || "Unknown",
       imported: true,
-      encodedTitle: publishedId, // optional — your real unique ID
+      encodedTitle: publishedId, // optional but fine
       datePublished: buildData.datePublished?.toMillis?.() || Date.now(),
       timestamp: Date.now(),
     });
@@ -88,12 +86,13 @@ async function importBuildHandler() {
     if (importBtn) {
       importBtn.disabled = true;
       importBtn.textContent = "Imported";
+      importBtn.classList.add("imported");
     }
 
-    alert("✅ Build imported successfully!");
+    showToast("✅ Build imported successfully!", "success");
   } catch (error) {
     console.error(error);
-    alert("❌ Failed to import build.");
+    showToast("❌ Failed to import build.", "error");
     logAnalyticsEvent("build_import_failed", { reason: error.message });
   }
 }
