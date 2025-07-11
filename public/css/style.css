@@ -3032,6 +3032,9 @@ td {
   color: #fff;
   font-weight: bold;
 }
+#mobile-header {
+  display: none;
+}
 
 /* Default state - shown */
 
@@ -5225,6 +5228,31 @@ optgroup[label="Terran"] {
   border-radius: 4px;
   padding: 4px 6px;
 }
+  #top-logo-container {
+    display: none;
+  }
+  #mobile-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 10px;
+    background-color: #222;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1000;
+  }
+  #mobile-header .mobile-logo {
+    width: 120px;
+  }
+  #mobile-header #auth-container {
+    position: static;
+    background-color: transparent;
+    box-shadow: none;
+    padding: 0;
+    border: none;
+  }
 
 @media (hover: hover) and (pointer: fine) {
   .role-gear-icon {
