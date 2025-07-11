@@ -146,6 +146,14 @@ input[type="text"]:disabled {
   margin-bottom: 30px;
 }
 
+.build-header-row #importBuildButton {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-top: 0;
+}
+
 /* Map Section, YouTube Section, Comment Section Common */
 .map-section,
 .youtube-section,
