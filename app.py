@@ -669,10 +669,27 @@ def upload():
                 break
 
 
-            # ---- AbilityEvent for warp-ins ------------------------------------
+            # ---- AbilityEvent for warp-ins and Zerg morphs --------------------
             if isinstance(event, ABILITY_EVENTS):
                 ability_name = getattr(event, "ability_name", "")
                 if not ability_name:
+                    continue
+
+                # Zerg morph abilities (Roach→Ravager, Hydra→Lurker)
+                if ability_name in {"MorphToRavager", "MorphToLurker"}:
+                    pid = getattr(event, "player", None).pid if getattr(event, "player", None) else event.pid
+                    if pid == player.pid:
+                        unit_name = "Ravager" if "Ravager" in ability_name else "Lurker"
+                        ingame_sec = frame_to_ingame_seconds(event.frame, replay)
+                        used_s = supply_at_frame(player.pid, event.frame) + 1
+                        entries.append({
+                            'clock_sec': int(ingame_sec),
+                            'supply': used_s,
+                            'made': 0,
+                            'unit': unit_name,
+                            'kind': 'start',
+                            'source': 'morph'
+                        })
                     continue
 
                 # Only handle Protoss warp-ins
@@ -711,6 +728,10 @@ def upload():
 
                 name = format_name(event.unit_type_name)
                 base_type_name = re.sub(r'^Hallucinated\s+', '', name, flags=re.I)
+
+                # Skip morph results handled via abilities
+                if base_type_name in {"Ravager", "Lurker"}:
+                    continue
 
                 hallucinated = getattr(event.unit, "is_hallucination", False)
                 slot_match_found = False
