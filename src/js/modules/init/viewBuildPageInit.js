@@ -13,6 +13,13 @@ import {
 import { logAnalyticsEvent } from "../analyticsHelper.js";
 import { showToast } from "../toastHandler.js"; // ✅ Make sure this is correct!
 
+function getBuildIdFromPath() {
+  const parts = window.location.pathname.split("/").filter(Boolean);
+  let id = parts[parts.length - 1] || "";
+  if (id.includes("-")) id = id.split("-").pop();
+  return decodeURIComponent(id);
+}
+
 export function initializeViewBuildPage() {
   safeAdd("signInBtn", "click", window.handleSignIn);
   safeAdd("signOutBtn", "click", window.handleSignOut);
@@ -22,8 +29,7 @@ export function initializeViewBuildPage() {
 }
 
 async function importBuildHandler() {
-  const pathParts = window.location.pathname.split("/");
-  let maybeTitleOrId = decodeURIComponent(pathParts[2]);
+  const maybeTitleOrId = getBuildIdFromPath();
 
   if (!maybeTitleOrId) {
     showToast("❌ Build ID or title not found in URL.", "error");
@@ -37,21 +43,7 @@ async function importBuildHandler() {
 
   const userId = auth.currentUser.uid;
 
-  let publishedId = maybeTitleOrId;
-
-  // ✅ Fallback if your URL uses a title instead of the publishedId
-  if (publishedId.length < 15 || publishedId.includes(" ")) {
-    const publishedRef = collection(db, "publishedBuilds");
-    const q = query(publishedRef, where("title", "==", publishedId));
-    const snapshot = await getDocs(q);
-
-    if (snapshot.empty) {
-      showToast("❌ Build not found in published builds.", "error");
-      return;
-    }
-
-    publishedId = snapshot.docs[0].id; // ✅ This is the unique Firestore ID!
-  }
+  const publishedId = maybeTitleOrId;
 
   const communityBuildRef = doc(db, "publishedBuilds", publishedId);
   const userBuildDocRef = doc(db, `users/${userId}/builds/${publishedId}`); // ✅ Always the publishedId!

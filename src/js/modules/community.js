@@ -878,7 +878,7 @@ function renderCommunityBuildBatch(builds) {
       const matchup = build.subcategory?.toLowerCase() || "unknown";
       const slug = slugify(build.title || "untitled");
 
-      window.location.href = `/build/${matchup}/${slug}-${build.id}`;
+      window.location.href = `/build/${matchup}/${slug}/${build.id}`;
     });
 
     buildEntry.addEventListener("mouseover", () => showBuildPreview(build));
