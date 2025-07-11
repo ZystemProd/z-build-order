@@ -590,6 +590,7 @@ def upload():
         pending_hallucinations = []
         roach_deaths = []  # (frame, supply, unit_id)
         unit_supply_map = {}
+        morphed_ids = set()
 
         # ---- iterate event stream --------------------------------
         for event in replay.events:
@@ -603,11 +604,33 @@ def upload():
                     print(f"   unit={event.unit}")
                     print(f"   type_history={getattr(event.unit, 'type_history', None)}")
 
+                new_type = event.unit_type_name
+                owner_pid = (
+                    event.unit.owner.pid
+                    if getattr(event, "unit", None) and getattr(event.unit, "owner", None)
+                    else None
+                )
+                if owner_pid == player.pid and new_type in {"RavagerCocoon", "LurkerMPEgg"}:
+                    ingame_sec = frame_to_ingame_seconds(event.frame, replay)
+                    used_s = supply_at_frame(player.pid, event.frame) + 1
+                    unit_name = "Ravager" if "Ravager" in new_type else "Lurker"
+                    entries.append({
+                        'clock_sec': int(ingame_sec),
+                        'supply': used_s,
+                        'made': 0,
+                        'unit': unit_name,
+                        'kind': 'start',
+                        'source': 'morph'
+                    })
+                    morphed_ids.add(event.unit_id)
+                    roach_deaths[:] = [d for d in roach_deaths if d[2] != event.unit_id]
+                    continue
+
             # ---- UnitDiedEvent: fallback for Roach → Ravager morph ----
             if isinstance(event, sc2reader.events.tracker.UnitDiedEvent):
                 if getattr(event.unit, "owner", None) and event.unit.owner.pid == player.pid:
                     unit_name = format_name(event.unit.name)
-                    if unit_name.lower() == "roach":
+                    if unit_name.lower() == "roach" and event.unit_id not in morphed_ids:
                         roach_deaths.append((
                             event.frame,
                             supply_at_frame(player.pid, event.frame),
@@ -756,6 +779,9 @@ def upload():
                 ):
                     continue
 
+                if base_type_name in {"Ravager", "Lurker"} and event.unit_id in morphed_ids:
+                    continue
+
                 # ✅ Normal supply logic
                 unit_name_lower = name.lower()
                 if unit_name_lower in ["probe", "drone", "scv"]:
@@ -825,7 +851,7 @@ def upload():
                     cocoon_frame = event.frame
                     match = None
                     for death_frame, death_supply, unit_id in roach_deaths:
-                        if abs(cocoon_frame - death_frame) <= 280:
+                        if abs(cocoon_frame - death_frame) <= 280 and unit_id not in morphed_ids:
                             match = (death_frame, death_supply, unit_id)
                             break
 
