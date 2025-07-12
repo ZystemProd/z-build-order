@@ -26,9 +26,20 @@ exports.sitemap = onRequest(async (req, res) => {
 
   buildsSnapshot.forEach((doc) => {
     const data = doc.data();
-    const lastmod = data.datePublished
-      ? new Date(data.datePublished).toISOString().split("T")[0]
-      : new Date().toISOString().split("T")[0];
+
+    // ✅ Safe fallback for lastmod
+    let lastmod = new Date();
+    if (data.datePublished) {
+      try {
+        lastmod = new Date(data.datePublished);
+        if (isNaN(lastmod.getTime())) {
+          lastmod = new Date(); // fallback if invalid
+        }
+      } catch (err) {
+        lastmod = new Date(); // fallback if error
+      }
+    }
+    const lastmodStr = lastmod.toISOString().split("T")[0];
 
     const matchup = (data.subcategory || "unknown").toLowerCase();
     const slug = slugify(data.title || "untitled");
@@ -36,7 +47,7 @@ exports.sitemap = onRequest(async (req, res) => {
     urls.push(`
   <url>
     <loc>https://zbuildorder.com/build/${matchup}/${slug}/${doc.id}</loc>
-    <lastmod>${lastmod}</lastmod>
+    <lastmod>${lastmodStr}</lastmod>
     <priority>0.8</priority>
   </url>
   `);
