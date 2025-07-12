@@ -161,11 +161,12 @@ body {
 #game-select {
   position: absolute;
   top: 10px;
-  right: 250px;
+  left: 10px;
   padding: 10px;
-  height: 80px;
+  height: 70px;
+  width: 70px;
   background-color: #37373780;
-  border-radius: 8px;
+  border-radius: 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -173,8 +174,8 @@ body {
 }
 
 #game-select .selected-game img {
-  width: 60px;
-  height: 60px;
+  width: 50px;
+  height: 50px;
   object-fit: cover;
   border-radius: 4px;
   cursor: pointer;
@@ -183,9 +184,9 @@ body {
 #game-select .game-dropdown {
   display: none;
   position: absolute;
-  top: 80px;
+  top: 60px;
   left: 0;
-  background-color: #37373780;
+  background-color: #373737;
   padding: 5px;
   border-radius: 8px;
   min-width: 210px;
@@ -603,10 +604,10 @@ button:hover {
   text-overflow: ellipsis;
 }
 
-@media (max-width: 877px) {
+@media (max-width: 768px) {
   #buildOrderTitleText {
     text-align: center;
-    font-size: 1em;
+    font-size: 1.2em;
     line-height: normal;
   }
 }
@@ -2915,22 +2916,12 @@ td {
   transform: translateY(-50%);
 }
 
-/* Centered site-info */
-.footer-center {
-  display: inline-block;
-}
-
 /* Right side: clickable logo */
 .footer-right {
   position: absolute;
   right: 20px;
   top: 50%;
   transform: translateY(-50%);
-}
-
-.footer-right img {
-  max-width: 50px; /* Adjust as needed */
-  height: auto;
 }
 
 /* Common link styling */
@@ -3016,21 +3007,12 @@ td {
   pointer-events: none;
 }
 
-/* Right side: clickable logo */
-#site-logo {
-  flex: 0 0 auto;
-  text-align: right;
-}
-
-#site-logo img {
-  width: 50px; /* Adjust as needed */
-  height: 50px;
-  position: static; /* Override any absolute positioning */
-}
-
 .divider {
   color: #fff;
   font-weight: bold;
+}
+#main-header {
+  display: none;
 }
 
 /* Default state - shown */
@@ -4668,7 +4650,7 @@ button.btn-small {
   }
 
   .footer-left {
-    max-width: 100px;
+    max-width: 200px;
   }
 }
 
@@ -5224,6 +5206,64 @@ optgroup[label="Terran"] {
   border: 1px solid #444;
   border-radius: 4px;
   padding: 4px 6px;
+}
+@media (max-width: 768px) {
+  #top-logo-container {
+    display: none;
+  }
+  #main-header {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    width: 100%;
+    padding: 10px;
+    box-sizing: border-box;
+    background-color: #222;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    gap: 20px;
+  }
+  #main-header #auth-container {
+    position: static;
+    background-color: transparent;
+    box-shadow: none;
+    padding: 0;
+    border: none;
+    margin-left: auto;
+  }
+  #main-header #game-select {
+    position: relative;
+    top: 0;
+    right: 0;
+    background-color: transparent;
+    padding: 0;
+    height: 40px;
+    flex-direction: row;
+  }
+  #main-header #game-select .selected-game img {
+    width: 32px;
+    height: 32px;
+  }
+  #main-header #game-select .game-dropdown {
+    top: calc(100% + 5px);
+    right: 0;
+  }
+  #main-header button {
+    border: none;
+    padding: 0;
+    height: 35px;
+    width: 35px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #main-header button img {
+    width: 24px;
+    height: 24px;
+  }
 }
 
 @media (hover: hover) and (pointer: fine) {
