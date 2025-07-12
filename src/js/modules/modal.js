@@ -23,7 +23,7 @@ import { auth, db } from "../../app.js";
 import { showToast } from "./toastHandler.js";
 import { updateYouTubeEmbed, clearYouTubeEmbed } from "./youtube.js";
 import { mapAnnotations } from "./interactive_map.js";
-import { formatActionText } from "./textFormatters.js";
+import { formatActionText, formatWorkersOrTimestampText } from "./textFormatters.js";
 import { capitalize } from "./helpers/sharedEventUtils.js";
 import { analyzeBuildOrder } from "./uiHandlers.js";
 import { publishBuildToCommunity } from "./community.js";
@@ -1073,9 +1073,18 @@ function updateBuildPreview(build) {
 
   // Format the build order using formatActionText
   const formattedBuildOrder = build.buildOrder
-    .map(
-      (step) => `[${step.workersOrTimestamp}] ${formatActionText(step.action)}`
-    )
+    .map((step) => {
+      if (typeof step === "string") {
+        return formatActionText(step);
+      }
+      if (step && step.action) {
+        const bracket = step.workersOrTimestamp
+          ? `<strong>${formatWorkersOrTimestampText(step.workersOrTimestamp)}</strong> `
+          : "";
+        return `${bracket}${formatActionText(step.action)}`;
+      }
+      return "";
+    })
     .join("<br>"); // Use <br> for line breaks in HTML output
 
   // Apply the formatted text, including publisher (without video link)
