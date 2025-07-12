@@ -198,9 +198,13 @@
   border-top: 10px solid #555;
 }
 
-@media (max-width: 830px) {
+@media (max-width: 768px) {
   #box {
     display: none;
+  }
+  .cat-tip-bubble {
+    width: 250px;
+    font-size: 16px;
   }
 }
 
