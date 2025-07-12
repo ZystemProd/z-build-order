@@ -2915,10 +2915,6 @@ td {
   transform: translateY(-50%);
 }
 
-/* Centered site-info */
-.footer-center {
-  display: inline-block;
-}
 
 /* Right side: clickable logo */
 .footer-right {
@@ -2928,10 +2924,6 @@ td {
   transform: translateY(-50%);
 }
 
-.footer-right img {
-  max-width: 50px; /* Adjust as needed */
-  height: auto;
-}
 
 /* Common link styling */
 #legalNoticeLink,
@@ -3016,17 +3008,6 @@ td {
   pointer-events: none;
 }
 
-/* Right side: clickable logo */
-#site-logo {
-  flex: 0 0 auto;
-  text-align: right;
-}
-
-#site-logo img {
-  width: 50px; /* Adjust as needed */
-  height: 50px;
-  position: static; /* Override any absolute positioning */
-}
 
 .divider {
   color: #fff;
@@ -5244,9 +5225,6 @@ optgroup[label="Terran"] {
     left: 0;
     z-index: 1000;
     gap: 8px;
-  }
-  #main-header .main-logo {
-    width: 100px;
   }
   #main-header #auth-container {
     position: static;
