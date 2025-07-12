@@ -1,12 +1,13 @@
 #box {
-  position: absolute;
-  top: 163px;
-  left: 50%;
-  transform: translateX(-50%);
+  position: relative;
+  top: 0;
+  left: 0;
+  transform: none;
   z-index: 999;
   display: inline-block;
   height: 150px;
   pointer-events: none; /* block everything by default */
+  margin-right: 10px;
 }
 
 .cat * {
