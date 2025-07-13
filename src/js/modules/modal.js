@@ -476,6 +476,8 @@ export async function viewBuild(buildId) {
       editBanner.innerHTML =
         '<img src="./img/SVG/pencil.svg" class="svg-icon" alt="Edit"> <strong>Edit Mode</strong>';
       editBanner.style.display = "flex";
+      editBanner.style.backgroundColor = "#165016";
+      editBanner.style.color = "#fff";
       updateTooltips();
     }
 

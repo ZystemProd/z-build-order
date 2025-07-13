@@ -354,6 +354,8 @@ export async function initializeIndexPage() {
           editBanner.innerHTML =
             '<img src="./img/SVG/pencil.svg" class="svg-icon" alt="Edit"> <strong>Edit Mode</strong>';
           editBanner.style.display = "flex";
+          editBanner.style.backgroundColor = "#165016";
+          editBanner.style.color = "#fff";
           updateTooltips();
         }
 
@@ -390,7 +392,11 @@ export async function initializeIndexPage() {
     clearEditingPublishedBuild();
 
     const editBanner = document.getElementById("editModeBanner");
-    if (editBanner) editBanner.style.display = "none";
+    if (editBanner) {
+      editBanner.style.display = "none";
+      editBanner.style.backgroundColor = "";
+      editBanner.style.color = "";
+    }
 
     const saveBtn = document.getElementById("saveBuildButton");
     const updateBtn = document.getElementById("updateBuildButton");

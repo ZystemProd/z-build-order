@@ -2878,11 +2878,9 @@ td {
 
 #editModeBanner {
   display: none;
-  background-color: #165016;
   color: #fff;
   padding: 6px;
   border-radius: 4px;
-  margin-bottom: 10px;
   text-align: center;
   display: flex;
   align-items: center;
