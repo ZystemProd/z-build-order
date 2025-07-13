@@ -349,12 +349,10 @@ export async function initializeIndexPage() {
         newBuildButton.style.display = "inline-block";
         showToast("✅ Build saved!", "success");
 
-        const titleInput = document.getElementById("buildOrderTitleInput");
         const editBanner = document.getElementById("editModeBanner");
-        if (editBanner && titleInput) {
-          editBanner.innerHTML = `<img src="./img/SVG/pencil.svg" class="svg-icon" alt="Edit"> <strong>${DOMPurify.sanitize(
-            titleInput.value.trim()
-          )}</strong>`;
+        if (editBanner) {
+          editBanner.innerHTML =
+            '<img src="./img/SVG/pencil.svg" class="svg-icon" alt="Edit"> <strong>Edit Mode</strong>';
           editBanner.style.display = "flex";
           updateTooltips();
         }
