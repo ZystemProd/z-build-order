@@ -473,10 +473,11 @@ export async function viewBuild(buildId) {
 
     const editBanner = document.getElementById("editModeBanner");
     if (editBanner) {
-      editBanner.innerHTML = `[Edit Mode] <strong>${DOMPurify.sanitize(
+      editBanner.innerHTML = `<img src="./img/SVG/pencil.svg" class="svg-icon" alt="Edit"> <strong>${DOMPurify.sanitize(
         build.title
       )}</strong>`;
-      editBanner.style.display = "block";
+      editBanner.style.display = "flex";
+      updateTooltips();
     }
 
     const saveBtn = document.getElementById("saveBuildButton");
@@ -1184,12 +1185,13 @@ function showEditorUIForPublishedEdit() {
   if (!build) return;
 
   // Show edit banner
-  titleBanner.innerHTML = `[Edit Mode] <strong>${DOMPurify.sanitize(
+  titleBanner.innerHTML = `<img src="./img/SVG/pencil.svg" class="svg-icon" alt="Edit"> <strong>${DOMPurify.sanitize(
     build.title
   )}</strong>`;
-  titleBanner.style.display = "block";
+  titleBanner.style.display = "flex";
   titleBanner.style.backgroundColor = "#165016";
   titleBanner.style.color = "#fff";
+  updateTooltips();
 
   // Button logic
   saveButton.style.display = "none";

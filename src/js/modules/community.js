@@ -15,7 +15,7 @@ import {
   increment,
   startAfter,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
-import { formatActionText } from "./textFormatters.js";
+import { formatActionText, formatWorkersOrTimestampText } from "./textFormatters.js";
 import { showToast } from "./toastHandler.js";
 import { formatMatchup, formatShortDate } from "./modal.js";
 
@@ -320,15 +320,15 @@ function showBuildPreview(build) {
             return `<p style="color:red;"><em>Malformed step at index ${index}</em></p>`;
           }
 
-          const bracket = step.workersOrTimestamp || "";
           const action = step.action || "";
+          const bracket = step.workersOrTimestamp
+            ? `<strong>${formatWorkersOrTimestampText(step.workersOrTimestamp)}</strong> `
+            : "";
 
           // Skip completely empty lines
           if (!bracket && !action) return "";
 
-          return `<p><strong>${
-            bracket ? `[${bracket}]` : ""
-          }</strong> ${formatActionText(action)}</p>`;
+          return `<p>${bracket}${formatActionText(action)}</p>`;
         })
         .join("")
     : "<p>No build order available.</p>";
@@ -343,6 +343,7 @@ function showBuildPreview(build) {
   `;
 
   communityBuildPreview.style.display = "block";
+  updateTooltips();
 }
 
 const communitySearchInput = document.getElementById("communitySearchBar");

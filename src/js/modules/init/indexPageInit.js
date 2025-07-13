@@ -352,10 +352,11 @@ export async function initializeIndexPage() {
         const titleInput = document.getElementById("buildOrderTitleInput");
         const editBanner = document.getElementById("editModeBanner");
         if (editBanner && titleInput) {
-          editBanner.innerHTML = `[Edit Mode] <strong>${DOMPurify.sanitize(
+          editBanner.innerHTML = `<img src="./img/SVG/pencil.svg" class="svg-icon" alt="Edit"> <strong>${DOMPurify.sanitize(
             titleInput.value.trim()
           )}</strong>`;
-          editBanner.style.display = "block";
+          editBanner.style.display = "flex";
+          updateTooltips();
         }
 
         const replayUrl = document
