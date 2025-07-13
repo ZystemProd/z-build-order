@@ -2879,13 +2879,14 @@ td {
 #editModeBanner {
   display: none;
   color: #fff;
-  padding: 6px;
+  padding: 4px 6px;
   border-radius: 4px;
   text-align: center;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
+  font-size: 15px;
 }
 
 #editModeBanner img {

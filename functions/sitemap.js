@@ -1,7 +1,5 @@
 const { onRequest } = require("firebase-functions/v2/https");
-const admin = require("firebase-admin");
-
-admin.initializeApp();
+const admin = require("./admin.js");
 
 exports.sitemap = onRequest(async (req, res) => {
   const db = admin.firestore();

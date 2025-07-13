@@ -24,11 +24,11 @@
       },
       {
         "source": "/build/:matchup/:slug/:id",
-        "destination": "/viewBuild.html"
+        "function": "ssrBuildPage"
       },
       {
         "source": "/build/:id",
-        "destination": "/viewBuild.html"
+        "function": "ssrBuildPage"
       }
     ]
   },
