@@ -536,6 +536,7 @@ def upload():
         # ---- containers -------------------------------------------
         entries = []
         init_map = {}
+        overlord_started = False
 
 
         # NEW: running supply snapshot (O(1) look‑ups) --------------
@@ -840,6 +841,8 @@ def upload():
                     'unit': name,
                     'kind': 'start'
                 })
+                if name.lower() == "overlord" and not overlord_started:
+                    overlord_started = True
                 # ✅ Fallback: match Ravager Cocoon births to Roach deaths
                 # ✅ Fallback: match Ravager Cocoon births to Roach deaths
                 if name.lower() == "ravager cocoon":
@@ -933,10 +936,16 @@ def upload():
 
                 init_map[event.unit_id] = name
 
+                is_oversupply = (
+                    not overlord_started
+                    and name.lower() in {"hatchery", "spawning pool", "extractor"}
+                    and supply_at_start == 14
+                )
+
                 entries.append({
                     'clock_sec': int(init_ingame_sec),
-                    'supply': supply_at_start,
-                    'made': 0,
+                    'supply': 15 if is_oversupply else supply_at_start,
+                    'made': 14 if is_oversupply else 0,
                     'unit': name,
                     'kind': 'start'
                 })
