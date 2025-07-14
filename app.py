@@ -536,6 +536,7 @@ def upload():
         # ---- containers -------------------------------------------
         entries = []
         init_map = {}
+        overlord_started = False
 
 
         # NEW: running supply snapshot (O(1) look‑ups) --------------
@@ -622,6 +623,13 @@ def upload():
             if hasattr(event, "ability_name") and event.ability_name:
                 ability_name = event.ability_name
                 ability_lower = ability_name.lower()
+
+                if (
+                    not overlord_started
+                    and "overlord" in ability_lower
+                    and event.pid == player.pid
+                ):
+                    overlord_started = True
 
                 if "hallucination" in ability_lower or "hallucinate" in ability_lower:
                     unit_raw = None
@@ -840,6 +848,8 @@ def upload():
                     'unit': name,
                     'kind': 'start'
                 })
+                if name.lower() == "overlord" and not overlord_started:
+                    overlord_started = True
                 # ✅ Fallback: match Ravager Cocoon births to Roach deaths
                 # ✅ Fallback: match Ravager Cocoon births to Roach deaths
                 if name.lower() == "ravager cocoon":
@@ -930,13 +940,20 @@ def upload():
                 init_frame = event.frame
                 init_ingame_sec = frame_to_ingame_seconds(init_frame, replay)
                 supply_at_start = supply_at_frame(player.pid, init_frame)
+                supply_before_start = supply_at_frame(player.pid, max(0, init_frame - 1))
 
                 init_map[event.unit_id] = name
 
+                is_oversupply = (
+                    not overlord_started
+                    and name.lower() in {"hatchery", "spawning pool", "extractor"}
+                    and supply_before_start >= 15
+                )
+
                 entries.append({
                     'clock_sec': int(init_ingame_sec),
-                    'supply': supply_at_start,
-                    'made': 0,
+                    'supply': supply_before_start if is_oversupply else supply_at_start,
+                    'made': supply_at_start if is_oversupply else 0,
                     'unit': name,
                     'kind': 'start'
                 })
