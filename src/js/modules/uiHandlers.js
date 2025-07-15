@@ -225,30 +225,15 @@ export function formatWorkersOrTimestamp(
 // Function to analyze and update the build order table automatically
 export function analyzeBuildOrder(inputText) {
   requestAnimationFrame(() => {
-    const lines = inputText.split("\n");
     const table = document.getElementById("buildOrderTable");
+    const steps = parseBuildOrder(inputText);
 
     while (table.rows.length > 1) {
       table.deleteRow(1);
     }
 
-    lines.forEach((line) => {
-      const match = line.match(/\[(.*?)\]\s*(.*)/);
-
-      let workersOrTimestamp = "";
-      let actionText = "";
-
-      if (match) {
-        workersOrTimestamp = match[1];
-        actionText = match[2];
-      } else {
-        // If no brackets, consider the entire line as the action text
-        workersOrTimestamp = "";
-        actionText = line;
-      }
-
-      // Format using Trie-based formatting
-      actionText = formatActionText(actionText);
+    steps.forEach(({ workersOrTimestamp, action }) => {
+      const actionText = formatActionText(action);
 
       const row = table.insertRow();
       row.insertCell(0).innerHTML = workersOrTimestamp

@@ -8,7 +8,7 @@ export function parseBuildOrder(buildOrderText) {
   }
 
   // Proceed with parsing if it's a valid string
-  return buildOrderText
+  const steps = buildOrderText
     .split("\n")
     .map((line) => {
       const match = line.match(/\[(.*?)\]\s*(.*)/); // Example: [01:00] Build structure
@@ -24,6 +24,31 @@ export function parseBuildOrder(buildOrderText) {
       return null; // Return null if empty line
     })
     .filter((step) => step !== null); // Filter out invalid steps
+
+  return adjustOversupply(steps);
+}
+
+function adjustOversupply(steps) {
+  let cap = null;
+  for (let i = steps.length - 1; i >= 0; i--) {
+    const step = steps[i];
+    const m = /^\s*(\d{1,3})(?:\/(\d{1,3}))?\s*$/.exec(step.workersOrTimestamp);
+    if (!m) continue;
+
+    const used = parseInt(m[1], 10);
+    const explicitCap = m[2] ? parseInt(m[2], 10) : null;
+
+    if (explicitCap !== null) {
+      cap = explicitCap;
+    } else if (cap === null) {
+      cap = used;
+    } else if (used > cap) {
+      step.workersOrTimestamp = `${used}/${cap}`;
+    } else {
+      cap = used;
+    }
+  }
+  return steps;
 }
 
 export function resetBuildInputs() {
