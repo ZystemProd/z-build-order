@@ -1030,6 +1030,16 @@ def upload():
         # final sort ------------------------------------------------
         entries.sort(key=lambda e: e.get('clock_sec', e.get('time', 0)))
 
+        # determine when the first Overlord finishes
+        first_overlord_done = None
+        for e in entries:
+            if (
+                e.get('kind') == 'finish'
+                and e.get('unit', '').lower() == 'overlord'
+            ):
+                first_overlord_done = e.get('clock_sec', e.get('time', 0))
+                break
+
 
         # ----- stringify build lines -------------------------------
         build_lines = []
@@ -1071,8 +1081,14 @@ def upload():
                     units.append(label)
                     i += 1
                 parts = []
+                oversupply = (
+                    first_overlord_done is not None
+                    and first.get('kind') == 'start'
+                    and supply == 15
+                    and start_time < first_overlord_done
+                )
                 if not exclude_supply:
-                    parts.append(str(supply))
+                    parts.append("15/14" if oversupply else str(supply))
                 prefix = f"[{' '.join(parts)}] " if parts else ""
                 build_lines.append(prefix + " + ".join(units))
         else:
@@ -1094,8 +1110,14 @@ def upload():
                     continue
 
                 parts = []
+                oversupply = (
+                    first_overlord_done is not None
+                    and item.get('kind') == 'start'
+                    and item['supply'] == 15
+                    and item['clock_sec'] < first_overlord_done
+                )
                 if not exclude_supply:
-                    parts.append(str(item['supply']))
+                    parts.append("15/14" if oversupply else str(item['supply']))
                 if not exclude_time:
                     minutes, seconds = divmod(item.get('clock_sec', item.get('time', 0)), 60)
                     parts.append(f"{minutes:02d}:{seconds:02d}")
@@ -1103,18 +1125,6 @@ def upload():
                 qty = item.get('count', 1)
                 label = f"{qty} {item['unit']}" if qty > 1 else item['unit']
                 build_lines.append(prefix + label)
-
-        # ---- oversupply correction ---------------------------------
-        try:
-            ov_idx = next(i for i, line in enumerate(build_lines)
-                         if re.search(r"\[14\]\s+.*Overlord", line))
-        except StopIteration:
-            ov_idx = None
-
-        if ov_idx is not None:
-            for j in range(ov_idx):
-                if re.match(r"\[15\]", build_lines[j]):
-                    build_lines[j] = build_lines[j].replace("[15]", "[15/14]", 1)
 
         return '\n'.join(build_lines)
 
