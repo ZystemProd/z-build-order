@@ -1110,6 +1110,15 @@ def upload():
                 label = f"{qty} {item['unit']}" if qty > 1 else item['unit']
                 build_lines.append(prefix + label)
 
+        # ---- oversupply correction ---------------------------------
+        try:
+            ov_idx = next(i for i, line in enumerate(build_lines)
+                         if re.search(r"\[14(?:/\d+)?\]\s+.*Overlord", line))
+            for j in range(ov_idx):
+                if re.match(r"\[15\](?!/)", build_lines[j]):
+                    build_lines[j] = build_lines[j].replace("[15]", "[15/14]")
+        except StopIteration:
+            pass
 
         return '\n'.join(build_lines)
 
