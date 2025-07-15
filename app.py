@@ -995,6 +995,19 @@ def upload():
                 })
 
 
+        # final sort ------------------------------------------------
+        entries.sort(key=lambda e: e.get('clock_sec', e.get('time', 0)))
+
+        # determine when the first Overlord finishes
+        first_overlord_done = None
+        for e in entries:
+            if (
+                e.get('kind') == 'finish'
+                and e.get('unit', '').lower() == 'overlord'
+            ):
+                first_overlord_done = e.get('clock_sec', e.get('time', 0))
+                break
+
         # keep only start rows --------------------------------------
         entries = [
             e for e in entries
@@ -1025,20 +1038,6 @@ def upload():
                 tmp.append(e)
 
         entries = tmp
-
-
-        # final sort ------------------------------------------------
-        entries.sort(key=lambda e: e.get('clock_sec', e.get('time', 0)))
-
-        # determine when the first Overlord finishes
-        first_overlord_done = None
-        for e in entries:
-            if (
-                e.get('kind') == 'finish'
-                and e.get('unit', '').lower() == 'overlord'
-            ):
-                first_overlord_done = e.get('clock_sec', e.get('time', 0))
-                break
 
 
         # ----- stringify build lines -------------------------------
