@@ -685,7 +685,7 @@ def upload():
                         entries.append({
                             'clock_sec': int(ingame_sec),
                             'supply': used_s,
-                            'made': 0,
+                            'made': current_made if have_stats else get_supply(event.second)[1],
                             'unit': unit_name,
                             'kind': 'start',
                             'source': 'morph'
@@ -709,7 +709,7 @@ def upload():
                     entries.append({
                         'clock_sec': int(ingame_sec),
                         'supply': used_s,
-                        'made': 0,
+                        'made': current_made if have_stats else get_supply(event.second)[1],
                         'unit': name,
                         'kind': 'start',
                         'source': 'warp-in'  # new!
@@ -836,7 +836,7 @@ def upload():
                 entries.append({
                     'clock_sec': int(start_ingame_sec),
                     'supply': used_s,
-                    'made': 0,
+                    'made': current_made if have_stats else get_supply(event.second)[1],
                     'unit': name,
                     'kind': 'start'
                 })
@@ -856,7 +856,7 @@ def upload():
                         entries.append({
                             'clock_sec': int(frame_to_ingame_seconds(cocoon_frame, replay)),
                             'supply': ravager_supply,
-                            'made': 0,
+                            'made': current_made if have_stats else get_supply(event.second)[1],
                             'unit': 'Ravager',
                             'kind': 'start',
                         })
@@ -936,7 +936,7 @@ def upload():
                 entries.append({
                     'clock_sec': int(init_ingame_sec),
                     'supply': supply_at_start,
-                    'made': 0,
+                    'made': current_made if have_stats else get_supply(event.second)[1],
                     'unit': name,
                     'kind': 'start'
                 })
