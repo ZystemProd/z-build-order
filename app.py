@@ -681,7 +681,7 @@ def upload():
                     if pid == player.pid:
                         unit_name = "Ravager" if "Ravager" in ability_name else "Lurker"
                         ingame_sec = frame_to_ingame_seconds(event.frame, replay)
-                        used_s = supply_at_frame(player.pid, event.frame) + 1
+                        used_s = supply_at_frame(player.pid, event.frame - 1) + 1
                         entries.append({
                             'clock_sec': int(ingame_sec),
                             'supply': used_s,
@@ -704,7 +704,7 @@ def upload():
 
                     # Snapshot supply at the moment the player clicked warp-in
                     ingame_sec = frame_to_ingame_seconds(event.frame, replay)
-                    used_s = supply_at_frame(player.pid, event.frame)
+                    used_s = supply_at_frame(player.pid, event.frame - 1)
 
                     entries.append({
                         'clock_sec': int(ingame_sec),
@@ -782,7 +782,7 @@ def upload():
                 if unit_name_lower in ["probe", "drone", "scv"]:
                     start_frame = event.frame
                     start_ingame_sec = frame_to_ingame_seconds(start_frame, replay) - 12
-                    used_s = supply_at_frame(player.pid, start_frame) - 1
+                    used_s = supply_at_frame(player.pid, start_frame - 1)
 
                 elif unit_name_lower in [
                     "zealot", "stalker", "sentry", "adept", "dark templar", "high templar"
@@ -806,14 +806,7 @@ def upload():
                         start_frame = max(born_frame - build_frames, 0)
 
                         start_ingame_sec = frame_to_ingame_seconds(start_frame, replay) - 6
-                        used_s = supply_at_frame(player.pid, start_frame)
-
-                        if unit_name_lower in [
-                            "sentry", "stalker", "adept", "dark templar", "high templar"
-                        ]:
-                            used_s -= 2
-                        elif unit_name_lower == "zealot":
-                            used_s -= 1
+                        used_s = supply_at_frame(player.pid, start_frame - 1)
                     else:
                         continue
 
@@ -827,7 +820,7 @@ def upload():
                     build_frames = int(build_time * fps)
                     start_frame = max(born_frame - build_frames, 0)
                     start_ingame_sec = frame_to_ingame_seconds(start_frame, replay)
-                    used_s = supply_at_frame(player.pid, start_frame)
+                    used_s = supply_at_frame(player.pid, start_frame - 1)
                     # Normal Roach or other unit born logic:
                     unit_id = event.unit_id
                     supply_at = supply_at_frame(player.pid, event.frame)
@@ -929,7 +922,7 @@ def upload():
                 # ✅ Frame-based structure start
                 init_frame = event.frame
                 init_ingame_sec = frame_to_ingame_seconds(init_frame, replay)
-                supply_at_start = supply_at_frame(player.pid, init_frame)
+                supply_at_start = supply_at_frame(player.pid, init_frame - 1)
 
                 init_map[event.unit_id] = name
 
@@ -948,7 +941,7 @@ def upload():
             if isinstance(event, sc2reader.events.tracker.UnitDoneEvent):
                 if event.unit_id in init_map:
                     name = init_map[event.unit_id]
-                    entries.append({'clock_sec': int(event.second / speed_factor), 'supply': current_used if have_stats else get_supply(event.second)[0], 'made': current_made if have_stats else get_supply(event.second)[1], 'unit': name, 'kind': 'finish'})
+                    entries.append({'clock_sec': int(frame_to_ingame_seconds(event.frame, replay)), 'supply': current_used if have_stats else get_supply(event.second)[0], 'made': current_made if have_stats else get_supply(event.second)[1], 'unit': name, 'kind': 'finish'})
                 continue
 
             # ---- UpgradeCompleteEvent -----------------------------------------
