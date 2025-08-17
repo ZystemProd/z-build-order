@@ -5298,6 +5298,13 @@ optgroup[label="Terran"] {
   text-decoration: none;
 }
 
+#supportModal .brand-icon {
+  width: 1.2em;
+  height: 1.2em;
+  margin-right: 0.5em;
+  filter: brightness(0) invert(1);
+}
+
 #supportModal .ko-fi-button {
   background-color: #d9534f;
 }
@@ -5341,19 +5348,29 @@ optgroup[label="Terran"] {
   margin-bottom: 1.5rem;
 }
 
+#supportModal .kofi-frame-wrapper {
+  margin-top: 1rem;
+}
+
 #supportModal table {
   width: 100%;
   border-collapse: collapse;
+  margin-top: 1rem;
 }
 
 #supportModal th,
 #supportModal td {
-  border: 1px solid #ddd;
-  padding: 8px;
+  border: 1px solid #444;
+  padding: 0.5rem 0.75rem;
   text-align: left;
+  color: #eee;
 }
 
 #supportModal th {
-  background-color: #f2f2f2;
+  background-color: #2a2a2a;
+}
+
+#supportModal tbody tr:nth-child(even) {
+  background-color: #1e1e1e;
 }
 

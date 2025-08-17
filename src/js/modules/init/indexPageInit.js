@@ -126,7 +126,7 @@ function updateBuildInputPlaceholder() {
 
 async function loadDonations() {
   try {
-    const res = await fetch("public/data/donations.json");
+    const res = await fetch("/public/data/donations.json");
     if (!res.ok) return;
     const donations = await res.json();
     const tbody = document.getElementById("donationsBody");
@@ -184,16 +184,6 @@ let currentBuildFilter = "all";
  ----------------- */
 export async function initializeIndexPage() {
   console.log("🛠 Initializing Index Page");
-
-  if (window.kofiWidgetOverlay && !window.__koFiOverlayInitialized) {
-    window.kofiWidgetOverlay.draw("zystem", {
-      type: "popup",
-      "floating-chat.donateButton.text": "Donate",
-      "floating-chat.donateButton.background-color": "#d9534f",
-      "floating-chat.donateButton.text-color": "#fff",
-    });
-    window.__koFiOverlayInitialized = true;
-  }
 
   const restoreCommunity = localStorage.getItem("restoreCommunityModal");
   const filterType = localStorage.getItem("communityFilterType");
@@ -871,15 +861,17 @@ export async function initializeIndexPage() {
     if (modal) modal.style.display = "block";
   });
 
-  safeAdd("supportersLink", "click", showSupportModal);
+  safeAdd("supportersLink", "click", (e) => {
+    e.preventDefault();
+    showSupportModal();
+  });
 
   safeAdd("koFiButton", "click", (e) => {
     e.preventDefault();
-    const overlay = window.kofiWidgetOverlay;
-    if (overlay && typeof overlay.open === "function") {
-      overlay.open();
-    } else {
-      window.open("https://ko-fi.com/zystem", "_blank");
+    const wrapper = document.getElementById("koFiFrameWrapper");
+    if (wrapper) {
+      wrapper.style.display =
+        wrapper.style.display === "none" || wrapper.style.display === "" ? "block" : "none";
     }
   });
 
