@@ -28,15 +28,20 @@ function initKoFiOverlay() {
         "floating-chat.donateButton.background-color": "#d9534f",
         "floating-chat.donateButton.text-color": "#fff",
       });
-      const overlay = document.getElementById("kofi-widget-overlay");
-      const container = document.getElementById("koFiWidgetContainer");
-      if (overlay && container) {
-        container.appendChild(overlay);
-        overlay.style.position = "static";
-        overlay.style.bottom = "";
-        overlay.style.right = "";
-      }
-      koFiOverlayInitialized = true;
+      const moveOverlay = () => {
+        const overlay = document.querySelector('[id^="kofi-widget-overlay"]');
+        const container = document.getElementById("koFiWidgetContainer");
+        if (overlay && container) {
+          container.appendChild(overlay);
+          overlay.style.position = "static";
+          overlay.style.bottom = "";
+          overlay.style.right = "";
+          koFiOverlayInitialized = true;
+        } else {
+          setTimeout(moveOverlay, 100);
+        }
+      };
+      moveOverlay();
     } else {
       setTimeout(attempt, 300);
     }
@@ -183,7 +188,7 @@ function showSupportModal() {
   if (!koFiOverlayInitialized) {
     initKoFiOverlay();
   } else {
-    const overlay = document.getElementById("kofi-widget-overlay");
+    const overlay = document.querySelector('[id^="kofi-widget-overlay"]');
     const container = document.getElementById("koFiWidgetContainer");
     if (overlay && container && overlay.parentElement !== container) {
       container.appendChild(overlay);
