@@ -863,6 +863,13 @@ export async function initializeIndexPage() {
 
   safeAdd("supportersLink", "click", showSupportModal);
 
+  safeAdd("koFiButton", "click", (e) => {
+    e.preventDefault();
+    if (window.kofiWidgetOverlay) {
+      window.kofiWidgetOverlay.open();
+    }
+  });
+
   safeAdd("closeSupportModal", "click", () => {
     const modal = document.getElementById("supportModal");
     if (modal) modal.style.display = "none";
