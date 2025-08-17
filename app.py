@@ -681,11 +681,12 @@ def upload():
                     if pid == player.pid:
                         unit_name = "Ravager" if "Ravager" in ability_name else "Lurker"
                         ingame_sec = frame_to_ingame_seconds(event.frame, replay)
-                        used_s = supply_at_frame(player.pid, event.frame) + 1
+                        used_s = supply_at_frame(player.pid, event.frame - 1) + 1
                         entries.append({
                             'clock_sec': int(ingame_sec),
                             'supply': used_s,
-                            'made': 0,
+                            'made': current_made if have_stats else get_supply(int(start_ingame_sec))[1]
+,
                             'unit': unit_name,
                             'kind': 'start',
                             'source': 'morph'
@@ -704,12 +705,13 @@ def upload():
 
                     # Snapshot supply at the moment the player clicked warp-in
                     ingame_sec = frame_to_ingame_seconds(event.frame, replay)
-                    used_s = supply_at_frame(player.pid, event.frame)
+                    used_s = supply_at_frame(player.pid, event.frame - 1)
 
                     entries.append({
                         'clock_sec': int(ingame_sec),
                         'supply': used_s,
-                        'made': 0,
+                        'made': current_made if have_stats else get_supply(int(start_ingame_sec))[1]
+,
                         'unit': name,
                         'kind': 'start',
                         'source': 'warp-in'  # new!
@@ -782,7 +784,7 @@ def upload():
                 if unit_name_lower in ["probe", "drone", "scv"]:
                     start_frame = event.frame
                     start_ingame_sec = frame_to_ingame_seconds(start_frame, replay) - 12
-                    used_s = supply_at_frame(player.pid, start_frame) - 1
+                    used_s = supply_at_frame(player.pid, start_frame - 1)
 
                 elif unit_name_lower in [
                     "zealot", "stalker", "sentry", "adept", "dark templar", "high templar"
@@ -804,16 +806,8 @@ def upload():
                         born_frame = event.frame
                         build_frames = int(build_time * fps)
                         start_frame = max(born_frame - build_frames, 0)
-
                         start_ingame_sec = frame_to_ingame_seconds(start_frame, replay) - 6
-                        used_s = supply_at_frame(player.pid, start_frame)
-
-                        if unit_name_lower in [
-                            "sentry", "stalker", "adept", "dark templar", "high templar"
-                        ]:
-                            used_s -= 2
-                        elif unit_name_lower == "zealot":
-                            used_s -= 1
+                        used_s = supply_at_frame(player.pid, start_frame - 1)
                     else:
                         continue
 
@@ -826,20 +820,31 @@ def upload():
                     born_frame = event.frame
                     build_frames = int(build_time * fps)
                     start_frame = max(born_frame - build_frames, 0)
-                    start_ingame_sec = frame_to_ingame_seconds(start_frame, replay)
-                    used_s = supply_at_frame(player.pid, start_frame)
+
+                    # 🟡 Fix: account for Faster game speed factor
+                    speed_factor = GAME_SPEED_FACTOR.get(replay.expansion, {}).get(replay.speed, 1.0)
+                    if replay.expansion == "LotV" and replay.speed == "Faster" and speed_factor == 1.0:
+                        speed_factor = 1.4
+
+                    real_seconds = start_frame / fps
+                    start_ingame_sec = real_seconds / speed_factor
+
+                    used_s = supply_at_frame(player.pid, start_frame - 1)
+
                     # Normal Roach or other unit born logic:
                     unit_id = event.unit_id
                     supply_at = supply_at_frame(player.pid, event.frame)
-                    unit_supply_map[unit_id] = supply_at  # ✅ store exact supply for this unit
+                    unit_supply_map[unit_id] = supply_at
 
                 entries.append({
                     'clock_sec': int(start_ingame_sec),
                     'supply': used_s,
-                    'made': 0,
+                    'made': current_made if have_stats else get_supply(int(start_ingame_sec))[1]
+,
                     'unit': name,
                     'kind': 'start'
                 })
+
                 # ✅ Fallback: match Ravager Cocoon births to Roach deaths
                 # ✅ Fallback: match Ravager Cocoon births to Roach deaths
                 if name.lower() == "ravager cocoon":
@@ -856,7 +861,8 @@ def upload():
                         entries.append({
                             'clock_sec': int(frame_to_ingame_seconds(cocoon_frame, replay)),
                             'supply': ravager_supply,
-                            'made': 0,
+                            'made': current_made if have_stats else get_supply(int(start_ingame_sec))[1]
+,
                             'unit': 'Ravager',
                             'kind': 'start',
                         })
@@ -929,14 +935,15 @@ def upload():
                 # ✅ Frame-based structure start
                 init_frame = event.frame
                 init_ingame_sec = frame_to_ingame_seconds(init_frame, replay)
-                supply_at_start = supply_at_frame(player.pid, init_frame)
+                supply_at_start = supply_at_frame(player.pid, init_frame - 1)
 
                 init_map[event.unit_id] = name
 
                 entries.append({
                     'clock_sec': int(init_ingame_sec),
                     'supply': supply_at_start,
-                    'made': 0,
+                    'made': current_made if have_stats else get_supply(int(start_ingame_sec))[1]
+,
                     'unit': name,
                     'kind': 'start'
                 })
@@ -948,7 +955,8 @@ def upload():
             if isinstance(event, sc2reader.events.tracker.UnitDoneEvent):
                 if event.unit_id in init_map:
                     name = init_map[event.unit_id]
-                    entries.append({'clock_sec': int(event.second / speed_factor), 'supply': current_used if have_stats else get_supply(event.second)[0], 'made': current_made if have_stats else get_supply(event.second)[1], 'unit': name, 'kind': 'finish'})
+                    entries.append({'clock_sec': int(frame_to_ingame_seconds(event.frame, replay)), 'supply': current_used if have_stats else get_supply(event.second)[0], 'made': current_made if have_stats else get_supply(int(start_ingame_sec))[1]
+, 'unit': name, 'kind': 'finish'})
                 continue
 
             # ---- UpgradeCompleteEvent -----------------------------------------
@@ -995,6 +1003,19 @@ def upload():
                 })
 
 
+        # final sort ------------------------------------------------
+        entries.sort(key=lambda e: e.get('clock_sec', e.get('time', 0)))
+
+        # determine when the first Overlord finishes
+        first_overlord_done = None
+        for e in entries:
+            if (
+                e.get('kind') == 'finish'
+                and e.get('unit', '').lower() == 'overlord'
+            ):
+                first_overlord_done = e.get('clock_sec', e.get('time', 0))
+                break
+
         # keep only start rows --------------------------------------
         entries = [
             e for e in entries
@@ -1027,10 +1048,6 @@ def upload():
         entries = tmp
 
 
-        # final sort ------------------------------------------------
-        entries.sort(key=lambda e: e.get('clock_sec', e.get('time', 0)))
-
-
         # ----- stringify build lines -------------------------------
         build_lines = []
         if compact:
@@ -1044,8 +1061,7 @@ def upload():
 
                     parts = []
                     if not exclude_supply:
-                        supply_str = f"{first['supply']}/{first['made']}" if first['supply'] > first['made'] and first['made'] > 0 else str(first['supply'])
-                        parts.append(supply_str)
+                        parts.append(str(first['supply']))
                     if not exclude_time:    
                         parts.append(f"{minutes:02d}:{seconds:02d}")
 
@@ -1072,11 +1088,14 @@ def upload():
                     units.append(label)
                     i += 1
                 parts = []
+                oversupply = (
+                    first_overlord_done is not None
+                    and first.get('kind') == 'start'
+                    and supply == 15
+                    and start_time < first_overlord_done
+                )
                 if not exclude_supply:
-                    supply_str = (
-                        f"{supply}/{made}" if supply > made and made > 0 else str(supply)
-                    )
-                    parts.append(supply_str)
+                    parts.append("15/14" if oversupply else str(supply))
                 prefix = f"[{' '.join(parts)}] " if parts else ""
                 build_lines.append(prefix + " + ".join(units))
         else:
@@ -1087,8 +1106,7 @@ def upload():
 
                     parts = []
                     if not exclude_supply:
-                        supply_str = f"{item['supply']}/{item['made']}" if item['supply'] > item['made'] and item['made'] > 0 else str(item['supply'])
-                        parts.append(supply_str)
+                        parts.append(str(item['supply']))
 
                     if not exclude_time:
                         parts.append(f"{minutes:02d}:{seconds:02d}")
@@ -1099,9 +1117,14 @@ def upload():
                     continue
 
                 parts = []
+                oversupply = (
+                    first_overlord_done is not None
+                    and item.get('kind') == 'start'
+                    and item['supply'] == 15
+                    and item['clock_sec'] < first_overlord_done
+                )
                 if not exclude_supply:
-                    supply_str = f"{item['supply']}/{item['made']}" if item['supply'] > item['made'] and item['made'] > 0 else str(item['supply'])
-                    parts.append(supply_str)
+                    parts.append("15/14" if oversupply else str(item['supply']))
                 if not exclude_time:
                     minutes, seconds = divmod(item.get('clock_sec', item.get('time', 0)), 60)
                     parts.append(f"{minutes:02d}:{seconds:02d}")
@@ -1109,7 +1132,6 @@ def upload():
                 qty = item.get('count', 1)
                 label = f"{qty} {item['unit']}" if qty > 1 else item['unit']
                 build_lines.append(prefix + label)
-
 
         return '\n'.join(build_lines)
 

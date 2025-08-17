@@ -1,7 +1,7 @@
 import requests
 
 # Path to your test replay
-REPLAY_PATH = r"C:\Users\Mattias Viklund\Documents\GitHub\z-build-order\replay\replaytest5.SC2Replay"
+REPLAY_PATH = r"C:\Users\Mattias Viklund\Documents\GitHub\z-build-order\replay\replaytest6.SC2Replay"
 
 # The local endpoint
 URL = "http://localhost:5000/upload"
