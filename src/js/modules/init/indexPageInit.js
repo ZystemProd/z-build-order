@@ -10,6 +10,31 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { auth, db } from "../../../app.js";
 import DOMPurify from "dompurify";
+
+let koFiOverlayInitialized = false;
+let koFiOverlayInitStarted = false;
+
+function initKoFiOverlay() {
+  if (koFiOverlayInitialized || koFiOverlayInitStarted) return;
+  koFiOverlayInitStarted = true;
+  const attempt = () => {
+    if (
+      window.kofiWidgetOverlay &&
+      typeof window.kofiWidgetOverlay.draw === "function"
+    ) {
+      window.kofiWidgetOverlay.draw("zystem", {
+        type: "floating-chat",
+        "floating-chat.donateButton.text": "Donate",
+        "floating-chat.donateButton.background-color": "#d9534f",
+        "floating-chat.donateButton.text-color": "#fff",
+      });
+      koFiOverlayInitialized = true;
+    } else {
+      setTimeout(attempt, 300);
+    }
+  };
+  attempt();
+}
 import {
   saveCurrentBuild,
   updateCurrentBuild,
@@ -134,7 +159,11 @@ async function loadDonations() {
     tbody.innerHTML = "";
     donations.forEach((d) => {
       const tr = document.createElement("tr");
-      tr.innerHTML = `<td>${d.date}</td><td>${d.from}</td><td>${d.amount}</td><td>${d.method}</td>`;
+      ["date", "from", "amount", "method"].forEach((key) => {
+        const td = document.createElement("td");
+        td.textContent = DOMPurify.sanitize(d[key] ?? "");
+        tr.appendChild(td);
+      });
       tbody.appendChild(tr);
     });
   } catch (e) {
@@ -184,6 +213,9 @@ let currentBuildFilter = "all";
  ----------------- */
 export async function initializeIndexPage() {
   console.log("🛠 Initializing Index Page");
+  initKoFiOverlay();
+  const supportLink = document.getElementById("supportersLink");
+  if (supportLink) supportLink.textContent = "support";
 
   const restoreCommunity = localStorage.getItem("restoreCommunityModal");
   const filterType = localStorage.getItem("communityFilterType");
@@ -868,10 +900,16 @@ export async function initializeIndexPage() {
 
   safeAdd("koFiButton", "click", (e) => {
     e.preventDefault();
-    const wrapper = document.getElementById("koFiFrameWrapper");
-    if (wrapper) {
-      wrapper.style.display =
-        wrapper.style.display === "none" || wrapper.style.display === "" ? "block" : "none";
+    if (!koFiOverlayInitialized) {
+      initKoFiOverlay();
+    }
+    if (
+      window.kofiWidgetOverlay &&
+      typeof window.kofiWidgetOverlay.open === "function"
+    ) {
+      window.kofiWidgetOverlay.open();
+    } else {
+      window.open("https://ko-fi.com/zystem", "_blank", "noopener");
     }
   });
 
