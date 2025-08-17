@@ -5284,3 +5284,42 @@ optgroup[label="Terran"] {
     visibility: visible;
   }
 }
+
+/* Support modal styles */
+#supportModal .donate-buttons {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+#supportModal .donate-buttons a {
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  text-decoration: none;
+  color: #fff;
+}
+
+#supportModal .ko-fi-button {
+  background-color: #d9534f;
+}
+
+#supportModal .patreon-button {
+  background-color: #f96854;
+}
+
+#supportModal table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+#supportModal th,
+#supportModal td {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: left;
+}
+
+#supportModal th {
+  background-color: #f2f2f2;
+}
+

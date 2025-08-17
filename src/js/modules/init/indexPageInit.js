@@ -124,6 +124,30 @@ function updateBuildInputPlaceholder() {
     : "Spawning Pool";
 }
 
+async function loadDonations() {
+  try {
+    const res = await fetch("public/data/donations.json");
+    if (!res.ok) return;
+    const donations = await res.json();
+    const tbody = document.getElementById("donationsBody");
+    if (!tbody) return;
+    tbody.innerHTML = "";
+    donations.forEach((d) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${d.date}</td><td>${d.from}</td><td>${d.amount}</td><td>${d.method}</td>`;
+      tbody.appendChild(tr);
+    });
+  } catch (e) {
+    console.error("Failed to load donations", e);
+  }
+}
+
+function showSupportModal() {
+  loadDonations();
+  const modal = document.getElementById("supportModal");
+  if (modal) modal.style.display = "block";
+}
+
 async function populateMainClanDropdown() {
   const select = document.getElementById("mainClanSelect");
   if (!select) return;
@@ -835,6 +859,20 @@ export async function initializeIndexPage() {
   safeAdd("cookiePolicyLink", "click", () => {
     const modal = document.getElementById("privacyModal");
     if (modal) modal.style.display = "block";
+  });
+
+  safeAdd("supportersLink", "click", showSupportModal);
+
+  safeAdd("closeSupportModal", "click", () => {
+    const modal = document.getElementById("supportModal");
+    if (modal) modal.style.display = "none";
+  });
+
+  const supportModal = document.getElementById("supportModal");
+  window.addEventListener("mousedown", (event) => {
+    if (supportModal && event.target === supportModal) {
+      supportModal.style.display = "none";
+    }
   });
 
   safeAdd("closeSettingsModal", "click", () => {
