@@ -5288,15 +5288,14 @@ optgroup[label="Terran"] {
 /* Support modal styles */
 #supportModal .donate-buttons {
   display: flex;
+  flex-direction: column;
   gap: 1rem;
   margin-bottom: 1.5rem;
 }
 
-#supportModal .donate-buttons a {
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
+#supportModal .donate-buttons a,
+#supportModal .donate-buttons button {
   text-decoration: none;
-  color: #fff;
 }
 
 #supportModal .ko-fi-button {
@@ -5305,6 +5304,41 @@ optgroup[label="Terran"] {
 
 #supportModal .patreon-button {
   background-color: #f96854;
+}
+
+#supportModal .v-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  color: #fff;
+}
+
+#supportModal .v-btn--block {
+  width: 100%;
+}
+
+#supportModal .v-btn--is-elevated {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+#supportModal .v-btn--has-bg {
+  color: #fff;
+}
+
+#supportModal .v-btn--tile {
+  border-radius: 0;
+}
+
+#supportModal .v-size--large {
+  font-size: 1.1rem;
+  padding: 0.75rem 1rem;
+}
+
+#supportModal .my-6 {
+  margin-top: 1.5rem;
+  margin-bottom: 1.5rem;
 }
 
 #supportModal table {

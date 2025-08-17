@@ -185,6 +185,16 @@ let currentBuildFilter = "all";
 export async function initializeIndexPage() {
   console.log("🛠 Initializing Index Page");
 
+  if (window.kofiWidgetOverlay && !window.__koFiOverlayInitialized) {
+    window.kofiWidgetOverlay.draw("zystem", {
+      type: "popup",
+      "floating-chat.donateButton.text": "Donate",
+      "floating-chat.donateButton.background-color": "#d9534f",
+      "floating-chat.donateButton.text-color": "#fff",
+    });
+    window.__koFiOverlayInitialized = true;
+  }
+
   const restoreCommunity = localStorage.getItem("restoreCommunityModal");
   const filterType = localStorage.getItem("communityFilterType");
   const filterValue = localStorage.getItem("communityFilterValue");
@@ -867,7 +877,7 @@ export async function initializeIndexPage() {
     e.preventDefault();
     const overlay = window.kofiWidgetOverlay;
     if (overlay && typeof overlay.open === "function") {
-      overlay.open("zystem");
+      overlay.open();
     } else {
       window.open("https://ko-fi.com/zystem", "_blank");
     }
