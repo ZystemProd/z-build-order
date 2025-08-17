@@ -865,8 +865,11 @@ export async function initializeIndexPage() {
 
   safeAdd("koFiButton", "click", (e) => {
     e.preventDefault();
-    if (window.kofiWidgetOverlay) {
-      window.kofiWidgetOverlay.open();
+    const overlay = window.kofiWidgetOverlay;
+    if (overlay && typeof overlay.open === "function") {
+      overlay.open("zystem");
+    } else {
+      window.open("https://ko-fi.com/zystem", "_blank");
     }
   });
 
