@@ -685,7 +685,8 @@ def upload():
                         entries.append({
                             'clock_sec': int(ingame_sec),
                             'supply': used_s,
-                            'made': current_made if have_stats else get_supply(event.second)[1],
+                            'made': current_made if have_stats else get_supply(int(start_ingame_sec))[1]
+,
                             'unit': unit_name,
                             'kind': 'start',
                             'source': 'morph'
@@ -709,7 +710,8 @@ def upload():
                     entries.append({
                         'clock_sec': int(ingame_sec),
                         'supply': used_s,
-                        'made': current_made if have_stats else get_supply(event.second)[1],
+                        'made': current_made if have_stats else get_supply(int(start_ingame_sec))[1]
+,
                         'unit': name,
                         'kind': 'start',
                         'source': 'warp-in'  # new!
@@ -804,7 +806,6 @@ def upload():
                         born_frame = event.frame
                         build_frames = int(build_time * fps)
                         start_frame = max(born_frame - build_frames, 0)
-
                         start_ingame_sec = frame_to_ingame_seconds(start_frame, replay) - 6
                         used_s = supply_at_frame(player.pid, start_frame - 1)
                     else:
@@ -819,20 +820,31 @@ def upload():
                     born_frame = event.frame
                     build_frames = int(build_time * fps)
                     start_frame = max(born_frame - build_frames, 0)
-                    start_ingame_sec = frame_to_ingame_seconds(start_frame, replay)
+
+                    # 🟡 Fix: account for Faster game speed factor
+                    speed_factor = GAME_SPEED_FACTOR.get(replay.expansion, {}).get(replay.speed, 1.0)
+                    if replay.expansion == "LotV" and replay.speed == "Faster" and speed_factor == 1.0:
+                        speed_factor = 1.4
+
+                    real_seconds = start_frame / fps
+                    start_ingame_sec = real_seconds / speed_factor
+
                     used_s = supply_at_frame(player.pid, start_frame - 1)
+
                     # Normal Roach or other unit born logic:
                     unit_id = event.unit_id
                     supply_at = supply_at_frame(player.pid, event.frame)
-                    unit_supply_map[unit_id] = supply_at  # ✅ store exact supply for this unit
+                    unit_supply_map[unit_id] = supply_at
 
                 entries.append({
                     'clock_sec': int(start_ingame_sec),
                     'supply': used_s,
-                    'made': current_made if have_stats else get_supply(event.second)[1],
+                    'made': current_made if have_stats else get_supply(int(start_ingame_sec))[1]
+,
                     'unit': name,
                     'kind': 'start'
                 })
+
                 # ✅ Fallback: match Ravager Cocoon births to Roach deaths
                 # ✅ Fallback: match Ravager Cocoon births to Roach deaths
                 if name.lower() == "ravager cocoon":
@@ -849,7 +861,8 @@ def upload():
                         entries.append({
                             'clock_sec': int(frame_to_ingame_seconds(cocoon_frame, replay)),
                             'supply': ravager_supply,
-                            'made': current_made if have_stats else get_supply(event.second)[1],
+                            'made': current_made if have_stats else get_supply(int(start_ingame_sec))[1]
+,
                             'unit': 'Ravager',
                             'kind': 'start',
                         })
@@ -929,7 +942,8 @@ def upload():
                 entries.append({
                     'clock_sec': int(init_ingame_sec),
                     'supply': supply_at_start,
-                    'made': current_made if have_stats else get_supply(event.second)[1],
+                    'made': current_made if have_stats else get_supply(int(start_ingame_sec))[1]
+,
                     'unit': name,
                     'kind': 'start'
                 })
@@ -941,7 +955,8 @@ def upload():
             if isinstance(event, sc2reader.events.tracker.UnitDoneEvent):
                 if event.unit_id in init_map:
                     name = init_map[event.unit_id]
-                    entries.append({'clock_sec': int(frame_to_ingame_seconds(event.frame, replay)), 'supply': current_used if have_stats else get_supply(event.second)[0], 'made': current_made if have_stats else get_supply(event.second)[1], 'unit': name, 'kind': 'finish'})
+                    entries.append({'clock_sec': int(frame_to_ingame_seconds(event.frame, replay)), 'supply': current_used if have_stats else get_supply(event.second)[0], 'made': current_made if have_stats else get_supply(int(start_ingame_sec))[1]
+, 'unit': name, 'kind': 'finish'})
                 continue
 
             # ---- UpgradeCompleteEvent -----------------------------------------
