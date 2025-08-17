@@ -28,20 +28,11 @@ function initKoFiOverlay() {
         "floating-chat.donateButton.background-color": "#d9534f",
         "floating-chat.donateButton.text-color": "#fff",
       });
-      const moveOverlay = () => {
-        const overlay = document.querySelector('[id^="kofi-widget-overlay"]');
-        const container = document.getElementById("koFiWidgetContainer");
-        if (overlay && container) {
-          container.appendChild(overlay);
-          overlay.style.position = "static";
-          overlay.style.bottom = "";
-          overlay.style.right = "";
-          koFiOverlayInitialized = true;
-        } else {
-          setTimeout(moveOverlay, 100);
-        }
-      };
-      moveOverlay();
+      const overlay = document.querySelector('[id^="kofi-widget-overlay"]');
+      if (overlay) {
+        overlay.style.display = "none";
+        koFiOverlayInitialized = true;
+      }
     } else {
       setTimeout(attempt, 300);
     }
@@ -187,15 +178,6 @@ async function loadDonations() {
 function showSupportModal() {
   if (!koFiOverlayInitialized) {
     initKoFiOverlay();
-  } else {
-    const overlay = document.querySelector('[id^="kofi-widget-overlay"]');
-    const container = document.getElementById("koFiWidgetContainer");
-    if (overlay && container && overlay.parentElement !== container) {
-      container.appendChild(overlay);
-      overlay.style.position = "static";
-      overlay.style.bottom = "";
-      overlay.style.right = "";
-    }
   }
   loadDonations();
   const modal = document.getElementById("supportModal");
@@ -932,6 +914,18 @@ export async function initializeIndexPage() {
   window.addEventListener("mousedown", (event) => {
     if (supportModal && event.target === supportModal) {
       supportModal.style.display = "none";
+    }
+  });
+
+  safeAdd("koFiButton", "click", (e) => {
+    e.preventDefault();
+    if (
+      window.kofiWidgetOverlay &&
+      typeof window.kofiWidgetOverlay.open === "function"
+    ) {
+      window.kofiWidgetOverlay.open();
+    } else {
+      window.open("https://ko-fi.com/zystem", "_blank", "noopener");
     }
   });
 
