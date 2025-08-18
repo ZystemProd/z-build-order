@@ -11,7 +11,7 @@ import {
   query,
   where,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
-import { formatActionText } from "../modules/textFormatters.js"; // ✅ Format build steps
+import { formatActionText, formatWorkersOrTimestampText } from "../modules/textFormatters.js"; // ✅ Format build steps
 import {
   MapAnnotations,
   renderMapCards,
@@ -230,7 +230,7 @@ async function loadBuild() {
           step.action.trim() !== ""
         ) {
           const bracket = step.workersOrTimestamp
-            ? `<strong>[${step.workersOrTimestamp}]</strong> `
+            ? `<strong>${formatWorkersOrTimestampText(step.workersOrTimestamp)}</strong> `
             : "";
           buildOrderContainer.innerHTML += `<p>${bracket}${formatActionText(
             step.action

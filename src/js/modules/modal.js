@@ -23,7 +23,7 @@ import { auth, db } from "../../app.js";
 import { showToast } from "./toastHandler.js";
 import { updateYouTubeEmbed, clearYouTubeEmbed } from "./youtube.js";
 import { mapAnnotations } from "./interactive_map.js";
-import { formatActionText } from "./textFormatters.js";
+import { formatActionText, formatWorkersOrTimestampText } from "./textFormatters.js";
 import { capitalize } from "./helpers/sharedEventUtils.js";
 import { analyzeBuildOrder } from "./uiHandlers.js";
 import { publishBuildToCommunity } from "./community.js";
@@ -473,10 +473,12 @@ export async function viewBuild(buildId) {
 
     const editBanner = document.getElementById("editModeBanner");
     if (editBanner) {
-      editBanner.innerHTML = `[Edit Mode] <strong>${DOMPurify.sanitize(
-        build.title
-      )}</strong>`;
-      editBanner.style.display = "block";
+      editBanner.innerHTML =
+        '<img src="./img/SVG/pencil.svg" class="svg-icon" alt="Edit"> <strong>Edit Mode</strong>';
+      editBanner.style.display = "flex";
+      editBanner.style.backgroundColor = "#165016";
+      editBanner.style.color = "#fff";
+      updateTooltips();
     }
 
     const saveBtn = document.getElementById("saveBuildButton");
@@ -1073,9 +1075,18 @@ function updateBuildPreview(build) {
 
   // Format the build order using formatActionText
   const formattedBuildOrder = build.buildOrder
-    .map(
-      (step) => `[${step.workersOrTimestamp}] ${formatActionText(step.action)}`
-    )
+    .map((step) => {
+      if (typeof step === "string") {
+        return formatActionText(step);
+      }
+      if (step && step.action) {
+        const bracket = step.workersOrTimestamp
+          ? `<strong>${formatWorkersOrTimestampText(step.workersOrTimestamp)}</strong> `
+          : "";
+        return `${bracket}${formatActionText(step.action)}`;
+      }
+      return "";
+    })
     .join("<br>"); // Use <br> for line breaks in HTML output
 
   // Apply the formatted text, including publisher (without video link)
@@ -1175,12 +1186,12 @@ function showEditorUIForPublishedEdit() {
   if (!build) return;
 
   // Show edit banner
-  titleBanner.innerHTML = `[Edit Mode] <strong>${DOMPurify.sanitize(
-    build.title
-  )}</strong>`;
-  titleBanner.style.display = "block";
+  titleBanner.innerHTML =
+    '<img src="./img/SVG/pencil.svg" class="svg-icon" alt="Edit"> <strong>Edit Mode</strong>';
+  titleBanner.style.display = "flex";
   titleBanner.style.backgroundColor = "#165016";
   titleBanner.style.color = "#fff";
+  updateTooltips();
 
   // Button logic
   saveButton.style.display = "none";
