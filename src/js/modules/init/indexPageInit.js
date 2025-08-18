@@ -10,6 +10,35 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { auth, db } from "../../../app.js";
 import DOMPurify from "dompurify";
+
+let koFiOverlayInitialized = false;
+let koFiOverlayInitStarted = false;
+
+function initKoFiOverlay() {
+  if (koFiOverlayInitialized || koFiOverlayInitStarted) return;
+  koFiOverlayInitStarted = true;
+  const attempt = () => {
+    if (
+      window.kofiWidgetOverlay &&
+      typeof window.kofiWidgetOverlay.draw === "function"
+    ) {
+      window.kofiWidgetOverlay.draw("zystem", {
+        type: "floating-chat",
+        "floating-chat.donateButton.text": "Donate",
+        "floating-chat.donateButton.background-color": "#d9534f",
+        "floating-chat.donateButton.text-color": "#fff",
+      });
+      const overlay = document.querySelector('[id^="kofi-widget-overlay"]');
+      if (overlay) {
+        overlay.style.display = "none";
+        koFiOverlayInitialized = true;
+      }
+    } else {
+      setTimeout(attempt, 300);
+    }
+  };
+  attempt();
+}
 import {
   saveCurrentBuild,
   updateCurrentBuild,
@@ -124,6 +153,37 @@ function updateBuildInputPlaceholder() {
     : "Spawning Pool";
 }
 
+async function loadDonations() {
+  try {
+    const res = await fetch("/public/data/donations.json");
+    if (!res.ok) return;
+    const donations = await res.json();
+    const tbody = document.getElementById("donationsBody");
+    if (!tbody) return;
+    tbody.innerHTML = "";
+    donations.forEach((d) => {
+      const tr = document.createElement("tr");
+      ["date", "from", "amount", "method"].forEach((key) => {
+        const td = document.createElement("td");
+        td.textContent = DOMPurify.sanitize(d[key] ?? "");
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+  } catch (e) {
+    console.error("Failed to load donations", e);
+  }
+}
+
+function showSupportModal() {
+  if (!koFiOverlayInitialized) {
+    initKoFiOverlay();
+  }
+  loadDonations();
+  const modal = document.getElementById("supportModal");
+  if (modal) modal.style.display = "block";
+}
+
 async function populateMainClanDropdown() {
   const select = document.getElementById("mainClanSelect");
   if (!select) return;
@@ -160,6 +220,9 @@ let currentBuildFilter = "all";
  ----------------- */
 export async function initializeIndexPage() {
   console.log("🛠 Initializing Index Page");
+  initKoFiOverlay();
+  const supportLink = document.getElementById("supportersLink");
+  if (supportLink) supportLink.textContent = "support";
 
   const restoreCommunity = localStorage.getItem("restoreCommunityModal");
   const filterType = localStorage.getItem("communityFilterType");
@@ -837,6 +900,35 @@ export async function initializeIndexPage() {
     if (modal) modal.style.display = "block";
   });
 
+  safeAdd("supportersLink", "click", (e) => {
+    e.preventDefault();
+    showSupportModal();
+  });
+
+  safeAdd("closeSupportModal", "click", () => {
+    const modal = document.getElementById("supportModal");
+    if (modal) modal.style.display = "none";
+  });
+
+  const supportModal = document.getElementById("supportModal");
+  window.addEventListener("mousedown", (event) => {
+    if (supportModal && event.target === supportModal) {
+      supportModal.style.display = "none";
+    }
+  });
+
+  safeAdd("koFiButton", "click", (e) => {
+    e.preventDefault();
+    if (
+      window.kofiWidgetOverlay &&
+      typeof window.kofiWidgetOverlay.open === "function"
+    ) {
+      window.kofiWidgetOverlay.open();
+    } else {
+      window.open("https://ko-fi.com/zystem", "_blank", "noopener");
+    }
+  });
+
   safeAdd("closeSettingsModal", "click", () => {
     const modal = document.getElementById("settingsModal");
     if (modal) modal.style.display = "none";
@@ -882,23 +974,6 @@ export async function initializeIndexPage() {
 
   window.addEventListener("mousedown", (event) => {
     const modal = document.getElementById("privacyModal");
-    if (modal && event.target === modal) {
-      modal.style.display = "none";
-    }
-  });
-
-  safeAdd("supportersLink", "click", () => {
-    const modal = document.getElementById("supportersModal");
-    if (modal) modal.style.display = "block";
-  });
-
-  safeAdd("closeSupportersModal", "click", () => {
-    const modal = document.getElementById("supportersModal");
-    if (modal) modal.style.display = "none";
-  });
-
-  window.addEventListener("mousedown", (event) => {
-    const modal = document.getElementById("supportersModal");
     if (modal && event.target === modal) {
       modal.style.display = "none";
     }
