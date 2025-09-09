@@ -27,10 +27,10 @@
         <ul class="map-list"></ul>
         <!-- Empty list to be populated by JS -->
       </div>
-        <div class="mobile-action-buttons">
-          <button id="resetButtonMobile">Reset All</button>
-          <button id="undoButtonMobile">Undo</button>
-        </div>
+      <div class="mobile-action-buttons">
+        <button id="resetButtonMobile">Reset All</button>
+        <button id="undoButtonMobile">Undo</button>
+      </div>
 
       <div class="map-preview">
         <img id="previewImage" src="img/maps/current/incorporeal.webp" alt="Map Preview" />
@@ -64,6 +64,16 @@
             Show
           </button>
         </h5>
+        <!-- Mode Selection -->
+        <div class="mode-select">
+          <label for="modeDropdown">Mode:</label>
+          <select id="modeDropdown">
+            <option value="1v1" selected>1v1</option>
+            <option value="2v2">2v2</option>
+            <option value="3v3">3v3</option>
+            <option value="4v4">4v4</option>
+          </select>
+        </div>
         <!-- Heading for Map Settings -->
         <div class="button-container">
           <button id="prevMapButton">Previous</button>
@@ -101,7 +111,8 @@
           <button id="undoButton">Undo</button>
         </div>
 
-        <div id="startPlayerWrapper" class="hidden"><label for="startingPlayerSelect">Start:</label> <select id="startingPlayerSelect">
+        <div id="startPlayerWrapper" class="hidden"><label for="startingPlayerSelect">Start:</label> <select
+            id="startingPlayerSelect">
             <option value="player1">Player 1</option>
             <option value="player2">Player 2</option>
           </select></div>

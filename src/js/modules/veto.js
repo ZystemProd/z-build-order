@@ -55,7 +55,6 @@ window.addEventListener("DOMContentLoaded", () => {
     updateDisplayedMap();
   });
 
-
   const confirmBtn = document.getElementById("confirmBestOfButton");
   const bestOfInput = document.getElementById("bestOfInput");
   if (confirmBtn)
@@ -478,7 +477,8 @@ function toggleAdvancedView() {
 
   if (adv.classList.contains("hidden")) {
     const startSel = document.getElementById("startingPlayerSelect");
-    if (startSel && actionHistory.length === 0) currentAdvancedPlayer = startSel.value;
+    if (startSel && actionHistory.length === 0)
+      currentAdvancedPlayer = startSel.value;
     const advListEl = document.getElementById("advanced-map-list");
     if (advListEl && advListEl.childElementCount === 0) {
       advancedStage = "veto";
@@ -536,7 +536,13 @@ function advancedVeto(mapId, playerListId, player) {
   const li = document.getElementById(`adv-map${mapId}`);
   const target = document.getElementById(playerListId);
   if (!li || !target) return;
-  actionHistory.push({ action: "veto", mapId, player, playerListId, element: li });
+  actionHistory.push({
+    action: "veto",
+    mapId,
+    player,
+    playerListId,
+    element: li,
+  });
   moveElementWithAnimation(li, target, () => li.classList.add("vetoed-map"));
   checkAdvancedCompletion();
   updateStageIndicator();
@@ -693,8 +699,7 @@ function undoLastAction() {
       last.element.classList.remove("vetoed-map");
       advList.appendChild(last.element);
     }
-  }
-  else if (last.action === "basicToggle") {
+  } else if (last.action === "basicToggle") {
     const li = document.getElementById(`map${last.mapId}`);
     const indicator = li.querySelector(".order-indicator");
     if (li && indicator) {
@@ -716,38 +721,56 @@ function undoLastAction() {
   updateStageIndicator();
 }
 
-window.addEventListener("DOMContentLoaded", async () => {
-  // Load current maps from maps.json
+async function loadMapsByMode(mode, folder = "current") {
   try {
     const response = await fetch("/data/maps.json");
     const allMaps = await response.json();
-    const currentMaps = allMaps.filter((map) => map.folder === "current");
 
-    mapData = currentMaps.map((map, index) => ({
+    // Filter maps for selected folder + mode
+    const selectedMaps = allMaps.filter(
+      (map) => map.folder === folder && map.mode === mode
+    );
+
+    mapData = selectedMaps.map((map, index) => ({
       id: index + 1,
       name: map.name,
       file: map.file,
     }));
 
+    // Setup map images (now uses folder + mode in the path)
     mapImages = {};
     mapData.forEach((map) => {
-      mapImages[map.id] = `img/maps/current/${map.file}`;
+      mapImages[map.id] = `img/maps/${folder}/${mode}/${map.file}`;
     });
 
+    // Reset and render
+    resetAll();
+    const list = document.querySelector(".map-list ul");
+    if (list) list.innerHTML = "";
     renderMapList();
     updateDisplayedMap();
-    updateDisplayedBestOf();
+
+    if (mapData.length > 0) {
+      const previewImage = document.getElementById("previewImage");
+      previewImage.src = mapImages[mapData[0].id];
+      previewImage.alt = `Map ${mapData[0].name} Preview`;
+    }
   } catch (err) {
-    console.error("❌ Failed to load maps.json or process maps:", err);
+    console.error("❌ Failed to load maps.json:", err);
+  }
+}
+
+// Attach dropdown change
+window.addEventListener("DOMContentLoaded", () => {
+  const modeDropdown = document.getElementById("modeDropdown");
+  if (modeDropdown) {
+    modeDropdown.addEventListener("change", (e) =>
+      loadMapsByMode(e.target.value, "current")
+    );
   }
 
-  // Attach hide preview checkbox listener
-  const checkbox = document.getElementById("hidePreviewCheckbox");
-  if (checkbox) {
-    checkbox.addEventListener("change", toggleMapPreviewVisibility);
-  }
-
-  // Your other listeners...
+  // Default load = current 1v1
+  loadMapsByMode("1v1", "current");
 });
 
 document
