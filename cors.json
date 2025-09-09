@@ -2,7 +2,7 @@
   {
     "origin": [
       "https://zbuildorder.com",
-      "https://z-build-order--dev-48d2kuqu.web.app"
+      "https://z-build-order--dev-l0a5crn1.web.app"
     ],
     "method": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     "maxAgeSeconds": 3600,

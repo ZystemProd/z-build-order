@@ -685,7 +685,7 @@ def upload():
                         entries.append({
                             'clock_sec': int(ingame_sec),
                             'supply': used_s,
-                            'made': 0,
+                            'made': current_made if have_stats else get_supply(event.second)[1],
                             'unit': unit_name,
                             'kind': 'start',
                             'source': 'morph'
@@ -709,7 +709,7 @@ def upload():
                     entries.append({
                         'clock_sec': int(ingame_sec),
                         'supply': used_s,
-                        'made': 0,
+                        'made': current_made if have_stats else get_supply(event.second)[1],
                         'unit': name,
                         'kind': 'start',
                         'source': 'warp-in'  # new!
@@ -836,7 +836,7 @@ def upload():
                 entries.append({
                     'clock_sec': int(start_ingame_sec),
                     'supply': used_s,
-                    'made': 0,
+                    'made': current_made if have_stats else get_supply(event.second)[1],
                     'unit': name,
                     'kind': 'start'
                 })
@@ -856,7 +856,7 @@ def upload():
                         entries.append({
                             'clock_sec': int(frame_to_ingame_seconds(cocoon_frame, replay)),
                             'supply': ravager_supply,
-                            'made': 0,
+                            'made': current_made if have_stats else get_supply(event.second)[1],
                             'unit': 'Ravager',
                             'kind': 'start',
                         })
@@ -936,7 +936,7 @@ def upload():
                 entries.append({
                     'clock_sec': int(init_ingame_sec),
                     'supply': supply_at_start,
-                    'made': 0,
+                    'made': current_made if have_stats else get_supply(event.second)[1],
                     'unit': name,
                     'kind': 'start'
                 })
@@ -1044,8 +1044,7 @@ def upload():
 
                     parts = []
                     if not exclude_supply:
-                        supply_str = f"{first['supply']}/{first['made']}" if first['supply'] > first['made'] and first['made'] > 0 else str(first['supply'])
-                        parts.append(supply_str)
+                        parts.append(str(first['supply']))
                     if not exclude_time:    
                         parts.append(f"{minutes:02d}:{seconds:02d}")
 
@@ -1073,10 +1072,7 @@ def upload():
                     i += 1
                 parts = []
                 if not exclude_supply:
-                    supply_str = (
-                        f"{supply}/{made}" if supply > made and made > 0 else str(supply)
-                    )
-                    parts.append(supply_str)
+                    parts.append(str(supply))
                 prefix = f"[{' '.join(parts)}] " if parts else ""
                 build_lines.append(prefix + " + ".join(units))
         else:
@@ -1087,8 +1083,7 @@ def upload():
 
                     parts = []
                     if not exclude_supply:
-                        supply_str = f"{item['supply']}/{item['made']}" if item['supply'] > item['made'] and item['made'] > 0 else str(item['supply'])
-                        parts.append(supply_str)
+                        parts.append(str(item['supply']))
 
                     if not exclude_time:
                         parts.append(f"{minutes:02d}:{seconds:02d}")
@@ -1100,8 +1095,7 @@ def upload():
 
                 parts = []
                 if not exclude_supply:
-                    supply_str = f"{item['supply']}/{item['made']}" if item['supply'] > item['made'] and item['made'] > 0 else str(item['supply'])
-                    parts.append(supply_str)
+                    parts.append(str(item['supply']))
                 if not exclude_time:
                     minutes, seconds = divmod(item.get('clock_sec', item.get('time', 0)), 60)
                     parts.append(f"{minutes:02d}:{seconds:02d}")
@@ -1110,6 +1104,17 @@ def upload():
                 label = f"{qty} {item['unit']}" if qty > 1 else item['unit']
                 build_lines.append(prefix + label)
 
+        # ---- oversupply correction ---------------------------------
+        try:
+            ov_idx = next(i for i, line in enumerate(build_lines)
+                         if re.search(r"\[14\]\s+.*Overlord", line))
+        except StopIteration:
+            ov_idx = None
+
+        if ov_idx is not None:
+            for j in range(ov_idx):
+                if re.match(r"\[15\]", build_lines[j]):
+                    build_lines[j] = build_lines[j].replace("[15]", "[15/14]", 1)
 
         return '\n'.join(build_lines)
 
