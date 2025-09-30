@@ -11,7 +11,7 @@ import {
   where,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { logAnalyticsEvent } from "../analyticsHelper.js";
-import { showToast } from "../toastHandler.js"; // ✅ Make sure this is correct!
+import { showToast } from "../toastHandler.js";
 
 function getBuildIdFromPath() {
   const parts = window.location.pathname.split("/").filter(Boolean);
@@ -88,3 +88,28 @@ async function importBuildHandler() {
     logAnalyticsEvent("build_import_failed", { reason: error.message });
   }
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+  const shareButton = document.getElementById("shareBuildButton");
+  if (!shareButton) return;
+
+  shareButton.style.display = "inline-flex";
+
+  safeAdd("shareBuildButton", "click", async () => {
+    const shareUrl = window.location.href; // current page URL, already pretty
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: "Check out this SC2 Build Order",
+          url: shareUrl,
+        });
+      } catch (err) {
+        console.warn("Share canceled:", err);
+      }
+    } else {
+      await navigator.clipboard.writeText(shareUrl);
+      showToast("✅ Link copied to clipboard!", "success");
+    }
+  });
+});

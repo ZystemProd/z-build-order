@@ -23,7 +23,10 @@ import { auth, db } from "../../app.js";
 import { showToast } from "./toastHandler.js";
 import { updateYouTubeEmbed, clearYouTubeEmbed } from "./youtube.js";
 import { mapAnnotations } from "./interactive_map.js";
-import { formatActionText, formatWorkersOrTimestampText } from "./textFormatters.js";
+import {
+  formatActionText,
+  formatWorkersOrTimestampText,
+} from "./textFormatters.js";
 import { capitalize } from "./helpers/sharedEventUtils.js";
 import { analyzeBuildOrder } from "./uiHandlers.js";
 import { publishBuildToCommunity } from "./community.js";
@@ -299,6 +302,10 @@ export async function viewBuild(buildId) {
     const titleInput = document.getElementById("buildOrderTitleInput");
     const titleText = document.getElementById("buildOrderTitleText");
     const matchUpDropdown = document.getElementById("buildCategoryDropdown");
+    const modeDropdown = document.getElementById("mapModeDropdown");
+    if (modeDropdown && build.mapMode) {
+      modeDropdown.value = build.mapMode;
+    }
 
     const capitalizeWords = (str) =>
       str
@@ -354,9 +361,12 @@ export async function viewBuild(buildId) {
         const folder = mapEntry?.folder || "";
         const fileName =
           mapEntry?.file || mapName.replace(/ /g, "_").toLowerCase() + ".webp";
+        // ✅ Add support for mapMode
+        const mode = build.mapMode || "1v1"; // fallback for old builds
+
         mapUrl = folder
-          ? `/img/maps/${folder}/${fileName}`
-          : `/img/maps/${fileName}`;
+          ? `/img/maps/${folder}/${mode}/${fileName}`
+          : `/img/maps/${mode}/${fileName}`;
       } catch (err) {
         console.warn("Could not load maps.json, falling back.");
         mapUrl = `/img/maps/${mapName.replace(/ /g, "_").toLowerCase()}.webp`;
@@ -1081,7 +1091,9 @@ function updateBuildPreview(build) {
       }
       if (step && step.action) {
         const bracket = step.workersOrTimestamp
-          ? `<strong>${formatWorkersOrTimestampText(step.workersOrTimestamp)}</strong> `
+          ? `<strong>${formatWorkersOrTimestampText(
+              step.workersOrTimestamp
+            )}</strong> `
           : "";
         return `${bracket}${formatActionText(step.action)}`;
       }

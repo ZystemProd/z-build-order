@@ -69,6 +69,9 @@ export async function saveCurrentBuild() {
   const videoInput = document.getElementById("videoInput");
   const buildOrderInput = document.getElementById("buildOrderInput");
   const mapImage = document.getElementById("map-preview-image");
+  // ✅ Get map mode dropdown value
+  const modeDropdown = document.getElementById("mapModeDropdown");
+  const mapMode = modeDropdown ? DOMPurify.sanitize(modeDropdown.value) : "1v1";
 
   if (!titleInput || !categoryDropdown || !titleText) {
     console.error("Title or match-up dropdown is missing.");
@@ -219,6 +222,7 @@ export async function saveCurrentBuild() {
     buildOrder,
     map: mapName,
     mapFolder,
+    mapMode: mapMode,
     interactiveMap: {
       circles: mapAnnotations.circles.map(({ x, y }) => ({ x, y })),
       arrows: mapAnnotations.arrows.map(({ startX, startY, endX, endY }) => ({
@@ -325,6 +329,8 @@ export async function updateCurrentBuild(buildId) {
   const buildOrderInput = document.getElementById("buildOrderInput");
   const replayInput = document.getElementById("replayLinkInput");
   const mapImage = document.getElementById("map-preview-image");
+  const modeDropdown = document.getElementById("mapModeDropdown");
+  const mapMode = modeDropdown ? DOMPurify.sanitize(modeDropdown.value) : "1v1";
 
   const updatedData = {
     comment: DOMPurify.sanitize(commentInput?.value.trim() || ""),
@@ -332,6 +338,7 @@ export async function updateCurrentBuild(buildId) {
     replayUrl: DOMPurify.sanitize(replayInput?.value.trim() || ""),
     buildOrder: parseBuildOrder(buildOrderInput.value),
     subcategory: DOMPurify.sanitize(categoryDropdown.value || ""),
+    mapMode, // ✅ add this line
     interactiveMap: {
       circles: mapAnnotations.circles.map(({ x, y }) => ({ x, y })),
       arrows: mapAnnotations.arrows.map(({ startX, startY, endX, endY }) => ({
@@ -473,10 +480,15 @@ export async function syncToPublishedBuild(buildId, buildData) {
           upvotes: existingSnap.data().upvotes || 0,
           downvotes: existingSnap.data().downvotes || 0,
           userVotes: existingSnap.data().userVotes || {},
-          datePublished:
-            existingSnap.data().datePublished || Timestamp.now(),
+          datePublished: existingSnap.data().datePublished || Timestamp.now(),
         }
-      : { views: 0, upvotes: 0, downvotes: 0, userVotes: {}, datePublished: Timestamp.now() };
+      : {
+          views: 0,
+          upvotes: 0,
+          downvotes: 0,
+          userVotes: {},
+          datePublished: Timestamp.now(),
+        };
 
     let publisherClan = null;
     try {

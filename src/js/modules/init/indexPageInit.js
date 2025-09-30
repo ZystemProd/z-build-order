@@ -662,7 +662,9 @@ export async function initializeIndexPage() {
         btn.dataset.pid = pid;
         btn.addEventListener("click", () => {
           selectedPlayerPid = pid;
-          Array.from(wrapper.children).forEach((b) => b.classList.remove("active"));
+          Array.from(wrapper.children).forEach((b) =>
+            b.classList.remove("active")
+          );
           btn.classList.add("active");
           updateChronoWarning();
         });
@@ -672,8 +674,8 @@ export async function initializeIndexPage() {
         }
         wrapper.appendChild(btn);
       });
-  }
-  if (loader) loader.style.display = "none";
+    }
+    if (loader) loader.style.display = "none";
   }
 
   // Handle the actual replay upload and parsing
@@ -1088,6 +1090,55 @@ export async function initializeIndexPage() {
       }
     });
   }
+
+  // 🆕 Share button trigger
+  safeAdd("shareBuildButton", "click", async () => {
+    const buildId = getCurrentBuildId();
+
+    if (!buildId) {
+      showToast(
+        "⚠️ You need to publish this build first before sharing.",
+        "error"
+      );
+      return;
+    }
+
+    // Get the current build data to generate slug
+    const buildRef = doc(db, `publishedBuilds`, buildId);
+    const buildSnap = await getDoc(buildRef);
+
+    if (!buildSnap.exists()) {
+      showToast("❌ Build not found.", "error");
+      return;
+    }
+
+    const build = buildSnap.data();
+
+    const slugify = (text) =>
+      text
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)+/g, "");
+
+    const matchup = (build.subcategory || "unknown").toLowerCase();
+    const titleSlug = slugify(build.title || "untitled");
+
+    const shareUrl = `${window.location.origin}/build/${matchup}/${titleSlug}/${buildId}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: "Check out this SC2 Build Order",
+          url: shareUrl,
+        });
+      } catch (err) {
+        console.warn("Share canceled:", err);
+      }
+    } else {
+      await navigator.clipboard.writeText(shareUrl);
+      showToast("✅ Link copied to clipboard!", "success");
+    }
+  });
 
   // --- Other Initializations
   initializeSectionToggles();

@@ -255,48 +255,5 @@
     "file": "tuonela.webp",
     "folder": "current",
     "mode": "4v4"
-  },
-
-  {
-    "name": "Abyssal Reef",
-    "file": "abyssal_reef.webp",
-    "folder": "archive",
-    "mode": "1v1"
-  },
-  {
-    "name": "Amygdala",
-    "file": "amygdala.webp",
-    "folder": "archive",
-    "mode": "1v1"
-  },
-  {
-    "name": "El Dorado",
-    "file": "el_dorado.webp",
-    "folder": "archive",
-    "mode": "1v1"
-  },
-  {
-    "name": "Frostline",
-    "file": "frostline.webp",
-    "folder": "archive",
-    "mode": "1v1"
-  },
-  {
-    "name": "King's Cove",
-    "file": "king's_cove.webp",
-    "folder": "archive",
-    "mode": "1v1"
-  },
-  {
-    "name": "Neon Violet Square",
-    "file": "neon_violet_square.webp",
-    "folder": "archive",
-    "mode": "1v1"
-  },
-  {
-    "name": "Whispers of Gold",
-    "file": "whispers_of_gold.webp",
-    "folder": "archive",
-    "mode": "1v1"
   }
 ]
