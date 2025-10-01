@@ -277,12 +277,6 @@ input[type="text"]:disabled {
   vertical-align: middle;
 }
 
-#importBuildButton.imported {
-  background-color: #444;
-  color: #ccc;
-  cursor: default;
-}
-
 .build-header-row {
   display: flex;
   align-items: center;

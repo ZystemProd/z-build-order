@@ -15,8 +15,18 @@
       <label for="bestOfInput">Best of (1-9):</label>
       <input type="number" id="bestOfInput" min="1" max="9" />
       <button id="confirmBestOfButton">Confirm</button>
+
+      <!-- Mode dropdown moved here -->
+      <label for="modeDropdown">Mode:</label>
+      <select id="modeDropdown">
+        <option value="1v1" selected>1v1</option>
+        <option value="2v2">2v2</option>
+        <option value="3v3">3v3</option>
+        <option value="4v4">4v4</option>
+      </select>
     </div>
   </div>
+
   <div class="main-wrapper">
     <div class="container">
       <a href="index.html" id="backButton" class="back-button">
@@ -64,16 +74,7 @@
             Show
           </button>
         </h5>
-        <!-- Mode Selection -->
-        <div class="mode-select">
-          <label for="modeDropdown">Mode:</label>
-          <select id="modeDropdown">
-            <option value="1v1" selected>1v1</option>
-            <option value="2v2">2v2</option>
-            <option value="3v3">3v3</option>
-            <option value="4v4">4v4</option>
-          </select>
-        </div>
+
         <!-- Heading for Map Settings -->
         <div class="button-container">
           <button id="prevMapButton">Previous</button>

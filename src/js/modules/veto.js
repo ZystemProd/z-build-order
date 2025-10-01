@@ -106,35 +106,6 @@ window.addEventListener("DOMContentLoaded", () => {
   updateStageIndicator();
 });
 
-// Map Rendering
-function renderMapList() {
-  const mapList = document.querySelector(".map-list ul");
-  mapData.forEach((map) => {
-    const li = document.createElement("li");
-    li.id = `map${map.id}`;
-
-    const labelSpan = document.createElement("span");
-    labelSpan.id = `label${map.id}`;
-    labelSpan.textContent = map.name;
-
-    const indicatorSpan = document.createElement("span");
-    indicatorSpan.classList.add("order-indicator");
-
-    li.appendChild(labelSpan);
-    li.appendChild(indicatorSpan);
-
-    // Event listeners instead of inline attributes
-    li.addEventListener("click", () => toggleVeto(map.id));
-    li.addEventListener("mouseover", () => showPreview(map.id));
-    li.addEventListener("mouseout", () => keepHoveredMap());
-    indicatorSpan.addEventListener("click", (event) =>
-      cycleOrder(map.id, event)
-    );
-
-    mapList.appendChild(li);
-  });
-}
-
 // Map Preview on Hover
 function showPreview(mapNumber) {
   const previewImage = document.getElementById("previewImage");
@@ -721,29 +692,33 @@ function undoLastAction() {
   updateStageIndicator();
 }
 
-async function loadMapsByMode(mode, folder = "current") {
+// Load maps by mode (only current maps)
+async function loadMapsByMode(mode) {
   try {
     const response = await fetch("/data/maps.json");
     const allMaps = await response.json();
 
-    // Filter maps for selected folder + mode
+    // Filter maps: current maps only, matching mode
     const selectedMaps = allMaps.filter(
-      (map) => map.folder === folder && map.mode === mode
+      (map) => map.mode === mode && map.folder.startsWith("current")
     );
 
     mapData = selectedMaps.map((map, index) => ({
       id: index + 1,
-      name: map.name,
+      name: map.name, // only show the name
       file: map.file,
+      folder: map.folder,
+      mode: map.mode,
     }));
 
-    // Setup map images (now uses folder + mode in the path)
+    // Setup map images
     mapImages = {};
     mapData.forEach((map) => {
-      mapImages[map.id] = `img/maps/${folder}/${mode}/${map.file}`;
+      // Use "current" folder in path
+      mapImages[map.id] = `img/maps/current/${mode}/${map.file}`;
     });
 
-    // Reset and render
+    // Reset & render
     resetAll();
     const list = document.querySelector(".map-list ul");
     if (list) list.innerHTML = "";
@@ -760,17 +735,53 @@ async function loadMapsByMode(mode, folder = "current") {
   }
 }
 
+function renderMapList() {
+  const mapList = document.querySelector(".map-list ul");
+  mapList.innerHTML = ""; // Clear previous maps
+  mapData.forEach((map) => {
+    const li = document.createElement("li");
+    li.id = `map${map.id}`;
+
+    const labelSpan = document.createElement("span");
+    labelSpan.id = `label${map.id}`;
+    labelSpan.textContent = map.name; // only show the name
+
+    const indicatorSpan = document.createElement("span");
+    indicatorSpan.classList.add("order-indicator");
+
+    li.appendChild(labelSpan);
+    li.appendChild(indicatorSpan);
+
+    li.addEventListener("click", () => toggleVeto(map.id));
+    li.addEventListener("mouseover", () => showPreview(map.id));
+    li.addEventListener("mouseout", () => keepHoveredMap());
+    indicatorSpan.addEventListener("click", (event) =>
+      cycleOrder(map.id, event)
+    );
+
+    mapList.appendChild(li);
+  });
+}
+
 // Attach dropdown change
 window.addEventListener("DOMContentLoaded", () => {
   const modeDropdown = document.getElementById("modeDropdown");
   if (modeDropdown) {
-    modeDropdown.addEventListener("change", (e) =>
-      loadMapsByMode(e.target.value, "current")
-    );
+    modeDropdown.addEventListener("change", async (e) => {
+      const mode = e.target.value; // "1v1", "2v2", etc.
+      await loadMapsByMode(mode);
+
+      // Refresh advanced list if exists
+      const modalList = document.getElementById("advanced-map-list");
+      if (modalList) {
+        modalList.innerHTML = "";
+        renderAdvancedMapList();
+      }
+    });
   }
 
   // Default load = current 1v1
-  loadMapsByMode("1v1", "current");
+  loadMapsByMode("1v1");
 });
 
 document
