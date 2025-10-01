@@ -339,10 +339,11 @@ export function initializeMapSelection(mapAnnotations) {
   })();
 
   // Re-render maps when mode changes (delegated on the modal so we don't miss a late DOM)
+  // When mode dropdown changes
   modal.addEventListener("change", (e) => {
     if (!e.target || e.target.id !== "mapModeDropdown") return;
-    const folder = getActiveFolder();
-    renderMapCards(folder).then(() => loadMapsOnDemand());
+    const selectedMode = e.target.value;
+    renderMapCards("current").then(() => loadMapsOnDemand());
   });
 
   // Map card clicks — set preview + attach metadata (folder/mode/name) on the preview image
@@ -414,32 +415,26 @@ export async function renderMapCards(folder = "current") {
     const maps = await response.json();
 
     // Clear container
-    while (buildsContainer.firstChild)
-      buildsContainer.removeChild(buildsContainer.firstChild);
+    buildsContainer.innerHTML = "";
 
     const seen = new Set();
 
     maps
       .filter((map) => {
-        const mapFolder = map.folder || "";
-        if (mapFolder !== folder) return false;
+        // Only include "current" maps
+        if (!map.folder || !map.folder.startsWith("current")) return false;
 
-        // Normalize map.mode: could be string or array or missing
+        // Ensure map mode matches selectedMode
         const mapMode = Array.isArray(map.mode) ? map.mode : map.mode || "1v1";
-
         if (Array.isArray(mapMode)) return mapMode.includes(selectedMode);
-        return (mapMode || "1v1") === selectedMode;
+        return mapMode === selectedMode;
       })
       .forEach((map) => {
         const fileName =
           map.file ||
           `${(map.name || "").replace(/\s+/g, "_").toLowerCase()}.webp`;
-        const modeForCard = Array.isArray(map.mode)
-          ? selectedMode
-          : map.mode || "1v1";
-        const dataMapPath = `img/maps/${DOMPurify.sanitize(
-          map.folder || folder
-        )}/${DOMPurify.sanitize(modeForCard)}/${DOMPurify.sanitize(fileName)}`;
+
+        const dataMapPath = `img/maps/current/${selectedMode}/${fileName}`;
 
         // Deduplicate by name + file
         const dedupeKey = `${(map.name || "").toLowerCase()}|${fileName}`;
@@ -449,20 +444,17 @@ export async function renderMapCards(folder = "current") {
         const mapCard = document.createElement("div");
         mapCard.className = "map-card";
 
-        // Attach helpful dataset for later usage when clicked
-        mapCard.dataset.mapName = DOMPurify.sanitize(map.name || "");
-        mapCard.dataset.folder = DOMPurify.sanitize(map.folder || folder);
-        mapCard.dataset.mode = DOMPurify.sanitize(modeForCard);
-        mapCard.dataset.file = DOMPurify.sanitize(fileName);
+        mapCard.dataset.mapName = map.name || "";
+        mapCard.dataset.folder = "current";
+        mapCard.dataset.mode = selectedMode;
+        mapCard.dataset.file = fileName;
         mapCard.setAttribute("data-map", dataMapPath);
 
         mapCard.innerHTML = `
-          <div class="map-card-title">${DOMPurify.sanitize(
-            map.name || ""
-          )}</div>
-          <img class="map-image" data-src="${DOMPurify.sanitize(
-            dataMapPath
-          )}" alt="${DOMPurify.sanitize(map.name || "")}">
+          <div class="map-card-title">${map.name || ""}</div>
+          <img class="map-image" data-src="${dataMapPath}" alt="${
+          map.name || ""
+        }">
         `;
 
         buildsContainer.appendChild(mapCard);
