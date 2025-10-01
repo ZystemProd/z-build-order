@@ -11,33 +11,34 @@ let advancedStage = "veto"; // stages: veto, pick
 let pickOrder = 1;
 let actionHistory = [];
 
+const bestOfSelect = document.getElementById("bestOfSelect");
+
 function showBestOfModal() {
   const modal = document.getElementById("bestOfModal");
-  const input = document.getElementById("bestOfInput");
-  if (modal && input) {
-    input.value = bestOfValue;
+  if (modal && bestOfSelect) {
+    bestOfSelect.value = bestOfValue;
     modal.style.display = "flex";
-    input.focus();
+    // no focus needed — prevents mobile zoom
   }
 }
 
-function confirmBestOf(inputEl) {
-  if (!inputEl) return;
-  const val = parseInt(inputEl.value, 10);
-  if (val >= 1 && val <= 9) {
-    bestOfValue = val;
-    const modal = document.getElementById("bestOfModal");
-    if (modal) modal.style.display = "none";
-    updateDisplayedBestOf();
-    checkUnvetoedMapsForBestOf();
-    if (document.getElementById("advanced-map-list")) {
-      recalcAdvancedStage();
-      updateStageIndicator();
-    }
-  } else {
-    alert("Please enter a number between 1 and 9.");
+function confirmBestOf(selectEl) {
+  if (!selectEl) return;
+  const val = parseInt(selectEl.value, 10);
+  bestOfValue = val;
+  const modal = document.getElementById("bestOfModal");
+  if (modal) modal.style.display = "none";
+  updateDisplayedBestOf();
+  checkUnvetoedMapsForBestOf();
+  if (document.getElementById("advanced-map-list")) {
+    recalcAdvancedStage();
+    updateStageIndicator();
   }
 }
+
+document
+  .getElementById("confirmBestOfButton")
+  ?.addEventListener("click", () => confirmBestOf(bestOfSelect));
 
 // DOM Content Loaded
 window.addEventListener("DOMContentLoaded", () => {
