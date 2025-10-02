@@ -738,21 +738,44 @@ async function loadMapsByMode(mode) {
 
 function renderMapList() {
   const mapList = document.querySelector(".map-list ul");
+  if (!mapList) return;
+
   mapList.innerHTML = ""; // Clear previous maps
+
   mapData.forEach((map) => {
+    // Map list item
     const li = document.createElement("li");
     li.id = `map${map.id}`;
 
+    // Map name
     const labelSpan = document.createElement("span");
     labelSpan.id = `label${map.id}`;
-    labelSpan.textContent = map.name; // only show the name
+    labelSpan.textContent = map.name;
 
+    // Order indicator
     const indicatorSpan = document.createElement("span");
     indicatorSpan.classList.add("order-indicator");
 
+    // Preview button inside <li>
+    const previewBtn = document.createElement("button");
+    previewBtn.className = "preview-btn";
+    previewBtn.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+        <path d="M12 5c-7.633 0-11 7-11 7s3.367 7 11 7 11-7 11-7-3.367-7-11-7zm0 11a4 4 0 110-8 4 4 0 010 8z"/>
+        <circle cx="12" cy="12" r="2.5"/>
+      </svg>
+    `;
+    previewBtn.addEventListener("click", (e) => {
+      e.stopPropagation(); // don’t trigger veto
+      openMapPreview(map.id);
+    });
+
+    // Add elements to <li>
     li.appendChild(labelSpan);
     li.appendChild(indicatorSpan);
+    li.appendChild(previewBtn); // ✅ inside li
 
+    // Events for veto/order
     li.addEventListener("click", () => toggleVeto(map.id));
     li.addEventListener("mouseover", () => showPreview(map.id));
     li.addEventListener("mouseout", () => keepHoveredMap());
@@ -760,7 +783,41 @@ function renderMapList() {
       cycleOrder(map.id, event)
     );
 
-    mapList.appendChild(li);
+    // Row wrapper
+    const row = document.createElement("div");
+    row.className = "map-row";
+    row.appendChild(li);
+
+    // Add row to list
+    mapList.appendChild(row);
+  });
+}
+
+// --- Mobile Preview Modal ---
+const modal = document.getElementById("mapPreviewModal");
+const modalImg = document.getElementById("modalPreviewImage");
+const closeModalBtn = document.getElementById("closePreviewModal");
+
+function openMapPreview(mapId) {
+  if (!modal || !modalImg) return;
+  modalImg.src = mapImages[mapId];
+  modalImg.alt = `Map ${
+    mapData.find((m) => m.id === mapId)?.name || ""
+  } Preview`;
+  modal.style.display = "flex";
+}
+
+if (closeModalBtn) {
+  closeModalBtn.addEventListener("click", () => {
+    modal.style.display = "none";
+  });
+}
+
+if (modal) {
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) {
+      modal.style.display = "none";
+    }
   });
 }
 

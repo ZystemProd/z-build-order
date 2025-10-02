@@ -85,6 +85,20 @@ body {
   border-color: #fff;
 }
 
+.map-list li:not(.vetoed-map) .preview-btn {
+  display: flex !important;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 6px;
+  align-items: center;
+}
+
+.map-list li.vetoed-map .preview-btn {
+  display: none !important;
+}
+
 #previewImage {
   width: 100%;
   max-width: 400px; /* Max width for preview image */
@@ -206,7 +220,7 @@ button {
   align-items: center; /* Center the text vertically within the footer */
   color: white;
   font-family: Arial, sans-serif;
-  z-index: -1;
+  z-index: 1;
 }
 
 .footer-logo {
@@ -925,6 +939,83 @@ html {
   cursor: pointer;
 }
 
+/* Modal */
+.map-preview-modal {
+  display: none;
+  position: fixed;
+  z-index: 2000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.8);
+  justify-content: center;
+  align-items: center;
+}
+
+.map-preview-modal-content {
+  background: #222;
+  padding: 12px;
+  border-radius: 10px;
+  max-width: 90%;
+  max-height: 80%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.map-preview-modal-content img {
+  max-width: 100%;
+  max-height: 70vh;
+  border-radius: 10px;
+}
+
+.close-preview {
+  color: #fff;
+  font-size: 28px;
+  font-weight: bold;
+  cursor: pointer;
+  margin-bottom: 6px;
+}
+
+/* New wrapper for each map row */
+.map-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Keep map li same as before */
+.map-row li {
+  flex: 1;
+  margin: 5px; /* Reset since wrapper adds spacing */
+}
+
+/* Preview button styling */
+.preview-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  margin: 0px;
+  align-items: center;
+}
+
+.preview-btn svg {
+  width: 22px;
+  height: 22px;
+  fill: #eee;
+  transition: fill 0.2s;
+}
+
+.preview-btn:hover svg {
+  fill: var(--hover-blue);
+}
+
+/* Remove preview button if vetoed */
+.vetoed-map + .preview-btn {
+  display: none;
+}
+
 /* Responsive Layout */
 @media (max-width: 768px) {
   .container {
@@ -941,6 +1032,7 @@ html {
   .map-list {
     height: calc(100vh - 220px);
     overflow-y: auto;
+    padding-bottom: 140px; /* ✅ adds breathing room so mobile-action-buttons don't overlap */
   }
 
   .map-preview {
@@ -962,11 +1054,12 @@ html {
   .mobile-action-buttons {
     display: flex;
     position: fixed;
-    bottom: 110px;
+    bottom: 80px; /* ✅ slightly closer to footer */
     width: 70%;
     max-width: 420px;
     left: 50%;
     transform: translateX(-50%);
+    z-index: 10; /* make sure it's above content */
   }
 
   .footer {
@@ -981,6 +1074,36 @@ html {
     margin-top: 6px;
     right: auto;
     bottom: auto;
+  }
+
+  .map-list li {
+    margin: 6px 0; /* still compact on mobile */
+  }
+
+  .map-list .preview-btn {
+    display: flex; /* show button */
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    margin-left: 6px; /* small gap, not big */
+    align-items: center;
+  }
+
+  .map-list .preview-btn svg {
+    width: 22px;
+    height: 22px;
+    fill: #eee;
+    transition: fill 0.2s;
+  }
+
+  .map-list .preview-btn:hover svg {
+    fill: var(--hover-blue);
+  }
+
+  /* Hide preview button when vetoed */
+  .map-list li.vetoed-map .preview-btn {
+    display: none;
   }
 }
 
@@ -998,5 +1121,11 @@ html {
   .advanced-map-list li {
     width: 48%;
     max-width: none;
+  }
+}
+
+@media (min-width: 769px) {
+  .map-list .preview-btn {
+    display: none !important;
   }
 }
