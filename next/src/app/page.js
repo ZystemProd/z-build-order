@@ -356,7 +356,12 @@ export default function HomePage() {
               </div>
 
               <div id="map-preview-container" className="map-preview">
-                <img id="map-preview-image" className="map-image" src="" alt="Map Preview" />
+                <img
+                  id="map-preview-image"
+                  className="map-image"
+                  src={null}
+                  alt="Map Preview"
+                />
                 <div id="map-annotations" className="annotations"></div>
               </div>
             </div>
