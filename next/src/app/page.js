@@ -1,103 +1,102 @@
-import Image from "next/image";
+import Link from "next/link";
+
+const checklist = [
+  {
+    title: "Set up shared Firebase utilities",
+    description:
+      "Move initialization logic into src/lib/firebase.js and swap legacy module imports to use the shared instance.",
+  },
+  {
+    title: "Port priority pages",
+    description:
+      "Translate index.html and viewBuild.html into server components for SEO, then hydrate interactivity with client wrappers.",
+  },
+  {
+    title: "Componentize legacy modules",
+    description:
+      "Replace imperative DOM manipulation with React hooks (see BuildModal.jsx for the modal migration).",
+  },
+  {
+    title: "Adopt Tailwind incrementally",
+    description:
+      "Use utility classes for layout while keeping unique effects in globals.css until equivalents exist.",
+  },
+];
+
+const resources = [
+  {
+    name: "Migration Plan",
+    href: "https://github.com/zystemprod/z-build-order/blob/main/next/MIGRATION_PLAN.md",
+    description: "Project-wide mapping and milestone tracker for the move to Next.js.",
+  },
+  {
+    name: "Example Build Page",
+    href: "/viewBuild",
+    description: "Preview the React-powered build viewer backed by Firestore helpers.",
+  },
+  {
+    name: "Build Modal Component",
+    href: "https://github.com/zystemprod/z-build-order/blob/main/next/src/components/BuildModal.jsx",
+    description: "Direct link to the converted modal implementation for comparison with legacy modal.js.",
+  },
+];
 
 export default function Home() {
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.js
-            </code>
-            .
+    <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col gap-12 px-6 py-16 lg:px-12">
+      <header className="flex flex-col gap-4">
+        <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Next.js Migration</p>
+        <h1 className="text-balance text-4xl font-semibold text-white sm:text-5xl">
+          Bring Z-Build Order to the App Router without losing Firebase features.
+        </h1>
+        <p className="max-w-2xl text-pretty text-base text-slate-300 sm:text-lg">
+          Use this workspace to port modules, pages, and Firestore logic into reusable React components. Each section below
+          highlights what to tackle next so the legacy Vite experience can coexist while you iterate.
+        </p>
+      </header>
+
+      <section className="grid gap-6 sm:grid-cols-2">
+        {checklist.map((item) => (
+          <article
+            key={item.title}
+            className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-[0_1px_0_theme(colors.white/0.05)] backdrop-blur"
+          >
+            <h2 className="text-lg font-medium text-white">{item.title}</h2>
+            <p className="mt-2 text-sm text-slate-300">{item.description}</p>
+          </article>
+        ))}
+      </section>
+
+      <section className="rounded-3xl border border-cyan-500/30 bg-cyan-500/10 p-8">
+        <h2 className="text-xl font-semibold text-cyan-200">Suggested Order of Operations</h2>
+        <ol className="mt-4 space-y-3 text-sm text-cyan-50/90">
+          <li>
+            <span className="font-semibold text-cyan-100">1.</span> Wire up Firebase auth and Firestore in <code className="rounded bg-black/50 px-1 py-0.5">src/lib</code>.
           </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
+          <li>
+            <span className="font-semibold text-cyan-100">2.</span> Migrate page shells (navigation, footer, modals) into React components that accept props.
+          </li>
+          <li>
+            <span className="font-semibold text-cyan-100">3.</span> Recreate build parsing and interactive map logic inside client components that consume shared hooks.
+          </li>
+          <li>
+            <span className="font-semibold text-cyan-100">4.</span> Enable server-rendered SEO by introducing cached Firestore queries for community and comment content.
           </li>
         </ol>
+      </section>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+      <section className="grid gap-4 sm:grid-cols-3">
+        {resources.map((resource) => (
+          <Link
+            key={resource.name}
+            href={resource.href}
+            className="group rounded-2xl border border-white/10 bg-white/5 p-5 transition hover:border-cyan-400/60 hover:bg-cyan-500/10"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+            <h3 className="text-base font-semibold text-white group-hover:text-cyan-100">{resource.name}</h3>
+            <p className="mt-2 text-sm text-slate-300">{resource.description}</p>
+          </Link>
+        ))}
+      </section>
+    </main>
   );
 }
