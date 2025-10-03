@@ -1,3 +1,5 @@
+"use client";
+
 export default function HomePage() {
   // TODO: Replace placeholder handlers with real implementations using React state and Firebase hooks.
   const handlePlaceholder = () => {
