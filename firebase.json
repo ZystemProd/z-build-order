@@ -18,18 +18,13 @@
       }
     ],
     "rewrites": [
-      {
-        "source": "/sitemap.xml",
-        "function": "sitemap"
-      },
+      { "source": "/sitemap.xml", "function": "sitemap" },
       {
         "source": "/build/:matchup/:slug/:id",
-        "destination": "/viewBuild.html"
+        "function": "servePreRenderedBuild"
       },
-      {
-        "source": "/build/:id",
-        "destination": "/viewBuild.html"
-      }
+      { "source": "/build/:id", "function": "servePreRenderedBuild" },
+      { "source": "/viewBuild.html", "function": "servePreRenderedBuild" }
     ]
   },
   "emulators": {
