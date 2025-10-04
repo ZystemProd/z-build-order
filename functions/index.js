@@ -48,41 +48,74 @@ exports.renderNewBuild = onDocumentCreated(
     const page = await browser.newPage();
 
     const url = `${SITE_URL}?id=${buildId}`;
-    await page.goto(url, { waitUntil: "domcontentloaded" });
+    await page.goto(url, { waitUntil: "networkidle0" });
+
+    const waitForSelectorWithWarning = async (selector, timeout = 10000) => {
+      try {
+        await page.waitForSelector(selector, { timeout });
+      } catch (err) {
+        console.warn(
+          `Selector ${selector} not found within ${timeout}ms for build ${buildId}:`,
+          err.message
+        );
+      }
+    };
 
     // Wait for SPA to populate the main build data
-    // Adjust selectors to match your SPA
-    await page.waitForSelector("#buildTitle", { timeout: 10000 });
-    await page.waitForSelector("#buildUsername", { timeout: 10000 });
-    await page.waitForSelector("#buildSteps", { timeout: 10000 });
+    await waitForSelectorWithWarning("#buildTitle");
+    await waitForSelectorWithWarning("#buildPublisher");
+    await waitForSelectorWithWarning("#buildOrder");
+
+    try {
+      await page.addScriptTag({
+        url: "https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.3/purify.min.js",
+      });
+    } catch (err) {
+      console.warn("Failed to load DOMPurify for sanitization:", err.message);
+    }
 
     // Inject SEO meta tags dynamically
     await page.evaluate((data) => {
       const head = document.querySelector("head");
+      if (!head || typeof DOMPurify === "undefined") {
+        console.warn("DOMPurify not available or head element missing");
+        return;
+      }
+
+      const sanitizedTitle = DOMPurify.sanitize(data.title || "Untitled build");
+      const sanitizedPublisher = DOMPurify.sanitize(
+        data.publisher || "Anonymous"
+      );
+      const sanitizedSubcategory = DOMPurify.sanitize(
+        data.subcategory || "Unknown"
+      );
 
       // Title
       const titleTag = document.createElement("title");
-      titleTag.textContent = `Z-Build Order – ${data.title}`;
+      titleTag.textContent = `Z-Build Order – ${sanitizedTitle}`;
       head.appendChild(titleTag);
 
       // Meta description
       const descTag = document.createElement("meta");
       descTag.name = "description";
-      descTag.content = `StarCraft 2 build order by ${
-        data.username || "Anonymous"
-      }, matchup: ${data.subcategory || "Unknown"}`;
+      descTag.content = `StarCraft 2 build order by ${sanitizedPublisher}, matchup: ${sanitizedSubcategory}`;
       head.appendChild(descTag);
 
       // Open Graph tags
       const ogTitle = document.createElement("meta");
       ogTitle.setAttribute("property", "og:title");
-      ogTitle.content = `Z-Build Order – ${data.title}`;
+      ogTitle.content = `Z-Build Order – ${sanitizedTitle}`;
       head.appendChild(ogTitle);
 
       const ogDesc = document.createElement("meta");
       ogDesc.setAttribute("property", "og:description");
-      ogDesc.content = `Build order for ${data.subcategory || "Unknown"}`;
+      ogDesc.content = `Build order for ${sanitizedSubcategory}`;
       head.appendChild(ogDesc);
+
+      const ogPublisher = document.createElement("meta");
+      ogPublisher.setAttribute("property", "og:site_name");
+      ogPublisher.content = sanitizedPublisher;
+      head.appendChild(ogPublisher);
     }, buildData);
 
     const html = await page.content();
@@ -116,9 +149,7 @@ exports.servePreRenderedBuild = onRequest(async (req, res) => {
   const userAgent = req.headers["user-agent"] || "";
 
   if (!isBot(userAgent)) {
-    const host = req.headers.host;
     res.redirect(302, `/viewBuild.html?id=${buildId}`);
-
     return;
   }
 
@@ -127,13 +158,13 @@ exports.servePreRenderedBuild = onRequest(async (req, res) => {
     const [exists] = await file.exists();
 
     if (!exists) {
-      res.status(404).send("Pre-rendered build not found.");
+      res.redirect(302, `/viewBuild.html?id=${buildId}`);
       return;
     }
 
     const [contents] = await file.download();
     res.set("Content-Type", "text/html");
-    res.set("Cache-Control", "public, max-age=300"); // 5 min cache
+    res.set("Cache-Control", "public, max-age=300, s-maxage=600");
 
     res.status(200).send(contents.toString("utf-8"));
   } catch (err) {
