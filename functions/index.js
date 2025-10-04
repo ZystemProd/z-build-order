@@ -380,12 +380,13 @@ exports.servePreRenderedBuild = onRequest(
     const canonicalUrl = buildCanonicalUrl(req);
 
     if (!isBot(userAgent)) {
-      try {
-        await sendSpaIndex(res);
-      } catch (error) {
-        console.error("❌ Failed to serve SPA index:", error);
-        res.status(500).send("Application unavailable.");
-      }
+      const filePath = path.join(process.cwd(), "dist", "viewBuild.html");
+      res.sendFile(filePath, (err) => {
+        if (err) {
+          console.error("Failed to send SPA fallback:", err);
+          res.status(500).send("Application unavailable.");
+        }
+      });
       return;
     }
 
