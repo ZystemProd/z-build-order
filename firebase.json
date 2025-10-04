@@ -15,12 +15,30 @@
             "value": "same-origin-allow-popups"
           }
         ]
+      },
+      {
+        "source": "/build/**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
       }
     ],
     "rewrites": [
-      { "source": "/sitemap.xml", "function": "sitemap" },
-      { "source": "/build/:matchup/:slug/:id", "function": "servePreRenderedBuild" },
-      { "source": "/build/:id", "function": "servePreRenderedBuild" }
+      {
+        "source": "/build/**",
+        "function": "servePreRenderedBuild"
+      },
+      {
+        "source": "/sitemap.xml",
+        "function": "sitemap"
+      },
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
     ]
   },
   "emulators": {

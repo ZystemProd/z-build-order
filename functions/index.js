@@ -73,7 +73,10 @@ async function loadSpaIndex() {
     try {
       cachedSpaIndex = await fs.readFile(SPA_INDEX_PATH, "utf8");
     } catch (error) {
-      console.warn("⚠️ Failed to read SPA index from filesystem:", error.message);
+      console.warn(
+        "⚠️ Failed to read SPA index from filesystem:",
+        error.message
+      );
 
       try {
         const response = await fetch(SPA_REMOTE_URL, {
@@ -166,14 +169,8 @@ function addCanonicalLink(html, canonicalUrl) {
 
 function buildMetaStrings(buildData) {
   const sanitizedTitle = sanitizeText(buildData.title, "Untitled build");
-  const sanitizedPublisher = sanitizeText(
-    buildData.publisher,
-    "Anonymous"
-  );
-  const sanitizedSubcategory = sanitizeText(
-    buildData.subcategory,
-    "Unknown"
-  );
+  const sanitizedPublisher = sanitizeText(buildData.publisher, "Anonymous");
+  const sanitizedSubcategory = sanitizeText(buildData.subcategory, "Unknown");
 
   return {
     pageTitle: sanitizeText(
@@ -184,27 +181,13 @@ function buildMetaStrings(buildData) {
       `StarCraft 2 build order by ${sanitizedPublisher}, matchup: ${sanitizedSubcategory}`,
       "StarCraft 2 build order"
     ),
-    ogTitle: sanitizeText(
-      `Z-Build Order – ${sanitizedTitle}`,
-      "Z-Build Order"
-    ),
+    ogTitle: sanitizeText(`Z-Build Order – ${sanitizedTitle}`, "Z-Build Order"),
     ogDescription: sanitizeText(
       `Build order for ${sanitizedSubcategory}`,
       "StarCraft 2 build order"
     ),
     ogSiteName: sanitizedPublisher,
   };
-}
-
-async function waitForSelectorWithWarning(page, selector, buildId) {
-  try {
-    await page.waitForSelector(selector, { timeout: 10_000 });
-  } catch (err) {
-    console.warn(
-      `⚠️ Selector ${selector} not found within timeout for build ${buildId}:`,
-      err.message
-    );
-  }
 }
 
 async function launchBrowser() {
@@ -230,9 +213,19 @@ async function fetchBuildData(buildId) {
   return snapshot.data();
 }
 
+async function waitForSelectorWithWarning(page, selector, buildId) {
+  try {
+    await page.waitForSelector(selector, { timeout: 10_000 });
+  } catch (err) {
+    console.warn(
+      `⚠️ Selector ${selector} not found within timeout for build ${buildId}:`,
+      err.message
+    );
+  }
+}
+
 async function captureBuildHtml(buildId, buildDataFromEvent) {
   const buildData = buildDataFromEvent || (await fetchBuildData(buildId));
-
   if (!buildData) {
     throw new Error(`No build data found for ${buildId}`);
   }
@@ -247,6 +240,7 @@ async function captureBuildHtml(buildId, buildDataFromEvent) {
     await page.setDefaultNavigationTimeout(PRERENDER_TIMEOUT_MS);
     await page.setDefaultTimeout(PRERENDER_TIMEOUT_MS / 4);
 
+    // Intercept requests to reduce bandwidth usage
     await page.setRequestInterception(true);
     page.on("request", (request) => {
       try {
@@ -258,66 +252,147 @@ async function captureBuildHtml(buildId, buildDataFromEvent) {
         }
       } catch (err) {
         console.warn(
-          `⚠️ Request interception failed for ${request.url?.() || "unknown URL"}:`,
+          `⚠️ Request interception failed for ${
+            request.url?.() || "unknown URL"
+          }:`,
           err.message
         );
       }
     });
 
     const targetUrl = `${SITE_URL}?id=${encodeURIComponent(buildId)}`;
-    await page.goto(targetUrl, { waitUntil: "networkidle0", timeout: PRERENDER_TIMEOUT_MS });
+    await page.goto(targetUrl, {
+      waitUntil: "networkidle0",
+      timeout: PRERENDER_TIMEOUT_MS,
+    });
 
-    for (const selector of SELECTORS_TO_WAIT) {
-      await waitForSelectorWithWarning(page, selector, buildId);
+    // ✅ Wait for main elements to load
+    await Promise.all([
+      waitForSelectorWithWarning(page, "#buildTitle", buildId),
+      waitForSelectorWithWarning(page, "#buildPublisher", buildId),
+      waitForSelectorWithWarning(page, "#buildOrder", buildId),
+    ]);
+
+    try {
+      // Wait for essential elements AND that they contain real text (not just "Loading...")
+      await page.waitForFunction(
+        () => {
+          const title = document
+            .querySelector("#buildTitle")
+            ?.textContent?.trim();
+          const publisher = document
+            .querySelector("#buildPublisher")
+            ?.textContent?.trim();
+          const order = document
+            .querySelector("#buildOrder")
+            ?.innerText?.trim();
+
+          const isReady =
+            title &&
+            title !== "Loading..." &&
+            publisher &&
+            order &&
+            order.length > 5;
+
+          // Debug output in Cloud Logs
+          if (!isReady)
+            console.log("⏳ Waiting for data...", { title, publisher });
+          return isReady;
+        },
+        { timeout: 30000 }
+      );
+
+      console.log(`✅ Build data fully loaded for prerender: ${buildId}`);
+      console.log(`✅ Comment loaded successfully for build ${buildId}.`);
+    } catch {
+      console.warn(`⚠️ Comment not found or still empty for build ${buildId}.`);
     }
 
-    await page.evaluate((metaInfo) => {
+    // ✅ Inject SEO-friendly meta tags dynamically
+    await page.evaluate(() => {
       const head = document.head || document.querySelector("head");
-      if (!head) {
-        return;
-      }
+      if (!head) return;
 
       const removeIfExists = (selector) => {
         const existing = head.querySelector(selector);
-        if (existing) {
-          existing.remove();
-        }
+        if (existing) existing.remove();
       };
 
-      document.title = metaInfo.pageTitle;
+      // Extract live data from DOM
+      const title =
+        document.querySelector("#buildTitle")?.textContent?.trim() ||
+        "Untitled Build";
+      const publisher =
+        document.querySelector("#buildPublisher")?.textContent?.trim() ||
+        "Anonymous";
+      const matchup =
+        document.querySelector("#buildMatchup")?.textContent?.trim() ||
+        "Unknown matchup";
+      const comment =
+        document.querySelector("#buildComment")?.textContent?.trim() ||
+        document.querySelector("#commentInput")?.value?.trim() ||
+        "";
+
+      const pageTitle = `Z-Build Order – ${title}`;
+      const description =
+        comment || `StarCraft 2 build order by ${publisher} (${matchup}).`;
+      const ogTitle = pageTitle;
+      const ogDescription =
+        comment || `Build order for ${matchup} by ${publisher}.`;
+      const ogSiteName = publisher;
+
+      document.title = pageTitle;
 
       removeIfExists('meta[name="description"]');
-      const description = document.createElement("meta");
-      description.name = "description";
-      description.content = metaInfo.description;
-      head.appendChild(description);
+      const metaDesc = document.createElement("meta");
+      metaDesc.name = "description";
+      metaDesc.content = description;
+      head.appendChild(metaDesc);
 
       removeIfExists('meta[property="og:title"]');
-      const ogTitle = document.createElement("meta");
-      ogTitle.setAttribute("property", "og:title");
-      ogTitle.content = metaInfo.ogTitle;
-      head.appendChild(ogTitle);
+      const ogTitleTag = document.createElement("meta");
+      ogTitleTag.setAttribute("property", "og:title");
+      ogTitleTag.content = ogTitle;
+      head.appendChild(ogTitleTag);
 
       removeIfExists('meta[property="og:description"]');
-      const ogDescription = document.createElement("meta");
-      ogDescription.setAttribute("property", "og:description");
-      ogDescription.content = metaInfo.ogDescription;
-      head.appendChild(ogDescription);
+      const ogDescTag = document.createElement("meta");
+      ogDescTag.setAttribute("property", "og:description");
+      ogDescTag.content = ogDescription;
+      head.appendChild(ogDescTag);
 
       removeIfExists('meta[property="og:site_name"]');
-      const ogSiteName = document.createElement("meta");
-      ogSiteName.setAttribute("property", "og:site_name");
-      ogSiteName.content = metaInfo.ogSiteName;
-      head.appendChild(ogSiteName);
-    }, meta);
+      const ogSiteTag = document.createElement("meta");
+      ogSiteTag.setAttribute("property", "og:site_name");
+      ogSiteTag.content = ogSiteName;
+      head.appendChild(ogSiteTag);
 
+      removeIfExists('link[rel="canonical"]');
+      const canonical = document.createElement("link");
+      canonical.setAttribute("rel", "canonical");
+      const path = window.location.pathname.replace(/^\/+/, "");
+      canonical.setAttribute("href", `https://zbuildorder.com/${path}`);
+      head.appendChild(canonical);
+    });
+
+    // ✅ Return final prerendered HTML
     const html = await page.content();
     return html;
+  } catch (error) {
+    console.error(`❌ Error during prerender for build ${buildId}:`, error);
+    throw error;
   } finally {
     if (page) {
       await page.close().catch(() => {});
     }
     await browser.close().catch(() => {});
+
+    // Cleanup Chrome temp files to avoid EFAULT
+    try {
+      //await fs.rm("/tmp", { recursive: true, force: true });
+    } catch (err) {
+      console.warn("⚠️ Failed to clean /tmp:", err.message);
+    }
   }
 }
 
@@ -354,8 +429,9 @@ exports.renderNewBuild = onDocumentWritten(
   {
     document: "publishedBuilds/{buildId}",
     region: "us-central1",
-    memory: "1GiB",
-    timeoutSeconds: 120,
+    memory: "2GiB", // ⬅️ Increase from 1GiB
+    timeoutSeconds: 180,
+    concurrency: 1, // Optional safeguard
   },
   async (event) => {
     const buildId = event.params.buildId;
