@@ -30,6 +30,7 @@ const BOT_USER_AGENTS = [
 ];
 
 const PRERENDER_TIMEOUT_MS = 60_000;
+const MAX_PRERENDER_ATTEMPTS = 3;
 const SELECTORS_TO_WAIT = ["#buildTitle", "#buildPublisher", "#buildOrder"];
 
 const SPA_INDEX_PATH = path.resolve(__dirname, "../dist/viewBuild.html");
@@ -246,6 +247,22 @@ async function waitForFirestoreContent(
       const innerText = (selector) =>
         document.querySelector(selector)?.innerText?.trim() || "";
 
+      const normalize = (value) =>
+        (value || "")
+          .replace(/\u2026/g, "...")
+          .replace(/\s+/g, " ")
+          .trim();
+      const isPlaceholder = (value) => {
+        const normalized = normalize(value);
+        if (!normalized) return true;
+        const lower = normalized.toLowerCase();
+        if (lower === "loading" || lower === "loading..." || lower === "loading..") {
+          return true;
+        }
+        return lower.startsWith("loading") && normalized.length <= 30;
+      };
+      const hasContent = (value) => !isPlaceholder(value);
+
       const fields = {
         title: textContent("#buildTitle"),
         publisher: textContent("#buildPublisher"),
@@ -253,11 +270,8 @@ async function waitForFirestoreContent(
         buildOrder: innerText("#buildOrder"),
       };
 
-      const hasContent = (value) =>
-        value && value !== "Loading..." && value.length > 0;
-
       const buildOrderReady =
-        hasContent(fields.buildOrder) && !fields.buildOrder.includes("Loading...");
+        hasContent(fields.buildOrder) && fields.buildOrder.length > 0;
 
       const ready =
         hasContent(fields.title) &&
@@ -297,6 +311,97 @@ async function waitForFirestoreContent(
   throw new Error(
     `Timed out after ${timeoutMs}ms waiting for Firestore content for build ${buildId}.`
   );
+}
+
+function analyzeHtmlForPlaceholders(html, buildId = "unknown") {
+  if (!html) {
+    return {
+      ready: false,
+      fields: {
+        title: "",
+        publisher: "",
+        matchup: "",
+        buildOrder: "",
+      },
+      missing: ["html"],
+    };
+  }
+
+  try {
+    const dom = new JSDOM(html);
+    const { document } = dom.window;
+
+    const textContent = (selector) =>
+      document.querySelector(selector)?.textContent?.trim() || "";
+
+    const normalize = (value) =>
+      (value || "")
+        .replace(/\u2026/g, "...")
+        .replace(/\s+/g, " ")
+        .trim();
+
+    const isPlaceholder = (value) => {
+      const normalized = normalize(value);
+      if (!normalized) return true;
+      const lower = normalized.toLowerCase();
+      if (lower === "loading" || lower === "loading..." || lower === "loading..") {
+        return true;
+      }
+      return lower.startsWith("loading") && normalized.length <= 30;
+    };
+
+    const buildOrderContainer = document.querySelector("#buildOrder");
+    const buildOrderText = normalize(buildOrderContainer?.textContent || "");
+
+    const fields = {
+      title: normalize(textContent("#buildTitle")),
+      publisher: normalize(textContent("#buildPublisher")),
+      matchup: normalize(textContent("#buildMatchup")),
+      buildOrder: buildOrderText,
+    };
+
+    const buildOrderHasContent =
+      !!buildOrderContainer &&
+      !isPlaceholder(buildOrderText) &&
+      buildOrderText.length > 0;
+
+    const ready =
+      !isPlaceholder(fields.title) &&
+      !isPlaceholder(fields.publisher) &&
+      !isPlaceholder(fields.matchup) &&
+      buildOrderHasContent;
+
+    const missing = [];
+    if (isPlaceholder(fields.title)) missing.push("title");
+    if (isPlaceholder(fields.publisher)) missing.push("publisher");
+    if (isPlaceholder(fields.matchup)) missing.push("matchup");
+    if (!buildOrderHasContent) missing.push("build order");
+
+    if (!ready) {
+      console.warn(
+        `⚠️ Cached HTML for build ${buildId} is missing data:`,
+        missing,
+        fields
+      );
+    }
+
+    return { ready, fields, missing };
+  } catch (error) {
+    console.warn(
+      `⚠️ Failed to analyze prerendered HTML for build ${buildId}:`,
+      error
+    );
+    return {
+      ready: false,
+      fields: {
+        title: "",
+        publisher: "",
+        matchup: "",
+        buildOrder: "",
+      },
+      missing: ["parse"],
+    };
+  }
 }
 
 async function captureBuildHtml(buildId, buildDataFromEvent) {
@@ -488,8 +593,23 @@ async function saveHtmlToStorage(buildId, html) {
   return file;
 }
 
-async function renderAndStoreBuild(buildId, buildDataFromEvent) {
+async function renderAndStoreBuild(buildId, buildDataFromEvent, attempt = 1) {
   const html = await captureBuildHtml(buildId, buildDataFromEvent);
+  const analysis = analyzeHtmlForPlaceholders(html, buildId);
+
+  if (!analysis.ready) {
+    if (attempt < MAX_PRERENDER_ATTEMPTS) {
+      console.warn(
+        `⚠️ Attempt ${attempt} for build ${buildId} returned incomplete data. Retrying...`
+      );
+      return renderAndStoreBuild(buildId, buildDataFromEvent, attempt + 1);
+    }
+
+    throw new Error(
+      `Failed to capture complete content for build ${buildId} after ${attempt} attempts.`
+    );
+  }
+
   await saveHtmlToStorage(buildId, html);
   return html;
 }
@@ -500,7 +620,26 @@ async function getPrerenderedHtml(buildId) {
 
   if (exists) {
     const [contents] = await file.download();
-    return contents.toString("utf-8");
+    const html = contents.toString("utf-8");
+    const analysis = analyzeHtmlForPlaceholders(html, buildId);
+
+    if (analysis.ready) {
+      return html;
+    }
+
+    console.warn(
+      `⚠️ Re-rendering build ${buildId} because cached HTML is incomplete. Missing: ${analysis.missing.join(", ")}`
+    );
+
+    try {
+      await file.delete({ ignoreNotFound: true });
+      console.log(`🧹 Removed stale prerendered HTML for build ${buildId}.`);
+    } catch (error) {
+      console.warn(
+        `⚠️ Failed to delete stale prerendered HTML for build ${buildId}:`,
+        error.message
+      );
+    }
   }
 
   return renderAndStoreBuild(buildId);
