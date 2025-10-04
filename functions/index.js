@@ -35,6 +35,11 @@ const SELECTORS_TO_WAIT = ["#buildTitle", "#buildPublisher", "#buildOrder"];
 const SPA_INDEX_PATH = path.resolve(__dirname, "../dist/viewBuild.html");
 let cachedSpaIndex = null;
 
+const SPA_REMOTE_URL = sanitizeUrl(
+  process.env.SPA_FALLBACK_URL || SITE_URL,
+  "https://z-build-order.web.app/viewBuild.html"
+);
+
 const CHROMIUM_ARGS = [
   ...chromium.args,
   "--no-sandbox",
@@ -68,8 +73,24 @@ async function loadSpaIndex() {
     try {
       cachedSpaIndex = await fs.readFile(SPA_INDEX_PATH, "utf8");
     } catch (error) {
-      console.error("❌ Failed to read SPA index file:", error);
-      throw error;
+      console.warn("⚠️ Failed to read SPA index from filesystem:", error.message);
+
+      try {
+        const response = await fetch(SPA_REMOTE_URL, {
+          redirect: "follow",
+        });
+
+        if (!response.ok) {
+          throw new Error(
+            `Unexpected status ${response.status} when fetching SPA fallback.`
+          );
+        }
+
+        cachedSpaIndex = await response.text();
+      } catch (fetchError) {
+        console.error("❌ Failed to download SPA index fallback:", fetchError);
+        throw fetchError;
+      }
     }
   }
   return cachedSpaIndex;
@@ -380,13 +401,12 @@ exports.servePreRenderedBuild = onRequest(
     const canonicalUrl = buildCanonicalUrl(req);
 
     if (!isBot(userAgent)) {
-      const filePath = path.join(process.cwd(), "dist", "viewBuild.html");
-      res.sendFile(filePath, (err) => {
-        if (err) {
-          console.error("Failed to send SPA fallback:", err);
-          res.status(500).send("Application unavailable.");
-        }
-      });
+      try {
+        await sendSpaIndex(res);
+      } catch (error) {
+        console.error("❌ Failed to serve SPA fallback:", error);
+        res.status(500).send("Application unavailable.");
+      }
       return;
     }
 
