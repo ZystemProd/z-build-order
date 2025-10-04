@@ -13,11 +13,21 @@ import {
 import { logAnalyticsEvent } from "../analyticsHelper.js";
 import { showToast } from "../toastHandler.js";
 
-function getBuildIdFromPath() {
-  const parts = window.location.pathname.split("/").filter(Boolean);
-  let id = parts[parts.length - 1] || "";
-  if (id.includes("-")) id = id.split("-").pop();
-  return decodeURIComponent(id);
+function getBuildId() {
+  const path = window.location.pathname;
+  const prettyMatch = path.match(/\/build\/[^/]+\/[^/]+\/([^/]+)/);
+  if (prettyMatch?.[1]) {
+    return decodeURIComponent(prettyMatch[1]);
+  }
+
+  const shortMatch = path.match(/\/build\/([^/]+)/);
+  if (shortMatch?.[1]) {
+    return decodeURIComponent(shortMatch[1]);
+  }
+
+  const query = new URLSearchParams(window.location.search);
+  const queryId = query.get("id");
+  return queryId ? decodeURIComponent(queryId) : "";
 }
 
 export function initializeViewBuildPage() {
@@ -29,7 +39,7 @@ export function initializeViewBuildPage() {
 }
 
 async function importBuildHandler() {
-  const maybeTitleOrId = getBuildIdFromPath();
+  const maybeTitleOrId = getBuildId();
 
   if (!maybeTitleOrId) {
     showToast("❌ Build ID or title not found in URL.", "error");

@@ -131,21 +131,25 @@ async function incrementBuildViews(buildId) {
   }
 }
 
-function getBuildIdFromPath() {
-  const searchParams = new URLSearchParams(window.location.search);
-  const queryId = searchParams.get("id");
-  if (queryId) {
-    return decodeURIComponent(queryId);
+function getBuildId() {
+  const path = window.location.pathname;
+  const prettyMatch = path.match(/\/build\/[^/]+\/[^/]+\/([^/]+)/);
+  if (prettyMatch?.[1]) {
+    return decodeURIComponent(prettyMatch[1]);
   }
 
-  const parts = window.location.pathname.split("/").filter(Boolean);
-  let id = parts[parts.length - 1] || "";
-  if (id.includes("-")) id = id.split("-").pop();
-  return decodeURIComponent(id);
+  const shortMatch = path.match(/\/build\/([^/]+)/);
+  if (shortMatch?.[1]) {
+    return decodeURIComponent(shortMatch[1]);
+  }
+
+  const searchParams = new URLSearchParams(window.location.search);
+  const queryId = searchParams.get("id");
+  return queryId ? decodeURIComponent(queryId) : "";
 }
 
 async function loadBuild() {
-  const buildId = getBuildIdFromPath();
+  const buildId = getBuildId();
 
   if (!buildId) {
     document.getElementById("buildTitle").innerText = "Build not found.";
@@ -685,7 +689,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Don't show the button until we know the status
       importBtn.style.display = "none";
 
-      const buildId = getBuildIdFromPath();
+      const buildId = getBuildId();
       if (!buildId) return;
 
       const buildRef = doc(db, "publishedBuilds", buildId);
@@ -731,7 +735,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Update vote UI when auth state changes (e.g., after sign-in)
   auth.onAuthStateChanged(() => {
-    const buildId = getBuildIdFromPath();
+    const buildId = getBuildId();
     if (buildId) updateVoteButtonIcons(buildId);
   });
 

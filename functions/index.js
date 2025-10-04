@@ -3,9 +3,11 @@ const { onDocumentWritten } = require("firebase-functions/v2/firestore");
 const { onRequest } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const chromium = require("@sparticuz/chromium");
-const puppeteer = require("puppeteer");
+const puppeteer = require("puppeteer-core");
 const { JSDOM } = require("jsdom");
 const createDOMPurify = require("dompurify");
+const path = require("path");
+const fs = require("fs/promises");
 
 admin.initializeApp();
 const bucket = admin.storage().bucket();
@@ -30,6 +32,9 @@ const BOT_USER_AGENTS = [
 const PRERENDER_TIMEOUT_MS = 60_000;
 const SELECTORS_TO_WAIT = ["#buildTitle", "#buildPublisher", "#buildOrder"];
 
+const SPA_INDEX_PATH = path.resolve(__dirname, "../dist/viewBuild.html");
+let cachedSpaIndex = null;
+
 const CHROMIUM_ARGS = [
   ...chromium.args,
   "--no-sandbox",
@@ -48,6 +53,94 @@ function sanitizeText(value, fallback) {
     ALLOWED_ATTR: [],
   }).trim();
   return sanitized || fallback;
+}
+
+function sanitizeUrl(value, fallback) {
+  const sanitized = sanitizeText(value, "");
+  if (sanitized) {
+    return sanitized;
+  }
+  return sanitizeText(fallback, fallback);
+}
+
+async function loadSpaIndex() {
+  if (!cachedSpaIndex) {
+    try {
+      cachedSpaIndex = await fs.readFile(SPA_INDEX_PATH, "utf8");
+    } catch (error) {
+      console.error("❌ Failed to read SPA index file:", error);
+      throw error;
+    }
+  }
+  return cachedSpaIndex;
+}
+
+async function sendSpaIndex(res, statusCode = 200) {
+  const spaHtml = await loadSpaIndex();
+  res.set("Content-Type", "text/html; charset=utf-8");
+  res.set("Cache-Control", "public, max-age=0, s-maxage=600");
+  res.status(statusCode).send(spaHtml);
+}
+
+function extractBuildIdFromRequest(req) {
+  if (!req) return "";
+
+  const queryId = req.query?.id;
+  if (queryId) {
+    return decodeURIComponent(String(queryId));
+  }
+
+  const pathToInspect = req.path || req.originalUrl || "";
+  const prettyMatch = pathToInspect.match(/\/build\/[^/]+\/[^/]+\/([^/?#]+)/i);
+  if (prettyMatch?.[1]) {
+    return decodeURIComponent(prettyMatch[1]);
+  }
+
+  const shortMatch = pathToInspect.match(/\/build\/([^/?#]+)/i);
+  if (shortMatch?.[1]) {
+    return decodeURIComponent(shortMatch[1]);
+  }
+
+  return "";
+}
+
+function buildCanonicalUrl(req) {
+  const forwardedProto = req.headers["x-forwarded-proto"];
+  const protocol = sanitizeUrl(forwardedProto, "https");
+  const forwardedHost = req.headers["x-forwarded-host"] || req.headers.host;
+  const host = sanitizeUrl(forwardedHost, "zbuildorder.com");
+  const pathPortion = sanitizeUrl(req.path || "/", "/");
+
+  return `${protocol}://${host}${pathPortion}`;
+}
+
+function addCanonicalLink(html, canonicalUrl) {
+  if (!html || !canonicalUrl) {
+    return html;
+  }
+
+  try {
+    const dom = new JSDOM(html);
+    const { document } = dom.window;
+    const head = document.head || document.createElement("head");
+
+    const sanitizedCanonical = sanitizeUrl(canonicalUrl, canonicalUrl);
+
+    const existing = head.querySelector('link[rel="canonical"]');
+    if (existing) {
+      existing.setAttribute("href", sanitizedCanonical);
+    } else {
+      const link = document.createElement("link");
+      link.setAttribute("rel", "canonical");
+      link.setAttribute("href", sanitizedCanonical);
+      head.appendChild(link);
+    }
+
+    return dom.serialize();
+  } catch (error) {
+    console.warn("⚠️ Failed to inject canonical link:", error.message);
+    return html;
+  }
 }
 
 function buildMetaStrings(buildData) {
@@ -224,6 +317,18 @@ async function renderAndStoreBuild(buildId, buildDataFromEvent) {
   return html;
 }
 
+async function getPrerenderedHtml(buildId) {
+  const file = bucket.file(`preRenderedBuilds/${buildId}.html`);
+  const [exists] = await file.exists();
+
+  if (exists) {
+    const [contents] = await file.download();
+    return contents.toString("utf-8");
+  }
+
+  return renderAndStoreBuild(buildId);
+}
+
 exports.renderNewBuild = onDocumentWritten(
   {
     document: "publishedBuilds/{buildId}",
@@ -262,47 +367,44 @@ exports.servePreRenderedBuild = onRequest(
     timeoutSeconds: 120,
   },
   async (req, res) => {
-    let buildId = req.query.id;
-
-    if (!buildId && req.path) {
-      const parts = req.path.split("/").filter(Boolean);
-      buildId = parts[parts.length - 1];
-    }
+    const buildId = extractBuildIdFromRequest(req);
 
     if (!buildId) {
       res.status(400).send("Build ID missing.");
       return;
     }
 
+    res.set("Vary", "User-Agent");
+
     const userAgent = req.headers["user-agent"] || "";
+    const canonicalUrl = buildCanonicalUrl(req);
 
     if (!isBot(userAgent)) {
-      res.redirect(302, `/viewBuild.html?id=${encodeURIComponent(buildId)}`);
+      try {
+        await sendSpaIndex(res);
+      } catch (error) {
+        console.error("❌ Failed to serve SPA index:", error);
+        res.status(500).send("Application unavailable.");
+      }
       return;
     }
 
-    res.set("Vary", "User-Agent");
-
     try {
-      const file = bucket.file(`preRenderedBuilds/${buildId}.html`);
-      const [exists] = await file.exists();
-
-      let html;
-
-      if (exists) {
-        const [contents] = await file.download();
-        html = contents.toString("utf-8");
-      } else {
-        html = await renderAndStoreBuild(buildId);
-      }
+      let html = await getPrerenderedHtml(buildId);
+      html = addCanonicalLink(html, canonicalUrl);
 
       res.set("Content-Type", "text/html; charset=utf-8");
       res.set("Cache-Control", "public, max-age=300, s-maxage=600");
 
       res.status(200).send(html);
     } catch (error) {
-      console.error("Error serving pre-rendered build:", error);
-      res.redirect(302, `/viewBuild.html?id=${encodeURIComponent(buildId)}`);
+      console.error("❌ Error serving pre-rendered build:", error);
+      try {
+        await sendSpaIndex(res);
+      } catch (spaError) {
+        console.error("❌ Failed to fallback to SPA index:", spaError);
+        res.status(500).send("Application unavailable.");
+      }
     }
   }
 );
