@@ -19,11 +19,7 @@
     ],
     "rewrites": [
       { "source": "/sitemap.xml", "function": "sitemap" },
-      {
-        "source": "/build/:matchup/:slug/:id",
-        "function": "servePreRenderedBuild"
-      },
-      { "source": "/build/:id", "function": "servePreRenderedBuild" }
+      { "source": "/build/**", "function": "servePreRenderedBuild" }
     ]
   },
   "emulators": {
