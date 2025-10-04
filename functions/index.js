@@ -224,6 +224,81 @@ async function waitForSelectorWithWarning(page, selector, buildId) {
   }
 }
 
+async function waitForFirestoreContent(
+  page,
+  buildId,
+  {
+    timeoutMs = 30_000,
+    pollMs = 500,
+  } = {}
+) {
+  console.log(
+    `⏳ Waiting for Firestore data to load for build ${buildId} (timeout ${timeoutMs}ms)...`
+  );
+
+  const startedAt = Date.now();
+  let attempt = 0;
+
+  while (Date.now() - startedAt < timeoutMs) {
+    const status = await page.evaluate(() => {
+      const textContent = (selector) =>
+        document.querySelector(selector)?.textContent?.trim() || "";
+      const innerText = (selector) =>
+        document.querySelector(selector)?.innerText?.trim() || "";
+
+      const fields = {
+        title: textContent("#buildTitle"),
+        publisher: textContent("#buildPublisher"),
+        matchup: textContent("#buildMatchup"),
+        buildOrder: innerText("#buildOrder"),
+      };
+
+      const hasContent = (value) =>
+        value && value !== "Loading..." && value.length > 0;
+
+      const buildOrderReady =
+        hasContent(fields.buildOrder) && !fields.buildOrder.includes("Loading...");
+
+      const ready =
+        hasContent(fields.title) &&
+        hasContent(fields.publisher) &&
+        hasContent(fields.matchup) &&
+        buildOrderReady;
+
+      const missing = [];
+      if (!hasContent(fields.title)) missing.push("title");
+      if (!hasContent(fields.publisher)) missing.push("publisher");
+      if (!hasContent(fields.matchup)) missing.push("matchup");
+      if (!buildOrderReady) missing.push("build order");
+
+      return { ready, fields, missing };
+    });
+
+    if (status.ready) {
+      console.log(
+        `✅ Firestore content loaded for build ${buildId} after ${Date.now() -
+          startedAt}ms.`,
+        status.fields
+      );
+      return status.fields;
+    }
+
+    attempt += 1;
+    console.log(
+      `⏳ Waiting for content attempt ${attempt} for build ${buildId}. Missing: ${
+        status.missing.length ? status.missing.join(", ") : "unknown"
+      }. Current values:`,
+      status.fields
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, pollMs));
+  }
+
+  throw new Error(
+    `Timed out after ${timeoutMs}ms waiting for Firestore content for build ${buildId}.`
+  );
+}
+
 async function captureBuildHtml(buildId, buildDataFromEvent) {
   const buildData = buildDataFromEvent || (await fetchBuildData(buildId));
   if (!buildData) {
@@ -273,36 +348,24 @@ async function captureBuildHtml(buildId, buildDataFromEvent) {
       waitForSelectorWithWarning(page, "#buildOrder", buildId),
     ]);
 
+    const firestoreContent = await waitForFirestoreContent(page, buildId);
+
+    console.log(
+      `✅ Build data fully loaded for prerender: ${buildId}`,
+      firestoreContent
+    );
+
     try {
-      // Wait for essential elements AND that they contain real text (not just "Loading...")
       await page.waitForFunction(
         () => {
-          const title = document
-            .querySelector("#buildTitle")
-            ?.textContent?.trim();
-          const publisher = document
-            .querySelector("#buildPublisher")
-            ?.textContent?.trim();
-          const order = document
-            .querySelector("#buildOrder")
-            ?.innerText?.trim();
-
-          const isReady =
-            title &&
-            title !== "Loading..." &&
-            publisher &&
-            order &&
-            order.length > 5;
-
-          // Debug output in Cloud Logs
-          if (!isReady)
-            console.log("⏳ Waiting for data...", { title, publisher });
-          return isReady;
+          const comment =
+            document.querySelector("#buildComment")?.textContent?.trim() ||
+            document.querySelector("#commentInput")?.value?.trim() ||
+            "";
+          return comment.length > 0;
         },
-        { timeout: 30000 }
+        { timeout: 5_000 }
       );
-
-      console.log(`✅ Build data fully loaded for prerender: ${buildId}`);
       console.log(`✅ Comment loaded successfully for build ${buildId}.`);
     } catch {
       console.warn(`⚠️ Comment not found or still empty for build ${buildId}.`);
@@ -374,6 +437,24 @@ async function captureBuildHtml(buildId, buildDataFromEvent) {
       canonical.setAttribute("href", `https://zbuildorder.com/${path}`);
       head.appendChild(canonical);
     });
+
+    const metaSummary = await page.evaluate(() => {
+      const textContent = (selector) =>
+        document.querySelector(selector)?.textContent?.trim() || "";
+      const getMetaContent = (selector) =>
+        document.querySelector(selector)?.getAttribute("content") || "";
+
+      return {
+        title: document.title,
+        publisher: textContent("#buildPublisher"),
+        matchup: textContent("#buildMatchup"),
+        description: getMetaContent('meta[name="description"]'),
+        ogTitle: getMetaContent('meta[property="og:title"]'),
+        ogDescription: getMetaContent('meta[property="og:description"]'),
+      };
+    });
+
+    console.log(`✅ Final metadata for build ${buildId}:`, metaSummary);
 
     // ✅ Return final prerendered HTML
     const html = await page.content();
