@@ -2,6 +2,7 @@
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { onRequest } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
+const chromium = require("@sparticuz/chromium");
 const puppeteer = require("puppeteer");
 
 admin.initializeApp();
@@ -29,21 +30,36 @@ function isBot(userAgent) {
 /**
  * Firestore trigger: pre-render new builds (v6+ modular)
  */
-exports.renderNewBuild = onDocumentCreated(
-  "publishedBuilds/{buildId}",
+const { onDocumentWritten } = require("firebase-functions/v2/firestore");
+
+// Firestore trigger: pre-render builds on create or update
+exports.renderNewBuild = onDocumentWritten(
+  {
+    document: "publishedBuilds/{buildId}",
+    region: "us-central1",
+    memory: "1GiB", // 👈 bump memory
+    timeoutSeconds: 120, // 👈 optional: allow longer Puppeteer runs
+  },
   async (event) => {
     const buildId = event.params.buildId;
-    const buildData = event.data.data();
+    const buildData = event.data.after?.data();
+
     if (!buildData) {
-      console.warn("No build data available, skipping prerender for", buildId);
+      console.warn(
+        "❌ No build data available (deleted?), skipping prerender for",
+        buildId
+      );
       return null;
     }
 
     console.log("🚀 Pre-rendering build:", buildId);
 
     const browser = await puppeteer.launch({
-      headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
+      ignoreHTTPSErrors: true,
     });
     const page = await browser.newPage();
 
@@ -55,7 +71,7 @@ exports.renderNewBuild = onDocumentCreated(
         await page.waitForSelector(selector, { timeout });
       } catch (err) {
         console.warn(
-          `Selector ${selector} not found within ${timeout}ms for build ${buildId}:`,
+          `⚠️ Selector ${selector} not found within ${timeout}ms for build ${buildId}:`,
           err.message
         );
       }
@@ -71,14 +87,17 @@ exports.renderNewBuild = onDocumentCreated(
         url: "https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.3/purify.min.js",
       });
     } catch (err) {
-      console.warn("Failed to load DOMPurify for sanitization:", err.message);
+      console.warn(
+        "⚠️ Failed to load DOMPurify for sanitization:",
+        err.message
+      );
     }
 
     // Inject SEO meta tags dynamically
     await page.evaluate((data) => {
       const head = document.querySelector("head");
       if (!head || typeof DOMPurify === "undefined") {
-        console.warn("DOMPurify not available or head element missing");
+        console.warn("⚠️ DOMPurify not available or head element missing");
         return;
       }
 
