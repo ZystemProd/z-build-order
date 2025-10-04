@@ -132,6 +132,12 @@ async function incrementBuildViews(buildId) {
 }
 
 function getBuildIdFromPath() {
+  const searchParams = new URLSearchParams(window.location.search);
+  const queryId = searchParams.get("id");
+  if (queryId) {
+    return decodeURIComponent(queryId);
+  }
+
   const parts = window.location.pathname.split("/").filter(Boolean);
   let id = parts[parts.length - 1] || "";
   if (id.includes("-")) id = id.split("-").pop();
