@@ -8,7 +8,8 @@ admin.initializeApp();
 const bucket = admin.storage().bucket();
 
 // Your site URL
-const SITE_URL = "/viewBuild.html"; // relative path
+const SITE_URL =
+  process.env.SITE_URL || "https://z-build-order.web.app/viewBuild.html"; // absolute path
 
 // Common crawler user-agents
 const BOT_USER_AGENTS = [
@@ -31,8 +32,12 @@ function isBot(userAgent) {
 exports.renderNewBuild = onDocumentCreated(
   "publishedBuilds/{buildId}",
   async (event) => {
-    const buildData = event.data;
     const buildId = event.params.buildId;
+    const buildData = event.data.data();
+    if (!buildData) {
+      console.warn("No build data available, skipping prerender for", buildId);
+      return null;
+    }
 
     console.log("🚀 Pre-rendering build:", buildId);
 
