@@ -17,7 +17,7 @@ const window = new JSDOM("").window;
 const DOMPurify = createDOMPurify(window);
 
 const SITE_URL =
-  process.env.SITE_URL || "https://z-build-order.web.app/viewBuild.html";
+  process.env.SITE_URL || "https://zbuildorder.com/viewBuild.html";
 
 const BOT_USER_AGENTS = [
   /googlebot/i,
@@ -43,7 +43,7 @@ let cachedStaticTemplate = null;
 
 const SPA_REMOTE_URL = sanitizeUrl(
   process.env.SPA_FALLBACK_URL || SITE_URL,
-  "https://z-build-order.web.app/viewBuild.html"
+  "https://zbuildorder.com/viewBuild.html"
 );
 
 const CHROMIUM_ARGS = [
@@ -640,12 +640,24 @@ async function captureBuildHtml(buildId, buildDataFromEvent) {
         ogSiteTag.content = data.meta.ogSiteName;
         head.appendChild(ogSiteTag);
 
+        removeIfExists('meta[property="og:image"]');
+        const ogImageTag = doc.createElement("meta");
+        ogImageTag.setAttribute("property", "og:image");
+        ogImageTag.content = "https://zbuildorder.com/img/og-image.webp";
+        head.appendChild(ogImageTag);
+
         removeIfExists('link[rel="canonical"]');
         const canonical = doc.createElement("link");
         canonical.setAttribute("rel", "canonical");
         const path = window.location.pathname.replace(/^\/+/, "");
         canonical.setAttribute("href", `https://zbuildorder.com/${path}`);
         head.appendChild(canonical);
+
+        removeIfExists('meta[name="robots"]');
+        const robotsTag = doc.createElement("meta");
+        robotsTag.setAttribute("name", "robots");
+        robotsTag.content = "index,follow";
+        head.appendChild(robotsTag);
       }
     }, { data: payload });
 
