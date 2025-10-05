@@ -31,10 +31,15 @@ const BOT_USER_AGENTS = [
 
 const PRERENDER_TIMEOUT_MS = 60_000;
 const MAX_PRERENDER_ATTEMPTS = 3;
-const SELECTORS_TO_WAIT = ["#buildTitle", "#buildPublisher", "#buildOrder"];
+const REQUIRED_STATIC_SELECTORS = [
+  "#buildTitle",
+  "#buildPublisher",
+  "#buildOrder",
+];
 
 const SPA_INDEX_PATH = path.resolve(__dirname, "../dist/viewBuild.html");
 let cachedSpaIndex = null;
+let cachedStaticTemplate = null;
 
 const SPA_REMOTE_URL = sanitizeUrl(
   process.env.SPA_FALLBACK_URL || SITE_URL,
@@ -98,6 +103,34 @@ async function loadSpaIndex() {
     }
   }
   return cachedSpaIndex;
+}
+
+async function loadStaticPrerenderTemplate() {
+  if (cachedStaticTemplate) {
+    return cachedStaticTemplate;
+  }
+
+  const baseHtml = await loadSpaIndex();
+
+  try {
+    const dom = new JSDOM(baseHtml);
+    const { document } = dom.window;
+
+    document.querySelectorAll("script").forEach((node) => node.remove());
+    document
+      .querySelectorAll('link[rel="modulepreload"], link[rel="preload"]')
+      .forEach((node) => node.remove());
+
+    cachedStaticTemplate = dom.serialize();
+  } catch (error) {
+    console.warn(
+      "⚠️ Failed to sanitize SPA template for prerender:",
+      error.message
+    );
+    cachedStaticTemplate = baseHtml;
+  }
+
+  return cachedStaticTemplate;
 }
 
 async function sendSpaIndex(res, statusCode = 200) {
@@ -352,17 +385,6 @@ async function fetchBuildData(buildId) {
   return snapshot.data();
 }
 
-async function waitForSelectorWithWarning(page, selector, buildId) {
-  try {
-    await page.waitForSelector(selector, { timeout: 10_000 });
-  } catch (err) {
-    console.warn(
-      `⚠️ Selector ${selector} not found within timeout for build ${buildId}:`,
-      err.message
-    );
-  }
-}
-
 function analyzeHtmlForPlaceholders(html, buildId = "unknown") {
   if (!html) {
     return {
@@ -461,6 +483,7 @@ async function captureBuildHtml(buildId, buildDataFromEvent) {
   }
 
   const payload = buildPrerenderPayload(buildData);
+  const staticTemplate = await loadStaticPrerenderTemplate();
   console.log(`📦 Loaded Firestore data for build ${buildId}.`, {
     title: payload.title,
     publisher: payload.publisher,
@@ -483,7 +506,7 @@ async function captureBuildHtml(buildId, buildDataFromEvent) {
     page.on("request", (request) => {
       try {
         const resourceType = request.resourceType();
-        if (["image", "media", "font"].includes(resourceType)) {
+        if (["image", "media", "font", "script"].includes(resourceType)) {
           request.abort();
         } else {
           request.continue();
@@ -498,18 +521,21 @@ async function captureBuildHtml(buildId, buildDataFromEvent) {
       }
     });
 
-    const targetUrl = `${SITE_URL}?id=${encodeURIComponent(buildId)}`;
-    await page.goto(targetUrl, {
-      waitUntil: "networkidle0",
-      timeout: PRERENDER_TIMEOUT_MS,
+    await page.setContent(staticTemplate, {
+      waitUntil: "domcontentloaded",
     });
 
-    // ✅ Wait for main elements to load
-    await Promise.all([
-      waitForSelectorWithWarning(page, "#buildTitle", buildId),
-      waitForSelectorWithWarning(page, "#buildPublisher", buildId),
-      waitForSelectorWithWarning(page, "#buildOrder", buildId),
-    ]);
+    const missingSelectors = await page.evaluate(
+      (selectors) =>
+        selectors.filter((selector) => !document.querySelector(selector)),
+      REQUIRED_STATIC_SELECTORS
+    );
+
+    if (missingSelectors.length > 0) {
+      throw new Error(
+        `Static template missing required selectors: ${missingSelectors.join(", ")}`
+      );
+    }
 
     console.log(`🧩 Injecting Firestore data into DOM for build ${buildId}.`, {
       title: payload.title,
