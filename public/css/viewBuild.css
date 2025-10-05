@@ -151,6 +151,10 @@ input[type="text"]:disabled {
   gap: 16px;
 }
 
+.comment-section.comment-section--ready {
+  display: flex;
+}
+
 .comment-section-header {
   display: flex;
   align-items: center;

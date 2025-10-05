@@ -40,6 +40,12 @@ let commentsUnsubscribe = null;
 let latestComments = [];
 let currentBuildId = "";
 let cachedUserProfile = null;
+let pendingCommentUser = null;
+let hasPendingCommentUser = false;
+let pendingCommentRender = false;
+let pendingCommentsListHtml = null;
+let hasPendingCommentsListHtml = false;
+let commentShellInitialized = false;
 
 const backButton = document.getElementById("backButton");
 const pageBackButton = document.getElementById("pageBackButton");
@@ -111,13 +117,64 @@ function updateCommentCount(count) {
   countEl.textContent = label;
 }
 
+function ensureCommentShellVisible() {
+  const commentSection = document.querySelector(".comment-section");
+  if (!commentSection) return false;
+
+  if (!commentShellInitialized) {
+    commentSection.classList.add("comment-section--ready");
+  }
+
+  if (typeof window !== "undefined") {
+    try {
+      const computed = window.getComputedStyle(commentSection);
+      if (computed?.display === "none") {
+        commentSection.style.display = "flex";
+      }
+    } catch (err) {
+      commentSection.style.display = "flex";
+    }
+  }
+
+  if (!commentSection.style.display || commentSection.style.display === "none") {
+    commentSection.style.display = "flex";
+  }
+
+  commentShellInitialized = true;
+  return true;
+}
+
+function setCommentsListContent(html) {
+  const commentsList = document.getElementById("commentsList");
+  if (!commentsList) {
+    pendingCommentRender = true;
+    pendingCommentsListHtml = html;
+    hasPendingCommentsListHtml = true;
+    return false;
+  }
+
+  ensureCommentShellVisible();
+
+  commentsList.innerHTML = html;
+  pendingCommentRender = false;
+  pendingCommentsListHtml = null;
+  hasPendingCommentsListHtml = false;
+  return true;
+}
+
 function renderComments() {
   const commentsList = document.getElementById("commentsList");
-  if (!commentsList) return;
+  if (!commentsList) {
+    pendingCommentRender = true;
+    return;
+  }
+
+  ensureCommentShellVisible();
 
   if (!latestComments.length) {
-    commentsList.innerHTML =
-      '<p class="comment-empty">No comments yet. Be the first to share your strategy!</p>';
+    setCommentsListContent(
+      '<p class="comment-empty">No comments yet. Be the first to share your strategy!</p>'
+    );
     updateCommentCount(0);
     return;
   }
@@ -212,6 +269,9 @@ function renderComments() {
 
   commentsList.innerHTML = "";
   commentsList.appendChild(fragment);
+  pendingCommentRender = false;
+  pendingCommentsListHtml = null;
+  hasPendingCommentsListHtml = false;
   updateCommentCount(latestComments.length);
 }
 
@@ -254,13 +314,17 @@ async function loadCurrentUserProfile() {
 
 function updateCommentFormState(user) {
   const commentSection = document.querySelector(".comment-section");
+  if (!commentSection) {
+    pendingCommentUser = user;
+    hasPendingCommentUser = true;
+    return;
+  }
+
+  ensureCommentShellVisible();
+
   const commentForm = document.getElementById("commentForm");
   const signInPrompt = document.getElementById("commentSignInPrompt");
   const signInBtn = document.getElementById("commentSignInBtn");
-
-  if (commentSection) {
-    commentSection.style.display = "flex";
-  }
 
   if (user) {
     if (commentForm) commentForm.style.display = "flex";
@@ -274,16 +338,21 @@ function updateCommentFormState(user) {
     cachedUserProfile = null;
   }
 
+  hasPendingCommentUser = false;
+  pendingCommentUser = null;
+
+  if (hasPendingCommentsListHtml) {
+    setCommentsListContent(pendingCommentsListHtml);
+  }
+
   renderComments();
 }
 
 function loadComments(buildId) {
-  const commentsList = document.getElementById("commentsList");
-  if (!commentsList) return;
-
   if (!buildId) {
-    commentsList.innerHTML =
-      '<p class="comment-error">Unable to load comments for this build.</p>';
+    setCommentsListContent(
+      '<p class="comment-error">Unable to load comments for this build.</p>'
+    );
     updateCommentCount(0);
     return;
   }
@@ -300,7 +369,7 @@ function loadComments(buildId) {
 
   currentBuildId = buildId;
   latestComments = [];
-  commentsList.innerHTML = '<p class="comment-loading">Loading comments...</p>';
+  setCommentsListContent('<p class="comment-loading">Loading comments...</p>');
   updateCommentCount(0);
 
   try {
@@ -322,14 +391,16 @@ function loadComments(buildId) {
       },
       (error) => {
         console.error("❌ Failed to load comments:", error);
-        commentsList.innerHTML =
-          '<p class="comment-error">Unable to load comments right now.</p>';
+        setCommentsListContent(
+          '<p class="comment-error">Unable to load comments right now.</p>'
+        );
       }
     );
   } catch (error) {
     console.error("❌ Error initializing comments listener:", error);
-    commentsList.innerHTML =
-      '<p class="comment-error">Unable to load comments right now.</p>';
+    setCommentsListContent(
+      '<p class="comment-error">Unable to load comments right now.</p>'
+    );
   }
 }
 
@@ -1068,6 +1139,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const viewBuildContainer = document.querySelector(".view-build-container");
   if (!viewBuildContainer) return;
 
+  ensureCommentShellVisible();
+
   const postCommentBtn = document.getElementById("postCommentBtn");
   if (postCommentBtn) {
     postCommentBtn.addEventListener("click", async () => {
@@ -1192,7 +1265,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
-  updateCommentFormState(auth.currentUser);
+  if (hasPendingCommentsListHtml) {
+    setCommentsListContent(pendingCommentsListHtml);
+  } else if (pendingCommentRender) {
+    renderComments();
+  }
+
+  if (hasPendingCommentUser) {
+    const userToApply = pendingCommentUser;
+    hasPendingCommentUser = false;
+    pendingCommentUser = null;
+    updateCommentFormState(userToApply);
+  } else {
+    updateCommentFormState(auth.currentUser);
+  }
 
   // ✅ Initialize MapAnnotations readonly
   const mapContainer = document.getElementById("map-preview-image");
