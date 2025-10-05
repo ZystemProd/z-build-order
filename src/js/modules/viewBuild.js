@@ -1,3 +1,4 @@
+import DOMPurify from "dompurify";
 import { auth, db, initializeAuthUI } from "../../app.js"; // ✅ Reuse Firebase app
 import {
   collection,
@@ -266,10 +267,54 @@ async function loadBuild() {
       }
     }
 
-    // Set description
-    const descEl = document.getElementById("buildDescription");
-    if (descEl)
-      descEl.innerText = build.description || "No description provided.";
+    // Set description (supports legacy comment markup)
+    const legacyDescEl = document.getElementById("buildComment");
+    const legacyHeader = document.getElementById("commentHeader");
+    let descEl =
+      document.getElementById("buildDescription") || legacyDescEl || null;
+    let descHeader =
+      document.getElementById("descriptionHeader") || legacyHeader || null;
+
+    if (descEl && descEl.id === "buildComment") {
+      descEl.id = "buildDescription";
+      descEl.classList.add("description-display");
+      descEl.classList.remove("comment-display");
+      descEl.style.display = "block";
+      descEl = document.getElementById("buildDescription");
+    }
+
+    if (descHeader && descHeader.id === "commentHeader") {
+      descHeader.id = "descriptionHeader";
+      descHeader.textContent = "Description";
+      descHeader.classList.add("toggle-title");
+      descHeader.style.display = "block";
+      descHeader = document.getElementById("descriptionHeader");
+    }
+
+    const descContainer =
+      descEl?.closest(".build-description-container") ||
+      descEl?.parentElement ||
+      null;
+
+    if (descContainer && !descContainer.classList.contains("build-description-container")) {
+      descContainer.classList.add("build-description-container");
+    }
+
+    if (descContainer) {
+      descContainer.style.display = "block";
+    }
+
+    if (descHeader) {
+      descHeader.style.display = "block";
+    }
+
+    if (descEl) {
+      const clean = DOMPurify.sanitize(
+        build.description || "No description provided."
+      );
+      descEl.innerHTML = clean.replace(/\n/g, "<br>");
+      descEl.style.display = "block";
+    }
 
     // Set YouTube link
     const youtubeEmbed = document.getElementById("videoIframe");

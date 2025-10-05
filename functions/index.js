@@ -319,6 +319,7 @@ function buildPrerenderPayload(buildData) {
   const category = sanitizeText(buildData.category, "Unknown");
   const matchup = formatMatchupText(buildData.subcategory);
   const description = sanitizeText(buildData.description, "");
+  const descriptionHtml = description ? description.replace(/\n/g, "<br>") : "";
 
   const buildOrderHtml = createBuildOrderHtml(buildData.buildOrder);
   const buildOrderStepCount = Array.isArray(buildData.buildOrder)
@@ -352,6 +353,7 @@ function buildPrerenderPayload(buildData) {
     category,
     matchup,
     description,
+    descriptionHtml,
     hasDescription: Boolean(description),
     datePublished,
     buildOrderHtml,
@@ -590,10 +592,56 @@ async function captureBuildHtml(buildId, buildDataFromEvent) {
 
         setInnerHtml("#buildOrder", data.buildOrderHtml);
 
-        setTextContent(
-          "#buildDescription",
-          data.description || "No description provided."
-        );
+        const ensureDescriptionElements = () => {
+          let desc =
+            doc.querySelector("#buildDescription") ||
+            doc.querySelector("#buildComment") ||
+            null;
+          let header =
+            doc.querySelector("#descriptionHeader") ||
+            doc.querySelector("#commentHeader") ||
+            null;
+
+          if (desc && desc.id === "buildComment") {
+            desc.id = "buildDescription";
+            desc.classList.remove("comment-display");
+            desc.classList.add("description-display");
+          }
+
+          if (header && header.id === "commentHeader") {
+            header.id = "descriptionHeader";
+            header.textContent = "Description";
+            header.classList.add("toggle-title");
+          }
+
+          const container =
+            desc?.closest(".build-description-container") || desc?.parentElement;
+
+          if (container && !container.classList.contains("build-description-container")) {
+            container.classList.add("build-description-container");
+          }
+
+          if (container) {
+            container.style.display = "block";
+          }
+
+          if (header) {
+            header.style.display = "block";
+          }
+
+          if (desc) {
+            desc.style.display = "block";
+          }
+
+          return { desc };
+        };
+
+        const { desc } = ensureDescriptionElements();
+
+        if (desc) {
+          const html = data.descriptionHtml || data.description;
+          desc.innerHTML = html || "No description provided.";
+        }
 
         const replayWrapper = doc.querySelector("#replayViewWrapper");
         const replayHeader = doc.querySelector("#replayHeader");
