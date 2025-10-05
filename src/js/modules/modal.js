@@ -432,10 +432,10 @@ export async function viewBuild(buildId) {
       }`;
     }
 
-    // Comment
-    const commentInput = document.getElementById("commentInput");
-    if (commentInput)
-      commentInput.value = DOMPurify.sanitize(build.comment) || "";
+    // Description
+    const descriptionInput = document.getElementById("descriptionInput");
+    if (descriptionInput)
+      descriptionInput.value = DOMPurify.sanitize(build.description) || "";
 
     // YouTube
     const videoInput = document.getElementById("videoInput");
@@ -1215,7 +1215,7 @@ function loadBuildIntoEditor(build) {
   document.getElementById("buildOrderTitleInput").value = build.title || "";
   document.getElementById("buildCategoryDropdown").value =
     build.subcategory || "";
-  document.getElementById("commentInput").value = build.comment || "";
+  document.getElementById("descriptionInput").value = build.description || "";
   document.getElementById("videoInput").value = build.videoLink || "";
   document.getElementById("buildOrderInput").value = Array.isArray(
     build.buildOrder

@@ -143,10 +143,10 @@ input[type="text"]:disabled {
   margin-bottom: 30px;
 }
 
-/* Map Section, YouTube Section, Comment Section Common */
+/* Map Section, YouTube Section, Description Section Common */
 .map-section,
 .youtube-section,
-.comment-section {
+.description-section {
   margin-top: 40px;
 }
 
@@ -232,8 +232,8 @@ input[type="text"]:disabled {
   margin: 20px auto 0 auto;
 }
 
-/* Comments Section */
-.comment-display {
+/* Description Section */
+.description-display {
   background: #1a1a1a;
   padding: 20px;
   border-radius: 8px;

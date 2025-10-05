@@ -1672,7 +1672,7 @@ export async function initializeIndexPage() {
   function monitorBuildChanges() {
     const fields = [
       "buildOrderInput",
-      "commentInput",
+      "descriptionInput",
       "videoInput",
       "replayLinkInput",
       "buildOrderTitleInput",

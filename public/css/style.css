@@ -495,7 +495,7 @@ textarea {
 }
 
 textarea:focus,
-#commentInput:focus,
+#descriptionInput:focus,
 #videoInput:focus {
   outline: none; /* Removes the outline */
   border: 2px solid #cfcfcf; /* Adds a border for focus instead */
@@ -650,7 +650,7 @@ button:hover {
   animation: highlight 1s ease-in-out 0s infinite alternate;
 }
 
-/* Comment and Video Sections */
+/* Description and Video Sections */
 .hideable-section {
   display: none;
   margin-top: 10px;
@@ -696,8 +696,8 @@ button:hover {
   color: #e0e0e0;
 }
 
-/* Comment and Video Inputs */
-#commentInput,
+/* Description and Video Inputs */
+#descriptionInput,
 #videoInput,
 #replayLinkInput {
   width: 100%;
@@ -2082,7 +2082,7 @@ body.modal-open {
   align-items: center;
 }
 
-/* Second Row: Map and Comment/Video */
+/* Second Row: Map and Description/Video */
 .second-row {
   display: flex;
   gap: 20px; /* Space between the columns */
@@ -2103,16 +2103,16 @@ body.modal-open {
   gap: 8px; /* Space between buttons */
 }
 
-/* Comment and Video Container (Second Column) */
-.comment-video-container {
+/* Description and Video Container (Second Column) */
+.description-video-container {
   flex: 1; /* Takes up the remaining space */
   max-width: 50%; /* Limit width */
   display: flex;
-  flex-direction: column; /* Stack comment and video sections */
-  gap: 8px; /* Space between comment & video */
+  flex-direction: column; /* Stack description and video sections */
+  gap: 8px; /* Space between description & video */
 }
 
-.comment-video-container h3 {
+.description-video-container h3 {
   margin-top: 0px;
 }
 
@@ -4539,7 +4539,7 @@ button.btn-small {
     flex-direction: column; /* Stack elements vertically */
     gap: 20px; /* Add spacing between sections */
   }
-  .comment-video-container {
+  .description-video-container {
     max-width: 100%;
     width: 100%;
   }

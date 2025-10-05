@@ -155,9 +155,14 @@
       <!-- Build steps are dynamically inserted here -->
     </div>
 
+    <div class="build-description-container">
+      <h3>Description</h3>
+      <p id="buildDescription">No description provided.</p>
+    </div>
+
     <!-- Second Row Layout -->
     <div class="main-layout">
-      <!-- Second Row: Map and Comment/Video -->
+      <!-- Second Row: Map and Description/Video -->
 
       <h3 id="additionalSettingsHeader" data-section="secondRow" class="toggle-title" style="display: none">
         <span class="arrow"></span> Additional Settings
@@ -178,18 +183,14 @@
           </div>
         </div>
 
-        <!-- RIGHT COLUMN: Comment & Video Container -->
-        <div class="comment-video-container">
+        <!-- RIGHT COLUMN: Description & Video Container -->
+        <div class="description-video-container">
           <h3 id="replayHeader" class="toggle-title" style="display: none">Replay</h3>
           <div id="replayViewWrapper" style="display: none;">
             <a id="replayDownloadBtn" href="#" target="_blank" class="download-replay-link">
               Download Replay on Drop.sc
             </a>
           </div>
-
-          <h3 id="commentHeader" class="toggle-title" style="display: none">Comment</h3>
-          <p id="buildComment" class="comment-display" style="display: none"></p>
-
           <h3 id="videoHeader" class="toggle-title" style="display: none">Video</h3>
           <iframe id="videoIframe" style="display: none;" width="560" height="315" frameborder="0"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"

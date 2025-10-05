@@ -284,7 +284,7 @@ function buildMetaStrings(buildData) {
     "Anonymous"
   );
   const sanitizedSubcategory = sanitizeText(buildData.subcategory, "Unknown");
-  const sanitizedComment = sanitizeText(buildData.comment, "");
+  const sanitizedDescription = sanitizeText(buildData.description, "");
   const formattedMatchup = formatMatchupText(sanitizedSubcategory);
 
   const defaultDescription = sanitizeText(
@@ -295,8 +295,8 @@ function buildMetaStrings(buildData) {
     `Build order for ${formattedMatchup} by ${sanitizedPublisher}.`,
     "StarCraft 2 build order"
   );
-  const description = sanitizedComment || defaultDescription;
-  const ogDescription = sanitizedComment || defaultOgDescription;
+  const description = sanitizedDescription || defaultDescription;
+  const ogDescription = sanitizedDescription || defaultOgDescription;
 
   return {
     pageTitle: sanitizeText(
@@ -318,7 +318,7 @@ function buildPrerenderPayload(buildData) {
   );
   const category = sanitizeText(buildData.category, "Unknown");
   const matchup = formatMatchupText(buildData.subcategory);
-  const comment = sanitizeText(buildData.comment, "");
+  const description = sanitizeText(buildData.description, "");
 
   const buildOrderHtml = createBuildOrderHtml(buildData.buildOrder);
   const buildOrderStepCount = Array.isArray(buildData.buildOrder)
@@ -343,7 +343,7 @@ function buildPrerenderPayload(buildData) {
     publisher,
     username: publisher,
     subcategory: matchup,
-    comment,
+    description,
   });
 
   return {
@@ -351,8 +351,8 @@ function buildPrerenderPayload(buildData) {
     publisher,
     category,
     matchup,
-    comment,
-    hasComment: Boolean(comment),
+    description,
+    hasDescription: Boolean(description),
     datePublished,
     buildOrderHtml,
     buildOrderStepCount,
@@ -494,7 +494,7 @@ async function captureBuildHtml(buildId, buildDataFromEvent) {
     matchup: payload.matchup,
     category: payload.category,
     steps: payload.buildOrderStepCount,
-    hasComment: payload.hasComment,
+    hasDescription: payload.hasDescription,
   });
   const browser = await launchBrowser();
   let page;
@@ -549,7 +549,7 @@ async function captureBuildHtml(buildId, buildDataFromEvent) {
       matchup: payload.matchup,
       category: payload.category,
       steps: payload.buildOrderStepCount,
-      hasComment: payload.hasComment,
+      hasDescription: payload.hasDescription,
     });
 
     await page.evaluate(
@@ -590,15 +590,10 @@ async function captureBuildHtml(buildId, buildDataFromEvent) {
 
         setInnerHtml("#buildOrder", data.buildOrderHtml);
 
-        if (data.hasComment) {
-          setTextContent("#buildComment", data.comment);
-          toggleDisplay("#buildComment", true);
-          toggleDisplay("#commentHeader", true);
-        } else {
-          setTextContent("#buildComment", "");
-          toggleDisplay("#buildComment", false);
-          toggleDisplay("#commentHeader", false);
-        }
+        setTextContent(
+          "#buildDescription",
+          data.description || "No description provided."
+        );
 
         const replayWrapper = doc.querySelector("#replayViewWrapper");
         const replayHeader = doc.querySelector("#replayHeader");

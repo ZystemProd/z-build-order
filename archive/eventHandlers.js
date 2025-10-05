@@ -756,7 +756,7 @@ function updateDropdownColor() {
 function monitorBuildChanges() {
   const fields = [
     "buildOrderInput",
-    "commentInput",
+    "descriptionInput",
     "videoInput",
     "replayLinkInput",
   ];

@@ -266,19 +266,10 @@ async function loadBuild() {
       }
     }
 
-    // Set comment
-    const commentElement = document.getElementById("buildComment");
-    const commentHeader = document.getElementById("commentHeader");
-    if (commentElement && commentHeader) {
-      if (build.comment && build.comment.trim() !== "") {
-        commentElement.innerText = build.comment;
-        commentElement.style.display = "block";
-        commentHeader.style.display = "block";
-      } else {
-        commentElement.style.display = "none";
-        commentHeader.style.display = "none";
-      }
-    }
+    // Set description
+    const descEl = document.getElementById("buildDescription");
+    if (descEl)
+      descEl.innerText = build.description || "No description provided.";
 
     // Set YouTube link
     const youtubeEmbed = document.getElementById("videoIframe");
@@ -454,8 +445,6 @@ async function loadBuild() {
     );
     const mainLayout = document.querySelector(".main-layout");
     if (additionalHeader || mainLayout) {
-      const commentVisible =
-        commentElement && commentElement.style.display !== "none";
       const videoVisible =
         youtubeEmbed && youtubeEmbed.style.display !== "none";
       const mapVisible =
@@ -463,8 +452,7 @@ async function loadBuild() {
       const replayVisible =
         replayWrapper && replayWrapper.style.display !== "none";
 
-      const anyVisible =
-        commentVisible || videoVisible || mapVisible || replayVisible;
+      const anyVisible = videoVisible || mapVisible || replayVisible;
 
       const secondRow = document.getElementById("secondRow");
       const secondRowHeader = document.querySelector(

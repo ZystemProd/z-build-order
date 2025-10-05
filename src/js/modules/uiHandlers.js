@@ -89,14 +89,14 @@ export function populateBuildDetails(index) {
     return;
   }
 
-  // Update comment and video input fields
-  const commentInput = document.getElementById("commentInput");
+  // Update description and video input fields
+  const descriptionInput = document.getElementById("descriptionInput");
   const videoInput = document.getElementById("videoInput");
 
-  if (commentInput) {
-    commentInput.value = build.comment || "";
+  if (descriptionInput) {
+    descriptionInput.value = build.description || "";
   } else {
-    console.warn("commentInput not found!");
+    console.warn("descriptionInput not found!");
   }
 
   if (videoInput) {
@@ -139,7 +139,9 @@ export function populateBuildDetails(index) {
 
   buildDetailsContainer.innerHTML = `
   <h3>${DOMPurify.sanitize(build.title)}</h3>
-  <p>${DOMPurify.sanitize(build.comment || "No comments provided.")}</p>
+  <p>${DOMPurify.sanitize(
+    build.description || "No description provided."
+  )}</p>
   <pre>${build.buildOrder
     .map(
       (step) =>
