@@ -176,6 +176,9 @@ input[type="text"]:disabled {
 }
 
 .comment-signin-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid #00bcd4;
   background: transparent;
   color: #00bcd4;

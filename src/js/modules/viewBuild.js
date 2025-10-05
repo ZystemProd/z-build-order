@@ -47,6 +47,74 @@ let pendingCommentsListHtml = null;
 let hasPendingCommentsListHtml = false;
 let commentShellInitialized = false;
 
+function buildCommentSectionMarkup() {
+  return `
+    <div class="comment-section-header">
+      <h3>Comments <span id="commentsCount" class="comment-count">0 comments</span></h3>
+      <button id="commentSignInBtn" class="comment-signin-btn" type="button">Sign in to comment</button>
+    </div>
+    <div id="commentsList" class="comments-list">
+      <p class="comment-loading">Loading comments...</p>
+    </div>
+    <p id="commentSignInPrompt" class="comment-signin-prompt">Sign in to share your thoughts.</p>
+    <div id="commentForm" class="comment-form" style="display: none;">
+      <textarea id="newCommentInput" placeholder="Write a comment..."></textarea>
+      <button id="postCommentBtn" type="button">Post</button>
+    </div>
+  `;
+}
+
+function ensureCommentSectionStructure() {
+  const viewBuildContainer = document.querySelector(".view-build-container");
+  if (!viewBuildContainer) return null;
+
+  let commentSection = viewBuildContainer.querySelector(".comment-section");
+  const requiredIds = [
+    "commentsList",
+    "commentForm",
+    "commentSignInPrompt",
+    "commentSignInBtn",
+    "newCommentInput",
+    "postCommentBtn",
+    "commentsCount",
+  ];
+
+  if (!commentSection) {
+    commentSection = document.createElement("div");
+    commentSection.className = "comment-section";
+    commentSection.innerHTML = buildCommentSectionMarkup();
+
+    const descriptionContainer = viewBuildContainer.querySelector(
+      ".build-description-container"
+    );
+
+    if (descriptionContainer) {
+      descriptionContainer.insertAdjacentElement("afterend", commentSection);
+    } else {
+      viewBuildContainer.appendChild(commentSection);
+    }
+  } else {
+    const isMissingRequiredChild = requiredIds.some(
+      (id) => !commentSection.querySelector(`#${id}`)
+    );
+
+    if (isMissingRequiredChild) {
+      commentSection.innerHTML = buildCommentSectionMarkup();
+    }
+  }
+
+  return {
+    section: commentSection,
+    commentsList: commentSection.querySelector("#commentsList"),
+    commentForm: commentSection.querySelector("#commentForm"),
+    signInPrompt: commentSection.querySelector("#commentSignInPrompt"),
+    signInButton: commentSection.querySelector("#commentSignInBtn"),
+    textarea: commentSection.querySelector("#newCommentInput"),
+    postButton: commentSection.querySelector("#postCommentBtn"),
+    commentsCount: commentSection.querySelector("#commentsCount"),
+  };
+}
+
 const backButton = document.getElementById("backButton");
 const pageBackButton = document.getElementById("pageBackButton");
 const ratingItem = document.getElementById("ratingItem");
@@ -107,6 +175,7 @@ function formatRelativeTime(date) {
 }
 
 function updateCommentCount(count) {
+  ensureCommentSectionStructure();
   const countEl = document.getElementById("commentsCount");
   if (!countEl) return;
 
@@ -118,7 +187,7 @@ function updateCommentCount(count) {
 }
 
 function ensureCommentShellVisible() {
-  const commentSection = document.querySelector(".comment-section");
+  const { section: commentSection } = ensureCommentSectionStructure() || {};
   if (!commentSection) return false;
 
   if (!commentShellInitialized) {
@@ -145,7 +214,7 @@ function ensureCommentShellVisible() {
 }
 
 function setCommentsListContent(html) {
-  const commentsList = document.getElementById("commentsList");
+  const { commentsList } = ensureCommentSectionStructure() || {};
   if (!commentsList) {
     pendingCommentRender = true;
     pendingCommentsListHtml = html;
@@ -163,7 +232,7 @@ function setCommentsListContent(html) {
 }
 
 function renderComments() {
-  const commentsList = document.getElementById("commentsList");
+  const { commentsList } = ensureCommentSectionStructure() || {};
   if (!commentsList) {
     pendingCommentRender = true;
     return;
@@ -313,7 +382,8 @@ async function loadCurrentUserProfile() {
 }
 
 function updateCommentFormState(user) {
-  const commentSection = document.querySelector(".comment-section");
+  const commentElements = ensureCommentSectionStructure();
+  const commentSection = commentElements?.section;
   if (!commentSection) {
     pendingCommentUser = user;
     hasPendingCommentUser = true;
@@ -322,9 +392,9 @@ function updateCommentFormState(user) {
 
   ensureCommentShellVisible();
 
-  const commentForm = document.getElementById("commentForm");
-  const signInPrompt = document.getElementById("commentSignInPrompt");
-  const signInBtn = document.getElementById("commentSignInBtn");
+  const commentForm = commentElements?.commentForm;
+  const signInPrompt = commentElements?.signInPrompt;
+  const signInBtn = commentElements?.signInButton;
 
   if (user) {
     if (commentForm) commentForm.style.display = "flex";
@@ -405,8 +475,11 @@ function loadComments(buildId) {
 }
 
 async function postComment(buildId) {
-  const textarea = document.getElementById("newCommentInput");
-  const postButton = document.getElementById("postCommentBtn");
+  const commentElements = ensureCommentSectionStructure();
+  const textarea = commentElements?.textarea ||
+    document.getElementById("newCommentInput");
+  const postButton = commentElements?.postButton ||
+    document.getElementById("postCommentBtn");
 
   if (!textarea || !postButton) return;
 
@@ -1139,18 +1212,20 @@ document.addEventListener("DOMContentLoaded", async () => {
   const viewBuildContainer = document.querySelector(".view-build-container");
   if (!viewBuildContainer) return;
 
+  const commentElements = ensureCommentSectionStructure();
   ensureCommentShellVisible();
 
-  const postCommentBtn = document.getElementById("postCommentBtn");
-  if (postCommentBtn) {
+  const postCommentBtn = commentElements?.postButton;
+  if (postCommentBtn && !postCommentBtn.dataset.listenerBound) {
     postCommentBtn.addEventListener("click", async () => {
       const buildId = getBuildId();
       if (buildId) await postComment(buildId);
     });
+    postCommentBtn.dataset.listenerBound = "true";
   }
 
-  const commentInput = document.getElementById("newCommentInput");
-  if (commentInput) {
+  const commentInput = commentElements?.textarea;
+  if (commentInput && !commentInput.dataset.submitBound) {
     commentInput.addEventListener("keydown", async (event) => {
       if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
         event.preventDefault();
@@ -1158,15 +1233,17 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (buildId) await postComment(buildId);
       }
     });
+    commentInput.dataset.submitBound = "true";
   }
 
-  const commentSignInBtn = document.getElementById("commentSignInBtn");
-  if (commentSignInBtn) {
+  const commentSignInBtn = commentElements?.signInButton;
+  if (commentSignInBtn && !commentSignInBtn.dataset.listenerBound) {
     commentSignInBtn.addEventListener("click", () => {
       if (typeof window.handleSignIn === "function") {
         window.handleSignIn();
       }
     });
+    commentSignInBtn.dataset.listenerBound = "true";
   }
 
   adjustRatingPosition();
