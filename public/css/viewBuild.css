@@ -133,6 +133,7 @@ input[type="text"]:disabled {
   color: #ffffff;
 }
 
+.description-display,
 #buildDescription {
   margin: 0;
   color: #e0e0e0;
