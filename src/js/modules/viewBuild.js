@@ -5,12 +5,14 @@ import {
   doc,
   addDoc,
   getDoc,
-  getDocs,
-  setDoc,
   updateDoc,
   increment,
   query,
-  where,
+  orderBy,
+  limit,
+  onSnapshot,
+  serverTimestamp,
+  deleteDoc,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { formatActionText, formatWorkersOrTimestampText } from "../modules/textFormatters.js"; // ✅ Format build steps
 import {
@@ -21,8 +23,23 @@ import {
 import { updateYouTubeEmbed, clearYouTubeEmbed } from "./youtube.js";
 import { getPublisherClanInfo } from "./community.js";
 import { formatShortDate } from "./modal.js";
+import { showToast } from "./toastHandler.js";
 
 initializeAuthUI();
+
+const adminEmails = (
+  Array.isArray(window?.adminEmails) ? window.adminEmails : []
+)
+  .map((email) => (typeof email === "string" ? email.toLowerCase() : ""))
+  .filter(Boolean);
+
+const DEFAULT_AVATAR_URL = "img/default-avatar.webp";
+const MAX_COMMENTS_TO_DISPLAY = 50;
+
+let commentsUnsubscribe = null;
+let latestComments = [];
+let currentBuildId = "";
+let cachedUserProfile = null;
 
 const backButton = document.getElementById("backButton");
 const pageBackButton = document.getElementById("pageBackButton");
@@ -36,6 +53,364 @@ let increaseFontBtn = document.getElementById("increaseFontBtn");
 let decreaseFontBtn = document.getElementById("decreaseFontBtn");
 let focusContent = document.getElementById("focusContent");
 let focusFontSize = 1;
+
+function sanitizePlainText(text) {
+  if (typeof text !== "string") return "";
+  return DOMPurify.sanitize(text, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
+}
+
+function sanitizeAvatarUrl(url) {
+  if (typeof url !== "string") return DEFAULT_AVATAR_URL;
+  const trimmed = url.trim();
+  if (!trimmed) return DEFAULT_AVATAR_URL;
+  const lower = trimmed.toLowerCase();
+  const allowedStarts = ["http://", "https://", "data:image", "img/", "/img/"]; // Support hosted + local assets
+  if (allowedStarts.some((prefix) => lower.startsWith(prefix))) {
+    return trimmed;
+  }
+  return DEFAULT_AVATAR_URL;
+}
+
+function formatRelativeTime(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+    return "Just now";
+  }
+
+  const diffSeconds = Math.max(0, (Date.now() - date.getTime()) / 1000);
+  if (diffSeconds < 45) return "Just now";
+  if (diffSeconds < 90) return "1 minute ago";
+
+  const units = [
+    { seconds: 60, label: "minute" },
+    { seconds: 3600, label: "hour" },
+    { seconds: 86400, label: "day" },
+    { seconds: 604800, label: "week" },
+    { seconds: 2592000, label: "month" },
+    { seconds: 31536000, label: "year" },
+  ];
+
+  for (let i = units.length - 1; i >= 0; i--) {
+    const { seconds, label } = units[i];
+    if (diffSeconds >= seconds) {
+      const value = Math.floor(diffSeconds / seconds);
+      return `${value} ${label}${value !== 1 ? "s" : ""} ago`;
+    }
+  }
+
+  return "Just now";
+}
+
+function updateCommentCount(count) {
+  const countEl = document.getElementById("commentsCount");
+  if (!countEl) return;
+
+  let label = `${count} comments`;
+  if (count === 0) label = "0 comments";
+  else if (count === 1) label = "1 comment";
+
+  countEl.textContent = label;
+}
+
+function renderComments() {
+  const commentsList = document.getElementById("commentsList");
+  if (!commentsList) return;
+
+  if (!latestComments.length) {
+    commentsList.innerHTML =
+      '<p class="comment-empty">No comments yet. Be the first to share your strategy!</p>';
+    updateCommentCount(0);
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+  const currentUserId = auth.currentUser?.uid || "";
+  const currentUserEmail = auth.currentUser?.email
+    ? auth.currentUser.email.toLowerCase()
+    : "";
+  const isAdminUser = currentUserEmail
+    ? adminEmails.includes(currentUserEmail)
+    : false;
+
+  latestComments.forEach(({ id, data }) => {
+    const commentData = data || {};
+    const avatarUrl = sanitizeAvatarUrl(commentData.photoURL || "");
+    const username = sanitizePlainText(commentData.username || "Anonymous");
+    const text = sanitizePlainText(commentData.text || "");
+
+    let timestampDate = null;
+    try {
+      if (commentData.timestamp?.toDate) {
+        timestampDate = commentData.timestamp.toDate();
+      } else if (commentData.timestamp instanceof Date) {
+        timestampDate = commentData.timestamp;
+      } else if (commentData.timestamp) {
+        timestampDate = new Date(commentData.timestamp);
+      }
+    } catch (err) {
+      timestampDate = null;
+    }
+
+    const timeLabel = formatRelativeTime(timestampDate || new Date());
+    const isOwner = commentData.userId === currentUserId;
+    const allowDelete = isOwner || isAdminUser;
+
+    const commentCard = document.createElement("div");
+    commentCard.className = "comment-card";
+
+    const avatarEl = document.createElement("img");
+    avatarEl.className = "comment-avatar";
+    avatarEl.src = avatarUrl;
+    avatarEl.alt = `${username}'s avatar`;
+
+    const contentEl = document.createElement("div");
+    contentEl.className = "comment-content";
+
+    const headerEl = document.createElement("div");
+    headerEl.className = "comment-header";
+
+    const usernameEl = document.createElement("span");
+    usernameEl.className = "comment-username";
+    usernameEl.textContent = username || "Anonymous";
+
+    const metaEl = document.createElement("div");
+    metaEl.className = "comment-meta";
+
+    const timestampEl = document.createElement("span");
+    timestampEl.className = "comment-timestamp";
+    timestampEl.textContent = timeLabel;
+    metaEl.appendChild(timestampEl);
+
+    if (allowDelete) {
+      const deleteBtn = document.createElement("button");
+      deleteBtn.type = "button";
+      deleteBtn.className = "comment-delete-btn";
+      deleteBtn.setAttribute("aria-label", "Delete comment");
+      deleteBtn.innerHTML =
+        '<img src="img/SVG/trash.svg" alt="" aria-hidden="true" />';
+      deleteBtn.addEventListener("click", () => {
+        if (!currentBuildId) return;
+        deleteComment(currentBuildId, id, commentData);
+      });
+      metaEl.appendChild(deleteBtn);
+    }
+
+    headerEl.appendChild(usernameEl);
+    headerEl.appendChild(metaEl);
+
+    const textEl = document.createElement("div");
+    textEl.className = "comment-text";
+    textEl.innerHTML = text.replace(/\n/g, "<br>");
+
+    contentEl.appendChild(headerEl);
+    contentEl.appendChild(textEl);
+
+    commentCard.appendChild(avatarEl);
+    commentCard.appendChild(contentEl);
+
+    fragment.appendChild(commentCard);
+  });
+
+  commentsList.innerHTML = "";
+  commentsList.appendChild(fragment);
+  updateCommentCount(latestComments.length);
+}
+
+async function loadCurrentUserProfile() {
+  const user = auth.currentUser;
+  if (!user) {
+    cachedUserProfile = null;
+    return null;
+  }
+
+  if (cachedUserProfile?.uid === user.uid) {
+    return cachedUserProfile;
+  }
+
+  try {
+    const userDocRef = doc(db, "users", user.uid);
+    const userSnapshot = await getDoc(userDocRef);
+    const username = userSnapshot.exists()
+      ? userSnapshot.data().username || user.displayName || "Anonymous"
+      : user.displayName || "Anonymous";
+
+    cachedUserProfile = {
+      uid: user.uid,
+      username,
+      photoURL: user.photoURL || DEFAULT_AVATAR_URL,
+      email: user.email || "",
+    };
+  } catch (error) {
+    console.warn("⚠️ Failed to load user profile for comments", error);
+    cachedUserProfile = {
+      uid: user.uid,
+      username: user.displayName || "Anonymous",
+      photoURL: user.photoURL || DEFAULT_AVATAR_URL,
+      email: user.email || "",
+    };
+  }
+
+  return cachedUserProfile;
+}
+
+function updateCommentFormState(user) {
+  const commentForm = document.getElementById("commentForm");
+  const signInPrompt = document.getElementById("commentSignInPrompt");
+  const signInBtn = document.getElementById("commentSignInBtn");
+
+  if (user) {
+    if (commentForm) commentForm.style.display = "flex";
+    if (signInPrompt) signInPrompt.style.display = "none";
+    if (signInBtn) signInBtn.style.display = "none";
+    loadCurrentUserProfile();
+  } else {
+    if (commentForm) commentForm.style.display = "none";
+    if (signInPrompt) signInPrompt.style.display = "block";
+    if (signInBtn) signInBtn.style.display = "inline-flex";
+    cachedUserProfile = null;
+  }
+
+  renderComments();
+}
+
+function loadComments(buildId) {
+  const commentsList = document.getElementById("commentsList");
+  if (!commentsList) return;
+
+  if (!buildId) {
+    commentsList.innerHTML =
+      '<p class="comment-error">Unable to load comments for this build.</p>';
+    updateCommentCount(0);
+    return;
+  }
+
+  if (currentBuildId === buildId && commentsUnsubscribe) {
+    renderComments();
+    return;
+  }
+
+  if (commentsUnsubscribe) {
+    commentsUnsubscribe();
+    commentsUnsubscribe = null;
+  }
+
+  currentBuildId = buildId;
+  latestComments = [];
+  commentsList.innerHTML = '<p class="comment-loading">Loading comments...</p>';
+  updateCommentCount(0);
+
+  try {
+    const commentsRef = collection(db, `publishedBuilds/${buildId}/comments`);
+    const commentsQuery = query(
+      commentsRef,
+      orderBy("timestamp", "desc"),
+      limit(MAX_COMMENTS_TO_DISPLAY)
+    );
+
+    commentsUnsubscribe = onSnapshot(
+      commentsQuery,
+      (snapshot) => {
+        latestComments = snapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          data: docSnap.data(),
+        }));
+        renderComments();
+      },
+      (error) => {
+        console.error("❌ Failed to load comments:", error);
+        commentsList.innerHTML =
+          '<p class="comment-error">Unable to load comments right now.</p>';
+      }
+    );
+  } catch (error) {
+    console.error("❌ Error initializing comments listener:", error);
+    commentsList.innerHTML =
+      '<p class="comment-error">Unable to load comments right now.</p>';
+  }
+}
+
+async function postComment(buildId) {
+  const textarea = document.getElementById("newCommentInput");
+  const postButton = document.getElementById("postCommentBtn");
+
+  if (!textarea || !postButton) return;
+
+  const user = auth.currentUser;
+  if (!user) {
+    showToast("⚠️ Please sign in to post a comment.", "warning");
+    return;
+  }
+
+  const rawInput = textarea.value || "";
+  const trimmed = rawInput.trim();
+
+  if (trimmed.length < 2) {
+    showToast("⚠️ Comment must be at least 2 characters.", "warning");
+    return;
+  }
+
+  if (trimmed.length > 1200) {
+    showToast("⚠️ Comment is too long. Please keep it under 1200 characters.", "warning");
+    return;
+  }
+
+  const sanitized = sanitizePlainText(trimmed);
+  if (!sanitized || sanitized.length < 2) {
+    showToast("⚠️ Please enter a valid comment.", "warning");
+    return;
+  }
+
+  postButton.disabled = true;
+  const previousLabel = postButton.textContent;
+  postButton.textContent = "Posting...";
+
+  try {
+    const profile = await loadCurrentUserProfile();
+    const username = profile?.username || "Anonymous";
+    const photoURL = sanitizeAvatarUrl(profile?.photoURL || "");
+
+    await addDoc(collection(db, `publishedBuilds/${buildId}/comments`), {
+      userId: user.uid,
+      username,
+      photoURL,
+      text: sanitized,
+      timestamp: serverTimestamp(),
+    });
+
+    textarea.value = "";
+  } catch (error) {
+    console.error("❌ Failed to post comment:", error);
+    showToast("❌ Failed to post comment. Please try again.", "error");
+  } finally {
+    postButton.disabled = false;
+    postButton.textContent = previousLabel || "Post";
+  }
+}
+
+async function deleteComment(buildId, commentId, commentData) {
+  const user = auth.currentUser;
+  if (!user) {
+    showToast("⚠️ Please sign in to delete comments.", "warning");
+    return;
+  }
+
+  const currentEmail = user.email ? user.email.toLowerCase() : "";
+  const isOwner = commentData?.userId === user.uid;
+  const isAdminUser = currentEmail ? adminEmails.includes(currentEmail) : false;
+
+  if (!isOwner && !isAdminUser) {
+    showToast("⚠️ You can only delete your own comments.", "warning");
+    return;
+  }
+
+  try {
+    const commentRef = doc(db, `publishedBuilds/${buildId}/comments`, commentId);
+    await deleteDoc(commentRef);
+    showToast("🗑️ Comment deleted.", "success");
+  } catch (error) {
+    console.error("❌ Failed to delete comment:", error);
+    showToast("❌ Failed to delete comment. Please try again.", "error");
+  }
+}
 
 function adjustRatingPosition() {
   if (!ratingItem || !infoGrid || !mainLayout) return;
@@ -159,6 +534,8 @@ async function loadBuild() {
   }
 
   console.log("🔍 Loading build with ID:", buildId);
+
+  loadComments(buildId);
 
   // Clear existing map annotations and image before loading new build
   const existingMapImage = document.getElementById("map-preview-image");
@@ -685,6 +1062,34 @@ function updateVoteUI(buildId, upvotes, downvotes, userVote) {
 document.addEventListener("DOMContentLoaded", async () => {
   if (!window.location.pathname.startsWith("/build/")) return;
 
+  const postCommentBtn = document.getElementById("postCommentBtn");
+  if (postCommentBtn) {
+    postCommentBtn.addEventListener("click", async () => {
+      const buildId = getBuildId();
+      if (buildId) await postComment(buildId);
+    });
+  }
+
+  const commentInput = document.getElementById("newCommentInput");
+  if (commentInput) {
+    commentInput.addEventListener("keydown", async (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+        event.preventDefault();
+        const buildId = getBuildId();
+        if (buildId) await postComment(buildId);
+      }
+    });
+  }
+
+  const commentSignInBtn = document.getElementById("commentSignInBtn");
+  if (commentSignInBtn) {
+    commentSignInBtn.addEventListener("click", () => {
+      if (typeof window.handleSignIn === "function") {
+        window.handleSignIn();
+      }
+    });
+  }
+
   adjustRatingPosition();
   window.addEventListener("resize", adjustRatingPosition);
 
@@ -767,10 +1172,21 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   // Update vote UI when auth state changes (e.g., after sign-in)
-  auth.onAuthStateChanged(() => {
+  auth.onAuthStateChanged((user) => {
+    updateCommentFormState(user);
+
     const buildId = getBuildId();
-    if (buildId) updateVoteButtonIcons(buildId);
+    if (buildId) {
+      updateVoteButtonIcons(buildId);
+      if (!commentsUnsubscribe || currentBuildId !== buildId) {
+        loadComments(buildId);
+      } else {
+        renderComments();
+      }
+    }
   });
+
+  updateCommentFormState(auth.currentUser);
 
   // ✅ Initialize MapAnnotations readonly
   const mapContainer = document.getElementById("map-preview-image");

@@ -1,0 +1,51 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function adminEmailList() {
+      return exists(/databases/$(database)/documents/appConfig/admins)
+        && get(/databases/$(database)/documents/appConfig/admins).data.emails is list
+        ? get(/databases/$(database)/documents/appConfig/admins).data.emails
+        : [];
+    }
+
+    function isAdmin() {
+      return isSignedIn()
+        && request.auth.token.email is string
+        && adminEmailList().hasAny([request.auth.token.email]);
+    }
+
+    match /publishedBuilds/{buildId} {
+      allow read: if true;
+
+      match /comments/{commentId} {
+        allow read: if true;
+
+        allow create: if isSignedIn()
+          && request.resource.data.keys().hasOnly([
+            "userId",
+            "username",
+            "photoURL",
+            "text",
+            "timestamp"
+          ])
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.username is string
+          && request.resource.data.username.size() >= 2
+          && request.resource.data.text is string
+          && request.resource.data.text.size() >= 2
+          && request.resource.data.text.size() <= 1200
+          && request.resource.data.photoURL is string
+          && request.resource.data.timestamp == request.time;
+
+        allow delete: if isSignedIn()
+          && (request.auth.uid == resource.data.userId || isAdmin());
+
+        allow update: if false;
+      }
+    }
+  }
+}
