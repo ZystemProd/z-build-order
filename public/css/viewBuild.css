@@ -120,6 +120,25 @@ input[type="text"]:disabled {
   text-align: left;
 }
 
+.build-description-container {
+  margin-top: 20px;
+  padding: 16px;
+  background: #141414;
+  border-radius: 8px;
+  display: block;
+}
+
+.build-description-container h3 {
+  margin: 0 0 8px;
+  color: #ffffff;
+}
+
+#buildDescription {
+  margin: 0;
+  color: #e0e0e0;
+  line-height: 1.5;
+}
+
 /* Scrollbar for Build Order */
 .build-order-container::-webkit-scrollbar {
   width: 8px;

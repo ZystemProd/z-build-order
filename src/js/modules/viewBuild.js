@@ -1,3 +1,4 @@
+import DOMPurify from "dompurify";
 import { auth, db, initializeAuthUI } from "../../app.js"; // ✅ Reuse Firebase app
 import {
   collection,
@@ -268,8 +269,13 @@ async function loadBuild() {
 
     // Set description
     const descEl = document.getElementById("buildDescription");
-    if (descEl)
-      descEl.innerText = build.description || "No description provided.";
+    if (descEl) {
+      const clean = DOMPurify.sanitize(
+        build.description || "No description provided."
+      );
+      descEl.innerHTML = clean.replace(/\n/g, "<br>");
+      descEl.style.display = "block";
+    }
 
     // Set YouTube link
     const youtubeEmbed = document.getElementById("videoIframe");
