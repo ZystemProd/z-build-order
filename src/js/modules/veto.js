@@ -11,33 +11,34 @@ let advancedStage = "veto"; // stages: veto, pick
 let pickOrder = 1;
 let actionHistory = [];
 
+const bestOfSelect = document.getElementById("bestOfSelect");
+
 function showBestOfModal() {
   const modal = document.getElementById("bestOfModal");
-  const input = document.getElementById("bestOfInput");
-  if (modal && input) {
-    input.value = bestOfValue;
+  if (modal && bestOfSelect) {
+    bestOfSelect.value = bestOfValue;
     modal.style.display = "flex";
-    input.focus();
+    // no focus needed — prevents mobile zoom
   }
 }
 
-function confirmBestOf(inputEl) {
-  if (!inputEl) return;
-  const val = parseInt(inputEl.value, 10);
-  if (val >= 1 && val <= 9) {
-    bestOfValue = val;
-    const modal = document.getElementById("bestOfModal");
-    if (modal) modal.style.display = "none";
-    updateDisplayedBestOf();
-    checkUnvetoedMapsForBestOf();
-    if (document.getElementById("advanced-map-list")) {
-      recalcAdvancedStage();
-      updateStageIndicator();
-    }
-  } else {
-    alert("Please enter a number between 1 and 9.");
+function confirmBestOf(selectEl) {
+  if (!selectEl) return;
+  const val = parseInt(selectEl.value, 10);
+  bestOfValue = val;
+  const modal = document.getElementById("bestOfModal");
+  if (modal) modal.style.display = "none";
+  updateDisplayedBestOf();
+  checkUnvetoedMapsForBestOf();
+  if (document.getElementById("advanced-map-list")) {
+    recalcAdvancedStage();
+    updateStageIndicator();
   }
 }
+
+document
+  .getElementById("confirmBestOfButton")
+  ?.addEventListener("click", () => confirmBestOf(bestOfSelect));
 
 // DOM Content Loaded
 window.addEventListener("DOMContentLoaded", () => {
@@ -105,35 +106,6 @@ window.addEventListener("DOMContentLoaded", () => {
   if (p2Input) p2Input.addEventListener("input", updateStageIndicator);
   updateStageIndicator();
 });
-
-// Map Rendering
-function renderMapList() {
-  const mapList = document.querySelector(".map-list ul");
-  mapData.forEach((map) => {
-    const li = document.createElement("li");
-    li.id = `map${map.id}`;
-
-    const labelSpan = document.createElement("span");
-    labelSpan.id = `label${map.id}`;
-    labelSpan.textContent = map.name;
-
-    const indicatorSpan = document.createElement("span");
-    indicatorSpan.classList.add("order-indicator");
-
-    li.appendChild(labelSpan);
-    li.appendChild(indicatorSpan);
-
-    // Event listeners instead of inline attributes
-    li.addEventListener("click", () => toggleVeto(map.id));
-    li.addEventListener("mouseover", () => showPreview(map.id));
-    li.addEventListener("mouseout", () => keepHoveredMap());
-    indicatorSpan.addEventListener("click", (event) =>
-      cycleOrder(map.id, event)
-    );
-
-    mapList.appendChild(li);
-  });
-}
 
 // Map Preview on Hover
 function showPreview(mapNumber) {
@@ -721,29 +693,33 @@ function undoLastAction() {
   updateStageIndicator();
 }
 
-async function loadMapsByMode(mode, folder = "current") {
+// Load maps by mode (only current maps)
+async function loadMapsByMode(mode) {
   try {
     const response = await fetch("/data/maps.json");
     const allMaps = await response.json();
 
-    // Filter maps for selected folder + mode
+    // Filter maps: current maps only, matching mode
     const selectedMaps = allMaps.filter(
-      (map) => map.folder === folder && map.mode === mode
+      (map) => map.mode === mode && map.folder.startsWith("current")
     );
 
     mapData = selectedMaps.map((map, index) => ({
       id: index + 1,
-      name: map.name,
+      name: map.name, // only show the name
       file: map.file,
+      folder: map.folder,
+      mode: map.mode,
     }));
 
-    // Setup map images (now uses folder + mode in the path)
+    // Setup map images
     mapImages = {};
     mapData.forEach((map) => {
-      mapImages[map.id] = `img/maps/${folder}/${mode}/${map.file}`;
+      // Use "current" folder in path
+      mapImages[map.id] = `img/maps/current/${mode}/${map.file}`;
     });
 
-    // Reset and render
+    // Reset & render
     resetAll();
     const list = document.querySelector(".map-list ul");
     if (list) list.innerHTML = "";
@@ -760,17 +736,110 @@ async function loadMapsByMode(mode, folder = "current") {
   }
 }
 
+function renderMapList() {
+  const mapList = document.querySelector(".map-list ul");
+  if (!mapList) return;
+
+  mapList.innerHTML = ""; // Clear previous maps
+
+  mapData.forEach((map) => {
+    // Map list item
+    const li = document.createElement("li");
+    li.id = `map${map.id}`;
+
+    // Map name
+    const labelSpan = document.createElement("span");
+    labelSpan.id = `label${map.id}`;
+    labelSpan.textContent = map.name;
+
+    // Order indicator
+    const indicatorSpan = document.createElement("span");
+    indicatorSpan.classList.add("order-indicator");
+
+    // Preview button inside <li>
+    const previewBtn = document.createElement("button");
+    previewBtn.className = "preview-btn";
+    previewBtn.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+        <path d="M12 5c-7.633 0-11 7-11 7s3.367 7 11 7 11-7 11-7-3.367-7-11-7zm0 11a4 4 0 110-8 4 4 0 010 8z"/>
+        <circle cx="12" cy="12" r="2.5"/>
+      </svg>
+    `;
+    previewBtn.addEventListener("click", (e) => {
+      e.stopPropagation(); // don’t trigger veto
+      openMapPreview(map.id);
+    });
+
+    // Add elements to <li>
+    li.appendChild(labelSpan);
+    li.appendChild(indicatorSpan);
+    li.appendChild(previewBtn); // ✅ inside li
+
+    // Events for veto/order
+    li.addEventListener("click", () => toggleVeto(map.id));
+    li.addEventListener("mouseover", () => showPreview(map.id));
+    li.addEventListener("mouseout", () => keepHoveredMap());
+    indicatorSpan.addEventListener("click", (event) =>
+      cycleOrder(map.id, event)
+    );
+
+    // Row wrapper
+    const row = document.createElement("div");
+    row.className = "map-row";
+    row.appendChild(li);
+
+    // Add row to list
+    mapList.appendChild(row);
+  });
+}
+
+// --- Mobile Preview Modal ---
+const modal = document.getElementById("mapPreviewModal");
+const modalImg = document.getElementById("modalPreviewImage");
+const closeModalBtn = document.getElementById("closePreviewModal");
+
+function openMapPreview(mapId) {
+  if (!modal || !modalImg) return;
+  modalImg.src = mapImages[mapId];
+  modalImg.alt = `Map ${
+    mapData.find((m) => m.id === mapId)?.name || ""
+  } Preview`;
+  modal.style.display = "flex";
+}
+
+if (closeModalBtn) {
+  closeModalBtn.addEventListener("click", () => {
+    modal.style.display = "none";
+  });
+}
+
+if (modal) {
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) {
+      modal.style.display = "none";
+    }
+  });
+}
+
 // Attach dropdown change
 window.addEventListener("DOMContentLoaded", () => {
   const modeDropdown = document.getElementById("modeDropdown");
   if (modeDropdown) {
-    modeDropdown.addEventListener("change", (e) =>
-      loadMapsByMode(e.target.value, "current")
-    );
+    modeDropdown.addEventListener("change", async (e) => {
+      const mode = e.target.value; // "1v1", "2v2", etc.
+      await loadMapsByMode(mode);
+
+      // Refresh advanced list if exists
+      const modalList = document.getElementById("advanced-map-list");
+      if (modalList) {
+        modalList.innerHTML = "";
+        renderAdvancedMapList();
+      }
+    });
   }
 
   // Default load = current 1v1
-  loadMapsByMode("1v1", "current");
+  loadMapsByMode("1v1");
 });
 
 document

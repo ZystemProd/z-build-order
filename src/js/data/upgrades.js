@@ -19,6 +19,7 @@ export const upgrades = [
   "adaptive talons",
   "seismic spines",
   "overlord speed",
+  "microbial shroud",
 
   // Protoss Upgrades
   "research warp gate",

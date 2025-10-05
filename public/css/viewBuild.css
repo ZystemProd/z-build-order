@@ -143,14 +143,6 @@ input[type="text"]:disabled {
   margin-bottom: 30px;
 }
 
-.build-header-row #importBuildButton {
-  position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  margin-top: 0;
-}
-
 /* Map Section, YouTube Section, Comment Section Common */
 .map-section,
 .youtube-section,
@@ -285,19 +277,72 @@ input[type="text"]:disabled {
   vertical-align: middle;
 }
 
-#importBuildButton {
+.build-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* title centered relative to buttons */
+  height: 60px;
+  gap: 10px;
+  padding: 0 20px;
+  margin-bottom: 30px;
+}
+
+/* Title stays centered */
+.build-header-row h1 {
+  flex: 1;
+  text-align: center;
+  margin: 0;
+  font-size: clamp(1.5rem, 4vw, 2rem);
+}
+
+/* Buttons wrapper */
+.header-buttons {
+  display: flex;
+  align-items: center;
+  gap: 10px; /* space between Import and Share */
+}
+
+/* Shared button style */
+.build-header-row .header-btn {
+  all: unset; /* optional: remove all inherited styles */
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 8px 16px;
-  margin-top: 8px;
-  width: auto;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #ffffff;
+  background-color: #00bcd4;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
 }
 
-#importBuildButton.imported {
-  background-color: #444;
-  color: #ccc;
-  cursor: default;
+.header-btn:hover {
+  background-color: #555;
+}
+
+/* Responsive: stack buttons on mobile */
+@media (max-width: 768px) {
+  .build-header-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    height: auto;
+    padding: 0 10px;
+  }
+
+  .build-header-row h1 {
+    text-align: left;
+    width: 100%;
+  }
+
+  .header-buttons {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 8px;
+  }
 }
 
 /* Responsive for Mobile */

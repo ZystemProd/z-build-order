@@ -12,11 +12,32 @@
 <body>
   <div id="bestOfModal" class="bestof-modal" style="display:none;">
     <div class="bestof-content">
-      <label for="bestOfInput">Best of (1-9):</label>
-      <input type="number" id="bestOfInput" min="1" max="9" />
+      <label for="bestOfSelect">Best of (1-9):</label>
+      <select id="bestOfSelect">
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+        <option value="6">6</option>
+        <option value="7">7</option>
+        <option value="8">8</option>
+        <option value="9">9</option>
+      </select>
       <button id="confirmBestOfButton">Confirm</button>
+
+      <!-- Mode dropdown moved here -->
+      <label for="modeDropdown">Mode:</label>
+      <select id="modeDropdown">
+        <option value="1v1" selected>1v1</option>
+        <option value="2v2">2v2</option>
+        <option value="3v3">3v3</option>
+        <option value="4v4">4v4</option>
+      </select>
     </div>
   </div>
+
+
   <div class="main-wrapper">
     <div class="container">
       <a href="index.html" id="backButton" class="back-button">
@@ -31,6 +52,15 @@
         <button id="resetButtonMobile">Reset All</button>
         <button id="undoButtonMobile">Undo</button>
       </div>
+
+      <!-- Map Preview Modal -->
+      <div id="mapPreviewModal" class="map-preview-modal">
+        <div class="map-preview-modal-content">
+          <span id="closePreviewModal" class="close-preview">&times;</span>
+          <img id="modalPreviewImage" src="" alt="Map Preview" />
+        </div>
+      </div>
+
 
       <div class="map-preview">
         <img id="previewImage" src="img/maps/current/incorporeal.webp" alt="Map Preview" />
@@ -64,16 +94,7 @@
             Show
           </button>
         </h5>
-        <!-- Mode Selection -->
-        <div class="mode-select">
-          <label for="modeDropdown">Mode:</label>
-          <select id="modeDropdown">
-            <option value="1v1" selected>1v1</option>
-            <option value="2v2">2v2</option>
-            <option value="3v3">3v3</option>
-            <option value="4v4">4v4</option>
-          </select>
-        </div>
+
         <!-- Heading for Map Settings -->
         <div class="button-container">
           <button id="prevMapButton">Previous</button>
@@ -131,14 +152,14 @@
         <button id="advancedToggle">Advanced Mode</button>
       </div>
     </div>
+
+
+
   </div>
   <!-- Footer Section -->
   <div class="footer">
-    <a href="https://www.twitch.tv/zystem" target="_blank">
-      <img src="img/logo_footer.webp" alt="Zystem Logo" class="footer-logo" />
-    </a>
 
-    <p>︱Version 0.5.7040</p>
+    <p>Version 1.0.0</p>
 
     <!-- Version number here -->
   </div>

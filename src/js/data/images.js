@@ -19,6 +19,7 @@ export const upgradeImages = {
   seismic_spines: "img/upgrade/seismic_spines.webp",
   neural_parasite: "img/upgrade/neural_parasite.webp",
   overlord_speed: "img/upgrade/overlord_speed.webp",
+  microbial_shroud: "img/upgrade/microbial_shroud.webp",
   // protoss
   air_armor: "img/upgrade/air_armor.webp",
   air_weapons: "img/upgrade/air_weapons.webp",

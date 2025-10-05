@@ -38,6 +38,7 @@ export const abbreviationMap = {
     "lurker range": "seismic spines",
     "Lurker speed": "adaptive talons",
     "range attack": "missile attacks",
+    shroud: "microbial shroud",
     "building armor": "Neosteel armor",
     "blue flame": "Infernal pre-igniter",
     "phoenix range": "anion pulse-crystals",

@@ -11,13 +11,23 @@ import {
   where,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { logAnalyticsEvent } from "../analyticsHelper.js";
-import { showToast } from "../toastHandler.js"; // ✅ Make sure this is correct!
+import { showToast } from "../toastHandler.js";
 
-function getBuildIdFromPath() {
-  const parts = window.location.pathname.split("/").filter(Boolean);
-  let id = parts[parts.length - 1] || "";
-  if (id.includes("-")) id = id.split("-").pop();
-  return decodeURIComponent(id);
+function getBuildId() {
+  const path = window.location.pathname;
+  const prettyMatch = path.match(/\/build\/[^/]+\/[^/]+\/([^/]+)/);
+  if (prettyMatch?.[1]) {
+    return decodeURIComponent(prettyMatch[1]);
+  }
+
+  const shortMatch = path.match(/\/build\/([^/]+)/);
+  if (shortMatch?.[1]) {
+    return decodeURIComponent(shortMatch[1]);
+  }
+
+  const query = new URLSearchParams(window.location.search);
+  const queryId = query.get("id");
+  return queryId ? decodeURIComponent(queryId) : "";
 }
 
 export function initializeViewBuildPage() {
@@ -29,7 +39,7 @@ export function initializeViewBuildPage() {
 }
 
 async function importBuildHandler() {
-  const maybeTitleOrId = getBuildIdFromPath();
+  const maybeTitleOrId = getBuildId();
 
   if (!maybeTitleOrId) {
     showToast("❌ Build ID or title not found in URL.", "error");
@@ -88,3 +98,28 @@ async function importBuildHandler() {
     logAnalyticsEvent("build_import_failed", { reason: error.message });
   }
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+  const shareButton = document.getElementById("shareBuildButton");
+  if (!shareButton) return;
+
+  shareButton.style.display = "inline-flex";
+
+  safeAdd("shareBuildButton", "click", async () => {
+    const shareUrl = window.location.href; // current page URL, already pretty
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: "Check out this SC2 Build Order",
+          url: shareUrl,
+        });
+      } catch (err) {
+        console.warn("Share canceled:", err);
+      }
+    } else {
+      await navigator.clipboard.writeText(shareUrl);
+      showToast("✅ Link copied to clipboard!", "success");
+    }
+  });
+});

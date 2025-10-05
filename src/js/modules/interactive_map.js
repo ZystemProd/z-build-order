@@ -83,7 +83,10 @@ export class MapAnnotations {
     const dx = x2 - x1;
     const dy = y2 - y1;
     if (dx === 0 && dy === 0) return { x: x1, y: y1 };
-    const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy)));
+    const t = Math.max(
+      0,
+      Math.min(1, ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy))
+    );
     return { x: x1 + t * dx, y: y1 + t * dy };
   }
 
@@ -104,7 +107,14 @@ export class MapAnnotations {
     this.arrows.forEach((a) => {
       checkPoint(a.startX, a.startY);
       checkPoint(a.endX, a.endY);
-      const nearest = this.nearestPointOnSegment(x, y, a.startX, a.startY, a.endX, a.endY);
+      const nearest = this.nearestPointOnSegment(
+        x,
+        y,
+        a.startX,
+        a.startY,
+        a.endX,
+        a.endY
+      );
       checkPoint(nearest.x, nearest.y);
     });
 
@@ -298,70 +308,153 @@ export function initializeMapSelection(mapAnnotations) {
     return;
   }
 
-  renderMapCards();
+  // Ensure there is a mode dropdown in the modal; if not, create it
+  let modeDropdown = document.getElementById("mapModeDropdown");
+  if (!modeDropdown) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "map-mode-selector";
+    wrapper.innerHTML = `
+      <label for="mapModeDropdown">Mode:</label>
+      <select id="mapModeDropdown">
+        <option value="1v1">1v1</option>
+        <option value="2v2">2v2</option>
+        <option value="3v3">3v3</option>
+        <option value="4v4">4v4</option>
+      </select>
+    `;
+    // insert before the builds container
+    buildsContainer.parentNode.insertBefore(wrapper, buildsContainer);
+    modeDropdown = document.getElementById("mapModeDropdown");
+  }
 
-  // Map card clicks
-  buildsContainer.addEventListener("click", (event) => {
-    const card = event.target.closest(".map-card");
-    if (card) {
-      const selectedMapPath = card.getAttribute("data-map");
-      const selectedMapName = card.querySelector(".map-card-title")?.innerText;
-      const mapImage = document.getElementById("map-preview-image");
-      const selectedMapText = document.getElementById("selected-map-text");
+  const getActiveFolder = () => {
+    const active = document.querySelector(".toggle-folder.active");
+    return active ? active.dataset.folder : "current";
+  };
 
-      if (mapImage && selectedMapText) {
-        selectedMapText.innerText = selectedMapName || "";
-        mapImage.src = selectedMapPath;
-      }
+  // initial load using active folder + selected mode
+  (async () => {
+    await renderMapCards(getActiveFolder());
+    loadMapsOnDemand();
+  })();
 
-      mapAnnotations.circles = [];
-      mapAnnotations.arrows = [];
-      mapAnnotations.annotationsContainer.innerHTML = "";
-
-      const clearBtn = document.querySelector(".clear-annotations-button");
-      if (clearBtn) clearBtn.style.display = "inline-block";
-
-      modal.style.display = "none";
-    }
+  // Re-render maps when mode changes (delegated on the modal so we don't miss a late DOM)
+  // When mode dropdown changes
+  modal.addEventListener("change", (e) => {
+    if (!e.target || e.target.id !== "mapModeDropdown") return;
+    const selectedMode = e.target.value;
+    renderMapCards("current").then(() => loadMapsOnDemand());
   });
 
+  // Map card clicks — set preview + attach metadata (folder/mode/name) on the preview image
+  buildsContainer.addEventListener("click", (event) => {
+    const card = event.target.closest(".map-card");
+    if (!card) return;
+
+    const selectedMapPath = card.getAttribute("data-map");
+    const selectedMapName =
+      card.dataset.mapName ||
+      card.querySelector(".map-card-title")?.innerText ||
+      "";
+    const selectedFolder = card.dataset.folder || getActiveFolder();
+    const selectedMode =
+      card.dataset.mode ||
+      document.getElementById("mapModeDropdown")?.value ||
+      "1v1";
+
+    const mapImage = document.getElementById("map-preview-image");
+    const selectedMapText = document.getElementById("selected-map-text");
+
+    if (mapImage) {
+      mapImage.src = selectedMapPath;
+      // attach metadata for later saving
+      mapImage.dataset.mapName = selectedMapName;
+      mapImage.dataset.mapFolder = selectedFolder;
+      mapImage.dataset.mapMode = selectedMode;
+    }
+    if (selectedMapText) selectedMapText.innerText = selectedMapName;
+
+    // clear annotations
+    if (mapAnnotations) {
+      mapAnnotations.circles = [];
+      mapAnnotations.arrows = [];
+      if (mapAnnotations.annotationsContainer)
+        mapAnnotations.annotationsContainer.innerHTML = "";
+    }
+
+    const clearBtn = document.querySelector(".clear-annotations-button");
+    if (clearBtn) clearBtn.style.display = "inline-block";
+
+    modal.style.display = "none";
+    enableSaveButton();
+  });
+
+  // open/close hooks
   document
     .getElementById("openMapModalButton")
     ?.addEventListener("click", () => {
       modal.style.display = "block";
     });
+  closeModal.addEventListener("click", () => (modal.style.display = "none"));
 
-  closeModal.addEventListener("click", () => {
-    modal.style.display = "none";
-  });
-
+  // click outside closes modal
   window.addEventListener("click", (event) => {
-    if (event.target === modal) {
-      modal.style.display = "none";
-    }
+    if (event.target === modal) modal.style.display = "none";
   });
 }
 
 export async function renderMapCards(folder = "current") {
   const buildsContainer = document.querySelector(".builds-container");
+  const modeDropdown = document.getElementById("mapModeDropdown");
+  const selectedMode = modeDropdown ? modeDropdown.value : "1v1";
+
   if (!buildsContainer) return;
 
   try {
     const response = await fetch("/data/maps.json");
     const maps = await response.json();
 
+    // Clear container
     buildsContainer.innerHTML = "";
 
+    const seen = new Set();
+
     maps
-      .filter((map) => map.folder === folder)
+      .filter((map) => {
+        // Only include "current" maps
+        if (!map.folder || !map.folder.startsWith("current")) return false;
+
+        // Ensure map mode matches selectedMode
+        const mapMode = Array.isArray(map.mode) ? map.mode : map.mode || "1v1";
+        if (Array.isArray(mapMode)) return mapMode.includes(selectedMode);
+        return mapMode === selectedMode;
+      })
       .forEach((map) => {
+        const fileName =
+          map.file ||
+          `${(map.name || "").replace(/\s+/g, "_").toLowerCase()}.webp`;
+
+        const dataMapPath = `img/maps/current/${selectedMode}/${fileName}`;
+
+        // Deduplicate by name + file
+        const dedupeKey = `${(map.name || "").toLowerCase()}|${fileName}`;
+        if (seen.has(dedupeKey)) return;
+        seen.add(dedupeKey);
+
         const mapCard = document.createElement("div");
         mapCard.className = "map-card";
-        mapCard.setAttribute("data-map", `img/maps/${map.folder}/${map.file}`);
+
+        mapCard.dataset.mapName = map.name || "";
+        mapCard.dataset.folder = "current";
+        mapCard.dataset.mode = selectedMode;
+        mapCard.dataset.file = fileName;
+        mapCard.setAttribute("data-map", dataMapPath);
 
         mapCard.innerHTML = `
-          <div class="map-card-title">${map.name}</div>
-          <img class="map-image" data-src="img/maps/${map.folder}/${map.file}" alt="${map.name}">
+          <div class="map-card-title">${map.name || ""}</div>
+          <img class="map-image" data-src="${dataMapPath}" alt="${
+          map.name || ""
+        }">
         `;
 
         buildsContainer.appendChild(mapCard);
@@ -371,20 +464,21 @@ export async function renderMapCards(folder = "current") {
   }
 }
 
-const toggleButtons = document.querySelectorAll(".toggle-folder");
+const toggleButtons = Array.from(
+  document.querySelectorAll(".toggle-folder") || []
+);
 
 toggleButtons.forEach((btn) => {
-  btn.addEventListener("click", () => {
-    const folder = btn.dataset.folder;
+  btn.addEventListener("click", async () => {
+    const folder = btn.dataset.folder || "current";
 
     // Toggle active class
     toggleButtons.forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
 
     // Render maps from selected folder
-    renderMapCards(folder).then(() => {
-      loadMapsOnDemand();
-    });
+    await renderMapCards(folder);
+    loadMapsOnDemand();
   });
 });
 

@@ -2292,10 +2292,6 @@ body.modal-open {
   object-fit: contain; /* Ensure fitting inside the box */
 }
 
-.svg-icon:hover {
-  filter: brightness(0.8) invert(1); /* Example hover effect */
-}
-
 #openMapModalButton {
   margin-right: 5px;
 }
@@ -2702,28 +2698,6 @@ td {
   background-color: rgba(0, 188, 212, 0.25);
   box-shadow: 0 0 10px #00bcd4;
   transform: translateY(-1px);
-}
-
-#importBuildButton {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 0;
-  padding: 8px 16px;
-  width: auto;
-  font-size: 1rem;
-  font-weight: 600;
-  color: #ffffff;
-  background-color: #00bcd4;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background-color 0.3s ease, transform 0.2s ease;
-}
-
-#importBuildButton:hover {
-  background-color: #0097a7;
-  transform: translateY(-2px);
 }
 
 .build-info-grid {
@@ -5373,4 +5347,3 @@ optgroup[label="Terran"] {
 #supportModal tbody tr:nth-child(even) {
   background-color: #1e1e1e;
 }
-
