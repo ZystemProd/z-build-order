@@ -416,7 +416,11 @@ function analyzeHtmlForPlaceholders(html, buildId = "unknown") {
       const normalized = normalize(value);
       if (!normalized) return true;
       const lower = normalized.toLowerCase();
-      if (lower === "loading" || lower === "loading..." || lower === "loading..") {
+      if (
+        lower === "loading" ||
+        lower === "loading..." ||
+        lower === "loading.."
+      ) {
         return true;
       }
       return lower.startsWith("loading") && normalized.length <= 30;
@@ -533,7 +537,9 @@ async function captureBuildHtml(buildId, buildDataFromEvent) {
 
     if (missingSelectors.length > 0) {
       throw new Error(
-        `Static template missing required selectors: ${missingSelectors.join(", ")}`
+        `Static template missing required selectors: ${missingSelectors.join(
+          ", "
+        )}`
       );
     }
 
@@ -546,120 +552,123 @@ async function captureBuildHtml(buildId, buildDataFromEvent) {
       hasComment: payload.hasComment,
     });
 
-    await page.evaluate(({ data }) => {
-      const doc = document;
-      const head = doc.head || doc.querySelector("head");
+    await page.evaluate(
+      ({ data }) => {
+        const doc = document;
+        const head = doc.head || doc.querySelector("head");
 
-      const setTextContent = (selector, value) => {
-        const element = doc.querySelector(selector);
-        if (element && typeof value === "string") {
-          element.textContent = value;
-        }
-      };
-
-      const setInnerHtml = (selector, value) => {
-        const element = doc.querySelector(selector);
-        if (element && typeof value === "string") {
-          element.innerHTML = value;
-        }
-      };
-
-      const toggleDisplay = (selector, shouldShow) => {
-        const element = doc.querySelector(selector);
-        if (element) {
-          element.style.display = shouldShow ? "block" : "none";
-        }
-      };
-
-      setTextContent("#buildTitle", data.title);
-      setTextContent("#buildPublisher", data.publisher);
-      setTextContent("#buildPublisherMobile", data.publisher);
-      setTextContent("#buildCategory", data.category);
-      setTextContent("#buildCategoryMobile", data.category);
-      setTextContent("#buildMatchup", data.matchup);
-      setTextContent("#buildMatchupMobile", data.matchup);
-      setTextContent("#buildDate", data.datePublished);
-      setTextContent("#buildDateMobile", data.datePublished);
-
-      setInnerHtml("#buildOrder", data.buildOrderHtml);
-
-      if (data.hasComment) {
-        setTextContent("#buildComment", data.comment);
-        toggleDisplay("#buildComment", true);
-        toggleDisplay("#commentHeader", true);
-      } else {
-        setTextContent("#buildComment", "");
-        toggleDisplay("#buildComment", false);
-        toggleDisplay("#commentHeader", false);
-      }
-
-      const replayWrapper = doc.querySelector("#replayViewWrapper");
-      const replayHeader = doc.querySelector("#replayHeader");
-      const replayBtn = doc.querySelector("#replayDownloadBtn");
-      if (replayWrapper && replayHeader && replayBtn) {
-        if (data.replayUrl) {
-          replayBtn.href = data.replayUrl;
-          replayWrapper.style.display = "block";
-          replayHeader.style.display = "block";
-        } else {
-          replayBtn.removeAttribute("href");
-          replayWrapper.style.display = "none";
-          replayHeader.style.display = "none";
-        }
-      }
-
-      if (head && data.meta) {
-        const removeIfExists = (selector) => {
-          const existing = head.querySelector(selector);
-          if (existing) existing.remove();
+        const setTextContent = (selector, value) => {
+          const element = doc.querySelector(selector);
+          if (element && typeof value === "string") {
+            element.textContent = value;
+          }
         };
 
-        doc.title = data.meta.pageTitle;
+        const setInnerHtml = (selector, value) => {
+          const element = doc.querySelector(selector);
+          if (element && typeof value === "string") {
+            element.innerHTML = value;
+          }
+        };
 
-        removeIfExists('meta[name="description"]');
-        const metaDesc = doc.createElement("meta");
-        metaDesc.name = "description";
-        metaDesc.content = data.meta.description;
-        head.appendChild(metaDesc);
+        const toggleDisplay = (selector, shouldShow) => {
+          const element = doc.querySelector(selector);
+          if (element) {
+            element.style.display = shouldShow ? "block" : "none";
+          }
+        };
 
-        removeIfExists('meta[property="og:title"]');
-        const ogTitleTag = doc.createElement("meta");
-        ogTitleTag.setAttribute("property", "og:title");
-        ogTitleTag.content = data.meta.ogTitle;
-        head.appendChild(ogTitleTag);
+        setTextContent("#buildTitle", data.title);
+        setTextContent("#buildPublisher", data.publisher);
+        setTextContent("#buildPublisherMobile", data.publisher);
+        setTextContent("#buildCategory", data.category);
+        setTextContent("#buildCategoryMobile", data.category);
+        setTextContent("#buildMatchup", data.matchup);
+        setTextContent("#buildMatchupMobile", data.matchup);
+        setTextContent("#buildDate", data.datePublished);
+        setTextContent("#buildDateMobile", data.datePublished);
 
-        removeIfExists('meta[property="og:description"]');
-        const ogDescTag = doc.createElement("meta");
-        ogDescTag.setAttribute("property", "og:description");
-        ogDescTag.content = data.meta.ogDescription;
-        head.appendChild(ogDescTag);
+        setInnerHtml("#buildOrder", data.buildOrderHtml);
 
-        removeIfExists('meta[property="og:site_name"]');
-        const ogSiteTag = doc.createElement("meta");
-        ogSiteTag.setAttribute("property", "og:site_name");
-        ogSiteTag.content = data.meta.ogSiteName;
-        head.appendChild(ogSiteTag);
+        if (data.hasComment) {
+          setTextContent("#buildComment", data.comment);
+          toggleDisplay("#buildComment", true);
+          toggleDisplay("#commentHeader", true);
+        } else {
+          setTextContent("#buildComment", "");
+          toggleDisplay("#buildComment", false);
+          toggleDisplay("#commentHeader", false);
+        }
 
-        removeIfExists('meta[property="og:image"]');
-        const ogImageTag = doc.createElement("meta");
-        ogImageTag.setAttribute("property", "og:image");
-        ogImageTag.content = "https://zbuildorder.com/img/og-image.webp";
-        head.appendChild(ogImageTag);
+        const replayWrapper = doc.querySelector("#replayViewWrapper");
+        const replayHeader = doc.querySelector("#replayHeader");
+        const replayBtn = doc.querySelector("#replayDownloadBtn");
+        if (replayWrapper && replayHeader && replayBtn) {
+          if (data.replayUrl) {
+            replayBtn.href = data.replayUrl;
+            replayWrapper.style.display = "block";
+            replayHeader.style.display = "block";
+          } else {
+            replayBtn.removeAttribute("href");
+            replayWrapper.style.display = "none";
+            replayHeader.style.display = "none";
+          }
+        }
 
-        removeIfExists('link[rel="canonical"]');
-        const canonical = doc.createElement("link");
-        canonical.setAttribute("rel", "canonical");
-        const path = window.location.pathname.replace(/^\/+/, "");
-        canonical.setAttribute("href", `https://zbuildorder.com/${path}`);
-        head.appendChild(canonical);
+        if (head && data.meta) {
+          const removeIfExists = (selector) => {
+            const existing = head.querySelector(selector);
+            if (existing) existing.remove();
+          };
 
-        removeIfExists('meta[name="robots"]');
-        const robotsTag = doc.createElement("meta");
-        robotsTag.setAttribute("name", "robots");
-        robotsTag.content = "index,follow";
-        head.appendChild(robotsTag);
-      }
-    }, { data: payload });
+          doc.title = data.meta.pageTitle;
+
+          removeIfExists('meta[name="description"]');
+          const metaDesc = doc.createElement("meta");
+          metaDesc.name = "description";
+          metaDesc.content = data.meta.description;
+          head.appendChild(metaDesc);
+
+          removeIfExists('meta[property="og:title"]');
+          const ogTitleTag = doc.createElement("meta");
+          ogTitleTag.setAttribute("property", "og:title");
+          ogTitleTag.content = data.meta.ogTitle;
+          head.appendChild(ogTitleTag);
+
+          removeIfExists('meta[property="og:description"]');
+          const ogDescTag = doc.createElement("meta");
+          ogDescTag.setAttribute("property", "og:description");
+          ogDescTag.content = data.meta.ogDescription;
+          head.appendChild(ogDescTag);
+
+          removeIfExists('meta[property="og:site_name"]');
+          const ogSiteTag = doc.createElement("meta");
+          ogSiteTag.setAttribute("property", "og:site_name");
+          ogSiteTag.content = data.meta.ogSiteName;
+          head.appendChild(ogSiteTag);
+
+          removeIfExists('meta[property="og:image"]');
+          const ogImageTag = doc.createElement("meta");
+          ogImageTag.setAttribute("property", "og:image");
+          ogImageTag.content = "https://zbuildorder.com/img/og-image.webp";
+          head.appendChild(ogImageTag);
+
+          removeIfExists('link[rel="canonical"]');
+          const canonical = doc.createElement("link");
+          canonical.setAttribute("rel", "canonical");
+          const path = window.location.pathname.replace(/^\/+/, "");
+          canonical.setAttribute("href", `https://zbuildorder.com/${path}`);
+          head.appendChild(canonical);
+
+          removeIfExists('meta[name="robots"]');
+          const robotsTag = doc.createElement("meta");
+          robotsTag.setAttribute("name", "robots");
+          robotsTag.content = "index,follow";
+          head.appendChild(robotsTag);
+        }
+      },
+      { data: payload }
+    );
 
     console.log(`✅ DOM updated using Firestore data for build ${buildId}.`);
 
@@ -748,7 +757,9 @@ async function getPrerenderedHtml(buildId) {
     }
 
     console.warn(
-      `⚠️ Re-rendering build ${buildId} because cached HTML is incomplete. Missing: ${analysis.missing.join(", ")}`
+      `⚠️ Re-rendering build ${buildId} because cached HTML is incomplete. Missing: ${analysis.missing.join(
+        ", "
+      )}`
     );
 
     try {
