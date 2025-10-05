@@ -1,5 +1,6 @@
 import DOMPurify from "dompurify";
 import { auth, db, initializeAuthUI } from "../../app.js"; // ✅ Reuse Firebase app
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
 import {
   collection,
   doc,
@@ -1079,7 +1080,7 @@ async function loadBuild() {
   });
 
   // ✅ Wait for auth state to initialize THEN show correct vote state
-  auth.onAuthStateChanged(() => {
+  onAuthStateChanged(auth, () => {
     updateVoteButtonIcons(buildId);
   });
 }
@@ -1271,7 +1272,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const importBtn = document.getElementById("importBuildButton");
 
   if (importBtn) {
-    auth.onAuthStateChanged(async (user) => {
+    onAuthStateChanged(auth, async (user) => {
       const importBtn = document.getElementById("importBuildButton");
       if (!importBtn) return;
 
@@ -1328,7 +1329,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   // Update vote UI when auth state changes (e.g., after sign-in)
-  auth.onAuthStateChanged((user) => {
+  onAuthStateChanged(auth, (user) => {
     updateCommentFormState(user);
 
     const buildId = getBuildId();
