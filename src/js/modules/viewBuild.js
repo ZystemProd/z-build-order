@@ -253,9 +253,14 @@ async function loadCurrentUserProfile() {
 }
 
 function updateCommentFormState(user) {
+  const commentSection = document.querySelector(".comment-section");
   const commentForm = document.getElementById("commentForm");
   const signInPrompt = document.getElementById("commentSignInPrompt");
   const signInBtn = document.getElementById("commentSignInBtn");
+
+  if (commentSection) {
+    commentSection.style.display = "flex";
+  }
 
   if (user) {
     if (commentForm) commentForm.style.display = "flex";
@@ -1060,7 +1065,8 @@ function updateVoteUI(buildId, upvotes, downvotes, userVote) {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
-  if (!window.location.pathname.startsWith("/build/")) return;
+  const viewBuildContainer = document.querySelector(".view-build-container");
+  if (!viewBuildContainer) return;
 
   const postCommentBtn = document.getElementById("postCommentBtn");
   if (postCommentBtn) {
