@@ -269,12 +269,20 @@ async function loadBuild() {
 
     // Set description
     const descEl = document.getElementById("buildDescription");
+    const descContainer = descEl?.closest(".build-description-container");
+    const descHeader = document.getElementById("descriptionHeader");
     if (descEl) {
       const clean = DOMPurify.sanitize(
         build.description || "No description provided."
       );
       descEl.innerHTML = clean.replace(/\n/g, "<br>");
       descEl.style.display = "block";
+      if (descContainer) {
+        descContainer.style.display = "block";
+      }
+      if (descHeader) {
+        descHeader.style.display = "block";
+      }
     }
 
     // Set YouTube link
