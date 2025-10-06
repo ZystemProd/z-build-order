@@ -28,6 +28,7 @@ import { updateYouTubeEmbed, clearYouTubeEmbed } from "./youtube.js";
 import { getPublisherClanInfo } from "./community.js";
 import { formatShortDate } from "./modal.js";
 import { showToast } from "./toastHandler.js";
+import { bannedWords } from "../data/bannedWords.js";
 
 initializeAuthUI();
 
@@ -50,6 +51,20 @@ let pendingCommentRender = false;
 let pendingCommentsListHtml = null;
 let hasPendingCommentsListHtml = false;
 let commentShellInitialized = false;
+const userProfileCache = new Map();
+
+function escapeRegExp(input) {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+const bannedWordsPattern = bannedWords
+  .filter((word) => typeof word === "string" && word.trim().length > 0)
+  .map((word) => escapeRegExp(word.trim()))
+  .join("|");
+
+const bannedWordsRegex = bannedWordsPattern
+  ? new RegExp(`(${bannedWordsPattern})`, "gi")
+  : null;
 
 function buildCommentSectionMarkup() {
   return `
@@ -57,13 +72,13 @@ function buildCommentSectionMarkup() {
       <h3>Comments <span id="commentsCount" class="comment-count">0 comments</span></h3>
       <button id="commentSignInBtn" class="comment-signin-btn" type="button">Sign in to comment</button>
     </div>
-    <div id="commentsList" class="comments-list">
-      <p class="comment-loading">Loading comments...</p>
-    </div>
-    <p id="commentSignInPrompt" class="comment-signin-prompt">Sign in to share your thoughts.</p>
     <div id="commentForm" class="comment-form" style="display: none;">
       <textarea id="newCommentInput" placeholder="Write a comment..."></textarea>
       <button id="postCommentBtn" type="button">Post</button>
+    </div>
+    <p id="commentSignInPrompt" class="comment-signin-prompt">Sign in to share your thoughts.</p>
+    <div id="commentsList" class="comments-list">
+      <p class="comment-loading">Loading comments...</p>
     </div>
   `;
 }
@@ -154,6 +169,17 @@ function sanitizeAvatarUrl(url) {
     return trimmed;
   }
   return DEFAULT_AVATAR_URL;
+}
+
+function filterBannedWords(text) {
+  if (typeof text !== "string") return "";
+  if (!text.trim() || !bannedWordsRegex) return text;
+  return text.replace(bannedWordsRegex, "*****");
+}
+
+function sanitizeAndFilterComment(text) {
+  const sanitized = sanitizePlainText(text);
+  return filterBannedWords(sanitized);
 }
 
 function formatRelativeTime(date) {
@@ -272,10 +298,17 @@ function renderComments() {
     : false;
 
   latestComments.forEach(({ id, data }) => {
-    const commentData = data || {};
-    const avatarUrl = sanitizeAvatarUrl(commentData.photoURL || "");
+    const commentData = data ? { ...data } : {};
     const username = sanitizePlainText(commentData.username || "Anonymous");
-    const text = sanitizePlainText(commentData.text || "");
+    const displayText =
+      typeof commentData.displayText === "string"
+        ? commentData.displayText
+        : sanitizeAndFilterComment(commentData.text || "");
+    commentData.displayText = displayText;
+    commentData.text =
+      typeof commentData.text === "string"
+        ? commentData.text
+        : sanitizePlainText(displayText || "");
 
     let timestampDate = null;
     try {
@@ -284,7 +317,8 @@ function renderComments() {
       } else if (commentData.timestamp instanceof Date) {
         timestampDate = commentData.timestamp;
       } else if (commentData.timestamp) {
-        timestampDate = new Date(commentData.timestamp);
+        const parsed = new Date(commentData.timestamp);
+        timestampDate = Number.isNaN(parsed.getTime()) ? null : parsed;
       }
     } catch (err) {
       timestampDate = null;
@@ -293,14 +327,16 @@ function renderComments() {
     const timeLabel = formatRelativeTime(timestampDate || new Date());
     const isOwner = commentData.userId === currentUserId;
     const allowDelete = isOwner || isAdminUser;
-    const effectiveAvatar =
+    const avatarSource =
       isOwner && cachedUserProfile?.photoURL
-        ? sanitizeAvatarUrl(cachedUserProfile.photoURL)
-        : avatarUrl;
+        ? cachedUserProfile.photoURL
+        : commentData.photoURL || DEFAULT_AVATAR_URL;
+    const effectiveAvatar = sanitizeAvatarUrl(avatarSource);
 
     const commentCard = document.createElement("div");
     commentCard.className = "comment-card";
     commentCard.dataset.userId = commentData.userId || "";
+    commentCard.dataset.commentId = id;
 
     const avatarEl = document.createElement("img");
     avatarEl.className = "comment-avatar";
@@ -314,17 +350,38 @@ function renderComments() {
     const headerEl = document.createElement("div");
     headerEl.className = "comment-header";
 
-    const usernameEl = document.createElement("span");
-    usernameEl.className = "comment-username";
-    usernameEl.textContent = username || "Anonymous";
+    const metaGroup = document.createElement("div");
+    metaGroup.className = "comment-meta-group";
 
-    const metaEl = document.createElement("div");
-    metaEl.className = "comment-meta";
+    const usernameEl = document.createElement("span");
+    usernameEl.className = "comment-identity";
+    usernameEl.textContent = username || "Anonymous";
 
     const timestampEl = document.createElement("span");
     timestampEl.className = "comment-timestamp";
-    timestampEl.textContent = timeLabel;
-    metaEl.appendChild(timestampEl);
+    const editedSuffix = commentData.isEdited ? " (edited)" : "";
+    timestampEl.textContent = `• ${timeLabel}${editedSuffix}`;
+
+    metaGroup.appendChild(usernameEl);
+    metaGroup.appendChild(timestampEl);
+
+    headerEl.appendChild(metaGroup);
+
+    const actionsEl = document.createElement("div");
+    actionsEl.className = "comment-actions";
+    let hasActions = false;
+
+    if (isOwner) {
+      const editBtn = document.createElement("button");
+      editBtn.type = "button";
+      editBtn.className = "comment-edit-btn";
+      editBtn.textContent = "Edit";
+      editBtn.addEventListener("click", () => {
+        openCommentEditor(commentCard, id, commentData);
+      });
+      actionsEl.appendChild(editBtn);
+      hasActions = true;
+    }
 
     if (allowDelete) {
       const deleteBtn = document.createElement("button");
@@ -337,15 +394,17 @@ function renderComments() {
         if (!currentBuildId) return;
         deleteComment(currentBuildId, id, commentData);
       });
-      metaEl.appendChild(deleteBtn);
+      actionsEl.appendChild(deleteBtn);
+      hasActions = true;
     }
 
-    headerEl.appendChild(usernameEl);
-    headerEl.appendChild(metaEl);
+    if (hasActions) {
+      headerEl.appendChild(actionsEl);
+    }
 
     const textEl = document.createElement("div");
     textEl.className = "comment-text";
-    textEl.innerHTML = text.replace(/\n/g, "<br>");
+    textEl.innerHTML = displayText.replace(/\n/g, "<br>");
 
     contentEl.appendChild(headerEl);
     contentEl.appendChild(textEl);
@@ -364,6 +423,161 @@ function renderComments() {
   updateCommentCount(latestComments.length);
 }
 
+async function updateExistingComment(buildId, commentId, newContent, commentData) {
+  if (!buildId || !commentId) return false;
+
+  const user = auth.currentUser;
+  if (!user) {
+    showToast("⚠️ Please sign in to edit comments.", "warning");
+    return false;
+  }
+
+  if (!commentData || commentData.userId !== user.uid) {
+    showToast("⚠️ You can only edit your own comments.", "warning");
+    return false;
+  }
+
+  const trimmed = (newContent || "").trim();
+  if (trimmed.length < 2) {
+    showToast("⚠️ Comment must be at least 2 characters.", "warning");
+    return false;
+  }
+
+  if (trimmed.length > 1200) {
+    showToast(
+      "⚠️ Comment is too long. Please keep it under 1200 characters.",
+      "warning"
+    );
+    return false;
+  }
+
+  const sanitized = sanitizePlainText(trimmed);
+  if (!sanitized || sanitized.length < 2) {
+    showToast("⚠️ Please enter a valid comment.", "warning");
+    return false;
+  }
+
+  const filtered = filterBannedWords(sanitized);
+  if (filtered === (commentData?.text || "")) {
+    showToast("ℹ️ No changes to save.", "warning");
+    return false;
+  }
+
+  try {
+    const commentRef = doc(db, `publishedBuilds/${buildId}/comments`, commentId);
+    await updateDoc(commentRef, {
+      text: filtered,
+      isEdited: true,
+      editedAt: serverTimestamp(),
+    });
+
+    latestComments = latestComments.map((entry) => {
+      if (entry.id !== commentId) return entry;
+      const updatedData = {
+        ...entry.data,
+        text: filtered,
+        displayText: filterBannedWords(filtered),
+        isEdited: true,
+        editedAt: new Date(),
+      };
+      return { ...entry, data: updatedData };
+    });
+
+    showToast("💬 Comment updated.", "success");
+    renderComments();
+    return true;
+  } catch (error) {
+    console.error("❌ Failed to update comment:", error);
+    showToast("❌ Failed to update comment. Please try again.", "error");
+    return false;
+  }
+}
+
+function openCommentEditor(commentCard, commentId, commentData) {
+  if (!commentCard || commentCard.dataset.editing === "true") return;
+  if (!commentData || !currentBuildId) return;
+
+  const textContainer = commentCard.querySelector(".comment-text");
+  if (!textContainer) return;
+
+  const actionsContainer = commentCard.querySelector(".comment-actions");
+  const originalHtml = textContainer.innerHTML;
+  const originalText = commentData.text || "";
+
+  commentCard.dataset.editing = "true";
+  commentCard.classList.add("comment-card--editing");
+
+  const textarea = document.createElement("textarea");
+  textarea.className = "comment-edit-textarea";
+  textarea.value = originalText;
+
+  const controls = document.createElement("div");
+  controls.className = "comment-edit-controls";
+
+  const cancelBtn = document.createElement("button");
+  cancelBtn.type = "button";
+  cancelBtn.className = "comment-cancel-btn";
+  cancelBtn.textContent = "Cancel";
+
+  const saveBtn = document.createElement("button");
+  saveBtn.type = "button";
+  saveBtn.className = "comment-save-btn";
+  saveBtn.textContent = "Save";
+
+  controls.appendChild(cancelBtn);
+  controls.appendChild(saveBtn);
+
+  textContainer.innerHTML = "";
+  textContainer.appendChild(textarea);
+  textContainer.appendChild(controls);
+
+  const setDisabled = (state) => {
+    if (saveBtn) saveBtn.disabled = state;
+    if (cancelBtn) cancelBtn.disabled = state;
+    if (textarea) textarea.disabled = state;
+    if (actionsContainer) {
+      actionsContainer
+        .querySelectorAll("button")
+        .forEach((button) => {
+          if (button instanceof HTMLButtonElement) {
+            button.disabled = state;
+          }
+        });
+    }
+  };
+
+  cancelBtn.addEventListener("click", () => {
+    setDisabled(false);
+    commentCard.dataset.editing = "false";
+    commentCard.classList.remove("comment-card--editing");
+    textContainer.innerHTML = originalHtml;
+  });
+
+  saveBtn.addEventListener("click", async () => {
+    setDisabled(true);
+    const success = await updateExistingComment(
+      currentBuildId,
+      commentId,
+      textarea.value || "",
+      commentData
+    );
+    if (!success && commentCard.isConnected) {
+      setDisabled(false);
+    }
+  });
+
+  textarea.addEventListener("keydown", (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+      event.preventDefault();
+      saveBtn.click();
+    }
+  });
+
+  textarea.focus();
+  const { value } = textarea;
+  textarea.setSelectionRange(value.length, value.length);
+}
+
 window.addEventListener("user-avatar-updated", (event) => {
   const newUrl = sanitizeAvatarUrl(event?.detail?.avatarUrl || "");
   if (!newUrl) return;
@@ -377,6 +591,16 @@ window.addEventListener("user-avatar-updated", (event) => {
       photoURL: newUrl,
     };
   }
+
+  const existingProfile = userProfileCache.get(user.uid) || {};
+  userProfileCache.set(user.uid, {
+    ...existingProfile,
+    photoURL: newUrl,
+    username:
+      existingProfile.username ||
+      cachedUserProfile?.username ||
+      sanitizePlainText(user.displayName || "Anonymous"),
+  });
 
   let shouldRerender = false;
   latestComments = latestComments.map((entry) => {
@@ -423,7 +647,9 @@ async function loadCurrentUserProfile() {
     const userDocRef = doc(db, "users", user.uid);
     const userSnapshot = await getDoc(userDocRef);
     const userData = userSnapshot.exists() ? userSnapshot.data() : {};
-    const username = userData.username || user.displayName || "Anonymous";
+    const username = sanitizePlainText(
+      userData.username || user.displayName || "Anonymous"
+    );
 
     const avatarFromProfile =
       userData?.profile?.avatarUrl || userData?.avatarUrl || DEFAULT_AVATAR_URL;
@@ -434,14 +660,22 @@ async function loadCurrentUserProfile() {
       photoURL: sanitizeAvatarUrl(avatarFromProfile),
       email: user.email || "",
     };
+    userProfileCache.set(user.uid, {
+      username: cachedUserProfile.username,
+      photoURL: cachedUserProfile.photoURL,
+    });
   } catch (error) {
     console.warn("?? Failed to load user profile for comments", error);
     cachedUserProfile = {
       uid: user.uid,
-      username: user.displayName || "Anonymous",
+      username: sanitizePlainText(user.displayName || "Anonymous"),
       photoURL: sanitizeAvatarUrl(DEFAULT_AVATAR_URL),
       email: user.email || "",
     };
+    userProfileCache.set(user.uid, {
+      username: cachedUserProfile.username,
+      photoURL: cachedUserProfile.photoURL,
+    });
   }
 
   return cachedUserProfile;
@@ -484,6 +718,82 @@ function updateCommentFormState(user) {
   renderComments();
 }
 
+async function resolveUserProfile(userId, fallbackData = {}) {
+  if (!userId) return null;
+
+  if (userProfileCache.has(userId)) {
+    return userProfileCache.get(userId);
+  }
+
+  try {
+    const userDocRef = doc(db, "users", userId);
+    const userSnapshot = await getDoc(userDocRef);
+    if (userSnapshot.exists()) {
+      const profileData = userSnapshot.data() || {};
+      const username = sanitizePlainText(
+        profileData.username || fallbackData.username || "Anonymous"
+      );
+      const avatarSource =
+        profileData?.profile?.avatarUrl ||
+        profileData?.avatarUrl ||
+        fallbackData.photoURL ||
+        DEFAULT_AVATAR_URL;
+      const profile = {
+        username,
+        photoURL: sanitizeAvatarUrl(avatarSource),
+      };
+      userProfileCache.set(userId, profile);
+      return profile;
+    }
+  } catch (error) {
+    console.warn("⚠️ Failed to fetch user profile for comments", error);
+  }
+
+  if (fallbackData) {
+    const profile = {
+      username: sanitizePlainText(fallbackData.username || "Anonymous"),
+      photoURL: sanitizeAvatarUrl(
+        fallbackData.photoURL || DEFAULT_AVATAR_URL
+      ),
+    };
+    userProfileCache.set(userId, profile);
+    return profile;
+  }
+
+  return null;
+}
+
+async function enrichCommentEntry(entry) {
+  const baseData = entry?.data || {};
+  const sanitizedText = sanitizePlainText(baseData.text || "");
+  const filteredText = filterBannedWords(sanitizedText);
+
+  let username = sanitizePlainText(baseData.username || "Anonymous");
+  let photoURL = sanitizeAvatarUrl(baseData.photoURL || DEFAULT_AVATAR_URL);
+
+  if (baseData.userId) {
+    const profile = await resolveUserProfile(baseData.userId, {
+      username,
+      photoURL,
+    });
+    if (profile) {
+      username = sanitizePlainText(profile.username || username);
+      photoURL = sanitizeAvatarUrl(profile.photoURL || photoURL);
+    }
+  }
+
+  return {
+    id: entry.id,
+    data: {
+      ...baseData,
+      username,
+      photoURL,
+      text: sanitizedText,
+      displayText: filteredText,
+    },
+  };
+}
+
 function loadComments(buildId) {
   if (!buildId) {
     setCommentsListContent(
@@ -518,12 +828,25 @@ function loadComments(buildId) {
 
     commentsUnsubscribe = onSnapshot(
       commentsQuery,
-      (snapshot) => {
-        latestComments = snapshot.docs.map((docSnap) => ({
-          id: docSnap.id,
-          data: docSnap.data(),
-        }));
-        renderComments();
+      async (snapshot) => {
+        try {
+          const commentEntries = snapshot.docs.map((docSnap) => ({
+            id: docSnap.id,
+            data: docSnap.data(),
+          }));
+
+          const enrichedComments = await Promise.all(
+            commentEntries.map((entry) => enrichCommentEntry(entry))
+          );
+
+          latestComments = enrichedComments;
+          renderComments();
+        } catch (err) {
+          console.error("❌ Failed to process comments:", err);
+          setCommentsListContent(
+            '<p class="comment-error">Unable to load comments right now.</p>'
+          );
+        }
       },
       (error) => {
         console.error("❌ Failed to load comments:", error);
@@ -577,6 +900,12 @@ async function postComment(buildId) {
     return;
   }
 
+  const filtered = filterBannedWords(sanitized);
+  if (!filtered || filtered.length < 2) {
+    showToast("⚠️ Please enter a valid comment.", "warning");
+    return;
+  }
+
   postButton.disabled = true;
   const previousLabel = postButton.textContent;
   postButton.textContent = "Posting...";
@@ -590,7 +919,8 @@ async function postComment(buildId) {
       userId: user.uid,
       username,
       photoURL,
-      text: sanitized,
+      text: filtered,
+      isEdited: false,
       timestamp: serverTimestamp(),
     });
 
