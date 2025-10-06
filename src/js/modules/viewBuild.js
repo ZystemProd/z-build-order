@@ -15,7 +15,10 @@ import {
   serverTimestamp,
   deleteDoc,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
-import { formatActionText, formatWorkersOrTimestampText } from "../modules/textFormatters.js"; // ✅ Format build steps
+import {
+  formatActionText,
+  formatWorkersOrTimestampText,
+} from "../modules/textFormatters.js"; // ✅ Format build steps
 import {
   MapAnnotations,
   renderMapCards,
@@ -34,7 +37,7 @@ const adminEmails = (
   .map((email) => (typeof email === "string" ? email.toLowerCase() : ""))
   .filter(Boolean);
 
-const DEFAULT_AVATAR_URL = "img/default-avatar.webp";
+const DEFAULT_AVATAR_URL = "img/avatar/marine_avatar_1.webp";
 const MAX_COMMENTS_TO_DISPLAY = 50;
 
 let commentsUnsubscribe = null;
@@ -139,7 +142,14 @@ function sanitizeAvatarUrl(url) {
   const trimmed = url.trim();
   if (!trimmed) return DEFAULT_AVATAR_URL;
   const lower = trimmed.toLowerCase();
-  const allowedStarts = ["http://", "https://", "data:image", "img/", "/img/"]; // Support hosted + local assets
+  const allowedStarts = [
+    "http://",
+    "https://",
+    "data:image",
+    "img/",
+    "/img/",
+    "./img/",
+  ]; // Support hosted + local assets
   if (allowedStarts.some((prefix) => lower.startsWith(prefix))) {
     return trimmed;
   }
@@ -206,7 +216,10 @@ function ensureCommentShellVisible() {
     }
   }
 
-  if (!commentSection.style.display || commentSection.style.display === "none") {
+  if (
+    !commentSection.style.display ||
+    commentSection.style.display === "none"
+  ) {
     commentSection.style.display = "flex";
   }
 
@@ -280,14 +293,20 @@ function renderComments() {
     const timeLabel = formatRelativeTime(timestampDate || new Date());
     const isOwner = commentData.userId === currentUserId;
     const allowDelete = isOwner || isAdminUser;
+    const effectiveAvatar =
+      isOwner && cachedUserProfile?.photoURL
+        ? sanitizeAvatarUrl(cachedUserProfile.photoURL)
+        : avatarUrl;
 
     const commentCard = document.createElement("div");
     commentCard.className = "comment-card";
+    commentCard.dataset.userId = commentData.userId || "";
 
     const avatarEl = document.createElement("img");
     avatarEl.className = "comment-avatar";
-    avatarEl.src = avatarUrl;
+    avatarEl.src = effectiveAvatar;
     avatarEl.alt = `${username}'s avatar`;
+    avatarEl.loading = "lazy";
 
     const contentEl = document.createElement("div");
     contentEl.className = "comment-content";
@@ -345,6 +364,50 @@ function renderComments() {
   updateCommentCount(latestComments.length);
 }
 
+window.addEventListener("user-avatar-updated", (event) => {
+  const newUrl = sanitizeAvatarUrl(event?.detail?.avatarUrl || "");
+  if (!newUrl) return;
+
+  const user = auth.currentUser;
+  if (!user?.uid) return;
+
+  if (cachedUserProfile?.uid === user.uid) {
+    cachedUserProfile = {
+      ...cachedUserProfile,
+      photoURL: newUrl,
+    };
+  }
+
+  let shouldRerender = false;
+  latestComments = latestComments.map((entry) => {
+    if (entry?.data?.userId === user.uid) {
+      shouldRerender = true;
+      return {
+        ...entry,
+        data: {
+          ...entry.data,
+          photoURL: newUrl,
+        },
+      };
+    }
+    return entry;
+  });
+
+  document
+    .querySelectorAll(
+      `.comment-card[data-user-id="${user.uid}"] .comment-avatar`
+    )
+    .forEach((img) => {
+      if (img instanceof HTMLImageElement) {
+        img.src = newUrl;
+      }
+    });
+
+  if (shouldRerender) {
+    renderComments();
+  }
+});
+
 async function loadCurrentUserProfile() {
   const user = auth.currentUser;
   if (!user) {
@@ -359,22 +422,24 @@ async function loadCurrentUserProfile() {
   try {
     const userDocRef = doc(db, "users", user.uid);
     const userSnapshot = await getDoc(userDocRef);
-    const username = userSnapshot.exists()
-      ? userSnapshot.data().username || user.displayName || "Anonymous"
-      : user.displayName || "Anonymous";
+    const userData = userSnapshot.exists() ? userSnapshot.data() : {};
+    const username = userData.username || user.displayName || "Anonymous";
+
+    const avatarFromProfile =
+      userData?.profile?.avatarUrl || userData?.avatarUrl || DEFAULT_AVATAR_URL;
 
     cachedUserProfile = {
       uid: user.uid,
       username,
-      photoURL: user.photoURL || DEFAULT_AVATAR_URL,
+      photoURL: sanitizeAvatarUrl(avatarFromProfile),
       email: user.email || "",
     };
   } catch (error) {
-    console.warn("⚠️ Failed to load user profile for comments", error);
+    console.warn("?? Failed to load user profile for comments", error);
     cachedUserProfile = {
       uid: user.uid,
       username: user.displayName || "Anonymous",
-      photoURL: user.photoURL || DEFAULT_AVATAR_URL,
+      photoURL: sanitizeAvatarUrl(DEFAULT_AVATAR_URL),
       email: user.email || "",
     };
   }
@@ -477,10 +542,10 @@ function loadComments(buildId) {
 
 async function postComment(buildId) {
   const commentElements = ensureCommentSectionStructure();
-  const textarea = commentElements?.textarea ||
-    document.getElementById("newCommentInput");
-  const postButton = commentElements?.postButton ||
-    document.getElementById("postCommentBtn");
+  const textarea =
+    commentElements?.textarea || document.getElementById("newCommentInput");
+  const postButton =
+    commentElements?.postButton || document.getElementById("postCommentBtn");
 
   if (!textarea || !postButton) return;
 
@@ -499,7 +564,10 @@ async function postComment(buildId) {
   }
 
   if (trimmed.length > 1200) {
-    showToast("⚠️ Comment is too long. Please keep it under 1200 characters.", "warning");
+    showToast(
+      "⚠️ Comment is too long. Please keep it under 1200 characters.",
+      "warning"
+    );
     return;
   }
 
@@ -553,7 +621,11 @@ async function deleteComment(buildId, commentId, commentData) {
   }
 
   try {
-    const commentRef = doc(db, `publishedBuilds/${buildId}/comments`, commentId);
+    const commentRef = doc(
+      db,
+      `publishedBuilds/${buildId}/comments`,
+      commentId
+    );
     await deleteDoc(commentRef);
     showToast("🗑️ Comment deleted.", "success");
   } catch (error) {
@@ -768,7 +840,9 @@ async function loadBuild() {
           step.action.trim() !== ""
         ) {
           const bracket = step.workersOrTimestamp
-            ? `<strong>${formatWorkersOrTimestampText(step.workersOrTimestamp)}</strong> `
+            ? `<strong>${formatWorkersOrTimestampText(
+                step.workersOrTimestamp
+              )}</strong> `
             : "";
           buildOrderContainer.innerHTML += `<p>${bracket}${formatActionText(
             step.action
@@ -823,7 +897,10 @@ async function loadBuild() {
       descEl?.parentElement ||
       null;
 
-    if (descContainer && !descContainer.classList.contains("build-description-container")) {
+    if (
+      descContainer &&
+      !descContainer.classList.contains("build-description-container")
+    ) {
       descContainer.classList.add("build-description-container");
     }
 
@@ -1312,19 +1389,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadBuild();
 
   // Redirect to community builds when clicking publisher name
-  document.querySelectorAll('.publisher-chip').forEach((chip) => {
-    chip.addEventListener('click', (e) => {
+  document.querySelectorAll(".publisher-chip").forEach((chip) => {
+    chip.addEventListener("click", (e) => {
       e.stopPropagation();
       const name =
-        document.getElementById('buildPublisher')?.innerText ||
-        document.getElementById('buildPublisherMobile')?.innerText ||
-        '';
+        document.getElementById("buildPublisher")?.innerText ||
+        document.getElementById("buildPublisherMobile")?.innerText ||
+        "";
       if (!name) return;
-      localStorage.setItem('restoreCommunityModal', 'true');
-      localStorage.removeItem('communityFilterType');
-      localStorage.removeItem('communityFilterValue');
-      localStorage.setItem('communitySearchQuery', name);
-      window.location.href = 'index.html';
+      localStorage.setItem("restoreCommunityModal", "true");
+      localStorage.removeItem("communityFilterType");
+      localStorage.removeItem("communityFilterValue");
+      localStorage.setItem("communitySearchQuery", name);
+      window.location.href = "index.html";
     });
   });
 

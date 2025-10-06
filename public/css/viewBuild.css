@@ -824,3 +824,9 @@ body.modal-open {
   outline: 2px solid #00bcd4;
   outline-offset: 2px;
 }
+
+.avatar-option.is-selected {
+  border: 1px solid rgba(0, 188, 212, 0.6);
+  box-shadow: 0 0 0 2px rgba(0, 188, 212, 0.35), 0 10px 22px rgba(0, 188, 212, 0.25);
+  transform: translateY(-1px);
+}
