@@ -10,6 +10,7 @@ let currentAdvancedPlayer = "player1";
 let advancedStage = "veto"; // stages: veto, pick
 let pickOrder = 1;
 let actionHistory = [];
+let draggedRow = null;
 
 const bestOfSelect = document.getElementById("bestOfSelect");
 
@@ -184,12 +185,25 @@ function checkUnvetoedMapsForBestOf() {
     .forEach((li) => li.classList.remove("pulsing-border"));
   const indicators = document.querySelectorAll(".order-indicator");
   const target = bestOfValue;
-  if (target && unvetoed.length === target) {
+  const isActive = Boolean(target) && unvetoed.length === target;
+  if (isActive) {
     unvetoed.forEach((li) => li.classList.add("pulsing-border"));
-    indicators.forEach((ind) => (ind.style.background = "#555"));
-  } else {
-    indicators.forEach((ind) => (ind.style.background = ""));
   }
+  indicators.forEach((ind) => {
+    if (isActive) {
+      ind.classList.add("order-indicator--active");
+      ind.style.background = "#555";
+    } else {
+      ind.classList.remove("order-indicator--active");
+      ind.style.background = "";
+    }
+  });
+}
+
+function getUnvetoedMapCount() {
+  return [...document.querySelectorAll(".map-list li")].filter(
+    (li) => !li.classList.contains("vetoed-map")
+  ).length;
 }
 
 function cycleOrder(mapNumber, event) {
@@ -197,7 +211,13 @@ function cycleOrder(mapNumber, event) {
   const li = document.getElementById(`map${mapNumber}`);
   const indicator = li.querySelector(".order-indicator");
 
-  if (li.classList.contains("vetoed-map") || bestOfValue <= 1) return;
+  if (
+    li.classList.contains("vetoed-map") ||
+    bestOfValue <= 1 ||
+    !indicator.classList.contains("order-indicator--active") ||
+    getUnvetoedMapCount() !== bestOfValue
+  )
+    return;
 
   const maxOrders = bestOfValue;
   const currentOrder = parseInt(indicator.textContent) || 0;
@@ -410,8 +430,11 @@ function animateVetoDirection(element, direction) {
   if (!element) return;
   const row = element.closest(".map-row");
   const cls = direction === "left" ? "veto-left" : "veto-right";
-  if (row) row.classList.add(cls);
-  element.classList.add(cls);
+  if (row) {
+    row.classList.add(cls);
+  } else {
+    element.classList.add(cls);
+  }
   const target = row || element;
   target.addEventListener(
     "transitionend",
@@ -425,6 +448,100 @@ function animateVetoDirection(element, direction) {
     },
     { once: true }
   );
+}
+
+// --- Drag & Drop ordering ---
+function handleRowDragStart(event) {
+  draggedRow = event.currentTarget;
+  if (!draggedRow) return;
+  draggedRow.classList.add("dragging");
+  event.dataTransfer.effectAllowed = "move";
+  const mapId = draggedRow.dataset.mapId || "";
+  try {
+    event.dataTransfer.setData("text/plain", mapId);
+  } catch (err) {
+    // ignore if browser blocks setData
+  }
+}
+
+function handleRowDragEnd() {
+  if (!draggedRow) return;
+  draggedRow.classList.remove("dragging");
+  draggedRow = null;
+  updateMapOrderFromDOM();
+}
+
+function handleListDragOver(event) {
+  if (!draggedRow) return;
+  event.preventDefault();
+  const container = event.currentTarget;
+  const afterElement = getDragAfterElement(container, event.clientY);
+  if (!afterElement) {
+    container.appendChild(draggedRow);
+  } else if (afterElement !== draggedRow) {
+    container.insertBefore(draggedRow, afterElement);
+  }
+}
+
+function handleListDrop(event) {
+  if (!draggedRow) return;
+  event.preventDefault();
+  draggedRow.classList.remove("dragging");
+  draggedRow = null;
+  updateMapOrderFromDOM();
+}
+
+function getDragAfterElement(container, y) {
+  const rows = [
+    ...container.querySelectorAll(".map-row:not(.dragging):not([style*='display: none'])"),
+  ];
+  return rows
+    .map((row) => {
+      const box = row.getBoundingClientRect();
+      return {
+        offset: y - (box.top + box.height / 2),
+        element: row,
+      };
+    })
+    .filter((item) => item.offset < 0)
+    .reduce(
+      (closest, item) =>
+        item.offset > closest.offset ? item : closest,
+      { offset: Number.NEGATIVE_INFINITY, element: null }
+    ).element;
+}
+
+function updateMapOrderFromDOM() {
+  const rows = [...document.querySelectorAll(".map-list .map-row")];
+  if (rows.length === 0) return;
+  const idOrder = rows
+    .map((row) => {
+      const li = row.querySelector("li");
+      if (!li) return null;
+      const id = parseInt(li.id.replace("map", ""), 10);
+      return Number.isNaN(id) ? null : id;
+    })
+    .filter((id) => id !== null);
+
+  if (idOrder.length !== mapData.length) return;
+
+  const byId = new Map(mapData.map((map) => [map.id, map]));
+  mapData = idOrder.map((id) => byId.get(id)).filter(Boolean);
+
+  if (currentMap) {
+    const idx = mapData.findIndex((map) => map.id === currentMap);
+    currentIndex = idx >= 0 ? idx : 0;
+  } else {
+    currentIndex = 0;
+  }
+  updateDisplayedMap();
+}
+
+function attachListDragEvents(list) {
+  if (!list || list.dataset.dragAttached) return;
+  list.addEventListener("dragover", handleListDragOver);
+  list.addEventListener("drop", handleListDrop);
+  list.dataset.dragAttached = "true";
 }
 
 function updateStageIndicator() {
@@ -816,12 +933,19 @@ function renderMapList() {
     // Row wrapper
     const row = document.createElement("div");
     row.className = "map-row";
+    row.dataset.mapId = `${map.id}`;
+    row.draggable = true;
+    row.addEventListener("dragstart", handleRowDragStart);
+    row.addEventListener("dragend", handleRowDragEnd);
     row.appendChild(li);
     row.appendChild(previewBtn);
 
     // Add row to list
     mapList.appendChild(row);
   });
+
+  attachListDragEvents(mapList);
+  checkUnvetoedMapsForBestOf();
 }
 
 // --- Mobile Preview Modal ---
