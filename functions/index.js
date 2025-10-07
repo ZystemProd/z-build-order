@@ -300,11 +300,11 @@ function buildMetaStrings(buildData) {
 
   return {
     pageTitle: sanitizeText(
-      `Z-Build Order – ${sanitizedTitle}`,
+      `${sanitizedTitle} – Z-Build Order`,
       "Z-Build Order"
     ),
     description,
-    ogTitle: sanitizeText(`Z-Build Order – ${sanitizedTitle}`, "Z-Build Order"),
+    ogTitle: sanitizeText(`${sanitizedTitle} – Z-Build Order`, "Z-Build Order"),
     ogDescription,
     ogSiteName: sanitizedPublisher,
   };
@@ -615,9 +615,13 @@ async function captureBuildHtml(buildId, buildDataFromEvent) {
           }
 
           const container =
-            desc?.closest(".build-description-container") || desc?.parentElement;
+            desc?.closest(".build-description-container") ||
+            desc?.parentElement;
 
-          if (container && !container.classList.contains("build-description-container")) {
+          if (
+            container &&
+            !container.classList.contains("build-description-container")
+          ) {
             container.classList.add("build-description-container");
           }
 
@@ -696,6 +700,18 @@ async function captureBuildHtml(buildId, buildDataFromEvent) {
           ogImageTag.content = "https://zbuildorder.com/img/og-image.webp";
           head.appendChild(ogImageTag);
 
+          removeIfExists('meta[property="og:type"]');
+          const ogTypeTag = doc.createElement("meta");
+          ogTypeTag.setAttribute("property", "og:type");
+          ogTypeTag.content = "article";
+          head.appendChild(ogTypeTag);
+
+          removeIfExists('meta[property="og:url"]');
+          const ogUrlTag = doc.createElement("meta");
+          ogUrlTag.setAttribute("property", "og:url");
+          ogUrlTag.content = window.location.href;
+          head.appendChild(ogUrlTag);
+
           removeIfExists('link[rel="canonical"]');
           const canonical = doc.createElement("link");
           canonical.setAttribute("rel", "canonical");
@@ -708,6 +724,40 @@ async function captureBuildHtml(buildId, buildDataFromEvent) {
           robotsTag.setAttribute("name", "robots");
           robotsTag.content = "index,follow";
           head.appendChild(robotsTag);
+
+          if (data.datePublished) {
+            const isoDate = new Date(data.datePublished).toISOString();
+            removeIfExists('meta[property="article:published_time"]');
+            const publishedTag = doc.createElement("meta");
+            publishedTag.setAttribute("property", "article:published_time");
+            publishedTag.content = isoDate;
+            head.appendChild(publishedTag);
+          }
+
+          const jsonLd = {
+            "@context": "https://schema.org",
+            "@type": "Article",
+            headline: data.title,
+            author: data.publisher,
+            datePublished: data.datePublished
+              ? new Date(data.datePublished).toISOString()
+              : undefined,
+            description: data.meta.description,
+            url: window.location.href,
+            publisher: {
+              "@type": "Organization",
+              name: "Z-Build Order",
+              logo: {
+                "@type": "ImageObject",
+                url: "https://zbuildorder.com/img/og-image.webp",
+              },
+            },
+          };
+
+          const script = doc.createElement("script");
+          script.type = "application/ld+json";
+          script.textContent = JSON.stringify(jsonLd);
+          head.appendChild(script);
         }
       },
       { data: payload }
@@ -757,9 +807,11 @@ async function captureBuildHtml(buildId, buildDataFromEvent) {
 async function saveHtmlToStorage(buildId, html) {
   const file = bucket.file(`preRenderedBuilds/${buildId}.html`);
   await file.save(html, {
-    contentType: "text/html",
+    gzip: true,
+    contentType: "text/html; charset=utf-8",
     metadata: {
-      cacheControl: "public, max-age=86400",
+      cacheControl: "public, max-age=86400, immutable",
+      contentDisposition: `inline; filename="${buildId}.html"`,
     },
   });
   return file;
