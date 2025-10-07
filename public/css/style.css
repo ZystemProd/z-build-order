@@ -692,7 +692,6 @@ button:hover {
 
 .toggle-title {
   margin: 0;
-  font-size: 1.2em;
   color: #e0e0e0;
 }
 
@@ -5461,6 +5460,7 @@ optgroup[label="Terran"] {
 
 .avatar-option.is-selected {
   border: 1px solid rgba(0, 188, 212, 0.6);
-  box-shadow: 0 0 0 2px rgba(0, 188, 212, 0.35), 0 10px 22px rgba(0, 188, 212, 0.25);
+  box-shadow: 0 0 0 2px rgba(0, 188, 212, 0.35),
+    0 10px 22px rgba(0, 188, 212, 0.25);
   transform: translateY(-1px);
 }

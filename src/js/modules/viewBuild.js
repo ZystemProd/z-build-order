@@ -103,13 +103,13 @@ function ensureCommentSectionStructure() {
     commentSection.className = "comment-section";
     commentSection.innerHTML = buildCommentSectionMarkup();
 
-    const descriptionContainer = viewBuildContainer.querySelector(
-      ".build-description-container"
-    );
+    const mainLayout = viewBuildContainer.querySelector(".main-layout");
 
-    if (descriptionContainer) {
-      descriptionContainer.insertAdjacentElement("afterend", commentSection);
+    if (mainLayout) {
+      // ✅ Place comment section *after* main-layout (bottom of page)
+      mainLayout.insertAdjacentElement("afterend", commentSection);
     } else {
+      // fallback if main-layout not found
       viewBuildContainer.appendChild(commentSection);
     }
   } else {
@@ -328,9 +328,8 @@ function renderComments() {
     const isOwner = commentData.userId === currentUserId;
     const allowDelete = isOwner || isAdminUser;
     const avatarSource =
-      isOwner && cachedUserProfile?.photoURL
-        ? cachedUserProfile.photoURL
-        : commentData.photoURL || DEFAULT_AVATAR_URL;
+      commentData.photoURL || cachedUserProfile?.photoURL || DEFAULT_AVATAR_URL;
+
     const effectiveAvatar = sanitizeAvatarUrl(avatarSource);
 
     const commentCard = document.createElement("div");
@@ -423,7 +422,12 @@ function renderComments() {
   updateCommentCount(latestComments.length);
 }
 
-async function updateExistingComment(buildId, commentId, newContent, commentData) {
+async function updateExistingComment(
+  buildId,
+  commentId,
+  newContent,
+  commentData
+) {
   if (!buildId || !commentId) return false;
 
   const user = auth.currentUser;
@@ -464,7 +468,11 @@ async function updateExistingComment(buildId, commentId, newContent, commentData
   }
 
   try {
-    const commentRef = doc(db, `publishedBuilds/${buildId}/comments`, commentId);
+    const commentRef = doc(
+      db,
+      `publishedBuilds/${buildId}/comments`,
+      commentId
+    );
     await updateDoc(commentRef, {
       text: filtered,
       isEdited: true,
@@ -536,13 +544,11 @@ function openCommentEditor(commentCard, commentId, commentData) {
     if (cancelBtn) cancelBtn.disabled = state;
     if (textarea) textarea.disabled = state;
     if (actionsContainer) {
-      actionsContainer
-        .querySelectorAll("button")
-        .forEach((button) => {
-          if (button instanceof HTMLButtonElement) {
-            button.disabled = state;
-          }
-        });
+      actionsContainer.querySelectorAll("button").forEach((button) => {
+        if (button instanceof HTMLButtonElement) {
+          button.disabled = state;
+        }
+      });
     }
   };
 
@@ -652,7 +658,7 @@ async function loadCurrentUserProfile() {
     );
 
     const avatarFromProfile =
-      userData?.profile?.avatarUrl || userData?.avatarUrl || DEFAULT_AVATAR_URL;
+      userData?.avatarUrl || userData?.profile?.avatarUrl || DEFAULT_AVATAR_URL;
 
     cachedUserProfile = {
       uid: user.uid,
@@ -734,10 +740,10 @@ async function resolveUserProfile(userId, fallbackData = {}) {
         profileData.username || fallbackData.username || "Anonymous"
       );
       const avatarSource =
-        profileData?.profile?.avatarUrl ||
         profileData?.avatarUrl ||
-        fallbackData.photoURL ||
+        profileData?.profile?.avatarUrl ||
         DEFAULT_AVATAR_URL;
+
       const profile = {
         username,
         photoURL: sanitizeAvatarUrl(avatarSource),
@@ -752,9 +758,7 @@ async function resolveUserProfile(userId, fallbackData = {}) {
   if (fallbackData) {
     const profile = {
       username: sanitizePlainText(fallbackData.username || "Anonymous"),
-      photoURL: sanitizeAvatarUrl(
-        fallbackData.photoURL || DEFAULT_AVATAR_URL
-      ),
+      photoURL: sanitizeAvatarUrl(fallbackData.photoURL || DEFAULT_AVATAR_URL),
     };
     userProfileCache.set(userId, profile);
     return profile;
