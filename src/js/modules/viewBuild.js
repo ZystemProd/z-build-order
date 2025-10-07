@@ -182,6 +182,57 @@ function sanitizeAndFilterComment(text) {
   return filterBannedWords(sanitized);
 }
 
+async function submitCommentToFirestore(buildId, user, text, parentId = null) {
+  if (!buildId || !user) return false;
+
+  const profile = await loadCurrentUserProfile();
+  const username = profile?.username || "Anonymous";
+  const photoURL = sanitizeAvatarUrl(profile?.photoURL || "");
+
+  await addDoc(collection(db, `publishedBuilds/${buildId}/comments`), {
+    userId: user.uid,
+    username,
+    photoURL,
+    text,
+    isEdited: false,
+    parentId: parentId || null,
+    timestamp: serverTimestamp(),
+  });
+
+  return true;
+}
+
+function prepareCommentText(rawInput) {
+  const trimmed = typeof rawInput === "string" ? rawInput.trim() : "";
+
+  if (trimmed.length < 2) {
+    showToast("⚠️ Comment must be at least 2 characters.", "warning");
+    return null;
+  }
+
+  if (trimmed.length > 1200) {
+    showToast(
+      "⚠️ Comment is too long. Please keep it under 1200 characters.",
+      "warning"
+    );
+    return null;
+  }
+
+  const sanitized = sanitizePlainText(trimmed);
+  if (!sanitized || sanitized.length < 2) {
+    showToast("⚠️ Please enter a valid comment.", "warning");
+    return null;
+  }
+
+  const filtered = filterBannedWords(sanitized);
+  if (!filtered || filtered.length < 2) {
+    showToast("⚠️ Please enter a valid comment.", "warning");
+    return null;
+  }
+
+  return filtered;
+}
+
 function formatRelativeTime(date) {
   if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
     return "Just now";
@@ -271,46 +322,61 @@ function setCommentsListContent(html) {
   return true;
 }
 
-function renderComments() {
-  const { commentsList } = ensureCommentSectionStructure() || {};
-  if (!commentsList) {
-    pendingCommentRender = true;
-    return;
-  }
+function buildCommentTree(comments) {
+  const nodesById = new Map();
+  const roots = [];
 
-  ensureCommentShellVisible();
+  comments.forEach((entry) => {
+    const node = {
+      id: entry.id,
+      data: entry.data || {},
+      children: [],
+    };
+    nodesById.set(entry.id, node);
+  });
 
-  if (!latestComments.length) {
-    setCommentsListContent(
-      '<p class="comment-empty">No comments yet. Be the first to share your strategy!</p>'
+  nodesById.forEach((node) => {
+    const parentId = node.data?.parentId;
+    if (parentId && nodesById.has(parentId)) {
+      nodesById.get(parentId).children.push(node);
+    } else {
+      roots.push(node);
+    }
+  });
+
+  const sortNodes = (list) => {
+    list.sort(
+      (a, b) =>
+        (a.data?.resolvedTimestampMs || 0) - (b.data?.resolvedTimestampMs || 0)
     );
-    updateCommentCount(0);
-    return;
-  }
+    list.forEach((child) => sortNodes(child.children));
+  };
 
-  const fragment = document.createDocumentFragment();
-  const currentUserId = auth.currentUser?.uid || "";
-  const currentUserEmail = auth.currentUser?.email
-    ? auth.currentUser.email.toLowerCase()
-    : "";
-  const isAdminUser = currentUserEmail
-    ? adminEmails.includes(currentUserEmail)
-    : false;
+  sortNodes(roots);
+  return roots;
+}
 
-  latestComments.forEach(({ id, data }) => {
-    const commentData = data ? { ...data } : {};
-    const username = sanitizePlainText(commentData.username || "Anonymous");
-    const displayText =
-      typeof commentData.displayText === "string"
-        ? commentData.displayText
-        : sanitizeAndFilterComment(commentData.text || "");
-    commentData.displayText = displayText;
-    commentData.text =
-      typeof commentData.text === "string"
-        ? commentData.text
-        : sanitizePlainText(displayText || "");
+function createCommentCardElement(node, depth, context) {
+  const { currentUserId, isAdminUser } = context;
+  const { id, data } = node;
+  const commentData = data ? { ...data } : {};
 
-    let timestampDate = null;
+  const username = sanitizePlainText(commentData.username || "Anonymous");
+  const displayText =
+    typeof commentData.displayText === "string"
+      ? commentData.displayText
+      : sanitizeAndFilterComment(commentData.text || "");
+  commentData.displayText = displayText;
+  commentData.text =
+    typeof commentData.text === "string"
+      ? commentData.text
+      : sanitizePlainText(displayText || "");
+
+  let timestampDate = commentData.resolvedTimestamp;
+  if (
+    !(timestampDate instanceof Date) ||
+    Number.isNaN(timestampDate.getTime())
+  ) {
     try {
       if (commentData.timestamp?.toDate) {
         timestampDate = commentData.timestamp.toDate();
@@ -323,95 +389,284 @@ function renderComments() {
     } catch (err) {
       timestampDate = null;
     }
+  }
+  const fallbackDate = timestampDate || new Date();
+  const timeLabel = formatRelativeTime(fallbackDate);
 
-    const timeLabel = formatRelativeTime(timestampDate || new Date());
-    const isOwner = commentData.userId === currentUserId;
-    const allowDelete = isOwner || isAdminUser;
-    const avatarSource =
-      commentData.photoURL || cachedUserProfile?.photoURL || DEFAULT_AVATAR_URL;
+  const isOwner = commentData.userId === currentUserId;
+  const allowDelete = isOwner || isAdminUser;
+  const avatarSource =
+    commentData.photoURL || cachedUserProfile?.photoURL || DEFAULT_AVATAR_URL;
 
-    const effectiveAvatar = sanitizeAvatarUrl(avatarSource);
+  const effectiveAvatar = sanitizeAvatarUrl(avatarSource);
 
-    const commentCard = document.createElement("div");
-    commentCard.className = "comment-card";
-    commentCard.dataset.userId = commentData.userId || "";
-    commentCard.dataset.commentId = id;
+  const commentCard = document.createElement("div");
+  commentCard.className = "comment-card";
+  if (depth > 0) commentCard.classList.add("comment-card--child");
+  commentCard.dataset.userId = commentData.userId || "";
+  commentCard.dataset.commentId = id;
+  commentCard.dataset.depth = String(depth);
+  if (commentData.parentId) {
+    commentCard.dataset.parentId = commentData.parentId;
+  }
 
-    const avatarEl = document.createElement("img");
-    avatarEl.className = "comment-avatar";
-    avatarEl.src = effectiveAvatar;
-    avatarEl.alt = `${username}'s avatar`;
-    avatarEl.loading = "lazy";
+  const avatarEl = document.createElement("img");
+  avatarEl.className = "comment-avatar";
+  avatarEl.src = effectiveAvatar;
+  avatarEl.alt = `${username}'s avatar`;
+  avatarEl.loading = "lazy";
 
-    const contentEl = document.createElement("div");
-    contentEl.className = "comment-content";
+  const contentEl = document.createElement("div");
+  contentEl.className = "comment-content";
 
-    const headerEl = document.createElement("div");
-    headerEl.className = "comment-header";
+  const headerEl = document.createElement("div");
+  headerEl.className = "comment-header";
 
-    const metaGroup = document.createElement("div");
-    metaGroup.className = "comment-meta-group";
+  const metaGroup = document.createElement("div");
+  metaGroup.className = "comment-meta-group";
 
-    const usernameEl = document.createElement("span");
-    usernameEl.className = "comment-identity";
-    usernameEl.textContent = username || "Anonymous";
+  const usernameEl = document.createElement("span");
+  usernameEl.className = "comment-identity";
+  usernameEl.textContent = username || "Anonymous";
 
-    const timestampEl = document.createElement("span");
-    timestampEl.className = "comment-timestamp";
-    const editedSuffix = commentData.isEdited ? " (edited)" : "";
-    timestampEl.textContent = `• ${timeLabel}${editedSuffix}`;
+  const timestampEl = document.createElement("span");
+  timestampEl.className = "comment-timestamp";
+  const editedSuffix = commentData.isEdited ? " (edited)" : "";
+  timestampEl.textContent = `${timeLabel}${editedSuffix}`;
 
-    metaGroup.appendChild(usernameEl);
-    metaGroup.appendChild(timestampEl);
+  metaGroup.appendChild(usernameEl);
+  metaGroup.appendChild(timestampEl);
 
-    headerEl.appendChild(metaGroup);
+  headerEl.appendChild(metaGroup);
 
-    const actionsEl = document.createElement("div");
-    actionsEl.className = "comment-actions";
-    let hasActions = false;
+  const actionsEl = document.createElement("div");
+  actionsEl.className = "comment-actions";
+  let hasActions = false;
 
-    if (isOwner) {
-      const editBtn = document.createElement("button");
-      editBtn.type = "button";
-      editBtn.className = "comment-edit-btn";
-      editBtn.textContent = "Edit";
-      editBtn.addEventListener("click", () => {
-        openCommentEditor(commentCard, id, commentData);
-      });
-      actionsEl.appendChild(editBtn);
-      hasActions = true;
+  const replyBtn = document.createElement("button");
+  replyBtn.type = "button";
+  replyBtn.className = "comment-reply-btn";
+  replyBtn.textContent = "Reply";
+  replyBtn.addEventListener("click", () => toggleReplyForm(commentCard, id));
+  actionsEl.appendChild(replyBtn);
+  hasActions = true;
+
+  if (isOwner) {
+    const editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.className = "comment-edit-btn";
+    editBtn.textContent = "Edit";
+    editBtn.addEventListener("click", () => {
+      openCommentEditor(commentCard, id, commentData);
+    });
+    actionsEl.appendChild(editBtn);
+    hasActions = true;
+  }
+
+  if (allowDelete) {
+    const deleteBtn = document.createElement("button");
+    deleteBtn.type = "button";
+    deleteBtn.className = "comment-delete-btn";
+    deleteBtn.setAttribute("aria-label", "Delete comment");
+    deleteBtn.innerHTML =
+      '<img src="img/SVG/trash.svg" alt="" aria-hidden="true" />';
+    deleteBtn.addEventListener("click", () => {
+      if (!currentBuildId) return;
+      deleteComment(currentBuildId, id, commentData);
+    });
+    actionsEl.appendChild(deleteBtn);
+    hasActions = true;
+  }
+
+  if (hasActions) {
+    headerEl.appendChild(actionsEl);
+  }
+
+  const textEl = document.createElement("div");
+  textEl.className = "comment-text";
+  textEl.innerHTML = displayText.replace(/\n/g, "<br>");
+
+  contentEl.appendChild(headerEl);
+  contentEl.appendChild(textEl);
+
+  commentCard.appendChild(avatarEl);
+  commentCard.appendChild(contentEl);
+
+  return commentCard;
+}
+
+function createCommentThreadElement(node, depth, context) {
+  const threadWrapper = document.createElement("div");
+  threadWrapper.className = "comment-thread";
+  if (depth > 0) threadWrapper.classList.add("comment-thread--child");
+  threadWrapper.dataset.commentId = node.id;
+
+  const commentCard = createCommentCardElement(node, depth, context);
+  threadWrapper.appendChild(commentCard);
+
+  const repliesContainer = document.createElement("div");
+  repliesContainer.className = "comment-replies";
+  threadWrapper.appendChild(repliesContainer);
+
+  node.children.forEach((childNode) => {
+    repliesContainer.appendChild(
+      createCommentThreadElement(childNode, depth + 1, context)
+    );
+  });
+
+  return threadWrapper;
+}
+
+function toggleReplyForm(commentCard, commentId) {
+  if (!commentCard || !commentId) return;
+  const user = auth.currentUser;
+  if (!user) {
+    showToast("⚠️ Please sign in to reply.", "warning");
+    const elements = ensureCommentSectionStructure();
+    elements?.signInButton?.focus();
+    return;
+  }
+
+  const threadWrapper = commentCard.parentElement;
+  if (!threadWrapper) return;
+
+  const existingForm = threadWrapper.querySelector(
+    ":scope > .comment-reply-form"
+  );
+  if (existingForm) {
+    existingForm.remove();
+    return;
+  }
+
+  const repliesContainer = threadWrapper.querySelector(
+    ":scope > .comment-replies"
+  );
+
+  const formWrapper = document.createElement("div");
+  formWrapper.className = "comment-reply-form";
+
+  const textarea = document.createElement("textarea");
+  textarea.className = "comment-reply-input";
+  textarea.placeholder = "Write a reply...";
+  textarea.rows = 3;
+
+  const actions = document.createElement("div");
+  actions.className = "comment-reply-actions";
+
+  const cancelBtn = document.createElement("button");
+  cancelBtn.type = "button";
+  cancelBtn.className = "comment-reply-cancel";
+  cancelBtn.textContent = "Cancel";
+
+  const submitBtn = document.createElement("button");
+  submitBtn.type = "button";
+  submitBtn.className = "comment-reply-submit";
+  submitBtn.textContent = "Post reply";
+
+  cancelBtn.addEventListener("click", () => {
+    formWrapper.remove();
+  });
+
+  submitBtn.addEventListener("click", async () => {
+    await handleReplySubmit(commentId, textarea, submitBtn, formWrapper);
+  });
+
+  textarea.addEventListener("keydown", (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+      event.preventDefault();
+      submitBtn.click();
     }
+  });
 
-    if (allowDelete) {
-      const deleteBtn = document.createElement("button");
-      deleteBtn.type = "button";
-      deleteBtn.className = "comment-delete-btn";
-      deleteBtn.setAttribute("aria-label", "Delete comment");
-      deleteBtn.innerHTML =
-        '<img src="img/SVG/trash.svg" alt="" aria-hidden="true" />';
-      deleteBtn.addEventListener("click", () => {
-        if (!currentBuildId) return;
-        deleteComment(currentBuildId, id, commentData);
-      });
-      actionsEl.appendChild(deleteBtn);
-      hasActions = true;
+  actions.appendChild(cancelBtn);
+  actions.appendChild(submitBtn);
+
+  formWrapper.appendChild(textarea);
+  formWrapper.appendChild(actions);
+
+  if (repliesContainer) {
+    threadWrapper.insertBefore(formWrapper, repliesContainer);
+  } else {
+    threadWrapper.appendChild(formWrapper);
+  }
+
+  textarea.focus();
+}
+
+async function handleReplySubmit(commentId, textarea, submitBtn, formWrapper) {
+  if (!currentBuildId) return;
+  const user = auth.currentUser;
+  if (!user) {
+    showToast("⚠️ Please sign in to reply.", "warning");
+    return;
+  }
+
+  const filtered = prepareCommentText(textarea.value || "");
+  if (!filtered) return;
+
+  const originalLabel = submitBtn.textContent;
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Posting...";
+
+  try {
+    const success = await submitCommentToFirestore(
+      currentBuildId,
+      user,
+      filtered,
+      commentId
+    );
+    if (success) {
+      textarea.value = "";
+      if (formWrapper?.parentElement) {
+        formWrapper.remove();
+      }
     }
+  } catch (error) {
+    console.error("❌ Failed to post reply:", error);
+    showToast("❌ Failed to post reply. Please try again.", "error");
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = originalLabel || "Post reply";
+  }
+}
 
-    if (hasActions) {
-      headerEl.appendChild(actionsEl);
-    }
+function renderComments() {
+  const { commentsList } = ensureCommentSectionStructure() || {};
+  if (!commentsList) {
+    pendingCommentRender = true;
+    return;
+  }
 
-    const textEl = document.createElement("div");
-    textEl.className = "comment-text";
-    textEl.innerHTML = displayText.replace(/\n/g, "<br>");
+  ensureCommentShellVisible();
 
-    contentEl.appendChild(headerEl);
-    contentEl.appendChild(textEl);
+  updateCommentCount(latestComments.length);
 
-    commentCard.appendChild(avatarEl);
-    commentCard.appendChild(contentEl);
+  if (!latestComments.length) {
+    setCommentsListContent(
+      '<p class="comment-empty">No comments yet. Be the first to share your strategy!</p>'
+    );
 
-    fragment.appendChild(commentCard);
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+  const currentUserId = auth.currentUser?.uid || "";
+  const currentUserEmail = auth.currentUser?.email
+    ? auth.currentUser.email.toLowerCase()
+    : "";
+  const isAdminUser = currentUserEmail
+    ? adminEmails.includes(currentUserEmail)
+    : false;
+
+  const sortedComments = [...latestComments].sort(
+    (a, b) =>
+      (a?.data?.resolvedTimestampMs || 0) - (b?.data?.resolvedTimestampMs || 0)
+  );
+  const commentTree = buildCommentTree(sortedComments);
+  const context = { currentUserId, isAdminUser };
+
+  commentTree.forEach((node) => {
+    fragment.appendChild(createCommentThreadElement(node, 0, context));
   });
 
   commentsList.innerHTML = "";
@@ -419,9 +674,7 @@ function renderComments() {
   pendingCommentRender = false;
   pendingCommentsListHtml = null;
   hasPendingCommentsListHtml = false;
-  updateCommentCount(latestComments.length);
 }
-
 async function updateExistingComment(
   buildId,
   commentId,
@@ -771,6 +1024,29 @@ async function enrichCommentEntry(entry) {
   const baseData = entry?.data || {};
   const sanitizedText = sanitizePlainText(baseData.text || "");
   const filteredText = filterBannedWords(sanitizedText);
+  const parentId =
+    typeof baseData.parentId === "string" && baseData.parentId.trim().length > 0
+      ? baseData.parentId.trim()
+      : null;
+
+  let timestampDate = null;
+  try {
+    if (baseData.timestamp?.toDate) {
+      timestampDate = baseData.timestamp.toDate();
+    } else if (baseData.timestamp instanceof Date) {
+      timestampDate = baseData.timestamp;
+    } else if (baseData.timestamp) {
+      const parsed = new Date(baseData.timestamp);
+      if (!Number.isNaN(parsed.getTime())) {
+        timestampDate = parsed;
+      }
+    }
+  } catch (err) {
+    timestampDate = null;
+  }
+
+  const resolvedTimestamp = timestampDate || new Date();
+  const resolvedTimestampMs = resolvedTimestamp.getTime();
 
   let username = sanitizePlainText(baseData.username || "Anonymous");
   let photoURL = sanitizeAvatarUrl(baseData.photoURL || DEFAULT_AVATAR_URL);
@@ -794,6 +1070,9 @@ async function enrichCommentEntry(entry) {
       photoURL,
       text: sanitizedText,
       displayText: filteredText,
+      parentId,
+      resolvedTimestamp,
+      resolvedTimestampMs,
     },
   };
 }
@@ -882,53 +1161,23 @@ async function postComment(buildId) {
     return;
   }
 
-  const rawInput = textarea.value || "";
-  const trimmed = rawInput.trim();
-
-  if (trimmed.length < 2) {
-    showToast("⚠️ Comment must be at least 2 characters.", "warning");
-    return;
-  }
-
-  if (trimmed.length > 1200) {
-    showToast(
-      "⚠️ Comment is too long. Please keep it under 1200 characters.",
-      "warning"
-    );
-    return;
-  }
-
-  const sanitized = sanitizePlainText(trimmed);
-  if (!sanitized || sanitized.length < 2) {
-    showToast("⚠️ Please enter a valid comment.", "warning");
-    return;
-  }
-
-  const filtered = filterBannedWords(sanitized);
-  if (!filtered || filtered.length < 2) {
-    showToast("⚠️ Please enter a valid comment.", "warning");
-    return;
-  }
+  const filtered = prepareCommentText(textarea.value || "");
+  if (!filtered) return;
 
   postButton.disabled = true;
   const previousLabel = postButton.textContent;
   postButton.textContent = "Posting...";
 
   try {
-    const profile = await loadCurrentUserProfile();
-    const username = profile?.username || "Anonymous";
-    const photoURL = sanitizeAvatarUrl(profile?.photoURL || "");
-
-    await addDoc(collection(db, `publishedBuilds/${buildId}/comments`), {
-      userId: user.uid,
-      username,
-      photoURL,
-      text: filtered,
-      isEdited: false,
-      timestamp: serverTimestamp(),
-    });
-
-    textarea.value = "";
+    const success = await submitCommentToFirestore(
+      buildId,
+      user,
+      filtered,
+      null
+    );
+    if (success) {
+      textarea.value = "";
+    }
   } catch (error) {
     console.error("❌ Failed to post comment:", error);
     showToast("❌ Failed to post comment. Please try again.", "error");
