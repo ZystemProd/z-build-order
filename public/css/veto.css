@@ -85,20 +85,6 @@ body {
   border-color: #fff;
 }
 
-.map-list li:not(.vetoed-map) .preview-btn {
-  display: flex !important;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-  margin-left: 6px;
-  align-items: center;
-}
-
-.map-list li.vetoed-map .preview-btn {
-  display: none !important;
-}
-
 #previewImage {
   width: 100%;
   max-width: 400px; /* Max width for preview image */
@@ -130,6 +116,7 @@ body {
   display: flex; /* Use flexbox for layout */
   justify-content: space-between; /* Space out the content */
   align-items: center; /* Center vertically */
+  gap: 8px;
   cursor: pointer; /* Change cursor to pointer for better UX */
   -webkit-user-select: none; /* Safari */
   -ms-user-select: none; /* IE 10 and IE 11 */
@@ -137,8 +124,9 @@ body {
 }
 
 .map-list li span:not(.order-indicator) {
-  display: inline-block;
-
+  flex: 1;
+  display: block;
+  margin-right: 8px;
   vertical-align: middle; /* Ensures alignment */
   font-size: inherit; /* Maintain the font size */
 }
@@ -150,15 +138,17 @@ body {
   justify-content: center; /* Centers content horizontally */
   align-items: center; /* Centers content vertically */
   font-size: 16px; /* Adjust text size as needed */
-  height: 15px;
-  width: 10%; /* Give it 10% width */
+  height: 20px;
+  min-width: 32px;
+  margin-left: auto;
   text-align: center; /* Center the text */
   color: white; /* White text color */
   border-radius: 5px; /* Slightly rounded corners */
-  padding: 5px; /* Padding for the indicator */
+  padding: 4px 8px; /* Padding for the indicator */
   transition: background 0.3s; /* Smooth background transition */
   cursor: pointer; /* Change cursor to pointer for better UX */
   visibility: visible; /* Ensure it's visible initially */
+  flex-shrink: 0;
 }
 
 .order-indicator span {
@@ -983,21 +973,27 @@ html {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  transition: transform 0.3s ease, opacity 0.3s ease;
 }
 
 /* Keep map li same as before */
 .map-row li {
   flex: 1;
-  margin: 5px; /* Reset since wrapper adds spacing */
+  margin: 0;
 }
 
 /* Preview button styling */
 .preview-btn {
+  display: none;
   background: none;
   border: none;
   cursor: pointer;
-  margin: 0px;
+  padding: 4px;
+  margin: 0;
   align-items: center;
+  justify-content: center;
 }
 
 .preview-btn svg {
@@ -1012,7 +1008,7 @@ html {
 }
 
 /* Remove preview button if vetoed */
-.vetoed-map + .preview-btn {
+.map-row li.vetoed-map + .preview-btn {
   display: none;
 }
 
@@ -1080,7 +1076,7 @@ html {
     margin: 6px 0; /* still compact on mobile */
   }
 
-  .map-list .preview-btn {
+  .map-row .preview-btn {
     display: flex; /* show button */
     background: none;
     border: none;
@@ -1088,21 +1084,22 @@ html {
     padding: 0;
     margin-left: 6px; /* small gap, not big */
     align-items: center;
+    justify-content: center;
   }
 
-  .map-list .preview-btn svg {
+  .map-row .preview-btn svg {
     width: 22px;
     height: 22px;
     fill: #eee;
     transition: fill 0.2s;
   }
 
-  .map-list .preview-btn:hover svg {
+  .map-row .preview-btn:hover svg {
     fill: var(--hover-blue);
   }
 
   /* Hide preview button when vetoed */
-  .map-list li.vetoed-map .preview-btn {
+  .map-row li.vetoed-map + .preview-btn {
     display: none;
   }
 }
@@ -1125,7 +1122,7 @@ html {
 }
 
 @media (min-width: 769px) {
-  .map-list .preview-btn {
+  .map-row .preview-btn {
     display: none !important;
   }
 }
