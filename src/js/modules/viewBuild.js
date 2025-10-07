@@ -7,6 +7,7 @@ import {
   addDoc,
   getDoc,
   updateDoc,
+  setDoc,
   increment,
   query,
   orderBy,
@@ -52,6 +53,21 @@ let pendingCommentsListHtml = null;
 let hasPendingCommentsListHtml = false;
 let commentShellInitialized = false;
 const userProfileCache = new Map();
+
+const MAX_THREAD_DEPTH = 5;
+
+const commentThreadState = {
+  replyVisibility: new Map(),
+  nodesById: new Map(),
+  adjacency: new Map(),
+  replyCounts: new Map(),
+  roots: [],
+};
+
+const blockedUsersState = {
+  set: new Set(),
+  unsubscribe: null,
+};
 
 function escapeRegExp(input) {
   return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -322,60 +338,191 @@ function setCommentsListContent(html) {
   return true;
 }
 
-function buildCommentTree(comments) {
-  const nodesById = new Map();
-  const roots = [];
+function resetCommentThreadData() {
+  commentThreadState.nodesById = new Map();
+  commentThreadState.adjacency = new Map();
+  commentThreadState.replyCounts = new Map();
+  commentThreadState.roots = [];
+}
 
-  comments.forEach((entry) => {
-    const node = {
-      id: entry.id,
-      data: entry.data || {},
-      children: [],
-    };
-    nodesById.set(entry.id, node);
+function pruneReplyVisibility() {
+  commentThreadState.replyVisibility.forEach((_, commentId) => {
+    if (!commentThreadState.nodesById.has(commentId)) {
+      commentThreadState.replyVisibility.delete(commentId);
+    }
+  });
+}
+
+function hydrateCommentThreadState() {
+  const rawById = new Map();
+  latestComments.forEach(({ id, data }) => {
+    if (!id || !data) return;
+    rawById.set(id, { ...data });
   });
 
+  const hiddenCache = new Map();
+  const isHidden = (commentId) => {
+    if (!rawById.has(commentId)) return true;
+    if (hiddenCache.has(commentId)) return hiddenCache.get(commentId);
+
+    const data = rawById.get(commentId);
+    let hidden = false;
+
+    if (blockedUsersState.set.has(data.userId)) {
+      hidden = true;
+    } else if (data.parentId && rawById.has(data.parentId)) {
+      hidden = isHidden(data.parentId);
+    }
+
+    hiddenCache.set(commentId, hidden);
+    return hidden;
+  };
+
+  const nodesById = new Map();
+  const adjacency = new Map();
+  const replyCounts = new Map();
+  const roots = [];
+
+  rawById.forEach((data, id) => {
+    if (isHidden(id)) return;
+    nodesById.set(id, { id, data });
+  });
+
+  const sortIdsByTimestamp = (ids) =>
+    ids.sort((a, b) => {
+      const aData = nodesById.get(a)?.data;
+      const bData = nodesById.get(b)?.data;
+      return (
+        (aData?.resolvedTimestampMs || aData?.timestamp?.toMillis?.() || 0) -
+        (bData?.resolvedTimestampMs || bData?.timestamp?.toMillis?.() || 0)
+      );
+    });
+
   nodesById.forEach((node) => {
-    const parentId = node.data?.parentId;
+    const parentId = node.data?.parentId || null;
     if (parentId && nodesById.has(parentId)) {
-      nodesById.get(parentId).children.push(node);
+      if (!adjacency.has(parentId)) adjacency.set(parentId, []);
+      adjacency.get(parentId).push(node.id);
     } else {
-      roots.push(node);
+      roots.push(node.id);
     }
   });
 
-  const sortNodes = (list) => {
-    list.sort(
-      (a, b) =>
-        (a.data?.resolvedTimestampMs || 0) - (b.data?.resolvedTimestampMs || 0)
-    );
-    list.forEach((child) => sortNodes(child.children));
-  };
+  adjacency.forEach((ids, parentId) => {
+    sortIdsByTimestamp(ids);
+    replyCounts.set(parentId, ids.length);
+  });
 
-  sortNodes(roots);
-  return roots;
+  sortIdsByTimestamp(roots);
+
+  commentThreadState.nodesById = nodesById;
+  commentThreadState.adjacency = adjacency;
+  commentThreadState.replyCounts = replyCounts;
+  commentThreadState.roots = roots;
+  pruneReplyVisibility();
 }
 
-function createCommentCardElement(node, depth, context) {
-  const { currentUserId, isAdminUser } = context;
-  const { id, data } = node;
-  const commentData = data ? { ...data } : {};
+function getChildIds(commentId) {
+  const children = commentThreadState.adjacency.get(commentId);
+  return children ? [...children] : [];
+}
+
+function getReplyCount(commentId) {
+  return commentThreadState.replyCounts.get(commentId) || 0;
+}
+
+function createCommentFooter(cardEl, commentId, commentData, depth) {
+  const footer = document.createElement("div");
+  footer.className = "comment-footer";
+
+  const actionsLeft = document.createElement("div");
+  actionsLeft.className = "comment-footer-left";
+
+  const replyBtn = document.createElement("button");
+  replyBtn.type = "button";
+  replyBtn.className = "comment-footer-reply";
+  replyBtn.textContent = "Reply";
+  replyBtn.addEventListener("click", () => toggleReplyForm(cardEl, commentId));
+  actionsLeft.appendChild(replyBtn);
+
+  const blockBtn = document.createElement("button");
+  blockBtn.type = "button";
+  blockBtn.className = "comment-footer-block";
+  const currentUserId = auth.currentUser?.uid;
+  const isBlocked = blockedUsersState.set.has(commentData.userId);
+  blockBtn.textContent = isBlocked ? "Blocked" : "Block";
+
+  if (!commentData.userId || commentData.userId === currentUserId || isBlocked) {
+    blockBtn.disabled = true;
+  } else {
+    blockBtn.addEventListener("click", () =>
+      blockUser(commentData.userId, commentData.username || "this user")
+    );
+  }
+
+  actionsLeft.appendChild(blockBtn);
+
+  const actionsRight = document.createElement("div");
+  actionsRight.className = "comment-footer-right";
+
+  const directReplies = getReplyCount(commentId);
+  const isExpanded = commentThreadState.replyVisibility.get(commentId) || false;
+
+  if (directReplies > 0) {
+    if (depth >= MAX_THREAD_DEPTH - 1) {
+      const moreBtn = document.createElement("button");
+      moreBtn.type = "button";
+      moreBtn.className = "comment-more-replies-btn";
+      moreBtn.textContent = "View more replies →";
+      moreBtn.addEventListener("click", () =>
+        showToast("Thread depth limit reached.", "info")
+      );
+      actionsRight.appendChild(moreBtn);
+    } else {
+      const toggleBtn = document.createElement("button");
+      toggleBtn.type = "button";
+      toggleBtn.className = "comment-toggle-replies-btn";
+      toggleBtn.dataset.commentId = commentId;
+      toggleBtn.textContent = isExpanded
+        ? "Hide replies"
+        : `View ${directReplies} repl${directReplies === 1 ? "y" : "ies"}`;
+      toggleBtn.addEventListener("click", () => toggleReplies(commentId));
+      actionsRight.appendChild(toggleBtn);
+    }
+  }
+
+  footer.appendChild(actionsLeft);
+  footer.appendChild(actionsRight);
+
+  return footer;
+}
+
+function createCommentCard(commentId, depth) {
+  const node = commentThreadState.nodesById.get(commentId);
+  if (!node) return null;
+  const commentData = { ...node.data };
+
+  const currentUserId = auth.currentUser?.uid || "";
+  const currentUserEmail = auth.currentUser?.email
+    ? auth.currentUser.email.toLowerCase()
+    : "";
+  const isAdminUser = currentUserEmail
+    ? adminEmails.includes(currentUserEmail)
+    : false;
 
   const username = sanitizePlainText(commentData.username || "Anonymous");
-  const displayText =
-    typeof commentData.displayText === "string"
-      ? commentData.displayText
-      : sanitizeAndFilterComment(commentData.text || "");
-  commentData.displayText = displayText;
-  commentData.text =
-    typeof commentData.text === "string"
-      ? commentData.text
-      : sanitizePlainText(displayText || "");
+  const baseText =
+    typeof commentData.text === "string" ? commentData.text : "";
+  const filteredText = sanitizeAndFilterComment(baseText);
+  const safeHtml = DOMPurify.sanitize(filteredText.replace(/\n/g, "<br>"), {
+    ALLOWED_TAGS: ["br"],
+    ALLOWED_ATTR: [],
+  });
 
   let timestampDate = commentData.resolvedTimestamp;
   if (
     !(timestampDate instanceof Date) ||
-    Number.isNaN(timestampDate.getTime())
+    Number.isNaN(timestampDate?.getTime?.())
   ) {
     try {
       if (commentData.timestamp?.toDate) {
@@ -390,25 +537,20 @@ function createCommentCardElement(node, depth, context) {
       timestampDate = null;
     }
   }
-  const fallbackDate = timestampDate || new Date();
-  const timeLabel = formatRelativeTime(fallbackDate);
 
+  const timeLabel = formatRelativeTime(timestampDate || new Date());
   const isOwner = commentData.userId === currentUserId;
   const allowDelete = isOwner || isAdminUser;
   const avatarSource =
     commentData.photoURL || cachedUserProfile?.photoURL || DEFAULT_AVATAR_URL;
-
   const effectiveAvatar = sanitizeAvatarUrl(avatarSource);
 
-  const commentCard = document.createElement("div");
-  commentCard.className = "comment-card";
-  if (depth > 0) commentCard.classList.add("comment-card--child");
-  commentCard.dataset.userId = commentData.userId || "";
-  commentCard.dataset.commentId = id;
-  commentCard.dataset.depth = String(depth);
-  if (commentData.parentId) {
-    commentCard.dataset.parentId = commentData.parentId;
-  }
+  const card = document.createElement("div");
+  card.className = "comment-card";
+  if (depth > 0) card.classList.add("comment-card--child");
+  card.dataset.commentId = commentId;
+  card.dataset.userId = commentData.userId || "";
+  card.dataset.depth = String(depth);
 
   const avatarEl = document.createElement("img");
   avatarEl.className = "comment-avatar";
@@ -436,31 +578,20 @@ function createCommentCardElement(node, depth, context) {
 
   metaGroup.appendChild(usernameEl);
   metaGroup.appendChild(timestampEl);
-
   headerEl.appendChild(metaGroup);
 
   const actionsEl = document.createElement("div");
   actionsEl.className = "comment-actions";
-  let hasActions = false;
-
-  const replyBtn = document.createElement("button");
-  replyBtn.type = "button";
-  replyBtn.className = "comment-reply-btn";
-  replyBtn.textContent = "Reply";
-  replyBtn.addEventListener("click", () => toggleReplyForm(commentCard, id));
-  actionsEl.appendChild(replyBtn);
-  hasActions = true;
 
   if (isOwner) {
     const editBtn = document.createElement("button");
     editBtn.type = "button";
     editBtn.className = "comment-edit-btn";
     editBtn.textContent = "Edit";
-    editBtn.addEventListener("click", () => {
-      openCommentEditor(commentCard, id, commentData);
-    });
+    editBtn.addEventListener("click", () =>
+      openCommentEditor(card, commentId, commentData)
+    );
     actionsEl.appendChild(editBtn);
-    hasActions = true;
   }
 
   if (allowDelete) {
@@ -472,53 +603,136 @@ function createCommentCardElement(node, depth, context) {
       '<img src="img/SVG/trash.svg" alt="" aria-hidden="true" />';
     deleteBtn.addEventListener("click", () => {
       if (!currentBuildId) return;
-      deleteComment(currentBuildId, id, commentData);
+      deleteComment(currentBuildId, commentId, commentData);
     });
     actionsEl.appendChild(deleteBtn);
-    hasActions = true;
   }
 
-  if (hasActions) {
+  if (actionsEl.childElementCount > 0) {
     headerEl.appendChild(actionsEl);
   }
 
   const textEl = document.createElement("div");
   textEl.className = "comment-text";
-  textEl.innerHTML = displayText.replace(/\n/g, "<br>");
+  textEl.innerHTML = safeHtml;
 
   contentEl.appendChild(headerEl);
   contentEl.appendChild(textEl);
 
-  commentCard.appendChild(avatarEl);
-  commentCard.appendChild(contentEl);
+  const footerEl = createCommentFooter(card, commentId, commentData, depth);
+  contentEl.appendChild(footerEl);
 
-  return commentCard;
+  card.appendChild(avatarEl);
+  card.appendChild(contentEl);
+
+  return card;
 }
 
-function createCommentThreadElement(node, depth, context) {
-  const threadWrapper = document.createElement("div");
-  threadWrapper.className = "comment-thread";
-  if (depth > 0) threadWrapper.classList.add("comment-thread--child");
-  threadWrapper.dataset.commentId = node.id;
+function createCommentThreadElement(commentId, depth) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "comment-thread";
+  wrapper.dataset.commentId = commentId;
+  wrapper.dataset.depth = String(depth);
+  wrapper.classList.add(
+    `comment-thread--depth-${Math.min(depth + 1, MAX_THREAD_DEPTH)}`
+  );
 
-  const commentCard = createCommentCardElement(node, depth, context);
-  threadWrapper.appendChild(commentCard);
+  if (depth > 0) {
+    wrapper.classList.add("comment-thread--child");
+    const line = document.createElement("div");
+    line.className = "thread-line";
+    wrapper.appendChild(line);
+  }
 
-  const repliesContainer = document.createElement("div");
-  repliesContainer.className = "comment-replies";
-  threadWrapper.appendChild(repliesContainer);
+  const contentWrapper = document.createElement("div");
+  contentWrapper.className = "thread-content";
 
-  node.children.forEach((childNode) => {
-    repliesContainer.appendChild(
-      createCommentThreadElement(childNode, depth + 1, context)
+  const card = createCommentCard(commentId, depth);
+  if (card) {
+    contentWrapper.appendChild(card);
+
+    const repliesContainer = document.createElement("div");
+    repliesContainer.className = "comment-replies";
+    repliesContainer.dataset.commentId = commentId;
+    const isExpanded = commentThreadState.replyVisibility.get(commentId) || false;
+    repliesContainer.dataset.expanded = "false";
+    if (isExpanded && depth < MAX_THREAD_DEPTH - 1) {
+      const childIds = getChildIds(commentId);
+      childIds.forEach((childId) => {
+        const childThread = createCommentThreadElement(childId, depth + 1);
+        if (childThread) repliesContainer.appendChild(childThread);
+      });
+    }
+
+    contentWrapper.appendChild(repliesContainer);
+  }
+
+  wrapper.appendChild(contentWrapper);
+  return wrapper;
+}
+
+function renderCommentThread() {
+  const { commentsList } = ensureCommentSectionStructure() || {};
+  if (!commentsList) {
+    pendingCommentRender = true;
+    return;
+  }
+
+  ensureCommentShellVisible();
+
+  resetCommentThreadData();
+  hydrateCommentThreadState();
+
+  const roots = commentThreadState.roots || [];
+  updateCommentCount(roots.length);
+
+  if (!roots.length) {
+    setCommentsListContent(
+      '<p class="comment-empty">No comments yet. Be the first to share your strategy!</p>'
     );
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+  roots.forEach((rootId) => {
+    const threadEl = createCommentThreadElement(rootId, 0);
+    if (threadEl) fragment.appendChild(threadEl);
   });
 
-  return threadWrapper;
+  commentsList.innerHTML = "";
+  commentsList.appendChild(fragment);
+  pendingCommentRender = false;
+  pendingCommentsListHtml = null;
+  hasPendingCommentsListHtml = false;
+
+  requestAnimationFrame(applyExpandedStates);
+}
+
+function toggleReplies(commentId) {
+  if (!commentId) return;
+  const isExpanded = commentThreadState.replyVisibility.get(commentId) || false;
+  const nextState = !isExpanded;
+  if (nextState) {
+    commentThreadState.replyVisibility.set(commentId, true);
+  } else {
+    commentThreadState.replyVisibility.delete(commentId);
+  }
+  renderCommentThread();
+}
+
+function applyExpandedStates() {
+  commentThreadState.replyVisibility.forEach((isExpanded, commentId) => {
+    const container = document.querySelector(
+      `.comment-replies[data-comment-id="${commentId}"]`
+    );
+    if (!container) return;
+    container.dataset.expanded = isExpanded ? "true" : "false";
+  });
 }
 
 function toggleReplyForm(commentCard, commentId) {
   if (!commentCard || !commentId) return;
+
   const user = auth.currentUser;
   if (!user) {
     showToast("⚠️ Please sign in to reply.", "warning");
@@ -527,20 +741,11 @@ function toggleReplyForm(commentCard, commentId) {
     return;
   }
 
-  const threadWrapper = commentCard.parentElement;
-  if (!threadWrapper) return;
-
-  const existingForm = threadWrapper.querySelector(
-    ":scope > .comment-reply-form"
-  );
+  const existingForm = commentCard.querySelector(".comment-reply-form");
   if (existingForm) {
     existingForm.remove();
     return;
   }
-
-  const repliesContainer = threadWrapper.querySelector(
-    ":scope > .comment-replies"
-  );
 
   const formWrapper = document.createElement("div");
   formWrapper.className = "comment-reply-form";
@@ -557,19 +762,15 @@ function toggleReplyForm(commentCard, commentId) {
   cancelBtn.type = "button";
   cancelBtn.className = "comment-reply-cancel";
   cancelBtn.textContent = "Cancel";
+  cancelBtn.addEventListener("click", () => formWrapper.remove());
 
   const submitBtn = document.createElement("button");
   submitBtn.type = "button";
   submitBtn.className = "comment-reply-submit";
   submitBtn.textContent = "Post reply";
-
-  cancelBtn.addEventListener("click", () => {
-    formWrapper.remove();
-  });
-
-  submitBtn.addEventListener("click", async () => {
-    await handleReplySubmit(commentId, textarea, submitBtn, formWrapper);
-  });
+  submitBtn.addEventListener("click", async () =>
+    handleReplySubmit(commentId, textarea, submitBtn, formWrapper)
+  );
 
   textarea.addEventListener("keydown", (event) => {
     if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
@@ -584,12 +785,7 @@ function toggleReplyForm(commentCard, commentId) {
   formWrapper.appendChild(textarea);
   formWrapper.appendChild(actions);
 
-  if (repliesContainer) {
-    threadWrapper.insertBefore(formWrapper, repliesContainer);
-  } else {
-    threadWrapper.appendChild(formWrapper);
-  }
-
+  commentCard.appendChild(formWrapper);
   textarea.focus();
 }
 
@@ -617,9 +813,8 @@ async function handleReplySubmit(commentId, textarea, submitBtn, formWrapper) {
     );
     if (success) {
       textarea.value = "";
-      if (formWrapper?.parentElement) {
-        formWrapper.remove();
-      }
+      formWrapper?.remove();
+      commentThreadState.replyVisibility.set(commentId, true);
     }
   } catch (error) {
     console.error("❌ Failed to post reply:", error);
@@ -630,51 +825,81 @@ async function handleReplySubmit(commentId, textarea, submitBtn, formWrapper) {
   }
 }
 
-function renderComments() {
-  const { commentsList } = ensureCommentSectionStructure() || {};
-  if (!commentsList) {
-    pendingCommentRender = true;
+async function blockUser(targetUserId, targetName = "this user") {
+  const user = auth.currentUser;
+  if (!user) {
+    showToast("⚠️ Please sign in to block users.", "warning");
     return;
   }
 
-  ensureCommentShellVisible();
-
-  updateCommentCount(latestComments.length);
-
-  if (!latestComments.length) {
-    setCommentsListContent(
-      '<p class="comment-empty">No comments yet. Be the first to share your strategy!</p>'
-    );
-
+  if (!targetUserId) {
+    showToast("⚠️ Unable to block this user.", "warning");
     return;
   }
 
-  const fragment = document.createDocumentFragment();
-  const currentUserId = auth.currentUser?.uid || "";
-  const currentUserEmail = auth.currentUser?.email
-    ? auth.currentUser.email.toLowerCase()
-    : "";
-  const isAdminUser = currentUserEmail
-    ? adminEmails.includes(currentUserEmail)
-    : false;
+  if (user.uid === targetUserId) {
+    showToast("⚠️ You cannot block yourself.", "warning");
+    return;
+  }
 
-  const sortedComments = [...latestComments].sort(
-    (a, b) =>
-      (a?.data?.resolvedTimestampMs || 0) - (b?.data?.resolvedTimestampMs || 0)
+  if (blockedUsersState.set.has(targetUserId)) {
+    showToast("ℹ️ User already blocked.", "info");
+    return;
+  }
+
+  const confirmed = window.confirm(
+    `Block ${targetName || "this user"}? Their comments and replies will be hidden.`
   );
-  const commentTree = buildCommentTree(sortedComments);
-  const context = { currentUserId, isAdminUser };
+  if (!confirmed) return;
 
-  commentTree.forEach((node) => {
-    fragment.appendChild(createCommentThreadElement(node, 0, context));
-  });
-
-  commentsList.innerHTML = "";
-  commentsList.appendChild(fragment);
-  pendingCommentRender = false;
-  pendingCommentsListHtml = null;
-  hasPendingCommentsListHtml = false;
+  try {
+    const blockRef = doc(db, `users/${user.uid}/blockedUsers`, targetUserId);
+    await setDoc(blockRef, { blockedAt: serverTimestamp() });
+    blockedUsersState.set.add(targetUserId);
+    showToast(`🚫 Blocked ${targetName || "user"}.`, "success");
+    renderCommentThread();
+  } catch (error) {
+    console.error("❌ Failed to block user:", error);
+    showToast("❌ Failed to block user. Please try again.", "error");
+  }
 }
+
+function listenToBlockedUsers(userId) {
+  if (blockedUsersState.unsubscribe) {
+    blockedUsersState.unsubscribe();
+    blockedUsersState.unsubscribe = null;
+  }
+
+  blockedUsersState.set.clear();
+  commentThreadState.replyVisibility = new Map();
+
+  if (!userId) {
+    renderCommentThread();
+    return;
+  }
+
+  try {
+    const blockedRef = collection(db, `users/${userId}/blockedUsers`);
+    blockedUsersState.unsubscribe = onSnapshot(
+      blockedRef,
+      (snapshot) => {
+        blockedUsersState.set.clear();
+        snapshot.forEach((docSnap) => blockedUsersState.set.add(docSnap.id));
+        renderCommentThread();
+      },
+      (error) => {
+        console.error("❌ Failed to listen to blocked users:", error);
+      }
+    );
+  } catch (error) {
+    console.error("❌ Error initializing blocked users listener:", error);
+  }
+}
+
+function renderComments() {
+  renderCommentThread();
+}
+
 async function updateExistingComment(
   buildId,
   commentId,
@@ -1098,6 +1323,7 @@ function loadComments(buildId) {
 
   currentBuildId = buildId;
   latestComments = [];
+  commentThreadState.replyVisibility = new Map();
   setCommentsListContent('<p class="comment-loading">Loading comments...</p>');
   updateCommentCount(0);
 
@@ -1991,6 +2217,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Update vote UI when auth state changes (e.g., after sign-in)
   onAuthStateChanged(auth, (user) => {
     updateCommentFormState(user);
+    listenToBlockedUsers(user?.uid || null);
 
     const buildId = getBuildId();
     if (buildId) {
