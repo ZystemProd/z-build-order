@@ -254,8 +254,7 @@ input[type="text"]:disabled {
   overflow: hidden;
   opacity: 0;
   transform: translateY(-6px);
-  transition: max-height 0.35s ease, opacity 0.25s ease,
-    transform 0.25s ease;
+  transition: max-height 0.35s ease, opacity 0.25s ease, transform 0.25s ease;
   pointer-events: none;
 }
 
@@ -1100,8 +1099,7 @@ body.modal-open {
 }
 
 .comment-footer-block:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
+  display: none;
 }
 
 .comment-toggle-replies-btn,
