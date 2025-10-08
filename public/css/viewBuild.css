@@ -202,11 +202,10 @@ input[type="text"]:disabled {
   gap: 14px;
 }
 
+/* === COMMENT CARD CONTAINER === */
 .comment-thread {
-  display: flex;
-  align-items: stretch;
-  gap: 12px;
   position: relative;
+  padding-top: 16px;
 }
 
 .comment-thread--child {
@@ -232,13 +231,46 @@ input[type="text"]:disabled {
   gap: 12px;
 }
 
+/* === COMMENT CARD STYLING === */
 .comment-card {
-  display: flex;
-  gap: 12px;
-  padding: 14px;
-  background: #1e1e1e;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  position: relative;
+  background: #1c1c1f;
+  border-radius: 16px;
+  padding: 16px 16px 16px 64px; /* Space for avatar */
+  margin-top: 24px;
+  color: #f0f0f0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  overflow: visible; /* ✅ Allow avatar to extend beyond card */
+  z-index: 1;
+}
+
+/* Avatar styling */
+.comment-avatar {
+  position: absolute;
+  top: -12px;
+  left: -12px;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 3px solid #1c1c1f; /* match card background */
+  background-color: #1c1c1f;
+  object-fit: cover;
+  z-index: 2; /* ensures avatar appears above the card */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+
+/* For nested (child) comments */
+.comment-card--child {
+  margin-left: 48px;
+  background: #202024;
+  padding-left: 56px;
+}
+
+.comment-card--child .comment-avatar {
+  width: 55px;
+  height: 55px;
+  top: -6px;
+  left: -6px;
 }
 
 .comment-card.comment-card--child {
@@ -266,13 +298,19 @@ input[type="text"]:disabled {
   margin-top: 8px;
 }
 
+/* Avatar styling */
 .comment-avatar {
-  width: 42px;
-  height: 42px;
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
+  border: 3px solid #1c1c1f; /* border color matches card background */
+  background-color: #1c1c1f;
   object-fit: cover;
-  flex-shrink: 0;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  z-index: 2;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
 }
 
 .comment-content {
