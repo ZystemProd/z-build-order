@@ -206,6 +206,37 @@ function sanitizeAndFilterComment(text) {
   return filterBannedWords(sanitized);
 }
 
+function formatCommentDisplayHtml(text) {
+  if (typeof text !== "string" || text.length === 0) {
+    return "";
+  }
+
+  const lines = text.split(/\r?\n/);
+  const formattedLines = lines.map((line) => {
+    if (!line || !line.trim()) return "";
+    return formatActionText(line);
+  });
+
+  const combinedHtml = formattedLines.join("<br>");
+
+  return DOMPurify.sanitize(combinedHtml, {
+    ALLOWED_TAGS: ["br", "span", "strong", "img", "svg", "path", "sup"],
+    ALLOWED_ATTR: [
+      "class",
+      "src",
+      "alt",
+      "data-tooltip",
+      "style",
+      "height",
+      "width",
+      "viewBox",
+      "fill",
+      "xmlns",
+      "d",
+    ],
+  });
+}
+
 async function submitCommentToFirestore(buildId, user, text, parentId = null) {
   if (!buildId || !user) return false;
 
@@ -916,10 +947,7 @@ function createCommentCard(commentId, depth) {
   const baseText =
     typeof commentData.text === "string" ? commentData.text : "";
   const filteredText = sanitizeAndFilterComment(baseText);
-  const safeHtml = DOMPurify.sanitize(filteredText.replace(/\n/g, "<br>"), {
-    ALLOWED_TAGS: ["br"],
-    ALLOWED_ATTR: [],
-  });
+  const safeHtml = formatCommentDisplayHtml(filteredText);
 
   let timestampDate = commentData.resolvedTimestamp;
   if (
