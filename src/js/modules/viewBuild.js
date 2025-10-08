@@ -15,6 +15,9 @@ import {
   onSnapshot,
   serverTimestamp,
   deleteDoc,
+  getDocs,
+  where,
+  startAfter,
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import {
   formatActionText,
@@ -44,6 +47,7 @@ const MAX_COMMENTS_TO_DISPLAY = 50;
 
 let commentsUnsubscribe = null;
 let latestComments = [];
+const commentCache = new Map();
 let currentBuildId = "";
 let cachedUserProfile = null;
 let pendingCommentUser = null;
@@ -54,7 +58,8 @@ let hasPendingCommentsListHtml = false;
 let commentShellInitialized = false;
 const userProfileCache = new Map();
 
-const MAX_THREAD_DEPTH = 5;
+const MAX_THREAD_DEPTH = 7;
+const REPLY_BATCH_SIZE = 10;
 
 const commentThreadState = {
   replyVisibility: new Map(),
@@ -62,6 +67,8 @@ const commentThreadState = {
   adjacency: new Map(),
   replyCounts: new Map(),
   roots: [],
+  visibleReplies: new Map(),
+  replyPagination: new Map(),
 };
 
 const blockedUsersState = {
@@ -353,9 +360,36 @@ function pruneReplyVisibility() {
   });
 }
 
+function pruneVisibleReplies() {
+  commentThreadState.visibleReplies.forEach((childIds, parentId) => {
+    if (!commentThreadState.nodesById.has(parentId)) {
+      commentThreadState.visibleReplies.delete(parentId);
+      return;
+    }
+
+    const filtered = childIds.filter((childId) =>
+      commentThreadState.nodesById.has(childId)
+    );
+
+    if (filtered.length) {
+      commentThreadState.visibleReplies.set(parentId, filtered);
+    } else {
+      commentThreadState.visibleReplies.delete(parentId);
+    }
+  });
+}
+
+function pruneReplyPagination() {
+  commentThreadState.replyPagination.forEach((_, parentId) => {
+    if (!commentThreadState.nodesById.has(parentId)) {
+      commentThreadState.replyPagination.delete(parentId);
+    }
+  });
+}
+
 function hydrateCommentThreadState() {
   const rawById = new Map();
-  latestComments.forEach(({ id, data }) => {
+  commentCache.forEach((data, id) => {
     if (!id || !data) return;
     rawById.set(id, { ...data });
   });
@@ -420,6 +454,22 @@ function hydrateCommentThreadState() {
   commentThreadState.replyCounts = replyCounts;
   commentThreadState.roots = roots;
   pruneReplyVisibility();
+  pruneVisibleReplies();
+  pruneReplyPagination();
+
+  commentThreadState.visibleReplies.forEach((visibleIds, parentId) => {
+    const allChildren = commentThreadState.adjacency.get(parentId) || [];
+    if (!allChildren.length) {
+      commentThreadState.visibleReplies.delete(parentId);
+      return;
+    }
+
+    const existingSet = new Set(visibleIds);
+    const ordered = allChildren.filter((childId) => existingSet.has(childId));
+    const appended = allChildren.filter((childId) => !existingSet.has(childId));
+
+    commentThreadState.visibleReplies.set(parentId, [...ordered, ...appended]);
+  });
 }
 
 function getChildIds(commentId) {
@@ -431,6 +481,327 @@ function getReplyCount(commentId) {
   return commentThreadState.replyCounts.get(commentId) || 0;
 }
 
+function getVisibleReplyIds(commentId) {
+  return commentThreadState.visibleReplies.get(commentId) || [];
+}
+
+function setVisibleReplyIds(commentId, ids) {
+  if (!Array.isArray(ids) || !ids.length) {
+    commentThreadState.visibleReplies.delete(commentId);
+    return;
+  }
+  const uniqueIds = Array.from(new Set(ids));
+  commentThreadState.visibleReplies.set(commentId, uniqueIds);
+}
+
+function ensureReplyPaginationState(commentId) {
+  if (!commentThreadState.replyPagination.has(commentId)) {
+    commentThreadState.replyPagination.set(commentId, {
+      lastDoc: null,
+      hasMore: true,
+      loading: false,
+    });
+  }
+  return commentThreadState.replyPagination.get(commentId);
+}
+
+function insertChildInAdjacency(parentId, childId, childData) {
+  if (!parentId || !childId || !childData) return;
+  const existing = commentThreadState.adjacency.get(parentId) || [];
+  if (existing.includes(childId)) return;
+
+  const timestamp =
+    childData.resolvedTimestampMs ||
+    childData.timestamp?.toMillis?.() ||
+    childData.timestamp?.seconds * 1000 ||
+    0;
+
+  let inserted = false;
+  for (let index = 0; index < existing.length; index += 1) {
+    const siblingId = existing[index];
+    const siblingData = commentThreadState.nodesById.get(siblingId)?.data;
+    const siblingTimestamp =
+      siblingData?.resolvedTimestampMs ||
+      siblingData?.timestamp?.toMillis?.() ||
+      siblingData?.timestamp?.seconds * 1000 ||
+      0;
+    if (timestamp < siblingTimestamp) {
+      existing.splice(index, 0, childId);
+      inserted = true;
+      break;
+    }
+  }
+
+  if (!inserted) {
+    existing.push(childId);
+  }
+
+  commentThreadState.adjacency.set(parentId, existing);
+  commentThreadState.replyCounts.set(parentId, existing.length);
+}
+
+function createMoreRepliesButton(parentId, depth) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "comment-more-replies-btn";
+  button.dataset.commentId = parentId;
+  button.textContent = `View ${REPLY_BATCH_SIZE} more repl${
+    REPLY_BATCH_SIZE === 1 ? "y" : "ies"
+  }`;
+
+  button.addEventListener("click", async () => {
+    const container = document.querySelector(
+      `.comment-replies[data-comment-id="${parentId}"]`
+    );
+    if (!container) return;
+
+    if (button.disabled) return;
+    button.disabled = true;
+    const originalLabel = button.textContent;
+    button.textContent = "Loading...";
+
+    try {
+      await loadRepliesForComment(parentId, depth, {
+        container,
+        reset: false,
+      });
+    } catch (error) {
+      console.error("❌ Failed to load additional replies:", error);
+      showToast("❌ Unable to load more replies right now.", "error");
+      button.disabled = false;
+      button.textContent = originalLabel;
+      return;
+    }
+
+    button.disabled = false;
+    button.textContent = originalLabel;
+  });
+
+  return button;
+}
+
+function renderRepliesContainer(container, parentId, depth, options = {}) {
+  if (!container) return;
+  const { animateIds = [] } = options;
+  const visibleChildren = getVisibleReplyIds(parentId);
+
+  const existingNodes = new Map();
+  Array.from(
+    container.querySelectorAll(":scope > .comment-thread")
+  ).forEach((threadNode) => {
+    if (threadNode instanceof HTMLElement) {
+      existingNodes.set(threadNode.dataset.commentId, threadNode);
+    }
+  });
+
+  const existingButton = container.querySelector(
+    ":scope > .comment-more-replies-btn"
+  );
+  if (existingButton) existingButton.remove();
+
+  visibleChildren.forEach((childId) => {
+    let childThread = existingNodes.get(childId);
+    if (childThread) {
+      existingNodes.delete(childId);
+    } else {
+      childThread = createCommentThreadElement(childId, depth);
+      if (!childThread) return;
+      if (animateIds.includes(childId)) {
+        childThread.classList.add("comment-thread--entering");
+        requestAnimationFrame(() => {
+          childThread.classList.remove("comment-thread--entering");
+        });
+      }
+    }
+
+    container.appendChild(childThread);
+  });
+
+  existingNodes.forEach((node) => node.remove());
+
+  const pagination = commentThreadState.replyPagination.get(parentId);
+  if (pagination?.hasMore) {
+    container.appendChild(createMoreRepliesButton(parentId, depth));
+  }
+
+  container.dataset.loaded = visibleChildren.length ? "true" : "false";
+  if (container.dataset.expanded === "true") {
+    container.style.height = "auto";
+  } else {
+    container.style.height = "0px";
+  }
+}
+
+async function loadRepliesForComment(parentId, depth, options = {}) {
+  if (!currentBuildId || !parentId) return [];
+  const { container = null, reset = false } = options;
+
+  const pagination = ensureReplyPaginationState(parentId);
+
+  if (reset) {
+    pagination.lastDoc = null;
+    pagination.hasMore = true;
+    pagination.loading = false;
+    commentThreadState.visibleReplies.delete(parentId);
+  }
+
+  if (pagination.loading) return [];
+  if (!pagination.hasMore && !reset) return [];
+
+  pagination.loading = true;
+
+  try {
+    const repliesRef = collection(
+      db,
+      `publishedBuilds/${currentBuildId}/comments`
+    );
+    const constraints = [
+      where("parentId", "==", parentId),
+      orderBy("timestamp", "asc"),
+    ];
+
+    if (pagination.lastDoc) {
+      constraints.push(startAfter(pagination.lastDoc));
+    }
+
+    constraints.push(limit(REPLY_BATCH_SIZE));
+
+    const repliesQuery = query(repliesRef, ...constraints);
+    const snapshot = await getDocs(repliesQuery);
+
+    const docs = snapshot.docs;
+    const enrichedReplies = await Promise.all(
+      docs.map((docSnap) =>
+        enrichCommentEntry({ id: docSnap.id, data: docSnap.data() })
+      )
+    );
+
+    const appendedIds = [];
+    const visibleSet = new Set(getVisibleReplyIds(parentId));
+
+    enrichedReplies.forEach((entry) => {
+      if (!entry?.id || !entry?.data) return;
+
+      commentCache.set(entry.id, entry.data);
+
+      const existingIndex = latestComments.findIndex(
+        (existing) => existing.id === entry.id
+      );
+      if (existingIndex === -1) {
+        latestComments.push(entry);
+      } else {
+        latestComments[existingIndex] = entry;
+      }
+
+      commentThreadState.nodesById.set(entry.id, {
+        id: entry.id,
+        data: entry.data,
+      });
+
+      insertChildInAdjacency(parentId, entry.id, entry.data);
+
+      if (!visibleSet.has(entry.id)) {
+        visibleSet.add(entry.id);
+        appendedIds.push(entry.id);
+      }
+    });
+
+    const orderedVisible = (commentThreadState.adjacency.get(parentId) || []).filter(
+      (id) => visibleSet.has(id)
+    );
+    setVisibleReplyIds(parentId, orderedVisible);
+
+    pagination.lastDoc = docs.length ? docs[docs.length - 1] : pagination.lastDoc;
+    pagination.hasMore = docs.length === REPLY_BATCH_SIZE;
+
+    if (container) {
+      renderRepliesContainer(container, parentId, depth, {
+        animateIds: appendedIds,
+      });
+    }
+
+    pagination.loading = false;
+    updateReplyToggleLabel(parentId);
+
+    return appendedIds;
+  } catch (error) {
+    pagination.loading = false;
+
+    if (reset) {
+      const existingChildren = getChildIds(parentId);
+      if (existingChildren.length && container) {
+        setVisibleReplyIds(parentId, existingChildren);
+        renderRepliesContainer(container, parentId, depth, {
+          animateIds: existingChildren,
+        });
+      }
+    }
+
+    throw error;
+  }
+}
+
+function animateReplies(container, expand) {
+  if (!container) return;
+
+  const startHeight = container.scrollHeight;
+  container.style.overflow = "hidden";
+
+  if (expand) {
+    container.style.height = "0px";
+    container.style.opacity = "0";
+    container.dataset.expanded = "true";
+
+    requestAnimationFrame(() => {
+      const targetHeight = container.scrollHeight || startHeight;
+      container.style.height = `${targetHeight}px`;
+      container.style.opacity = "1";
+    });
+  } else {
+    container.style.height = `${startHeight}px`;
+    container.style.opacity = "1";
+
+    requestAnimationFrame(() => {
+      container.dataset.expanded = "false";
+      container.style.height = "0px";
+      container.style.opacity = "0";
+    });
+  }
+
+  const cleanup = (event) => {
+    if (event.propertyName !== "height") return;
+    if (container.dataset.expanded === "true") {
+      container.style.height = "auto";
+      container.style.overflow = "visible";
+    } else {
+      container.style.overflow = "hidden";
+    }
+    container.removeEventListener("transitionend", cleanup);
+  };
+
+  container.addEventListener("transitionend", cleanup);
+}
+
+function updateReplyToggleLabel(commentId) {
+  const toggleBtn = document.querySelector(
+    `.comment-toggle-replies-btn[data-comment-id="${commentId}"]`
+  );
+  if (!toggleBtn) return;
+
+  const directReplies = getReplyCount(commentId);
+  const isExpanded =
+    commentThreadState.replyVisibility.get(commentId) || false;
+
+  if (!directReplies) {
+    toggleBtn.textContent = isExpanded ? "Hide replies" : "View replies";
+    return;
+  }
+
+  toggleBtn.textContent = isExpanded
+    ? "Hide replies"
+    : `View ${directReplies} repl${directReplies === 1 ? "y" : "ies"}`;
+}
+
 function createCommentFooter(cardEl, commentId, commentData, depth) {
   const footer = document.createElement("div");
   footer.className = "comment-footer";
@@ -438,12 +809,14 @@ function createCommentFooter(cardEl, commentId, commentData, depth) {
   const actionsLeft = document.createElement("div");
   actionsLeft.className = "comment-footer-left";
 
-  const replyBtn = document.createElement("button");
-  replyBtn.type = "button";
-  replyBtn.className = "comment-footer-reply";
-  replyBtn.textContent = "Reply";
-  replyBtn.addEventListener("click", () => toggleReplyForm(cardEl, commentId));
-  actionsLeft.appendChild(replyBtn);
+  if (depth < MAX_THREAD_DEPTH - 1) {
+    const replyBtn = document.createElement("button");
+    replyBtn.type = "button";
+    replyBtn.className = "comment-footer-reply";
+    replyBtn.textContent = "Reply";
+    replyBtn.addEventListener("click", () => toggleReplyForm(cardEl, commentId));
+    actionsLeft.appendChild(replyBtn);
+  }
 
   const blockBtn = document.createElement("button");
   blockBtn.type = "button";
@@ -469,26 +842,15 @@ function createCommentFooter(cardEl, commentId, commentData, depth) {
   const isExpanded = commentThreadState.replyVisibility.get(commentId) || false;
 
   if (directReplies > 0) {
-    if (depth >= MAX_THREAD_DEPTH - 1) {
-      const moreBtn = document.createElement("button");
-      moreBtn.type = "button";
-      moreBtn.className = "comment-more-replies-btn";
-      moreBtn.textContent = "View more replies →";
-      moreBtn.addEventListener("click", () =>
-        showToast("Thread depth limit reached.", "info")
-      );
-      actionsRight.appendChild(moreBtn);
-    } else {
-      const toggleBtn = document.createElement("button");
-      toggleBtn.type = "button";
-      toggleBtn.className = "comment-toggle-replies-btn";
-      toggleBtn.dataset.commentId = commentId;
-      toggleBtn.textContent = isExpanded
-        ? "Hide replies"
-        : `View ${directReplies} repl${directReplies === 1 ? "y" : "ies"}`;
-      toggleBtn.addEventListener("click", () => toggleReplies(commentId));
-      actionsRight.appendChild(toggleBtn);
-    }
+    const toggleBtn = document.createElement("button");
+    toggleBtn.type = "button";
+    toggleBtn.className = "comment-toggle-replies-btn";
+    toggleBtn.dataset.commentId = commentId;
+    toggleBtn.textContent = isExpanded
+      ? "Hide replies"
+      : `View ${directReplies} repl${directReplies === 1 ? "y" : "ies"}`;
+    toggleBtn.addEventListener("click", () => toggleReplies(commentId));
+    actionsRight.appendChild(toggleBtn);
   }
 
   footer.appendChild(actionsLeft);
@@ -655,13 +1017,18 @@ function createCommentThreadElement(commentId, depth) {
     repliesContainer.className = "comment-replies";
     repliesContainer.dataset.commentId = commentId;
     const isExpanded = commentThreadState.replyVisibility.get(commentId) || false;
-    repliesContainer.dataset.expanded = "false";
-    if (isExpanded && depth < MAX_THREAD_DEPTH - 1) {
-      const childIds = getChildIds(commentId);
-      childIds.forEach((childId) => {
-        const childThread = createCommentThreadElement(childId, depth + 1);
-        if (childThread) repliesContainer.appendChild(childThread);
-      });
+    const visibleChildren = getVisibleReplyIds(commentId);
+
+    if (visibleChildren.length) {
+      renderRepliesContainer(repliesContainer, commentId, depth + 1);
+    }
+
+    repliesContainer.dataset.loaded = visibleChildren.length ? "true" : "false";
+    repliesContainer.dataset.expanded = isExpanded ? "true" : "false";
+    if (isExpanded) {
+      repliesContainer.style.height = "auto";
+    } else {
+      repliesContainer.style.height = "0px";
     }
 
     contentWrapper.appendChild(repliesContainer);
@@ -705,19 +1072,64 @@ function renderCommentThread() {
   pendingCommentsListHtml = null;
   hasPendingCommentsListHtml = false;
 
-  requestAnimationFrame(applyExpandedStates);
+  requestAnimationFrame(() => {
+    applyExpandedStates();
+    commentThreadState.replyCounts.forEach((_, commentId) => {
+      updateReplyToggleLabel(commentId);
+    });
+  });
 }
 
-function toggleReplies(commentId) {
+async function toggleReplies(commentId) {
   if (!commentId) return;
-  const isExpanded = commentThreadState.replyVisibility.get(commentId) || false;
-  const nextState = !isExpanded;
-  if (nextState) {
-    commentThreadState.replyVisibility.set(commentId, true);
-  } else {
+
+  const threadEl = document.querySelector(
+    `.comment-thread[data-comment-id="${commentId}"]`
+  );
+  if (!threadEl) return;
+
+  const container = threadEl.querySelector(
+    ":scope > .thread-content > .comment-replies"
+  );
+  if (!container) return;
+
+  const isExpanded = container.dataset.expanded === "true";
+
+  if (isExpanded) {
     commentThreadState.replyVisibility.delete(commentId);
+    animateReplies(container, false);
+    updateReplyToggleLabel(commentId);
+    return;
   }
-  renderCommentThread();
+
+  commentThreadState.replyVisibility.set(commentId, true);
+  updateReplyToggleLabel(commentId);
+
+  const depth = Number(threadEl.dataset.depth || 0) + 1;
+
+  if (container.dataset.loaded !== "true") {
+    container.dataset.loading = "true";
+    try {
+      await loadRepliesForComment(commentId, depth, {
+        container,
+        reset: true,
+      });
+    } catch (error) {
+      console.error("❌ Failed to load replies:", error);
+      showToast("❌ Unable to load replies right now.", "error");
+      commentThreadState.replyVisibility.delete(commentId);
+      container.dataset.loading = "false";
+      updateReplyToggleLabel(commentId);
+      return;
+    }
+    container.dataset.loading = "false";
+  } else {
+    renderRepliesContainer(container, commentId, depth);
+  }
+
+  requestAnimationFrame(() => {
+    animateReplies(container, true);
+  });
 }
 
 function applyExpandedStates() {
@@ -727,6 +1139,12 @@ function applyExpandedStates() {
     );
     if (!container) return;
     container.dataset.expanded = isExpanded ? "true" : "false";
+    if (isExpanded) {
+      container.style.height = "auto";
+    } else {
+      container.style.height = "0px";
+    }
+    updateReplyToggleLabel(commentId);
   });
 }
 
@@ -741,14 +1159,24 @@ function toggleReplyForm(commentCard, commentId) {
     return;
   }
 
-  const existingForm = commentCard.querySelector(".comment-reply-form");
+  const threadContent = commentCard.closest(".thread-content");
+  if (!threadContent) return;
+
+  const existingForm = threadContent.querySelector(
+    `.comment-reply-form[data-parent-id="${commentId}"]`
+  );
   if (existingForm) {
     existingForm.remove();
     return;
   }
 
+  const repliesContainer = threadContent.querySelector(
+    `.comment-replies[data-comment-id="${commentId}"]`
+  );
+
   const formWrapper = document.createElement("div");
   formWrapper.className = "comment-reply-form";
+  formWrapper.dataset.parentId = commentId;
 
   const textarea = document.createElement("textarea");
   textarea.className = "comment-reply-input";
@@ -785,7 +1213,12 @@ function toggleReplyForm(commentCard, commentId) {
   formWrapper.appendChild(textarea);
   formWrapper.appendChild(actions);
 
-  commentCard.appendChild(formWrapper);
+  if (repliesContainer) {
+    threadContent.insertBefore(formWrapper, repliesContainer);
+  } else {
+    threadContent.appendChild(formWrapper);
+  }
+
   textarea.focus();
 }
 
@@ -957,9 +1390,10 @@ async function updateExistingComment(
       editedAt: serverTimestamp(),
     });
 
+    let updatedData = null;
     latestComments = latestComments.map((entry) => {
       if (entry.id !== commentId) return entry;
-      const updatedData = {
+      updatedData = {
         ...entry.data,
         text: filtered,
         displayText: filterBannedWords(filtered),
@@ -968,6 +1402,16 @@ async function updateExistingComment(
       };
       return { ...entry, data: updatedData };
     });
+
+    if (updatedData) {
+      commentCache.set(commentId, updatedData);
+      if (commentThreadState.nodesById.has(commentId)) {
+        commentThreadState.nodesById.set(commentId, {
+          id: commentId,
+          data: updatedData,
+        });
+      }
+    }
 
     showToast("💬 Comment updated.", "success");
     renderComments();
@@ -1090,12 +1534,20 @@ window.addEventListener("user-avatar-updated", (event) => {
   latestComments = latestComments.map((entry) => {
     if (entry?.data?.userId === user.uid) {
       shouldRerender = true;
+      const updatedData = {
+        ...entry.data,
+        photoURL: newUrl,
+      };
+      commentCache.set(entry.id, updatedData);
+      if (commentThreadState.nodesById.has(entry.id)) {
+        commentThreadState.nodesById.set(entry.id, {
+          id: entry.id,
+          data: updatedData,
+        });
+      }
       return {
         ...entry,
-        data: {
-          ...entry.data,
-          photoURL: newUrl,
-        },
+        data: updatedData,
       };
     }
     return entry;
@@ -1323,7 +1775,10 @@ function loadComments(buildId) {
 
   currentBuildId = buildId;
   latestComments = [];
+  commentCache.clear();
   commentThreadState.replyVisibility = new Map();
+  commentThreadState.visibleReplies = new Map();
+  commentThreadState.replyPagination = new Map();
   setCommentsListContent('<p class="comment-loading">Loading comments...</p>');
   updateCommentCount(0);
 
@@ -1349,6 +1804,12 @@ function loadComments(buildId) {
           );
 
           latestComments = enrichedComments;
+          commentCache.clear();
+          enrichedComments.forEach((entry) => {
+            if (entry?.id && entry?.data) {
+              commentCache.set(entry.id, entry.data);
+            }
+          });
           renderComments();
         } catch (err) {
           console.error("❌ Failed to process comments:", err);

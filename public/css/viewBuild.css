@@ -250,17 +250,16 @@ input[type="text"]:disabled {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  max-height: 0;
+  height: 0;
   overflow: hidden;
   opacity: 0;
   transform: translateY(-6px);
-  transition: max-height 0.35s ease, opacity 0.25s ease,
-    transform 0.25s ease;
+  transition: height 0.35s ease, opacity 0.25s ease, transform 0.25s ease;
   pointer-events: none;
+  margin-top: 0;
 }
 
 .comment-replies[data-expanded="true"] {
-  max-height: 1500px;
   opacity: 1;
   transform: translateY(0);
   pointer-events: auto;
@@ -1091,11 +1090,12 @@ body.modal-open {
 .comment-footer-block {
   border: 1px solid rgba(255, 255, 255, 0.15);
   color: #f48fb1;
+  cursor: pointer;
 }
 
 .comment-footer-block:hover:not(:disabled) {
-  background: rgba(244, 143, 177, 0.12);
-  border-color: rgba(244, 143, 177, 0.45);
+  background: rgba(255, 146, 186, 0.16);
+  border-color: rgba(255, 146, 186, 0.6);
   color: #ff92ba;
 }
 
@@ -1114,4 +1114,19 @@ body.modal-open {
 .comment-more-replies-btn:hover {
   background: rgba(255, 255, 255, 0.1);
   color: #ffffff;
+}
+
+.comment-thread--entering {
+  animation: comment-thread-enter 0.25s ease forwards;
+}
+
+@keyframes comment-thread-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

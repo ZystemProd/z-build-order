@@ -13,7 +13,14 @@ service cloud.firestore {
       match /builds/{buildId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
+
+      // ✅ BLOCKED USERS subcollection
+      match /blockedUsers/{blockedUserId} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow create, delete: if request.auth != null && request.auth.uid == userId;
+      }
     }
+
 
     // ✅ USERNAMES
     match /usernames/{username} {
