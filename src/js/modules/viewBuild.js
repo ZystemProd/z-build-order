@@ -647,6 +647,9 @@ function createMoreRepliesButton(parentId, depth) {
 function renderRepliesContainer(container, parentId, depth, options = {}) {
   if (!container) return;
   const { animateIds = [] } = options;
+  if (typeof depth === "number" && !Number.isNaN(depth)) {
+    container.dataset.depth = String(depth);
+  }
   const visibleChildren = getVisibleReplyIds(parentId);
 
   const existingNodes = new Map();
@@ -1069,9 +1072,6 @@ function createCommentThreadElement(commentId, depth) {
 
   if (depth > 0) {
     wrapper.classList.add("comment-thread--child");
-    const line = document.createElement("div");
-    line.className = "thread-line";
-    wrapper.appendChild(line);
   }
 
   const contentWrapper = document.createElement("div");
@@ -1084,6 +1084,7 @@ function createCommentThreadElement(commentId, depth) {
     const repliesContainer = document.createElement("div");
     repliesContainer.className = "comment-replies";
     repliesContainer.dataset.commentId = commentId;
+    repliesContainer.dataset.depth = String(depth + 1);
     const isExpanded = commentThreadState.replyVisibility.get(commentId) || false;
     const visibleChildren = getVisibleReplyIds(commentId);
 
