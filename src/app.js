@@ -520,7 +520,8 @@ export function initializeAuthUI() {
       if (statsMenuItem) statsMenuItem.style.display = "block";
       if (switchAccountMenuItem) switchAccountMenuItem.style.display = "block";
       if (signOutMenuItem) signOutMenuItem.style.display = "block";
-      if (deleteAccountMenuItem) deleteAccountMenuItem.style.display = "block";
+      if (deleteAccountMenuItem)
+        deleteAccountMenuItem.style.display = "inline-flex";
       menuDividers.forEach((d) => (d.style.display = "block"));
     } else {
       currentUserAvatarUrl = DEFAULT_AVATAR_URL;

@@ -167,7 +167,7 @@ body {
   width: 70px;
   background-color: #37373780;
   border-radius: 12px;
-  display: flex;
+  display: none !important;
   flex-direction: column;
   align-items: center;
   z-index: 999;
@@ -3747,15 +3747,26 @@ td {
   position: absolute;
   top: 55px;
   right: 10px;
-  width: 220px;
+  width: min(260px, calc(100vw - 20px));
   background-color: #1e1e1e;
   border: 1px solid #333;
   border-radius: 10px;
-  padding: 10px 0;
+  padding: 12px 0;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
   z-index: 1000;
   display: none;
   animation: fadeIn 0.2s ease-in-out;
+}
+
+.user-menu .menu-section {
+  padding: 0 10px 8px;
+}
+
+.user-menu .user-name {
+  display: block;
+  text-align: center;
+  padding: 0 12px 6px;
+  word-break: break-word;
 }
 
 .menu-item {
@@ -3823,12 +3834,47 @@ td {
   background-color: #333;
 }
 
-.user-menu #deleteAccountBtn {
-  color: #ff4c4c; /* Danger red */
+#settingsModal .menu-icon {
+  margin-right: 10px;
 }
 
-.user-menu #deleteAccountBtn:hover {
-  background-color: #3a0000;
+.settings-danger-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.settings-danger-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  color: #ff4c4c;
+  border: 1px solid rgba(255, 76, 76, 0.4);
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.settings-danger-note {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #ffbfbf;
+}
+
+#deleteAccountBtn.settings-danger-button {
+  color: #ff4c4c;
+  border: 1px solid rgba(255, 76, 76, 0.6);
+}
+
+#deleteAccountBtn.settings-danger-button:hover,
+#deleteAccountBtn.settings-danger-button:focus {
+  background-color: rgba(255, 76, 76, 0.15);
+  border-color: #ff4c4c;
 }
 
 #deleteAccountModal .modal-content {
@@ -4085,6 +4131,8 @@ td {
   align-items: center;
   justify-content: start;
   gap: 20px;
+  flex-wrap: wrap;
+  padding: 20px;
   position: relative; /* ✅ allows join button positioning */
   background-color: #1e1e1e;
   border-bottom: solid #353535;
@@ -4250,6 +4298,7 @@ button.btn-small {
   max-height: 728px; /* Adjust as needed */
   overflow-y: auto;
   padding-right: 6px;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Custom scrollbar styling */
@@ -4527,6 +4576,15 @@ button.btn-small {
     padding: 10px;
     margin: 0;
   }
+  #clanModal .modal-content-template {
+    margin: 5% auto;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .settings-scroll-wrapper {
+    max-height: calc(100vh - 220px);
+    padding-right: 2px;
+  }
   .footer {
     font-size: 12px; /* Slightly smaller text for small screens */
     padding: 16px 10px;
@@ -4633,6 +4691,66 @@ button.btn-small {
 
   .footer-left {
     max-width: 200px;
+  }
+}
+
+@media screen and (max-width: 520px) {
+  .user-menu {
+    right: 8px;
+    top: 60px;
+    width: min(300px, calc(100vw - 16px));
+    padding: 12px 0 16px;
+  }
+
+  .user-menu .menu-section {
+    padding: 0 8px 12px;
+  }
+
+  .user-menu .menu-item {
+    padding: 10px 14px;
+    font-size: 15px;
+  }
+
+  .user-menu .menu-icon {
+    width: 20px;
+    height: 20px;
+    margin-right: 10px;
+  }
+
+  .user-menu .user-name {
+    font-size: 1rem;
+  }
+}
+
+@media screen and (max-width: 640px) {
+  .clan-banner-wrapper {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 16px;
+    padding: 16px 12px;
+  }
+
+  .clan-banner-logo,
+  .clan-banner-wrapper img {
+    width: 140px;
+    height: 140px;
+  }
+
+  .clan-banner-text {
+    max-width: none;
+    width: 100%;
+    align-items: center;
+  }
+
+  .clan-banner-title {
+    font-size: 1.4rem;
+    text-align: center;
+  }
+
+  .clan-banner-info {
+    text-align: center;
+    align-items: center;
   }
 }
 
