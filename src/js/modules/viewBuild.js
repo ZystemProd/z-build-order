@@ -132,7 +132,7 @@ function createCommentActionsMenu({ canEdit, canRemove, onEdit, onRemove }) {
   toggleBtn.setAttribute("aria-haspopup", "true");
   toggleBtn.setAttribute("aria-expanded", "false");
   toggleBtn.setAttribute("aria-label", "Comment options");
-  toggleBtn.textContent = "⋮";
+  toggleBtn.innerHTML = '<span aria-hidden="true">⋮</span>';
 
   const menuList = document.createElement("div");
   menuList.className = "comment-actions-menu-list";
@@ -141,7 +141,18 @@ function createCommentActionsMenu({ canEdit, canRemove, onEdit, onRemove }) {
     const editItem = document.createElement("button");
     editItem.type = "button";
     editItem.className = "comment-actions-menu-item";
-    editItem.textContent = "Edit";
+    const editIcon = document.createElement("img");
+    editIcon.src = "img/SVG/pencil.svg";
+    editIcon.alt = "";
+    editIcon.setAttribute("aria-hidden", "true");
+    editIcon.className = "comment-actions-menu-item-icon";
+
+    const editLabel = document.createElement("span");
+    editLabel.className = "comment-actions-menu-item-label";
+    editLabel.textContent = "Edit";
+
+    editItem.appendChild(editIcon);
+    editItem.appendChild(editLabel);
     editItem.addEventListener("click", () => {
       closeOpenActionsMenu();
       onEdit();
@@ -154,7 +165,19 @@ function createCommentActionsMenu({ canEdit, canRemove, onEdit, onRemove }) {
     removeItem.type = "button";
     removeItem.className =
       "comment-actions-menu-item comment-actions-menu-item--danger";
-    removeItem.textContent = "Remove comment";
+
+    const removeIcon = document.createElement("img");
+    removeIcon.src = "img/SVG/trash.svg";
+    removeIcon.alt = "";
+    removeIcon.setAttribute("aria-hidden", "true");
+    removeIcon.className = "comment-actions-menu-item-icon";
+
+    const removeLabel = document.createElement("span");
+    removeLabel.className = "comment-actions-menu-item-label";
+    removeLabel.textContent = "Remove";
+
+    removeItem.appendChild(removeIcon);
+    removeItem.appendChild(removeLabel);
     removeItem.addEventListener("click", () => {
       onRemove();
     });
@@ -331,6 +354,13 @@ function filterBannedWords(text) {
 function sanitizeAndFilterComment(text) {
   const sanitized = sanitizePlainText(text);
   return filterBannedWords(sanitized);
+}
+
+function normalizeCommentText(text) {
+  if (typeof text !== "string") {
+    return "";
+  }
+  return text.replace(/\r\n/g, "\n");
 }
 
 function formatCommentDisplayHtml(text) {
@@ -1216,7 +1246,9 @@ function createCommentCard(commentId, depth) {
 
   const timestampEl = document.createElement("span");
   timestampEl.className = "comment-timestamp";
-  const editedSuffix = commentData.isEdited ? " (edited)" : "";
+  const hasEditedMarker =
+    Boolean(commentData.isEdited) && Boolean(commentData.editedAt);
+  const editedSuffix = hasEditedMarker ? " (edited)" : "";
   timestampEl.textContent = `${timeLabel}${editedSuffix}`;
 
   metaGroup.appendChild(identityWrapper);
@@ -1233,10 +1265,10 @@ function createCommentCard(commentId, depth) {
 
   const handleRemoveComment = () => {
     if (!currentBuildId) return;
+    closeOpenActionsMenu();
     const confirmed = window.confirm(
       "Remove this comment? This action cannot be undone."
     );
-    closeOpenActionsMenu();
     if (!confirmed) {
       return;
     }
@@ -1690,7 +1722,10 @@ async function updateExistingComment(
   }
 
   const filtered = filterBannedWords(sanitized);
-  if (filtered === (commentData?.text || "")) {
+  const normalizedNew = normalizeCommentText(filtered);
+  const normalizedExisting = normalizeCommentText(commentData?.text || "");
+
+  if (normalizedNew === normalizedExisting) {
     showToast("ℹ️ No changes to save.", "warning");
     return false;
   }
