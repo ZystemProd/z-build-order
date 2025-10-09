@@ -78,6 +78,7 @@ const blockedUsersState = {
 };
 
 let openIdentityMenu = null;
+let openActionsMenu = null;
 
 function closeOpenIdentityMenu(options = {}) {
   if (!openIdentityMenu) return;
@@ -97,6 +98,110 @@ function closeOpenIdentityMenu(options = {}) {
   }
 
   openIdentityMenu = null;
+}
+
+function closeOpenActionsMenu(options = {}) {
+  if (!openActionsMenu) return;
+
+  const { focusTrigger = false } = options;
+  const menuToClose = openActionsMenu;
+
+  menuToClose.classList.remove("comment-actions-menu--open");
+  const toggleBtn = menuToClose.querySelector(".comment-actions-menu-toggle");
+  if (toggleBtn) {
+    toggleBtn.setAttribute("aria-expanded", "false");
+    if (focusTrigger) {
+      toggleBtn.focus();
+    }
+  }
+
+  openActionsMenu = null;
+}
+
+function createCommentActionsMenu({ canEdit, canRemove, onEdit, onRemove }) {
+  if (!canEdit && !canRemove) {
+    return null;
+  }
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "comment-actions-menu";
+
+  const toggleBtn = document.createElement("button");
+  toggleBtn.type = "button";
+  toggleBtn.className = "comment-actions-menu-toggle";
+  toggleBtn.setAttribute("aria-haspopup", "true");
+  toggleBtn.setAttribute("aria-expanded", "false");
+  toggleBtn.setAttribute("aria-label", "Comment options");
+  toggleBtn.textContent = "⋮";
+
+  const menuList = document.createElement("div");
+  menuList.className = "comment-actions-menu-list";
+
+  if (canEdit && typeof onEdit === "function") {
+    const editItem = document.createElement("button");
+    editItem.type = "button";
+    editItem.className = "comment-actions-menu-item";
+    editItem.textContent = "Edit";
+    editItem.addEventListener("click", () => {
+      closeOpenActionsMenu();
+      onEdit();
+    });
+    menuList.appendChild(editItem);
+  }
+
+  if (canRemove && typeof onRemove === "function") {
+    const removeItem = document.createElement("button");
+    removeItem.type = "button";
+    removeItem.className =
+      "comment-actions-menu-item comment-actions-menu-item--danger";
+    removeItem.textContent = "Remove comment";
+    removeItem.addEventListener("click", () => {
+      onRemove();
+    });
+    menuList.appendChild(removeItem);
+  }
+
+  if (!menuList.childElementCount) {
+    return null;
+  }
+
+  toggleBtn.addEventListener("click", (event) => {
+    event.stopPropagation();
+
+    if (openActionsMenu && openActionsMenu !== wrapper) {
+      closeOpenActionsMenu();
+    }
+
+    const willOpen = !wrapper.classList.contains("comment-actions-menu--open");
+
+    if (willOpen) {
+      closeOpenIdentityMenu();
+      wrapper.classList.add("comment-actions-menu--open");
+      toggleBtn.setAttribute("aria-expanded", "true");
+      openActionsMenu = wrapper;
+    } else {
+      closeOpenActionsMenu();
+    }
+  });
+
+  wrapper.addEventListener("focusout", (event) => {
+    const nextFocusTarget = event.relatedTarget;
+    if (nextFocusTarget && wrapper.contains(nextFocusTarget)) {
+      return;
+    }
+    if (openActionsMenu === wrapper) {
+      closeOpenActionsMenu();
+    }
+  });
+
+  menuList.addEventListener("click", (event) => {
+    event.stopPropagation();
+  });
+
+  wrapper.appendChild(toggleBtn);
+  wrapper.appendChild(menuList);
+
+  return wrapper;
 }
 
 function escapeRegExp(input) {
@@ -1120,16 +1225,35 @@ function createCommentCard(commentId, depth) {
 
   const actionsEl = document.createElement("div");
   actionsEl.className = "comment-actions";
+  const inlineActionsEl = document.createElement("div");
+  inlineActionsEl.className = "comment-actions-inline";
+
+  const handleEditComment = () =>
+    openCommentEditor(card, commentId, commentData);
+
+  const handleRemoveComment = () => {
+    if (!currentBuildId) return;
+    const confirmed = window.confirm(
+      "Remove this comment? This action cannot be undone."
+    );
+    closeOpenActionsMenu();
+    if (!confirmed) {
+      return;
+    }
+
+    deleteComment(currentBuildId, commentId, commentData);
+  };
+
+  let hasActions = false;
 
   if (isOwner) {
     const editBtn = document.createElement("button");
     editBtn.type = "button";
     editBtn.className = "comment-edit-btn";
     editBtn.textContent = "Edit";
-    editBtn.addEventListener("click", () =>
-      openCommentEditor(card, commentId, commentData)
-    );
-    actionsEl.appendChild(editBtn);
+    editBtn.addEventListener("click", handleEditComment);
+    inlineActionsEl.appendChild(editBtn);
+    hasActions = true;
   }
 
   if (allowDelete) {
@@ -1139,11 +1263,26 @@ function createCommentCard(commentId, depth) {
     deleteBtn.setAttribute("aria-label", "Delete comment");
     deleteBtn.innerHTML =
       '<img src="img/SVG/trash.svg" alt="" aria-hidden="true" />';
-    deleteBtn.addEventListener("click", () => {
-      if (!currentBuildId) return;
-      deleteComment(currentBuildId, commentId, commentData);
+    deleteBtn.addEventListener("click", handleRemoveComment);
+    inlineActionsEl.appendChild(deleteBtn);
+    hasActions = true;
+  }
+
+  if (inlineActionsEl.childElementCount > 0) {
+    actionsEl.appendChild(inlineActionsEl);
+  }
+
+  if (hasActions) {
+    const actionsMenu = createCommentActionsMenu({
+      canEdit: isOwner,
+      canRemove: allowDelete,
+      onEdit: handleEditComment,
+      onRemove: handleRemoveComment,
     });
-    actionsEl.appendChild(deleteBtn);
+
+    if (actionsMenu) {
+      actionsEl.appendChild(actionsMenu);
+    }
   }
 
   if (actionsEl.childElementCount > 0) {
@@ -3002,14 +3141,25 @@ function injectMetaTags(buildId, build) {
 }
 
 document.addEventListener("click", (event) => {
-  if (!openIdentityMenu) return;
-  if (event.target.closest(".comment-identity-wrapper")) return;
-  closeOpenIdentityMenu();
+  if (openIdentityMenu && !event.target.closest(".comment-identity-wrapper")) {
+    closeOpenIdentityMenu();
+  }
+
+  if (openActionsMenu && !event.target.closest(".comment-actions-menu")) {
+    closeOpenActionsMenu();
+  }
 });
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
-    closeOpenIdentityMenu({ focusTrigger: true });
+    if (openIdentityMenu) {
+      closeOpenIdentityMenu({ focusTrigger: true });
+      return;
+    }
+
+    if (openActionsMenu) {
+      closeOpenActionsMenu({ focusTrigger: true });
+    }
   }
 });
 
