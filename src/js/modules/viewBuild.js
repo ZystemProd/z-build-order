@@ -77,6 +77,28 @@ const blockedUsersState = {
   unsubscribe: null,
 };
 
+let openIdentityMenu = null;
+
+function closeOpenIdentityMenu(options = {}) {
+  if (!openIdentityMenu) return;
+
+  const { focusTrigger = false } = options;
+  const menuToClose = openIdentityMenu;
+
+  if (menuToClose.isConnected) {
+    menuToClose.classList.remove("comment-identity-wrapper--open");
+    const toggleBtn = menuToClose.querySelector(".comment-identity");
+    if (toggleBtn) {
+      toggleBtn.setAttribute("aria-expanded", "false");
+      if (focusTrigger) {
+        toggleBtn.focus();
+      }
+    }
+  }
+
+  openIdentityMenu = null;
+}
+
 function escapeRegExp(input) {
   return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -890,23 +912,6 @@ function createCommentFooter(cardEl, commentId, commentData, depth) {
     actionsLeft.appendChild(replyBtn);
   }
 
-  const blockBtn = document.createElement("button");
-  blockBtn.type = "button";
-  blockBtn.className = "comment-footer-block";
-  const currentUserId = auth.currentUser?.uid;
-  const isBlocked = blockedUsersState.set.has(commentData.userId);
-  blockBtn.textContent = isBlocked ? "Blocked" : "Block";
-
-  if (!commentData.userId || commentData.userId === currentUserId || isBlocked) {
-    blockBtn.disabled = true;
-  } else {
-    blockBtn.addEventListener("click", () =>
-      blockUser(commentData.userId, commentData.username || "this user")
-    );
-  }
-
-  actionsLeft.appendChild(blockBtn);
-
   const actionsRight = document.createElement("div");
   actionsRight.className = "comment-footer-right";
 
@@ -927,8 +932,19 @@ function createCommentFooter(cardEl, commentId, commentData, depth) {
     actionsRight.appendChild(toggleBtn);
   }
 
-  footer.appendChild(actionsLeft);
-  footer.appendChild(actionsRight);
+  const hasLeftActions = actionsLeft.childElementCount > 0;
+  const hasRightActions = actionsRight.childElementCount > 0;
+
+  if (!hasLeftActions && !hasRightActions) {
+    return null;
+  }
+
+  if (hasLeftActions) {
+    footer.appendChild(actionsLeft);
+  }
+  if (hasRightActions) {
+    footer.appendChild(actionsRight);
+  }
 
   return footer;
 }
@@ -1000,16 +1016,105 @@ function createCommentCard(commentId, depth) {
   const metaGroup = document.createElement("div");
   metaGroup.className = "comment-meta-group";
 
-  const usernameEl = document.createElement("span");
-  usernameEl.className = "comment-identity";
-  usernameEl.textContent = username || "Anonymous";
+  const identityWrapper = document.createElement("div");
+  identityWrapper.className = "comment-identity-wrapper";
+
+  const usernameBtn = document.createElement("button");
+  usernameBtn.type = "button";
+  usernameBtn.className = "comment-identity";
+  usernameBtn.textContent = username || "Anonymous";
+  usernameBtn.setAttribute("aria-haspopup", "menu");
+  usernameBtn.setAttribute("aria-expanded", "false");
+  usernameBtn.setAttribute(
+    "aria-label",
+    `Show options for ${username || "this user"}`
+  );
+
+  const identityButtonId = `comment-identity-button-${commentId}`;
+  const identityMenuId = `comment-identity-menu-${commentId}`;
+  usernameBtn.id = identityButtonId;
+  usernameBtn.setAttribute("aria-controls", identityMenuId);
+
+  const identityMenu = document.createElement("div");
+  identityMenu.className = "comment-identity-menu";
+  identityMenu.setAttribute("role", "menu");
+  identityMenu.id = identityMenuId;
+  identityMenu.setAttribute("aria-labelledby", identityButtonId);
+
+  const blockMenuItem = document.createElement("button");
+  blockMenuItem.type = "button";
+  blockMenuItem.className =
+    "comment-identity-menu-item comment-identity-menu-block";
+  blockMenuItem.setAttribute("role", "menuitem");
+
+  const isBlockedUser = blockedUsersState.set.has(commentData.userId);
+  blockMenuItem.textContent = isBlockedUser ? "Blocked" : "Block user";
+
+  if (!commentData.userId) {
+    blockMenuItem.disabled = true;
+    blockMenuItem.setAttribute("aria-disabled", "true");
+    blockMenuItem.textContent = "Block unavailable";
+  } else if (commentData.userId === currentUserId) {
+    blockMenuItem.disabled = true;
+    blockMenuItem.setAttribute("aria-disabled", "true");
+    blockMenuItem.title = "You cannot block yourself";
+  } else if (isBlockedUser) {
+    blockMenuItem.disabled = true;
+    blockMenuItem.setAttribute("aria-disabled", "true");
+  } else {
+    blockMenuItem.addEventListener("click", (event) => {
+      event.stopPropagation();
+      closeOpenIdentityMenu();
+      blockUser(commentData.userId, commentData.username || "this user");
+    });
+  }
+
+  identityMenu.appendChild(blockMenuItem);
+  identityWrapper.appendChild(usernameBtn);
+  identityWrapper.appendChild(identityMenu);
+
+  usernameBtn.addEventListener("click", (event) => {
+    event.stopPropagation();
+
+    if (openIdentityMenu && openIdentityMenu !== identityWrapper) {
+      closeOpenIdentityMenu();
+    }
+
+    const willOpen = !identityWrapper.classList.contains(
+      "comment-identity-wrapper--open"
+    );
+
+    if (willOpen) {
+      identityWrapper.classList.add("comment-identity-wrapper--open");
+      usernameBtn.setAttribute("aria-expanded", "true");
+      openIdentityMenu = identityWrapper;
+    } else {
+      identityWrapper.classList.remove("comment-identity-wrapper--open");
+      usernameBtn.setAttribute("aria-expanded", "false");
+      openIdentityMenu = null;
+    }
+  });
+
+  identityWrapper.addEventListener("focusout", (event) => {
+    const nextFocusTarget = event.relatedTarget;
+    if (nextFocusTarget && identityWrapper.contains(nextFocusTarget)) {
+      return;
+    }
+    if (openIdentityMenu === identityWrapper) {
+      closeOpenIdentityMenu();
+    }
+  });
+
+  identityMenu.addEventListener("click", (event) => {
+    event.stopPropagation();
+  });
 
   const timestampEl = document.createElement("span");
   timestampEl.className = "comment-timestamp";
   const editedSuffix = commentData.isEdited ? " (edited)" : "";
   timestampEl.textContent = `${timeLabel}${editedSuffix}`;
 
-  metaGroup.appendChild(usernameEl);
+  metaGroup.appendChild(identityWrapper);
   metaGroup.appendChild(timestampEl);
   headerEl.appendChild(metaGroup);
 
@@ -1053,7 +1158,9 @@ function createCommentCard(commentId, depth) {
   contentEl.appendChild(textEl);
 
   const footerEl = createCommentFooter(card, commentId, commentData, depth);
-  contentEl.appendChild(footerEl);
+  if (footerEl) {
+    contentEl.appendChild(footerEl);
+  }
 
   card.appendChild(avatarEl);
   card.appendChild(contentEl);
@@ -1113,6 +1220,8 @@ function renderCommentThread() {
     pendingCommentRender = true;
     return;
   }
+
+  closeOpenIdentityMenu();
 
   ensureCommentShellVisible();
 
@@ -2891,6 +3000,18 @@ function injectMetaTags(buildId, build) {
   }
   canonical.setAttribute("href", url);
 }
+
+document.addEventListener("click", (event) => {
+  if (!openIdentityMenu) return;
+  if (event.target.closest(".comment-identity-wrapper")) return;
+  closeOpenIdentityMenu();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    closeOpenIdentityMenu({ focusTrigger: true });
+  }
+});
 
 window.addEventListener("popstate", () => {
   loadBuild();
