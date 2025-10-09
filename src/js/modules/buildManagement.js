@@ -65,7 +65,7 @@ export async function saveCurrentBuild() {
   const titleInput = document.getElementById("buildOrderTitleInput");
   const titleText = document.getElementById("buildOrderTitleText");
   const categoryDropdown = document.getElementById("buildCategoryDropdown");
-  const commentInput = document.getElementById("commentInput");
+  const descriptionInput = document.getElementById("descriptionInput");
   const videoInput = document.getElementById("videoInput");
   const buildOrderInput = document.getElementById("buildOrderInput");
   const mapImage = document.getElementById("map-preview-image");
@@ -216,7 +216,7 @@ export async function saveCurrentBuild() {
     subcategory: formattedMatchup,
     subcategoryLowercase: formattedMatchup.toLowerCase(),
     timestamp: Date.now(),
-    comment: DOMPurify.sanitize(commentInput?.value.trim() || ""),
+    description: DOMPurify.sanitize(descriptionInput?.value.trim() || ""),
     videoLink: DOMPurify.sanitize(videoInput?.value.trim() || ""),
     replayUrl,
     buildOrder,
@@ -323,7 +323,7 @@ export async function updateCurrentBuild(buildId) {
 
   const db = getFirestore();
   const buildDocRef = doc(db, `users/${user.uid}/builds/${buildId}`);
-  const commentInput = document.getElementById("commentInput");
+  const descriptionInput = document.getElementById("descriptionInput");
   const videoInput = document.getElementById("videoInput");
   const categoryDropdown = document.getElementById("buildCategoryDropdown");
   const buildOrderInput = document.getElementById("buildOrderInput");
@@ -333,7 +333,7 @@ export async function updateCurrentBuild(buildId) {
   const mapMode = modeDropdown ? DOMPurify.sanitize(modeDropdown.value) : "1v1";
 
   const updatedData = {
-    comment: DOMPurify.sanitize(commentInput?.value.trim() || ""),
+    description: DOMPurify.sanitize(descriptionInput?.value.trim() || ""),
     videoLink: DOMPurify.sanitize(videoInput?.value.trim() || ""),
     replayUrl: DOMPurify.sanitize(replayInput?.value.trim() || ""),
     buildOrder: parseBuildOrder(buildOrderInput.value),

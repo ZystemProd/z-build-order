@@ -284,7 +284,7 @@ function buildMetaStrings(buildData) {
     "Anonymous"
   );
   const sanitizedSubcategory = sanitizeText(buildData.subcategory, "Unknown");
-  const sanitizedComment = sanitizeText(buildData.comment, "");
+  const sanitizedDescription = sanitizeText(buildData.description, "");
   const formattedMatchup = formatMatchupText(sanitizedSubcategory);
 
   const defaultDescription = sanitizeText(
@@ -295,16 +295,16 @@ function buildMetaStrings(buildData) {
     `Build order for ${formattedMatchup} by ${sanitizedPublisher}.`,
     "StarCraft 2 build order"
   );
-  const description = sanitizedComment || defaultDescription;
-  const ogDescription = sanitizedComment || defaultOgDescription;
+  const description = sanitizedDescription || defaultDescription;
+  const ogDescription = sanitizedDescription || defaultOgDescription;
 
   return {
     pageTitle: sanitizeText(
-      `Z-Build Order – ${sanitizedTitle}`,
+      `${sanitizedTitle} – Z-Build Order`,
       "Z-Build Order"
     ),
     description,
-    ogTitle: sanitizeText(`Z-Build Order – ${sanitizedTitle}`, "Z-Build Order"),
+    ogTitle: sanitizeText(`${sanitizedTitle} – Z-Build Order`, "Z-Build Order"),
     ogDescription,
     ogSiteName: sanitizedPublisher,
   };
@@ -318,7 +318,8 @@ function buildPrerenderPayload(buildData) {
   );
   const category = sanitizeText(buildData.category, "Unknown");
   const matchup = formatMatchupText(buildData.subcategory);
-  const comment = sanitizeText(buildData.comment, "");
+  const description = sanitizeText(buildData.description, "");
+  const descriptionHtml = description ? description.replace(/\n/g, "<br>") : "";
 
   const buildOrderHtml = createBuildOrderHtml(buildData.buildOrder);
   const buildOrderStepCount = Array.isArray(buildData.buildOrder)
@@ -343,7 +344,7 @@ function buildPrerenderPayload(buildData) {
     publisher,
     username: publisher,
     subcategory: matchup,
-    comment,
+    description,
   });
 
   return {
@@ -351,8 +352,9 @@ function buildPrerenderPayload(buildData) {
     publisher,
     category,
     matchup,
-    comment,
-    hasComment: Boolean(comment),
+    description,
+    descriptionHtml,
+    hasDescription: Boolean(description),
     datePublished,
     buildOrderHtml,
     buildOrderStepCount,
@@ -494,7 +496,7 @@ async function captureBuildHtml(buildId, buildDataFromEvent) {
     matchup: payload.matchup,
     category: payload.category,
     steps: payload.buildOrderStepCount,
-    hasComment: payload.hasComment,
+    hasDescription: payload.hasDescription,
   });
   const browser = await launchBrowser();
   let page;
@@ -549,7 +551,7 @@ async function captureBuildHtml(buildId, buildDataFromEvent) {
       matchup: payload.matchup,
       category: payload.category,
       steps: payload.buildOrderStepCount,
-      hasComment: payload.hasComment,
+      hasDescription: payload.hasDescription,
     });
 
     await page.evaluate(
@@ -590,14 +592,59 @@ async function captureBuildHtml(buildId, buildDataFromEvent) {
 
         setInnerHtml("#buildOrder", data.buildOrderHtml);
 
-        if (data.hasComment) {
-          setTextContent("#buildComment", data.comment);
-          toggleDisplay("#buildComment", true);
-          toggleDisplay("#commentHeader", true);
-        } else {
-          setTextContent("#buildComment", "");
-          toggleDisplay("#buildComment", false);
-          toggleDisplay("#commentHeader", false);
+        const ensureDescriptionElements = () => {
+          let desc =
+            doc.querySelector("#buildDescription") ||
+            doc.querySelector("#buildComment") ||
+            null;
+          let header =
+            doc.querySelector("#descriptionHeader") ||
+            doc.querySelector("#commentHeader") ||
+            null;
+
+          if (desc && desc.id === "buildComment") {
+            desc.id = "buildDescription";
+            desc.classList.remove("comment-display");
+            desc.classList.add("description-display");
+          }
+
+          if (header && header.id === "commentHeader") {
+            header.id = "descriptionHeader";
+            header.textContent = "Description";
+            header.classList.add("toggle-title");
+          }
+
+          const container =
+            desc?.closest(".build-description-container") ||
+            desc?.parentElement;
+
+          if (
+            container &&
+            !container.classList.contains("build-description-container")
+          ) {
+            container.classList.add("build-description-container");
+          }
+
+          if (container) {
+            container.style.display = "block";
+          }
+
+          if (header) {
+            header.style.display = "block";
+          }
+
+          if (desc) {
+            desc.style.display = "block";
+          }
+
+          return { desc };
+        };
+
+        const { desc } = ensureDescriptionElements();
+
+        if (desc) {
+          const html = data.descriptionHtml || data.description;
+          desc.innerHTML = html || "No description provided.";
         }
 
         const replayWrapper = doc.querySelector("#replayViewWrapper");
@@ -653,6 +700,18 @@ async function captureBuildHtml(buildId, buildDataFromEvent) {
           ogImageTag.content = "https://zbuildorder.com/img/og-image.webp";
           head.appendChild(ogImageTag);
 
+          removeIfExists('meta[property="og:type"]');
+          const ogTypeTag = doc.createElement("meta");
+          ogTypeTag.setAttribute("property", "og:type");
+          ogTypeTag.content = "article";
+          head.appendChild(ogTypeTag);
+
+          removeIfExists('meta[property="og:url"]');
+          const ogUrlTag = doc.createElement("meta");
+          ogUrlTag.setAttribute("property", "og:url");
+          ogUrlTag.content = window.location.href;
+          head.appendChild(ogUrlTag);
+
           removeIfExists('link[rel="canonical"]');
           const canonical = doc.createElement("link");
           canonical.setAttribute("rel", "canonical");
@@ -665,6 +724,40 @@ async function captureBuildHtml(buildId, buildDataFromEvent) {
           robotsTag.setAttribute("name", "robots");
           robotsTag.content = "index,follow";
           head.appendChild(robotsTag);
+
+          if (data.datePublished) {
+            const isoDate = new Date(data.datePublished).toISOString();
+            removeIfExists('meta[property="article:published_time"]');
+            const publishedTag = doc.createElement("meta");
+            publishedTag.setAttribute("property", "article:published_time");
+            publishedTag.content = isoDate;
+            head.appendChild(publishedTag);
+          }
+
+          const jsonLd = {
+            "@context": "https://schema.org",
+            "@type": "Article",
+            headline: data.title,
+            author: data.publisher,
+            datePublished: data.datePublished
+              ? new Date(data.datePublished).toISOString()
+              : undefined,
+            description: data.meta.description,
+            url: window.location.href,
+            publisher: {
+              "@type": "Organization",
+              name: "Z-Build Order",
+              logo: {
+                "@type": "ImageObject",
+                url: "https://zbuildorder.com/img/og-image.webp",
+              },
+            },
+          };
+
+          const script = doc.createElement("script");
+          script.type = "application/ld+json";
+          script.textContent = JSON.stringify(jsonLd);
+          head.appendChild(script);
         }
       },
       { data: payload }
@@ -714,9 +807,11 @@ async function captureBuildHtml(buildId, buildDataFromEvent) {
 async function saveHtmlToStorage(buildId, html) {
   const file = bucket.file(`preRenderedBuilds/${buildId}.html`);
   await file.save(html, {
-    contentType: "text/html",
+    gzip: true,
+    contentType: "text/html; charset=utf-8",
     metadata: {
-      cacheControl: "public, max-age=86400",
+      cacheControl: "public, max-age=86400, immutable",
+      contentDisposition: `inline; filename="${buildId}.html"`,
     },
   });
   return file;

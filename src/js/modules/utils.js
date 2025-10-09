@@ -46,10 +46,10 @@ export function resetBuildInputs() {
     categoryDropdown.style.color = ""; // 🔁 Reset custom color
   }
 
-  // ✅ Reset Comment and Video Inputs
-  const commentInput = document.getElementById("commentInput");
+  // ✅ Reset Description and Video Inputs
+  const descriptionInput = document.getElementById("descriptionInput");
   const videoInput = document.getElementById("videoInput");
-  if (commentInput) commentInput.value = "";
+  if (descriptionInput) descriptionInput.value = "";
   if (videoInput) videoInput.value = "";
 
   // ✅ Reset Build Order Input

@@ -1188,10 +1188,14 @@ export async function initializeIndexPage() {
     const userSnapshot = await getDoc(userRef);
 
     if (userSnapshot.exists()) {
-      const username = userSnapshot.data().username || "Guest";
+      const data = userSnapshot.data() || {};
+      const username = data.username || "Guest";
       document.getElementById("userName").innerText = username;
-      document.getElementById("userPhoto").src =
-        user.photoURL || "img/default-avatar.webp";
+      const avatarUrl =
+        data?.profile?.avatarUrl ||
+        data?.avatarUrl ||
+        "img/avatar/marine_avatar_1.webp";
+      document.getElementById("userPhoto").src = avatarUrl;
       document.getElementById("userNameMenu").innerText = username;
     } else {
       // Handle case when user data doesn't exist
@@ -1672,7 +1676,7 @@ export async function initializeIndexPage() {
   function monitorBuildChanges() {
     const fields = [
       "buildOrderInput",
-      "commentInput",
+      "descriptionInput",
       "videoInput",
       "replayLinkInput",
       "buildOrderTitleInput",

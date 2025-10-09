@@ -1,0 +1,181 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ✅ USERS
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      match /profile {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      match /builds/{buildId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      // ✅ BLOCKED USERS subcollection
+      match /blockedUsers/{blockedUserId} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow create, delete: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    // ✅ USERNAMES
+    match /usernames/{username} {
+      allow read: if true;
+
+      allow create: if request.auth != null 
+                    && request.auth.uid == request.resource.data.userId
+                    && request.resource.data.keys().hasOnly(['userId']);
+
+      allow delete: if request.auth != null 
+                    && resource.data.userId == request.auth.uid;
+    }
+
+    // ✅ PUBLISHED BUILDS (shared to both public and clans)
+    match /publishedBuilds/{buildId} {
+      // 🌍 Everyone can read published builds
+      allow read: if true;
+
+      // 📝 Create: only owner can publish their build
+      allow write: if request.auth != null 
+                   && request.auth.uid == request.resource.data.publisherId
+                   && request.resource.data.keys().hasAny([
+                        'title', 
+                        'category', 
+                        'subcategory', 
+                        'publisherId', 
+                        'username',
+                        'isPublic',
+                        'sharedToClans',
+                        'timestamp'
+                    ]);
+
+      // 🔁 Update rules (voting/views)...
+      allow update: if request.auth != null && (
+        request.auth.uid == resource.data.publisherId ||
+        (
+          request.resource.data.diff(resource.data).changedKeys().hasOnly(["upvotes", "downvotes", "userVotes"]) &&
+          request.resource.data.userVotes[request.auth.uid] in ["up", "down"] &&
+          (
+            request.resource.data.upvotes == resource.data.upvotes + 1 ||
+            request.resource.data.downvotes == resource.data.downvotes + 1
+          )
+        ) ||
+        (
+          request.resource.data.diff(resource.data).changedKeys().hasOnly(["views"]) &&
+          request.resource.data.views == resource.data.views + 1
+        )
+      );
+
+      // ❌ Delete: only publisher can remove
+      allow delete: if request.auth != null 
+                    && request.auth.uid == resource.data.publisherId;
+
+      // ✅ COMMENTS SUBCOLLECTION
+      match /comments/{commentId} {
+        allow read: if true;
+
+        allow create: if request.auth != null
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.text is string
+          && request.resource.data.text.size() >= 2
+          && request.resource.data.text.size() <= 1200
+          && request.resource.data.timestamp == request.time;
+
+        // ✅ Allow the comment author to edit only their own text
+        allow update: if request.auth != null
+          && request.auth.uid == resource.data.userId
+          && request.resource.data.diff(resource.data).changedKeys().hasOnly(["text", "isEdited", "editedAt"]);
+
+        allow delete: if request.auth != null
+          && request.auth.uid == resource.data.userId;
+      }
+
+    }
+
+    // ✅ CLANS
+    match /clans/{clanId} {
+      // ✅ Allow read of top-level clan data (for name, tag, logo, etc.)
+      allow read: if true;
+
+      // ➕ Create clan
+      allow create: if request.auth != null &&
+                    request.auth.uid == request.resource.data.adminUid &&
+                    request.resource.data.members == [request.auth.uid] &&
+                    request.resource.data.joinRequests == [] &&
+                    request.resource.data.keys().hasAll([
+                      'name',
+                      'logoUrl',
+                      'adminUid',
+                      'members',
+                      'joinRequests',
+                      'created'
+                    ]);
+
+      // 🔁 Update: admin changes or member joining/leaving
+      allow update: if request.auth != null && (
+
+        // ✅ Admin can always update
+        request.auth.uid == resource.data.adminUid ||
+
+        // ✅ Member leaving (removing themselves from both members and memberInfo)
+        (
+          // Must have been a member before
+          request.auth.uid in resource.data.members &&
+
+          // Must not be in the updated members list
+          !(request.auth.uid in request.resource.data.members) &&
+
+          // Members count reduced by exactly 1
+          request.resource.data.members.size() == resource.data.members.size() - 1 &&
+
+          // memberInfo key removed
+          !(request.auth.uid in request.resource.data.memberInfo) &&
+          request.resource.data.memberInfo.size() == resource.data.memberInfo.size() - 1
+        ) ||
+
+        // ✅ Member joining via join request
+        (
+          request.resource.data.diff(resource.data).changedKeys().hasOnly(['joinRequests', 'memberInfo']) &&
+          request.resource.data.memberInfo[request.auth.uid].requestedAt is int &&
+          (
+            !resource.data.memberInfo[request.auth.uid] ||  
+            request.resource.data.memberInfo[request.auth.uid].requestedAt != null
+          )
+        )
+      );
+
+
+
+
+      // ❌ Delete: admin only
+      allow delete: if request.auth != null &&
+                    request.auth.uid == resource.data.adminUid;
+
+      // ✅ CLAN BUILDS (subcollection)
+      match /builds/{buildId} {
+        allow read: if request.auth != null &&
+                    request.auth.uid in get(/databases/$(database)/documents/clans/$(clanId)).data.members;
+
+        allow create: if request.auth != null &&
+                      request.auth.uid in get(/databases/$(database)/documents/clans/$(clanId)).data.members;
+
+        allow update: if request.auth != null &&
+                      (
+                        request.auth.uid == resource.data.ownerUid ||
+                        request.auth.uid == get(/databases/$(database)/documents/clans/$(clanId)).data.adminUid
+                      );
+
+        allow delete: if request.auth != null &&
+                      (
+                        request.auth.uid == resource.data.ownerUid ||
+                        request.auth.uid == get(/databases/$(database)/documents/clans/$(clanId)).data.adminUid
+                      );
+      }
+    }
+
+
+  }
+}
