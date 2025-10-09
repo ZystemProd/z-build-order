@@ -1257,8 +1257,6 @@ function createCommentCard(commentId, depth) {
 
   const actionsEl = document.createElement("div");
   actionsEl.className = "comment-actions";
-  const inlineActionsEl = document.createElement("div");
-  inlineActionsEl.className = "comment-actions-inline";
 
   const handleEditComment = () =>
     openCommentEditor(card, commentId, commentData);
@@ -1276,38 +1274,13 @@ function createCommentCard(commentId, depth) {
     deleteComment(currentBuildId, commentId, commentData);
   };
 
-  let hasActions = false;
+  const canEdit = Boolean(isOwner);
+  const canRemove = Boolean(allowDelete);
 
-  if (isOwner) {
-    const editBtn = document.createElement("button");
-    editBtn.type = "button";
-    editBtn.className = "comment-edit-btn";
-    editBtn.textContent = "Edit";
-    editBtn.addEventListener("click", handleEditComment);
-    inlineActionsEl.appendChild(editBtn);
-    hasActions = true;
-  }
-
-  if (allowDelete) {
-    const deleteBtn = document.createElement("button");
-    deleteBtn.type = "button";
-    deleteBtn.className = "comment-delete-btn";
-    deleteBtn.setAttribute("aria-label", "Delete comment");
-    deleteBtn.innerHTML =
-      '<img src="img/SVG/trash.svg" alt="" aria-hidden="true" />';
-    deleteBtn.addEventListener("click", handleRemoveComment);
-    inlineActionsEl.appendChild(deleteBtn);
-    hasActions = true;
-  }
-
-  if (inlineActionsEl.childElementCount > 0) {
-    actionsEl.appendChild(inlineActionsEl);
-  }
-
-  if (hasActions) {
+  if (canEdit || canRemove) {
     const actionsMenu = createCommentActionsMenu({
-      canEdit: isOwner,
-      canRemove: allowDelete,
+      canEdit,
+      canRemove,
       onEdit: handleEditComment,
       onRemove: handleRemoveComment,
     });
