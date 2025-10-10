@@ -377,6 +377,24 @@ function clearBuildInfoLabels() {
 }
 
 clearBuildInfoLabels();
+function ensurePublishedLabels() {
+  const publishedSelectors = [
+    ".build-info-item .published-label",
+    ".mobile-info .published-label",
+  ];
+
+  publishedSelectors.forEach((selector) => {
+    document.querySelectorAll(selector).forEach((node) => {
+      if (!node) return;
+      const hasText = node.textContent?.trim();
+      if (!hasText) {
+        node.textContent = "Published";
+      }
+    });
+  });
+}
+
+ensurePublishedLabels();
 const buildOrderContainer = document.getElementById("buildOrder");
 const mainLayout = document.querySelector(".main-layout");
 let focusBtn = document.getElementById("openFocusModal");
@@ -2508,6 +2526,7 @@ async function loadBuild() {
     if (mobileDate) mobileDate.innerText = dateText;
 
     clearBuildInfoLabels();
+    ensurePublishedLabels();
 
     // Set build order
     const buildOrderContainer = document.getElementById("buildOrder");

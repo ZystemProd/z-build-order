@@ -2468,7 +2468,6 @@ td {
 /* Mark selected vote with a filled color */
 .vote-button.voted-up {
   background-color: rgba(0, 255, 0, 0.2); /* Light green */
-  border-radius: 5px;
 }
 
 .vote-button.voted-up img {
@@ -2477,7 +2476,6 @@ td {
 
 .vote-button.voted-down {
   background-color: rgba(255, 0, 0, 0.2); /* Light red */
-  border-radius: 5px;
 }
 
 .vote-button.voted-down img {
