@@ -311,7 +311,6 @@ function ensureCommentSectionStructure() {
 const backButton = document.getElementById("backButton");
 const pageBackButton = document.getElementById("pageBackButton");
 const ratingItem = document.getElementById("ratingItem");
-const infoGrid = document.querySelector(".build-info-grid");
 const mainLayout = document.querySelector(".main-layout");
 let focusBtn = document.getElementById("openFocusModal");
 let focusModal = document.getElementById("focusModal");
@@ -2242,14 +2241,11 @@ async function deleteComment(buildId, commentId, commentData) {
 
 function adjustRatingPosition() {
   if (!ratingItem) return;
-  if (ratingItem.closest(".build-info-banner")) return;
-  if (!infoGrid || !mainLayout) return;
-  if (window.innerWidth <= 768) {
-    if (ratingItem.parentElement !== mainLayout.parentNode) {
-      mainLayout.insertAdjacentElement("afterend", ratingItem);
-    }
-  } else if (!infoGrid.contains(ratingItem)) {
-    infoGrid.appendChild(ratingItem);
+  const banner = document.querySelector(".build-info-banner");
+  if (!banner) return;
+
+  if (ratingItem.parentElement !== banner) {
+    banner.appendChild(ratingItem);
   }
 }
 
