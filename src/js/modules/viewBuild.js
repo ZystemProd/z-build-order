@@ -30,7 +30,6 @@ import {
 } from "./interactive_map.js"; // ✅ Map support
 import { updateYouTubeEmbed, clearYouTubeEmbed } from "./youtube.js";
 import { getPublisherClanInfo } from "./community.js";
-import { formatShortDate } from "./modal.js";
 import { showToast } from "./toastHandler.js";
 import { bannedWords } from "../data/bannedWords.js";
 
@@ -44,6 +43,11 @@ const adminEmails = (
 
 const DEFAULT_AVATAR_URL = "img/avatar/marine_avatar_1.webp";
 const MAX_COMMENTS_TO_DISPLAY = 50;
+const LONG_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  month: "long",
+  day: "numeric",
+  year: "numeric",
+});
 
 let commentsUnsubscribe = null;
 let latestComments = [];
@@ -358,6 +362,13 @@ function clearBuildInfoLabels() {
 
   selectors.forEach((selector) => {
     document.querySelectorAll(selector).forEach((node) => {
+      if (
+        node?.dataset?.keepLabel === "true" ||
+        node?.classList?.contains("published-label")
+      ) {
+        return;
+      }
+
       if (node?.textContent?.trim()) {
         node.textContent = "";
       }
@@ -2435,7 +2446,7 @@ async function loadBuild() {
     const matchupText =
       build.subcategory && build.subcategory.length === 3
         ? build.subcategory.charAt(0).toUpperCase() +
-          build.subcategory.charAt(1) +
+          build.subcategory.charAt(1).toLowerCase() +
           build.subcategory.charAt(2).toUpperCase()
         : build.subcategory || "Unknown";
     const publisherText = build.username || "Anonymous";
@@ -2446,7 +2457,7 @@ async function loadBuild() {
       if (typeof ts === "number" || typeof ts === "string") {
         const d = new Date(ts);
         if (!isNaN(d.getTime())) {
-          dateText = formatShortDate(d);
+          dateText = LONG_DATE_FORMATTER.format(d);
         }
       }
     } catch (err) {
@@ -2457,10 +2468,21 @@ async function loadBuild() {
     if (!clanInfo && build.publisherId) {
       clanInfo = await getPublisherClanInfo(build.publisherId);
     }
+    const publisherAvatar =
+      build.publisherAvatarUrl ||
+      build.publisherAvatar ||
+      build.publisherPhotoURL ||
+      build.publisherPhotoUrl ||
+      build.publisherPhoto ||
+      build.publisherIconUrl ||
+      build.publisherIconURL ||
+      build.publisherIcon ||
+      clanInfo?.logoUrl ||
+      DEFAULT_AVATAR_URL;
     const iconEl = document.getElementById("buildPublisherIcon");
-    if (iconEl && clanInfo?.logoUrl) iconEl.src = clanInfo.logoUrl;
+    if (iconEl) iconEl.src = publisherAvatar;
     const iconElMob = document.getElementById("buildPublisherIconMobile");
-    if (iconElMob && clanInfo?.logoUrl) iconElMob.src = clanInfo.logoUrl;
+    if (iconElMob) iconElMob.src = publisherAvatar;
 
     document.getElementById("buildMatchup").innerText = matchupText;
     if (infoGrid && typeof matchupText === "string") {
