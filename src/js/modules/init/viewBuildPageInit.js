@@ -13,6 +13,16 @@ import {
 import { logAnalyticsEvent } from "../analyticsHelper.js";
 import { showToast } from "../toastHandler.js";
 
+function setImportButtonLabel(button, label) {
+  if (!button) return;
+  const labelSpan = button.querySelector(".button-label");
+  if (labelSpan) {
+    labelSpan.textContent = label;
+  } else {
+    button.textContent = label;
+  }
+}
+
 function getBuildId() {
   const path = window.location.pathname;
   const prettyMatch = path.match(/\/build\/[^/]+\/[^/]+\/([^/]+)/);
@@ -87,7 +97,7 @@ async function importBuildHandler() {
     const importBtn = document.getElementById("importBuildButton");
     if (importBtn) {
       importBtn.disabled = true;
-      importBtn.textContent = "Imported";
+      setImportButtonLabel(importBtn, "Imported");
       importBtn.classList.add("imported");
     }
 

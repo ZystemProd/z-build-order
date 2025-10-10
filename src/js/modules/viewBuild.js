@@ -30,7 +30,6 @@ import {
 } from "./interactive_map.js"; // ✅ Map support
 import { updateYouTubeEmbed, clearYouTubeEmbed } from "./youtube.js";
 import { getPublisherClanInfo } from "./community.js";
-import { formatShortDate } from "./modal.js";
 import { showToast } from "./toastHandler.js";
 import { bannedWords } from "../data/bannedWords.js";
 
@@ -43,6 +42,7 @@ const adminEmails = (
   .filter(Boolean);
 
 const DEFAULT_AVATAR_URL = "img/avatar/marine_avatar_1.webp";
+const DEFAULT_CLAN_LOGO_URL = "./img/SVG/clan.svg";
 const MAX_COMMENTS_TO_DISPLAY = 50;
 
 let commentsUnsubscribe = null;
@@ -71,6 +71,52 @@ const commentThreadState = {
   visibleReplies: new Map(),
   replyPagination: new Map(),
 };
+
+function formatPublishedDate(dateValue) {
+  if (!dateValue) return "Unknown";
+
+  let rawValue = dateValue;
+  try {
+    if (typeof rawValue?.toMillis === "function") {
+      rawValue = rawValue.toMillis();
+    }
+
+    const date = new Date(rawValue);
+    if (Number.isNaN(date.getTime())) {
+      return "Unknown";
+    }
+
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  } catch (error) {
+    console.warn("Failed to format published date", dateValue, error);
+    return "Unknown";
+  }
+}
+
+function formatMatchupBadge(matchup) {
+  if (!matchup || typeof matchup !== "string") {
+    return "---";
+  }
+
+  const compact = matchup.replace(/\s+/g, "");
+  if (!compact) {
+    return "---";
+  }
+
+  if (compact.length === 3) {
+    return (
+      compact.charAt(0).toUpperCase() +
+      compact.charAt(1).toLowerCase() +
+      compact.charAt(2).toUpperCase()
+    );
+  }
+
+  return matchup.trim();
+}
 
 const blockedUsersState = {
   set: new Set(),
@@ -311,7 +357,6 @@ function ensureCommentSectionStructure() {
 const backButton = document.getElementById("backButton");
 const pageBackButton = document.getElementById("pageBackButton");
 const ratingItem = document.getElementById("ratingItem");
-const infoGrid = document.querySelector(".build-info-grid");
 const mainLayout = document.querySelector(".main-layout");
 let focusBtn = document.getElementById("openFocusModal");
 let focusModal = document.getElementById("focusModal");
@@ -320,6 +365,16 @@ let increaseFontBtn = document.getElementById("increaseFontBtn");
 let decreaseFontBtn = document.getElementById("decreaseFontBtn");
 let focusContent = document.getElementById("focusContent");
 let focusFontSize = 1;
+
+function setImportButtonLabel(button, label) {
+  if (!button) return;
+  const labelSpan = button.querySelector(".button-label");
+  if (labelSpan) {
+    labelSpan.textContent = label;
+  } else {
+    button.textContent = label;
+  }
+}
 
 function sanitizePlainText(text) {
   if (typeof text !== "string") return "";
@@ -2231,15 +2286,12 @@ async function deleteComment(buildId, commentId, commentData) {
 }
 
 function adjustRatingPosition() {
-  if (!ratingItem || !infoGrid || !mainLayout) return;
-  if (window.innerWidth <= 768) {
-    if (ratingItem.parentElement !== mainLayout.parentNode) {
-      mainLayout.insertAdjacentElement("afterend", ratingItem);
-    }
-  } else {
-    if (!infoGrid.contains(ratingItem)) {
-      infoGrid.appendChild(ratingItem);
-    }
+  if (!ratingItem) return;
+  const banner = document.querySelector(".build-info-banner");
+  if (!banner) return;
+
+  if (ratingItem.parentElement !== banner) {
+    banner.appendChild(ratingItem);
   }
 }
 
@@ -2369,53 +2421,137 @@ async function loadBuild() {
     await incrementBuildViews(buildId);
     console.log("✅ Build Loaded:", build);
 
-    // Set basic build info
-    document.getElementById("buildTitle").innerText =
-      build.title || "Untitled Build";
-    const categoryText = build.category || "Unknown";
-    const matchupText =
-      build.subcategory && build.subcategory.length === 3
-        ? build.subcategory.charAt(0).toUpperCase() +
-          build.subcategory.charAt(1) +
-          build.subcategory.charAt(2).toUpperCase()
-        : build.subcategory || "Unknown";
-    const publisherText = build.username || "Anonymous";
-    let dateText = "Unknown";
-    try {
-      let ts = build.datePublished;
-      if (ts && typeof ts.toMillis === "function") ts = ts.toMillis();
-      if (typeof ts === "number" || typeof ts === "string") {
-        const d = new Date(ts);
-        if (!isNaN(d.getTime())) {
-          dateText = formatShortDate(d);
+    // Set basic build info for the new header
+    const buildTitleEl = document.getElementById("buildTitle");
+    if (buildTitleEl) {
+      buildTitleEl.textContent = build.title || "Untitled Build";
+    }
+
+    const matchupSource =
+      (typeof build.matchup === "string" && build.matchup) ||
+      (typeof build.subcategory === "string" && build.subcategory) ||
+      "---";
+    const matchupDisplay = formatMatchupBadge(matchupSource);
+
+    const infoBanner = document.getElementById("buildInfoBanner");
+    if (infoBanner) {
+      infoBanner.classList.remove("matchup-z", "matchup-t", "matchup-p");
+      const matchupInitial = matchupSource.trim().toUpperCase();
+      if (matchupInitial.startsWith("Z")) infoBanner.classList.add("matchup-z");
+      else if (matchupInitial.startsWith("T"))
+        infoBanner.classList.add("matchup-t");
+      else if (matchupInitial.startsWith("P"))
+        infoBanner.classList.add("matchup-p");
+    }
+
+    const matchupBadge = document.getElementById("buildMatchupBadge");
+    if (matchupBadge) {
+      matchupBadge.textContent = matchupDisplay;
+    }
+
+    const publisherName = build.publisher || "Unknown";
+    const publisherDisplay = document.getElementById("buildPublisherDisplay");
+    if (publisherDisplay) {
+      publisherDisplay.textContent = publisherName;
+    }
+
+    const publishedDateText = formatPublishedDate(
+      build.datePublished ||
+        build.publishedAt ||
+        build.createdAt ||
+        build.created ||
+        build.updatedAt ||
+        build.updated
+    );
+    const bannerDate = document.getElementById("buildDateBanner");
+    if (bannerDate) {
+      bannerDate.textContent = publishedDateText;
+    }
+
+    let clanLogoUrl =
+      build.clanLogo ||
+      build.publisherClanLogo ||
+      build.publisherClan?.logoUrl ||
+      "";
+    if (!clanLogoUrl && build.publisherId) {
+      try {
+        const clanInfo = await getPublisherClanInfo(build.publisherId);
+        if (clanInfo?.logoUrl) {
+          clanLogoUrl = clanInfo.logoUrl;
         }
+      } catch (error) {
+        console.warn("Failed to load clan logo", error);
       }
-    } catch (err) {
-      console.warn("Failed to parse datePublished:", build.datePublished);
+    }
+    const clanLogoEl = document.getElementById("buildPublisherClanLogo");
+    if (clanLogoEl) {
+      clanLogoEl.src = clanLogoUrl || DEFAULT_CLAN_LOGO_URL;
+      clanLogoEl.alt = clanLogoUrl ? `${publisherName} clan logo` : "Clan logo";
+      clanLogoEl.style.display = "inline-flex";
     }
 
-    let clanInfo = build.publisherClan || null;
-    if (!clanInfo && build.publisherId) {
-      clanInfo = await getPublisherClanInfo(build.publisherId);
+    const avatarCandidates = [
+      build.publisherAvatar,
+      build.publisherAvatarUrl,
+      build.publisherAvatarURL,
+      build.publisherPhoto,
+      build.publisherPhotoUrl,
+      build.publisherPhotoURL,
+      build.avatar,
+      build.avatarUrl,
+      build.avatarURL,
+      build.publisherProfile?.avatarUrl,
+      build.publisherProfile?.photoURL,
+      build.publisher?.avatarUrl,
+      build.publisher?.photoURL,
+    ];
+
+    let resolvedAvatar = DEFAULT_AVATAR_URL;
+    for (const candidate of avatarCandidates) {
+      const sanitized = sanitizeAvatarUrl(candidate);
+      if (sanitized && sanitized !== DEFAULT_AVATAR_URL) {
+        resolvedAvatar = sanitized;
+        break;
+      }
     }
-    const iconEl = document.getElementById("buildPublisherIcon");
-    if (iconEl && clanInfo?.logoUrl) iconEl.src = clanInfo.logoUrl;
-    const iconElMob = document.getElementById("buildPublisherIconMobile");
-    if (iconElMob && clanInfo?.logoUrl) iconElMob.src = clanInfo.logoUrl;
 
-    document.getElementById("buildCategory").innerText = categoryText;
-    document.getElementById("buildMatchup").innerText = matchupText;
-    document.getElementById("buildPublisher").innerText = publisherText;
-    document.getElementById("buildDate").innerText = dateText;
+    const avatarEl = document.getElementById("buildPublisherAvatar");
+    if (avatarEl) {
+      avatarEl.src = resolvedAvatar;
+      avatarEl.alt = `${publisherName} avatar`;
+    }
 
-    const mobileCat = document.getElementById("buildCategoryMobile");
-    if (mobileCat) mobileCat.innerText = categoryText;
-    const mobileMatch = document.getElementById("buildMatchupMobile");
-    if (mobileMatch) mobileMatch.innerText = matchupText;
-    const mobilePub = document.getElementById("buildPublisherMobile");
-    if (mobilePub) mobilePub.innerText = publisherText;
-    const mobileDate = document.getElementById("buildDateMobile");
-    if (mobileDate) mobileDate.innerText = dateText;
+    const votePercentageEl = document.getElementById("vote-percentage-text");
+    const voteCountEl = document.getElementById("vote-count-text");
+    const upvotes = Number(build.upvotes || 0);
+    const downvotes = Number(build.downvotes || 0);
+    const storedVoteCount = Number(build.voteCount);
+    const totalVotes = Number.isFinite(storedVoteCount)
+      ? storedVoteCount
+      : upvotes + downvotes;
+    const storedPercentage = Number(build.votePercentage);
+    const derivedPercentage = Number.isFinite(storedPercentage)
+      ? Math.round(storedPercentage)
+      : totalVotes > 0
+        ? Math.round((upvotes / totalVotes) * 100)
+        : 0;
+
+    if (votePercentageEl) {
+      votePercentageEl.textContent = `${derivedPercentage || 0}%`;
+    }
+    if (voteCountEl) {
+      const votesDisplay = Number.isFinite(storedVoteCount)
+        ? storedVoteCount
+        : totalVotes;
+      voteCountEl.textContent = `(${votesDisplay || 0} votes)`;
+    }
+
+    const voteTrendIcon = document.getElementById("vote-trend-icon");
+    if (voteTrendIcon) {
+      const isPositive = upvotes >= downvotes;
+      voteTrendIcon.textContent = isPositive ? "↑" : "↓";
+      voteTrendIcon.classList.toggle("vote-trend-negative", !isPositive);
+    }
 
     // Set build order
     const buildOrderContainer = document.getElementById("buildOrder");
@@ -2855,6 +2991,7 @@ function updateVoteUI(buildId, upvotes, downvotes, userVote) {
   );
   const votePercentage = document.getElementById("vote-percentage-text");
   const voteCount = document.getElementById("vote-count-text");
+  const voteTrendIcon = document.getElementById("vote-trend-icon");
 
   if (!upvoteButton || !downvoteButton || !votePercentage) return;
 
@@ -2876,9 +3013,16 @@ function updateVoteUI(buildId, upvotes, downvotes, userVote) {
     totalVotes > 0 ? Math.round((upvotes / totalVotes) * 100) : 0;
   votePercentage.textContent = `${percentage}%`;
 
+  if (voteTrendIcon) {
+    const isPositive = upvotes >= downvotes;
+    voteTrendIcon.textContent = isPositive ? "↑" : "↓";
+    voteTrendIcon.classList.toggle("vote-trend-negative", !isPositive);
+  }
+
   // Update vote count text
   if (voteCount) {
-    voteCount.textContent = `${totalVotes} votes`;
+    const label = totalVotes === 1 ? "1 vote" : `${totalVotes} votes`;
+    voteCount.textContent = `(${label})`;
   }
 }
 
@@ -2969,13 +3113,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       if (userBuildSnap.exists()) {
         importBtn.disabled = true;
-        importBtn.textContent = "Imported";
+        setImportButtonLabel(importBtn, "Imported");
         importBtn.classList.add("imported");
       } else {
         importBtn.disabled = false;
-        importBtn.textContent = "Import";
+        setImportButtonLabel(importBtn, "Import");
+        importBtn.classList.remove("imported");
       }
-      importBtn.style.display = "inline-block";
+      importBtn.style.display = "inline-flex";
     });
   } else {
     console.warn("⚠️ Import button not found.");
@@ -2989,8 +3134,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     chip.addEventListener("click", (e) => {
       e.stopPropagation();
       const name =
-        document.getElementById("buildPublisher")?.innerText ||
-        document.getElementById("buildPublisherMobile")?.innerText ||
+        document.getElementById("buildPublisherDisplay")?.innerText?.trim() ||
         "";
       if (!name) return;
       localStorage.setItem("restoreCommunityModal", "true");

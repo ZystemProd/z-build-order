@@ -89,76 +89,56 @@
   </div>
 
   <div class="view-build-container">
-    <div class="build-header-row">
-      <a href="index.html" id="backButton" data-return-community="true" class="back-button">
-        <img src="./img/SVG/back.svg" alt="Back" />
-      </a>
-      <h1 id="buildTitle">Loading...</h1>
-
-      <!-- Import Button -->
-      <button id="importBuildButton" style="display: none">
-        <img src="./img/SVG/import2.svg" alt="Import" />
-        Import
-      </button>
-
-      <!-- Share Button -->
-      <button id="shareBuildButton" style="display: none">
-        <img src="./img/SVG/share.svg" alt="Share" class="svg-icon">Share</button>
-    </div>
-
-
-    <!-- Build Info Grid -->
-    <div class="build-info-grid">
-      <div class="build-info-item desktop-info">
-        <label>Category</label>
-        <span id="buildCategory">Loading...</span>
-      </div>
-      <div class="build-info-item desktop-info">
-        <label>Matchup</label>
-        <span id="buildMatchup">Loading...</span>
-      </div>
-      <div class="build-info-item desktop-info">
-        <label>Publisher</label>
-        <span class="meta-chip publisher-chip"><img id="buildPublisherIcon" src="./img/SVG/user-svgrepo-com.svg"
-            alt="Publisher" class="meta-icon" /> <span id="buildPublisher">Loading...</span></span>
-      </div>
-      <div class="build-info-item desktop-info">
-        <label>Date Published</label>
-        <span id="buildDate">Loading...</span>
-      </div>
-      <div class="build-info-item mobile-info">
-        <div class="info-row">
-          <label>Category</label>
-          <span id="buildCategoryMobile">Loading...</span>
+    <div class="build-header">
+      <div class="build-header-bar">
+        <div class="header-left">
+          <!-- Import Button -->
+          <button id="importBuildButton" class="import-button" style="display: none">
+            <img src="./img/SVG/import2.svg" alt="Import" class="button-icon" />
+            <span class="button-label">Import</span>
+          </button>
         </div>
-        <div class="info-row">
-          <label>Matchup</label>
-          <span id="buildMatchupMobile">Loading...</span>
-        </div>
-        <div class="info-row">
-          <label>Publisher</label>
-          <span class="meta-chip publisher-chip"><img id="buildPublisherIconMobile" src="./img/SVG/user-svgrepo-com.svg"
-              alt="Publisher" class="meta-icon" /> <span id="buildPublisherMobile">Loading...</span></span>
-        </div>
-        <div class="info-row">
-          <label>Date</label>
-          <span id="buildDateMobile">Loading...</span>
+        <h1 id="buildTitle" class="build-title">Loading...</h1>
+        <div class="header-right">
+          <!-- Share Button -->
+          <button id="shareBuildButton" class="share-button" style="display: none">
+            <img src="./img/SVG/share.svg" alt="Share" class="button-icon" />
+            <span class="button-label">Share</span>
+          </button>
         </div>
       </div>
-      <div class="build-info-item rating-item" id="ratingItem">
-        <label>Rating</label>
-        <div id="votingSection" class="vote-section">
-          <div class="vote-buttons">
-            <button class="vote-button vote-up" data-id="">
-              <img src="./img/SVG/vote-up.svg" alt="Upvote" />
-            </button>
-            <button class="vote-button vote-down" data-id="">
-              <img src="./img/SVG/vote-down.svg" alt="Downvote" />
-            </button>
+
+      <div class="build-info-banner" id="buildInfoBanner">
+        <div class="banner-matchup">
+          <span class="matchup-badge" id="buildMatchupBadge">---</span>
+        </div>
+        <div class="banner-user">
+          <img id="buildPublisherAvatar" class="banner-avatar" src="img/avatar/marine_avatar_1.webp" alt="Publisher avatar" />
+          <div class="banner-user-details publisher-chip">
+            <img id="buildPublisherClanLogo" class="clan-logo" src="./img/SVG/user-svgrepo-com.svg" alt="Clan logo" />
+            <span class="banner-username" id="buildPublisherDisplay">Loading...</span>
           </div>
-          <div class="vote-results-row">
-            <span class="vote-percentage" id="vote-percentage-text">0%</span>
-            <span class="vote-count" id="vote-count-text">0 votes</span>
+        </div>
+        <div class="banner-date">
+          <span class="banner-label">Published</span>
+          <span class="banner-date-text" id="buildDateBanner">Loading...</span>
+        </div>
+        <div class="banner-votes" id="ratingItem">
+          <div class="vote-section" id="votingSection">
+            <div class="vote-summary">
+              <span class="vote-trend-icon" id="vote-trend-icon">↑</span>
+              <span class="vote-percentage" id="vote-percentage-text">0%</span>
+              <span class="vote-divider">–</span>
+              <span class="vote-count" id="vote-count-text">(0 votes)</span>
+            </div>
+            <div class="vote-buttons">
+              <button class="vote-button vote-up" data-id="">
+                <img src="./img/SVG/vote-up.svg" alt="Upvote" />
+              </button>
+              <button class="vote-button vote-down" data-id="">
+                <img src="./img/SVG/vote-down.svg" alt="Downvote" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
