@@ -93,7 +93,7 @@ input[type="text"]:disabled {
 .mobile-info {
   display: none;
   padding: 12px 14px;
-  gap: 12px;
+  gap: 16px;
 }
 
 .mobile-info .info-pair {
@@ -1392,10 +1392,11 @@ input[type="text"]:disabled {
 
   .build-info-item.mobile-info {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    grid-template-columns: repeat(2, minmax(140px, 1fr));
     grid-column: 1 / -1;
     padding: 18px 16px;
     text-align: left;
+    gap: 12px;
   }
 
   .build-info-item.mobile-info .info-pair {
@@ -1404,6 +1405,10 @@ input[type="text"]:disabled {
 
   .build-info-item.mobile-info .info-value {
     font-size: 1rem;
+  }
+
+  .build-info-item.mobile-info .publisher-pair {
+    grid-column: 1 / -1;
   }
 
   .rating-item {
@@ -1415,11 +1420,6 @@ input[type="text"]:disabled {
   }
 }
 
-@media (max-width: 540px) {
-  .build-info-item.mobile-info {
-    grid-template-columns: 1fr;
-  }
-}
 
 /* Disable pointer events for annotations in view mode */
 .annotation-circle,

@@ -2381,7 +2381,6 @@ async function loadBuild() {
     // Set basic build info
     document.getElementById("buildTitle").innerText =
       build.title || "Untitled Build";
-    const categoryText = build.category || "Unknown";
     const matchupText =
       build.subcategory && build.subcategory.length === 3
         ? build.subcategory.charAt(0).toUpperCase() +
@@ -2412,13 +2411,10 @@ async function loadBuild() {
     const iconElMob = document.getElementById("buildPublisherIconMobile");
     if (iconElMob && clanInfo?.logoUrl) iconElMob.src = clanInfo.logoUrl;
 
-    document.getElementById("buildCategory").innerText = categoryText;
     document.getElementById("buildMatchup").innerText = matchupText;
     document.getElementById("buildPublisher").innerText = publisherText;
     document.getElementById("buildDate").innerText = dateText;
 
-    const mobileCat = document.getElementById("buildCategoryMobile");
-    if (mobileCat) mobileCat.innerText = categoryText;
     const mobileMatch = document.getElementById("buildMatchupMobile");
     if (mobileMatch) mobileMatch.innerText = matchupText;
     const mobilePub = document.getElementById("buildPublisherMobile");
