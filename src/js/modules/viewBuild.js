@@ -311,8 +311,14 @@ function ensureCommentSectionStructure() {
 const backButton = document.getElementById("backButton");
 const pageBackButton = document.getElementById("pageBackButton");
 const ratingItem = document.getElementById("ratingItem");
-const infoGrid = document.querySelector(".build-info-grid");
+const infoBanner = document.getElementById("buildInfoBanner");
 const mainLayout = document.querySelector(".main-layout");
+const MATCHUP_THEME_CLASSES = [
+  "matchup-zerg",
+  "matchup-terran",
+  "matchup-protoss",
+  "matchup-neutral",
+];
 let focusBtn = document.getElementById("openFocusModal");
 let focusModal = document.getElementById("focusModal");
 let closeFocusBtn = document.getElementById("closeFocusModal");
@@ -324,6 +330,25 @@ let focusFontSize = 1;
 function sanitizePlainText(text) {
   if (typeof text !== "string") return "";
   return DOMPurify.sanitize(text, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
+}
+
+function applyMatchupTheme(matchupText) {
+  if (!infoBanner) return;
+
+  const normalized =
+    typeof matchupText === "string" ? matchupText.trim().toUpperCase() : "";
+
+  let themeClass = "matchup-neutral";
+  if (normalized.startsWith("Z")) {
+    themeClass = "matchup-zerg";
+  } else if (normalized.startsWith("T")) {
+    themeClass = "matchup-terran";
+  } else if (normalized.startsWith("P")) {
+    themeClass = "matchup-protoss";
+  }
+
+  infoBanner.classList.remove(...MATCHUP_THEME_CLASSES);
+  infoBanner.classList.add(themeClass);
 }
 
 function sanitizeAvatarUrl(url) {
@@ -2231,15 +2256,9 @@ async function deleteComment(buildId, commentId, commentData) {
 }
 
 function adjustRatingPosition() {
-  if (!ratingItem || !infoGrid || !mainLayout) return;
-  if (window.innerWidth <= 768) {
-    if (ratingItem.parentElement !== mainLayout.parentNode) {
-      mainLayout.insertAdjacentElement("afterend", ratingItem);
-    }
-  } else {
-    if (!infoGrid.contains(ratingItem)) {
-      infoGrid.appendChild(ratingItem);
-    }
+  if (!ratingItem || !infoBanner) return;
+  if (!infoBanner.contains(ratingItem)) {
+    infoBanner.appendChild(ratingItem);
   }
 }
 
@@ -2398,15 +2417,45 @@ async function loadBuild() {
     if (!clanInfo && build.publisherId) {
       clanInfo = await getPublisherClanInfo(build.publisherId);
     }
+
+    const fallbackClanIcon = "./img/SVG/user-svgrepo-com.svg";
     const iconEl = document.getElementById("buildPublisherIcon");
-    if (iconEl && clanInfo?.logoUrl) iconEl.src = clanInfo.logoUrl;
+    if (iconEl) {
+      iconEl.src = clanInfo?.logoUrl || fallbackClanIcon;
+      iconEl.alt = clanInfo?.tag
+        ? `${clanInfo.tag} clan logo`
+        : "Clan logo";
+    }
     const iconElMob = document.getElementById("buildPublisherIconMobile");
-    if (iconElMob && clanInfo?.logoUrl) iconElMob.src = clanInfo.logoUrl;
+    if (iconElMob) iconElMob.src = clanInfo?.logoUrl || fallbackClanIcon;
+
+    const avatarEl = document.getElementById("buildPublisherAvatar");
+    if (avatarEl) {
+      const avatarCandidate =
+        build.publisherAvatarUrl ||
+        build.publisherAvatarURL ||
+        build.publisherAvatar ||
+        build.publisherPhotoUrl ||
+        build.publisherPhotoURL ||
+        build.publisherPhoto ||
+        build.avatarUrl ||
+        build.avatarURL ||
+        build.profile?.avatarUrl ||
+        build.profile?.photoURL ||
+        build.publisherProfile?.avatarUrl ||
+        DEFAULT_AVATAR_URL;
+
+      const safeAvatar = sanitizeAvatarUrl(avatarCandidate);
+      avatarEl.src = safeAvatar;
+      avatarEl.alt = `${publisherText}'s avatar`;
+    }
 
     document.getElementById("buildCategory").innerText = categoryText;
     document.getElementById("buildMatchup").innerText = matchupText;
     document.getElementById("buildPublisher").innerText = publisherText;
     document.getElementById("buildDate").innerText = dateText;
+
+    applyMatchupTheme(matchupText);
 
     const mobileCat = document.getElementById("buildCategoryMobile");
     if (mobileCat) mobileCat.innerText = categoryText;
@@ -2975,7 +3024,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         importBtn.disabled = false;
         importBtn.textContent = "Import";
       }
-      importBtn.style.display = "inline-block";
+      importBtn.style.display = "inline-flex";
     });
   } else {
     console.warn("⚠️ Import button not found.");
