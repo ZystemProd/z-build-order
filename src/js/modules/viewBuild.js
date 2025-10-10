@@ -310,11 +310,6 @@ function ensureCommentSectionStructure() {
 
 const backButton = document.getElementById("backButton");
 const pageBackButton = document.getElementById("pageBackButton");
-const ratingItem = document.getElementById("ratingItem");
-const infoGrid = document.querySelector(".build-info-grid");
-const mobileInfoItem = document.querySelector(
-  ".build-info-item.mobile-info"
-);
 
 function removeDeprecatedCategoryMetadata() {
   const desktopCategoryItems = document.querySelectorAll(
@@ -2268,24 +2263,6 @@ async function deleteComment(buildId, commentId, commentData) {
   }
 }
 
-function adjustRatingPosition() {
-  if (!ratingItem || !infoGrid) return;
-
-  if (window.innerWidth <= 768) {
-    if (mobileInfoItem && mobileInfoItem.nextElementSibling !== ratingItem) {
-      mobileInfoItem.insertAdjacentElement("afterend", ratingItem);
-    } else if (
-      !mobileInfoItem &&
-      buildOrderContainer &&
-      buildOrderContainer.previousElementSibling !== ratingItem
-    ) {
-      buildOrderContainer.insertAdjacentElement("beforebegin", ratingItem);
-    }
-  } else if (!infoGrid.contains(ratingItem)) {
-    infoGrid.appendChild(ratingItem);
-  }
-}
-
 function openFocusModal() {
   if (!focusModal || !focusContent) return;
   const buildOrder = document.getElementById("buildOrder");
@@ -2413,8 +2390,10 @@ async function loadBuild() {
     console.log("✅ Build Loaded:", build);
 
     // Set basic build info
-    document.getElementById("buildTitle").innerText =
-      build.title || "Untitled Build";
+    const titleEl = document.getElementById("buildTitle");
+    if (titleEl) {
+      titleEl.innerText = build.title || "Untitled Build";
+    }
     const matchupText =
       build.subcategory && build.subcategory.length === 3
         ? build.subcategory.charAt(0).toUpperCase() +
@@ -2445,9 +2424,12 @@ async function loadBuild() {
     const iconElMob = document.getElementById("buildPublisherIconMobile");
     if (iconElMob && clanInfo?.logoUrl) iconElMob.src = clanInfo.logoUrl;
 
-    document.getElementById("buildMatchup").innerText = matchupText;
-    document.getElementById("buildPublisher").innerText = publisherText;
-    document.getElementById("buildDate").innerText = dateText;
+    const matchupEl = document.getElementById("buildMatchup");
+    if (matchupEl) matchupEl.innerText = matchupText;
+    const publisherEl = document.getElementById("buildPublisher");
+    if (publisherEl) publisherEl.innerText = publisherText;
+    const dateEl = document.getElementById("buildDate");
+    if (dateEl) dateEl.innerText = dateText;
 
     const mobileMatch = document.getElementById("buildMatchupMobile");
     if (mobileMatch) mobileMatch.innerText = matchupText;
@@ -2892,10 +2874,7 @@ function updateVoteUI(buildId, upvotes, downvotes, userVote) {
   const downvoteButton = document.querySelector(
     `.vote-down[data-id="${buildId}"]`
   );
-  const votePercentage = document.getElementById("vote-percentage-text");
-  const voteCount = document.getElementById("vote-count-text");
-
-  if (!upvoteButton || !downvoteButton || !votePercentage) return;
+  if (!upvoteButton || !downvoteButton) return;
 
   // Update SVG icons
   upvoteButton.querySelector("img").src =
@@ -2913,12 +2892,11 @@ function updateVoteUI(buildId, upvotes, downvotes, userVote) {
   const totalVotes = upvotes + downvotes;
   const percentage =
     totalVotes > 0 ? Math.round((upvotes / totalVotes) * 100) : 0;
-  votePercentage.textContent = `${percentage}%`;
 
-  // Update vote count text
-  if (voteCount) {
-    voteCount.textContent = `${totalVotes} votes`;
-  }
+  upvoteButton.setAttribute("data-total-votes", String(totalVotes));
+  upvoteButton.setAttribute("data-vote-percentage", String(percentage));
+  downvoteButton.setAttribute("data-total-votes", String(totalVotes));
+  downvoteButton.setAttribute("data-vote-percentage", String(percentage));
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -2958,9 +2936,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
     commentSignInBtn.dataset.listenerBound = "true";
   }
-
-  adjustRatingPosition();
-  window.addEventListener("resize", adjustRatingPosition);
 
   focusBtn = document.getElementById("openFocusModal");
   focusModal = document.getElementById("focusModal");
