@@ -5358,12 +5358,14 @@ optgroup[label="Terran"] {
   }
   #main-header button {
     border: none;
-    padding: 0;
+    padding: 0 10px;
     height: 35px;
-    width: 35px;
-    display: flex;
+    width: auto;
+    min-width: 35px;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
+    gap: 8px;
   }
   #main-header button img {
     width: 24px;
