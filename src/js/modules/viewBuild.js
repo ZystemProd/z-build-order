@@ -311,44 +311,7 @@ function ensureCommentSectionStructure() {
 const backButton = document.getElementById("backButton");
 const pageBackButton = document.getElementById("pageBackButton");
 const ratingItem = document.getElementById("ratingItem");
-const infoGrid = document.querySelector(".build-info-grid");
-const mobileInfoItem = document.querySelector(
-  ".build-info-item.mobile-info"
-);
-
-function removeDeprecatedCategoryMetadata() {
-  const desktopCategoryItems = document.querySelectorAll(
-    ".build-info-item.desktop-info"
-  );
-
-  desktopCategoryItems.forEach((item) => {
-    const labelText = item
-      .querySelector("label")
-      ?.textContent?.trim()
-      .toLowerCase();
-
-    if (labelText === "category") {
-      item.remove();
-    }
-  });
-
-  const mobileCategoryRows = document.querySelectorAll(
-    ".build-info-item.mobile-info .info-row, .build-info-item.mobile-info .info-pair"
-  );
-
-  mobileCategoryRows.forEach((row) => {
-    const labelText = row
-      .querySelector("label, .info-label")
-      ?.textContent?.trim()
-      .toLowerCase();
-
-    if (labelText === "category") {
-      row.remove();
-    }
-  });
-}
-
-removeDeprecatedCategoryMetadata();
+const infoBanner = document.querySelector(".build-info-banner");
 const buildOrderContainer = document.getElementById("buildOrder");
 const mainLayout = document.querySelector(".main-layout");
 let focusBtn = document.getElementById("openFocusModal");
@@ -381,6 +344,38 @@ function sanitizeAvatarUrl(url) {
     return trimmed;
   }
   return DEFAULT_AVATAR_URL;
+}
+
+function applyMatchupTheme(matchupText = "") {
+  const banner = infoBanner;
+  const badge = document.getElementById("buildMatchup");
+  if (!banner && !badge) return;
+
+  const normalized = matchupText.trim().toUpperCase();
+  const firstChar = normalized.charAt(0);
+  let factionClass = "matchup-neutral";
+
+  if (firstChar === "Z") factionClass = "matchup-zerg";
+  else if (firstChar === "T") factionClass = "matchup-terran";
+  else if (firstChar === "P") factionClass = "matchup-protoss";
+
+  const classesToRemove = [
+    "matchup-zerg",
+    "matchup-terran",
+    "matchup-protoss",
+    "matchup-neutral",
+  ];
+
+  [banner, badge]
+    .filter(Boolean)
+    .forEach((el) => {
+      classesToRemove.forEach((cls) => el.classList.remove(cls));
+      el.classList.add(factionClass);
+    });
+
+  if (banner) {
+    banner.dataset.matchup = factionClass.replace("matchup-", "");
+  }
 }
 
 function filterBannedWords(text) {
@@ -2269,20 +2264,12 @@ async function deleteComment(buildId, commentId, commentData) {
 }
 
 function adjustRatingPosition() {
-  if (!ratingItem || !infoGrid) return;
+  if (!ratingItem) return;
 
   if (window.innerWidth <= 768) {
-    if (mobileInfoItem && mobileInfoItem.nextElementSibling !== ratingItem) {
-      mobileInfoItem.insertAdjacentElement("afterend", ratingItem);
-    } else if (
-      !mobileInfoItem &&
-      buildOrderContainer &&
-      buildOrderContainer.previousElementSibling !== ratingItem
-    ) {
-      buildOrderContainer.insertAdjacentElement("beforebegin", ratingItem);
-    }
-  } else if (!infoGrid.contains(ratingItem)) {
-    infoGrid.appendChild(ratingItem);
+    ratingItem.classList.add("is-mobile");
+  } else {
+    ratingItem.classList.remove("is-mobile");
   }
 }
 
@@ -2421,7 +2408,8 @@ async function loadBuild() {
           build.subcategory.charAt(1) +
           build.subcategory.charAt(2).toUpperCase()
         : build.subcategory || "Unknown";
-    const publisherText = build.username || "Anonymous";
+    let publisherText = build.username || "Anonymous";
+    let displayPublisher = publisherText;
     let dateText = "Unknown";
     try {
       let ts = build.datePublished;
@@ -2440,21 +2428,59 @@ async function loadBuild() {
     if (!clanInfo && build.publisherId) {
       clanInfo = await getPublisherClanInfo(build.publisherId);
     }
-    const iconEl = document.getElementById("buildPublisherIcon");
-    if (iconEl && clanInfo?.logoUrl) iconEl.src = clanInfo.logoUrl;
-    const iconElMob = document.getElementById("buildPublisherIconMobile");
-    if (iconElMob && clanInfo?.logoUrl) iconElMob.src = clanInfo.logoUrl;
+    const clanIcon = document.getElementById("buildPublisherIcon");
+    const defaultClanIcon = "./img/SVG/user-svgrepo-com.svg";
+    if (clanIcon) {
+      clanIcon.src = clanInfo?.logoUrl || defaultClanIcon;
+    }
 
-    document.getElementById("buildMatchup").innerText = matchupText;
-    document.getElementById("buildPublisher").innerText = publisherText;
-    document.getElementById("buildDate").innerText = dateText;
+    const matchupEl = document.getElementById("buildMatchup");
+    if (matchupEl) matchupEl.innerText = matchupText;
+    applyMatchupTheme(matchupText);
 
-    const mobileMatch = document.getElementById("buildMatchupMobile");
-    if (mobileMatch) mobileMatch.innerText = matchupText;
-    const mobilePub = document.getElementById("buildPublisherMobile");
-    if (mobilePub) mobilePub.innerText = publisherText;
-    const mobileDate = document.getElementById("buildDateMobile");
-    if (mobileDate) mobileDate.innerText = dateText;
+    const avatarEl = document.getElementById("buildPublisherAvatar");
+    let avatarUrlCandidate =
+      build.publisherAvatar ||
+      build.publisherAvatarUrl ||
+      build.publisherAvatarURL ||
+      build.publisherProfile?.avatarUrl ||
+      build.publisherProfile?.photoURL ||
+      build.publisherPhotoURL ||
+      build.publisherPhotoUrl ||
+      build.publisherPhoto ||
+      "";
+
+    let resolvedAvatarUrl = sanitizeAvatarUrl(
+      avatarUrlCandidate || DEFAULT_AVATAR_URL
+    );
+
+    if (build.publisherId) {
+      try {
+        const profile = await resolveUserProfile(build.publisherId, {
+          username: publisherText,
+          photoURL: resolvedAvatarUrl,
+        });
+        if (profile?.username) {
+          displayPublisher = profile.username;
+        }
+        if (profile?.photoURL) {
+          resolvedAvatarUrl = sanitizeAvatarUrl(profile.photoURL);
+        }
+      } catch (err) {
+        console.warn("⚠️ Failed to enrich publisher profile", err);
+      }
+    }
+
+    const publisherNameEl = document.getElementById("buildPublisher");
+    if (publisherNameEl) publisherNameEl.innerText = displayPublisher;
+
+    const dateEl = document.getElementById("buildDate");
+    if (dateEl) dateEl.innerText = dateText;
+
+    if (avatarEl) {
+      avatarEl.src = resolvedAvatarUrl || DEFAULT_AVATAR_URL;
+      avatarEl.alt = `${displayPublisher}'s avatar`;
+    }
 
     // Set build order
     const buildOrderContainer = document.getElementById("buildOrder");
@@ -2917,7 +2943,7 @@ function updateVoteUI(buildId, upvotes, downvotes, userVote) {
 
   // Update vote count text
   if (voteCount) {
-    voteCount.textContent = `${totalVotes} votes`;
+    voteCount.textContent = `(${totalVotes} ${totalVotes === 1 ? "vote" : "votes"})`;
   }
 }
 
@@ -3006,15 +3032,20 @@ document.addEventListener("DOMContentLoaded", async () => {
       const userBuildDocRef = doc(db, `users/${user.uid}/builds/${buildId}`);
       const userBuildSnap = await getDoc(userBuildDocRef);
 
+      const label = importBtn.querySelector(".btn-label");
+
       if (userBuildSnap.exists()) {
         importBtn.disabled = true;
-        importBtn.textContent = "Imported";
+        if (label) label.textContent = "Imported";
+        else importBtn.textContent = "Imported";
         importBtn.classList.add("imported");
       } else {
         importBtn.disabled = false;
-        importBtn.textContent = "Import";
+        importBtn.classList.remove("imported");
+        if (label) label.textContent = "Import";
+        else importBtn.textContent = "Import";
       }
-      importBtn.style.display = "inline-block";
+      importBtn.style.display = "inline-flex";
     });
   } else {
     console.warn("⚠️ Import button not found.");
@@ -3028,9 +3059,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     chip.addEventListener("click", (e) => {
       e.stopPropagation();
       const name =
-        document.getElementById("buildPublisher")?.innerText ||
-        document.getElementById("buildPublisherMobile")?.innerText ||
-        "";
+        document.getElementById("buildPublisher")?.innerText?.trim() || "";
       if (!name) return;
       localStorage.setItem("restoreCommunityModal", "true");
       localStorage.removeItem("communityFilterType");

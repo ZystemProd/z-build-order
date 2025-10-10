@@ -89,79 +89,59 @@
   </div>
 
   <div class="view-build-container">
-    <div class="build-header-row">
-      <a href="index.html" id="backButton" data-return-community="true" class="back-button">
-        <img src="./img/SVG/back.svg" alt="Back" />
-      </a>
-      <h1 id="buildTitle">Loading...</h1>
-
-      <div class="header-buttons">
-        <button id="importBuildButton" class="header-btn" type="button" style="display: none;">
+    <div class="build-header">
+      <div class="build-header-bar">
+        <button id="importBuildButton" class="header-btn import-btn" type="button" style="display: none;">
           <img src="./img/SVG/import2.svg" alt="Import" />
-          Import
+          <span class="btn-label">Import</span>
         </button>
 
-        <button id="shareBuildButton" class="header-btn" type="button" style="display: none;">
+        <h1 id="buildTitle" class="build-title">Loading...</h1>
+
+        <button id="shareBuildButton" class="header-btn share-btn" type="button" style="display: none;">
           <img src="./img/SVG/share.svg" alt="Share" class="svg-icon" />
-          Share
+          <span class="btn-label">Share</span>
         </button>
       </div>
-    </div>
 
+      <div class="build-info-banner matchup-neutral">
+        <div class="banner-content">
+          <span id="buildMatchup" class="matchup-badge">Loading...</span>
 
-    <!-- Build Info Grid -->
-    <div class="build-info-grid">
-      <div class="build-info-item desktop-info">
-        <label>Matchup</label>
-        <span id="buildMatchup">Loading...</span>
-      </div>
-      <div class="build-info-item desktop-info">
-        <label>Publisher</label>
-        <span class="meta-chip publisher-chip"><img id="buildPublisherIcon" src="./img/SVG/user-svgrepo-com.svg"
-            alt="Publisher" class="meta-icon" /> <span id="buildPublisher">Loading...</span></span>
-      </div>
-      <div class="build-info-item desktop-info">
-        <label>Date Published</label>
-        <span id="buildDate">Loading...</span>
-      </div>
-      <div class="build-info-item mobile-info">
-        <div class="info-pair publisher-pair">
-          <span class="info-label">Publisher</span>
-          <span class="info-value">
-            <span class="meta-chip publisher-chip">
-              <img id="buildPublisherIconMobile" src="./img/SVG/user-svgrepo-com.svg" alt="Publisher"
-                class="meta-icon" />
-              <span id="buildPublisherMobile">Loading...</span>
-            </span>
-          </span>
-        </div>
-        <div class="info-pair matchup-pair">
-          <span class="info-label">Matchup</span>
-          <span class="info-value" id="buildMatchupMobile">Loading...</span>
-        </div>
-        <div class="info-pair date-pair">
-          <span class="info-label">Date</span>
-          <span class="info-value" id="buildDateMobile">Loading...</span>
-        </div>
-      </div>
-      <div class="build-info-item rating-item" id="ratingItem">
-        <label>Rating</label>
-        <div id="votingSection" class="vote-section">
-          <div class="vote-buttons">
+          <div class="publisher-section">
+            <img id="buildPublisherAvatar" class="publisher-avatar" src="img/avatar/marine_avatar_1.webp"
+              alt="Publisher avatar" />
+            <div class="publisher-meta">
+              <img id="buildPublisherIcon" class="clan-icon" src="./img/SVG/user-svgrepo-com.svg" alt="Clan logo" />
+              <span class="publisher-name publisher-chip">
+                <span id="buildPublisher">Loading...</span>
+              </span>
+            </div>
+          </div>
+
+          <div class="publish-date">
+            <span id="buildDate">Loading...</span>
+          </div>
+
+          <div class="vote-panel" id="ratingItem">
             <button class="vote-button vote-up" data-id="">
               <img src="./img/SVG/vote-up.svg" alt="Upvote" />
             </button>
+            <div class="vote-stats">
+              <span class="vote-percentage" id="vote-percentage-text">0%</span>
+              <span class="vote-divider">•</span>
+              <span class="vote-count" id="vote-count-text">(0 votes)</span>
+            </div>
             <button class="vote-button vote-down" data-id="">
               <img src="./img/SVG/vote-down.svg" alt="Downvote" />
             </button>
           </div>
-          <div class="vote-results-row">
-            <span class="vote-percentage" id="vote-percentage-text">0%</span>
-            <span class="vote-count" id="vote-count-text">0 votes</span>
-          </div>
         </div>
       </div>
     </div>
+
+
+
 
     <!-- Build Order -->
     <div id="buildOrder" class="build-order-container">
@@ -268,8 +248,3 @@
 </body>
 
 </html>
-
-
-
-
-
