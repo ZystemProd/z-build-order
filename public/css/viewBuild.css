@@ -92,17 +92,41 @@ input[type="text"]:disabled {
 
 .mobile-info {
   display: none;
+  padding: 12px 14px;
+  gap: 12px;
 }
 
-.mobile-info .info-row {
+.mobile-info .info-pair {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 4px;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 10px;
+  min-height: 72px;
 }
 
-.mobile-info .info-row:last-child {
-  margin-bottom: 0;
+.mobile-info .info-label {
+  color: #a5a5a5;
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.mobile-info .info-value {
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.mobile-info .meta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  justify-content: flex-start;
 }
 
 /* Build Order */
@@ -1081,15 +1105,6 @@ input[type="text"]:disabled {
   background: rgba(255, 255, 255, 0.05);
 }
 
-.build-header-row {
-  position: relative; /* 🔥 Important */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 60px; /* or whatever you want for row height */
-  margin-bottom: 30px;
-}
-
 /* Map Section, YouTube Section, Description Section Common */
 .map-section,
 .youtube-section,
@@ -1225,70 +1240,132 @@ input[type="text"]:disabled {
 }
 
 .build-header-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas: "back title actions";
   align-items: center;
-  justify-content: space-between; /* title centered relative to buttons */
-  height: 60px;
-  gap: 10px;
+  gap: 16px;
   padding: 0 20px;
   margin-bottom: 30px;
+  position: relative;
 }
 
-/* Title stays centered */
 .build-header-row h1 {
-  flex: 1;
-  text-align: center;
+  grid-area: title;
   margin: 0;
-  font-size: clamp(1.5rem, 4vw, 2rem);
+  font-size: clamp(1.6rem, 4vw, 2.2rem);
+  text-align: center;
 }
 
-/* Buttons wrapper */
+.build-header-row .back-button {
+  grid-area: back;
+  justify-self: start;
+}
+
 .header-buttons {
+  grid-area: actions;
   display: flex;
   align-items: center;
-  gap: 10px; /* space between Import and Share */
+  justify-content: flex-end;
+  gap: 12px;
+  justify-self: end;
 }
 
-/* Shared button style */
 .build-header-row .header-btn {
-  all: unset; /* optional: remove all inherited styles */
-  display: flex;
+  display: flex !important;
   align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  font-size: 1rem;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px;
+  font-size: 0.95rem;
   font-weight: 600;
   color: #ffffff;
-  background-color: #00bcd4;
-  border-radius: 8px;
+  background: linear-gradient(135deg, #00bcd4, #007a9c);
+  border-radius: 10px;
   border: none;
   cursor: pointer;
-  transition: background-color 0.3s ease, transform 0.2s ease;
+  min-height: 44px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.3s ease;
+}
+
+.header-btn img {
+  width: 18px;
+  height: 18px;
 }
 
 .header-btn:hover {
-  background-color: #555;
+  background: linear-gradient(135deg, #01d2ec, #0098b4);
+  box-shadow: 0 6px 14px rgba(0, 188, 212, 0.24);
+  transform: translateY(-1px);
 }
 
-/* Responsive: stack buttons on mobile */
-@media (max-width: 768px) {
+.header-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 3px 8px rgba(0, 188, 212, 0.2);
+}
+
+.header-btn.imported {
+  background: rgba(0, 188, 212, 0.14);
+  color: #9feaff;
+  cursor: default;
+  box-shadow: none;
+}
+
+.header-btn.imported:hover {
+  transform: none;
+  background: rgba(0, 188, 212, 0.18);
+  box-shadow: none;
+}
+
+@media (max-width: 1024px) {
   .build-header-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-    height: auto;
-    padding: 0 10px;
+    grid-template-columns: auto 1fr;
+    grid-template-areas:
+      "back title"
+      "actions actions";
+    row-gap: 12px;
+  }
+
+  .build-header-row .back-button {
+    grid-area: back;
   }
 
   .build-header-row h1 {
+    grid-area: title;
     text-align: left;
-    width: 100%;
+  }
+
+  .header-buttons {
+    grid-area: actions;
+    justify-content: flex-start;
+    justify-self: stretch;
+  }
+}
+
+@media (max-width: 768px) {
+  .build-header-row {
+    padding: 0 12px;
   }
 
   .header-buttons {
     width: 100%;
-    justify-content: flex-start;
-    gap: 8px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .header-btn {
+    flex: 1 1 160px;
+  }
+}
+
+@media (max-width: 520px) {
+  .header-buttons {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .header-btn {
+    width: 100%;
   }
 }
 
@@ -1313,25 +1390,20 @@ input[type="text"]:disabled {
     display: none;
   }
 
-  .mobile-info {
+  .build-info-item.mobile-info {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
     grid-column: 1 / -1;
+    padding: 18px 16px;
     text-align: left;
-    font-size: 0.8rem;
-    gap: 4px 10px;
   }
 
-  .mobile-info .info-row {
-    margin-bottom: 0;
+  .build-info-item.mobile-info .info-pair {
+    min-height: 80px;
   }
 
-  .mobile-info label {
-    font-size: 0.6rem;
-  }
-
-  .mobile-info span {
-    font-size: 0.8rem;
+  .build-info-item.mobile-info .info-value {
+    font-size: 1rem;
   }
 
   .rating-item {
@@ -1343,21 +1415,9 @@ input[type="text"]:disabled {
   }
 }
 
-/* Optional: Responsive adjustment */
-@media (max-width: 600px) {
-  .build-header-row {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  #backButton,
-  #buildTitle {
-    width: 100%;
-    text-align: center;
-  }
-
-  #buildTitle {
-    margin-top: 10px;
+@media (max-width: 540px) {
+  .build-info-item.mobile-info {
+    grid-template-columns: 1fr;
   }
 }
 

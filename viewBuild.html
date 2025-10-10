@@ -95,15 +95,17 @@
       </a>
       <h1 id="buildTitle">Loading...</h1>
 
-      <!-- Import Button -->
-      <button id="importBuildButton" style="display: none">
-        <img src="./img/SVG/import2.svg" alt="Import" />
-        Import
-      </button>
+      <div class="header-buttons">
+        <button id="importBuildButton" class="header-btn" type="button" style="display: none;">
+          <img src="./img/SVG/import2.svg" alt="Import" />
+          Import
+        </button>
 
-      <!-- Share Button -->
-      <button id="shareBuildButton" style="display: none">
-        <img src="./img/SVG/share.svg" alt="Share" class="svg-icon">Share</button>
+        <button id="shareBuildButton" class="header-btn" type="button" style="display: none;">
+          <img src="./img/SVG/share.svg" alt="Share" class="svg-icon" />
+          Share
+        </button>
+      </div>
     </div>
 
 
@@ -127,22 +129,27 @@
         <span id="buildDate">Loading...</span>
       </div>
       <div class="build-info-item mobile-info">
-        <div class="info-row">
-          <label>Category</label>
-          <span id="buildCategoryMobile">Loading...</span>
+        <div class="info-pair">
+          <span class="info-label">Category</span>
+          <span class="info-value" id="buildCategoryMobile">Loading...</span>
         </div>
-        <div class="info-row">
-          <label>Matchup</label>
-          <span id="buildMatchupMobile">Loading...</span>
+        <div class="info-pair">
+          <span class="info-label">Matchup</span>
+          <span class="info-value" id="buildMatchupMobile">Loading...</span>
         </div>
-        <div class="info-row">
-          <label>Publisher</label>
-          <span class="meta-chip publisher-chip"><img id="buildPublisherIconMobile" src="./img/SVG/user-svgrepo-com.svg"
-              alt="Publisher" class="meta-icon" /> <span id="buildPublisherMobile">Loading...</span></span>
+        <div class="info-pair">
+          <span class="info-label">Publisher</span>
+          <span class="info-value">
+            <span class="meta-chip publisher-chip">
+              <img id="buildPublisherIconMobile" src="./img/SVG/user-svgrepo-com.svg" alt="Publisher"
+                class="meta-icon" />
+              <span id="buildPublisherMobile">Loading...</span>
+            </span>
+          </span>
         </div>
-        <div class="info-row">
-          <label>Date</label>
-          <span id="buildDateMobile">Loading...</span>
+        <div class="info-pair">
+          <span class="info-label">Date</span>
+          <span class="info-value" id="buildDateMobile">Loading...</span>
         </div>
       </div>
       <div class="build-info-item rating-item" id="ratingItem">
