@@ -349,6 +349,23 @@ function removeDeprecatedCategoryMetadata() {
 }
 
 removeDeprecatedCategoryMetadata();
+
+function clearBuildInfoLabels() {
+  const selectors = [
+    ".build-info-item label",
+    ".build-info-item .info-label",
+  ];
+
+  selectors.forEach((selector) => {
+    document.querySelectorAll(selector).forEach((node) => {
+      if (node?.textContent?.trim()) {
+        node.textContent = "";
+      }
+    });
+  });
+}
+
+clearBuildInfoLabels();
 const buildOrderContainer = document.getElementById("buildOrder");
 const mainLayout = document.querySelector(".main-layout");
 let focusBtn = document.getElementById("openFocusModal");
@@ -2467,6 +2484,8 @@ async function loadBuild() {
     if (mobilePub) mobilePub.innerText = publisherText;
     const mobileDate = document.getElementById("buildDateMobile");
     if (mobileDate) mobileDate.innerText = dateText;
+
+    clearBuildInfoLabels();
 
     // Set build order
     const buildOrderContainer = document.getElementById("buildOrder");
