@@ -345,25 +345,25 @@ function sanitizeAvatarUrl(url) {
 
 const MATCHUP_THEME_CLASSES = ["matchup-z", "matchup-t", "matchup-p"];
 
-function deriveMatchupInfo(rawMatchup) {
-  const defaultInfo = { badge: "--", primaryRace: "" };
-  if (!rawMatchup) return defaultInfo;
-
-  const letters = String(rawMatchup)
-    .toUpperCase()
-    .match(/[ZTP]/g);
-
-  if (!letters || letters.length === 0) {
-    return defaultInfo;
+function resolveMatchupInfo(build) {
+  if (!build || typeof build !== "object") {
+    return { badge: "---", primaryRace: "" };
   }
 
-  const primaryRace = letters[0];
-  const opponentRace = letters[1] || "X";
+  const rawMatchup = [build.matchup, build.subcategory]
+    .map((value) => (typeof value === "string" ? value.trim() : ""))
+    .find((value) => value.length > 0);
 
-  return {
-    badge: `${primaryRace}v${opponentRace}`,
-    primaryRace,
-  };
+  if (!rawMatchup) {
+    return { badge: "---", primaryRace: "" };
+  }
+
+  const normalized = rawMatchup.replace(/\s+/g, "").toUpperCase();
+  const letters = normalized.match(/[ZTP]/g) || [];
+  const primaryRace = letters[0] || "";
+  const badge = normalized || "---";
+
+  return { badge, primaryRace };
 }
 
 function applyMatchupTheme(bannerEl, primaryRace) {
@@ -375,38 +375,47 @@ function applyMatchupTheme(bannerEl, primaryRace) {
 
   if (!primaryRace) return;
 
-  const themeClass = `matchup-${primaryRace.toLowerCase()}`;
-  if (MATCHUP_THEME_CLASSES.includes(themeClass)) {
-    bannerEl.classList.add(themeClass);
+  if (primaryRace === "Z") {
+    bannerEl.classList.add("matchup-z");
+  } else if (primaryRace === "T") {
+    bannerEl.classList.add("matchup-t");
+  } else if (primaryRace === "P") {
+    bannerEl.classList.add("matchup-p");
   }
 }
 
 function formatBannerDate(dateValue) {
   let value = dateValue;
-  if (value && typeof value.toMillis === "function") {
+
+  if (value && typeof value.toDate === "function") {
+    value = value.toDate();
+  } else if (value && typeof value.toMillis === "function") {
     value = value.toMillis();
   }
 
-  if (typeof value === "string" || typeof value === "number") {
+  if (value instanceof Date) {
+    if (!Number.isNaN(value.getTime())) {
+      return value.toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      });
+    }
+    return "---";
+  }
+
+  if (typeof value === "number" || typeof value === "string") {
     const parsed = new Date(value);
     if (!Number.isNaN(parsed.getTime())) {
-      return parsed.toLocaleDateString(undefined, {
-        month: "short",
+      return parsed.toLocaleDateString("en-US", {
+        month: "long",
         day: "numeric",
         year: "numeric",
       });
     }
   }
 
-  if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return value.toLocaleDateString(undefined, {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  }
-
-  return "--";
+  return "---";
 }
 
 function resolvePublisherAvatar(build) {
@@ -453,10 +462,10 @@ function resolvePublisherClanLogo(build) {
   }
 
   const candidates = [
+    build.clanLogo,
     build.publisherClan?.logoUrl,
     build.publisherClan?.logo,
     build.publisherClanLogo,
-    build.clanLogo,
     build.clan?.logoUrl,
   ];
 
@@ -467,52 +476,6 @@ function resolvePublisherClanLogo(build) {
   }
 
   return "";
-}
-
-function updateHeaderBanner(build) {
-  const bannerEl = document.getElementById("buildInfoBanner");
-  const matchupBadgeEl = document.getElementById("buildMatchupBadge");
-  const publisherNameEl = document.getElementById("buildPublisherDisplay");
-  const avatarEl = document.getElementById("buildPublisherAvatar");
-  const clanLogoEl = document.getElementById("buildPublisherClanLogo");
-  const dateEl = document.getElementById("buildDateBanner");
-
-  const matchupInfo = deriveMatchupInfo(build?.subcategory);
-  applyMatchupTheme(bannerEl, matchupInfo.primaryRace);
-
-  if (matchupBadgeEl) {
-    matchupBadgeEl.textContent = matchupInfo.badge || "--";
-  }
-
-  const publisherName = sanitizePlainText(
-    build?.username || build?.publisher || "Anonymous"
-  );
-
-  if (publisherNameEl) {
-    publisherNameEl.textContent = publisherName || "Anonymous";
-  }
-
-  if (avatarEl) {
-    const avatarUrl = sanitizeAvatarUrl(resolvePublisherAvatar(build));
-    avatarEl.src = avatarUrl;
-    avatarEl.alt = `${publisherName || "Publisher"}'s avatar`;
-  }
-
-  if (clanLogoEl) {
-    const clanLogoUrl = resolvePublisherClanLogo(build);
-    if (clanLogoUrl) {
-      clanLogoEl.src = sanitizeAvatarUrl(clanLogoUrl);
-      clanLogoEl.alt = `${publisherName || "Publisher"} clan logo`;
-      clanLogoEl.style.display = "inline-block";
-    } else {
-      clanLogoEl.removeAttribute("src");
-      clanLogoEl.style.display = "none";
-    }
-  }
-
-  if (dateEl) {
-    dateEl.textContent = formatBannerDate(build?.datePublished);
-  }
 }
 
 function filterBannedWords(text) {
@@ -2532,7 +2495,81 @@ async function loadBuild() {
       titleEl.innerText = build.title || "Untitled Build";
     }
 
-    updateHeaderBanner(build);
+    const bannerEl = document.getElementById("buildInfoBanner");
+    const matchupBadgeEl = document.getElementById("buildMatchupBadge");
+    const publisherDisplayEl = document.getElementById("buildPublisherDisplay");
+    const avatarEl = document.getElementById("buildPublisherAvatar");
+    const clanLogoEl = document.getElementById("buildPublisherClanLogo");
+    const dateEl = document.getElementById("buildDateBanner");
+    const votePercentageEl = document.getElementById("vote-percentage-text");
+    const voteCountEl = document.getElementById("vote-count-text");
+
+    const matchupInfo = resolveMatchupInfo(build);
+    if (matchupBadgeEl) {
+      matchupBadgeEl.textContent = matchupInfo.badge;
+    }
+
+    if (bannerEl) {
+      applyMatchupTheme(bannerEl, matchupInfo.primaryRace);
+    }
+
+    const publisherName = sanitizePlainText(
+      build.publisher || build.username || "Unknown"
+    );
+
+    if (publisherDisplayEl) {
+      publisherDisplayEl.textContent = publisherName;
+    }
+
+    if (avatarEl) {
+      const avatarUrl = sanitizeAvatarUrl(
+        build.publisherAvatar || resolvePublisherAvatar(build)
+      );
+      avatarEl.src = avatarUrl || DEFAULT_AVATAR_URL;
+      avatarEl.alt = `${publisherName || "Publisher"}'s avatar`;
+    }
+
+    if (clanLogoEl) {
+      const clanLogoUrl = resolvePublisherClanLogo(build);
+      const sanitizedClanLogo = sanitizeAvatarUrl(
+        clanLogoUrl || "./img/SVG/clan.svg"
+      );
+      clanLogoEl.src = sanitizedClanLogo;
+      clanLogoEl.alt = `${publisherName || "Publisher"} clan logo`;
+    }
+
+    if (dateEl) {
+      dateEl.textContent = formatBannerDate(build.datePublished);
+    }
+
+    const upvotes =
+      typeof build.upvotes === "number" && build.upvotes > 0 ? build.upvotes : 0;
+    const downvotes =
+      typeof build.downvotes === "number" && build.downvotes > 0
+        ? build.downvotes
+        : 0;
+    const baseVoteTotal = upvotes + downvotes;
+    const totalVotes =
+      typeof build.voteCount === "number" && build.voteCount >= 0
+        ? build.voteCount
+        : baseVoteTotal;
+    const computedPercentage = baseVoteTotal
+      ? Math.round((upvotes / Math.max(baseVoteTotal, 1)) * 100)
+      : 0;
+    const votePercentageValue =
+      typeof build.votePercentage === "number"
+        ? build.votePercentage
+        : computedPercentage;
+
+    if (votePercentageEl) {
+      votePercentageEl.textContent = `${votePercentageValue}%`;
+    }
+
+    if (voteCountEl) {
+      const label = totalVotes === 1 ? "vote" : "votes";
+      voteCountEl.textContent = `(${totalVotes} ${label})`;
+    }
+
     // Set build order
     const buildOrderContainer = document.getElementById("buildOrder");
     if (!buildOrderContainer) {
@@ -2978,12 +3015,12 @@ function updateVoteUI(buildId, upvotes, downvotes, userVote) {
   const percentage =
     totalVotes > 0 ? Math.round((upvotes / totalVotes) * 100) : 0;
 
-  const percentageEl = document.getElementById("votePercentageText");
+  const percentageEl = document.getElementById("vote-percentage-text");
   if (percentageEl) {
     percentageEl.textContent = `${percentage}%`;
   }
 
-  const countEl = document.getElementById("voteCountText");
+  const countEl = document.getElementById("vote-count-text");
   if (countEl) {
     const label = totalVotes === 1 ? "vote" : "votes";
     countEl.textContent = `(${totalVotes} ${label})`;
