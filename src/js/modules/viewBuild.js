@@ -312,6 +312,10 @@ const backButton = document.getElementById("backButton");
 const pageBackButton = document.getElementById("pageBackButton");
 const ratingItem = document.getElementById("ratingItem");
 const infoGrid = document.querySelector(".build-info-grid");
+const mobileInfoItem = document.querySelector(
+  ".build-info-item.mobile-info"
+);
+const buildOrderContainer = document.getElementById("buildOrder");
 const mainLayout = document.querySelector(".main-layout");
 let focusBtn = document.getElementById("openFocusModal");
 let focusModal = document.getElementById("focusModal");
@@ -2231,15 +2235,20 @@ async function deleteComment(buildId, commentId, commentData) {
 }
 
 function adjustRatingPosition() {
-  if (!ratingItem || !infoGrid || !mainLayout) return;
+  if (!ratingItem || !infoGrid) return;
+
   if (window.innerWidth <= 768) {
-    if (ratingItem.parentElement !== mainLayout.parentNode) {
-      mainLayout.insertAdjacentElement("afterend", ratingItem);
+    if (mobileInfoItem && mobileInfoItem.nextElementSibling !== ratingItem) {
+      mobileInfoItem.insertAdjacentElement("afterend", ratingItem);
+    } else if (
+      !mobileInfoItem &&
+      buildOrderContainer &&
+      buildOrderContainer.previousElementSibling !== ratingItem
+    ) {
+      buildOrderContainer.insertAdjacentElement("beforebegin", ratingItem);
     }
-  } else {
-    if (!infoGrid.contains(ratingItem)) {
-      infoGrid.appendChild(ratingItem);
-    }
+  } else if (!infoGrid.contains(ratingItem)) {
+    infoGrid.appendChild(ratingItem);
   }
 }
 
