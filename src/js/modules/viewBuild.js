@@ -2446,6 +2446,18 @@ async function loadBuild() {
     if (iconElMob && clanInfo?.logoUrl) iconElMob.src = clanInfo.logoUrl;
 
     document.getElementById("buildMatchup").innerText = matchupText;
+    if (infoGrid && typeof matchupText === "string") {
+      const matchupKey = matchupText.trim().toLowerCase();
+      infoGrid.classList.remove("matchup-zvx", "matchup-tvx", "matchup-pvx");
+
+      if (matchupKey.startsWith("zv")) {
+        infoGrid.classList.add("matchup-zvx");
+      } else if (matchupKey.startsWith("tv")) {
+        infoGrid.classList.add("matchup-tvx");
+      } else if (matchupKey.startsWith("pv")) {
+        infoGrid.classList.add("matchup-pvx");
+      }
+    }
     document.getElementById("buildPublisher").innerText = publisherText;
     document.getElementById("buildDate").innerText = dateText;
 
