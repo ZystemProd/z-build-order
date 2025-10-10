@@ -102,7 +102,7 @@ input[type="text"]:disabled {
 }
 
 .build-info-item {
-  background: none;
+  background: none !important;
   border: none;
   box-shadow: none;
   flex: 0 0 auto;
@@ -138,6 +138,15 @@ input[type="text"]:disabled {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  background: none;
+  background-color: transparent;
+  padding: 0;
+}
+
+.build-info-item .meta-chip.publisher-chip {
+  background: none !important;
+  background-color: transparent !important;
+  color: inherit !important;
 }
 
 #buildMatchup,
@@ -170,6 +179,8 @@ input[type="text"]:disabled {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  background: none !important;
+  padding: 0;
 }
 
 .publisher-chip img {
