@@ -99,10 +99,6 @@
     <!-- Build Info Grid -->
     <div class="build-info-grid">
       <div class="build-info-item desktop-info">
-        <label>Category</label>
-        <span id="buildCategory">Loading...</span>
-      </div>
-      <div class="build-info-item desktop-info">
         <label>Matchup</label>
         <span id="buildMatchup">Loading...</span>
       </div>
@@ -116,22 +112,23 @@
         <span id="buildDate">Loading...</span>
       </div>
       <div class="build-info-item mobile-info">
-        <div class="info-row">
-          <label>Category</label>
-          <span id="buildCategoryMobile">Loading...</span>
+        <div class="info-pair publisher-pair">
+          <span class="info-label">Publisher</span>
+          <span class="info-value">
+            <span class="meta-chip publisher-chip">
+              <img id="buildPublisherIconMobile" src="./img/SVG/user-svgrepo-com.svg" alt="Publisher"
+                class="meta-icon" />
+              <span id="buildPublisherMobile">Loading...</span>
+            </span>
+          </span>
         </div>
-        <div class="info-row">
-          <label>Matchup</label>
-          <span id="buildMatchupMobile">Loading...</span>
+        <div class="info-pair matchup-pair">
+          <span class="info-label">Matchup</span>
+          <span class="info-value" id="buildMatchupMobile">Loading...</span>
         </div>
-        <div class="info-row">
-          <label>Publisher</label>
-          <span class="meta-chip publisher-chip"><img id="buildPublisherIconMobile" src="./img/SVG/user-svgrepo-com.svg"
-              alt="Publisher" class="meta-icon" /> <span id="buildPublisherMobile">Loading...</span></span>
-        </div>
-        <div class="info-row">
-          <label>Date</label>
-          <span id="buildDateMobile">Loading...</span>
+        <div class="info-pair date-pair">
+          <span class="info-label">Date</span>
+          <span class="info-value" id="buildDateMobile">Loading...</span>
         </div>
       </div>
       <div class="build-info-item rating-item" id="ratingItem">

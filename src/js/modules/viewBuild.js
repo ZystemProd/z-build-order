@@ -315,6 +315,40 @@ const infoGrid = document.querySelector(".build-info-grid");
 const mobileInfoItem = document.querySelector(
   ".build-info-item.mobile-info"
 );
+
+function removeDeprecatedCategoryMetadata() {
+  const desktopCategoryItems = document.querySelectorAll(
+    ".build-info-item.desktop-info"
+  );
+
+  desktopCategoryItems.forEach((item) => {
+    const labelText = item
+      .querySelector("label")
+      ?.textContent?.trim()
+      .toLowerCase();
+
+    if (labelText === "category") {
+      item.remove();
+    }
+  });
+
+  const mobileCategoryRows = document.querySelectorAll(
+    ".build-info-item.mobile-info .info-row, .build-info-item.mobile-info .info-pair"
+  );
+
+  mobileCategoryRows.forEach((row) => {
+    const labelText = row
+      .querySelector("label, .info-label")
+      ?.textContent?.trim()
+      .toLowerCase();
+
+    if (labelText === "category") {
+      row.remove();
+    }
+  });
+}
+
+removeDeprecatedCategoryMetadata();
 const buildOrderContainer = document.getElementById("buildOrder");
 const mainLayout = document.querySelector(".main-layout");
 let focusBtn = document.getElementById("openFocusModal");
