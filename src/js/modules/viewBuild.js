@@ -29,8 +29,6 @@ import {
   loadMapsOnDemand,
 } from "./interactive_map.js"; // ✅ Map support
 import { updateYouTubeEmbed, clearYouTubeEmbed } from "./youtube.js";
-import { getPublisherClanInfo } from "./community.js";
-import { formatShortDate } from "./modal.js";
 import { showToast } from "./toastHandler.js";
 import { bannedWords } from "../data/bannedWords.js";
 
@@ -310,45 +308,7 @@ function ensureCommentSectionStructure() {
 
 const backButton = document.getElementById("backButton");
 const pageBackButton = document.getElementById("pageBackButton");
-const ratingItem = document.getElementById("ratingItem");
-const infoGrid = document.querySelector(".build-info-grid");
-const mobileInfoItem = document.querySelector(
-  ".build-info-item.mobile-info"
-);
 
-function removeDeprecatedCategoryMetadata() {
-  const desktopCategoryItems = document.querySelectorAll(
-    ".build-info-item.desktop-info"
-  );
-
-  desktopCategoryItems.forEach((item) => {
-    const labelText = item
-      .querySelector("label")
-      ?.textContent?.trim()
-      .toLowerCase();
-
-    if (labelText === "category") {
-      item.remove();
-    }
-  });
-
-  const mobileCategoryRows = document.querySelectorAll(
-    ".build-info-item.mobile-info .info-row, .build-info-item.mobile-info .info-pair"
-  );
-
-  mobileCategoryRows.forEach((row) => {
-    const labelText = row
-      .querySelector("label, .info-label")
-      ?.textContent?.trim()
-      .toLowerCase();
-
-    if (labelText === "category") {
-      row.remove();
-    }
-  });
-}
-
-removeDeprecatedCategoryMetadata();
 const buildOrderContainer = document.getElementById("buildOrder");
 const mainLayout = document.querySelector(".main-layout");
 let focusBtn = document.getElementById("openFocusModal");
@@ -381,6 +341,141 @@ function sanitizeAvatarUrl(url) {
     return trimmed;
   }
   return DEFAULT_AVATAR_URL;
+}
+
+const MATCHUP_THEME_CLASSES = ["matchup-z", "matchup-t", "matchup-p"];
+
+function resolveMatchupInfo(build) {
+  if (!build || typeof build !== "object") {
+    return { badge: "---", primaryRace: "" };
+  }
+
+  const rawMatchup = [build.matchup, build.subcategory]
+    .map((value) => (typeof value === "string" ? value.trim() : ""))
+    .find((value) => value.length > 0);
+
+  if (!rawMatchup) {
+    return { badge: "---", primaryRace: "" };
+  }
+
+  const normalized = rawMatchup.replace(/\s+/g, "").toUpperCase();
+  const letters = normalized.match(/[ZTP]/g) || [];
+  const primaryRace = letters[0] || "";
+  const badge = normalized || "---";
+
+  return { badge, primaryRace };
+}
+
+function applyMatchupTheme(bannerEl, primaryRace) {
+  if (!bannerEl) return;
+
+  MATCHUP_THEME_CLASSES.forEach((cls) => {
+    bannerEl.classList.remove(cls);
+  });
+
+  if (!primaryRace) return;
+
+  if (primaryRace === "Z") {
+    bannerEl.classList.add("matchup-z");
+  } else if (primaryRace === "T") {
+    bannerEl.classList.add("matchup-t");
+  } else if (primaryRace === "P") {
+    bannerEl.classList.add("matchup-p");
+  }
+}
+
+function formatBannerDate(dateValue) {
+  let value = dateValue;
+
+  if (value && typeof value.toDate === "function") {
+    value = value.toDate();
+  } else if (value && typeof value.toMillis === "function") {
+    value = value.toMillis();
+  }
+
+  if (value instanceof Date) {
+    if (!Number.isNaN(value.getTime())) {
+      return value.toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      });
+    }
+    return "---";
+  }
+
+  if (typeof value === "number" || typeof value === "string") {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      });
+    }
+  }
+
+  return "---";
+}
+
+function resolvePublisherAvatar(build) {
+  if (!build || typeof build !== "object") {
+    return DEFAULT_AVATAR_URL;
+  }
+
+  const candidateKeys = [
+    "publisherAvatarUrl",
+    "publisherAvatarURL",
+    "publisherAvatar",
+    "avatarUrl",
+    "avatarURL",
+    "photoURL",
+    "publisherPhotoURL",
+    "userAvatar",
+  ];
+
+  for (const key of candidateKeys) {
+    const value = build[key];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  const nestedCandidates = [
+    build.profile?.avatarUrl,
+    build.profile?.photoURL,
+    build.publisherProfile?.avatarUrl,
+  ];
+
+  for (const value of nestedCandidates) {
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return DEFAULT_AVATAR_URL;
+}
+
+function resolvePublisherClanLogo(build) {
+  if (!build || typeof build !== "object") {
+    return "";
+  }
+
+  const candidates = [
+    build.clanLogo,
+    build.publisherClan?.logoUrl,
+    build.publisherClan?.logo,
+    build.publisherClanLogo,
+    build.clan?.logoUrl,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim()) {
+      return candidate.trim();
+    }
+  }
+
+  return "";
 }
 
 function filterBannedWords(text) {
@@ -2268,24 +2363,6 @@ async function deleteComment(buildId, commentId, commentData) {
   }
 }
 
-function adjustRatingPosition() {
-  if (!ratingItem || !infoGrid) return;
-
-  if (window.innerWidth <= 768) {
-    if (mobileInfoItem && mobileInfoItem.nextElementSibling !== ratingItem) {
-      mobileInfoItem.insertAdjacentElement("afterend", ratingItem);
-    } else if (
-      !mobileInfoItem &&
-      buildOrderContainer &&
-      buildOrderContainer.previousElementSibling !== ratingItem
-    ) {
-      buildOrderContainer.insertAdjacentElement("beforebegin", ratingItem);
-    }
-  } else if (!infoGrid.contains(ratingItem)) {
-    infoGrid.appendChild(ratingItem);
-  }
-}
-
 function openFocusModal() {
   if (!focusModal || !focusContent) return;
   const buildOrder = document.getElementById("buildOrder");
@@ -2413,48 +2490,85 @@ async function loadBuild() {
     console.log("✅ Build Loaded:", build);
 
     // Set basic build info
-    document.getElementById("buildTitle").innerText =
-      build.title || "Untitled Build";
-    const matchupText =
-      build.subcategory && build.subcategory.length === 3
-        ? build.subcategory.charAt(0).toUpperCase() +
-          build.subcategory.charAt(1) +
-          build.subcategory.charAt(2).toUpperCase()
-        : build.subcategory || "Unknown";
-    const publisherText = build.username || "Anonymous";
-    let dateText = "Unknown";
-    try {
-      let ts = build.datePublished;
-      if (ts && typeof ts.toMillis === "function") ts = ts.toMillis();
-      if (typeof ts === "number" || typeof ts === "string") {
-        const d = new Date(ts);
-        if (!isNaN(d.getTime())) {
-          dateText = formatShortDate(d);
-        }
-      }
-    } catch (err) {
-      console.warn("Failed to parse datePublished:", build.datePublished);
+    const titleEl = document.getElementById("buildTitle");
+    if (titleEl) {
+      titleEl.innerText = build.title || "Untitled Build";
     }
 
-    let clanInfo = build.publisherClan || null;
-    if (!clanInfo && build.publisherId) {
-      clanInfo = await getPublisherClanInfo(build.publisherId);
+    const bannerEl = document.getElementById("buildInfoBanner");
+    const matchupBadgeEl = document.getElementById("buildMatchupBadge");
+    const publisherDisplayEl = document.getElementById("buildPublisherDisplay");
+    const avatarEl = document.getElementById("buildPublisherAvatar");
+    const clanLogoEl = document.getElementById("buildPublisherClanLogo");
+    const dateEl = document.getElementById("buildDateBanner");
+    const votePercentageEl = document.getElementById("vote-percentage-text");
+    const voteCountEl = document.getElementById("vote-count-text");
+
+    const matchupInfo = resolveMatchupInfo(build);
+    if (matchupBadgeEl) {
+      matchupBadgeEl.textContent = matchupInfo.badge;
     }
-    const iconEl = document.getElementById("buildPublisherIcon");
-    if (iconEl && clanInfo?.logoUrl) iconEl.src = clanInfo.logoUrl;
-    const iconElMob = document.getElementById("buildPublisherIconMobile");
-    if (iconElMob && clanInfo?.logoUrl) iconElMob.src = clanInfo.logoUrl;
 
-    document.getElementById("buildMatchup").innerText = matchupText;
-    document.getElementById("buildPublisher").innerText = publisherText;
-    document.getElementById("buildDate").innerText = dateText;
+    if (bannerEl) {
+      applyMatchupTheme(bannerEl, matchupInfo.primaryRace);
+    }
 
-    const mobileMatch = document.getElementById("buildMatchupMobile");
-    if (mobileMatch) mobileMatch.innerText = matchupText;
-    const mobilePub = document.getElementById("buildPublisherMobile");
-    if (mobilePub) mobilePub.innerText = publisherText;
-    const mobileDate = document.getElementById("buildDateMobile");
-    if (mobileDate) mobileDate.innerText = dateText;
+    const publisherName = sanitizePlainText(
+      build.publisher || build.username || "Unknown"
+    );
+
+    if (publisherDisplayEl) {
+      publisherDisplayEl.textContent = publisherName;
+    }
+
+    if (avatarEl) {
+      const avatarUrl = sanitizeAvatarUrl(
+        build.publisherAvatar || resolvePublisherAvatar(build)
+      );
+      avatarEl.src = avatarUrl || DEFAULT_AVATAR_URL;
+      avatarEl.alt = `${publisherName || "Publisher"}'s avatar`;
+    }
+
+    if (clanLogoEl) {
+      const clanLogoUrl = resolvePublisherClanLogo(build);
+      const sanitizedClanLogo = sanitizeAvatarUrl(
+        clanLogoUrl || "./img/SVG/clan.svg"
+      );
+      clanLogoEl.src = sanitizedClanLogo;
+      clanLogoEl.alt = `${publisherName || "Publisher"} clan logo`;
+    }
+
+    if (dateEl) {
+      dateEl.textContent = formatBannerDate(build.datePublished);
+    }
+
+    const upvotes =
+      typeof build.upvotes === "number" && build.upvotes > 0 ? build.upvotes : 0;
+    const downvotes =
+      typeof build.downvotes === "number" && build.downvotes > 0
+        ? build.downvotes
+        : 0;
+    const baseVoteTotal = upvotes + downvotes;
+    const totalVotes =
+      typeof build.voteCount === "number" && build.voteCount >= 0
+        ? build.voteCount
+        : baseVoteTotal;
+    const computedPercentage = baseVoteTotal
+      ? Math.round((upvotes / Math.max(baseVoteTotal, 1)) * 100)
+      : 0;
+    const votePercentageValue =
+      typeof build.votePercentage === "number"
+        ? build.votePercentage
+        : computedPercentage;
+
+    if (votePercentageEl) {
+      votePercentageEl.textContent = `${votePercentageValue}%`;
+    }
+
+    if (voteCountEl) {
+      const label = totalVotes === 1 ? "vote" : "votes";
+      voteCountEl.textContent = `(${totalVotes} ${label})`;
+    }
 
     // Set build order
     const buildOrderContainer = document.getElementById("buildOrder");
@@ -2771,6 +2885,15 @@ async function loadBuild() {
     }
     injectSchemaMarkup(build);
     injectMetaTags(buildId, build);
+
+    const currentUser = auth.currentUser;
+    const userVote = currentUser ? build.userVotes?.[currentUser.uid] || null : null;
+    updateVoteUI(
+      buildId,
+      build.upvotes || 0,
+      build.downvotes || 0,
+      userVote
+    );
   } else {
     console.error("❌ Build not found in Firestore:", buildId);
     document.getElementById("buildTitle").innerText = "Build not found.";
@@ -2888,37 +3011,56 @@ function updateVoteButtonIcons(buildId) {
 }
 
 function updateVoteUI(buildId, upvotes, downvotes, userVote) {
-  const upvoteButton = document.querySelector(`.vote-up[data-id="${buildId}"]`);
-  const downvoteButton = document.querySelector(
-    `.vote-down[data-id="${buildId}"]`
-  );
-  const votePercentage = document.getElementById("vote-percentage-text");
-  const voteCount = document.getElementById("vote-count-text");
+  const totalVotes = upvotes + downvotes;
+  const percentage =
+    totalVotes > 0 ? Math.round((upvotes / totalVotes) * 100) : 0;
 
-  if (!upvoteButton || !downvoteButton || !votePercentage) return;
+  const percentageEl = document.getElementById("vote-percentage-text");
+  if (percentageEl) {
+    percentageEl.textContent = `${percentage}%`;
+  }
+
+  const countEl = document.getElementById("vote-count-text");
+  if (countEl) {
+    const label = totalVotes === 1 ? "vote" : "votes";
+    countEl.textContent = `(${totalVotes} ${label})`;
+  }
+
+  const upvoteButton =
+    document.querySelector(`.vote-up[data-id="${buildId}"]`) ||
+    document.querySelector(".vote-up");
+  const downvoteButton =
+    document.querySelector(`.vote-down[data-id="${buildId}"]`) ||
+    document.querySelector(".vote-down");
+
+  if (!upvoteButton || !downvoteButton) {
+    return;
+  }
 
   // Update SVG icons
-  upvoteButton.querySelector("img").src =
-    userVote === "up" ? "./img/SVG/voted-up.svg" : "./img/SVG/vote-up.svg";
-  downvoteButton.querySelector("img").src =
-    userVote === "down"
-      ? "./img/SVG/voted-down.svg"
-      : "./img/SVG/vote-down.svg";
+  const upvoteIcon = upvoteButton.querySelector("img");
+  const downvoteIcon = downvoteButton.querySelector("img");
+
+  if (upvoteIcon) {
+    upvoteIcon.src =
+      userVote === "up" ? "./img/SVG/voted-up.svg" : "./img/SVG/vote-up.svg";
+  }
+
+  if (downvoteIcon) {
+    downvoteIcon.src =
+      userVote === "down"
+        ? "./img/SVG/voted-down.svg"
+        : "./img/SVG/vote-down.svg";
+  }
 
   // Highlight selected vote
   upvoteButton.classList.toggle("voted-up", userVote === "up");
   downvoteButton.classList.toggle("voted-down", userVote === "down");
 
-  // Calculate vote percentage
-  const totalVotes = upvotes + downvotes;
-  const percentage =
-    totalVotes > 0 ? Math.round((upvotes / totalVotes) * 100) : 0;
-  votePercentage.textContent = `${percentage}%`;
-
-  // Update vote count text
-  if (voteCount) {
-    voteCount.textContent = `${totalVotes} votes`;
-  }
+  upvoteButton.setAttribute("data-total-votes", String(totalVotes));
+  upvoteButton.setAttribute("data-vote-percentage", String(percentage));
+  downvoteButton.setAttribute("data-total-votes", String(totalVotes));
+  downvoteButton.setAttribute("data-vote-percentage", String(percentage));
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -2958,9 +3100,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
     commentSignInBtn.dataset.listenerBound = "true";
   }
-
-  adjustRatingPosition();
-  window.addEventListener("resize", adjustRatingPosition);
 
   focusBtn = document.getElementById("openFocusModal");
   focusModal = document.getElementById("focusModal");
@@ -3022,23 +3161,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ✅ Load build data after DOM ready
   await loadBuild();
-
-  // Redirect to community builds when clicking publisher name
-  document.querySelectorAll(".publisher-chip").forEach((chip) => {
-    chip.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const name =
-        document.getElementById("buildPublisher")?.innerText ||
-        document.getElementById("buildPublisherMobile")?.innerText ||
-        "";
-      if (!name) return;
-      localStorage.setItem("restoreCommunityModal", "true");
-      localStorage.removeItem("communityFilterType");
-      localStorage.removeItem("communityFilterValue");
-      localStorage.setItem("communitySearchQuery", name);
-      window.location.href = "index.html";
-    });
-  });
 
   // Update vote UI when auth state changes (e.g., after sign-in)
   onAuthStateChanged(auth, (user) => {
