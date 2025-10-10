@@ -29,8 +29,6 @@ import {
   loadMapsOnDemand,
 } from "./interactive_map.js"; // ✅ Map support
 import { updateYouTubeEmbed, clearYouTubeEmbed } from "./youtube.js";
-import { getPublisherClanInfo } from "./community.js";
-import { formatShortDate } from "./modal.js";
 import { showToast } from "./toastHandler.js";
 import { bannedWords } from "../data/bannedWords.js";
 
@@ -311,39 +309,6 @@ function ensureCommentSectionStructure() {
 const backButton = document.getElementById("backButton");
 const pageBackButton = document.getElementById("pageBackButton");
 
-function removeDeprecatedCategoryMetadata() {
-  const desktopCategoryItems = document.querySelectorAll(
-    ".build-info-item.desktop-info"
-  );
-
-  desktopCategoryItems.forEach((item) => {
-    const labelText = item
-      .querySelector("label")
-      ?.textContent?.trim()
-      .toLowerCase();
-
-    if (labelText === "category") {
-      item.remove();
-    }
-  });
-
-  const mobileCategoryRows = document.querySelectorAll(
-    ".build-info-item.mobile-info .info-row, .build-info-item.mobile-info .info-pair"
-  );
-
-  mobileCategoryRows.forEach((row) => {
-    const labelText = row
-      .querySelector("label, .info-label")
-      ?.textContent?.trim()
-      .toLowerCase();
-
-    if (labelText === "category") {
-      row.remove();
-    }
-  });
-}
-
-removeDeprecatedCategoryMetadata();
 const buildOrderContainer = document.getElementById("buildOrder");
 const mainLayout = document.querySelector(".main-layout");
 let focusBtn = document.getElementById("openFocusModal");
@@ -2394,50 +2359,6 @@ async function loadBuild() {
     if (titleEl) {
       titleEl.innerText = build.title || "Untitled Build";
     }
-    const matchupText =
-      build.subcategory && build.subcategory.length === 3
-        ? build.subcategory.charAt(0).toUpperCase() +
-          build.subcategory.charAt(1) +
-          build.subcategory.charAt(2).toUpperCase()
-        : build.subcategory || "Unknown";
-    const publisherText = build.username || "Anonymous";
-    let dateText = "Unknown";
-    try {
-      let ts = build.datePublished;
-      if (ts && typeof ts.toMillis === "function") ts = ts.toMillis();
-      if (typeof ts === "number" || typeof ts === "string") {
-        const d = new Date(ts);
-        if (!isNaN(d.getTime())) {
-          dateText = formatShortDate(d);
-        }
-      }
-    } catch (err) {
-      console.warn("Failed to parse datePublished:", build.datePublished);
-    }
-
-    let clanInfo = build.publisherClan || null;
-    if (!clanInfo && build.publisherId) {
-      clanInfo = await getPublisherClanInfo(build.publisherId);
-    }
-    const iconEl = document.getElementById("buildPublisherIcon");
-    if (iconEl && clanInfo?.logoUrl) iconEl.src = clanInfo.logoUrl;
-    const iconElMob = document.getElementById("buildPublisherIconMobile");
-    if (iconElMob && clanInfo?.logoUrl) iconElMob.src = clanInfo.logoUrl;
-
-    const matchupEl = document.getElementById("buildMatchup");
-    if (matchupEl) matchupEl.innerText = matchupText;
-    const publisherEl = document.getElementById("buildPublisher");
-    if (publisherEl) publisherEl.innerText = publisherText;
-    const dateEl = document.getElementById("buildDate");
-    if (dateEl) dateEl.innerText = dateText;
-
-    const mobileMatch = document.getElementById("buildMatchupMobile");
-    if (mobileMatch) mobileMatch.innerText = matchupText;
-    const mobilePub = document.getElementById("buildPublisherMobile");
-    if (mobilePub) mobilePub.innerText = publisherText;
-    const mobileDate = document.getElementById("buildDateMobile");
-    if (mobileDate) mobileDate.innerText = dateText;
-
     // Set build order
     const buildOrderContainer = document.getElementById("buildOrder");
     if (!buildOrderContainer) {
@@ -2997,23 +2918,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ✅ Load build data after DOM ready
   await loadBuild();
-
-  // Redirect to community builds when clicking publisher name
-  document.querySelectorAll(".publisher-chip").forEach((chip) => {
-    chip.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const name =
-        document.getElementById("buildPublisher")?.innerText ||
-        document.getElementById("buildPublisherMobile")?.innerText ||
-        "";
-      if (!name) return;
-      localStorage.setItem("restoreCommunityModal", "true");
-      localStorage.removeItem("communityFilterType");
-      localStorage.removeItem("communityFilterValue");
-      localStorage.setItem("communitySearchQuery", name);
-      window.location.href = "index.html";
-    });
-  });
 
   // Update vote UI when auth state changes (e.g., after sign-in)
   onAuthStateChanged(auth, (user) => {
