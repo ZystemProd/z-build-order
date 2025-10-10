@@ -343,6 +343,178 @@ function sanitizeAvatarUrl(url) {
   return DEFAULT_AVATAR_URL;
 }
 
+const MATCHUP_THEME_CLASSES = ["matchup-z", "matchup-t", "matchup-p"];
+
+function deriveMatchupInfo(rawMatchup) {
+  const defaultInfo = { badge: "--", primaryRace: "" };
+  if (!rawMatchup) return defaultInfo;
+
+  const letters = String(rawMatchup)
+    .toUpperCase()
+    .match(/[ZTP]/g);
+
+  if (!letters || letters.length === 0) {
+    return defaultInfo;
+  }
+
+  const primaryRace = letters[0];
+  const opponentRace = letters[1] || "X";
+
+  return {
+    badge: `${primaryRace}v${opponentRace}`,
+    primaryRace,
+  };
+}
+
+function applyMatchupTheme(bannerEl, primaryRace) {
+  if (!bannerEl) return;
+
+  MATCHUP_THEME_CLASSES.forEach((cls) => {
+    bannerEl.classList.remove(cls);
+  });
+
+  if (!primaryRace) return;
+
+  const themeClass = `matchup-${primaryRace.toLowerCase()}`;
+  if (MATCHUP_THEME_CLASSES.includes(themeClass)) {
+    bannerEl.classList.add(themeClass);
+  }
+}
+
+function formatBannerDate(dateValue) {
+  let value = dateValue;
+  if (value && typeof value.toMillis === "function") {
+    value = value.toMillis();
+  }
+
+  if (typeof value === "string" || typeof value === "number") {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    }
+  }
+
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
+
+  return "--";
+}
+
+function resolvePublisherAvatar(build) {
+  if (!build || typeof build !== "object") {
+    return DEFAULT_AVATAR_URL;
+  }
+
+  const candidateKeys = [
+    "publisherAvatarUrl",
+    "publisherAvatarURL",
+    "publisherAvatar",
+    "avatarUrl",
+    "avatarURL",
+    "photoURL",
+    "publisherPhotoURL",
+    "userAvatar",
+  ];
+
+  for (const key of candidateKeys) {
+    const value = build[key];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  const nestedCandidates = [
+    build.profile?.avatarUrl,
+    build.profile?.photoURL,
+    build.publisherProfile?.avatarUrl,
+  ];
+
+  for (const value of nestedCandidates) {
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return DEFAULT_AVATAR_URL;
+}
+
+function resolvePublisherClanLogo(build) {
+  if (!build || typeof build !== "object") {
+    return "";
+  }
+
+  const candidates = [
+    build.publisherClan?.logoUrl,
+    build.publisherClan?.logo,
+    build.publisherClanLogo,
+    build.clanLogo,
+    build.clan?.logoUrl,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim()) {
+      return candidate.trim();
+    }
+  }
+
+  return "";
+}
+
+function updateHeaderBanner(build) {
+  const bannerEl = document.getElementById("buildInfoBanner");
+  const matchupBadgeEl = document.getElementById("buildMatchupBadge");
+  const publisherNameEl = document.getElementById("buildPublisherDisplay");
+  const avatarEl = document.getElementById("buildPublisherAvatar");
+  const clanLogoEl = document.getElementById("buildPublisherClanLogo");
+  const dateEl = document.getElementById("buildDateBanner");
+
+  const matchupInfo = deriveMatchupInfo(build?.subcategory);
+  applyMatchupTheme(bannerEl, matchupInfo.primaryRace);
+
+  if (matchupBadgeEl) {
+    matchupBadgeEl.textContent = matchupInfo.badge || "--";
+  }
+
+  const publisherName = sanitizePlainText(
+    build?.username || build?.publisher || "Anonymous"
+  );
+
+  if (publisherNameEl) {
+    publisherNameEl.textContent = publisherName || "Anonymous";
+  }
+
+  if (avatarEl) {
+    const avatarUrl = sanitizeAvatarUrl(resolvePublisherAvatar(build));
+    avatarEl.src = avatarUrl;
+    avatarEl.alt = `${publisherName || "Publisher"}'s avatar`;
+  }
+
+  if (clanLogoEl) {
+    const clanLogoUrl = resolvePublisherClanLogo(build);
+    if (clanLogoUrl) {
+      clanLogoEl.src = sanitizeAvatarUrl(clanLogoUrl);
+      clanLogoEl.alt = `${publisherName || "Publisher"} clan logo`;
+      clanLogoEl.style.display = "inline-block";
+    } else {
+      clanLogoEl.removeAttribute("src");
+      clanLogoEl.style.display = "none";
+    }
+  }
+
+  if (dateEl) {
+    dateEl.textContent = formatBannerDate(build?.datePublished);
+  }
+}
+
 function filterBannedWords(text) {
   if (typeof text !== "string") return "";
   if (!text.trim() || !bannedWordsRegex) return text;
@@ -2359,6 +2531,8 @@ async function loadBuild() {
     if (titleEl) {
       titleEl.innerText = build.title || "Untitled Build";
     }
+
+    updateHeaderBanner(build);
     // Set build order
     const buildOrderContainer = document.getElementById("buildOrder");
     if (!buildOrderContainer) {
@@ -2674,6 +2848,15 @@ async function loadBuild() {
     }
     injectSchemaMarkup(build);
     injectMetaTags(buildId, build);
+
+    const currentUser = auth.currentUser;
+    const userVote = currentUser ? build.userVotes?.[currentUser.uid] || null : null;
+    updateVoteUI(
+      buildId,
+      build.upvotes || 0,
+      build.downvotes || 0,
+      userVote
+    );
   } else {
     console.error("❌ Build not found in Firestore:", buildId);
     document.getElementById("buildTitle").innerText = "Build not found.";
@@ -2791,28 +2974,51 @@ function updateVoteButtonIcons(buildId) {
 }
 
 function updateVoteUI(buildId, upvotes, downvotes, userVote) {
-  const upvoteButton = document.querySelector(`.vote-up[data-id="${buildId}"]`);
-  const downvoteButton = document.querySelector(
-    `.vote-down[data-id="${buildId}"]`
-  );
-  if (!upvoteButton || !downvoteButton) return;
+  const totalVotes = upvotes + downvotes;
+  const percentage =
+    totalVotes > 0 ? Math.round((upvotes / totalVotes) * 100) : 0;
+
+  const percentageEl = document.getElementById("votePercentageText");
+  if (percentageEl) {
+    percentageEl.textContent = `${percentage}%`;
+  }
+
+  const countEl = document.getElementById("voteCountText");
+  if (countEl) {
+    const label = totalVotes === 1 ? "vote" : "votes";
+    countEl.textContent = `(${totalVotes} ${label})`;
+  }
+
+  const upvoteButton =
+    document.querySelector(`.vote-up[data-id="${buildId}"]`) ||
+    document.querySelector(".vote-up");
+  const downvoteButton =
+    document.querySelector(`.vote-down[data-id="${buildId}"]`) ||
+    document.querySelector(".vote-down");
+
+  if (!upvoteButton || !downvoteButton) {
+    return;
+  }
 
   // Update SVG icons
-  upvoteButton.querySelector("img").src =
-    userVote === "up" ? "./img/SVG/voted-up.svg" : "./img/SVG/vote-up.svg";
-  downvoteButton.querySelector("img").src =
-    userVote === "down"
-      ? "./img/SVG/voted-down.svg"
-      : "./img/SVG/vote-down.svg";
+  const upvoteIcon = upvoteButton.querySelector("img");
+  const downvoteIcon = downvoteButton.querySelector("img");
+
+  if (upvoteIcon) {
+    upvoteIcon.src =
+      userVote === "up" ? "./img/SVG/voted-up.svg" : "./img/SVG/vote-up.svg";
+  }
+
+  if (downvoteIcon) {
+    downvoteIcon.src =
+      userVote === "down"
+        ? "./img/SVG/voted-down.svg"
+        : "./img/SVG/vote-down.svg";
+  }
 
   // Highlight selected vote
   upvoteButton.classList.toggle("voted-up", userVote === "up");
   downvoteButton.classList.toggle("voted-down", userVote === "down");
-
-  // Calculate vote percentage
-  const totalVotes = upvotes + downvotes;
-  const percentage =
-    totalVotes > 0 ? Math.round((upvotes / totalVotes) * 100) : 0;
 
   upvoteButton.setAttribute("data-total-votes", String(totalVotes));
   upvoteButton.setAttribute("data-vote-percentage", String(percentage));

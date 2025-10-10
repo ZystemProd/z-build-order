@@ -89,25 +89,60 @@
   </div>
 
   <div class="view-build-container">
-    <div class="build-header-row">
-      <a href="index.html" id="backButton" data-return-community="true" class="back-button">
-        <img src="./img/SVG/back.svg" alt="Back" />
-      </a>
-      <h1 id="buildTitle">Loading...</h1>
-
-      <div class="header-buttons">
-        <button id="importBuildButton" class="header-btn" type="button" style="display: none;">
-          <img src="./img/SVG/import2.svg" alt="Import" />
-          Import
+    <div class="build-header">
+      <div class="build-header-bar">
+        <button id="importBuildButton" class="header-action import-button" type="button" style="display: none;">
+          <img src="./img/SVG/import2.svg" alt="Import" class="button-icon" />
+          <span class="button-label">Import</span>
         </button>
 
-        <button id="shareBuildButton" class="header-btn" type="button" style="display: none;">
-          <img src="./img/SVG/share.svg" alt="Share" class="svg-icon" />
-          Share
+        <h1 id="buildTitle" class="build-title">Loading...</h1>
+
+        <button id="shareBuildButton" class="header-action share-button" type="button" style="display: none;">
+          <img src="./img/SVG/share.svg" alt="Share" class="button-icon" />
+          <span class="button-label">Share</span>
         </button>
       </div>
-    </div>
 
+      <div class="build-info-banner" id="buildInfoBanner">
+        <div class="banner-section matchup-section">
+          <span class="banner-label">Matchup</span>
+          <span class="matchup-badge" id="buildMatchupBadge">--</span>
+        </div>
+
+        <div class="banner-section publisher-section">
+          <div class="publisher-identity">
+            <img id="buildPublisherClanLogo" class="clan-logo" src="" alt="Clan logo" loading="lazy" style="display: none;" />
+            <img id="buildPublisherAvatar" class="publisher-avatar" src="img/avatar/marine_avatar_1.webp" alt="Publisher avatar" loading="lazy" />
+          </div>
+          <div class="publisher-details">
+            <span class="banner-label">Commander</span>
+            <span class="publisher-name" id="buildPublisherDisplay">Loading...</span>
+          </div>
+        </div>
+
+        <div class="banner-section date-section">
+          <span class="banner-label">Published</span>
+          <span class="banner-value" id="buildDateBanner">--</span>
+        </div>
+
+        <div class="banner-section votes-section">
+          <div class="vote-buttons">
+            <button class="vote-button vote-up" type="button" aria-label="Upvote this build">
+              <img src="./img/SVG/vote-up.svg" alt="" aria-hidden="true" />
+            </button>
+            <button class="vote-button vote-down" type="button" aria-label="Downvote this build">
+              <img src="./img/SVG/vote-down.svg" alt="" aria-hidden="true" />
+            </button>
+          </div>
+          <div class="vote-summary">
+            <span class="vote-percentage" id="votePercentageText">0%</span>
+            <span class="vote-divider">•</span>
+            <span class="vote-count" id="voteCountText">(0 votes)</span>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Build Order -->
     <div id="buildOrder" class="build-order-container">
