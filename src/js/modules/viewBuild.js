@@ -321,6 +321,16 @@ let decreaseFontBtn = document.getElementById("decreaseFontBtn");
 let focusContent = document.getElementById("focusContent");
 let focusFontSize = 1;
 
+function setImportButtonLabel(button, label) {
+  if (!button) return;
+  const labelSpan = button.querySelector(".button-label");
+  if (labelSpan) {
+    labelSpan.textContent = label;
+  } else {
+    button.textContent = label;
+  }
+}
+
 function sanitizePlainText(text) {
   if (typeof text !== "string") return "";
   return DOMPurify.sanitize(text, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
@@ -2231,15 +2241,15 @@ async function deleteComment(buildId, commentId, commentData) {
 }
 
 function adjustRatingPosition() {
-  if (!ratingItem || !infoGrid || !mainLayout) return;
+  if (!ratingItem) return;
+  if (ratingItem.closest(".build-info-banner")) return;
+  if (!infoGrid || !mainLayout) return;
   if (window.innerWidth <= 768) {
     if (ratingItem.parentElement !== mainLayout.parentNode) {
       mainLayout.insertAdjacentElement("afterend", ratingItem);
     }
-  } else {
-    if (!infoGrid.contains(ratingItem)) {
-      infoGrid.appendChild(ratingItem);
-    }
+  } else if (!infoGrid.contains(ratingItem)) {
+    infoGrid.appendChild(ratingItem);
   }
 }
 
@@ -2402,6 +2412,66 @@ async function loadBuild() {
     if (iconEl && clanInfo?.logoUrl) iconEl.src = clanInfo.logoUrl;
     const iconElMob = document.getElementById("buildPublisherIconMobile");
     if (iconElMob && clanInfo?.logoUrl) iconElMob.src = clanInfo.logoUrl;
+
+    const headerClanLogo = document.getElementById("buildPublisherClanLogo");
+    if (headerClanLogo) {
+      if (clanInfo?.logoUrl) {
+        headerClanLogo.src = clanInfo.logoUrl;
+        headerClanLogo.style.display = "inline-flex";
+      } else {
+        headerClanLogo.src = "./img/SVG/user-svgrepo-com.svg";
+        headerClanLogo.style.display = "none";
+      }
+    }
+
+    const infoBanner = document.getElementById("buildInfoBanner");
+    if (infoBanner) {
+      infoBanner.classList.remove("matchup-z", "matchup-t", "matchup-p");
+      const firstLetter = matchupText?.trim?.().charAt(0)?.toLowerCase() || "";
+      if (firstLetter === "z") infoBanner.classList.add("matchup-z");
+      else if (firstLetter === "t") infoBanner.classList.add("matchup-t");
+      else if (firstLetter === "p") infoBanner.classList.add("matchup-p");
+    }
+
+    const matchupBadge = document.getElementById("buildMatchupBadge");
+    if (matchupBadge) matchupBadge.innerText = matchupText;
+
+    const bannerPublisher = document.getElementById("buildPublisherDisplay");
+    if (bannerPublisher) bannerPublisher.innerText = publisherText;
+
+    const bannerDate = document.getElementById("buildDateBanner");
+    if (bannerDate) bannerDate.innerText = dateText;
+
+    const avatarCandidates = [
+      build.publisherAvatar,
+      build.publisherAvatarUrl,
+      build.publisherAvatarURL,
+      build.publisherPhoto,
+      build.publisherPhotoUrl,
+      build.publisherPhotoURL,
+      build.avatar,
+      build.avatarUrl,
+      build.avatarURL,
+      build.publisherProfile?.avatarUrl,
+      build.publisherProfile?.photoURL,
+      build.publisher?.avatarUrl,
+      build.publisher?.photoURL,
+    ];
+
+    let resolvedAvatar = DEFAULT_AVATAR_URL;
+    for (const candidate of avatarCandidates) {
+      const sanitized = sanitizeAvatarUrl(candidate);
+      if (sanitized && sanitized !== DEFAULT_AVATAR_URL) {
+        resolvedAvatar = sanitized;
+        break;
+      }
+    }
+
+    const avatarEl = document.getElementById("buildPublisherAvatar");
+    if (avatarEl) {
+      avatarEl.src = resolvedAvatar;
+      avatarEl.alt = `${publisherText} avatar`;
+    }
 
     document.getElementById("buildCategory").innerText = categoryText;
     document.getElementById("buildMatchup").innerText = matchupText;
@@ -2855,6 +2925,7 @@ function updateVoteUI(buildId, upvotes, downvotes, userVote) {
   );
   const votePercentage = document.getElementById("vote-percentage-text");
   const voteCount = document.getElementById("vote-count-text");
+  const voteTrendIcon = document.getElementById("vote-trend-icon");
 
   if (!upvoteButton || !downvoteButton || !votePercentage) return;
 
@@ -2876,9 +2947,16 @@ function updateVoteUI(buildId, upvotes, downvotes, userVote) {
     totalVotes > 0 ? Math.round((upvotes / totalVotes) * 100) : 0;
   votePercentage.textContent = `${percentage}%`;
 
+  if (voteTrendIcon) {
+    const isPositive = upvotes >= downvotes;
+    voteTrendIcon.textContent = isPositive ? "↑" : "↓";
+    voteTrendIcon.classList.toggle("vote-trend-negative", !isPositive);
+  }
+
   // Update vote count text
   if (voteCount) {
-    voteCount.textContent = `${totalVotes} votes`;
+    const label = totalVotes === 1 ? "1 vote" : `${totalVotes} votes`;
+    voteCount.textContent = `(${label})`;
   }
 }
 
@@ -2969,13 +3047,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       if (userBuildSnap.exists()) {
         importBtn.disabled = true;
-        importBtn.textContent = "Imported";
+        setImportButtonLabel(importBtn, "Imported");
         importBtn.classList.add("imported");
       } else {
         importBtn.disabled = false;
-        importBtn.textContent = "Import";
+        setImportButtonLabel(importBtn, "Import");
+        importBtn.classList.remove("imported");
       }
-      importBtn.style.display = "inline-block";
+      importBtn.style.display = "inline-flex";
     });
   } else {
     console.warn("⚠️ Import button not found.");
