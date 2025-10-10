@@ -2430,7 +2430,7 @@ async function loadBuild() {
     const matchupSource =
       (typeof build.matchup === "string" && build.matchup) ||
       (typeof build.subcategory === "string" && build.subcategory) ||
-      "";
+      "---";
     const matchupDisplay = formatMatchupBadge(matchupSource);
 
     const infoBanner = document.getElementById("buildInfoBanner");
@@ -2449,12 +2449,7 @@ async function loadBuild() {
       matchupBadge.textContent = matchupDisplay;
     }
 
-    const publisherName =
-      build.publisher ||
-      build.publisherDisplayName ||
-      build.username ||
-      build.author ||
-      "Unknown";
+    const publisherName = build.publisher || "Unknown";
     const publisherDisplay = document.getElementById("buildPublisherDisplay");
     if (publisherDisplay) {
       publisherDisplay.textContent = publisherName;
@@ -2542,11 +2537,13 @@ async function loadBuild() {
         : 0;
 
     if (votePercentageEl) {
-      votePercentageEl.textContent = `${derivedPercentage}%`;
+      votePercentageEl.textContent = `${derivedPercentage || 0}%`;
     }
     if (voteCountEl) {
-      const votesLabel = totalVotes === 1 ? "1 vote" : `${totalVotes} votes`;
-      voteCountEl.textContent = `(${votesLabel})`;
+      const votesDisplay = Number.isFinite(storedVoteCount)
+        ? storedVoteCount
+        : totalVotes;
+      voteCountEl.textContent = `(${votesDisplay || 0} votes)`;
     }
 
     const voteTrendIcon = document.getElementById("vote-trend-icon");
