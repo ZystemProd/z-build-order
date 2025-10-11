@@ -19,7 +19,7 @@ body {
 }
 
 .view-build-container.is-loaded {
-  animation: softGlowReveal 1s ease-out;
+  animation: softGlowReveal 2s ease-out;
 }
 
 .view-build-container.matchup-zvx {
@@ -111,7 +111,7 @@ input[type="text"]:disabled {
 }
 
 .build-info-grid.is-loaded {
-  animation: softGlowReveal 1s ease-out;
+  animation: softGlowReveal 2s ease-out;
 }
 
 .build-info-grid.matchup-zvx {
