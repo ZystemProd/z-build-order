@@ -83,6 +83,9 @@ input[type="text"]:disabled {
   text-align: center;
   filter: brightness(1) saturate(1);
   transition: background 0.8s ease, box-shadow 0.8s ease, filter 0.8s ease;
+}
+
+.build-info-grid.is-loaded {
   animation: softGlowReveal 1s ease-out;
 }
 

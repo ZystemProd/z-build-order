@@ -2433,6 +2433,10 @@ async function loadBuild() {
 
   console.log("🔍 Loading build with ID:", buildId);
 
+  if (infoGrid) {
+    infoGrid.classList.remove("is-loaded");
+  }
+
   loadComments(buildId);
 
   // Clear existing map annotations and image before loading new build
@@ -2519,6 +2523,13 @@ async function loadBuild() {
 
     clearBuildInfoLabels();
     ensurePublishedLabels();
+
+    if (infoGrid) {
+      // trigger header glow animation once data is ready
+      requestAnimationFrame(() => {
+        infoGrid.classList.add("is-loaded");
+      });
+    }
 
     // Set build order
     const buildOrderContainer = document.getElementById("buildOrder");
