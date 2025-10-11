@@ -63,6 +63,8 @@ input[type="text"]:disabled {
   --accent-color: #5cc6ff;
   --accent-soft: rgba(92, 198, 255, 0.2);
   --accent-glow: rgba(92, 198, 255, 0.35);
+  --grid-gradient-start: rgba(20, 24, 38, 0.82);
+  --grid-gradient-end: rgba(8, 10, 18, 0.66);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -71,7 +73,7 @@ input[type="text"]:disabled {
   padding: 0 clamp(16px, 3vw, 28px);
   margin-bottom: 18px;
   border-radius: 16px;
-  background: linear-gradient(140deg, rgba(20, 24, 38, 0.82), rgba(8, 10, 18, 0.66));
+  background: linear-gradient(135deg, var(--grid-gradient-start), var(--grid-gradient-end));
   box-shadow: 0 14px 38px rgba(0, 0, 0, 0.45);
   border: 1px solid rgba(255, 255, 255, 0.07);
   backdrop-filter: blur(10px);
@@ -80,27 +82,47 @@ input[type="text"]:disabled {
   color: #f5f7ff;
   text-align: center;
   transition: background 0.6s ease, box-shadow 0.6s ease, border-color 0.6s ease;
+  animation: none;
 }
 
 .build-info-grid.matchup-zvx {
   --accent-color: #b573ff;
   --accent-soft: rgba(181, 115, 255, 0.18);
   --accent-glow: rgba(181, 115, 255, 0.32);
-  background: linear-gradient(135deg, rgba(50, 20, 80, 0.6), rgba(18, 10, 32, 0.42));
+  --grid-gradient-start: #32145099;
+  --grid-gradient-end: #120a206b;
+  animation: buildInfoAccentReveal 900ms ease forwards;
 }
 
 .build-info-grid.matchup-tvx {
   --accent-color: #ff6b6b;
   --accent-soft: rgba(255, 107, 107, 0.22);
   --accent-glow: rgba(255, 107, 107, 0.38);
-  background: linear-gradient(135deg, rgba(70, 20, 28, 0.85), rgba(22, 12, 18, 0.65));
+  --grid-gradient-start: #46141ccc;
+  --grid-gradient-end: #160c12a6;
+  animation: buildInfoAccentReveal 900ms ease forwards;
 }
 
 .build-info-grid.matchup-pvx {
   --accent-color: #5cc6ff;
   --accent-soft: rgba(92, 198, 255, 0.2);
   --accent-glow: rgba(92, 198, 255, 0.35);
-  background: linear-gradient(135deg, rgba(18, 40, 70, 0.85), rgba(10, 18, 28, 0.65));
+  --grid-gradient-start: #122846d9;
+  --grid-gradient-end: #0a121ca6;
+  animation: buildInfoAccentReveal 900ms ease forwards;
+}
+
+@keyframes buildInfoAccentReveal {
+  0% {
+    background: linear-gradient(135deg, rgba(18, 22, 34, 0.32), rgba(10, 12, 20, 0.22));
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    border-color: rgba(255, 255, 255, 0.04);
+  }
+  100% {
+    background: linear-gradient(135deg, var(--grid-gradient-start), var(--grid-gradient-end));
+    box-shadow: 0 14px 38px rgba(0, 0, 0, 0.45);
+    border-color: rgba(255, 255, 255, 0.07);
+  }
 }
 
 .build-info-item {
@@ -182,26 +204,6 @@ input[type="text"]:disabled {
   text-align: center;
   white-space: nowrap;
   text-shadow: 0 0 12px rgba(160, 120, 255, 0.65);
-  animation: matchupBadgeReveal 650ms ease forwards;
-}
-
-@keyframes matchupBadgeReveal {
-  0% {
-    background: linear-gradient(145deg, rgba(28, 12, 54, 0.2), rgba(28, 12, 54, 0.15));
-    box-shadow:
-      0 0 0 0 rgba(0, 0, 0, 0),
-      0 0 0 0 rgba(0, 0, 0, 0),
-      inset 0 0 0 rgba(22, 28, 52, 0);
-    color: rgba(239, 228, 255, 0.65);
-  }
-  100% {
-    background: linear-gradient(145deg, rgba(28, 12, 54, 0.9), var(--accent-soft));
-    box-shadow:
-      0 0 0 1px var(--accent-soft),
-      0 0 22px var(--accent-glow),
-      inset 0 0 18px rgba(22, 28, 52, 0.5);
-    color: #efe4ff;
-  }
 }
 
 .publisher-chip,
