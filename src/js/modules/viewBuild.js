@@ -65,6 +65,40 @@ const userProfileCache = new Map();
 const MAX_THREAD_DEPTH = 7;
 const REPLY_BATCH_SIZE = 10;
 
+let cachedMapsList = null;
+let mapsListPromise = null;
+
+async function getCachedMapsList() {
+  if (Array.isArray(cachedMapsList)) {
+    return cachedMapsList;
+  }
+
+  if (!mapsListPromise) {
+    mapsListPromise = fetch("/data/maps.json")
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        return response.json();
+      })
+      .catch((error) => {
+        console.warn("⚠️ Could not load maps.json", error);
+        return null;
+      })
+      .finally(() => {
+        mapsListPromise = null;
+      });
+  }
+
+  const maps = await mapsListPromise;
+  if (Array.isArray(maps)) {
+    cachedMapsList = maps;
+    return cachedMapsList;
+  }
+
+  return [];
+}
+
 const commentThreadState = {
   replyVisibility: new Map(),
   nodesById: new Map(),
@@ -2557,13 +2591,17 @@ async function loadBuild() {
       return;
     }
 
-    buildOrderContainer.innerHTML = "";
-
     if (Array.isArray(build.buildOrder) && build.buildOrder.length > 0) {
+      const stepsMarkup = [];
+
       build.buildOrder.forEach((step) => {
         if (typeof step === "string") {
-          buildOrderContainer.innerHTML += `<p>${formatActionText(step)}</p>`;
-        } else if (
+          stepsMarkup.push(`<p>${formatActionText(step)}</p>`);
+          return;
+        }
+
+        if (
+          step &&
           typeof step === "object" &&
           step.action &&
           step.action.trim() !== ""
@@ -2573,11 +2611,16 @@ async function loadBuild() {
                 step.workersOrTimestamp
               )}</strong> `
             : "";
-          buildOrderContainer.innerHTML += `<p>${bracket}${formatActionText(
-            step.action
-          )}</p>`;
+          stepsMarkup.push(
+            `<p>${bracket}${formatActionText(step.action)}</p>`
+          );
         }
       });
+
+      buildOrderContainer.innerHTML =
+        stepsMarkup.length > 0
+          ? stepsMarkup.join("")
+          : "<p>No build order available.</p>";
     } else {
       buildOrderContainer.innerHTML = "<p>No build order available.</p>";
     }
@@ -2677,10 +2720,9 @@ async function loadBuild() {
     if (mapImage) {
       if (isValidMap) {
         let mapPath = "";
-        try {
-          const response = await fetch("/data/maps.json");
-          const maps = await response.json();
+        const maps = await getCachedMapsList();
 
+        if (Array.isArray(maps) && maps.length > 0) {
           const entry = maps.find(
             (m) => m.name.toLowerCase() === mapName.toLowerCase()
           );
@@ -2688,8 +2730,6 @@ async function loadBuild() {
           if (entry) {
             mapPath = `img/maps/${entry.folder}/${entry.file}`;
           }
-        } catch (err) {
-          console.warn("⚠️ Could not load maps.json");
         }
 
         if (mapPath) {
