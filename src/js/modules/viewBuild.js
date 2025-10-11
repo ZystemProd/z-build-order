@@ -30,7 +30,6 @@ import {
 } from "./interactive_map.js"; // ✅ Map support
 import { updateYouTubeEmbed, clearYouTubeEmbed } from "./youtube.js";
 import { getPublisherClanInfo } from "./community.js";
-import { formatShortDate } from "./modal.js";
 import { showToast } from "./toastHandler.js";
 import { bannedWords } from "../data/bannedWords.js";
 
@@ -44,6 +43,11 @@ const adminEmails = (
 
 const DEFAULT_AVATAR_URL = "img/avatar/marine_avatar_1.webp";
 const MAX_COMMENTS_TO_DISPLAY = 50;
+const LONG_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  month: "long",
+  day: "numeric",
+  year: "numeric",
+});
 
 let commentsUnsubscribe = null;
 let latestComments = [];
@@ -349,6 +353,39 @@ function removeDeprecatedCategoryMetadata() {
 }
 
 removeDeprecatedCategoryMetadata();
+
+function clearBuildInfoLabels() {
+  const selectors = [".build-info-item label", ".build-info-item .info-label"];
+
+  selectors.forEach((selector) => {
+    document.querySelectorAll(selector).forEach((node) => {
+      const labelText = node.textContent?.trim()?.toLowerCase();
+
+      if (
+        labelText === "published" ||
+        node?.dataset?.keepLabel === "true" ||
+        node?.classList?.contains("published-label")
+      ) {
+        return;
+      }
+
+      node.textContent = "";
+    });
+  });
+}
+
+clearBuildInfoLabels();
+function ensurePublishedLabels() {
+  document
+    .querySelectorAll(".build-info-item label.published-label")
+    .forEach((node) => {
+      if (!node.textContent?.trim()) {
+        node.textContent = "Published";
+      }
+    });
+}
+
+ensurePublishedLabels();
 const buildOrderContainer = document.getElementById("buildOrder");
 const mainLayout = document.querySelector(".main-layout");
 let focusBtn = document.getElementById("openFocusModal");
@@ -2396,6 +2433,18 @@ async function loadBuild() {
 
   console.log("🔍 Loading build with ID:", buildId);
 
+  const viewContainer = document.querySelector(".view-build-container");
+
+  const matchupAccentClasses = ["matchup-zvx", "matchup-tvx", "matchup-pvx"];
+
+  if (infoGrid) {
+    infoGrid.classList.remove("is-loaded", ...matchupAccentClasses);
+  }
+
+  if (viewContainer) {
+    viewContainer.classList.remove("is-loaded", ...matchupAccentClasses);
+  }
+
   loadComments(buildId);
 
   // Clear existing map annotations and image before loading new build
@@ -2418,7 +2467,7 @@ async function loadBuild() {
     const matchupText =
       build.subcategory && build.subcategory.length === 3
         ? build.subcategory.charAt(0).toUpperCase() +
-          build.subcategory.charAt(1) +
+          build.subcategory.charAt(1).toLowerCase() +
           build.subcategory.charAt(2).toUpperCase()
         : build.subcategory || "Unknown";
     const publisherText = build.username || "Anonymous";
@@ -2429,7 +2478,7 @@ async function loadBuild() {
       if (typeof ts === "number" || typeof ts === "string") {
         const d = new Date(ts);
         if (!isNaN(d.getTime())) {
-          dateText = formatShortDate(d);
+          dateText = LONG_DATE_FORMATTER.format(d);
         }
       }
     } catch (err) {
@@ -2440,14 +2489,48 @@ async function loadBuild() {
     if (!clanInfo && build.publisherId) {
       clanInfo = await getPublisherClanInfo(build.publisherId);
     }
+    const publisherAvatar =
+      build.publisherAvatarUrl ||
+      build.publisherAvatar ||
+      build.publisherPhotoURL ||
+      build.publisherPhotoUrl ||
+      build.publisherPhoto ||
+      build.publisherIconUrl ||
+      build.publisherIconURL ||
+      build.publisherIcon ||
+      clanInfo?.logoUrl ||
+      DEFAULT_AVATAR_URL;
     const iconEl = document.getElementById("buildPublisherIcon");
-    if (iconEl && clanInfo?.logoUrl) iconEl.src = clanInfo.logoUrl;
+    if (iconEl) iconEl.src = publisherAvatar;
     const iconElMob = document.getElementById("buildPublisherIconMobile");
-    if (iconElMob && clanInfo?.logoUrl) iconElMob.src = clanInfo.logoUrl;
+    if (iconElMob) iconElMob.src = publisherAvatar;
 
     document.getElementById("buildMatchup").innerText = matchupText;
+    if (typeof matchupText === "string") {
+      const matchupKey = matchupText.trim().toLowerCase();
+
+      if (infoGrid) {
+        infoGrid.classList.remove(...matchupAccentClasses);
+      }
+
+      if (viewContainer) {
+        viewContainer.classList.remove(...matchupAccentClasses);
+      }
+
+      if (matchupKey.startsWith("zv")) {
+        if (infoGrid) infoGrid.classList.add("matchup-zvx");
+        if (viewContainer) viewContainer.classList.add("matchup-zvx");
+      } else if (matchupKey.startsWith("tv")) {
+        if (infoGrid) infoGrid.classList.add("matchup-tvx");
+        if (viewContainer) viewContainer.classList.add("matchup-tvx");
+      } else if (matchupKey.startsWith("pv")) {
+        if (infoGrid) infoGrid.classList.add("matchup-pvx");
+        if (viewContainer) viewContainer.classList.add("matchup-pvx");
+      }
+    }
     document.getElementById("buildPublisher").innerText = publisherText;
     document.getElementById("buildDate").innerText = dateText;
+    ensurePublishedLabels();
 
     const mobileMatch = document.getElementById("buildMatchupMobile");
     if (mobileMatch) mobileMatch.innerText = matchupText;
@@ -2455,6 +2538,17 @@ async function loadBuild() {
     if (mobilePub) mobilePub.innerText = publisherText;
     const mobileDate = document.getElementById("buildDateMobile");
     if (mobileDate) mobileDate.innerText = dateText;
+
+    clearBuildInfoLabels();
+    ensurePublishedLabels();
+
+    if (infoGrid || viewContainer) {
+      // trigger header glow animation once data is ready
+      requestAnimationFrame(() => {
+        if (infoGrid) infoGrid.classList.add("is-loaded");
+        if (viewContainer) viewContainer.classList.add("is-loaded");
+      });
+    }
 
     // Set build order
     const buildOrderContainer = document.getElementById("buildOrder");

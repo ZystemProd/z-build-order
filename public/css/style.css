@@ -2468,7 +2468,6 @@ td {
 /* Mark selected vote with a filled color */
 .vote-button.voted-up {
   background-color: rgba(0, 255, 0, 0.2); /* Light green */
-  border-radius: 5px;
 }
 
 .vote-button.voted-up img {
@@ -2477,7 +2476,6 @@ td {
 
 .vote-button.voted-down {
   background-color: rgba(255, 0, 0, 0.2); /* Light red */
-  border-radius: 5px;
 }
 
 .vote-button.voted-down img {
@@ -2700,13 +2698,19 @@ td {
 }
 
 .build-info-grid {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   gap: 15px;
+  flex-wrap: wrap;
   margin-bottom: 20px;
 }
 
 .build-info-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   background: rgba(255, 255, 255, 0.05);
   padding: 10px 16px;
   border-radius: 8px;
@@ -2731,7 +2735,7 @@ td {
 
 @media (max-width: 768px) {
   .build-info-grid {
-    grid-template-columns: repeat(2, 1fr);
+    flex-direction: column;
   }
 }
 
