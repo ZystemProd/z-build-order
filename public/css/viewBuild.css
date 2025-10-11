@@ -1631,7 +1631,7 @@ input[type="text"]:disabled {
 .build-header-row {
   display: grid;
   grid-template-columns: auto 1fr;
-  grid-template-areas: "back title";
+  grid-template-areas: "back main";
   align-items: center;
   gap: 16px;
   padding: 0 20px;
@@ -1639,21 +1639,19 @@ input[type="text"]:disabled {
   position: relative;
 }
 
-.build-header-row .build-title-group {
-  grid-area: title;
-  display: flex;
+.build-header-row .build-header-main {
+  grid-area: main;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
+  column-gap: 16px;
 }
 
 .build-header-row .title-stack {
-  flex: 1 1 auto;
-  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  min-width: 0;
 }
 
 .build-header-row h1 {
@@ -1688,41 +1686,46 @@ input[type="text"]:disabled {
 .build-header-row .header-actions {
   display: inline-flex;
   align-items: center;
-  justify-content: flex-end;
   gap: 12px;
-  flex: 0 0 auto;
 }
 
-.build-header-row .header-actions .header-btn {
-  flex-shrink: 0;
+.build-header-row .header-actions-left {
+  justify-content: flex-start;
+}
+
+.build-header-row .header-actions-right {
+  justify-content: flex-end;
 }
 
 @media (max-width: 1024px) {
   .build-header-row {
-    grid-template-columns: auto 1fr;
-    grid-template-areas: "back title";
     row-gap: 12px;
   }
 
-  .build-header-row .back-button {
-    grid-area: back;
-  }
-
-  .build-header-row .build-title-group {
-    justify-content: space-between;
-    align-items: center;
+  .build-header-row .build-header-main {
+    column-gap: 12px;
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 820px) {
   .build-header-row {
     padding: 0 12px;
   }
 
-  .build-header-row .build-title-group {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
+  .build-header-row .build-header-main {
+    grid-template-columns: 1fr;
+    row-gap: 12px;
+    justify-items: center;
+  }
+
+  .build-header-row .header-actions {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .build-header-row .header-actions .header-btn {
+    width: 100%;
+    max-width: 280px;
   }
 
   .build-header-row .title-stack {
@@ -1732,31 +1735,11 @@ input[type="text"]:disabled {
   .build-header-row h1 {
     text-align: center;
   }
-
-  .build-header-row .header-actions {
-    width: 100%;
-    justify-content: center;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-
-  .build-header-row .header-actions .header-btn {
-    flex: 1 1 160px;
-    min-width: 140px;
-  }
 }
 
 @media (max-width: 520px) {
-  .build-header-row .build-title-group {
-    width: 100%;
-  }
-
-  .build-header-row .header-actions {
-    gap: 8px;
-  }
-
   .build-header-row .header-actions .header-btn {
-    flex: 1 1 100%;
+    max-width: none;
   }
 }
 
