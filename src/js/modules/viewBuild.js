@@ -2433,8 +2433,16 @@ async function loadBuild() {
 
   console.log("🔍 Loading build with ID:", buildId);
 
+  const viewContainer = document.querySelector(".view-build-container");
+
+  const matchupAccentClasses = ["matchup-zvx", "matchup-tvx", "matchup-pvx"];
+
   if (infoGrid) {
-    infoGrid.classList.remove("is-loaded");
+    infoGrid.classList.remove("is-loaded", ...matchupAccentClasses);
+  }
+
+  if (viewContainer) {
+    viewContainer.classList.remove("is-loaded", ...matchupAccentClasses);
   }
 
   loadComments(buildId);
@@ -2498,16 +2506,26 @@ async function loadBuild() {
     if (iconElMob) iconElMob.src = publisherAvatar;
 
     document.getElementById("buildMatchup").innerText = matchupText;
-    if (infoGrid && typeof matchupText === "string") {
+    if (typeof matchupText === "string") {
       const matchupKey = matchupText.trim().toLowerCase();
-      infoGrid.classList.remove("matchup-zvx", "matchup-tvx", "matchup-pvx");
+
+      if (infoGrid) {
+        infoGrid.classList.remove(...matchupAccentClasses);
+      }
+
+      if (viewContainer) {
+        viewContainer.classList.remove(...matchupAccentClasses);
+      }
 
       if (matchupKey.startsWith("zv")) {
-        infoGrid.classList.add("matchup-zvx");
+        if (infoGrid) infoGrid.classList.add("matchup-zvx");
+        if (viewContainer) viewContainer.classList.add("matchup-zvx");
       } else if (matchupKey.startsWith("tv")) {
-        infoGrid.classList.add("matchup-tvx");
+        if (infoGrid) infoGrid.classList.add("matchup-tvx");
+        if (viewContainer) viewContainer.classList.add("matchup-tvx");
       } else if (matchupKey.startsWith("pv")) {
-        infoGrid.classList.add("matchup-pvx");
+        if (infoGrid) infoGrid.classList.add("matchup-pvx");
+        if (viewContainer) viewContainer.classList.add("matchup-pvx");
       }
     }
     document.getElementById("buildPublisher").innerText = publisherText;
@@ -2524,10 +2542,11 @@ async function loadBuild() {
     clearBuildInfoLabels();
     ensurePublishedLabels();
 
-    if (infoGrid) {
+    if (infoGrid || viewContainer) {
       // trigger header glow animation once data is ready
       requestAnimationFrame(() => {
-        infoGrid.classList.add("is-loaded");
+        if (infoGrid) infoGrid.classList.add("is-loaded");
+        if (viewContainer) viewContainer.classList.add("is-loaded");
       });
     }
 
