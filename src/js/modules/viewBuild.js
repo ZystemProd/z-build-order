@@ -355,43 +355,34 @@ function removeDeprecatedCategoryMetadata() {
 removeDeprecatedCategoryMetadata();
 
 function clearBuildInfoLabels() {
-  const selectors = [
-    ".build-info-item label",
-    ".build-info-item .info-label",
-  ];
+  const selectors = [".build-info-item label", ".build-info-item .info-label"];
 
   selectors.forEach((selector) => {
     document.querySelectorAll(selector).forEach((node) => {
+      const labelText = node.textContent?.trim()?.toLowerCase();
+
       if (
+        labelText === "published" ||
         node?.dataset?.keepLabel === "true" ||
         node?.classList?.contains("published-label")
       ) {
         return;
       }
 
-      if (node?.textContent?.trim()) {
-        node.textContent = "";
-      }
+      node.textContent = "";
     });
   });
 }
 
 clearBuildInfoLabels();
 function ensurePublishedLabels() {
-  const publishedSelectors = [
-    ".build-info-item .published-label",
-    ".mobile-info .published-label",
-  ];
-
-  publishedSelectors.forEach((selector) => {
-    document.querySelectorAll(selector).forEach((node) => {
-      if (!node) return;
-      const hasText = node.textContent?.trim();
-      if (!hasText) {
+  document
+    .querySelectorAll(".build-info-item label.published-label")
+    .forEach((node) => {
+      if (!node.textContent?.trim()) {
         node.textContent = "Published";
       }
     });
-  });
 }
 
 ensurePublishedLabels();
@@ -2517,6 +2508,7 @@ async function loadBuild() {
     }
     document.getElementById("buildPublisher").innerText = publisherText;
     document.getElementById("buildDate").innerText = dateText;
+    ensurePublishedLabels();
 
     const mobileMatch = document.getElementById("buildMatchupMobile");
     if (mobileMatch) mobileMatch.innerText = matchupText;
