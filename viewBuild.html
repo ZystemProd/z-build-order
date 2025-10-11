@@ -88,22 +88,24 @@
     </div>
   </div>
 
-  <div class="view-build-container">
+  <div class="view-build-container is-loading">
     <div class="build-header-row">
       <a href="index.html" id="backButton" data-return-community="true" class="back-button">
         <img src="./img/SVG/back.svg" alt="Back" />
       </a>
-      <h1 id="buildTitle">Loading...</h1>
+      <h1 id="buildTitle" data-fade-target>Loading...</h1>
 
       <div class="header-buttons">
-        <button id="importBuildButton" class="header-btn" type="button" style="display: none;">
+        <button id="importBuildButton" class="header-btn import-btn" type="button" data-fade-target disabled
+          aria-disabled="true">
           <img src="./img/SVG/import2.svg" alt="Import" />
-          Import
+          <span class="btn-label">Import</span>
         </button>
 
-        <button id="shareBuildButton" class="header-btn" type="button" style="display: none;">
+        <button id="shareBuildButton" class="header-btn share-btn" type="button" data-fade-target disabled
+          aria-disabled="true">
           <img src="./img/SVG/share.svg" alt="Share" class="svg-icon" />
-          Share
+          <span class="btn-label">Share</span>
         </button>
       </div>
     </div>
@@ -113,16 +115,16 @@
     <div class="build-info-grid">
       <div class="build-info-item desktop-info">
         <label aria-hidden="true"></label>
-        <span id="buildMatchup">Loading...</span>
+        <span id="buildMatchup" data-fade-target>Loading...</span>
       </div>
       <div class="build-info-item desktop-info">
         <label aria-hidden="true"></label>
         <span class="meta-chip publisher-chip"><img id="buildPublisherIcon" src="./img/SVG/user-svgrepo-com.svg"
-            alt="Publisher" class="meta-icon" /> <span id="buildPublisher">Loading...</span></span>
+            alt="Publisher" class="meta-icon" /> <span id="buildPublisher" data-fade-target>Loading...</span></span>
       </div>
       <div class="build-info-item desktop-info date-info">
         <label class="published-label" aria-hidden="true" data-keep-label="true">Published</label>
-        <span id="buildDate">Loading...</span>
+        <span id="buildDate" data-fade-target>Loading...</span>
       </div>
       <div class="build-info-item mobile-info">
         <div class="info-pair publisher-pair">
@@ -131,17 +133,17 @@
             <span class="meta-chip publisher-chip">
               <img id="buildPublisherIconMobile" src="./img/SVG/user-svgrepo-com.svg" alt="Publisher"
                 class="meta-icon" />
-              <span id="buildPublisherMobile">Loading...</span>
+              <span id="buildPublisherMobile" data-fade-target>Loading...</span>
             </span>
           </span>
         </div>
         <div class="info-pair matchup-pair">
           <span class="info-label" aria-hidden="true"></span>
-          <span class="info-value" id="buildMatchupMobile">Loading...</span>
+          <span class="info-value" id="buildMatchupMobile" data-fade-target>Loading...</span>
         </div>
         <div class="info-pair date-pair">
           <span class="info-label published-label" aria-hidden="true" data-keep-label="true">Published</span>
-          <span class="info-value" id="buildDateMobile">Loading...</span>
+          <span class="info-value" id="buildDateMobile" data-fade-target>Loading...</span>
         </div>
       </div>
       <div class="build-info-item rating-item" id="ratingItem">

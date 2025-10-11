@@ -27,6 +27,27 @@ body {
   animation: softGlowReveal 2s ease-out;
 }
 
+.view-build-container [data-fade-target] {
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+.view-build-container.is-loading [data-fade-target],
+.view-build-container .header-btn.is-loading-button {
+  opacity: 0.4;
+}
+
+.view-build-container.is-loaded [data-fade-target] {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.view-build-container.is-loading .header-btn {
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
 .view-build-container.matchup-zvx {
   background: linear-gradient(
     90deg,
@@ -1652,7 +1673,8 @@ input[type="text"]:disabled {
   border: none;
   cursor: pointer;
   min-height: 44px;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.3s ease;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.3s ease,
+    opacity 0.3s ease;
 }
 
 .header-btn img {

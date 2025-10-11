@@ -350,6 +350,70 @@ const backButton = document.getElementById("backButton");
 const pageBackButton = document.getElementById("pageBackButton");
 const ratingItem = document.getElementById("ratingItem");
 const infoGrid = document.querySelector(".build-info-grid");
+const FADE_TARGET_SELECTOR = "[data-fade-target]";
+
+function getViewBuildContainer() {
+  return document.querySelector(".view-build-container");
+}
+
+function updateButtonLabel(button, text) {
+  if (!button) return;
+  const label = button.querySelector(".btn-label");
+  if (label) {
+    label.textContent = text;
+  } else {
+    button.textContent = text;
+  }
+}
+
+function setBuildViewLoading(isLoading) {
+  const container = getViewBuildContainer();
+  if (!container) return;
+
+  container.classList.toggle("is-loading", isLoading);
+
+  if (!isLoading) {
+    requestAnimationFrame(() => {
+      container.classList.add("is-loaded");
+    });
+  } else {
+    container.classList.remove("is-loaded");
+  }
+
+  container.querySelectorAll(FADE_TARGET_SELECTOR).forEach((node) => {
+    if (isLoading) {
+      node.setAttribute("aria-busy", "true");
+    } else {
+      node.removeAttribute("aria-busy");
+    }
+  });
+
+  const shareBtn = document.getElementById("shareBuildButton");
+  if (shareBtn) {
+    shareBtn.classList.toggle("is-loading-button", isLoading);
+    if (isLoading) {
+      shareBtn.disabled = true;
+      shareBtn.setAttribute("aria-disabled", "true");
+    } else {
+      shareBtn.disabled = false;
+      shareBtn.removeAttribute("aria-disabled");
+    }
+  }
+
+  const importBtn = document.getElementById("importBuildButton");
+  if (importBtn) {
+    importBtn.classList.toggle("is-loading-button", isLoading);
+    if (isLoading) {
+      importBtn.setAttribute("aria-disabled", "true");
+    } else if (importBtn.dataset.keepDisabled === "true" || importBtn.disabled) {
+      importBtn.setAttribute("aria-disabled", "true");
+    } else {
+      importBtn.removeAttribute("aria-disabled");
+    }
+  }
+}
+
+setBuildViewLoading(true);
 const mobileInfoItem = document.querySelector(
   ".build-info-item.mobile-info"
 );
@@ -2462,12 +2526,15 @@ async function loadBuild() {
   if (!buildId) {
     document.getElementById("buildTitle").innerText = "Build not found.";
     console.error("❌ Error: No build ID in URL.");
+    setBuildViewLoading(false);
     return;
   }
 
   console.log("🔍 Loading build with ID:", buildId);
 
   const viewContainer = document.querySelector(".view-build-container");
+
+  setBuildViewLoading(true);
 
   const matchupAccentClasses = ["matchup-zvx", "matchup-tvx", "matchup-pvx"];
 
@@ -2588,6 +2655,7 @@ async function loadBuild() {
     const buildOrderContainer = document.getElementById("buildOrder");
     if (!buildOrderContainer) {
       console.error("❌ Error: 'buildOrder' container not found!");
+      setBuildViewLoading(false);
       return;
     }
 
@@ -2905,9 +2973,11 @@ async function loadBuild() {
     }
     injectSchemaMarkup(build);
     injectMetaTags(buildId, build);
+    setBuildViewLoading(false);
   } else {
     console.error("❌ Build not found in Firestore:", buildId);
     document.getElementById("buildTitle").innerText = "Build not found.";
+    setBuildViewLoading(false);
   }
 
   // ✅ Setup voting buttons (unchanged)
@@ -3059,6 +3129,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const viewBuildContainer = document.querySelector(".view-build-container");
   if (!viewBuildContainer) return;
 
+  setBuildViewLoading(true);
+
   const commentElements = ensureCommentSectionStructure();
   ensureCommentShellVisible();
 
@@ -3123,12 +3195,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (!importBtn) return;
 
       if (!user) {
-        importBtn.style.display = "none";
+        importBtn.disabled = true;
+        importBtn.dataset.keepDisabled = "true";
+        importBtn.classList.remove("imported");
+        updateButtonLabel(importBtn, "Import");
+        importBtn.setAttribute("aria-disabled", "true");
         return;
       }
-
-      // Don't show the button until we know the status
-      importBtn.style.display = "none";
 
       const buildId = getBuildId();
       if (!buildId) return;
@@ -3142,13 +3215,17 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       if (userBuildSnap.exists()) {
         importBtn.disabled = true;
-        importBtn.textContent = "Imported";
+        updateButtonLabel(importBtn, "Imported");
         importBtn.classList.add("imported");
+        importBtn.dataset.keepDisabled = "true";
+        importBtn.setAttribute("aria-disabled", "true");
       } else {
         importBtn.disabled = false;
-        importBtn.textContent = "Import";
+        updateButtonLabel(importBtn, "Import");
+        importBtn.classList.remove("imported");
+        importBtn.dataset.keepDisabled = "false";
+        importBtn.removeAttribute("aria-disabled");
       }
-      importBtn.style.display = "inline-block";
     });
   } else {
     console.warn("⚠️ Import button not found.");

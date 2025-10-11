@@ -87,8 +87,13 @@ async function importBuildHandler() {
     const importBtn = document.getElementById("importBuildButton");
     if (importBtn) {
       importBtn.disabled = true;
-      importBtn.textContent = "Imported";
       importBtn.classList.add("imported");
+      const label = importBtn.querySelector(".btn-label");
+      if (label) {
+        label.textContent = "Imported";
+      } else {
+        importBtn.textContent = "Imported";
+      }
     }
 
     showToast("✅ Build imported successfully!", "success");

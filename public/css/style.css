@@ -4364,6 +4364,74 @@ button.btn-small {
   color: #ccc !important;
 }
 
+.view-build-container .header-buttons .import-btn,
+.view-build-container .header-buttons .share-btn {
+  background: linear-gradient(135deg, #5fe5ff 0%, #007bff 100%);
+  color: #ffffff;
+  border-radius: 12px;
+  padding: 10px 22px;
+  min-height: 46px;
+  box-shadow: 0 10px 24px rgba(0, 123, 255, 0.35);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-decoration: none;
+  letter-spacing: 0.01em;
+  transform-origin: center;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease,
+    opacity 0.3s ease;
+}
+
+.view-build-container .header-buttons .import-btn img,
+.view-build-container .header-buttons .share-btn img {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.view-build-container .header-buttons .btn-label {
+  display: inline-block;
+  font-size: 0.95rem;
+  line-height: 1.2;
+}
+
+.view-build-container .header-buttons .import-btn:hover:not(:disabled):not(.imported),
+.view-build-container .header-buttons .share-btn:hover:not(:disabled) {
+  transform: scale(1.05);
+  box-shadow: 0 14px 32px rgba(0, 123, 255, 0.45);
+}
+
+.view-build-container .header-buttons .import-btn:active:not(:disabled):not(.imported),
+.view-build-container .header-buttons .share-btn:active:not(:disabled) {
+  transform: scale(0.98);
+  background: linear-gradient(135deg, #4bcaf0 0%, #0062d9 100%);
+  box-shadow: 0 6px 16px rgba(0, 98, 217, 0.4);
+}
+
+.view-build-container .header-buttons .import-btn:disabled,
+.view-build-container .header-buttons .share-btn:disabled,
+.view-build-container .header-buttons .import-btn[aria-disabled="true"],
+.view-build-container .header-buttons .share-btn[aria-disabled="true"] {
+  cursor: not-allowed;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+  transform: none;
+  background: linear-gradient(135deg, rgba(95, 229, 255, 0.55) 0%,
+      rgba(0, 123, 255, 0.55) 100%);
+}
+
+.view-build-container .header-buttons .import-btn.imported {
+  background: rgba(0, 123, 255, 0.24);
+  color: #d8ecff;
+  box-shadow: none;
+  cursor: default;
+}
+
+.view-build-container .header-buttons .import-btn.imported:hover {
+  transform: none;
+  box-shadow: none;
+}
+
 .clan-breadcrumb {
   font-size: 0.9rem;
   margin-bottom: 12px;
