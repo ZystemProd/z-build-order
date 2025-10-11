@@ -79,6 +79,7 @@ input[type="text"]:disabled {
   min-height: 90px;
   color: #f5f7ff;
   text-align: center;
+  transition: background 0.6s ease, box-shadow 0.6s ease, border-color 0.6s ease;
 }
 
 .build-info-grid.matchup-zvx {
@@ -181,6 +182,26 @@ input[type="text"]:disabled {
   text-align: center;
   white-space: nowrap;
   text-shadow: 0 0 12px rgba(160, 120, 255, 0.65);
+  animation: matchupBadgeReveal 650ms ease forwards;
+}
+
+@keyframes matchupBadgeReveal {
+  0% {
+    background: linear-gradient(145deg, rgba(28, 12, 54, 0.2), rgba(28, 12, 54, 0.15));
+    box-shadow:
+      0 0 0 0 rgba(0, 0, 0, 0),
+      0 0 0 0 rgba(0, 0, 0, 0),
+      inset 0 0 0 rgba(22, 28, 52, 0);
+    color: rgba(239, 228, 255, 0.65);
+  }
+  100% {
+    background: linear-gradient(145deg, rgba(28, 12, 54, 0.9), var(--accent-soft));
+    box-shadow:
+      0 0 0 1px var(--accent-soft),
+      0 0 22px var(--accent-glow),
+      inset 0 0 18px rgba(22, 28, 52, 0.5);
+    color: #efe4ff;
+  }
 }
 
 .publisher-chip,
@@ -245,7 +266,6 @@ input[type="text"]:disabled {
 #ratingItem {
   margin-left: 0;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 10px;
