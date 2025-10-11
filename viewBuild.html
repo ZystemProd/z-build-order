@@ -93,19 +93,22 @@
       <a href="index.html" id="backButton" data-return-community="true" class="back-button">
         <img src="./img/SVG/back.svg" alt="Back" />
       </a>
-      <h1 id="buildTitle" data-fade-target>Loading...</h1>
+
+      <div class="build-title-group">
+        <h1 id="buildTitle" data-fade-target>Loading...</h1>
+
+        <button id="shareBuildButton" class="header-btn share-btn" type="button" data-fade-target disabled
+          aria-disabled="true">
+          <img src="./img/SVG/share.svg" alt="Share" class="svg-icon" />
+          <span class="btn-label">Share</span>
+        </button>
+      </div>
 
       <div class="header-buttons">
         <button id="importBuildButton" class="header-btn import-btn" type="button" data-fade-target disabled
           aria-disabled="true">
           <img src="./img/SVG/import2.svg" alt="Import" />
           <span class="btn-label">Import</span>
-        </button>
-
-        <button id="shareBuildButton" class="header-btn share-btn" type="button" data-fade-target disabled
-          aria-disabled="true">
-          <img src="./img/SVG/share.svg" alt="Share" class="svg-icon" />
-          <span class="btn-label">Share</span>
         </button>
       </div>
     </div>
