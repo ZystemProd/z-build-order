@@ -2633,7 +2633,7 @@ td {
 }
 
 .build-info-grid .meta-chip.publisher-chip {
-  display: block;
+  display: flex;
   width: fit-content;
   margin: auto;
 }
