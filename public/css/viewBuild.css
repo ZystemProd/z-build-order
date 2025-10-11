@@ -1645,6 +1645,7 @@ input[type="text"]:disabled {
   grid-template-columns: auto 1fr auto;
   align-items: center;
   column-gap: 16px;
+  padding-inline: clamp(160px, 18vw, 260px);
 }
 
 .build-header-row .title-stack {
@@ -1704,6 +1705,7 @@ input[type="text"]:disabled {
 
   .build-header-row .build-header-main {
     column-gap: 12px;
+    padding-inline: clamp(140px, 16vw, 240px);
   }
 }
 
@@ -1716,6 +1718,7 @@ input[type="text"]:disabled {
     grid-template-columns: 1fr;
     row-gap: 12px;
     justify-items: center;
+    padding-inline: 0;
   }
 
   .build-header-row .header-actions {
