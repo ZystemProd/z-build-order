@@ -68,7 +68,7 @@ input[type="text"]:disabled {
   justify-content: center;
   gap: clamp(12px, 2.5vw, 28px);
   flex-wrap: wrap;
-  padding: 18px clamp(16px, 3vw, 28px);
+  padding: 0 clamp(16px, 3vw, 28px);
   margin-bottom: 18px;
   border-radius: 16px;
   background: linear-gradient(140deg, rgba(20, 24, 38, 0.82), rgba(8, 10, 18, 0.66));
@@ -115,6 +115,10 @@ input[type="text"]:disabled {
   min-width: 0;
   min-height: 0;
   color: inherit;
+}
+
+.build-info-item.mobile-info {
+  display: none;
 }
 
 .build-info-item label {
@@ -306,6 +310,10 @@ input[type="text"]:disabled {
 
   .desktop-info {
     display: none;
+  }
+
+  .build-info-item.mobile-info {
+    display: flex;
   }
 
   .mobile-info {
