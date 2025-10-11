@@ -95,19 +95,21 @@
       </a>
 
       <div class="build-title-group">
-        <button id="importBuildButton" class="header-btn import-btn" type="button" data-fade-target disabled
-          aria-disabled="true">
-          <img src="./img/SVG/import2.svg" alt="Import" />
-          <span class="btn-label">Import</span>
-        </button>
+        <div class="title-stack">
+          <h1 id="buildTitle" data-fade-target>Loading...</h1>
+        </div>
 
-        <h1 id="buildTitle" data-fade-target>Loading...</h1>
+        <div class="header-actions" data-fade-target>
+          <button id="importBuildButton" class="header-btn import-btn" type="button" disabled aria-disabled="true">
+            <img src="./img/SVG/import2.svg" alt="Import" />
+            <span class="btn-label">Import</span>
+          </button>
 
-        <button id="shareBuildButton" class="header-btn share-btn" type="button" data-fade-target disabled
-          aria-disabled="true">
-          <img src="./img/SVG/share.svg" alt="Share" class="svg-icon" />
-          <span class="btn-label">Share</span>
-        </button>
+          <button id="shareBuildButton" class="header-btn share-btn" type="button" disabled aria-disabled="true">
+            <img src="./img/SVG/share.svg" alt="Share" class="svg-icon" />
+            <span class="btn-label">Share</span>
+          </button>
+        </div>
       </div>
     </div>
 
