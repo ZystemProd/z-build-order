@@ -346,7 +346,6 @@ function ensureCommentSectionStructure() {
   };
 }
 
-const backButton = document.getElementById("backButton");
 const pageBackButton = document.getElementById("pageBackButton");
 const ratingItem = document.getElementById("ratingItem");
 const infoGrid = document.querySelector(".build-info-grid");
@@ -405,7 +404,10 @@ function setBuildViewLoading(isLoading) {
     importBtn.classList.toggle("is-loading-button", isLoading);
     if (isLoading) {
       importBtn.setAttribute("aria-disabled", "true");
-    } else if (importBtn.dataset.keepDisabled === "true" || importBtn.disabled) {
+    } else if (
+      importBtn.dataset.keepDisabled === "true" ||
+      importBtn.disabled
+    ) {
       importBtn.setAttribute("aria-disabled", "true");
     } else {
       importBtn.removeAttribute("aria-disabled");
@@ -414,9 +416,7 @@ function setBuildViewLoading(isLoading) {
 }
 
 setBuildViewLoading(true);
-const mobileInfoItem = document.querySelector(
-  ".build-info-item.mobile-info"
-);
+const mobileInfoItem = document.querySelector(".build-info-item.mobile-info");
 
 function removeDeprecatedCategoryMetadata() {
   const desktopCategoryItems = document.querySelectorAll(
@@ -983,13 +983,13 @@ function renderRepliesContainer(container, parentId, depth, options = {}) {
   const visibleChildren = getVisibleReplyIds(parentId);
 
   const existingNodes = new Map();
-  Array.from(
-    container.querySelectorAll(":scope > .comment-thread")
-  ).forEach((threadNode) => {
-    if (threadNode instanceof HTMLElement) {
-      existingNodes.set(threadNode.dataset.commentId, threadNode);
+  Array.from(container.querySelectorAll(":scope > .comment-thread")).forEach(
+    (threadNode) => {
+      if (threadNode instanceof HTMLElement) {
+        existingNodes.set(threadNode.dataset.commentId, threadNode);
+      }
     }
-  });
+  );
 
   const existingButton = container.querySelector(
     ":scope > .comment-more-replies-btn"
@@ -1103,14 +1103,16 @@ async function loadRepliesForComment(parentId, depth, options = {}) {
       }
     });
 
-    const orderedVisible = (commentThreadState.adjacency.get(parentId) || []).filter(
-      (id) => visibleSet.has(id)
-    );
+    const orderedVisible = (
+      commentThreadState.adjacency.get(parentId) || []
+    ).filter((id) => visibleSet.has(id));
     setVisibleReplyIds(parentId, orderedVisible);
 
     recomputeTotalReplyCounts();
 
-    pagination.lastDoc = docs.length ? docs[docs.length - 1] : pagination.lastDoc;
+    pagination.lastDoc = docs.length
+      ? docs[docs.length - 1]
+      : pagination.lastDoc;
     pagination.hasMore = docs.length === REPLY_BATCH_SIZE;
 
     if (container) {
@@ -1189,8 +1191,7 @@ function updateReplyToggleLabel(commentId) {
 
   const directReplies = getReplyCount(commentId);
   const totalReplies = getTotalReplyCount(commentId);
-  const isExpanded =
-    commentThreadState.replyVisibility.get(commentId) || false;
+  const isExpanded = commentThreadState.replyVisibility.get(commentId) || false;
 
   if (!directReplies) {
     toggleBtn.textContent = isExpanded ? "Hide replies" : "View replies";
@@ -1216,7 +1217,9 @@ function createCommentFooter(cardEl, commentId, commentData, depth) {
     replyBtn.type = "button";
     replyBtn.className = "comment-footer-reply";
     replyBtn.textContent = "Reply";
-    replyBtn.addEventListener("click", () => toggleReplyForm(cardEl, commentId));
+    replyBtn.addEventListener("click", () =>
+      toggleReplyForm(cardEl, commentId)
+    );
     actionsLeft.appendChild(replyBtn);
   }
 
@@ -1271,8 +1274,7 @@ function createCommentCard(commentId, depth) {
     : false;
 
   const username = sanitizePlainText(commentData.username || "Anonymous");
-  const baseText =
-    typeof commentData.text === "string" ? commentData.text : "";
+  const baseText = typeof commentData.text === "string" ? commentData.text : "";
   const filteredText = sanitizeAndFilterComment(baseText);
   const safeHtml = formatCommentDisplayHtml(filteredText);
 
@@ -1509,7 +1511,8 @@ function createCommentThreadElement(commentId, depth) {
     repliesContainer.className = "comment-replies";
     repliesContainer.dataset.commentId = commentId;
     repliesContainer.dataset.depth = String(depth + 1);
-    const isExpanded = commentThreadState.replyVisibility.get(commentId) || false;
+    const isExpanded =
+      commentThreadState.replyVisibility.get(commentId) || false;
     const visibleChildren = getVisibleReplyIds(commentId);
 
     if (visibleChildren.length) {
@@ -1776,7 +1779,9 @@ async function blockUser(targetUserId, targetName = "this user") {
   }
 
   const confirmed = window.confirm(
-    `Block ${targetName || "this user"}? Their comments and replies will be hidden.`
+    `Block ${
+      targetName || "this user"
+    }? Their comments and replies will be hidden.`
   );
   if (!confirmed) return;
 
@@ -2485,10 +2490,6 @@ function handleBackClick(e) {
   window.location.href = "/";
 }
 
-if (backButton) {
-  backButton.addEventListener("click", handleBackClick);
-}
-
 if (pageBackButton) {
   pageBackButton.addEventListener("click", handleBackClick);
 }
@@ -2679,9 +2680,7 @@ async function loadBuild() {
                 step.workersOrTimestamp
               )}</strong> `
             : "";
-          stepsMarkup.push(
-            `<p>${bracket}${formatActionText(step.action)}</p>`
-          );
+          stepsMarkup.push(`<p>${bracket}${formatActionText(step.action)}</p>`);
         }
       });
 

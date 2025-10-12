@@ -1627,8 +1627,6 @@ input[type="text"]:disabled {
   vertical-align: middle;
 }
 
-
-
 .build-header-row {
   display: flex;
   align-items: center;
@@ -1664,6 +1662,10 @@ input[type="text"]:disabled {
 .build-header-row .back-button {
   flex-shrink: 0;
   align-self: center;
+}
+
+#importBuildButton {
+  display: block;
 }
 
 .build-header-row .header-btn {
