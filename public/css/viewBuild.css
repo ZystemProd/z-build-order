@@ -1634,6 +1634,7 @@ input[type="text"]:disabled {
   padding: 0 20px;
   margin-bottom: 30px;
   position: relative;
+  flex-wrap: wrap;
 }
 
 .build-header-row .build-header-main {
@@ -1656,16 +1657,22 @@ input[type="text"]:disabled {
   margin: 0;
   font-size: clamp(1.6rem, 4vw, 2.2rem);
   text-align: center;
-  width: 100%;
+  flex: 1 1 auto;
+  order: 2;
 }
 
 .build-header-row .back-button {
-  flex-shrink: 0;
-  align-self: center;
+  margin-right: 4px;
+  order: 0;
 }
 
-#importBuildButton {
-  display: block;
+.build-header-row #importBuildButton {
+  order: 1;
+}
+
+.build-header-row #shareBuildButton {
+  order: 3;
+  margin-left: auto;
 }
 
 .build-header-row .header-btn {
@@ -1673,36 +1680,100 @@ input[type="text"]:disabled {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 10px 18px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  border: none;
+  padding: 12px 22px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #ecf3ff;
+  background: linear-gradient(145deg, #151927, #10131e);
+  border-radius: 14px;
+  border: 1px solid #2b3145;
+  cursor: pointer;
   min-height: 44px;
+  transition: transform 0.2s ease, box-shadow 0.25s ease, background 0.3s ease,
+    color 0.3s ease;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
 }
 
 .build-header-row .header-btn img {
   width: 18px;
   height: 18px;
+  filter: drop-shadow(0 0 4px rgba(146, 186, 255, 0.45));
 }
 
-.build-header-row .header-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
+.header-btn:hover {
+  background: linear-gradient(145deg, #1d2234, #141827);
+  box-shadow: 0 14px 32px rgba(12, 17, 31, 0.55);
+  transform: translateY(-1px);
 }
 
-.build-header-row .header-actions-left {
-  justify-content: flex-start;
+.header-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 8px 18px rgba(12, 17, 31, 0.5);
 }
 
-.build-header-row .header-actions-right {
-  justify-content: flex-end;
+.header-btn.imported {
+  background: #10121b;
+  border-color: #2e3243;
+  color: #8ea5d8;
+  cursor: default;
+  box-shadow: inset 0 0 0 1px rgba(78, 106, 150, 0.3);
+}
+
+.header-btn.imported:hover {
+  transform: none;
+  background: #111421;
+  box-shadow: inset 0 0 0 1px rgba(78, 106, 150, 0.4);
+}
+
+.build-header-row #importBuildButton {
+  background: linear-gradient(160deg, #191d2c, #101320);
+  border-color: #2d3248;
+}
+
+.build-header-row #importBuildButton:hover {
+  background: linear-gradient(160deg, #23283b, #171b2b);
+  box-shadow: 0 16px 34px rgba(12, 17, 31, 0.6);
+}
+
+.build-header-row #importBuildButton img {
+  filter: drop-shadow(0 0 6px rgba(126, 167, 255, 0.55));
+}
+
+.build-header-row #shareBuildButton {
+  position: relative;
+  padding: 12px 30px;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background: linear-gradient(#0f131d, #0f131d) padding-box,
+    linear-gradient(130deg, rgba(125, 92, 255, 0.9), rgba(68, 244, 255, 0.95))
+      border-box;
+  color: #c8f7ff;
+  text-shadow: 0 0 8px rgba(68, 244, 255, 0.4);
+  box-shadow: 0 16px 36px rgba(68, 244, 255, 0.18);
+}
+
+.build-header-row #shareBuildButton:hover {
+  box-shadow: 0 20px 40px rgba(68, 244, 255, 0.28);
+}
+
+.build-header-row #shareBuildButton:active {
+  box-shadow: 0 12px 24px rgba(68, 244, 255, 0.24);
+}
+
+.build-header-row #shareBuildButton img {
+  filter: drop-shadow(0 0 6px rgba(68, 244, 255, 0.7));
 }
 
 @media (max-width: 1024px) {
-  .build-header-row .build-header-main {
-    column-gap: 12px;
-    padding-inline: clamp(140px, 16vw, 240px);
+  .build-header-row {
+    gap: 12px;
+  }
+
+  .build-header-row h1 {
+    order: 2;
+    flex: 1 1 100%;
   }
 }
 
@@ -1710,39 +1781,30 @@ input[type="text"]:disabled {
   .build-header-row {
     flex-direction: column;
     align-items: stretch;
-    gap: 12px;
     padding: 0 12px;
-  }
-
-  .build-header-row .build-header-main {
-    grid-template-columns: 1fr;
-    row-gap: 12px;
-    justify-items: center;
-    padding-inline: 0;
-  }
-
-  .build-header-row .header-actions {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .build-header-row .header-actions .header-btn {
-    width: 100%;
-    max-width: 280px;
-  }
-
-  .build-header-row .title-stack {
-    width: 100%;
+    gap: 10px;
   }
 
   .build-header-row h1 {
-    text-align: center;
+    order: 2;
+    width: 100%;
+    flex: 0 0 auto;
+    text-align: left;
+  }
+
+  .build-header-row #importBuildButton,
+  .build-header-row #shareBuildButton {
+    width: 100%;
+  }
+
+  .build-header-row #shareBuildButton {
+    margin-left: 0;
   }
 }
 
 @media (max-width: 520px) {
-  .build-header-row .header-actions .header-btn {
-    max-width: none;
+  .build-header-row {
+    row-gap: 8px;
   }
 }
 
