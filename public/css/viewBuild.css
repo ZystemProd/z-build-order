@@ -1607,37 +1607,35 @@ input[type="text"]:disabled {
 }
 
 .build-header-row {
-  display: grid;
-  grid-template-columns: auto auto 1fr auto;
-  grid-template-areas: "back import title share";
+  display: flex;
   align-items: center;
   gap: 16px;
   padding: 0 20px;
   margin-bottom: 30px;
   position: relative;
+  flex-wrap: wrap;
 }
 
 .build-header-row h1 {
-  grid-area: title;
   margin: 0;
   font-size: clamp(1.6rem, 4vw, 2.2rem);
   text-align: center;
-  justify-self: center;
+  flex: 1 1 auto;
+  order: 2;
 }
 
 .build-header-row .back-button {
-  grid-area: back;
-  justify-self: start;
+  margin-right: 4px;
+  order: 0;
 }
 
 .build-header-row #importBuildButton {
-  grid-area: import;
-  justify-self: start;
+  order: 1;
 }
 
 .build-header-row #shareBuildButton {
-  grid-area: share;
-  justify-self: end;
+  order: 3;
+  margin-left: auto;
 }
 
 .build-header-row .header-btn {
@@ -1731,44 +1729,37 @@ input[type="text"]:disabled {
 
 @media (max-width: 1024px) {
   .build-header-row {
-    grid-template-columns: auto 1fr auto;
-    grid-template-areas:
-      "back title share"
-      "import import import";
-    row-gap: 12px;
+    gap: 12px;
   }
 
   .build-header-row h1 {
-    text-align: center;
-    justify-self: center;
-  }
-
-  .build-header-row #importBuildButton {
-    justify-self: start;
+    order: 2;
+    flex: 1 1 100%;
   }
 }
 
 @media (max-width: 768px) {
   .build-header-row {
-    grid-template-columns: 1fr;
-    grid-template-areas:
-      "back"
-      "title"
-      "import"
-      "share";
+    flex-direction: column;
+    align-items: stretch;
     padding: 0 12px;
-    row-gap: 10px;
+    gap: 10px;
   }
 
   .build-header-row h1 {
-    justify-self: start;
+    order: 2;
+    width: 100%;
+    flex: 0 0 auto;
     text-align: left;
   }
 
   .build-header-row #importBuildButton,
   .build-header-row #shareBuildButton {
     width: 100%;
-    justify-self: stretch;
+  }
+
+  .build-header-row #shareBuildButton {
+    margin-left: 0;
   }
 }
 
