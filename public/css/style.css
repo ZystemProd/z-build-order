@@ -1560,6 +1560,44 @@ body.modal-open {
   margin-right: 10px;
 }
 
+.saveLoadContainer .share-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 28px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #c8f7ff;
+  text-shadow: 0 0 8px rgba(68, 244, 255, 0.4);
+  background: linear-gradient(#0f131d, #0f131d) padding-box,
+    linear-gradient(130deg, rgba(125, 92, 255, 0.9), rgba(68, 244, 255, 0.95)) border-box;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  box-shadow: 0 14px 32px rgba(68, 244, 255, 0.18);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.3s ease, color 0.3s ease;
+}
+
+.saveLoadContainer .share-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 40px rgba(68, 244, 255, 0.28);
+}
+
+.saveLoadContainer .share-button:active {
+  transform: translateY(0);
+  box-shadow: 0 10px 26px rgba(68, 244, 255, 0.24);
+}
+
+.saveLoadContainer .share-button img {
+  width: 18px;
+  height: 18px;
+  filter: drop-shadow(0 0 6px rgba(68, 244, 255, 0.7));
+}
+
 .green-text {
   color: #44e418;
   font-weight: bold;
