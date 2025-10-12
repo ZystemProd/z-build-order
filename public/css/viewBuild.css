@@ -1608,8 +1608,8 @@ input[type="text"]:disabled {
 
 .build-header-row {
   display: grid;
-  grid-template-columns: auto 1fr auto;
-  grid-template-areas: "back title actions";
+  grid-template-columns: auto auto 1fr auto;
+  grid-template-areas: "back import title share";
   align-items: center;
   gap: 16px;
   padding: 0 20px;
@@ -1622,6 +1622,7 @@ input[type="text"]:disabled {
   margin: 0;
   font-size: clamp(1.6rem, 4vw, 2.2rem);
   text-align: center;
+  justify-self: center;
 }
 
 .build-header-row .back-button {
@@ -1629,12 +1630,13 @@ input[type="text"]:disabled {
   justify-self: start;
 }
 
-.header-buttons {
-  grid-area: actions;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
+.build-header-row #importBuildButton {
+  grid-area: import;
+  justify-self: start;
+}
+
+.build-header-row #shareBuildButton {
+  grid-area: share;
   justify-self: end;
 }
 
@@ -1729,53 +1731,50 @@ input[type="text"]:disabled {
 
 @media (max-width: 1024px) {
   .build-header-row {
-    grid-template-columns: auto 1fr;
+    grid-template-columns: auto 1fr auto;
     grid-template-areas:
-      "back title"
-      "actions actions";
+      "back title share"
+      "import import import";
     row-gap: 12px;
   }
 
-  .build-header-row .back-button {
-    grid-area: back;
-  }
-
   .build-header-row h1 {
-    grid-area: title;
-    text-align: left;
+    text-align: center;
+    justify-self: center;
   }
 
-  .header-buttons {
-    grid-area: actions;
-    justify-content: flex-start;
-    justify-self: stretch;
+  .build-header-row #importBuildButton {
+    justify-self: start;
   }
 }
 
 @media (max-width: 768px) {
   .build-header-row {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "back"
+      "title"
+      "import"
+      "share";
     padding: 0 12px;
+    row-gap: 10px;
   }
 
-  .header-buttons {
+  .build-header-row h1 {
+    justify-self: start;
+    text-align: left;
+  }
+
+  .build-header-row #importBuildButton,
+  .build-header-row #shareBuildButton {
     width: 100%;
-    flex-wrap: wrap;
-    gap: 10px;
-  }
-
-  .header-btn {
-    flex: 1 1 160px;
+    justify-self: stretch;
   }
 }
 
 @media (max-width: 520px) {
-  .header-buttons {
-    display: grid;
-    grid-template-columns: 1fr;
-  }
-
-  .header-btn {
-    width: 100%;
+  .build-header-row {
+    row-gap: 8px;
   }
 }
 
