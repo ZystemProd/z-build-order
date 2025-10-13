@@ -152,6 +152,9 @@ input[type="text"]:disabled {
   text-align: center;
   filter: brightness(1) saturate(1);
   transition: background 0.8s ease, box-shadow 0.8s ease, filter 0.8s ease;
+  box-sizing: border-box;
+  width: 100%;
+  overflow: visible;
 }
 
 .build-info-grid.is-loaded {
@@ -1819,13 +1822,218 @@ input[type="text"]:disabled {
     max-width: 100%;
   }
 
+  /* --- Build Info Grid: two rows on mobile --- */
   .build-info-grid {
-    gap: 24px;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: 1fr 1fr;
+    grid-template-areas:
+      "matchup publisher"
+      "date rating";
+    column-gap: 16px;
+    row-gap: 12px;
+    gap: 16px;
     padding: 16px 18px;
+    height: auto;
+    min-height: 160px;
+    align-items: center;
+    align-content: stretch;
+    grid-auto-rows: minmax(min-content, auto);
+    grid-auto-flow: row dense;
+    transition: padding 0.25s ease, gap 0.25s ease, column-gap 0.25s ease,
+      row-gap 0.25s ease;
+    position: relative;
+    z-index: 0;
   }
 
-  #ratingItem {
+  /* Reset any leftover flex overrides from global styles */
+  .build-info-grid {
+    flex-direction: initial !important;
+  }
+
+  /* Ensure all direct items can shrink/wrap */
+  .build-info-grid > * {
+    min-width: 0;
+  }
+
+  .build-header-row {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    column-gap: clamp(14px, 3.5vw, 20px);
+    row-gap: 10px;
+    padding: 0 12px;
+    transition: gap 0.25s ease, padding 0.25s ease;
+  }
+
+  .build-header-row #importBuildButton,
+  .build-header-row #shareBuildButton {
+    order: 1;
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
     margin-left: 0;
+  }
+
+  .build-header-row h1 {
+    order: 2;
+    flex: 0 0 100%;
+    width: 100%;
+    text-align: center;
+    margin-top: 4px;
+  }
+
+  /* Slightly smaller buttons on mobile */
+  .build-header-row .header-btn {
+    padding: 10px 16px;
+    font-size: 0.85rem;
+    min-height: 40px;
+  }
+  .build-header-row .header-btn img {
+    width: 16px;
+    height: 16px;
+  }
+  /* Share button pill: slightly slimmer on mobile */
+  .build-header-row #shareBuildButton {
+    padding: 10px 20px;
+  }
+
+  /* Hide desktop-only items at <=768px */
+  .build-info-grid .desktop-info {
+    display: none !important;
+  }
+
+  /* Let mobile-info children participate directly in the grid */
+  .build-info-grid .build-info-item.mobile-info {
+    display: contents !important;
+  }
+
+  /* Ensure grid items can shrink/wrap cleanly */
+  .build-info-grid .info-pair,
+  .build-info-grid #ratingItem {
+    min-width: 0;
+  }
+
+  /* Text wrapping inside values to avoid overflow */
+  .build-info-grid .info-value {
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  /* Map mobile pairs to grid areas */
+  .build-info-grid .matchup-pair {
+    grid-area: matchup;
+    align-items: center;
+    justify-content: center;
+    justify-self: stretch;
+    align-self: stretch;
+    height: 100%;
+  }
+  .build-info-grid .publisher-pair {
+    grid-area: publisher;
+    align-items: center;
+    justify-content: center;
+    justify-self: stretch;
+    align-self: stretch;
+    height: 100%;
+  }
+  .build-info-grid .date-pair {
+    grid-area: date;
+    align-items: center;
+    justify-content: center;
+    justify-self: stretch;
+    align-self: stretch;
+    height: 100%;
+  }
+  .build-info-grid #ratingItem {
+    grid-area: rating;
+    align-self: stretch;
+    justify-self: stretch;
+    margin-left: 0;
+    max-width: 100%;
+  }
+  /* Center contents within equal cells */
+  .build-info-grid .info-pair {
+    justify-content: center;
+    height: 100%;
+  }
+  .build-info-grid #ratingItem .vote-section {
+    width: 100%;
+  }
+
+  /* Vote system stacked: row 1 results, row 2 buttons */
+  #ratingItem .vote-section {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0px;
+  }
+  #ratingItem .vote-results-row {
+    order: 0;
+    display: block;
+    width: 100%;
+    text-align: center;
+    margin: 0;
+  }
+  #ratingItem .vote-buttons {
+    order: 1;
+    gap: 10px;
+  }
+
+  /* Improve wrapping/spacing of publisher chip */
+  .build-info-grid .publisher-pair .meta-chip {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .build-info-grid .publisher-pair .meta-chip span {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  /* Allow matchup chip to wrap on very small widths */
+  #buildMatchupMobile {
+    white-space: normal;
+  }
+
+  /* Faint dividers (blend with theme) */
+  .build-info-grid::before,
+  .build-info-grid::after {
+    content: "";
+    position: absolute;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 1;
+  }
+  /* Vertical divider (center) */
+  .build-info-grid::before {
+    top: clamp(8px, 2vw, 14px);
+    bottom: clamp(8px, 2vw, 14px);
+    left: 50%;
+    width: 1px;
+    transform: translateX(-50%);
+    background: linear-gradient(
+      180deg,
+      transparent,
+      rgba(220, 230, 255, 0.08),
+      transparent
+    );
+  }
+  /* Horizontal divider (between rows) */
+  .build-info-grid::after {
+    left: clamp(8px, 2vw, 14px);
+    right: clamp(8px, 2vw, 14px);
+    top: 50%;
+    height: 1px;
+    transform: translateY(-50%);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(220, 230, 255, 0.08),
+      transparent
+    );
   }
 }
 
@@ -1881,6 +2089,31 @@ input[type="text"]:disabled {
   margin: 0 auto;
   padding: 0 20px;
   max-width: 1200px;
+}
+
+/* Desktop layout reset (769px and up): single-row header */
+@media (min-width: 769px) {
+  .build-header-row {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 0 20px;
+  }
+  .build-header-row h1 {
+    order: 2;
+    flex: 0 0 auto;
+    width: auto;
+    text-align: center;
+    margin-top: 0;
+  }
+  .build-header-row #importBuildButton,
+  .build-header-row #shareBuildButton {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: auto;
+  }
 }
 
 /* Scale images with font size inside focus modal */
