@@ -1567,14 +1567,11 @@ body.modal-open {
   justify-content: center;
   gap: 8px;
   padding: 12px 28px;
-  font-size: 0.85rem;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: #c8f7ff;
-  text-shadow: 0 0 8px rgba(68, 244, 255, 0.4);
-  background: linear-gradient(#0f131d, #0f131d) padding-box,
-    linear-gradient(130deg, rgba(125, 92, 255, 0.9), rgba(68, 244, 255, 0.95)) border-box;
   border-radius: 999px;
   border: 2px solid transparent;
   box-shadow: 0 14px 32px rgba(68, 244, 255, 0.18);
@@ -1596,6 +1593,37 @@ body.modal-open {
   width: 18px;
   height: 18px;
   filter: drop-shadow(0 0 6px rgba(68, 244, 255, 0.7));
+}
+
+/* === Override for index page: make Share match other buttons (not viewBuild) === */
+/* Index page Share button: explicitly match Save button look */
+.saveLoadContainer #shareBuildButton {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  background-color: #555 !important; /* matches menu/button gray tone */
+  color: #fff !important;
+  border: none !important;
+  border-radius: 5px !important;
+  padding: 10px 20px !important; /* same as .menu-button and Save */
+  font: inherit !important;
+  letter-spacing: normal !important;
+  text-transform: none !important;
+  box-shadow: none !important;
+}
+
+.saveLoadContainer #shareBuildButton:hover {
+  background-color: #666 !important;
+}
+
+.saveLoadContainer #shareBuildButton:active {
+  background-color: #4a4a4a !important;
+}
+
+.saveLoadContainer #shareBuildButton img {
+  width: 20px !important; /* align with #saveBuildButton img */
+  height: 20px !important;
+  filter: brightness(0) invert(1) !important;
 }
 
 .green-text {
@@ -4454,8 +4482,11 @@ button.btn-small {
   cursor: not-allowed;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
   transform: none;
-  background: linear-gradient(135deg, rgba(95, 229, 255, 0.55) 0%,
-      rgba(0, 123, 255, 0.55) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(95, 229, 255, 0.55) 0%,
+    rgba(0, 123, 255, 0.55) 100%
+  );
 }
 
 .view-build-container .import-btn.imported {
