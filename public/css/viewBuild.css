@@ -517,6 +517,21 @@ input[type="text"]:disabled {
   text-align: left;
 }
 
+/* Add clear spacing between the prefix (supply/time) and the action text */
+.build-order-container p > strong {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 12px; /* space before the action, e.g., before 'Pylon' */
+  color: mistyrose;
+}
+
+/* Subtle spacing and tone for the internal '|' separator */
+.build-order-container .workers-time-sep {
+  display: inline-block;
+  margin: 0 6px;
+  opacity: 0.9;
+}
+
 .build-description-container {
   margin-top: 20px;
   padding: 16px;
@@ -1683,8 +1698,6 @@ input[type="text"]:disabled {
 .build-header-row #importBuildButton {
   order: 1;
 }
-
-
 
 .build-header-row .header-btn {
   display: inline-flex !important;
