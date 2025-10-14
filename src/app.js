@@ -695,44 +695,31 @@ if (confirmDeleteAccountButton) {
 }
 
 /*********************************************************************
- * User Photo Click Menu
+ * Auth Container Click Menu (replaces avatar click)
  *********************************************************************/
-const userPhoto = document.getElementById("userPhoto");
 const userMenu = document.getElementById("userMenu");
+const authContainer = document.getElementById("auth-container");
+const userPhoto = document.getElementById("userPhoto");
 
-if (userPhoto && userMenu) {
-  // Toggle menu on avatar click
-  userPhoto.addEventListener("click", (event) => {
+if (authContainer && userMenu) {
+  // Toggle menu on auth container click
+  authContainer.addEventListener("click", (event) => {
+    // Prevent toggling when clicking inside the open menu itself
+    if (userMenu.contains(event.target)) return;
     event.stopPropagation();
     userMenu.style.display =
       userMenu.style.display === "block" ? "none" : "block";
   });
 
-  // Close menu if clicking outside
+  // Close menu if clicking outside of both auth container and the menu
   window.addEventListener("click", (e) => {
-    if (!userMenu.contains(e.target) && e.target !== userPhoto) {
+    const clickedInsideAuth = authContainer.contains(e.target);
+    const clickedInsideMenu = userMenu.contains(e.target);
+    if (!clickedInsideAuth && !clickedInsideMenu) {
       userMenu.style.display = "none";
     }
   });
 }
-
-// Also fix closing the menu if clicking outside
-window.addEventListener("click", (event) => {
-  if (
-    userMenu &&
-    !userMenu.contains(event.target) &&
-    event.target !== userPhoto
-  ) {
-    userMenu.style.display = "none";
-  }
-});
-
-// Close user menu if clicking outside
-window.addEventListener("click", (e) => {
-  if (userMenu && !userMenu.contains(e.target) && e.target !== userPhoto) {
-    userMenu.style.display = "none";
-  }
-});
 
 /*********************************************************************
  * Username Modal Closing Behavior

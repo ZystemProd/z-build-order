@@ -140,6 +140,15 @@ body {
   justify-content: end;
   backdrop-filter: blur(5px);
   border: 2px solid transparent;
+  cursor: pointer; /* Make the whole container clickable */
+  transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+/* Hover effect moved from avatar to container */
+#auth-container:hover {
+  /* Remove scaling on hover to avoid affecting userMenu */
+  transform: none;
+  box-shadow: 0 0 10px #00bfff78;
 }
 
 #userInfo {
@@ -371,9 +380,10 @@ body {
   border-radius: 100px;
 }
 
+/* Remove hover scaling from avatar; applied to container instead */
 .user-avatar:hover {
-  transform: scale(1.1);
-  box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+  transform: none;
+  box-shadow: none;
 }
 
 /* User Details */
@@ -618,7 +628,7 @@ button:hover {
   border-radius: 50%;
   object-fit: cover;
   display: inline-block;
-  cursor: pointer;
+  cursor: default; /* Hover/click now on auth-container instead */
 }
 
 #userName {
@@ -1598,22 +1608,22 @@ body.modal-open {
 /* === Override for index page: make Share match other buttons (not viewBuild) === */
 /* Index page Share button: explicitly match Save button look */
 .saveLoadContainer #shareBuildButton {
-  display: inline-flex !important;
-  align-items: center !important;
-  gap: 6px !important;
-  background-color: #555 !important; /* matches menu/button gray tone */
-  color: #fff !important;
+  display: inline-block !important;
+  background-color: #444 !important;
+  color: #e0e0e0 !important;
   border: none !important;
   border-radius: 5px !important;
-  padding: 10px 20px !important; /* same as .menu-button and Save */
+  padding: 10px 20px !important;
   font: inherit !important;
   letter-spacing: normal !important;
   text-transform: none !important;
   box-shadow: none !important;
+  font-family: Arial, Helvetica, sans-serif !important;
+  font-size: 14px !important;
 }
-
 .saveLoadContainer #shareBuildButton:hover {
-  background-color: #666 !important;
+  background-color: var(--active-color) !important;
+  transform: scale(1.05);
 }
 
 .saveLoadContainer #shareBuildButton:active {
@@ -2908,6 +2918,7 @@ td {
   cursor: pointer;
 }
 
+/* Save button icon (original) */
 #saveBuildButton img {
   width: 20px; /* Adjust size of the icon */
   height: 20px;
@@ -3829,7 +3840,7 @@ td {
 }
 
 .user-menu .menu-section {
-  padding: 0 10px 8px;
+  padding: 10px 10px 8px;
 }
 
 .user-menu .user-name {
