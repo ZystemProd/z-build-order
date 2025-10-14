@@ -9,6 +9,9 @@
   --share-shadow-hover: 0 20px 40px rgba(68, 244, 255, 0.28);
   --share-shadow-active: 0 12px 24px rgba(68, 244, 255, 0.24);
   --share-icon-filter: drop-shadow(0 0 6px rgba(68, 244, 255, 0.7));
+
+  /* Build order prefix column width (supply/time) */
+  --bo-prefix-width: clamp(68px, 14vw, 120px);
 }
 body {
   background-color: #121212;
@@ -515,14 +518,20 @@ input[type="text"]:disabled {
   padding: 8px 12px;
   border-radius: 6px;
   text-align: left;
+  display: grid; /* Reserve a left column for prefix (supply/time) */
+  grid-template-columns: var(--bo-prefix-width) 1fr;
+  column-gap: 12px;
+  align-items: center;
 }
 
-/* Add clear spacing between the prefix (supply/time) and the action text */
-.build-order-container p > strong {
+/* Prefix and action wrappers */
+.build-order-container .bo-prefix {
   display: inline-flex;
   align-items: center;
-  margin-right: 12px; /* space before the action, e.g., before 'Pylon' */
   color: mistyrose;
+}
+.build-order-container .bo-action {
+  display: inline-block;
 }
 
 /* Subtle spacing and tone for the internal '|' separator */

@@ -2665,7 +2665,12 @@ async function loadBuild() {
 
       build.buildOrder.forEach((step) => {
         if (typeof step === "string") {
-          stepsMarkup.push(`<p>${formatActionText(step)}</p>`);
+          // No explicit prefix; reserve space via CSS column
+          stepsMarkup.push(
+            `<p><span class="bo-prefix"></span><span class="bo-action">${formatActionText(
+              step
+            )}</span></p>`
+          );
           return;
         }
 
@@ -2675,12 +2680,16 @@ async function loadBuild() {
           step.action &&
           step.action.trim() !== ""
         ) {
-          const bracket = step.workersOrTimestamp
-            ? `<strong>${formatWorkersOrTimestampText(
+          const prefix = step.workersOrTimestamp
+            ? `<span class="bo-prefix"><strong>${formatWorkersOrTimestampText(
                 step.workersOrTimestamp
-              )}</strong> `
-            : "";
-          stepsMarkup.push(`<p>${bracket}${formatActionText(step.action)}</p>`);
+              )}</strong></span>`
+            : `<span class="bo-prefix"></span>`;
+          stepsMarkup.push(
+            `<p>${prefix}<span class="bo-action">${formatActionText(
+              step.action
+            )}</span></p>`
+          );
         }
       });
 
