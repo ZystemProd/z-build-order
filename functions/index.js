@@ -583,8 +583,6 @@ async function captureBuildHtml(buildId, buildDataFromEvent) {
         setTextContent("#buildTitle", data.title);
         setTextContent("#buildPublisher", data.publisher);
         setTextContent("#buildPublisherMobile", data.publisher);
-        setTextContent("#buildCategory", data.category);
-        setTextContent("#buildCategoryMobile", data.category);
         setTextContent("#buildMatchup", data.matchup);
         setTextContent("#buildMatchupMobile", data.matchup);
         setTextContent("#buildDate", data.datePublished);

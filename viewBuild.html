@@ -42,15 +42,29 @@
 
       <div id="userMenu" class="user-menu" style="display: none;">
         <div class="menu-section">
+          <p id="userNameMenu" class="user-name fade-in">Guest</p>
+          <hr id="userNameDivider" class="menu-divider" />
+          <button class="menu-item" id="mapVetoBtn">
+            <img src="img/SVG/map-solid.svg" class="menu-icon" /> Map Veto
+          </button>
+          <hr class="menu-divider" />
+          <button class="menu-item" id="showClanModalButton">
+            <img src="img/SVG/clan.svg" class="menu-icon" /> Clans
+          </button>
+          <hr class="menu-divider" />
+          <button id="showStatsButton" class="menu-item">
+            <img src="img/SVG/stats.svg" class="menu-icon" /> My Stats
+          </button>
+          <hr class="menu-divider" />
+          <button class="menu-item" id="settingsBtn">
+            <img src="img/SVG/settings.svg" class="menu-icon" /> Settings
+          </button>
           <hr class="menu-divider" />
           <button class="menu-item" id="switchAccountBtn">
             <img src="img/SVG/switch.svg" class="menu-icon" /> Switch Account
           </button>
           <button class="menu-item" id="signOutBtn">
             <img src="img/SVG/logout.svg" class="menu-icon" /> Sign Out
-          </button>
-          <button class="menu-item danger" id="deleteAccountBtn">
-            <img src="img/SVG/trash.svg" class="menu-icon" /> Delete Account
           </button>
         </div>
       </div>
@@ -74,65 +88,63 @@
     </div>
   </div>
 
-  <div class="view-build-container">
+  <div class="view-build-container is-loading">
     <div class="build-header-row">
       <a href="index.html" id="backButton" data-return-community="true" class="back-button">
         <img src="./img/SVG/back.svg" alt="Back" />
       </a>
-      <h1 id="buildTitle">Loading...</h1>
 
-      <!-- Import Button -->
-      <button id="importBuildButton" style="display: none">
+      <button id="importBuildButton" class="header-btn" type="button" style="display: none;">
         <img src="./img/SVG/import2.svg" alt="Import" />
         Import
       </button>
 
-      <!-- Share Button -->
-      <button id="shareBuildButton" style="display: none">
-        <img src="./img/SVG/share.svg" alt="Share" class="svg-icon">Share</button>
+      <h1 id="buildTitle">Loading...</h1>
+
+      <button id="shareBuildButton" class="header-btn" type="button" style="display: none;">
+        <img src="./img/SVG/share.svg" alt="Share" class="svg-icon" />
+        Share
+      </button>
     </div>
 
 
     <!-- Build Info Grid -->
     <div class="build-info-grid">
       <div class="build-info-item desktop-info">
-        <label>Category</label>
-        <span id="buildCategory">Loading...</span>
+        <label aria-hidden="true"></label>
+        <span id="buildMatchup" data-fade-target>Loading...</span>
       </div>
       <div class="build-info-item desktop-info">
-        <label>Matchup</label>
-        <span id="buildMatchup">Loading...</span>
-      </div>
-      <div class="build-info-item desktop-info">
-        <label>Publisher</label>
+        <label aria-hidden="true"></label>
         <span class="meta-chip publisher-chip"><img id="buildPublisherIcon" src="./img/SVG/user-svgrepo-com.svg"
-            alt="Publisher" class="meta-icon" /> <span id="buildPublisher">Loading...</span></span>
+            alt="Publisher" class="meta-icon" /> <span id="buildPublisher" data-fade-target>Loading...</span></span>
       </div>
-      <div class="build-info-item desktop-info">
-        <label>Date Published</label>
-        <span id="buildDate">Loading...</span>
+      <div class="build-info-item desktop-info date-info">
+        <label class="published-label" aria-hidden="true" data-keep-label="true">Published</label>
+        <span id="buildDate" data-fade-target>Loading...</span>
       </div>
       <div class="build-info-item mobile-info">
-        <div class="info-row">
-          <label>Category</label>
-          <span id="buildCategoryMobile">Loading...</span>
+        <div class="info-pair publisher-pair">
+          <span class="info-label" aria-hidden="true"></span>
+          <span class="info-value">
+            <span class="meta-chip publisher-chip">
+              <img id="buildPublisherIconMobile" src="./img/SVG/user-svgrepo-com.svg" alt="Publisher"
+                class="meta-icon" />
+              <span id="buildPublisherMobile" data-fade-target>Loading...</span>
+            </span>
+          </span>
         </div>
-        <div class="info-row">
-          <label>Matchup</label>
-          <span id="buildMatchupMobile">Loading...</span>
+        <div class="info-pair matchup-pair">
+          <span class="info-label" aria-hidden="true"></span>
+          <span class="info-value" id="buildMatchupMobile" data-fade-target>Loading...</span>
         </div>
-        <div class="info-row">
-          <label>Publisher</label>
-          <span class="meta-chip publisher-chip"><img id="buildPublisherIconMobile" src="./img/SVG/user-svgrepo-com.svg"
-              alt="Publisher" class="meta-icon" /> <span id="buildPublisherMobile">Loading...</span></span>
-        </div>
-        <div class="info-row">
-          <label>Date</label>
-          <span id="buildDateMobile">Loading...</span>
+        <div class="info-pair date-pair">
+          <span class="info-label published-label" aria-hidden="true" data-keep-label="true">Published</span>
+          <span class="info-value" id="buildDateMobile" data-fade-target>Loading...</span>
         </div>
       </div>
       <div class="build-info-item rating-item" id="ratingItem">
-        <label>Rating</label>
+        <label aria-hidden="true"></label>
         <div id="votingSection" class="vote-section">
           <div class="vote-buttons">
             <button class="vote-button vote-up" data-id="">
@@ -255,8 +267,3 @@
 </body>
 
 </html>
-
-
-
-
-

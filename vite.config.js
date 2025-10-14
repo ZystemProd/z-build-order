@@ -4,6 +4,8 @@ import path from "path";
 export default defineConfig({
   plugins: [splitVendorChunkPlugin()],
   build: {
+    sourcemap: true,
+    cssCodeSplit: true,
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, "index.html"),

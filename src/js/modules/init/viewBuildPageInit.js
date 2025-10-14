@@ -35,6 +35,35 @@ export function initializeViewBuildPage() {
   safeAdd("signOutBtn", "click", window.handleSignOut);
   safeAdd("switchAccountBtn", "click", window.handleSwitchAccount);
   safeAdd("importBuildButton", "click", importBuildHandler);
+  
+  // User menu actions: mirror index.html behavior
+  safeAdd("mapVetoBtn", "click", () => {
+    const userMenu = document.getElementById("userMenu");
+    if (userMenu) userMenu.style.display = "none";
+    window.location.href = "/veto.html";
+  });
+
+  // These modals live on index.html; set a flag and route there
+  safeAdd("showClanModalButton", "click", () => {
+    const userMenu = document.getElementById("userMenu");
+    if (userMenu) userMenu.style.display = "none";
+    try { localStorage.setItem("openClanModalOnLoad", "true"); } catch {}
+    window.location.href = "/index.html";
+  });
+
+  safeAdd("showStatsButton", "click", () => {
+    const userMenu = document.getElementById("userMenu");
+    if (userMenu) userMenu.style.display = "none";
+    try { localStorage.setItem("openStatsOnLoad", "true"); } catch {}
+    window.location.href = "/index.html";
+  });
+
+  safeAdd("settingsBtn", "click", () => {
+    const userMenu = document.getElementById("userMenu");
+    if (userMenu) userMenu.style.display = "none";
+    try { localStorage.setItem("openSettingsOnLoad", "true"); } catch {}
+    window.location.href = "/index.html";
+  });
   initializeSectionToggles();
 }
 
@@ -87,8 +116,13 @@ async function importBuildHandler() {
     const importBtn = document.getElementById("importBuildButton");
     if (importBtn) {
       importBtn.disabled = true;
-      importBtn.textContent = "Imported";
       importBtn.classList.add("imported");
+      const label = importBtn.querySelector(".btn-label");
+      if (label) {
+        label.textContent = "Imported";
+      } else {
+        importBtn.textContent = "Imported";
+      }
     }
 
     showToast("✅ Build imported successfully!", "success");

@@ -1334,6 +1334,59 @@ export async function initializeIndexPage() {
     document.getElementById(`${view}ClanBtn`)?.classList.add("active");
   }
 
+  // Open modals from flags set on other pages (e.g., viewBuild)
+  try {
+    const openSettings = localStorage.getItem("openSettingsOnLoad") === "true";
+    const openStats = localStorage.getItem("openStatsOnLoad") === "true";
+    const openClans = localStorage.getItem("openClanModalOnLoad") === "true";
+
+    if (openSettings) {
+      localStorage.removeItem("openSettingsOnLoad");
+      const modal = document.getElementById("settingsModal");
+      if (modal) {
+        modal.style.display = "block";
+        const toggle = document.getElementById("bracketInputToggle");
+        if (toggle) toggle.checked = isBracketInputEnabled();
+        await populateMainClanDropdown();
+      }
+    }
+
+    if (openStats) {
+      localStorage.removeItem("openStatsOnLoad");
+      // Opens the modal and populates stats
+      await showUserStats();
+    }
+
+    if (openClans) {
+      localStorage.removeItem("openClanModalOnLoad");
+      const clanModal = document.getElementById("clanModal");
+      if (clanModal) {
+        clanModal.style.display = "block";
+        activateClanMainTab("find");
+        ["create", "manage", "find"].forEach((view) => {
+          const btn = document.getElementById(`${view}ClanBtn`);
+          if (btn && !btn.dataset._handlerAttached) {
+            btn.addEventListener("click", () => {
+              if (currentClanView === view) return;
+              currentClanView = view;
+              document.querySelectorAll(".clan-subview").forEach((v) => (v.style.display = "none"));
+              document
+                .querySelectorAll(".clan-main-tab-button")
+                .forEach((b) => b.classList.remove("active"));
+              btn.classList.add("active");
+              const activeView = document.getElementById(`${view}ClanView`);
+              if (activeView) activeView.style.display = "block";
+              if (view === "create") renderCreateClanUI();
+              if (view === "manage") renderChooseManageClanUI();
+              if (view === "find") renderFindClanUI();
+            });
+            btn.dataset._handlerAttached = "true";
+          }
+        });
+      }
+    }
+  } catch {}
+
   function updateDropdownColor() {
     const dropdown = document.getElementById("buildCategoryDropdown");
     if (dropdown) {
