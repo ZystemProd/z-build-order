@@ -363,15 +363,51 @@ export function formatWorkersOrTimestampText(workersOrTimestamp) {
     return `${openBracket}${currentStyled}/${max}${closeBracket}`;
   }
 
-  // Handle resources
+  // Insert a visual separator between supply/resources and time if present
+  // e.g. "13 00:17" => "13 | 00:17" or "100 gas 00:17" => "100 gas | 00:17"
+  const timeMatch = workersOrTimestamp.match(/(\d{1,2}:\d{2})\s*$/);
+  let left = workersOrTimestamp.trim();
+  let time = null;
+  if (timeMatch && typeof timeMatch.index === "number") {
+    time = timeMatch[1];
+    left = workersOrTimestamp.slice(0, timeMatch.index).trim();
+  }
+
+  // Prepare resource-only trie to decorate "gas" / "minerals"
   const actorData = [
     { term: "minerals", category: "resource" },
     { term: "gas", category: "resource" },
   ];
   const actorTrie = buildActorTrie(actorData);
 
-  workersOrTimestamp = preprocessAbbreviations(workersOrTimestamp);
-  workersOrTimestamp = matchActorsWithTrie(workersOrTimestamp, actorTrie);
+  // Format the left side (supply/resources) if present
+  let leftFormatted = left;
 
-  return workersOrTimestamp;
+  if (left) {
+    // If left is a supply fraction like 15/14, style overcap
+    const leftSupply = left.match(/^\[?\s*(\d{1,3})\/(\d{1,3})\s*\]?$/);
+    if (leftSupply) {
+      const current = parseInt(leftSupply[1], 10);
+      const max = parseInt(leftSupply[2], 10);
+      const currentStyled =
+        current > max
+          ? `<span class="supply-overcap">${current}</span>`
+          : `${current}`;
+      leftFormatted = `${currentStyled}/${max}`;
+    } else {
+      // Otherwise, allow resources to be decorated
+      leftFormatted = preprocessAbbreviations(left);
+      leftFormatted = matchActorsWithTrie(leftFormatted, actorTrie);
+    }
+  }
+
+  if (time && leftFormatted) {
+    return `${leftFormatted} <span class="workers-time-sep">|</span> ${DOMPurify.sanitize(
+      time
+    )}`;
+  }
+
+  // If only one side exists, return it decorated (or raw time)
+  if (leftFormatted) return leftFormatted;
+  return DOMPurify.sanitize(time || workersOrTimestamp);
 }
