@@ -39,6 +39,7 @@ export const upgrades = [
   "flux vanes",
   "tectonic destabilizers",
   "shadow stride",
+  "chrono",
 
   // Terran Upgrades
   "weapon refit",

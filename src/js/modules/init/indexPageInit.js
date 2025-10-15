@@ -105,6 +105,74 @@ import {
 } from "../buildStorage.js";
 import { showUserStats, closeUserStats } from "../stats.js";
 import { setupCatActivationOnInput } from "../helpers/companion.js";
+
+// --- Cat overlap avoidance ---
+function debounce(fn, delay = 50) {
+  let t;
+  return (...args) => {
+    clearTimeout(t);
+    t = setTimeout(() => fn(...args), delay);
+  };
+}
+
+function adjustCatPosition() {
+  try {
+    const box = document.getElementById("box");
+    if (!box) return;
+
+    // If the cat is hidden by CSS (mobile), reset any shift and skip
+    const cs = window.getComputedStyle(box);
+    if (cs.display === "none") {
+      box.style.removeProperty("--cat-shift");
+      return;
+    }
+
+    // Helper: compute how much we need to move left to clear buttons
+    const computeShift = () => {
+      const safetyGap = 48; // extra horizontal spacing (px) to ensure no visual overlap
+      const proximityY = 96; // treat as collision if within this vertical distance
+      const catEl = document.querySelector("#box .cat") || box;
+      const catRect = catEl.getBoundingClientRect();
+      const candidates = [
+        document.getElementById("showBuildsButton"),
+        document.getElementById("showCommunityModalButton"),
+        document.querySelector(".toggle-header-right"),
+      ].filter(Boolean);
+      let need = 0;
+      for (const el of candidates) {
+        const r = el.getBoundingClientRect();
+        const vertOverlap = Math.min(catRect.bottom, r.bottom) - Math.max(catRect.top, r.top);
+        const nearVertical = vertOverlap >= -proximityY;
+        if (!nearVertical) continue;
+        const overlapX = catRect.right - (r.left - safetyGap);
+        if (overlapX > 0) need = Math.max(need, overlapX);
+      }
+      // Clamp to keep on-screen
+      const leftMin = 12;
+      const maxShift = Math.max(0, catRect.left - leftMin);
+      if (need > maxShift) need = maxShift;
+      return Math.max(0, Math.round(need));
+    };
+
+    // Start from centered baseline to avoid compounding
+    box.style.setProperty("--cat-shift", "0px");
+    let shift = computeShift();
+    if (shift > 0) {
+      box.style.setProperty("--cat-shift", `${shift}px`);
+      // Force sync layout and check if we still need a bit more (handles rounding/scale)
+      void box.getBoundingClientRect();
+      const extra = computeShift();
+      if (extra > 0) {
+        const total = shift + extra;
+        box.style.setProperty("--cat-shift", `${total}px`);
+      }
+    }
+  } catch (_) {
+    // no-op
+  }
+}
+
+const adjustCatPositionDebounced = debounce(adjustCatPosition, 80);
 import {
   getCurrentBuildId,
   setCurrentBuildId,
@@ -1149,6 +1217,23 @@ export async function initializeIndexPage() {
   updateBuildInputPlaceholder();
   initializeTooltips();
   setupCatActivationOnInput();
+  // Position companion to avoid overlapping right-side buttons
+  adjustCatPosition();
+  window.addEventListener("resize", adjustCatPositionDebounced);
+  window.addEventListener("scroll", adjustCatPositionDebounced, { passive: true });
+  window.addEventListener("orientationchange", adjustCatPositionDebounced);
+  // Also adjust after a tick to account for fonts/layout
+  setTimeout(adjustCatPosition, 50);
+  // Also react to resizes of the header or the cat itself
+  try {
+    const ro = new ResizeObserver(adjustCatPositionDebounced);
+    const right = document.querySelector(".toggle-header-right");
+    if (right) ro.observe(right);
+    const boxEl = document.getElementById("box");
+    if (boxEl) ro.observe(boxEl);
+  } catch (_) {
+    // ignore if ResizeObserver not available
+  }
   checkPublishButtonVisibility();
   const savedBuilds = getSavedBuilds();
   const buildId = sessionStorage.getItem("lastViewedBuild");

@@ -15,30 +15,20 @@
             "value": "same-origin-allow-popups"
           }
         ]
-      },
-      {
-        "source": "/build/**",
-        "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "no-cache, no-store, must-revalidate"
-          }
-        ]
       }
     ],
+
+    "redirects": [
+      { "source": "/veto.html", "destination": "/veto", "type": 301 },
+      { "source": "/viewBuild.html", "destination": "/viewBuild", "type": 301 }
+    ],
+
     "rewrites": [
-      {
-        "source": "/build/**",
-        "function": "servePreRenderedBuild"
-      },
-      {
-        "source": "/sitemap.xml",
-        "function": "sitemap"
-      },
-      {
-        "source": "**",
-        "destination": "/index.html"
-      }
+      { "source": "/build/**", "function": "servePreRenderedBuild" },
+      { "source": "/sitemap.xml", "function": "sitemap" },
+      { "source": "/veto", "destination": "/veto.html" },
+      { "source": "/viewBuild", "destination": "/viewBuild.html" },
+      { "source": "**", "destination": "/index.html" }
     ]
   },
   "firestore": {

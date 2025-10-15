@@ -1055,10 +1055,6 @@ body.modal-open {
   transition: filter 0.3s; /* ✅ soft glow without layout shift */
 }
 
-.build-card:hover {
-  /* removed hover lift */
-}
-
 .build-card:hover::before {
   filter: brightness(1.3) blur(4px); /* ✅ soft glow effect */
 }
