@@ -1,6 +1,9 @@
 // Map Data (New Map Pool)
 let mapData = [];
 let mapImages = {};
+let mapStatImages = {};
+let hasStatImage = {};
+let statMode = false; // false = normal; true = show stat variant when available
 
 // Best of Settings
 let bestOfValue = 3; // Default best of setting
@@ -47,14 +50,39 @@ window.addEventListener("DOMContentLoaded", () => {
   updateDisplayedMap();
   updateDisplayedBestOf();
 
+  // Setup Stat toggle buttons (overlay + panel)
+  const statBtnOverlay = document.getElementById("statToggleBtn");
+  const statBtnPanel = document.getElementById("statToggleBtnPanel");
+
+  function refreshPreviewForCurrent() {
+    const previewImage = document.getElementById("previewImage");
+    const mapId = lastHoveredMap || currentMap || (mapData[0] && mapData[0].id);
+    if (previewImage && mapId) previewImage.src = getEffectiveMapSrc(mapId);
+  }
+
+  function toggleStatModeHandler() {
+    statMode = !statMode;
+    updateStatButtonsUI();
+    const mapId = lastHoveredMap || currentMap || (mapData[0] && mapData[0].id);
+    if (mapId) updateStatButtonVisibility(mapId);
+    refreshPreviewForCurrent();
+  }
+
+  if (statBtnOverlay) statBtnOverlay.addEventListener("click", toggleStatModeHandler);
+  if (statBtnPanel) statBtnPanel.addEventListener("click", toggleStatModeHandler);
+
   document.getElementById("prevMapButton").addEventListener("click", () => {
     currentIndex = (currentIndex - 1 + mapData.length) % mapData.length;
     updateDisplayedMap();
+    const targetId = mapData[currentIndex]?.id;
+    if (targetId) updateStatButtonVisibility(targetId);
   });
 
   document.getElementById("nextMapButton").addEventListener("click", () => {
     currentIndex = (currentIndex + 1) % mapData.length;
     updateDisplayedMap();
+    const targetId = mapData[currentIndex]?.id;
+    if (targetId) updateStatButtonVisibility(targetId);
   });
 
   const confirmBtn = document.getElementById("confirmBestOfButton");
@@ -111,9 +139,10 @@ window.addEventListener("DOMContentLoaded", () => {
 // Map Preview on Hover
 function showPreview(mapNumber) {
   const previewImage = document.getElementById("previewImage");
-  previewImage.src = mapImages[mapNumber];
+  previewImage.src = getEffectiveMapSrc(mapNumber);
   previewImage.alt = `Map ${mapNumber} Preview`;
   lastHoveredMap = mapNumber;
+  updateStatButtonVisibility(mapNumber);
 }
 
 function keepHoveredMap() {
@@ -163,9 +192,10 @@ function toggleVeto(mapNumber) {
 
   currentMap = mapNumber;
   const previewImage = document.getElementById("previewImage");
-  if (currentMap) previewImage.src = mapImages[currentMap];
+  if (currentMap) previewImage.src = getEffectiveMapSrc(currentMap);
 
   checkUnvetoedMapsForBestOf();
+  updateStatButtonVisibility(currentMap);
 }
 
 function canVetoMoreMaps() {
@@ -297,8 +327,9 @@ function resetAll() {
 
 function resetPreview() {
   const previewImage = document.getElementById("previewImage");
-  previewImage.src = mapImages[1];
+  previewImage.src = getEffectiveMapSrc(1);
   previewImage.alt = "Map Preview";
+  updateStatButtonVisibility(1);
 }
 
 // Upload Map Preview + Rename Map
@@ -319,6 +350,11 @@ function updateMapPreview(event) {
         const previewImage = document.getElementById("previewImage");
         previewImage.src = e.target.result;
         previewImage.alt = `Map ${selectedMap.name} Preview`;
+        // Disable stat for custom uploaded preview
+        hasStatImage[selectedMap.id] = false;
+        statMode = false;
+        updateStatButtonsUI();
+        updateStatButtonVisibility(selectedMap.id);
 
         // ➡️ Suggest a name based on the file name
         let suggestedName = file.name.replace(/\.[^/.]+$/, ""); // Remove file extension
@@ -860,10 +896,21 @@ async function loadMapsByMode(mode) {
 
     // Setup map images
     mapImages = {};
+    mapStatImages = {};
+    hasStatImage = {};
     mapData.forEach((map) => {
       // Use "current" folder in path
       mapImages[map.id] = `img/maps/current/${mode}/${map.file}`;
     });
+
+    // Preload stat images only for 1v1 mode
+    if (mode === "1v1") {
+      await Promise.all(
+        mapData.map((map) => preloadStatForMap(map.id, map.file, mode))
+      );
+    } else {
+      mapData.forEach((map) => (hasStatImage[map.id] = false));
+    }
 
     // Reset & render
     resetAll();
@@ -874,8 +921,9 @@ async function loadMapsByMode(mode) {
 
     if (mapData.length > 0) {
       const previewImage = document.getElementById("previewImage");
-      previewImage.src = mapImages[mapData[0].id];
+      previewImage.src = getEffectiveMapSrc(mapData[0].id);
       previewImage.alt = `Map ${mapData[0].name} Preview`;
+      updateStatButtonVisibility(mapData[0].id);
     }
   } catch (err) {
     console.error("❌ Failed to load maps.json:", err);
@@ -955,7 +1003,7 @@ const closeModalBtn = document.getElementById("closePreviewModal");
 
 function openMapPreview(mapId) {
   if (!modal || !modalImg) return;
-  modalImg.src = mapImages[mapId];
+  modalImg.src = getEffectiveMapSrc(mapId);
   modalImg.alt = `Map ${
     mapData.find((m) => m.id === mapId)?.name || ""
   } Preview`;
@@ -1000,3 +1048,72 @@ window.addEventListener("DOMContentLoaded", () => {
 document
   .getElementById("hidePreviewCheckbox")
   .addEventListener("change", toggleMapPreviewVisibility);
+
+// ----- Helpers for Stat toggle -----
+function getEffectiveMapSrc(mapId) {
+  if (statMode && hasStatImage[mapId]) {
+    return mapStatImages[mapId] || mapImages[mapId];
+  }
+  return mapImages[mapId];
+}
+
+async function preloadStatForMap(mapId, fileName, mode) {
+  if (!fileName || !/\.webp$/i.test(fileName)) {
+    hasStatImage[mapId] = false;
+    return false;
+  }
+  const statPath = `img/maps/current/${mode}/${fileName.replace(/\.webp$/i, "-stat.webp")}`;
+  const ok = await imageExists(statPath);
+  if (ok) {
+    mapStatImages[mapId] = statPath;
+    hasStatImage[mapId] = true;
+  } else {
+    hasStatImage[mapId] = false;
+  }
+  return ok;
+}
+
+function imageExists(src) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(true);
+    img.onerror = () => resolve(false);
+    img.src = src;
+  });
+}
+
+function updateStatButtonVisibility(mapId) {
+  const previewContainer = document.querySelector(".map-preview");
+  const statBtn = document.getElementById("statToggleBtn");
+  const statBtnPanel = document.getElementById("statToggleBtnPanel");
+  if (!previewContainer || !statBtn) return;
+
+  if (hasStatImage[mapId]) {
+    previewContainer.classList.add("has-stat");
+    if (statBtnPanel) statBtnPanel.disabled = false;
+  } else {
+    previewContainer.classList.remove("has-stat");
+    if (statBtnPanel) statBtnPanel.disabled = true;
+  }
+
+  // If stat not available for this map, ensure UI shows normal
+  if (!hasStatImage[mapId] && statMode) {
+    statMode = false;
+    updateStatButtonsUI();
+    const previewImage = document.getElementById("previewImage");
+    if (previewImage) previewImage.src = mapImages[mapId] || previewImage.src;
+  }
+}
+
+function updateStatButtonsUI() {
+  const statBtnOverlay = document.getElementById("statToggleBtn");
+  const statBtnPanel = document.getElementById("statToggleBtnPanel");
+  if (statBtnOverlay) {
+    statBtnOverlay.textContent = statMode ? "Normal" : "Stat";
+    statBtnOverlay.setAttribute("aria-pressed", String(statMode));
+  }
+  if (statBtnPanel) {
+    statBtnPanel.textContent = statMode ? "Normal" : "Stat";
+    statBtnPanel.setAttribute("aria-pressed", String(statMode));
+  }
+}

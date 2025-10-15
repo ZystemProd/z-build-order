@@ -1,2 +1,2 @@
 // Abilities
-export const abilities = ["Lift off"];
+export const abilities = ["lift off", "chrono"];

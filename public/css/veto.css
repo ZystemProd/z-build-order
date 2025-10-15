@@ -79,6 +79,7 @@ body {
   -webkit-user-select: none; /* Safari */
   -ms-user-select: none; /* IE 10 and IE 11 */
   user-select: none; /* Standard syntax */
+  position: relative; /* Needed for stat toggle overlay */
 }
 
 .map-list li:hover {
@@ -96,6 +97,43 @@ body {
   -webkit-user-select: none; /* Safari */
   -ms-user-select: none; /* IE 10 and IE 11 */
   user-select: none; /* Standard syntax */
+}
+
+/* Stat toggle overlay button */
+.stat-toggle-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 6px 10px;
+  font-size: 12px;
+  line-height: 1;
+  background: rgba(0, 0, 0, 0.6);
+  color: #eee;
+  border: 1px solid #444;
+  border-radius: 6px;
+  cursor: pointer;
+  z-index: 2;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.stat-toggle-btn:hover {
+  background: rgba(0, 0, 0, 0.75);
+}
+
+/* Show toggle on hover when available */
+.map-preview.has-stat:hover .stat-toggle-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* On touch devices show it when available */
+@media (hover: none) and (pointer: coarse) {
+  .map-preview.has-stat .stat-toggle-btn {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 
 /* Other styles remain unchanged */
@@ -317,6 +355,12 @@ button {
 
 button:hover {
   background-color: #555; /* Change background on hover */
+}
+
+/* Panel stat toggle disabled state */
+.stat-toggle-panel-btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .toggle-content {

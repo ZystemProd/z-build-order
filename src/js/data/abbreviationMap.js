@@ -49,5 +49,6 @@ export const abbreviationMap = {
     "ghost cloak": "personal cloaking",
     "banshee cloak": "cloaking field",
     "medivac upgrade": "caduceus reactor",
+    "chrono boost": "chrono",
   },
 };

@@ -38,6 +38,7 @@ export const upgradeImages = {
   resonating_glaives: "img/upgrade/resonating_glaives.webp",
   shields: "img/upgrade/shields.webp",
   tectonic_destabilizers: "img/upgrade/tectonic_destabilizers.webp",
+  chrono: "img/abilities/chrono_boost.webp",
   // terran
   weapon_refit: "img/upgrade/weapon_refit.webp",
   vehicle_and_ship_plating: "img/upgrade/vehicle_and_ship_plating.webp",
@@ -181,4 +182,5 @@ export const unitImages = {
 
 export const abilitiesImages = {
   lift_off: "img/abilities/lift_off.webp",
+  chrono: "img/abilities/chrono_boost.webp",
 };
