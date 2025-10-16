@@ -365,8 +365,8 @@ export async function viewBuild(buildId) {
         const mode = build.mapMode || "1v1"; // fallback for old builds
 
         mapUrl = folder
-          ? `/img/maps/${folder}/${mode}/${fileName}`
-          : `/img/maps/${mode}/${fileName}`;
+          ? `/img/maps/${folder}/${fileName}`
+          : `/img/maps/${(build.mapMode || "1v1")}/${fileName}`;
       } catch (err) {
         console.warn("Could not load maps.json, falling back.");
         mapUrl = `/img/maps/${mapName.replace(/ /g, "_").toLowerCase()}.webp`;
@@ -467,15 +467,18 @@ export async function viewBuild(buildId) {
     const replayWrapper = document.getElementById("replayInputWrapper");
     const replayView = document.getElementById("replayViewWrapper");
     const replayBtn = document.getElementById("replayDownloadBtn");
+    const replayInput = document.getElementById("replayLinkInput");
 
-    if (replayUrl && replayWrapper && replayView && replayBtn) {
-      replayWrapper.style.display = "none";
+    // Always allow renewing the replay link
+    if (replayWrapper) replayWrapper.style.display = "flex";
+    if (replayUrl && replayView && replayBtn) {
       replayView.style.display = "block";
       replayBtn.href = replayUrl;
-      replayBtn.innerText = "Download Replay on Drop.sc";
-    } else if (replayWrapper && replayView) {
-      replayWrapper.style.display = "flex";
+      replayBtn.innerText = "Download Replay";
+      if (replayInput) replayInput.value = replayUrl;
+    } else if (replayView) {
       replayView.style.display = "none";
+      if (replayInput) replayInput.value = "";
     }
 
     analyzeBuildOrder(buildOrderInput?.value || "");

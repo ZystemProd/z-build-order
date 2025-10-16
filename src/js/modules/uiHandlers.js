@@ -3,6 +3,7 @@ import DOMPurify from "dompurify";
 import { getSavedBuilds } from "./buildStorage.js";
 import { closeModal, populateBuildList } from "./modal.js";
 import { updateYouTubeEmbed } from "./youtube.js";
+import { mapAnnotations } from "./interactive_map.js";
 import {
   formatActionText,
   formatWorkersOrTimestampText,
@@ -110,22 +111,114 @@ export function populateBuildDetails(index) {
   const replayWrapper = document.getElementById("replayInputWrapper");
   const replayView = document.getElementById("replayViewWrapper");
   const replayBtn = document.getElementById("replayDownloadBtn");
+  const replayInput = document.getElementById("replayLinkInput");
 
   if (replayUrl && replayWrapper && replayView && replayBtn) {
     replayWrapper.style.display = "none";
     replayView.style.display = "block";
     replayBtn.href = replayUrl;
-    replayBtn.innerText = "Download Replay on Drop.sc";
+    replayBtn.innerText = "Download Replay";
+    if (replayInput) replayInput.value = replayUrl;
   } else if (replayWrapper && replayView) {
     replayWrapper.style.display = "flex";
     replayView.style.display = "none";
+    if (replayInput) replayInput.value = "";
   }
+
+  // Always keep replay input visible to allow renewing the link
+  try {
+    const replayInputEl = document.getElementById("replayLinkInput");
+    if (replayInputEl) replayInputEl.value = replayUrl || "";
+    const replayWrapperEl = document.getElementById("replayInputWrapper");
+    if (replayWrapperEl) replayWrapperEl.style.display = "flex";
+    const replayBtnEl = document.getElementById("replayDownloadBtn");
+    if (replayBtnEl) replayBtnEl.innerText = "Download Replay";
+  } catch (_) {}
 
   console.log("🔍 Loaded build object:", build);
   console.log("🎮 Replay URL:", build.replayUrl);
 
   // Update video embed
   updateYouTubeEmbed();
+
+  // Preserve Map selection and annotations in the editor
+  try {
+    const mapImage = document.getElementById("map-preview-image");
+    const selectedMapText = document.getElementById("selected-map-text");
+    const modeDropdown = document.getElementById("mapModeDropdown");
+
+    if (modeDropdown && build.mapMode) {
+      modeDropdown.value = build.mapMode;
+    }
+
+    const mapNameRaw = (build.map || "").trim();
+    const hasValidMap =
+      mapNameRaw &&
+      mapNameRaw.toLowerCase() !== "index" &&
+      mapNameRaw.toLowerCase() !== "no map selected";
+
+    if (hasValidMap) {
+      const capitalizeWords = (str) =>
+        str
+          .split(" ")
+          .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
+          .join(" ");
+      const formattedName = capitalizeWords(mapNameRaw);
+
+      let mapUrl = "";
+      try {
+        const folder = build.mapFolder || `current/${build.mapMode || "1v1"}`;
+        const fileName = mapNameRaw.replace(/\s+/g, "_").toLowerCase() + ".webp";
+        mapUrl = `/img/maps/${folder}/${fileName}`;
+      } catch (_) {
+        mapUrl = `/img/maps/${mapNameRaw.replace(/\s+/g, "_").toLowerCase()}.webp`;
+      }
+
+      if (mapImage) {
+        mapImage.src = mapUrl;
+        mapImage.dataset.mapName = formattedName;
+        if (build.mapMode) mapImage.dataset.mapMode = build.mapMode;
+      }
+      if (selectedMapText) selectedMapText.innerText = formattedName;
+
+      if (mapAnnotations && mapAnnotations.annotationsContainer) {
+        mapAnnotations.annotationsContainer.innerHTML = "";
+        mapAnnotations.circles = [];
+        mapAnnotations.arrows = [];
+        const applyAnnotations = () => {
+          if (build.interactiveMap) {
+            (build.interactiveMap.circles || []).forEach(({ x, y }) =>
+              mapAnnotations.createCircle(x, y)
+            );
+            (build.interactiveMap.arrows || []).forEach(
+              ({ startX, startY, endX, endY }) =>
+                mapAnnotations.createArrow(startX, startY, endX, endY)
+            );
+            mapAnnotations.updateCircleNumbers?.();
+          }
+        };
+        if (mapImage && mapImage.complete && mapImage.naturalWidth > 0) {
+          applyAnnotations();
+        } else if (mapImage) {
+          mapImage.addEventListener("load", applyAnnotations, { once: true });
+        }
+      }
+    } else {
+      if (selectedMapText) selectedMapText.innerText = "No map selected";
+      if (mapImage) {
+        mapImage.removeAttribute("src");
+        delete mapImage.dataset.mapName;
+        delete mapImage.dataset.mapMode;
+      }
+      if (mapAnnotations && mapAnnotations.annotationsContainer) {
+        mapAnnotations.annotationsContainer.innerHTML = "";
+        mapAnnotations.circles = [];
+        mapAnnotations.arrows = [];
+      }
+    }
+  } catch (_) {
+    // non-fatal
+  }
 
   // Populate the modal details section
   const buildDetailsContainer = document.getElementById(

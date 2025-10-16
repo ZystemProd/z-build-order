@@ -2294,3 +2294,32 @@ body.modal-open {
     transform: translateY(0);
   }
 }
+/* Center map name text and style */
+#map-controls-row {
+  position: relative;
+  min-height: 32px;
+}
+
+#selected-map-text {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 22px !important;
+  text-transform: none;
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+/* Section headers (Replay/Video) in view page – same style, no pointer */
+#replayHeader,
+#videoHeader {
+  display: flex;
+  align-items: center;
+  font-size: 1.1em;
+  max-width: 210px;
+  color: #e0e0e0;
+  margin-top: 15px;
+  user-select: none;
+  cursor: default;
+  text-align: left;
+}

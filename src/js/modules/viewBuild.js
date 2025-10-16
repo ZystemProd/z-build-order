@@ -2821,7 +2821,9 @@ async function loadBuild() {
     }
 
     if (selectedMapText) {
-      selectedMapText.innerText = isValidMap && mapExists ? mapName : "";
+      const name = isValidMap && mapExists ? mapName : "";
+      const pretty = name ? name.charAt(0).toUpperCase() + name.slice(1) : "";
+      selectedMapText.innerText = pretty;
     }
 
     const mapContainerWrapper = document.getElementById("map-container");
@@ -2829,20 +2831,15 @@ async function loadBuild() {
       mapContainerWrapper.style.display = mapExists ? "block" : "none";
     }
 
-    // Ensure additional section is visible before rendering annotations
-    if (mapExists) {
-      const secondRow = document.getElementById("secondRow");
-      const secondRowHeader = document.querySelector(
-        '[data-section="secondRow"]'
-      );
-      if (secondRow) {
-        secondRow.classList.remove("hidden");
-        secondRow.classList.add("visible");
-      }
-      if (secondRowHeader) {
-        const arrowIcon = secondRowHeader.querySelector(".arrow");
-        if (arrowIcon) arrowIcon.classList.add("open");
-      }
+    // Ensure the second row with Map/Replay/Video is visible (no header controls)
+    const secondRow = document.getElementById("secondRow");
+    if (secondRow) {
+      secondRow.classList.remove("hidden");
+      secondRow.classList.add("visible");
+    }
+    const mainLayoutEl = document.querySelector(".main-layout");
+    if (mainLayoutEl) {
+      mainLayoutEl.style.display = "block";
     }
 
     // Setup map and annotations
@@ -2888,6 +2885,7 @@ async function loadBuild() {
           // 🛡 Disable click delete by replacing circles
           viewMapAnnotations.circles.forEach((circleData, index) => {
             const cleanClone = circleData.element.cloneNode(true);
+            cleanClone.style.pointerEvents = "none";
             circleData.element.parentNode.replaceChild(
               cleanClone,
               circleData.element
@@ -2918,6 +2916,7 @@ async function loadBuild() {
                 viewMapAnnotations.arrows[viewMapAnnotations.arrows.length - 1];
               if (last && last.element) {
                 const clone = last.element.cloneNode(true);
+                clone.style.pointerEvents = "none";
                 last.element.parentNode.replaceChild(clone, last.element);
                 last.element = clone;
               }
@@ -2934,51 +2933,14 @@ async function loadBuild() {
         mapImage.addEventListener("load", renderAnnotations, { once: true });
       }
     }
-    const additionalHeader = document.getElementById(
-      "additionalSettingsHeader"
-    );
-    const mainLayout = document.querySelector(".main-layout");
-    if (additionalHeader || mainLayout) {
-      const videoVisible =
-        youtubeEmbed && youtubeEmbed.style.display !== "none";
-      const mapVisible =
-        mapContainerWrapper && mapContainerWrapper.style.display !== "none";
-      const replayVisible =
-        replayWrapper && replayWrapper.style.display !== "none";
-
-      const anyVisible = videoVisible || mapVisible || replayVisible;
-
-      const secondRow = document.getElementById("secondRow");
-      const secondRowHeader = document.querySelector(
-        '[data-section="secondRow"]'
-      );
-      if (secondRow) {
-        if (anyVisible) {
-          secondRow.classList.remove("hidden");
-          secondRow.classList.add("visible");
-        } else {
-          secondRow.classList.add("hidden");
-          secondRow.classList.remove("visible");
-        }
-      }
-      if (secondRowHeader) {
-        const arrowIcon = secondRowHeader.querySelector(".arrow");
-        if (arrowIcon) {
-          if (anyVisible) {
-            arrowIcon.classList.add("open");
-          } else {
-            arrowIcon.classList.remove("open");
-          }
-        }
-      }
-
-      if (additionalHeader) {
-        additionalHeader.style.display = anyVisible ? "block" : "none";
-      }
-      if (mainLayout) {
-        mainLayout.style.display = anyVisible ? "block" : "none";
-      }
+    // Additional Settings header removed: keep section shown
+    const secondRowFinal = document.getElementById("secondRow");
+    if (secondRowFinal) {
+      secondRowFinal.classList.remove("hidden");
+      secondRowFinal.classList.add("visible");
     }
+    const mainLayoutFinal = document.querySelector(".main-layout");
+    if (mainLayoutFinal) mainLayoutFinal.style.display = "block";
     injectSchemaMarkup(build);
     injectMetaTags(buildId, build);
     setBuildViewLoading(false);

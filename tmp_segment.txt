@@ -1,0 +1,28 @@
+  const mapMode = modeDropdown ? DOMPurify.sanitize(modeDropdown.value) : "1v1";
+
+  const updatedData = {
+    description: DOMPurify.sanitize(descriptionInput?.value.trim() || ""),
+    videoLink: DOMPurify.sanitize(videoInput?.value.trim() || ""),
+    replayUrl: DOMPurify.sanitize(replayInput?.value.trim() || ""),
+    buildOrder: parseBuildOrder(buildOrderInput.value),
+    subcategory: DOMPurify.sanitize(categoryDropdown.value || ""),
+    mapMode, // ✅ add this line
+    interactiveMap: {
+      circles: mapAnnotations.circles.map(({ x, y }) => ({ x, y })),
+      arrows: mapAnnotations.arrows.map(({ startX, startY, endX, endY }) => ({
+        startX,
+        startY,
+        endX,
+        endY,
+      })),
+    },
+    timestamp: Date.now(),
+  };
+
+  // 🗺 Map name update (if selected)
+  if (mapImage?.src) {
+    const match = mapImage.src.match(/\/img\/maps\/(.+)\.webp/);
+    if (match) {
+      updatedData.map = match[1].replace(/_/g, " ");
+    }
+  }
