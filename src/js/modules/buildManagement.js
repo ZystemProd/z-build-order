@@ -147,11 +147,11 @@ export async function saveCurrentBuild() {
     mapName = "";
   }
 
-  let mapFolder = mapName ? "current" : "";
+  let mapFolder = mapName ? `current/${mapMode || "1v1"}` : "";
   if (mapImage?.src && mapName) {
     try {
       const url = new URL(mapImage.src);
-      const folderMatch = url.pathname.match(/\/maps\/([^/]+)\//);
+      const folderMatch = url.pathname.match(/\/maps\/(.+)\/[\w\-.'%()]+\.(?:webp|png|jpg|jpeg)$/i);
       if (folderMatch) mapFolder = folderMatch[1];
     } catch (err) {
       console.warn("🛑 Failed to parse map folder:", mapImage.src, err);
@@ -356,6 +356,38 @@ export async function updateCurrentBuild(buildId) {
     const match = mapImage.src.match(/\/img\/maps\/(.+)\.webp/);
     if (match) {
       updatedData.map = match[1].replace(/_/g, " ");
+    }
+  }
+
+  // Preserve replay link from view button if input was empty
+  if (!updatedData.replayUrl) {
+    const replayBtn = document.getElementById("replayDownloadBtn");
+    const fallback = replayBtn?.getAttribute("href") || replayBtn?.href || "";
+    if (fallback) updatedData.replayUrl = DOMPurify.sanitize(fallback.trim());
+  }
+
+  // Robustly derive map name and folder
+  if (mapImage?.src) {
+    try {
+      const url = new URL(mapImage.src);
+      const parts = url.pathname.split("/");
+      const filename = parts.at(-1);
+      let mapName = "";
+      if (filename) {
+        const base = filename.replace(/\.[a-z]+$/i, "");
+        mapName = base.replace(/_/g, " ");
+      }
+      if (
+        mapName &&
+        mapName.toLowerCase() !== "index" &&
+        mapName.toLowerCase() !== "no map selected"
+      ) {
+        updatedData.map = mapName;
+        const folderMatch = url.pathname.match(/\/maps\/(.+)\/[\w\-.'%()]+\.(?:webp|png|jpg|jpeg)$/i);
+        if (folderMatch) updatedData.mapFolder = folderMatch[1];
+      }
+    } catch (_) {
+      // ignore parse errors
     }
   }
 

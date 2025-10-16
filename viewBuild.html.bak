@@ -189,7 +189,7 @@
           <h3 id="replayHeader" class="toggle-title" style="display: none">Replay</h3>
           <div id="replayViewWrapper" style="display: none;">
             <a id="replayDownloadBtn" href="#" target="_blank" class="download-replay-link">
-              Download Replay on Drop.sc
+              Download Replay
             </a>
           </div>
           <h3 id="videoHeader" class="toggle-title" style="display: none">Video</h3>

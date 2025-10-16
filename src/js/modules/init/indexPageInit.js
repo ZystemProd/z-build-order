@@ -453,11 +453,12 @@ export async function initializeIndexPage() {
         const replayView = document.getElementById("replayViewWrapper");
         const replayBtn = document.getElementById("replayDownloadBtn");
 
-        if (replayUrl && replayWrapper && replayView && replayBtn) {
-          replayWrapper.style.display = "none";
+        // Always allow renewing the replay link
+        if (replayWrapper) replayWrapper.style.display = "flex";
+        if (replayUrl && replayView && replayBtn) {
           replayView.style.display = "block";
           replayBtn.href = replayUrl;
-          replayBtn.innerText = "Download Replay on Drop.sc";
+          replayBtn.innerText = "Download Replay";
         }
 
         saveBuildButton.disabled = true;
@@ -497,11 +498,13 @@ export async function initializeIndexPage() {
         const replayView = document.getElementById("replayViewWrapper");
         const replayBtn = document.getElementById("replayDownloadBtn");
 
-        if (replayUrl && replayWrapper && replayView && replayBtn) {
-          replayWrapper.style.display = "none";
+        if (replayWrapper) replayWrapper.style.display = "flex";
+        if (replayUrl && replayView && replayBtn) {
           replayView.style.display = "block";
           replayBtn.href = replayUrl;
-          replayBtn.innerText = "Download Replay on Drop.sc";
+          replayBtn.innerText = "Download Replay";
+        } else if (replayView) {
+          replayView.style.display = "none";
         }
 
         saveBuildButton.disabled = true;
@@ -1249,10 +1252,15 @@ export async function initializeIndexPage() {
   const replayView = document.getElementById("replayViewWrapper");
   const replayBtn = document.getElementById("replayDownloadBtn");
 
-  if (replayUrl && replayWrapper && replayView && replayBtn) {
-    replayWrapper.style.display = "none";
+  // Keep input visible and show view button if link exists
+  if (replayWrapper) replayWrapper.style.display = "flex";
+  if (replayUrl && replayView && replayBtn) {
     replayView.style.display = "block";
     replayBtn.href = replayUrl;
+    const btn = document.getElementById("replayDownloadBtn");
+    if (btn) btn.innerText = "Download Replay";
+  } else if (replayView) {
+    replayView.style.display = "none";
   }
 
   // --- Map Setup (only if map container exists)
