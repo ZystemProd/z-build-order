@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="280" height="64" viewBox="0 0 280 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Map Veto button concept">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#3B3B3B"/>
+      <stop offset="100%" stop-color="#2A2A2A"/>
+    </linearGradient>
+    <filter id="softShadow" x="-10%" y="-20%" width="120%" height="160%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000" flood-opacity="0.35"/>
+    </filter>
+    <filter id="innerGlow" x="-5%" y="-10%" width="110%" height="120%">
+      <feOffset dx="0" dy="0"/>
+      <feGaussianBlur stdDeviation="1.1" result="blur"/>
+      <feComposite in2="blur" in="SourceAlpha" operator="arithmetic" k2="-1" k3="1"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .06 0"/>
+      <feBlend in="SourceGraphic" mode="normal"/>
+    </filter>
+  </defs>
+
+  <!-- Background pill -->
+  <rect x="6" y="6" width="268" height="52" rx="14" fill="url(#bgGrad)" filter="url(#softShadow)"/>
+  <rect x="6" y="6" width="268" height="52" rx="14" fill="transparent" stroke="rgba(255,255,255,0.07)"/>
+  <rect x="7.5" y="7.5" width="265" height="49" rx="12.5" fill="transparent" filter="url(#innerGlow)"/>
+
+  <!-- Map icon (stylized folded map) -->
+  <g transform="translate(26,18)">
+    <polygon points="0,3 18,0 18,26 0,29" fill="#8EC7FF" opacity="0.25"/>
+    <polygon points="18,0 36,4 36,30 18,26" fill="#5EB0FF" opacity="0.35"/>
+    <polygon points="36,4 54,1 54,27 36,30" fill="#8EC7FF" opacity="0.25"/>
+    <polyline points="2,14 16,11 38,16 52,13" fill="none" stroke="#CFE6FF" stroke-width="2" stroke-linecap="round"/>
+  </g>
+
+  <!-- Text -->
+  <text x="100" y="38" font-family="Inter, Segoe UI, Roboto, Arial, sans-serif" font-size="18" font-weight="600" letter-spacing="0.2" fill="#EDEDED">Map Veto</text>
+
+  <!-- Focus ring example (hidden by default). Toggle display to preview. -->
+  <rect x="3" y="3" width="274" height="58" rx="16" fill="none" stroke="#00BFFF" stroke-opacity="0.55" stroke-width="2" style="display:none"/>
+</svg>
+

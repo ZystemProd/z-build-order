@@ -144,11 +144,46 @@ body {
   transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
-/* Hover effect moved from avatar to container */
-#auth-container:hover {
-  /* Remove scaling on hover to avoid affecting userMenu */
+/* Map Veto tile matches auth-container styling */
+#mapVetoTile.map-veto-tile {
+  position: fixed;
+  top: 10px;
+  right: 10px; /* Will be adjusted via JS to sit left of auth-container */
+  background-color: #37373780;
+  padding: 8px 15px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 1000;
+  justify-content: center;
+  backdrop-filter: blur(5px);
+  border: 2px solid transparent;
+  cursor: pointer;
+  color: #fff;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+#mapVetoTile.map-veto-tile:hover {
   transform: none;
   box-shadow: 0 0 10px #00bfff78;
+}
+
+/* Inline header veto button is hidden by default (desktop uses floating tile) */
+#mapVetoBtn {
+  display: none;
+}
+
+/* Only show hover effect when authenticated */
+#auth-container.is-auth:hover {
+  transform: none;
+  box-shadow: 0 0 10px #00bfff78;
+}
+
+/* Remove pointer/hover cue when not authenticated */
+#auth-container:not(.is-auth) {
+  cursor: default;
 }
 
 #userInfo {
@@ -5043,9 +5078,19 @@ button.btn-small {
     display: none;
   }
   #showBuildsButton,
-  #showCommunityModalButton {
+  #showCommunityModalButton,
+  #mapVetoBtn {
     transform: scale(1.4);
     margin: 5px;
+  }
+  /* Show inline veto button and hide floating tile on mobile */
+  #mapVetoBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #mapVetoTile {
+    display: none !important;
   }
   .filters-wrapper {
     grid-template-columns: repeat(4, 1fr);

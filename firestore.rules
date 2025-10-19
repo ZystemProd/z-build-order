@@ -2,7 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ✅ USERS
+    // ? USERS
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
 
@@ -14,14 +14,19 @@ service cloud.firestore {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
 
-      // ✅ BLOCKED USERS subcollection
+      // ? BLOCKED USERS subcollection
       match /blockedUsers/{blockedUserId} {
         allow read: if request.auth != null && request.auth.uid == userId;
         allow create, delete: if request.auth != null && request.auth.uid == userId;
       }
     }
 
-    // ✅ USERNAMES
+    // Private user templates
+    match /users/{userId}/templates/{templateId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ? USERNAMES
     match /usernames/{username} {
       allow read: if true;
 
@@ -33,12 +38,12 @@ service cloud.firestore {
                     && resource.data.userId == request.auth.uid;
     }
 
-    // ✅ PUBLISHED BUILDS (shared to both public and clans)
+    // ? PUBLISHED BUILDS (shared to both public and clans)
     match /publishedBuilds/{buildId} {
-      // 🌍 Everyone can read published builds
+      // ?? Everyone can read published builds
       allow read: if true;
 
-      // 📝 Create: only owner can publish their build
+      // ?? Create: only owner can publish their build
       allow write: if request.auth != null 
                    && request.auth.uid == request.resource.data.publisherId
                    && request.resource.data.keys().hasAny([
@@ -52,7 +57,7 @@ service cloud.firestore {
                         'timestamp'
                     ]);
 
-      // 🔁 Update rules (voting/views)...
+      // ?? Update rules (voting/views)...
       allow update: if request.auth != null && (
         request.auth.uid == resource.data.publisherId ||
         (
@@ -69,11 +74,11 @@ service cloud.firestore {
         )
       );
 
-      // ❌ Delete: only publisher can remove
+      // ? Delete: only publisher can remove
       allow delete: if request.auth != null 
                     && request.auth.uid == resource.data.publisherId;
 
-      // ✅ COMMENTS SUBCOLLECTION
+      // ? COMMENTS SUBCOLLECTION
       match /comments/{commentId} {
         allow read: if true;
 
@@ -84,7 +89,7 @@ service cloud.firestore {
           && request.resource.data.text.size() <= 1200
           && request.resource.data.timestamp == request.time;
 
-        // ✅ Allow the comment author to edit only their own text
+        // ? Allow the comment author to edit only their own text
         allow update: if request.auth != null
           && request.auth.uid == resource.data.userId
           && request.resource.data.diff(resource.data).changedKeys().hasOnly(["text", "isEdited", "editedAt"]);
@@ -95,12 +100,12 @@ service cloud.firestore {
 
     }
 
-    // ✅ CLANS
+    // ? CLANS
     match /clans/{clanId} {
-      // ✅ Allow read of top-level clan data (for name, tag, logo, etc.)
+      // ? Allow read of top-level clan data (for name, tag, logo, etc.)
       allow read: if true;
 
-      // ➕ Create clan
+      // ? Create clan
       allow create: if request.auth != null &&
                     request.auth.uid == request.resource.data.adminUid &&
                     request.resource.data.members == [request.auth.uid] &&
@@ -114,13 +119,13 @@ service cloud.firestore {
                       'created'
                     ]);
 
-      // 🔁 Update: admin changes or member joining/leaving
+      // ?? Update: admin changes or member joining/leaving
       allow update: if request.auth != null && (
 
-        // ✅ Admin can always update
+        // ? Admin can always update
         request.auth.uid == resource.data.adminUid ||
 
-        // ✅ Member leaving (removing themselves from both members and memberInfo)
+        // ? Member leaving (removing themselves from both members and memberInfo)
         (
           // Must have been a member before
           request.auth.uid in resource.data.members &&
@@ -136,7 +141,7 @@ service cloud.firestore {
           request.resource.data.memberInfo.size() == resource.data.memberInfo.size() - 1
         ) ||
 
-        // ✅ Member joining via join request
+        // ? Member joining via join request
         (
           request.resource.data.diff(resource.data).changedKeys().hasOnly(['joinRequests', 'memberInfo']) &&
           request.resource.data.memberInfo[request.auth.uid].requestedAt is int &&
@@ -150,11 +155,11 @@ service cloud.firestore {
 
 
 
-      // ❌ Delete: admin only
+      // ? Delete: admin only
       allow delete: if request.auth != null &&
                     request.auth.uid == resource.data.adminUid;
 
-      // ✅ CLAN BUILDS (subcollection)
+      // ? CLAN BUILDS (subcollection)
       match /builds/{buildId} {
         allow read: if request.auth != null &&
                     request.auth.uid in get(/databases/$(database)/documents/clans/$(clanId)).data.members;
@@ -179,3 +184,4 @@ service cloud.firestore {
 
   }
 }
+
