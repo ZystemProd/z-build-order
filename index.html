@@ -92,10 +92,6 @@
         <div class="menu-section">
           <p id="userNameMenu" class="user-name fade-in">Guest</p>
           <hr id="userNameDivider" class="menu-divider" />
-          <button class="menu-item" id="mapVetoBtn">
-            <img src="img/SVG/map-solid.svg" class="menu-icon" /> Map Veto
-          </button>
-          <hr class="menu-divider" />
           <button class="menu-item" id="showClanModalButton">
             <img src="img/SVG/clan.svg" class="menu-icon" /> Clans
           </button>
@@ -121,6 +117,12 @@
 
     <!-- Auth Buttons -->
     <button id="signInBtn" class="auth-button">Sign In</button>
+  </div>
+
+  <!-- Map Veto floating tile (left of auth-container) -->
+  <div id="mapVetoTile" class="map-veto-tile" role="button" tabindex="0">
+    <img src="img/SVG/map-solid.svg" class="menu-icon" alt="Map Veto" />
+    <span>Map Veto</span>
   </div>
 
   <!-- Username Modal -->
@@ -237,6 +239,10 @@
         <div class="toggle-header-right">
           <button id="showBuildsButton" disabled>
             <img src="img/SVG/library.svg" alt="Library Icon" class="svg-icon"> <span class="btn-text">My Builds</span>
+          </button>
+          <button id="mapVetoBtn" class="btn" aria-label="Open Map Veto">
+            <img src="img/SVG/map-solid.svg" alt="Map Veto" class="svg-icon">
+            <span class="btn-text">Map Veto</span>
           </button>
           <button id="showCommunityModalButton" class="btn" disabled>
             <img src="img/SVG/community.svg" alt="Community Icon" class="svg-icon"> <span class="btn-text">Community
@@ -1033,3 +1039,4 @@
 </body>
 
 </html>
+

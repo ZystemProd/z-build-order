@@ -50,6 +50,9 @@ document.addEventListener("DOMContentLoaded", () => {
   if (userName) userName.style.display = "none";
   if (userNameMenu) userNameMenu.style.display = "none";
   if (userMenu) userMenu.style.display = "none";
+
+  // Position the Map Veto tile relative to auth-container
+  try { updateMapVetoPosition(); } catch (_) {}
 });
 
 // Initialize Firebase
@@ -61,6 +64,37 @@ const provider = new GoogleAuthProvider();
 const appCheck = initializeAppCheck(app, {
   provider: new ReCaptchaV3Provider("6LcBBWsrAAAAALLmBNIhl-zKPa8KRj8mXMldoKbN"),
   isTokenAutoRefreshEnabled: true, // auto refresh recommended
+});
+
+function updateMapVetoPosition() {
+  const authEl = document.getElementById("auth-container");
+  const vetoEl = document.getElementById("mapVetoTile");
+  if (!authEl || !vetoEl) return;
+
+  // Skip on mobile (tile is hidden there)
+  if (window.matchMedia && window.matchMedia("(max-width: 768px)").matches) {
+    return;
+  }
+
+  // Preferred horizontal gap between elements
+  const gap = 16; // px
+
+  const rect = authEl.getBoundingClientRect();
+  if (!rect || rect.width === 0) {
+    vetoEl.style.right = "10px";
+    return;
+  }
+
+  // Place tile to the left of auth container with a fixed gap
+  const targetRight = Math.max(10, window.innerWidth - rect.left + gap);
+  vetoEl.style.right = `${targetRight}px`;
+}
+
+window.addEventListener("resize", () => {
+  try { updateMapVetoPosition(); } catch (_) {}
+});
+window.addEventListener("load", () => {
+  try { updateMapVetoPosition(); } catch (_) {}
 });
 
 function initCookieConsent() {
@@ -491,6 +525,8 @@ export function initializeAuthUI() {
 
   onAuthStateChanged(auth, async (user) => {
     if (user) {
+      const authContainerEl = document.getElementById("auth-container");
+      if (authContainerEl) authContainerEl.classList.add("is-auth");
       const userRef = doc(db, "users", user.uid);
       const userSnapshot = await getDoc(userRef);
 
@@ -514,7 +550,7 @@ export function initializeAuthUI() {
       emitAvatarUpdate(currentUserAvatarUrl);
       if (signInBtn) signInBtn.style.display = "none";
       if (showClanBtn) showClanBtn.disabled = false;
-      if (mapVetoBtn) mapVetoBtn.style.display = "block";
+      // map veto inline button visibility handled via CSS media queries
       if (showClanBtn) showClanBtn.style.display = "block";
       if (settingsMenuItem) settingsMenuItem.style.display = "block";
       if (statsMenuItem) statsMenuItem.style.display = "block";
@@ -523,7 +559,10 @@ export function initializeAuthUI() {
       if (deleteAccountMenuItem)
         deleteAccountMenuItem.style.display = "inline-flex";
       menuDividers.forEach((d) => (d.style.display = "block"));
+      try { updateMapVetoPosition(); } catch (_) {}
     } else {
+      const authContainerEl = document.getElementById("auth-container");
+      if (authContainerEl) authContainerEl.classList.remove("is-auth");
       currentUserAvatarUrl = DEFAULT_AVATAR_URL;
       updateAvatarSelectionHighlight(DEFAULT_AVATAR_URL);
       emitAvatarUpdate(DEFAULT_AVATAR_URL);
@@ -535,7 +574,7 @@ export function initializeAuthUI() {
       if (userMenu) userMenu.style.display = "none";
       if (signInBtn) signInBtn.style.display = "inline-block";
       if (showClanBtn) showClanBtn.disabled = true;
-      if (mapVetoBtn) mapVetoBtn.style.display = "block";
+      // map veto inline button visibility handled via CSS media queries
       if (showClanBtn) showClanBtn.style.display = "none";
       if (settingsMenuItem) settingsMenuItem.style.display = "none";
       if (statsMenuItem) statsMenuItem.style.display = "none";
@@ -544,12 +583,14 @@ export function initializeAuthUI() {
       if (deleteAccountMenuItem) deleteAccountMenuItem.style.display = "none";
       menuDividers.forEach((d) => (d.style.display = "none"));
       resetBuildInputs();
+      try { updateMapVetoPosition(); } catch (_) {}
     }
 
     if (authLoadingWrapper) authLoadingWrapper.style.display = "none";
     if (userName) userName.style.display = "inline";
     if (userNameMenu) userNameMenu.style.display = "inline-block";
     if (userPhoto) userPhoto.style.display = "inline";
+    try { updateMapVetoPosition(); } catch (_) {}
   });
 }
 
@@ -704,6 +745,16 @@ const userPhoto = document.getElementById("userPhoto");
 if (authContainer && userMenu) {
   // Toggle menu on auth container click
   authContainer.addEventListener("click", (event) => {
+    // Only allow toggling when user is signed in
+    if (!auth.currentUser) return;
+    // Do not toggle if clicking the sign-in button
+    const signInBtn = document.getElementById("signInBtn");
+    if (
+      signInBtn &&
+      (event.target === signInBtn || signInBtn.contains(event.target))
+    ) {
+      return;
+    }
     // Prevent toggling when clicking inside the open menu itself
     if (userMenu.contains(event.target)) return;
     event.stopPropagation();

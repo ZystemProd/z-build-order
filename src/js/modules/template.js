@@ -2,6 +2,15 @@ import { analyzeBuildOrder } from "./uiHandlers.js";
 import { formatActionText } from "./textFormatters.js";
 import DOMPurify from "dompurify";
 import { logAnalyticsEvent } from "./analyticsHelper.js";
+import { showToast } from "./toastHandler.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  getDocs,
+  Timestamp,
+} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 
 const predefinedTemplates = [
   {
@@ -48,11 +57,44 @@ const predefinedTemplates = [
   },
 ];
 
+// In-memory state
+let userTemplates = [];
 let templates = [...predefinedTemplates];
 
-export function showTemplatesModal() {
+async function loadUserTemplates() {
+  try {
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user) {
+      userTemplates = [];
+      templates = [...predefinedTemplates];
+      return templates;
+    }
+    const db = getFirestore();
+    const tplRef = collection(db, `users/${user.uid}/templates`);
+    const snap = await getDocs(tplRef);
+    userTemplates = snap.docs
+      .map((doc) => doc.data())
+      .filter((t) => t && t.title && t.category && t.data)
+      .map((t) => ({
+        title: String(t.title),
+        category: String(t.category).toLowerCase(),
+        image: t.image || `img/race/${String(t.category).toLowerCase()}.webp`,
+        data: String(t.data),
+      }));
+    templates = [...predefinedTemplates, ...userTemplates];
+    return templates;
+  } catch (err) {
+    console.error("Failed to load user templates:", err);
+    return [...predefinedTemplates];
+  }
+}
+
+export async function showTemplatesModal() {
   const templateModal = document.getElementById("templateModal");
-  templateModal.style.display = "block";
+  if (templateModal) templateModal.style.display = "block";
+  // Load user templates (if signed in) and then populate
+  await loadUserTemplates();
   populateTemplateList(templates);
 }
 
@@ -140,7 +182,19 @@ export function showSaveTemplateModal() {
   };
 
   const saveButton = document.getElementById("saveTemplateConfirmButton");
-  saveButton.onclick = () => {
+  saveButton.onclick = async () => {
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user) {
+      showToast("Sign in to save templates.", "info");
+      const authContainer = document.getElementById("auth-container");
+      if (authContainer) {
+        authContainer.classList.add("highlight");
+        setTimeout(() => authContainer.classList.remove("highlight"), 5000);
+      }
+      return;
+    }
+
     const title = document.getElementById("templateTitleInput").value.trim();
     const sanitizedTitle = DOMPurify.sanitize(title);
 
@@ -165,16 +219,27 @@ export function showSaveTemplateModal() {
 
     const raceImage = `img/race/${selectedRace}.webp`;
 
-    // Save the new template
-    templates.push({
-      title: sanitizedTitle,
-      category: selectedRace,
-      image: raceImage,
-      data: sanitizedBuildOrderInput,
-    });
+    try {
+      const db = getFirestore();
+      const tpl = {
+        title: sanitizedTitle,
+        category: selectedRace,
+        image: raceImage,
+        data: sanitizedBuildOrderInput,
+        createdAt: Timestamp.now(),
+      };
+      await addDoc(collection(db, `users/${user.uid}/templates`), tpl);
 
-    populateTemplateList(templates);
-    modal.style.display = "none";
+      // Update local state and UI
+      userTemplates.push(tpl);
+      templates = [...predefinedTemplates, ...userTemplates];
+      populateTemplateList(templates);
+      showToast("Template saved!", "success");
+      modal.style.display = "none";
+    } catch (err) {
+      console.error("Failed to save template:", err);
+      showToast("Failed to save template.", "error");
+    }
   };
 }
 

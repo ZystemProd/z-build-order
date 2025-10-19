@@ -1299,6 +1299,9 @@ export async function initializeIndexPage() {
   document.getElementById("mapVetoBtn")?.addEventListener("click", () => {
     window.location.href = "/veto.html";
   });
+  document.getElementById("mapVetoTile")?.addEventListener("click", () => {
+    window.location.href = "/veto.html";
+  });
 
   document.getElementById("showStatsButton")?.addEventListener("click", () => {
     const userMenu = document.getElementById("userMenu");

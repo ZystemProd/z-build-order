@@ -4,6 +4,7 @@ export function setupMobileHeader() {
   const gameSelect = document.getElementById('game-select');
   const communityBtn = document.getElementById('showCommunityModalButton');
   const buildsBtn = document.getElementById('showBuildsButton');
+  const vetoBtn = document.getElementById('mapVetoBtn');
 
   if (!mainHeader || !authContainer || !gameSelect) return;
 
@@ -15,6 +16,8 @@ export function setupMobileHeader() {
   const communityPlaceholder = document.createComment('community-placeholder');
   const buildsParent = buildsBtn ? buildsBtn.parentNode : null;
   const buildsPlaceholder = document.createComment('builds-placeholder');
+  const vetoParent = vetoBtn ? vetoBtn.parentNode : null;
+  const vetoPlaceholder = document.createComment('veto-placeholder');
 
   function moveToHeader() {
     if (!mainHeader.contains(gameSelect)) {
@@ -28,6 +31,10 @@ export function setupMobileHeader() {
     if (buildsBtn && !mainHeader.contains(buildsBtn)) {
       buildsParent.insertBefore(buildsPlaceholder, buildsBtn);
       mainHeader.appendChild(buildsBtn);
+    }
+    if (vetoBtn && !mainHeader.contains(vetoBtn)) {
+      vetoParent.insertBefore(vetoPlaceholder, vetoBtn);
+      mainHeader.appendChild(vetoBtn);
     }
     if (!mainHeader.contains(authContainer)) {
       authParent.insertBefore(authPlaceholder, authContainer);
@@ -51,6 +58,10 @@ export function setupMobileHeader() {
     if (buildsBtn && mainHeader.contains(buildsBtn) && buildsPlaceholder.parentNode) {
       buildsPlaceholder.parentNode.insertBefore(buildsBtn, buildsPlaceholder);
       buildsPlaceholder.remove();
+    }
+    if (vetoBtn && mainHeader.contains(vetoBtn) && vetoPlaceholder.parentNode) {
+      vetoPlaceholder.parentNode.insertBefore(vetoBtn, vetoPlaceholder);
+      vetoPlaceholder.remove();
     }
   }
 
