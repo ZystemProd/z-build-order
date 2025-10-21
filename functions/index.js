@@ -74,6 +74,15 @@ function sanitizeUrl(value, fallback) {
   return sanitizeText(fallback, fallback);
 }
 
+// Create a simple, stable slug for titles
+function slugify(text) {
+  const base = sanitizeText(text, "");
+  return base
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
+}
+
 async function loadSpaIndex() {
   if (!cachedSpaIndex) {
     try {
@@ -133,8 +142,15 @@ async function loadStaticPrerenderTemplate() {
   return cachedStaticTemplate;
 }
 
-async function sendSpaIndex(res, statusCode = 200) {
-  const spaHtml = await loadSpaIndex();
+async function sendSpaIndex(res, statusCode = 200, canonicalUrl = null) {
+  let spaHtml = await loadSpaIndex();
+  if (canonicalUrl) {
+    try {
+      spaHtml = addCanonicalLink(spaHtml, canonicalUrl);
+    } catch (_) {
+      // best-effort only
+    }
+  }
   res.set("Content-Type", "text/html; charset=utf-8");
   res.set("Cache-Control", "public, max-age=0, s-maxage=600");
   res.status(statusCode).send(spaHtml);
@@ -170,6 +186,19 @@ function buildCanonicalUrl(req) {
   const pathPortion = sanitizeUrl(req.path || "/", "/");
 
   return `${protocol}://${host}${pathPortion}`;
+}
+
+// Preferred path for a build (pretty URL)
+function buildPreferredPath(buildId, buildData) {
+  const matchup = sanitizeText(buildData?.subcategory || buildData?.matchup, "unknown").toLowerCase();
+  const slug = slugify(buildData?.title || "untitled");
+  return `/build/${matchup}/${slug}/${buildId}`;
+}
+
+function absoluteCanonical(host, path) {
+  const cleanHost = sanitizeText(host || "zbuildorder.com", "zbuildorder.com");
+  const cleanPath = sanitizeText(path || "/", "/");
+  return `https://${cleanHost}${cleanPath}`;
 }
 
 function addCanonicalLink(html, canonicalUrl) {
@@ -310,7 +339,7 @@ function buildMetaStrings(buildData) {
   };
 }
 
-function buildPrerenderPayload(buildData) {
+function buildPrerenderPayload(buildData, buildId) {
   const title = sanitizeText(buildData.title, "Untitled Build");
   const publisher = sanitizeText(
     buildData.username || buildData.publisher || buildData.publisherName,
@@ -320,6 +349,12 @@ function buildPrerenderPayload(buildData) {
   const matchup = formatMatchupText(buildData.subcategory);
   const description = sanitizeText(buildData.description, "");
   const descriptionHtml = description ? description.replace(/\n/g, "<br>") : "";
+
+  // Canonical for this build
+  const matchupRaw = sanitizeText(buildData.subcategory, "unknown").toLowerCase();
+  const titleSlug = slugify(title);
+  const canonicalPath = `/build/${matchupRaw}/${titleSlug}/${buildId}`;
+  const canonicalUrl = `https://zbuildorder.com${canonicalPath}`;
 
   const buildOrderHtml = createBuildOrderHtml(buildData.buildOrder);
   const buildOrderStepCount = Array.isArray(buildData.buildOrder)
@@ -360,6 +395,8 @@ function buildPrerenderPayload(buildData) {
     buildOrderStepCount,
     replayUrl,
     videoUrl,
+    canonicalPath,
+    canonicalUrl,
     meta,
   };
 }
@@ -488,7 +525,7 @@ async function captureBuildHtml(buildId, buildDataFromEvent) {
     throw new Error(`No build data found for ${buildId}`);
   }
 
-  const payload = buildPrerenderPayload(buildData);
+  const payload = buildPrerenderPayload(buildData, buildId);
   const staticTemplate = await loadStaticPrerenderTemplate();
   console.log(`📦 Loaded Firestore data for build ${buildId}.`, {
     title: payload.title,
@@ -707,14 +744,13 @@ async function captureBuildHtml(buildId, buildDataFromEvent) {
           removeIfExists('meta[property="og:url"]');
           const ogUrlTag = doc.createElement("meta");
           ogUrlTag.setAttribute("property", "og:url");
-          ogUrlTag.content = window.location.href;
+          ogUrlTag.content = data.canonicalUrl;
           head.appendChild(ogUrlTag);
 
           removeIfExists('link[rel="canonical"]');
           const canonical = doc.createElement("link");
           canonical.setAttribute("rel", "canonical");
-          const path = window.location.pathname.replace(/^\/+/, "");
-          canonical.setAttribute("href", `https://zbuildorder.com/${path}`);
+          canonical.setAttribute("href", data.canonicalUrl);
           head.appendChild(canonical);
 
           removeIfExists('meta[name="robots"]');
@@ -741,7 +777,7 @@ async function captureBuildHtml(buildId, buildDataFromEvent) {
               ? new Date(data.datePublished).toISOString()
               : undefined,
             description: data.meta.description,
-            url: window.location.href,
+            url: data.canonicalUrl,
             publisher: {
               "@type": "Organization",
               name: "Z-Build Order",
@@ -918,11 +954,32 @@ exports.servePreRenderedBuild = onRequest(
     res.set("Vary", "User-Agent");
 
     const userAgent = req.headers["user-agent"] || "";
-    const canonicalUrl = buildCanonicalUrl(req);
+
+    // Compute a preferred canonical URL using Firestore data
+    let preferredUrl = null;
+    try {
+      const data = await fetchBuildData(buildId);
+      if (data) {
+        const preferredPath = buildPreferredPath(buildId, data);
+        const host = req.headers["x-forwarded-host"] || req.headers.host || "zbuildorder.com";
+        preferredUrl = absoluteCanonical(host, preferredPath);
+
+        // Redirect any non-canonical path to the preferred one
+        if (req.path !== preferredPath) {
+          res.set("Location", preferredUrl);
+          res.status(301).send("Moved Permanently");
+          return;
+        }
+      }
+    } catch (e) {
+      // If we cannot compute preferred, fall back to request URL
+      preferredUrl = buildCanonicalUrl(req);
+    }
+    if (!preferredUrl) preferredUrl = buildCanonicalUrl(req);
 
     if (!isBot(userAgent)) {
       try {
-        await sendSpaIndex(res);
+        await sendSpaIndex(res, 200, preferredUrl);
       } catch (error) {
         console.error("❌ Failed to serve SPA fallback:", error);
         res.status(500).send("Application unavailable.");
@@ -932,16 +989,17 @@ exports.servePreRenderedBuild = onRequest(
 
     try {
       let html = await getPrerenderedHtml(buildId);
-      html = addCanonicalLink(html, canonicalUrl);
+      html = addCanonicalLink(html, preferredUrl);
 
       res.set("Content-Type", "text/html; charset=utf-8");
       res.set("Cache-Control", "public, max-age=300, s-maxage=600");
+      res.set("Link", `<${preferredUrl}>; rel=\"canonical\"`);
 
       res.status(200).send(html);
     } catch (error) {
       console.error("❌ Error serving pre-rendered build:", error);
       try {
-        await sendSpaIndex(res);
+        await sendSpaIndex(res, 200, preferredUrl);
       } catch (spaError) {
         console.error("❌ Failed to fallback to SPA index:", spaError);
         res.status(500).send("Application unavailable.");
