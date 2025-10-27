@@ -128,7 +128,10 @@ body.dark .transpose-group {
 }
 
 /* Optional disabled state */
-.transpose-group.is-disabled { opacity: 0.6; pointer-events: none; }
+.transpose-group.is-disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
 
 #content {
   flex: 1;
@@ -3311,19 +3314,6 @@ td {
   margin-right: 12px; /* Space between image and text */
 }
 
-/* Build list: align favorite star vertically via the left column */
-#buildsModal #buildList.list-view .build-left {
-  position: relative; /* anchor favorite */
-}
-
-#buildsModal #buildList.list-view .build-left .favorite-btn {
-  position: absolute;
-  left: -42px; /* sit inside the 50px reserved gutter */
-  top: 50%;
-  transform: translateY(-50%);
-  padding: 0;
-}
-
 /* ✅ Right section - Text content */
 .build-right {
   display: flex;
@@ -3496,33 +3486,6 @@ td {
   align-items: center;
 }
 
-/* Combined matchup icon + chip badge (Builds Modal) */
-#buildsModal .matchup-badge {
-  position: relative;
-  width: 40px;
-  height: 40px;
-  overflow: visible;
-}
-
-#buildsModal .matchup-badge .matchup-icon {
-  display: block;
-  width: 40px;
-  height: 40px;
-}
-
-#buildsModal .matchup-badge .matchup-overlay {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: -8px; /* slightly below the icon */
-  padding: 2px 8px;
-  font-size: 12px;
-  line-height: 1;
-  border-radius: 12px;
-  white-space: nowrap;
-  z-index: 1;
-}
-
 /* ---- Mobile fixes for Builds Modal (prevent overlap) ---- */
 @media (max-width: 768px) {
   /* Use a compact grid inside the list entries so the right-side actions
@@ -3536,10 +3499,9 @@ td {
     /* Keep space for the left favorite star */
     padding-left: 50px;
     /* Remove extra right/bottom padding previously used to avoid overlap */
-    padding-right: 100px; /* reserve space for absolute actions */
+    padding-right: 12px;
     padding-bottom: 8px;
-    min-height: 123px; /* ensure two meta rows fit comfortably */
-    position: relative; /* anchor absolute buttons */
+    min-height: 123px; /* more room for wrapped meta chips */
   }
 
   #buildsModal #buildList.list-view .build-left {
@@ -3549,7 +3511,6 @@ td {
     align-self: center; /* vertically center the matchup icon */
     display: flex;
     align-items: center;
-    overflow: visible; /* allow overlay chip to extend */
   }
 
   #buildsModal #buildList.list-view .build-right {
@@ -3559,55 +3520,29 @@ td {
   }
 
   /* Place actions in a dedicated right column and drop absolute positioning */
+  #buildsModal #buildList.list-view .delete-build-btn,
+  #buildsModal #buildList.list-view .build-publish-info {
+    position: static;
+  }
+
   #buildsModal #buildList.list-view .delete-build-btn {
-    position: absolute;
-    top: 8px;
-    right: 16px;
-    z-index: 1;
+    grid-column: 3;
+    grid-row: 1;
+    justify-self: end;
+    align-self: start;
   }
 
   #buildsModal #buildList.list-view .build-publish-info {
-    position: absolute;
-    right: 16px;
-    bottom: 8px;
-    z-index: 1;
+    grid-column: 3;
+    grid-row: 2;
+    justify-self: end;
+    align-self: end;
+    margin-top: 4px;
   }
 
   /* Title no longer needs extra right margin; meta wraps cleanly */
   #buildsModal #buildList.list-view .build-title {
     margin-right: 0;
-  }
-}
-
-/* ---- Medium screens: abbreviate publish tags in Builds modal to avoid collisions ---- */
-@media screen and (max-width: 1440px) and (min-width: 769px) {
-  /* Only affect the Builds modal list */
-  #buildsModal #buildList.list-view .build-publish-info .tag.public,
-  #buildsModal #buildList.list-view .build-publish-info .tag.clan {
-    font-size: 0; /* hide original word */
-    position: relative;
-    padding: 4px 8px; /* slightly tighter badge */
-  }
-
-  #buildsModal #buildList.list-view .build-publish-info .tag.public::after {
-    content: "P";
-    font-size: 0.8rem;
-  }
-
-  #buildsModal #buildList.list-view .build-publish-info .tag.clan::after {
-    content: "C";
-    font-size: 0.8rem;
-  }
-
-  /* Keep the publish cluster compact */
-  #buildsModal #buildList.list-view .build-publish-info {
-    gap: 6px;
-    white-space: nowrap;
-  }
-
-  /* Reserve a small right gutter so meta chips don't slide underneath */
-  #buildsModal #buildList.list-view .build-right {
-    padding-right: 120px;
   }
 }
 
