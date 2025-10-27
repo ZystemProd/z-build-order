@@ -811,6 +811,24 @@ export async function populateBuildList(
           if (info?.logoUrl) pubImg.src = info.logoUrl;
         });
       }
+
+      // Merge matchup icon and matchup chip to save space (list view)
+      try {
+        const left = buildEl.querySelector(".build-left");
+        const meta = buildEl.querySelector(".build-meta");
+        const chip = meta?.querySelector(".matchup-chip");
+        const icon = left?.querySelector(".matchup-icon");
+        if (left && icon && chip) {
+          const badge = document.createElement("div");
+          badge.className = "matchup-badge";
+          left.appendChild(badge);
+          badge.appendChild(icon);
+          chip.classList.add("matchup-overlay");
+          badge.appendChild(chip);
+        }
+      } catch (e) {
+        console.warn("Failed to merge matchup chip with icon", e);
+      }
     } else {
       buildEl.innerHTML = `
         <div class="build-card-header">
@@ -850,7 +868,14 @@ export async function populateBuildList(
       await updateBuildFavorite(build.id, newState);
       await filterBuilds(getCurrentBuildFilter());
     });
-    buildEl.prepend(favBtn);
+    // Place favorite button relative to the left column so it can be
+    // vertically centered against the matchup icon regardless of entry height.
+    const leftContainer = buildEl.querySelector(".build-left");
+    if (leftContainer) {
+      leftContainer.appendChild(favBtn);
+    } else {
+      buildEl.prepend(favBtn);
+    }
 
     // Color styles
     const sub = build.subcategory?.toUpperCase() || "";
