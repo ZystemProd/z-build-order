@@ -216,9 +216,8 @@ function updateBuildInputVisibility() {
 function updateBuildInputPlaceholder() {
   const textarea = document.getElementById("buildOrderInput");
   if (!textarea) return;
-  textarea.placeholder = isBracketInputEnabled()
-    ? "[12] Spawning Pool"
-    : "Spawning Pool";
+  const base = isBracketInputEnabled() ? "[12] Spawning Pool" : "Spawning Pool";
+  textarea.placeholder = `${base} — or drop a .SC2Replay here`;
 }
 
 async function loadDonations() {
@@ -847,6 +846,93 @@ export async function initializeIndexPage() {
     const modal = document.getElementById("replayOptionsModal");
     if (modal) modal.style.display = "block";
   });
+
+  // --- Global drag & drop for .SC2Replay files ---
+  (function setupReplayDragAndDrop() {
+    const overlay = document.getElementById("replayDropOverlay");
+    if (!overlay) return;
+
+    let dragDepth = 0;
+
+    function isFileDrag(evt) {
+      const dt = evt.dataTransfer;
+      if (!dt) return false;
+      // Chrome/Edge expose types as array-like
+      if (dt.types && typeof dt.types.includes === "function") {
+        return dt.types.includes("Files");
+      }
+      return true; // fallback: assume files
+    }
+
+    function showOverlay() {
+      overlay.style.display = "flex";
+      overlay.classList.add("active");
+    }
+    function hideOverlay() {
+      overlay.classList.remove("active");
+      overlay.style.display = "none";
+    }
+
+    document.addEventListener(
+      "dragenter",
+      (e) => {
+        if (!isFileDrag(e)) return;
+        e.preventDefault();
+        dragDepth++;
+        showOverlay();
+      },
+      false
+    );
+
+    document.addEventListener(
+      "dragover",
+      (e) => {
+        if (!isFileDrag(e)) return;
+        e.preventDefault();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+        showOverlay();
+      },
+      false
+    );
+
+    document.addEventListener(
+      "dragleave",
+      (e) => {
+        if (!isFileDrag(e)) return;
+        e.preventDefault();
+        dragDepth = Math.max(0, dragDepth - 1);
+        if (dragDepth === 0) hideOverlay();
+      },
+      false
+    );
+
+    document.addEventListener(
+      "drop",
+      async (e) => {
+        if (!isFileDrag(e)) return;
+        e.preventDefault();
+        dragDepth = 0;
+        hideOverlay();
+        const file = e.dataTransfer?.files?.[0];
+        if (!file) return;
+        if (!file.name.toLowerCase().endsWith(".sc2replay")) {
+          alert("Please drop a .SC2Replay file");
+          return;
+        }
+
+        selectedReplayFile = file;
+        window.lastReplayFile = file;
+        const reparseBtn = document.getElementById("reparseLastReplayButton");
+        if (reparseBtn) reparseBtn.style.display = "inline-block";
+
+        await populateReplayOptions(file);
+        updateChronoWarning();
+        const modal = document.getElementById("replayOptionsModal");
+        if (modal) modal.style.display = "block";
+      },
+      false
+    );
+  })();
 
   safeAdd("confirmReplayOptionsButton", "click", async () => {
     if (!selectedReplayFile) return;

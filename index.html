@@ -49,6 +49,13 @@
     <img src="img/toplogo.webp" alt="Z-Build Order Logo" class="top-logo" />
   </div>
   <div id="toast-container"></div>
+  <!-- Global Replay Drop Overlay -->
+  <div id="replayDropOverlay" class="replay-drop-overlay" aria-hidden="true" style="display:none;">
+    <div class="replay-drop-content">
+      <img src="img/SVG/import2.svg" alt="Drop Replay" class="replay-drop-icon" />
+      <p class="replay-drop-text">Drop .SC2Replay to parse</p>
+    </div>
+  </div>
 
   <!-- Game Selector -->
   <div id="game-select">
@@ -253,7 +260,7 @@
       </div>
       <div id="buildOrderInputField" class="hideable-section">
         <div class="template-wrapper">
-          <textarea id="buildOrderInput" placeholder="Spawning Pool"></textarea>
+          <textarea id="buildOrderInput" placeholder="Type a build order... or drop a .SC2Replay file here"></textarea>
           <div id="optionsLoadingWrapper">
             <div class="spinner"></div>
           </div>
