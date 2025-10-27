@@ -1,7 +1,8 @@
 const { onRequest } = require("firebase-functions/v2/https");
 const admin = require("./admin.js");
 
-exports.sitemap = onRequest(async (req, res) => {
+// Ensure region matches your deployed hosting region mapping
+exports.sitemap = onRequest({ region: "us-central1" }, async (req, res) => {
   const db = admin.firestore();
   const buildsSnapshot = await db.collection("publishedBuilds").get();
 

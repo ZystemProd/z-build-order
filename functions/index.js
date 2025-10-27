@@ -1007,3 +1007,11 @@ exports.servePreRenderedBuild = onRequest(
     }
   }
 );
+
+// Expose sitemap HTTP function so Hosting rewrite to /sitemap.xml works
+try {
+  const { sitemap } = require("./sitemap");
+  exports.sitemap = sitemap;
+} catch (e) {
+  console.warn("sitemap function not exported:", e?.message || e);
+}
