@@ -167,6 +167,9 @@ function adjustCatPosition() {
         box.style.setProperty("--cat-shift", `${total}px`);
       }
     }
+    // Reveal cat once positioned to avoid initial wrong placement flash
+    box.style.visibility = "visible";
+    box.style.opacity = "1";
   } catch (_) {
     // no-op
   }
@@ -1313,6 +1316,15 @@ export async function initializeIndexPage() {
   window.addEventListener("orientationchange", adjustCatPositionDebounced);
   // Also adjust after a tick to account for fonts/layout
   setTimeout(adjustCatPosition, 50);
+  // Adjust again once page fully loaded and fonts resolved
+  window.addEventListener("load", adjustCatPosition);
+  try {
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => adjustCatPosition());
+    }
+  } catch (_) {
+    /* ignore if document.fonts unsupported */
+  }
   // Also react to resizes of the header or the cat itself
   try {
     const ro = new ResizeObserver(adjustCatPositionDebounced);

@@ -2377,12 +2377,12 @@ body.modal-open {
   border-top-color: #333; /* Arrow color matches tooltip */
 }
 
-#buildOrderTable [data-tooltip] {
+#buildOrderTable [data-tooltip]:not(#openFocusModal) {
   position: relative; /* REQUIRED to position ::after */
   display: inline-block; /* Make it hoverable */
 }
 
-#buildOrderTable [data-tooltip]::after {
+#buildOrderTable [data-tooltip]:not(#openFocusModal)::after {
   content: attr(data-tooltip);
   position: absolute;
   bottom: 125%;
@@ -2401,7 +2401,7 @@ body.modal-open {
   z-index: 1000;
 }
 
-#buildOrderTable [data-tooltip]::before {
+#buildOrderTable [data-tooltip]:not(#openFocusModal)::before {
   content: "";
   position: absolute;
   bottom: -5px;
@@ -2411,7 +2411,7 @@ body.modal-open {
   border-top-color: #333;
 }
 
-#buildOrderTable [data-tooltip]:hover::after {
+#buildOrderTable [data-tooltip]:not(#openFocusModal):hover::after {
   opacity: 1;
   visibility: visible;
 }
