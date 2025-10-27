@@ -61,6 +61,58 @@ body {
   margin: 0 auto; /* Center the container */
 }
 
+/* Sort controls column (fixed width to avoid layout shift) */
+.sort-controls {
+  flex: 0 0 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px; /* reserve some height even when content is small */
+}
+
+.sort-button {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 59, 108, 0.65); /* var(--darker-blue) tinted */
+  border: 1px solid rgba(0, 255, 255, 0.6); /* var(--hover-blue) */
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.25);
+  cursor: pointer;
+  opacity: 0; /* hidden by default */
+  pointer-events: none; /* no interaction when hidden */
+  transition: opacity 0.15s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sort-button .sort-icon {
+  width: 22px;
+  height: 22px;
+  display: block;
+  object-fit: contain;
+  filter: drop-shadow(0 0 2px rgba(0,0,0,0.6));
+}
+
+.sort-button:hover {
+  background: rgba(10, 59, 108, 0.9);
+  border-color: var(--hover-blue);
+  box-shadow: 0 0 14px rgba(0, 255, 255, 0.45);
+}
+
+.sort-button:hover .sort-icon { filter: drop-shadow(0 0 2px rgba(0,255,255,0.6)); }
+
+.sort-button:focus-visible {
+  outline: 2px solid var(--hover-blue);
+  outline-offset: 2px;
+}
+
+/* Show sort button only when container hovered AND order is complete */
+.container.has-complete-order:hover .sort-button {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .map-list {
   display: initial;
   width: 30%;
@@ -1076,6 +1128,11 @@ html {
   .container {
     flex-direction: column;
     align-items: center;
+  }
+
+  /* Hide sort controls on mobile layout */
+  .sort-controls {
+    display: none;
   }
 
   .map-list,

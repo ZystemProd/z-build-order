@@ -34,6 +34,7 @@ function confirmBestOf(selectEl) {
   if (modal) modal.style.display = "none";
   updateDisplayedBestOf();
   checkUnvetoedMapsForBestOf();
+  updateSortButtonState();
   if (document.getElementById("advanced-map-list")) {
     recalcAdvancedStage();
     updateStageIndicator();
@@ -49,6 +50,7 @@ window.addEventListener("DOMContentLoaded", () => {
   renderMapList();
   updateDisplayedMap();
   updateDisplayedBestOf();
+  updateSortButtonState();
 
   // Setup Stat toggle buttons (overlay + panel)
   const statBtnOverlay = document.getElementById("statToggleBtn");
@@ -134,6 +136,9 @@ window.addEventListener("DOMContentLoaded", () => {
   if (p1Input) p1Input.addEventListener("input", updateStageIndicator);
   if (p2Input) p2Input.addEventListener("input", updateStageIndicator);
   updateStageIndicator();
+  // Sort button handler
+  const sortBtn = document.getElementById("sortButton");
+  if (sortBtn) sortBtn.addEventListener("click", sortChosenMaps);
 });
 
 // Map Preview on Hover
@@ -196,6 +201,7 @@ function toggleVeto(mapNumber) {
 
   checkUnvetoedMapsForBestOf();
   updateStatButtonVisibility(currentMap);
+  updateSortButtonState();
 }
 
 function canVetoMoreMaps() {
@@ -228,6 +234,7 @@ function checkUnvetoedMapsForBestOf() {
       ind.style.background = "";
     }
   });
+  updateSortButtonState();
 }
 
 function getUnvetoedMapCount() {
@@ -253,6 +260,7 @@ function cycleOrder(mapNumber, event) {
   const currentOrder = parseInt(indicator.textContent) || 0;
   indicator.textContent =
     currentOrder < maxOrders ? `${currentOrder + 1}.` : "";
+  updateSortButtonState();
 }
 
 // UI Controls
@@ -294,6 +302,7 @@ function resetAll() {
   resetPreview();
   bestOfValue = 3;
   showBestOfModal();
+  updateSortButtonState();
 
   const advList = document.getElementById("advanced-map-list");
   const p1 = document.getElementById("player1-list");
@@ -994,6 +1003,51 @@ function renderMapList() {
 
   attachListDragEvents(mapList);
   checkUnvetoedMapsForBestOf();
+  updateSortButtonState();
+}
+
+// --- Sorting (basic mode): sort chosen maps by order indicator ---
+function isOrderComplete() {
+  if (bestOfValue <= 1) return false;
+  const rows = [...document.querySelectorAll(".map-list .map-row")];
+  const chosen = rows
+    .map((r) => r.querySelector("li"))
+    .filter((li) => li && !li.classList.contains("vetoed-map"));
+  if (chosen.length !== bestOfValue) return false;
+  const nums = chosen
+    .map((li) => parseInt(li.querySelector(".order-indicator")?.textContent))
+    .filter((n) => Number.isFinite(n));
+  if (nums.length !== bestOfValue) return false;
+  const set = new Set(nums);
+  if (set.size !== bestOfValue) return false;
+  for (let i = 1; i <= bestOfValue; i++) if (!set.has(i)) return false;
+  return true;
+}
+
+function updateSortButtonState() {
+  const container = document.querySelector(".container");
+  if (!container) return;
+  if (isOrderComplete()) container.classList.add("has-complete-order");
+  else container.classList.remove("has-complete-order");
+}
+
+function sortChosenMaps() {
+  const list = document.querySelector(".map-list ul");
+  if (!list || !isOrderComplete()) return;
+  const rows = [...list.querySelectorAll(":scope > .map-row")];
+  const chosen = [];
+  const others = [];
+  for (const row of rows) {
+    const li = row.querySelector("li");
+    if (!li) continue;
+    const vetoed = li.classList.contains("vetoed-map");
+    const n = parseInt(li.querySelector(".order-indicator")?.textContent);
+    if (!vetoed && Number.isFinite(n)) chosen.push({ n, row });
+    else others.push(row);
+  }
+  chosen.sort((a, b) => a.n - b.n);
+  for (const { row } of chosen) list.appendChild(row);
+  for (const row of others) list.appendChild(row);
 }
 
 // --- Mobile Preview Modal ---
