@@ -1,4 +1,125 @@
 {
-  "indexes": [],
+  "indexes": [
+    {
+      "collectionId": "publishedBuilds",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "isPublic", "order": "ASCENDING" },
+        { "fieldPath": "datePublished", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionId": "publishedBuilds",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "isPublic", "order": "ASCENDING" },
+        { "fieldPath": "category", "order": "ASCENDING" },
+        { "fieldPath": "datePublished", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionId": "publishedBuilds",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "isPublic", "order": "ASCENDING" },
+        { "fieldPath": "subcategoryLowercase", "order": "ASCENDING" },
+        { "fieldPath": "datePublished", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionId": "publishedBuilds",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "sharedToClans", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "datePublished", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionId": "publishedBuilds",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "sharedToClans", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "category", "order": "ASCENDING" },
+        { "fieldPath": "datePublished", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionId": "publishedBuilds",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "sharedToClans", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "subcategoryLowercase", "order": "ASCENDING" },
+        { "fieldPath": "datePublished", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionId": "publishedBuilds",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "category", "order": "ASCENDING" },
+        { "fieldPath": "datePublished", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionId": "publishedBuilds",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "subcategoryLowercase", "order": "ASCENDING" },
+        { "fieldPath": "datePublished", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionId": "publishedBuilds",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "publisherId", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionId": "publishedBuilds",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "publisherId", "order": "ASCENDING" },
+        { "fieldPath": "category", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionId": "publishedBuilds",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "publisherId", "order": "ASCENDING" },
+        { "fieldPath": "subcategoryLowercase", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+
+    {
+      "collectionGroup": "builds",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "category", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "builds",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "subcategoryLowercase", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+
+    {
+      "collectionGroup": "comments",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "parentId", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "ASCENDING" }
+      ]
+    }
+  ],
   "fieldOverrides": []
 }
