@@ -1,6 +1,6 @@
 import DOMPurify from "dompurify";
 import { auth, db, initializeAuthUI } from "../../app.js"; // ✅ Reuse Firebase app
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+import { onAuthStateChanged } from "firebase/auth";
 import {
   collection,
   doc,
@@ -18,7 +18,7 @@ import {
   getDocs,
   where,
   startAfter,
-} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+} from "firebase/firestore";
 import {
   formatActionText,
   formatWorkersOrTimestampText,

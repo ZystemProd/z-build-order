@@ -3,14 +3,8 @@ import { formatActionText } from "./textFormatters.js";
 import DOMPurify from "dompurify";
 import { logAnalyticsEvent } from "./analyticsHelper.js";
 import { showToast } from "./toastHandler.js";
-import { getAuth } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
-import {
-  getFirestore,
-  collection,
-  addDoc,
-  getDocs,
-  Timestamp,
-} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+import { getAuth } from "firebase/auth";
+import { getFirestore, collection, addDoc, getDocs, Timestamp } from "firebase/firestore";
 
 const predefinedTemplates = [
   {

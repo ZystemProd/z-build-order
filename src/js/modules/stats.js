@@ -1,9 +1,4 @@
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+import { collection, query, where, getDocs } from "firebase/firestore";
 import { auth, db } from "../../app.js";
 import { showToast } from "./toastHandler.js";
 import { updateTooltips } from "./tooltip.js";
