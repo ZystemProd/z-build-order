@@ -34,12 +34,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <base href="/">
   <link rel="icon" type="image/x-icon" href="/img/favicon.ico" />
+  <!-- Performance: preconnect critical third-parties -->
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
+  <link rel="preconnect" href="https://content-firebaseappcheck.googleapis.com" crossorigin>
+  <link rel="preconnect" href="https://z-build-order.onrender.com" crossorigin>
 
   <!-- CSS -->
   <link rel="stylesheet" href="public/css/style.css">
   <link rel="stylesheet" href="public/css/alertNotification.css">
   <link rel="stylesheet" href="public/css/template.css">
-  <link rel="stylesheet" href="public/css/showToast.css">
+  <!-- Non‑blocking load for toast styles -->
+  <link id="toast-css-preload" rel="preload" as="style" href="public/css/showToast.css" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="public/css/showToast.css"></noscript>
   <link rel="stylesheet" href="public/css/catHelper.css">
 </head>
 
@@ -49,6 +56,13 @@
     <img src="img/toplogo.webp" alt="Z-Build Order Logo" class="top-logo" />
   </div>
   <div id="toast-container"></div>
+  <!-- Global Replay Drop Overlay -->
+  <div id="replayDropOverlay" class="replay-drop-overlay" aria-hidden="true" style="display:none;">
+    <div class="replay-drop-content">
+      <img src="img/SVG/import2.svg" alt="Drop Replay" class="replay-drop-icon" />
+      <p class="replay-drop-text">Drop .SC2Replay to parse</p>
+    </div>
+  </div>
 
   <!-- Game Selector -->
   <div id="game-select">
@@ -253,7 +267,7 @@
       </div>
       <div id="buildOrderInputField" class="hideable-section">
         <div class="template-wrapper">
-          <textarea id="buildOrderInput" placeholder="Spawning Pool"></textarea>
+          <textarea id="buildOrderInput" placeholder="[12] Spawning Pool — or drop a .SC2Replay here"></textarea>
           <div id="optionsLoadingWrapper">
             <div class="spinner"></div>
           </div>
@@ -313,7 +327,7 @@
         <tr>
           <th id="supplyHeader"><span class="full-text">Supply/Time</span><span class="short-text">S/T</span></th>
           <th class="action-header">Action
-            <button id="openFocusModal" class="focus-btn" title="Focus Mode">
+            <button id="openFocusModal" class="focus-btn" title="Focus Mode" data-tooltip="Open Focus Mode">
               <img src="img/SVG/expand-top-right-svgrepo-com.svg" alt="Focus">
             </button>
           </th>
@@ -331,7 +345,7 @@
           <img src="img/SVG/plus.svg" alt="New Build Icon" class="svg-icon">
           New Build
         </button>
-        <button id="shareBuildButton" class="share-button">
+        <button id="shareBuildButton" class="share-button" data-tooltip="Share build link">
           <img src="img/SVG/share.svg" alt="Share" class="svg-icon">Share</button>
       </div>
     </div>
@@ -1039,4 +1053,3 @@
 </body>
 
 </html>
-

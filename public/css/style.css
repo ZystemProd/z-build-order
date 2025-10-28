@@ -34,6 +34,47 @@ body {
   overflow-x: hidden;
   min-height: 100%;
 }
+
+/* Replay drag-and-drop overlay */
+.replay-drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  display: none; /* toggled to flex when active */
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+}
+
+.replay-drop-overlay.active {
+  display: flex;
+}
+
+.replay-drop-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 24px 28px;
+  border-radius: 16px;
+  border: 2px dashed rgba(0, 188, 212, 0.8);
+  background: rgba(14, 22, 28, 0.9);
+  box-shadow: 0 0 24px rgba(0, 188, 212, 0.35), 0 0 0 2px rgba(0, 188, 212, 0.25) inset;
+}
+
+.replay-drop-icon {
+  width: 52px;
+  height: 52px;
+  filter: drop-shadow(0 0 6px rgba(0, 188, 212, 0.65));
+}
+
+.replay-drop-text {
+  margin: 0;
+  color: #e7feff;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
 html,
 body {
   width: 100%;
@@ -609,9 +650,11 @@ tr:hover {
 /* Limit width of the first column (Workers/Timestamp) */
 #buildOrderTable td:first-child,
 #buildOrderTable th:first-child {
-  width: 50px;
+  width: 96px; /* slightly wider so ranges like 03:00 - 03:20 fit */
+  min-width: 96px;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 textarea {
@@ -2336,12 +2379,12 @@ body.modal-open {
   border-top-color: #333; /* Arrow color matches tooltip */
 }
 
-#buildOrderTable [data-tooltip] {
+#buildOrderTable [data-tooltip]:not(#openFocusModal) {
   position: relative; /* REQUIRED to position ::after */
   display: inline-block; /* Make it hoverable */
 }
 
-#buildOrderTable [data-tooltip]::after {
+#buildOrderTable [data-tooltip]:not(#openFocusModal)::after {
   content: attr(data-tooltip);
   position: absolute;
   bottom: 125%;
@@ -2360,7 +2403,7 @@ body.modal-open {
   z-index: 1000;
 }
 
-#buildOrderTable [data-tooltip]::before {
+#buildOrderTable [data-tooltip]:not(#openFocusModal)::before {
   content: "";
   position: absolute;
   bottom: -5px;
@@ -2370,7 +2413,7 @@ body.modal-open {
   border-top-color: #333;
 }
 
-#buildOrderTable [data-tooltip]:hover::after {
+#buildOrderTable [data-tooltip]:not(#openFocusModal):hover::after {
   opacity: 1;
   visibility: visible;
 }

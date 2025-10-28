@@ -8,6 +8,10 @@
   display: inline-block;
   height: 150px;
   pointer-events: none; /* block everything by default */
+  opacity: 0; /* hide during first layout to prevent flicker */
+  visibility: hidden; /* ensure it doesn't paint before first position */
+  transition: opacity 150ms ease;
+  will-change: transform, opacity;
 }
 
 .cat * {

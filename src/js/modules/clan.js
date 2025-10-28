@@ -13,8 +13,8 @@ import {
   deleteField,
   query,
   where,
-} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
-import { getAuth } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+} from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 import {
   getStorage,
   ref,
@@ -22,16 +22,15 @@ import {
   deleteObject,
   getDownloadURL,
   ref as storageRef,
-} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-storage.js";
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
+} from "firebase/storage";
 import { createNotificationDot } from "./uiHandlers.js";
 import { showToast } from "./toastHandler.js";
-import { db } from "../../app.js";
+import { app, db } from "../../app.js";
 import { checkForJoinRequestNotifications } from "./utils/notificationHelpers.js";
 import DOMPurify from "dompurify";
 import { logAnalyticsEvent } from "./analyticsHelper.js";
 
-const storage = getStorage();
+const storage = getStorage(app);
 
 let currentClanView = null;
 
@@ -53,7 +52,7 @@ export async function getUsernameFromUid(uid) {
 }
 
 export async function uploadClanLogo(file, clanId) {
-  const storage = getStorage();
+  const storage = getStorage(app);
   const filePath = `clanLogos/${clanId}/logo.webp`;
   const storageRef = ref(storage, filePath);
 

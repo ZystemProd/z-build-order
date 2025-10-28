@@ -14,7 +14,7 @@ import {
   updateDoc,
   increment,
   startAfter,
-} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+} from "firebase/firestore";
 import { formatActionText, formatWorkersOrTimestampText } from "./textFormatters.js";
 import { showToast } from "./toastHandler.js";
 import { formatMatchup, formatShortDate } from "./modal.js";
@@ -25,8 +25,18 @@ import { updateTooltips } from "./tooltip.js";
 import { getUserMainClanInfo } from "./clan.js";
 
 let communitySortMode = "hot"; // default sort mode
+const DEBUG_COMMUNITY = false; // verbose logs toggle
 
 const batchSize = 13;
+
+// Simple debounce utility to avoid hammering Firestore while typing
+function debounce(fn, wait = 250) {
+  let t = null;
+  return function (...args) {
+    clearTimeout(t);
+    t = setTimeout(() => fn.apply(this, args), wait);
+  };
+}
 
 let lastVisibleDoc = null;
 let isLoadingMoreBuilds = false;
@@ -295,13 +305,15 @@ async function incrementBuildViews(db, buildId) {
       viewElement.textContent = parseInt(viewElement.textContent) + 1;
     }
 
-    console.log(`👀 View count updated for Build ID: ${buildId}`);
+    // view count updated
   } catch (error) {
     console.error("❌ Error updating view count:", error);
   }
 }
 
 // ✅ Update Build Preview
+let lastPreviewBuildId = null;
+
 function showBuildPreview(build) {
   const communityBuildPreview = document.getElementById(
     "communityBuildPreview"
@@ -311,6 +323,10 @@ function showBuildPreview(build) {
     console.error("❌ Error: communityBuildPreview element not found!");
     return;
   }
+
+  // Skip re-render if preview already shows this build
+  if (lastPreviewBuildId === build.id) return;
+  lastPreviewBuildId = build.id;
 
   const formattedBuildOrder = Array.isArray(build.buildOrder)
     ? build.buildOrder
@@ -348,10 +364,12 @@ function showBuildPreview(build) {
 
 const communitySearchInput = document.getElementById("communitySearchBar");
 if (communitySearchInput) {
-  communitySearchInput.addEventListener("input", async function () {
-    const query = this.value;
-    await searchCommunityBuilds(query);
-  });
+  const debouncedSearch = debounce(async (value) => {
+    await searchCommunityBuilds(value);
+  }, 300);
+  communitySearchInput.addEventListener("input", function () {
+    debouncedSearch(this.value);
+  }, { passive: true });
 }
 
 function updateVoteUI(buildId, upvotes, downvotes, userVote) {
@@ -483,7 +501,7 @@ if (publishButton) {
         datePublished: new Date().toISOString(),
       });
 
-      console.log(`✅ Build published with ID: ${docRef.id}`);
+      // build published successfully
       alert("Build successfully published to the community!");
 
       const buildDocRef = snapshot.docs[0].ref;
@@ -557,7 +575,7 @@ export async function publishBuildToCommunity(buildId) {
     }
 
     await addDoc(publishedBuildsRef, newBuildData);
-    console.log(`✅ Published build ID ${buildId} to community`);
+    // published build to community
 
     // ✅ Mark user build as published
     await setDoc(
@@ -598,13 +616,10 @@ window.publishBuildToCommunity = async function (
   buildId,
   { isPublic, sharedToClans }
 ) {
-  const { getFirestore, doc, getDoc, collection, addDoc, setDoc } =
-    await import(
-      "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js"
-    );
-  const { getAuth } = await import(
-    "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js"
+  const { getFirestore, doc, getDoc, collection, addDoc, setDoc } = await import(
+    "firebase/firestore"
   );
+  const { getAuth } = await import("firebase/auth");
 
   const db = getFirestore();
   const auth = getAuth();
@@ -858,7 +873,7 @@ function renderCommunityBuildBatch(builds) {
 
     // 🧠 Normalize matchup for image + meta display
     const matchup = build.matchup || build.subcategory || "Unknown";
-    console.log("🧪 Build:", build.title, "| Matchup:", matchup);
+    // debug: build and matchup
 
     let matchupImage = "./img/race/unknown.webp";
     let matchupClass = "matchup-unknown";
@@ -887,7 +902,8 @@ function renderCommunityBuildBatch(builds) {
       window.location.href = `/build/${matchup}/${slug}/${build.id}`;
     });
 
-    buildEntry.addEventListener("mouseover", () => showBuildPreview(build));
+    // Use mouseenter so it doesn't retrigger while moving over children
+    buildEntry.addEventListener("mouseenter", () => showBuildPreview(build));
 
     const clanChip =
       localStorage.getItem("communityBuildType") === "clan" && build.clanInfo

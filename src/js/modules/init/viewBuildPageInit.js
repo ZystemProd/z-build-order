@@ -1,15 +1,7 @@
 import { auth, db } from "../../../app.js";
 import { safeAdd } from "../helpers/sharedEventUtils.js";
 import { initializeSectionToggles } from "../uiHandlers.js";
-import {
-  doc,
-  getDoc,
-  setDoc,
-  getDocs,
-  collection,
-  query,
-  where,
-} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+import { doc, getDoc, setDoc, getDocs, collection, query, where } from "firebase/firestore";
 import { logAnalyticsEvent } from "../analyticsHelper.js";
 import { showToast } from "../toastHandler.js";
 

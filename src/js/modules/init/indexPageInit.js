@@ -1,13 +1,4 @@
-import {
-  getDoc,
-  getDocs,
-  doc,
-  collection,
-  updateDoc,
-  setDoc,
-  query,
-  where,
-} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+import { getDoc, getDocs, doc, collection, updateDoc, setDoc, query, where } from "firebase/firestore";
 import { auth, db } from "../../../app.js";
 import DOMPurify from "dompurify";
 
@@ -67,24 +58,11 @@ import {
   createNotificationDot,
 } from "../uiHandlers.js";
 import {
-  showTemplatesModal,
-  setupTemplateModal,
-  showSaveTemplateModal,
-  searchTemplates,
-  previewTemplate,
-} from "../template.js";
-import {
   initializeTooltips,
   updateTooltips,
   forceShowTooltip,
   forceHideTooltip,
 } from "../tooltip.js";
-import {
-  populateCommunityBuilds,
-  checkPublishButtonVisibility,
-  searchCommunityBuilds,
-  filterCommunityBuilds,
-} from "../community.js";
 import { resetBuildInputs, enableSaveButton } from "../utils.js";
 import {
   renderCreateClanUI,
@@ -92,12 +70,57 @@ import {
   renderFindClanUI,
   getUserClans,
 } from "../clan.js";
-import {
-  MapAnnotations,
-  initializeMapControls,
-  initializeMapSelection,
-  mapAnnotations,
-} from "../interactive_map.js";
+// Dynamic imports for community, templates, and map modules
+async function loadCommunityModule() {
+  return import("../community.js");
+}
+
+async function loadTemplatesModule() {
+  return import("../template.js");
+}
+
+async function loadMapModule() {
+  return import("../interactive_map.js");
+}
+
+// Wrapper functions so existing calls remain the same API
+async function populateCommunityBuilds(...args) {
+  const m = await loadCommunityModule();
+  return m.populateCommunityBuilds(...args);
+}
+async function checkPublishButtonVisibility(...args) {
+  const m = await loadCommunityModule();
+  return m.checkPublishButtonVisibility(...args);
+}
+async function searchCommunityBuilds(...args) {
+  const m = await loadCommunityModule();
+  return m.searchCommunityBuilds(...args);
+}
+async function filterCommunityBuilds(...args) {
+  const m = await loadCommunityModule();
+  return m.filterCommunityBuilds(...args);
+}
+
+// Template wrappers
+async function showTemplatesModal() {
+  const m = await loadTemplatesModule();
+  // Ensure modal constructed before showing
+  if (typeof m.setupTemplateModal === "function") await m.setupTemplateModal();
+  return m.showTemplatesModal();
+}
+async function showSaveTemplateModal() {
+  const m = await loadTemplatesModule();
+  if (typeof m.setupTemplateModal === "function") await m.setupTemplateModal();
+  return m.showSaveTemplateModal();
+}
+async function searchTemplates(val) {
+  const m = await loadTemplatesModule();
+  return m.searchTemplates(val);
+}
+async function previewTemplate(data) {
+  const m = await loadTemplatesModule();
+  return m.previewTemplate(data);
+}
 import {
   getSavedBuilds,
   setSavedBuilds,
@@ -167,6 +190,9 @@ function adjustCatPosition() {
         box.style.setProperty("--cat-shift", `${total}px`);
       }
     }
+    // Reveal cat once positioned to avoid initial wrong placement flash
+    box.style.visibility = "visible";
+    box.style.opacity = "1";
   } catch (_) {
     // no-op
   }
@@ -216,9 +242,8 @@ function updateBuildInputVisibility() {
 function updateBuildInputPlaceholder() {
   const textarea = document.getElementById("buildOrderInput");
   if (!textarea) return;
-  textarea.placeholder = isBracketInputEnabled()
-    ? "[12] Spawning Pool"
-    : "Spawning Pool";
+  const base = isBracketInputEnabled() ? "[12] Spawning Pool" : "Spawning Pool";
+  textarea.placeholder = `${base} — or drop a .SC2Replay here`;
 }
 
 async function loadDonations() {
@@ -272,7 +297,7 @@ async function populateMainClanDropdown() {
   select.value = getMainClanId();
 }
 
-setupTemplateModal(); // Always call early
+// Templates modal will be set up lazily when first opened
 
 // — replay meta, filled by populateReplayOptions —
 let replayPlayers = [];
@@ -655,9 +680,13 @@ export async function initializeIndexPage() {
     if (modal) modal.style.display = "none";
   });
 
-  // --- Templates
-  safeAdd("openTemplatesButton", "click", showTemplatesModal);
-  safeAdd("saveTemplateButton", "click", showSaveTemplateModal);
+  // --- Templates (lazy load)
+  safeAdd("openTemplatesButton", "click", () => {
+    showTemplatesModal();
+  });
+  safeAdd("saveTemplateButton", "click", () => {
+    showSaveTemplateModal();
+  });
 
   // --- Text Inputs
   const buildInput = document.getElementById("buildOrderInput");
@@ -671,7 +700,9 @@ export async function initializeIndexPage() {
     await searchCommunityBuilds(val);
   });
 
-  safeInput("templateSearchBar", (val) => searchTemplates(val));
+  safeInput("templateSearchBar", (val) => {
+    searchTemplates(val);
+  });
   safeInput("videoInput", (val) => updateYouTubeEmbed(val));
 
   let selectedReplayFile = null;
@@ -847,6 +878,93 @@ export async function initializeIndexPage() {
     const modal = document.getElementById("replayOptionsModal");
     if (modal) modal.style.display = "block";
   });
+
+  // --- Global drag & drop for .SC2Replay files ---
+  (function setupReplayDragAndDrop() {
+    const overlay = document.getElementById("replayDropOverlay");
+    if (!overlay) return;
+
+    let dragDepth = 0;
+
+    function isFileDrag(evt) {
+      const dt = evt.dataTransfer;
+      if (!dt) return false;
+      // Chrome/Edge expose types as array-like
+      if (dt.types && typeof dt.types.includes === "function") {
+        return dt.types.includes("Files");
+      }
+      return true; // fallback: assume files
+    }
+
+    function showOverlay() {
+      overlay.style.display = "flex";
+      overlay.classList.add("active");
+    }
+    function hideOverlay() {
+      overlay.classList.remove("active");
+      overlay.style.display = "none";
+    }
+
+    document.addEventListener(
+      "dragenter",
+      (e) => {
+        if (!isFileDrag(e)) return;
+        e.preventDefault();
+        dragDepth++;
+        showOverlay();
+      },
+      false
+    );
+
+    document.addEventListener(
+      "dragover",
+      (e) => {
+        if (!isFileDrag(e)) return;
+        e.preventDefault();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+        showOverlay();
+      },
+      false
+    );
+
+    document.addEventListener(
+      "dragleave",
+      (e) => {
+        if (!isFileDrag(e)) return;
+        e.preventDefault();
+        dragDepth = Math.max(0, dragDepth - 1);
+        if (dragDepth === 0) hideOverlay();
+      },
+      false
+    );
+
+    document.addEventListener(
+      "drop",
+      async (e) => {
+        if (!isFileDrag(e)) return;
+        e.preventDefault();
+        dragDepth = 0;
+        hideOverlay();
+        const file = e.dataTransfer?.files?.[0];
+        if (!file) return;
+        if (!file.name.toLowerCase().endsWith(".sc2replay")) {
+          alert("Please drop a .SC2Replay file");
+          return;
+        }
+
+        selectedReplayFile = file;
+        window.lastReplayFile = file;
+        const reparseBtn = document.getElementById("reparseLastReplayButton");
+        if (reparseBtn) reparseBtn.style.display = "inline-block";
+
+        await populateReplayOptions(file);
+        updateChronoWarning();
+        const modal = document.getElementById("replayOptionsModal");
+        if (modal) modal.style.display = "block";
+      },
+      false
+    );
+  })();
 
   safeAdd("confirmReplayOptionsButton", "click", async () => {
     if (!selectedReplayFile) return;
@@ -1227,6 +1345,15 @@ export async function initializeIndexPage() {
   window.addEventListener("orientationchange", adjustCatPositionDebounced);
   // Also adjust after a tick to account for fonts/layout
   setTimeout(adjustCatPosition, 50);
+  // Adjust again once page fully loaded and fonts resolved
+  window.addEventListener("load", adjustCatPosition);
+  try {
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => adjustCatPosition());
+    }
+  } catch (_) {
+    /* ignore if document.fonts unsupported */
+  }
   // Also react to resizes of the header or the cat itself
   try {
     const ro = new ResizeObserver(adjustCatPositionDebounced);
@@ -1263,17 +1390,31 @@ export async function initializeIndexPage() {
     replayView.style.display = "none";
   }
 
-  // --- Map Setup (only if map container exists)
+  // --- Map Setup (lazy) — avoid fetching maps.json until needed
   if (document.getElementById("map-preview-container")) {
-    initializeMapControls(mapAnnotations);
-    initializeMapSelection(mapAnnotations);
     setupMapModalListeners();
+    let mapInitDone = false;
+    async function ensureMapInitialized() {
+      if (mapInitDone) return;
+      const m = await loadMapModule();
+      // Create interactive map instance and controls
+      const inst = typeof m.initializeInteractiveMap === "function" ? m.initializeInteractiveMap() : null;
+      if (typeof m.initializeMapControls === "function") m.initializeMapControls(inst);
+      // Render initial set of maps and lazy-load images
+      if (typeof m.renderMapCards === "function") await m.renderMapCards("current");
+      if (typeof m.loadMapsOnDemand === "function") m.loadMapsOnDemand();
+      mapInitDone = true;
+    }
+
+    // Open button should trigger lazy init + show modal
+    safeAdd("openMapModalButton", "click", async () => {
+      await ensureMapInitialized();
+      const modal = document.getElementById("mapSelectionModal");
+      if (modal) modal.style.display = "block";
+    });
   }
 
-  // --- Load Community Builds
-  document.addEventListener("DOMContentLoaded", async () => {
-    await populateCommunityBuilds();
-  });
+  // Community builds load lazily when the modal is opened
 
   // This will load the necessary user data after successful authentication
   async function initializeUserData(user) {

@@ -12,9 +12,9 @@ import {
   where,
   orderBy,
   Timestamp,
-} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+} from "firebase/firestore";
 
-import { getAuth } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+import { getAuth } from "firebase/auth";
 import { db, auth } from "../../app.js";
 import {
   getSavedBuilds,

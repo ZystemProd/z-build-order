@@ -1,9 +1,5 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
-import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-analytics.js";
-import {
-  initializeAppCheck,
-  ReCaptchaV3Provider,
-} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app-check.js";
+import { initializeApp } from "firebase/app";
+import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 import { initAnalytics } from "./js/modules/analyticsHelper.js";
 import {
   getAuth,
@@ -14,7 +10,7 @@ import {
   onAuthStateChanged,
   setPersistence,
   browserLocalPersistence,
-} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+} from "firebase/auth";
 import {
   getFirestore,
   getDocs,
@@ -23,7 +19,7 @@ import {
   getDoc,
   setDoc,
   deleteDoc,
-} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+} from "firebase/firestore";
 import { bannedWords } from "./js/data/bannedWords.js";
 import { showToast } from "./js/modules/toastHandler.js";
 import { resetBuildInputs } from "./js/modules/utils.js";
@@ -105,8 +101,10 @@ function initCookieConsent() {
   const consent = localStorage.getItem("analyticsConsent");
 
   if (consent === "accepted") {
-    getAnalytics(app);
-    initAnalytics(app);
+    import("firebase/analytics").then(({ getAnalytics }) => {
+      getAnalytics(app);
+      initAnalytics(app);
+    });
     if (banner) banner.style.display = "none";
     return;
   }
@@ -120,11 +118,16 @@ function initCookieConsent() {
 
   banner.style.display = "block";
   if (acceptBtn) {
-    acceptBtn.addEventListener("click", () => {
+    acceptBtn.addEventListener("click", async () => {
       localStorage.setItem("analyticsConsent", "accepted");
       banner.style.display = "none";
-      getAnalytics(app);
-      initAnalytics(app);
+      try {
+        const { getAnalytics } = await import("firebase/analytics");
+        getAnalytics(app);
+        initAnalytics(app);
+      } catch (_) {
+        // ignore analytics load errors
+      }
     });
   }
   if (declineBtn) {
