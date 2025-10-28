@@ -365,10 +365,19 @@ export function formatWorkersOrTimestampText(workersOrTimestamp) {
 
   // Insert a visual separator between supply/resources and time if present
   // e.g. "13 00:17" => "13 | 00:17" or "100 gas 00:17" => "100 gas | 00:17"
-  const timeMatch = workersOrTimestamp.match(/(\d{1,2}:\d{2})\s*$/);
+  // Time can also be a range: "03:00 - 03:20"
+  const timeRangeMatch = workersOrTimestamp.match(
+    /(\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2})\s*$/
+  );
+  const timeMatch = !timeRangeMatch
+    ? workersOrTimestamp.match(/(\d{1,2}:\d{2})\s*$/)
+    : null;
   let left = workersOrTimestamp.trim();
   let time = null;
-  if (timeMatch && typeof timeMatch.index === "number") {
+  if (timeRangeMatch && typeof timeRangeMatch.index === "number") {
+    time = timeRangeMatch[1];
+    left = workersOrTimestamp.slice(0, timeRangeMatch.index).trim();
+  } else if (timeMatch && typeof timeMatch.index === "number") {
     time = timeMatch[1];
     left = workersOrTimestamp.slice(0, timeMatch.index).trim();
   }
@@ -398,6 +407,20 @@ export function formatWorkersOrTimestampText(workersOrTimestamp) {
       // Otherwise, allow resources to be decorated
       leftFormatted = preprocessAbbreviations(left);
       leftFormatted = matchActorsWithTrie(leftFormatted, actorTrie);
+    }
+  }
+
+  // If we have both sides and any side expresses a range like "32 - 40" or
+  // "03:00 - 03:20", join without the divider.
+  if (time && leftFormatted) {
+    const hasRange = (s) => {
+      if (!s) return false;
+      const str = String(s);
+      if (/\b\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}\b/.test(str)) return true;
+      return /\b\d{1,3}\s*-\s*\d{1,3}\b/.test(str);
+    };
+    if (hasRange(left) || hasRange(time)) {
+      return `${leftFormatted} ${DOMPurify.sanitize(time)}`;
     }
   }
 

@@ -650,9 +650,11 @@ tr:hover {
 /* Limit width of the first column (Workers/Timestamp) */
 #buildOrderTable td:first-child,
 #buildOrderTable th:first-child {
-  width: 50px;
+  width: 96px; /* slightly wider so ranges like 03:00 - 03:20 fit */
+  min-width: 96px;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 textarea {
