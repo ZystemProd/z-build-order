@@ -895,7 +895,7 @@ export async function populateBuildList(
     // Hover + click preview
     buildEl.addEventListener("mouseover", () => {
       if (lastHoveredBuild !== build) {
-        updateBuildPreview(build);
+        updateBuildPreviewWithTabs(build);
         lastHoveredBuild = build;
       }
     });
@@ -1159,6 +1159,150 @@ export function hideBuildsModal() {
   buildsModal.style.display = "none";
 }
 
+// Enhanced preview with Variation tabs
+async function updateBuildPreviewWithTabs(build) {
+  const buildPreview = document.getElementById("buildPreview");
+  if (!buildPreview) return;
+
+  const publisherName = build.publisher || build.username || "Unknown";
+  const formattedBuildOrder = (build.buildOrder || [])
+    .map((step) => {
+      if (typeof step === "string") return formatActionText(step);
+      if (step && step.action) {
+        const bracket = step.workersOrTimestamp
+          ? `<strong>${formatWorkersOrTimestampText(step.workersOrTimestamp)}</strong> `
+          : "";
+        return `${bracket}${formatActionText(step.action)}`;
+      }
+      return "";
+    })
+    .join("<br>");
+
+  buildPreview.innerHTML = `
+    <h4>${DOMPurify.sanitize(build.title)}</h4>
+    <p class="build-publisher-line"><strong>Publisher:</strong> ${DOMPurify.sanitize(publisherName)}</p>
+    <div class="variation-tabs" id="buildPreviewTabs" aria-label="Build variations" role="tablist"></div>
+    <pre id="buildPreviewBody">${formattedBuildOrder}</pre>
+  `;
+
+  await setupVariationTabs(buildPreview, build);
+}
+
+async function setupVariationTabs(container, build) {
+  try {
+    const tabsHost = container.querySelector('#buildPreviewTabs');
+    const bodyEl = container.querySelector('#buildPreviewBody');
+    if (!tabsHost || !bodyEl) return;
+
+    let variations = Array.isArray(build.variations) ? build.variations : [];
+    if ((!variations || variations.length === 0) && build.groupId) {
+      try {
+        const grouped = await fetchVariationsForGroup(build.groupId);
+        variations = grouped.filter(v => v.id !== build.id);
+      } catch (e) {
+        console.warn('Failed to fetch grouped variations', e);
+      }
+    }
+
+    if (!Array.isArray(variations) || variations.length === 0) return;
+
+    tabsHost.innerHTML = '';
+
+    const MAX_TABS = 5;
+    const MAIN_COLOR = '#4CC9F0';
+    const VARIATION_COLORS = ['#F72585', '#8AC926', '#F19E39', '#B38CFF', '#3DD6D0'];
+    const tabModels = [{ id: 'main', name: 'Main', data: null, color: MAIN_COLOR }].concat(
+      variations.slice(0, MAX_TABS - 1).map((v, i) => ({
+        id: v.id || `var_${i + 1}`,
+        name: v.variantName || v.name || v.title || `Variation ${i + 1}`,
+        data: v,
+        color: VARIATION_COLORS[i % VARIATION_COLORS.length]
+      }))
+    );
+
+    function formatBuildArray(arr) {
+      return (arr || [])
+        .map((step) => {
+          if (typeof step === 'string') return formatActionText(step);
+          if (step && step.action) {
+            const bracket = step.workersOrTimestamp
+              ? `<strong>${formatWorkersOrTimestampText(step.workersOrTimestamp)}</strong> `
+              : '';
+            return `${bracket}${formatActionText(step.action)}`;
+          }
+          return '';
+        })
+        .join('<br>');
+    }
+
+    function applyTab(tabId) {
+      if (tabId === 'main') {
+        bodyEl.innerHTML = formatBuildArray(build.buildOrder || []);
+        return;
+      }
+      const model = tabModels.find(t => t.id === tabId);
+      if (!model || !model.data) return;
+      const v = model.data;
+      let html = '';
+      if (Array.isArray(v.buildOrder) && v.buildOrder.length > 0) {
+        html = formatBuildArray(v.buildOrder);
+      } else if (typeof v.text === 'string' && v.text.trim()) {
+        html = DOMPurify.sanitize(
+          v.text
+            .split(/\r?\n/)
+            .filter(Boolean)
+            .map((ln) => ln.replace(/</g, '&lt;').replace(/>/g, '&gt;'))
+            .join('<br>')
+        );
+      }
+      if (html) bodyEl.innerHTML = html;
+    }
+
+    tabModels.forEach((m, idx) => {
+      const btn = document.createElement('button');
+      btn.className = 'variation-tab' + (idx === 0 ? ' active' : '');
+      btn.type = 'button';
+      btn.setAttribute('role', 'tab');
+      btn.setAttribute('data-var-id', m.id);
+      btn.title = m.name;
+      btn.textContent = m.name;
+      try { btn.style.borderColor = m.color || MAIN_COLOR; } catch (_) {}
+      // active underline like main page
+      try { btn.style.boxShadow = idx === 0 ? `inset 0 -3px 0 0 ${m.color || MAIN_COLOR}` : 'none'; } catch (_) {}
+      btn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        tabsHost.querySelectorAll('.variation-tab').forEach((b) => {
+          b.classList.remove('active');
+          // clear underline
+          try { b.style.boxShadow = 'none'; } catch (_) {}
+        });
+        btn.classList.add('active');
+        try { btn.style.boxShadow = `inset 0 -3px 0 0 ${m.color || MAIN_COLOR}`; } catch (_) {}
+        applyTab(m.id);
+      });
+      tabsHost.appendChild(btn);
+    });
+
+    container.addEventListener(
+      'mouseleave',
+      () => {
+        const mainBtn = tabsHost.querySelector('.variation-tab[data-var-id="main"]');
+        if (mainBtn) {
+          tabsHost.querySelectorAll('.variation-tab').forEach((b) => {
+            b.classList.remove('active');
+            try { b.style.boxShadow = 'none'; } catch (_) {}
+          });
+          mainBtn.classList.add('active');
+          try { mainBtn.style.boxShadow = `inset 0 -3px 0 0 ${MAIN_COLOR}`; } catch (_) {}
+          applyTab('main');
+        }
+      },
+      { passive: true }
+    );
+  } catch (e) {
+    console.warn('setupVariationTabs failed', e);
+  }
+}
 export function loadBuild(index) {
   const build = getSavedBuilds()[index];
   const inputField = document.getElementById("buildOrderInput");

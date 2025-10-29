@@ -604,14 +604,28 @@ function ensureVariationUIContainers() {
   if (!output) return;
   const table = document.getElementById("buildOrderTable");
   if (!table) return;
+
   let tabs = document.getElementById("variationTabs");
   if (!tabs) {
     tabs = document.createElement("div");
     tabs.id = "variationTabs";
     tabs.className = "variation-tabs";
-    // Insert tabs just before the table
-    table.parentNode.insertBefore(tabs, table);
   }
+
+  // Ensure tabs live directly under .buildOrderOutput, immediately before the table
+  // This moves it out of the grid-based .form-container so it can flex full width on mobile
+  if (tabs.parentNode !== output || tabs.nextElementSibling !== table) {
+    try {
+      output.insertBefore(tabs, table);
+    } catch (_) {
+      // Fallback in case of rare DOM state; append to output then reorder
+      output.appendChild(tabs);
+      output.insertBefore(tabs, table);
+    }
+  }
+
+  // Make sure it renders as a flex row wrapper
+  tabs.style.display = "flex";
 }
 
 async function loadVariationGroupContext() {

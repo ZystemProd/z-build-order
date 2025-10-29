@@ -778,6 +778,56 @@ button:hover {
   cursor: pointer;
   transform: none; /* prevent global button hover transforms */
 }
+.build-preview .variation-tab,
+#buildPreview .variation-tab,
+#communityBuildPreview .variation-tab {
+  background: transparent !important; /* override modal/button defaults */
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-weight: 600;
+}
+
+/* Mobile: keep tabs on multiple per row, not one per row */
+@media (max-width: 768px) {
+  /* When variation tabs live inside the grid-based .form-container, force row layout */
+  .form-container #variationTabs {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    flex-direction: row !important;
+    gap: 10px;
+    align-items: center;
+    justify-content: flex-start;
+  }
+  .form-container #variationTabs .variation-tab {
+    display: inline-flex !important;
+    flex: 0 0 auto !important;
+    width: auto !important;
+    white-space: nowrap;
+    margin: 0;
+  }
+  .build-preview .variation-tabs,
+  #buildPreview .variation-tabs,
+  #communityBuildPreview .variation-tabs {
+    display: flex;
+    flex-wrap: wrap !important;
+    gap: 10px;
+    flex-direction: row !important;
+    justify-content: flex-start;
+  }
+  .build-preview .variation-tab,
+  #buildPreview .variation-tab,
+  #communityBuildPreview .variation-tab {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    width: auto !important;
+    max-width: 100%;
+    flex: 0 0 auto !important; /* prevent full-width stretching in flex rows */
+    max-width: 100%;
+    white-space: nowrap;
+    margin: 0; /* avoid block spacing rules from other button styles */
+  }
+}
 .variation-tab.active {
   background: transparent; /* keep transparent for active as well */
   border-color: #3a4761; /* will be overridden by inline border-color */
@@ -6079,4 +6129,12 @@ optgroup[label="Terran"] {
   box-shadow: 0 0 0 2px rgba(0, 188, 212, 0.35),
     0 10px 22px rgba(0, 188, 212, 0.25);
   transform: translateY(-1px);
+}
+/* Variation tabs: single row, equal widths, ellipsis overflow */
+/* Wrap variation tabs to next row if they don't fit */
+.variation-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0 6px 0;
+  flex-wrap: wrap; /* allow wrapping to next row */
 }
