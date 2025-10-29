@@ -45,8 +45,11 @@
   <link rel="stylesheet" href="public/css/alertNotification.css">
   <link rel="stylesheet" href="public/css/template.css">
   <!-- Non‑blocking load for toast styles -->
-  <link id="toast-css-preload" rel="preload" as="style" href="public/css/showToast.css" onload="this.onload=null;this.rel='stylesheet'">
-  <noscript><link rel="stylesheet" href="public/css/showToast.css"></noscript>
+  <link id="toast-css-preload" rel="preload" as="style" href="public/css/showToast.css"
+    onload="this.onload=null;this.rel='stylesheet'">
+  <noscript>
+    <link rel="stylesheet" href="public/css/showToast.css">
+  </noscript>
   <link rel="stylesheet" href="public/css/catHelper.css">
 </head>
 
@@ -319,6 +322,11 @@
 
         <!-- Right Column: Empty -->
         <div class="form-right"></div>
+
+        <!-- Variation Tabs -->
+        <div id="variationTabs" class="variation-tabs"></div>
+
+
       </div>
 
 

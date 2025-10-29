@@ -64,6 +64,10 @@ function positionPopupAtCaret(inputField, popup) {
 // Function to initialize the autocomplete feature
 export function initializeAutoCorrect() {
   const inputField = document.getElementById("buildOrderInput");
+  if (!inputField) return;
+  // Avoid rebinding events if this textarea is already initialized
+  if (inputField.__zboACBound) return;
+  inputField.__zboACBound = true;
   const popup = document.getElementById("autocomplete-popup");
 
   // Flatten data into a single list for suggestions

@@ -60,7 +60,8 @@ body {
   border-radius: 16px;
   border: 2px dashed rgba(0, 188, 212, 0.8);
   background: rgba(14, 22, 28, 0.9);
-  box-shadow: 0 0 24px rgba(0, 188, 212, 0.35), 0 0 0 2px rgba(0, 188, 212, 0.25) inset;
+  box-shadow: 0 0 24px rgba(0, 188, 212, 0.35),
+    0 0 0 2px rgba(0, 188, 212, 0.25) inset;
 }
 
 .replay-drop-icon {
@@ -741,6 +742,99 @@ button:hover {
   word-wrap: break-word; /* Ensure long words break and don't overflow */
   overflow: hidden;
   text-overflow: ellipsis; /* Add ellipsis when text overflows */
+}
+
+/* ------------------------------
+   Variations (tabs + rails + pips)
+   ------------------------------ */
+.variation-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0 6px 0;
+}
+.var-branch-btn {
+  margin-left: auto;
+  background: #1b2130;
+  color: #e0e0e0;
+  border: 1px solid #2a3347;
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.var-branch-btn img {
+  width: 16px;
+  height: 16px;
+  display: block;
+  filter: invert(90%);
+}
+.variation-tab {
+  background: #1b2130;
+  color: #e0e0e0;
+  border: 1px solid #2a3347;
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.variation-tab.active {
+  background: #2a3347;
+  border-color: #3a4761;
+}
+
+/* Third column to host rails only */
+#buildOrderTable .var-col-header {
+  width: 96px;
+  min-width: 96px;
+}
+#buildOrderTable .var-cell {
+  position: relative;
+  width: 96px;
+  min-width: 96px;
+}
+.var-rails {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  right: 8px; /* tight to far right */
+  width: 14px; /* space for up to 2 lines */
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-end;
+  gap: 4px;
+}
+.var-rail {
+  width: 2px;
+  border-radius: 2px;
+  opacity: 0.35;
+}
+.var-rail.is-active {
+  opacity: 0.95;
+}
+.var-rail.is-faded {
+  opacity: 0.2;
+}
+.var-branch-note {
+  opacity: 0.9;
+  font-weight: 600;
+  margin-left: 6px;
+}
+
+/* Row-level Branch buttons (rightmost column) */
+#buildOrderTable .var-branch-cell {
+  width: 96px;
+  min-width: 96px;
+  text-align: right;
+}
+.var-branch-row-btn {
+  background: #1b2130;
+  color: #e0e0e0;
+  border: 1px solid #2a3347;
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-weight: 600;
+  margin-right: 8px;
 }
 
 #buildOrderTable.hide-supply td:first-child,

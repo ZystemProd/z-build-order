@@ -1,0 +1,164 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="900" viewBox="0 0 1280 900">
+  <defs>
+    <style>
+      .bg { fill: #0f1116; }
+      .panel { fill: #151922; stroke: #232a36; stroke-width: 1; }
+      .table { fill: #11151d; stroke: #232a36; stroke-width: 1; }
+      .header { fill: #1b2130; }
+      .text { fill: #e5ecff; font: 600 15px Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+      .muted { fill: #9fb0d0; font: 500 13px Inter, system-ui; }
+      .dim { fill: #70809f; font: 500 13px Inter, system-ui; }
+      .mono { fill: #cfe0ff; font: 500 13px ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+      .row-line { stroke: #232a36; stroke-width: 1; }
+      .sep { fill: #2a3347; }
+
+      /* Ultra-compact right-edge rails (limit 5) */
+      .railA { stroke: #4CC9F0; stroke-width: 3; }
+      .railB { stroke: #F72585; stroke-width: 3; }
+      .railC { stroke: #F19E39; stroke-width: 3; }
+      .railD { stroke: #8AC926; stroke-width: 3; }
+      .railE { stroke: #B38CFF; stroke-width: 3; }
+
+      /* Compact clickable divs (left of rails) */
+      .pip { width: 14px; height: 14px; rx: 3; ry: 3; cursor: pointer; }
+      .pipA { fill: #15222a; stroke: #4CC9F0; stroke-width: 2; }
+      .pipB { fill: #241624; stroke: #F72585; stroke-width: 2; }
+      .pipC { fill: #261d12; stroke: #F19E39; stroke-width: 2; }
+      .pipD { fill: #162313; stroke: #8AC926; stroke-width: 2; }
+      .pipE { fill: #1b1626; stroke: #B38CFF; stroke-width: 2; }
+
+      .title { fill: #e5ecff; font: 700 18px Inter, system-ui; }
+      .note { fill: #b8c7e8; font: 500 12px Inter, system-ui; }
+      .purple { fill: #b68cff; }
+      .green { fill: #99f8fd; }
+      .red { fill: #ff8c8c; }
+    </style>
+  </defs>
+
+  <!-- Background -->
+  <rect class="bg" x="0" y="0" width="1280" height="900"/>
+
+  <!-- Top input panel -->
+  <rect class="panel" x="40" y="30" width="1200" height="160" rx="12"/>
+  <text class="title" x="60" y="62">Build Variations — Tight Right Rails + Left Pips</text>
+  <rect class="table" x="60" y="80" width="560" height="90" rx="8"/>
+  <text class="muted" x="76" y="105">[44 probe] Extractor trick</text>
+  <text class="muted" x="76" y="126">[15/14] Overlord</text>
+  <text class="muted" x="76" y="147">[16] Hatchery (b2)</text>
+  <text class="dim" x="640" y="110">Title…</text>
+
+  <!-- Tabs (short) -->
+  <g transform="translate(40,210)">
+    <rect x="0" y="0" width="110" height="32" rx="10" fill="#2a3347" stroke="#3a4761"/>
+    <text class="text" x="18" y="22">Main</text>
+    <rect x="120" y="0" width="120" height="32" rx="10" fill="#1b2130" stroke="#2a3347"/>
+    <text class="text" x="138" y="22">Var A</text>
+    <rect x="245" y="0" width="120" height="32" rx="10" fill="#1b2130" stroke="#2a3347"/>
+    <text class="text" x="263" y="22">Var B</text>
+    <rect x="370" y="0" width="120" height="32" rx="10" fill="#1b2130" stroke="#2a3347"/>
+    <text class="text" x="388" y="22">Var C</text>
+  </g>
+
+  <!-- Table with ultra-right rails cluster -->
+  <g transform="translate(40,260)">
+    <rect class="table" x="0" y="0" width="1200" height="560" rx="12"/>
+
+    <!-- Header row -->
+    <rect class="header" x="0" y="0" width="1200" height="44" rx="12"/>
+    <text class="text" x="24" y="28">Supply/Time</text>
+    <text class="text" x="190" y="28">Action</text>
+    <text class="muted" x="1000" y="28">Pips ◼ left • Rails │ right (max 5)</text>
+
+    <!-- Column separator -->
+    <rect class="sep" x="165" y="8" width="1" height="540" opacity="0.35"/>
+
+    <!-- Rails cluster pinned to the very right edge of the table -->
+    <!-- We use a 20px gutter inside the 1200px table; rails occupy ~18px total width -->
+    <g id="rails-cluster" transform="translate(1180,8)">
+      <!-- 5 tight vertical rails spaced 4px apart -->
+      <line class="railA" x1="0" y1="8" x2="0" y2="530"/>
+      <line class="railB" x1="4" y1="8" x2="4" y2="530"/>
+      <line class="railC" x1="8" y1="8" x2="8" y2="530"/>
+      <line class="railD" x1="12" y1="8" x2="12" y2="530"/>
+      <line class="railE" x1="16" y1="8" x2="16" y2="530"/>
+    </g>
+
+    <!-- Rows start -->
+    <g class="row" transform="translate(0,44)">
+      <!-- row 1 -->
+      <line class="row-line" x1="0" y1="44" x2="1200" y2="44"/>
+      <text class="mono" x="24" y="28">44 Probe</text>
+      <text class="text" x="190" y="28">Extractor <tspan class="muted">trick</tspan></text>
+      <!-- pips rendered just to the left of the rails cluster -->
+      <rect class="pip pipA" x="1152" y="15" width="14" height="14" rx="3"/>
+      <rect class="pip pipC" x="1169" y="15" width="14" height="14" rx="3"/>
+
+      <!-- row 2 -->
+      <g transform="translate(0,44)">
+        <line class="row-line" x1="0" y1="44" x2="1200" y2="44"/>
+        <text class="mono" x="24" y="28"><tspan class="red">15/14</tspan></text>
+        <text class="text" x="190" y="28"><tspan class="purple">Overlord</tspan></text>
+        <!-- pips: A,B -->
+        <rect class="pip pipA" x="1152" y="15" width="14" height="14" rx="3"/>
+        <rect class="pip pipB" x="1169" y="15" width="14" height="14" rx="3"/>
+      </g>
+
+      <!-- row 3 (branch start, shows three pips) -->
+      <g transform="translate(0,88)">
+        <line class="row-line" x1="0" y1="44" x2="1200" y2="44"/>
+        <text class="mono" x="24" y="28">16</text>
+        <text class="text" x="190" y="28"><tspan class="green">Hatchery</tspan> <tspan class="muted">(2nd base) — branch start</tspan></text>
+        <rect class="pip pipA" x="1152" y="15" width="14" height="14" rx="3"/>
+        <rect class="pip pipB" x="1169" y="15" width="14" height="14" rx="3"/>
+        <rect class="pip pipC" x="1186" y="15" width="14" height="14" rx="3"/>
+      </g>
+
+      <!-- row 4 unique to Var B -->
+      <g transform="translate(0,132)">
+        <line class="row-line" x1="0" y1="44" x2="1200" y2="44"/>
+        <text class="mono" x="24" y="28">18</text>
+        <text class="text" x="190" y="28">Extractor <tspan class="muted">(1st)</tspan></text>
+        <rect class="pip pipB" x="1152" y="15" width="14" height="14" rx="3"/>
+      </g>
+
+      <!-- row 5 unique to Var C -->
+      <g transform="translate(0,176)">
+        <line class="row-line" x1="0" y1="44" x2="1200" y2="44"/>
+        <text class="mono" x="24" y="28">17</text>
+        <text class="text" x="190" y="28">Spawning Pool</text>
+        <rect class="pip pipC" x="1152" y="15" width="14" height="14" rx="3"/>
+      </g>
+
+      <!-- row 6 common -->
+      <g transform="translate(0,220)">
+        <line class="row-line" x1="0" y1="44" x2="1200" y2="44"/>
+        <text class="mono" x="24" y="28">2:00</text>
+        <text class="text" x="190" y="28">Spawning Pool ✔ ➜ 2 Queen <tspan class="muted">(1 inject &amp; 1 Creep tumor)</tspan></text>
+        <rect class="pip pipA" x="1152" y="15" width="14" height="14" rx="3"/>
+        <rect class="pip pipB" x="1169" y="15" width="14" height="14" rx="3"/>
+        <rect class="pip pipC" x="1186" y="15" width="14" height="14" rx="3"/>
+      </g>
+
+      <!-- row 7 shows all five pips (max state) -->
+      <g transform="translate(0,264)">
+        <line class="row-line" x1="0" y1="44" x2="1200" y2="44"/>
+        <text class="mono" x="24" y="28">25</text>
+        <text class="text" x="190" y="28">4 Zergling</text>
+        <rect class="pip pipA" x="1135" y="15" width="14" height="14" rx="3"/>
+        <rect class="pip pipB" x="1152" y="15" width="14" height="14" rx="3"/>
+        <rect class="pip pipC" x="1169" y="15" width="14" height="14" rx="3"/>
+        <rect class="pip pipD" x="1186" y="15" width="14" height="14" rx="3"/>
+        <rect class="pip pipE" x="1203" y="15" width="14" height="14" rx="3"/>
+      </g>
+    </g>
+  </g>
+
+  <!-- Notes / Legend -->
+  <g transform="translate(40,840)">
+    <text class="note" x="0" y="0">Notes:</text>
+    <text class="note" x="60" y="0">• Rails are tightly packed at the far right; exactly vertical (no diagonals).</text>
+    <text class="note" x="60" y="18">• Clickable colored divs (pips) sit immediately to the left of the rails cluster.</text>
+    <text class="note" x="60" y="36">• Up to five variations shown concurrently; more can be selected via tabs.</text>
+  </g>
+</svg>
+
