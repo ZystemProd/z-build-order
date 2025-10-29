@@ -769,17 +769,27 @@ button:hover {
   filter: invert(90%);
 }
 .variation-tab {
-  background: #1b2130;
+  background: transparent; /* remove colored background */
   color: #e0e0e0;
-  border: 1px solid #2a3347;
+  border: 1px solid #343b4d; /* neutral default; per-tab border set inline */
   border-radius: 10px;
   padding: 6px 10px;
   font-weight: 600;
   cursor: pointer;
+  transform: none; /* prevent global button hover transforms */
 }
 .variation-tab.active {
-  background: #2a3347;
-  border-color: #3a4761;
+  background: transparent; /* keep transparent for active as well */
+  border-color: #3a4761; /* will be overridden by inline border-color */
+}
+
+/* Remove global button hover effects from tabs */
+.variation-tab:hover {
+  background: transparent; /* no hover color */
+  transform: none;
+}
+.variation-tab:active {
+  transform: none;
 }
 
 /* Third column to host rails only */
@@ -836,6 +846,9 @@ button:hover {
   font-weight: 600;
   margin-right: 8px;
 }
+
+/* Utility: rotate inline SVGs used in branch button */
+.rotate-180 { transform: rotate(180deg); display: inline-block; }
 
 #buildOrderTable.hide-supply td:first-child,
 #buildOrderTable.hide-supply th:first-child {

@@ -92,12 +92,27 @@ export function populateBuildDetails(index) {
 
   // Setup editors (Main + Variations) from the loaded build so tabs appear
   try {
+    // Sync title UI (text span + input)
+    try {
+      const titleStr = build.title || "";
+      const titleTextEl = document.getElementById("buildOrderTitleText");
+      if (titleTextEl) {
+        titleTextEl.textContent = titleStr || "Enter build order title here...";
+        if (titleStr) titleTextEl.classList.remove("dimmed");
+        else titleTextEl.classList.add("dimmed");
+      }
+      const titleInputEl = document.getElementById("buildOrderTitleInput");
+      if (titleInputEl) titleInputEl.value = titleStr;
+    } catch (_) {}
+
     const main = document.getElementById("buildOrderInput");
     if (main) {
       // Ensure matchup dropdown reflects build (case-insensitive)
       try {
         const dd = document.getElementById("buildCategoryDropdown");
-        const sub = (build.subcategory || build.subcategoryLowercase || "").toString().toLowerCase();
+        const sub = (build.subcategory || build.subcategoryLowercase || "")
+          .toString()
+          .toLowerCase();
         if (dd && sub) {
           for (const opt of dd.options) {
             if (String(opt.value).toLowerCase() === sub) {
@@ -124,7 +139,7 @@ export function populateBuildDetails(index) {
         stack.appendChild(main);
       } else {
         // Remove previously added variation editors
-        Array.from(stack.querySelectorAll('.bo-editor'))
+        Array.from(stack.querySelectorAll(".bo-editor"))
           .filter((ed) => ed !== main)
           .forEach((ed) => ed.remove());
       }
@@ -136,7 +151,9 @@ export function populateBuildDetails(index) {
       const toText = (arrOrObj) => {
         if (Array.isArray(arrOrObj)) {
           return arrOrObj
-            .map((s) => `[${s.workersOrTimestamp || ""}] ${s.action || ""}`.trim())
+            .map((s) =>
+              `[${s.workersOrTimestamp || ""}] ${s.action || ""}`.trim()
+            )
             .join("\n");
         }
         return String(arrOrObj?.text || "");
@@ -145,9 +162,14 @@ export function populateBuildDetails(index) {
       main.style.display = "block";
 
       // Add variations from the document (if present)
-      const variations = Array.isArray(build.variations) ? build.variations : [];
+      const variations = Array.isArray(build.variations)
+        ? build.variations
+        : [];
       // Expose names/ids so analyze can seed tabs if needed
-      window.zboPreloadedVariations = variations.map((v, idx) => ({ id: v.id || `var_${idx + 1}`, name: v.name || `Variation ${idx + 1}` }));
+      window.zboPreloadedVariations = variations.map((v, idx) => ({
+        id: v.id || `var_${idx + 1}`,
+        name: v.name || `Variation ${idx + 1}`,
+      }));
       variations.slice(0, 5).forEach((v, idx) => {
         const ta = document.createElement("textarea");
         ta.className = "bo-editor";
@@ -247,10 +269,13 @@ export function populateBuildDetails(index) {
       let mapUrl = "";
       try {
         const folder = build.mapFolder || `current/${build.mapMode || "1v1"}`;
-        const fileName = mapNameRaw.replace(/\s+/g, "_").toLowerCase() + ".webp";
+        const fileName =
+          mapNameRaw.replace(/\s+/g, "_").toLowerCase() + ".webp";
         mapUrl = `/img/maps/${folder}/${fileName}`;
       } catch (_) {
-        mapUrl = `/img/maps/${mapNameRaw.replace(/\s+/g, "_").toLowerCase()}.webp`;
+        mapUrl = `/img/maps/${mapNameRaw
+          .replace(/\s+/g, "_")
+          .toLowerCase()}.webp`;
       }
 
       if (mapImage) {
@@ -311,9 +336,7 @@ export function populateBuildDetails(index) {
 
   buildDetailsContainer.innerHTML = `
   <h3>${DOMPurify.sanitize(build.title)}</h3>
-  <p>${DOMPurify.sanitize(
-    build.description || "No description provided."
-  )}</p>
+  <p>${DOMPurify.sanitize(build.description || "No description provided.")}</p>
   <pre>${build.buildOrder
     .map(
       (step) =>
@@ -412,8 +435,15 @@ export async function analyzeBuildOrder(inputText) {
     let store = loadEditorsStateFromDOM();
     // Fallback: if editors are present but tabs still come up empty,
     // allow a preloaded list (set during build load) to seed the tabs.
-    if ((!store || store.variations.length === 0) && Array.isArray(window.zboPreloadedVariations) && window.zboPreloadedVariations.length > 0) {
-      store = { activeId: variationState.active || "main", variations: window.zboPreloadedVariations };
+    if (
+      (!store || store.variations.length === 0) &&
+      Array.isArray(window.zboPreloadedVariations) &&
+      window.zboPreloadedVariations.length > 0
+    ) {
+      store = {
+        activeId: variationState.active || "main",
+        variations: window.zboPreloadedVariations,
+      };
     }
     renderVariationTabs(store);
 
@@ -429,7 +459,8 @@ export async function analyzeBuildOrder(inputText) {
     const active = variationState.active || "main";
     const mainText = getMainText();
     const mainLines = splitLines(mainText);
-    const activeText = active === "main" ? mainText : (getEditorById(active)?.value || mainText);
+    const activeText =
+      active === "main" ? mainText : getEditorById(active)?.value || mainText;
     const lines = splitLines(activeText);
     const visibleSteps = lines
       .filter((l) => l.trim().length > 0)
@@ -466,7 +497,9 @@ export async function analyzeBuildOrder(inputText) {
       let actionHtml = formatActionText(step.actionText);
       // Append branch notes that are visible in current mode
       // No branch notes when using separate saved variations.
-      actionCell.innerHTML = DOMPurify.sanitize(actionHtml, { ADD_ATTR: ["style"] });
+      actionCell.innerHTML = DOMPurify.sanitize(actionHtml, {
+        ADD_ATTR: ["style"],
+      });
 
       // Variation cell on the right: tight rails only
       const varCell = row.insertCell(2);
@@ -475,7 +508,8 @@ export async function analyzeBuildOrder(inputText) {
       // Rails cluster: Main + either all variations (when viewing Main) or only active var
       const rails = document.createElement("div");
       rails.className = "var-rails";
-      const activeVar = active !== "main" ? variationState.byId.get(active) : null;
+      const activeVar =
+        active !== "main" ? variationState.byId.get(active) : null;
       const rowIndex = table.rows.length - 2; // zero-based row index within visible steps
 
       // Main rail
@@ -520,7 +554,7 @@ export async function analyzeBuildOrder(inputText) {
 
       // Adjust cluster width based on rail count (tight layout at far right)
       const linesCount = rails.children.length;
-      const widthPx = Math.max(14, (6 * linesCount - 4)); // 2px per line + ~4px gaps
+      const widthPx = Math.max(14, 6 * linesCount - 4); // 2px per line + ~4px gaps
       rails.style.width = `${widthPx}px`;
 
       varCell.appendChild(rails);
@@ -531,7 +565,11 @@ export async function analyzeBuildOrder(inputText) {
       if (active === "main") {
         const b = document.createElement("button");
         b.className = "var-branch-row-btn";
-        b.textContent = "Branch";
+        b.innerHTML =
+          '<img src="./img/SVG/branch.svg" alt="Branch" class="svg-icon rotate-180">';
+        try {
+          b.setAttribute("data-tooltip", "Branch");
+        } catch (_) {}
         const idx = table.rows.length - 2; // zero-based index into lines
         b.addEventListener("click", () => createBranchAtIndex(idx));
         btnCell.appendChild(b);
@@ -582,14 +620,20 @@ async function loadVariationGroupContext() {
     const user = getAuth().currentUser;
     if (!user || !currentId) return { variations: [], groupId: null };
     const database = getFirestore();
-    const snap = await getDoc(doc(database, `users/${user.uid}/builds/${currentId}`));
+    const snap = await getDoc(
+      doc(database, `users/${user.uid}/builds/${currentId}`)
+    );
     if (!snap.exists()) return { variations: [], groupId: null };
     const { groupId } = snap.data();
     if (!groupId) return { variations: [], groupId: null };
     const siblings = await fetchVariationsForGroup(groupId);
     // Normalize into simple structure
     const variations = siblings
-      .map((b) => ({ id: b.id, name: b.variantName || (b.isMain ? "Main" : "Variant"), isMain: !!b.isMain }))
+      .map((b) => ({
+        id: b.id,
+        name: b.variantName || (b.isMain ? "Main" : "Variant"),
+        isMain: !!b.isMain,
+      }))
       .sort((a, b) => (a.isMain === b.isMain ? 0 : a.isMain ? -1 : 1));
     return { variations, groupId };
   } catch (e) {
@@ -607,10 +651,31 @@ function renderVariationTabs(groupContext) {
 
   tabs.innerHTML = ""; // reset
 
-  const makeTab = (id, label) => {
+  const makeTab = (id, label, color = null) => {
     const btn = document.createElement("button");
-    btn.className = "variation-tab" + (variationState.active === id ? " active" : "");
+    btn.className =
+      "variation-tab" + (variationState.active === id ? " active" : "");
     btn.textContent = label;
+    try {
+      btn.setAttribute("data-tooltip", label);
+    } catch (_) {}
+    if (color) {
+      try {
+        btn.style.borderColor = color;
+      } catch (_) {}
+    }
+    // Subtle active indicator: colored underline that matches rail color
+    const isActive = variationState.active === id;
+    const underlineColor = color || MAIN_COLOR;
+    if (isActive) {
+      try {
+        btn.style.boxShadow = `inset 0 -3px 0 0 ${underlineColor}`;
+      } catch (_) {}
+    } else {
+      try {
+        btn.style.boxShadow = "none";
+      } catch (_) {}
+    }
     btn.addEventListener("click", () => setActiveVariation(id));
     return btn;
   };
@@ -627,11 +692,11 @@ function renderVariationTabs(groupContext) {
   });
 
   // Always render Main tab
-  tabs.appendChild(makeTab("main", "Main"));
+  tabs.appendChild(makeTab("main", "Main", MAIN_COLOR));
   // Other branches
   variationState.order.forEach((vid) => {
     const v = variationState.byId.get(vid);
-    tabs.appendChild(makeTab(vid, v?.name || "Var"));
+    tabs.appendChild(makeTab(vid, v?.name || "Var", v?.color));
   });
 }
 
@@ -642,7 +707,8 @@ function setActiveVariation(id) {
   const stack = getEditorStack();
   if (!stack) return;
   const all = getAllEditors();
-  let activeEditor = getEditorById(variationState.active) || getEditorById("main");
+  let activeEditor =
+    getEditorById(variationState.active) || getEditorById("main");
   all.forEach((ed) => {
     if (ed === activeEditor) {
       ed.style.display = "block";
@@ -659,7 +725,8 @@ function setActiveVariation(id) {
         import("./autoCorrect.js").then((m) => m.initializeAutoCorrect());
       } catch (_) {}
     } else {
-      if (ed.id === "buildOrderInput") ed.id = `buildOrderInput__${ed.dataset.editorId || "hidden"}`;
+      if (ed.id === "buildOrderInput")
+        ed.id = `buildOrderInput__${ed.dataset.editorId || "hidden"}`;
       ed.style.display = "none";
     }
   });
@@ -678,7 +745,10 @@ function loadEditorsStateFromDOM() {
   const editors = getAllEditors();
   const vars = editors
     .filter((ed) => ed.dataset.editorId !== "main")
-    .map((ed) => ({ id: ed.dataset.editorId, name: ed.dataset.editorName || "Variation" }));
+    .map((ed) => ({
+      id: ed.dataset.editorId,
+      name: ed.dataset.editorName || "Variation",
+    }));
   return { activeId: variationState.active || "main", variations: vars };
 }
 function getEditorStack() {
@@ -727,7 +797,8 @@ function createBranchAtIndex(index) {
   const prefix = lines.slice(0, index + 1).join("\n");
   const stack = getEditorStack();
   if (!stack) return;
-  const nextIdx = getAllEditors().filter((ed) => ed.dataset.editorId !== "main").length + 1;
+  const nextIdx =
+    getAllEditors().filter((ed) => ed.dataset.editorId !== "main").length + 1;
   const id = `var_${nextIdx}`;
   const name = `Variation ${nextIdx}`;
   const ta = document.createElement("textarea");
@@ -744,13 +815,16 @@ function findPivotIndex(mainLines, varLines) {
   const max = Math.min(mainLines.length, varLines.length);
   let lastShared = -1;
   for (let i = 0; i < max; i++) {
-    if (normalizeStep(mainLines[i]) === normalizeStep(varLines[i])) lastShared = i;
+    if (normalizeStep(mainLines[i]) === normalizeStep(varLines[i]))
+      lastShared = i;
     else break;
   }
   return lastShared;
 }
 function normalizeStep(line) {
-  return String(line || "").trim().toLowerCase();
+  return String(line || "")
+    .trim()
+    .toLowerCase();
 }
 
 function ensureVariationHeader(table) {
@@ -914,7 +988,10 @@ function generateTableOfContents(items) {
     <p>Table of Contents:</p>
     <ul class="help-toc">
       ${items
-        .map((ex) => `<li><a href="#${ex.id}" class="toc-link">${ex.title}</a></li>`)
+        .map(
+          (ex) =>
+            `<li><a href="#${ex.id}" class="toc-link">${ex.title}</a></li>`
+        )
         .join("")}
       <li><a href="#abbr-section" class="toc-link">Abbreviations Reference</a></li>
     </ul>

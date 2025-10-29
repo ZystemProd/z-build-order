@@ -1250,7 +1250,15 @@ function showEditorUIForPublishedEdit() {
 }
 
 async function loadBuildIntoEditor(build) {
-  document.getElementById("buildOrderTitleInput").value = build.title || "";
+  const titleStr = build.title || "";
+  const titleInputEl = document.getElementById("buildOrderTitleInput");
+  if (titleInputEl) titleInputEl.value = titleStr;
+  const titleTextEl = document.getElementById("buildOrderTitleText");
+  if (titleTextEl) {
+    titleTextEl.textContent = titleStr || "Enter build order title here...";
+    if (titleStr) titleTextEl.classList.remove("dimmed");
+    else titleTextEl.classList.add("dimmed");
+  }
   // Robustly apply matchup dropdown ignoring case
   try {
     const matchUpDropdown = document.getElementById("buildCategoryDropdown");
