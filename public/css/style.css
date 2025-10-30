@@ -857,11 +857,13 @@ button:hover {
   top: 8px;
   bottom: 8px;
   right: 8px; /* tight to far right */
-  width: 14px; /* space for up to 2 lines */
+  width: 96px; /* give chips room to expand */
   display: flex;
-  align-items: stretch;
+  align-items: center;
   justify-content: flex-end;
-  gap: 4px;
+  gap: 6px;
+  /* Acts as positioning context for connectors and nodes */
+  /* Since this is positioned (absolute), children with position:absolute will be relative to it */
 }
 .var-rail {
   width: 2px;
@@ -873,6 +875,71 @@ button:hover {
 }
 .var-rail.is-faded {
   opacity: 0.2;
+}
+.branch-chip {
+  position: absolute;
+  right: 0;
+  top: 6px; /* default; JS may override for stacking */
+  transform: none;
+  height: 16px;
+  min-width: 18px;
+  max-width: 140px;
+  border-radius: 10px 0 0 10px;
+  background-color: var(--chip-color, #4cc9f0);
+  background-image: linear-gradient(90deg, rgba(255,255,255,0.16), rgba(255,255,255,0.06));
+  clip-path: polygon(100% 0, 18% 0, 0 50%, 18% 100%, 100% 100%);
+  color: #0b0f14;
+  font-weight: 700;
+  font-size: 11px;
+  line-height: 16px;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: max-width 180ms ease, padding 180ms ease, box-shadow 160ms ease, filter 140ms ease;
+  padding-right: 8px;
+  cursor: pointer;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.12) inset, 0 0 0 1px rgba(0,0,0,0.35);
+  z-index: 2;
+}
+.branch-chip .chip-label {
+  opacity: 0;
+  padding-left: 12px;
+  transition: opacity 120ms ease;
+}
+.branch-chip:hover,
+.branch-chip:focus-visible {
+  max-width: 160px;
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.08) inset, 0 4px 18px rgba(0,0,0,0.35);
+  filter: saturate(1.15);
+}
+.branch-chip:hover .chip-label,
+.branch-chip:focus-visible .chip-label {
+  opacity: 0.95;
+}
+
+.branch-chip.more-chip {
+  background: #232a36;
+  background-image: linear-gradient(90deg, rgba(255,255,255,0.08), rgba(255,255,255,0.04));
+  color: #e6edf5;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset, 0 0 0 1px rgba(0,0,0,0.45);
+}
+.var-connector {
+  position: absolute;
+  height: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #6aa9ff; /* color set inline per variation */
+  opacity: 0.9;
+}
+.var-node {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 2px solid #4cc9f0; /* color set inline per variation */
+  background: #1e1e1e; /* match app dark bg so rail shows through */
+  z-index: 2;
 }
 .var-branch-note {
   opacity: 0.9;
@@ -895,6 +962,28 @@ button:hover {
   cursor: pointer;
   font-weight: 600;
   margin-right: 8px;
+  pointer-events: auto; /* overlay container has none; enable button */
+}
+
+/* Overlay column for branch buttons */
+.var-branch-overlay {
+  position: absolute;
+  right: 6px;
+  width: 96px;
+  /* top/height set dynamically in JS to align with table */
+  z-index: 3;
+  pointer-events: none; /* allow clicks through except on buttons */
+}
+
+/* Tighten on small screens */
+@media (max-width: 768px) {
+  .buildOrderOutput {
+    padding-right: 88px;
+  }
+  .var-branch-overlay {
+    right: 4px;
+    width: 84px;
+  }
 }
 
 /* Utility: rotate inline SVGs used in branch button */
@@ -1164,6 +1253,8 @@ button:hover {
 
 .buildOrderOutput {
   margin-top: 15px;
+  position: relative; /* anchor overlays like branch buttons */
+  padding-right: 110px; /* room for branch button column */
 }
 
 .arrow {

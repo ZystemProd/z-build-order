@@ -484,6 +484,11 @@ export async function analyzeBuildOrder(inputText) {
       pivotByVar.set(vid, findPivotIndex(mainLines, vLines));
     });
 
+    // Prepare overlay for branch buttons (outside table)
+    const outputEl = document.querySelector('.buildOrderOutput');
+    let branchOverlay = ensureBranchOverlay(outputEl);
+    if (branchOverlay) branchOverlay.innerHTML = '';
+
     // Render rows
     visibleSteps.forEach((step) => {
       const row = table.insertRow();
@@ -505,76 +510,109 @@ export async function analyzeBuildOrder(inputText) {
       const varCell = row.insertCell(2);
       varCell.className = "var-cell";
 
-      // Rails cluster: Main + either all variations (when viewing Main) or only active var
+      // New branch-chip system: show only a compact chip where a variation diverges from Main
       const rails = document.createElement("div");
       rails.className = "var-rails";
-      const activeVar =
-        active !== "main" ? variationState.byId.get(active) : null;
+      rails.style.width = "100%"; // use full var-cell width so chips can expand
+      const activeVar = active !== "main" ? variationState.byId.get(active) : null;
       const rowIndex = table.rows.length - 2; // zero-based row index within visible steps
 
-      // Main rail
-      const mainRail = document.createElement("span");
-      mainRail.className = "var-rail";
-      mainRail.style.backgroundColor = MAIN_COLOR;
-      if (!activeVar) {
-        // Viewing Main: always show main as active (overview mode)
-        mainRail.classList.add("is-active");
-      } else {
-        // Viewing a variation: main is active until divergence, then faded
-        const pv = pivotByVar.get(active) ?? -1;
-        if (rowIndex <= pv) mainRail.classList.add("is-active");
-        else mainRail.classList.add("is-faded");
-      }
-      rails.appendChild(mainRail);
+      // helper: create an interactive chip
+      const makeChip = (vid, name, color) => {
+        const chip = document.createElement("div");
+        chip.className = "branch-chip";
+        chip.style.setProperty("--chip-color", color || MAIN_COLOR);
+        chip.style.backgroundColor = color || MAIN_COLOR;
+        chip.title = name || "Variation";
+        chip.tabIndex = 0;
+        chip.setAttribute("role", "button");
+        chip.setAttribute("aria-label", `Open ${name}`);
+        const label = document.createElement("span");
+        label.className = "chip-label";
+        label.textContent = name || "Variation";
+        chip.appendChild(label);
+
+        const openVar = () => {
+          try { setActiveVariation(vid); } catch (_) {}
+        };
+        chip.addEventListener("click", (e) => { e.stopPropagation(); openVar(); });
+        chip.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openVar(); } });
+        return chip;
+      };
 
       if (!activeVar) {
-        // Overview on Main: show rails for each variation and fade after they branch off
+        // Overview: gather all chips that branch on this row, then stack up to 2 and aggregate the rest
+        const atThisRow = [];
         varIds.forEach((vid) => {
-          const v = variationState.byId.get(vid);
-          if (!v) return;
-          const vr = document.createElement("span");
-          vr.className = "var-rail";
-          vr.style.backgroundColor = v.color;
           const pv = pivotByVar.get(vid) ?? -1;
-          if (rowIndex <= pv) vr.classList.add("is-active");
-          else vr.classList.add("is-faded");
-          rails.appendChild(vr);
+          if (rowIndex === pv) {
+            const v = variationState.byId.get(vid);
+            atThisRow.push({ id: vid, name: v?.name || "Variation", color: v?.color || MAIN_COLOR });
+          }
         });
+        if (atThisRow.length > 0) {
+          const visible = atThisRow.slice(0, 2);
+          const hidden = atThisRow.slice(2);
+          const baseTop = 4; // px from top of cell
+          const step = 18; // px vertical spacing per stacked chip
+          visible.forEach((info, idx) => {
+            const chip = makeChip(info.id, info.name, info.color);
+            chip.style.top = `${baseTop + idx * step}px`;
+            rails.appendChild(chip);
+          });
+          if (hidden.length > 0) {
+            const more = document.createElement('div');
+            more.className = 'branch-chip more-chip';
+            more.style.top = `${baseTop + visible.length * step}px`;
+            const label = document.createElement('span');
+            label.className = 'chip-label';
+            label.textContent = `+${hidden.length}`;
+            more.appendChild(label);
+            const list = hidden.map(h => h.name).join(', ');
+            more.title = list;
+            // Click opens first hidden var by default
+            const firstHiddenId = hidden[0].id;
+            more.addEventListener('click', (e)=>{ e.stopPropagation(); try{ setActiveVariation(firstHiddenId); }catch(_){} });
+            more.addEventListener('keydown', (e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); try{ setActiveVariation(firstHiddenId);}catch(_){} }});
+            rails.appendChild(more);
+          }
+        }
       } else {
-        // Variation view: show only the active variation rail; it becomes active AFTER pivot
-        const v = activeVar;
-        const varRail = document.createElement("span");
-        varRail.className = "var-rail";
-        varRail.style.backgroundColor = v.color;
+        // Variation view: single chip at its pivot
         const pv = pivotByVar.get(active) ?? -1;
-        if (rowIndex > pv) varRail.classList.add("is-active");
-        else varRail.classList.add("is-faded");
-        rails.appendChild(varRail);
+        if (rowIndex === pv) {
+          const v = activeVar;
+          const chip = makeChip(active, v?.name || "Variation", v?.color || MAIN_COLOR);
+          chip.style.top = `6px`;
+          rails.appendChild(chip);
+        }
       }
-
-      // Adjust cluster width based on rail count (tight layout at far right)
-      const linesCount = rails.children.length;
-      const widthPx = Math.max(14, 6 * linesCount - 4); // 2px per line + ~4px gaps
-      rails.style.width = `${widthPx}px`;
 
       varCell.appendChild(rails);
 
-      // Branch column: only when viewing Main
-      const btnCell = row.insertCell(3);
-      btnCell.className = "var-branch-cell";
-      if (active === "main") {
-        const b = document.createElement("button");
-        b.className = "var-branch-row-btn";
-        b.innerHTML =
-          '<img src="./img/SVG/branch.svg" alt="Branch" class="svg-icon rotate-180">';
-        try {
-          b.setAttribute("data-tooltip", "Branch");
-        } catch (_) {}
+      // Branch button overlay: place outside table aligned to row (only when viewing Main)
+      if (branchOverlay && active === 'main') {
+        const b = document.createElement('button');
+        b.className = 'var-branch-row-btn';
+        b.innerHTML = '<img src="./img/SVG/branch.svg" alt="Branch" class="svg-icon rotate-180">';
+        try { b.setAttribute('data-tooltip', 'Branch'); } catch (_) {}
         const idx = table.rows.length - 2; // zero-based index into lines
-        b.addEventListener("click", () => createBranchAtIndex(idx));
-        btnCell.appendChild(b);
+        b.addEventListener('click', () => createBranchAtIndex(idx));
+        // position
+        b.style.position = 'absolute';
+        const btnH = 28; // approx height including padding
+        const y = row.offsetTop - table.offsetTop + (row.offsetHeight - btnH) / 2;
+        b.style.top = `${Math.max(0, y)}px`;
+        b.style.right = '0';
+        branchOverlay.appendChild(b);
       }
     });
+
+    // After rows are rendered, update overlay box metrics
+    if (branchOverlay) {
+      branchOverlay.style.top = table.offsetTop + 'px';
+      branchOverlay.style.height = table.offsetHeight + 'px';
+    }
   });
 }
 
@@ -626,6 +664,23 @@ function ensureVariationUIContainers() {
 
   // Make sure it renders as a flex row wrapper
   tabs.style.display = "flex";
+}
+
+function ensureBranchOverlay(outputEl) {
+  try {
+    if (!outputEl) return null;
+    let overlay = document.getElementById('varBranchOverlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'varBranchOverlay';
+      overlay.className = 'var-branch-overlay';
+      outputEl.appendChild(overlay);
+      outputEl.classList.add('with-branch-overlay');
+    }
+    // Ensure it sits above table interactions
+    overlay.style.pointerEvents = 'none';
+    return overlay;
+  } catch { return null; }
 }
 
 async function loadVariationGroupContext() {
@@ -850,11 +905,10 @@ function ensureVariationHeader(table) {
     th.className = "var-col-header";
     headerRow.appendChild(th);
   }
-  // Add branch button column
-  if (headerRow.cells.length < 4) {
-    const th2 = document.createElement("th");
-    th2.className = "var-branch-col-header";
-    headerRow.appendChild(th2);
+  // Remove legacy branch button column if present (buttons now overlay outside table)
+  const last = headerRow.cells[headerRow.cells.length - 1];
+  if (last && last.classList.contains('var-branch-col-header')) {
+    headerRow.deleteCell(headerRow.cells.length - 1);
   }
 }
 
