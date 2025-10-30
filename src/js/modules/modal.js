@@ -1181,7 +1181,9 @@ async function updateBuildPreviewWithTabs(build) {
   buildPreview.innerHTML = `
     <h4>${DOMPurify.sanitize(build.title)}</h4>
     <p class="build-publisher-line"><strong>Publisher:</strong> ${DOMPurify.sanitize(publisherName)}</p>
+    <div class="variation-section-title">Variations</div>
     <div class="variation-tabs" id="buildPreviewTabs" aria-label="Build variations" role="tablist"></div>
+    <div class="variation-divider"></div>
     <pre id="buildPreviewBody">${formattedBuildOrder}</pre>
   `;
 
@@ -1212,7 +1214,7 @@ async function setupVariationTabs(container, build) {
     const MAIN_COLOR = '#4CC9F0';
     const VARIATION_COLORS = ['#F72585', '#8AC926', '#F19E39', '#B38CFF', '#3DD6D0'];
     const tabModels = [{ id: 'main', name: 'Main', data: null, color: MAIN_COLOR }].concat(
-      variations.slice(0, MAX_TABS - 1).map((v, i) => ({
+      variations.slice(0, MAX_TABS).map((v, i) => ({
         id: v.id || `var_${i + 1}`,
         name: v.variantName || v.name || v.title || `Variation ${i + 1}`,
         data: v,
@@ -1534,3 +1536,4 @@ async function loadBuildIntoEditor(build) {
 }
 
 export { closeBuildsModal };
+

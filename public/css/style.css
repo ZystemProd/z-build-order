@@ -751,22 +751,50 @@ button:hover {
   display: flex;
   gap: 8px;
   margin: 8px 0 6px 0;
+  flex-wrap: wrap; /* allow wrapping so all chips fit */
 }
 .var-branch-btn {
   margin-left: auto;
-  background: #1b2130;
+  background: transparent;
   color: #e0e0e0;
-  border: 1px solid #2a3347;
-  border-radius: 8px;
-  padding: 6px 10px;
+  border: 1px solid #343b4d;
+  border-radius: 10px;
+  padding: 6px 8px;
   cursor: pointer;
   font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-shadow: none;
+  transition: background-color .15s ease, border-color .15s ease, transform .12s ease;
 }
+.var-edit-btn {
+  background: transparent;
+  color: #e0e0e0;
+  border: 1px solid #343b4d;
+  border-radius: 10px;
+  padding: 6px 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color .15s ease, border-color .15s ease;
+}
+.var-edit-btn:hover { background: rgba(255,255,255,0.05); border-color: #3a4761; }
+.var-edit-btn img { width: 16px; height: 16px; filter: brightness(0) invert(1); }
 .var-branch-btn img {
   width: 16px;
   height: 16px;
   display: block;
-  filter: invert(90%);
+  filter: brightness(0) invert(1);
+}
+.var-branch-btn:hover {
+  background: rgba(255,255,255,0.05);
+  border-color: #3a4761;
+}
+.var-branch-btn:active {
+  transform: scale(0.98);
 }
 .variation-tab {
   background: transparent; /* remove colored background */
@@ -785,6 +813,23 @@ button:hover {
   border-radius: 10px;
   padding: 6px 10px;
   font-weight: 600;
+}
+
+/* Build Preview specific tweaks */
+#buildPreview .variation-section-title {
+  margin-top: 6px;
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: #9aa0a6;
+  letter-spacing: .2px;
+}
+
+#buildPreview .variation-divider {
+  height: 1px;
+  width: 100%;
+  background: #2b3342;
+  margin: 6px 0 10px 0;
+  opacity: .6;
 }
 
 /* Mobile: keep tabs on multiple per row, not one per row */
@@ -962,32 +1007,67 @@ button:hover {
   cursor: pointer;
   font-weight: 600;
   margin-right: 8px;
-  pointer-events: auto; /* overlay container has none; enable button */
-}
-
-/* Overlay column for branch buttons */
-.var-branch-overlay {
-  position: absolute;
-  right: 6px;
-  width: 96px;
-  /* top/height set dynamically in JS to align with table */
-  z-index: 3;
-  pointer-events: none; /* allow clicks through except on buttons */
-}
-
-/* Tighten on small screens */
-@media (max-width: 768px) {
-  .buildOrderOutput {
-    padding-right: 88px;
-  }
-  .var-branch-overlay {
-    right: 4px;
-    width: 84px;
-  }
 }
 
 /* Utility: rotate inline SVGs used in branch button */
 .rotate-180 { transform: rotate(180deg); display: inline-block; }
+
+/* Branch select mode visuals */
+.branch-select-hint {
+  position: fixed;
+  left: 0; top: 0;
+  padding: 6px 10px;
+  background: rgba(0,0,0,0.8);
+  color: #e6edf5;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1;
+  pointer-events: none;
+  z-index: 2000;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+.branch-select-mode #buildOrderTable {
+  cursor: crosshair;
+}
+.branch-select-mode #buildOrderTable tr:hover td {
+  background-color: rgba(255,255,255,0.04);
+}
+
+/* Variation Manager modal */
+.zbo-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 2000; display: flex; align-items: center; justify-content: center; }
+.zbo-modal { width: min(520px, 92vw); background: #1f232a; border: 1px solid #343b4d; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); color: #e6edf5; }
+.zbo-mini-modal { width: min(420px, 90vw); background: #1f232a; border: 1px solid #343b4d; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); color: #e6edf5; padding: 8px 0; }
+.zbo-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #2b3342; }
+.zbo-modal-header h3 { margin: 0; font-size: 16px; }
+.zbo-close { background: transparent; border: 1px solid #3a4761; color: #e6edf5; border-radius: 8px; padding: 4px 8px; cursor: pointer; }
+.zbo-modal-body { padding: 12px 16px; max-height: 60vh; overflow:auto; }
+.zbo-modal-footer { display: flex; gap: 10px; justify-content: flex-end; padding: 12px 16px; border-top: 1px solid #2b3342; }
+.zbo-btn { background: #2b3342; border: 1px solid #3a4761; color: #e6edf5; border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+.zbo-btn.ghost { background: transparent; }
+.zbo-var-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.zbo-var-item { display: grid; grid-template-columns: 24px 16px 1fr auto; align-items: center; gap: 8px; padding: 8px; border: 1px solid #2b3342; border-radius: 10px; background: #181c22; }
+.zbo-drag { cursor: grab; user-select: none; color: #9aa0a6; }
+.zbo-color { width: 12px; height: 12px; border-radius: 50%; }
+.zbo-name { width: 100%; background: #0f141a; color: #e6edf5; border: 1px solid #2b3342; border-radius: 8px; padding: 6px 8px; }
+.zbo-remove {
+  background: transparent;
+  border: 1px solid #3a4761;
+  color: #e6edf5;
+  border-radius: 8px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1; /* prevent vertical offset */
+  font-size: 16px; /* slightly larger for optical balance */
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+}
+.zbo-remove:hover { background: rgba(255,255,255,0.06); }
 
 #buildOrderTable.hide-supply td:first-child,
 #buildOrderTable.hide-supply th:first-child {
@@ -1253,8 +1333,6 @@ button:hover {
 
 .buildOrderOutput {
   margin-top: 15px;
-  position: relative; /* anchor overlays like branch buttons */
-  padding-right: 110px; /* room for branch button column */
 }
 
 .arrow {
@@ -6229,3 +6307,8 @@ optgroup[label="Terran"] {
   margin: 8px 0 6px 0;
   flex-wrap: wrap; /* allow wrapping to next row */
 }
+
+/* Variation tabs baseline (added by view build tabs) */
+.variation-tabs { display: flex; gap: 8px; margin: 10px 0; }
+.variation-tab { background: #1b2130; color: #e0e0e0; border: 1px solid #2a3347; border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+.variation-tab.active-tab { background: #2e3b55; border-color: #5fe5ff; }

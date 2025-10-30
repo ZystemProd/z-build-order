@@ -149,3 +149,38 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 });
+
+// Variation tab listeners for View Build page
+export function addVariationTabListeners(build, onInlineChange, onGroupNavigate) {
+  const tabsEl = document.getElementById("variationTabs");
+  if (!tabsEl) return;
+  const buttons = tabsEl.querySelectorAll(".variation-tab");
+  buttons.forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      // Navigate if tab has a target URL (group mode)
+      const url = btn.dataset.url;
+      if (url) {
+        try {
+          if (typeof onGroupNavigate === "function") {
+            onGroupNavigate(url);
+            return;
+          }
+          window.history.pushState({}, "", url);
+          window.dispatchEvent(new PopStateEvent("popstate"));
+        } catch (_) {
+          window.location.href = url;
+        }
+        return;
+      }
+
+      // Inline variation index switch
+      const idx = parseInt(btn.dataset.varIndex || "0", 10);
+      tabsEl.querySelectorAll(".variation-tab").forEach((b) => b.classList.remove("active-tab"));
+      btn.classList.add("active-tab");
+      if (typeof onInlineChange === "function") {
+        try { onInlineChange(idx, build); } catch (_) {}
+      }
+    });
+  });
+}

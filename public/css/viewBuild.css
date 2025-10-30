@@ -2323,3 +2323,26 @@ body.modal-open {
   cursor: default;
   text-align: left;
 }
+/* Variation tabs for view build */
+.variation-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0;
+  flex-wrap: wrap;
+}
+
+.variation-tab {
+  background: #1b2130;
+  color: #e0e0e0;
+  border: 1px solid #2a3347;
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.15s ease;
+}
+
+.variation-tab.active {
+  background: #2e3b55;
+  border-color: #5fe5ff;
+}

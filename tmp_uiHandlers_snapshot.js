@@ -1,4 +1,42 @@
 import DOMPurify from "dompurify";
+}
+  return dot;
+function createBranchAtIndex(index) {
+  if (variationState.active !== "main") return;
+  const nextIdx = getNextVarIndex();
+  const suggested = `Variation ${nextIdx}`;
+  openNamePromptModal(suggested, (name) => doCreateBranchAtIndex(index, name || suggested));
+}
+
+function getNextVarIndex() {
+  return (getAllEditors().filter((ed) => ed.dataset.editorId !== "main").length + 1);
+}
+
+function sanitizeVarName(s) {
+  if (!s) return "";
+  return String(s).trim().slice(0, 32);
+}
+
+function doCreateBranchAtIndex(index, rawName) {
+  const mainText = getMainText();
+  const lines = splitLines(mainText);
+  const prefix = lines.slice(0, index + 1).join("\n");
+  const stack = getEditorStack();
+  if (!stack) return;
+  const id = `var_${getNextVarIndex()}`;
+  const name = sanitizeVarName(rawName) || `Variation ${getNextVarIndex()}`;
+  const ta = document.createElement("textarea");
+  ta.value = prefix;
+  ta.className = "bo-editor";
+  ta.dataset.editorId = id;
+  ta.dataset.editorName = name;
+  ta.style.display = "none";
+  ta.addEventListener("input", () => analyzeBuildOrder(ta.value));
+  stack.appendChild(ta);
+  setActiveVariation(id);
+}
+}
+import DOMPurify from "dompurify";
 
 import { getSavedBuilds } from "./buildStorage.js";
 import { closeModal, populateBuildList } from "./modal.js";
@@ -15,17 +53,6 @@ import { isBracketInputEnabled } from "./settings.js";
 import { updateTooltips } from "./tooltip.js";
 
 // Function to toggle the title input field
-
-// Enable the main Save button after any meaningful change
-function enableSaveButton() {
-  try {
-    const btn = document.getElementById("saveBuildButton");
-    if (btn) {
-      btn.disabled = false;
-      btn.style.backgroundColor = "";
-    }
-  } catch {}
-}
 export function toggleTitleInput(showInput) {
   const titleText = document.getElementById("buildOrderTitleText");
   const titleInput = document.getElementById("buildOrderTitleInput");
@@ -342,10 +369,11 @@ export function populateBuildDetails(index) {
   );
 
   if (!buildDetailsContainer) {
-    // Details container only exists in certain modals; skip gracefully if absent
-    // Do not early-return to avoid aborting the rest of the save/update flow
-  } else {
-    buildDetailsContainer.innerHTML = `
+    console.error("buildDetailsContainer not found!");
+    return;
+  }
+
+  buildDetailsContainer.innerHTML = `
   <h3>${DOMPurify.sanitize(build.title)}</h3>
   <p>${DOMPurify.sanitize(build.description || "No description provided.")}</p>
   <pre>${build.buildOrder
@@ -364,7 +392,6 @@ export function populateBuildDetails(index) {
       : ""
   }
 `;
-  }
 }
 
 // Function to load and display build order
@@ -746,23 +773,26 @@ function renderVariationTabs(groupContext) {
     tabs.appendChild(makeTab(vid, v?.name || "Var", v?.color));
   });
 
-    // Always show Edit button (on Main and variations)
-  const editBtn = document.createElement('button');
-  editBtn.className = 'var-edit-btn';
-  editBtn.innerHTML = '<img src="./img/SVG/pencil.svg" alt="Edit" class="svg-icon">';
-  try { editBtn.setAttribute('data-tooltip', 'Manage variations'); } catch (_) {}
-  editBtn.addEventListener('click', () => openVariationManager());
-  tabs.appendChild(editBtn);
+  // Add edit and branch buttons (only on Main). Hide branch when >=5 variations.
+  if ((variationState.active || 'main') === 'main') {
+    const editBtn = document.createElement('button');
+    editBtn.className = 'var-edit-btn';
+    editBtn.innerHTML = '<img src="./img/SVG/pencil.svg" alt="Edit" class="svg-icon">';
+    try { editBtn.setAttribute('data-tooltip', 'Manage variations'); } catch (_) {}
+    editBtn.addEventListener('click', () => openVariationManager());
+    tabs.appendChild(editBtn);
 
-  // Branch button only when Main is active and < 5 variations
-  if ((variationState.active || 'main') === 'main' && variationState.order.length < 5) {
-    const branchBtn = document.createElement('button');
-    branchBtn.className = 'var-branch-btn';
-    branchBtn.innerHTML = '<img src="./img/SVG/branch.svg" alt="Branch" class="svg-icon">';
-    try { branchBtn.setAttribute('data-tooltip', 'Branch'); } catch (_) {}
-    branchBtn.addEventListener('click', () => startBranchSelectMode());
-    tabs.appendChild(branchBtn);
-  }// Ensure custom tooltips attach to newly added elements
+    if (variationState.order.length < 5) {
+      const branchBtn = document.createElement('button');
+      branchBtn.className = 'var-branch-btn';
+      branchBtn.innerHTML = '<img src="./img/SVG/branch.svg" alt="Branch" class="svg-icon">';
+      try { branchBtn.setAttribute('data-tooltip', 'Branch'); } catch (_) {}
+      branchBtn.addEventListener('click', () => startBranchSelectMode());
+      tabs.appendChild(branchBtn);
+    }
+  }
+
+  // Ensure custom tooltips attach to newly added elements
   try { updateTooltips(); } catch (_) {}
 }
 
@@ -875,7 +905,7 @@ function createBranchAtIndex(index) {
   ta.style.display = "none";
   ta.addEventListener("input", () => analyzeBuildOrder(ta.value));
   stack.appendChild(ta);
-  setActiveVariation(id); enableSaveButton(); const saveBtn = document.getElementById('saveBuildButton'); if (saveBtn) { saveBtn.disabled = false; saveBtn.style.backgroundColor=''; }
+  setActiveVariation(id);
 }
 function findPivotIndex(mainLines, varLines) {
   const max = Math.min(mainLines.length, varLines.length);
@@ -891,12 +921,6 @@ function normalizeStep(line) {
   return String(line || "")
     .trim()
     .toLowerCase();
-}
-
-// Sanitize variation names (limit 32 chars, collapse whitespace)
-function sanitizeVarName(s) {
-  if (!s) return "";
-  return String(s).replace(/\s+/g, " ").trim().slice(0, 32);
 }
 
 function ensureVariationHeader(table) {
@@ -1276,26 +1300,21 @@ function openVariationManager() {
   document.body.appendChild(overlay);
 
   const list = modal.querySelector('#zboVarList');
-  const toDelete = new Set();
-  // Enable Save when editing names or order inside manager
-  list.addEventListener("input", (e)=>{ if(e.target.classList && e.target.classList.contains("zbo-name")) enableSaveButton(); });
-  list.addEventListener("dragend", ()=> enableSaveButton());
   vars.forEach((v) => {
     const li = document.createElement('li');
     li.className = 'zbo-var-item';
-    li.draggable = false;
+    li.draggable = true;
     li.dataset.varId = v.id;
-    li.innerHTML = `\n      <span class="zbo-drag" draggable="true">≡</span>\n      <span class="zbo-color" style="background:${v.color}"></span>\n      <input type="text" class="zbo-name" maxlength="32" value="${v.name}">\n      <button type="button" class="zbo-remove" title="Remove" aria-label="Remove">×</button>\n    `;
+    li.innerHTML = `
+      <span class="zbo-drag">≡</span>
+      <span class="zbo-color" style="background:${v.color}"></span>
+      <input type="text" class="zbo-name" maxlength="32" value="${v.name}">
+    `;
     list.appendChild(li);
   });
 
   let dragEl = null;
-  list.addEventListener('dragstart', (e)=>{
-    const handle = e.target.closest('.zbo-drag');
-    if (!handle) { e.preventDefault(); return; }
-    dragEl = handle.closest('.zbo-var-item');
-    e.dataTransfer.effectAllowed = 'move';
-  });
+  list.addEventListener('dragstart', (e)=>{ dragEl = e.target.closest('.zbo-var-item'); e.dataTransfer.effectAllowed='move'; });
   list.addEventListener('dragover', (e)=>{
     e.preventDefault();
     const over = e.target.closest('.zbo-var-item');
@@ -1303,16 +1322,6 @@ function openVariationManager() {
     const rect = over.getBoundingClientRect();
     const before = (e.clientY - rect.top) < rect.height/2;
     list.insertBefore(dragEl, before? over : over.nextSibling);
-  });
-
-  // Remove row / mark for deletion
-  list.addEventListener('click', (e)=>{
-    const btn = e.target.closest('.zbo-remove');
-    if (!btn) return;
-    const li = btn.closest('.zbo-var-item');
-    if (!li) return;
-    toDelete.add(li.dataset.varId);
-    li.remove();
   });
 
   const close = () => { overlay.remove(); };
@@ -1330,21 +1339,7 @@ function openVariationManager() {
       if (vd) vd.name = name || vd.name;
       newOrder.push(id);
     });
-    // Remove deleted editors from DOM
-    const stack = getEditorStack();
-    if (stack && toDelete.size) {
-      toDelete.forEach(id => { const ed = getEditorById(id); if (ed) ed.remove(); });
-    }
-    // Apply new order to state and editors DOM
     variationState.order = newOrder;
-    if (stack) {
-      const map = new Map();
-      getAllEditors().forEach(ed => map.set(ed.dataset.editorId, ed));
-      newOrder.forEach(id => { const ed = map.get(id); if (ed) stack.appendChild(ed); });
-    }
-    // Rebuild tabs to reflect order immediately
-    try { const store = loadEditorsStateFromDOM(); renderVariationTabs(store); } catch {}
-    enableSaveButton();
     try { analyzeBuildOrder(getEditorById(variationState.active||'main')?.value || getMainText()); } catch(_){}
     close();
   };
@@ -1371,22 +1366,4 @@ function openNamePromptModal(defaultName, onConfirm) {
   modal.querySelector('#zboConfirmNewVar').onclick = ()=>{ onConfirm?.(sanitizeVarName(input.value)); close(); };
   input.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ modal.querySelector('#zboConfirmNewVar').click(); } });
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

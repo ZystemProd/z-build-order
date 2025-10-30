@@ -729,10 +729,21 @@ export async function syncToPublishedBuild(buildId, buildData) {
       console.error("Failed to fetch main clan info", e);
     }
 
+    // Explicitly propagate variation metadata needed by the View page
+    const variationMeta = {
+      groupId: buildData.groupId || null,
+      isMain: buildData.isMain || false,
+      variantName: buildData.variantName || null,
+      parentId: buildData.parentId || null,
+      // Inline variations array for published fallback (read-only)
+      variations: Array.isArray(buildData.variations) ? buildData.variations.slice(0, 5) : [],
+    };
+
     await setDoc(
       publishedRef,
       {
         ...buildData,
+        ...variationMeta,
         publisherId: user.uid,
         username: buildData.publisher || buildData.username || "Unknown",
         publisherClan,
