@@ -21,6 +21,14 @@
   --hover-color: #504f4f;
   --active-color: #3b7493;
   --link-color: #fc0;
+  /* Rails sizing for right-edge variation lines */
+  --rails-line-width: 6px;     /* width of a single vertical label line */
+  --rails-gap: 3px;            /* gap between lines */
+  --rails-max-lines: 5;        /* we render up to 5 */
+  --rails-right-padding: calc(
+    var(--rails-line-width) * var(--rails-max-lines) +
+    var(--rails-gap) * (var(--rails-max-lines) - 1) + 10px
+  );
 }
 
 /* Dark mode for the main application */
@@ -931,18 +939,33 @@ button:hover {
   width: 96px;
   min-width: 96px;
 }
+
+/* When rails render inside the Action cell, reserve a small gutter so text doesn't collide */
+#buildOrderTable td.action-with-rails {
+  position: relative;
+  /* Default right padding; JS adjusts per-row when rails are present */
+  padding-right: 15px;
+  white-space: normal;
+  overflow-wrap: anywhere; /* wrap long sequences and emoji clusters if needed */
+}
 .var-rails {
   position: absolute;
-  top: 8px;
-  bottom: 8px;
-  right: 8px; /* tight to far right */
-  width: 96px; /* give chips room to expand */
+  top: 4px;
+  bottom: 4px;
+  right: 6px; /* hug the action cell's right edge */
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 6px;
-  /* Acts as positioning context for connectors and nodes */
-  /* Since this is positioned (absolute), children with position:absolute will be relative to it */
+  gap: var(--rails-gap); /* tight grouping like the mock */
+  pointer-events: none; /* purely visual, don't intercept row clicks */
+}
+.var-label-line {
+  height: 100%;
+  width: var(--rails-line-width);
+  min-width: var(--rails-line-width);
+  border-radius: 2px;
+  background: var(--var-color, #4cc9f0);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35) inset;
 }
 .var-rail {
   width: 2px;

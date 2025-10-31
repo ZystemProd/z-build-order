@@ -459,7 +459,7 @@ export async function analyzeBuildOrder(inputText) {
     }
     renderVariationTabs(store);
 
-    // Prepare table header for a right-side rails column (3rd col)
+    // Ensure header has only Supply/Time and Action; rails render inside Action cells
     ensureVariationHeader(table);
 
     // Clear previous rows
@@ -516,53 +516,27 @@ export async function analyzeBuildOrder(inputText) {
         ADD_ATTR: ["style"],
       });
 
-      // Variation cell on the right: tight rails only
-      const varCell = row.insertCell(2);
-      varCell.className = "var-cell";
-
-      // New branch-chip system: show only a compact chip where a variation diverges from Main
+      // Rails render inside the Action cell to avoid a dividing column
+      actionCell.classList.add("action-with-rails");
       const rails = document.createElement("div");
       rails.className = "var-rails";
-      rails.style.width = "100%"; // use full var-cell width so chips can expand
+      // Attach rails to the action cell (positioned absolute via CSS)
+      actionCell.style.position = "relative";
       const activeVar =
         active !== "main" ? variationState.byId.get(active) : null;
       const rowIndex = table.rows.length - 2; // zero-based row index within visible steps
 
-      // helper: create an interactive chip
-      const makeChip = (vid, name, color) => {
-        const chip = document.createElement("div");
-        chip.className = "branch-chip";
-        chip.style.setProperty("--chip-color", color || MAIN_COLOR);
-        chip.style.backgroundColor = color || MAIN_COLOR;
-        chip.title = name || "Variation";
-        chip.tabIndex = 0;
-        chip.setAttribute("role", "button");
-        chip.setAttribute("aria-label", `Open ${name}`);
-        const label = document.createElement("span");
-        label.className = "chip-label";
-        label.textContent = name || "Variation";
-        chip.appendChild(label);
-
-        const openVar = () => {
-          try {
-            setActiveVariation(vid);
-          } catch (_) {}
-        };
-        chip.addEventListener("click", (e) => {
-          e.stopPropagation();
-          openVar();
-        });
-        chip.addEventListener("keydown", (e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            openVar();
-          }
-        });
-        return chip;
+      // helper: create a non-interactive vertical line (chip-label replacement)
+      const makeLine = (color) => {
+        const line = document.createElement("div");
+        line.className = "var-label-line";
+        try { line.style.setProperty("--var-color", color || MAIN_COLOR); } catch (_) {}
+        line.style.backgroundColor = color || MAIN_COLOR;
+        return line;
       };
 
       if (!activeVar) {
-        // Overview: gather all chips that branch on this row, then stack up to 2 and aggregate the rest
+        // Overview: gather all variations that branch on this row and render side-by-side lines
         const atThisRow = [];
         varIds.forEach((vid) => {
           const pv = pivotByVar.get(vid) ?? -1;
@@ -575,61 +549,30 @@ export async function analyzeBuildOrder(inputText) {
             });
           }
         });
-        if (atThisRow.length > 0) {
-          const visible = atThisRow.slice(0, 2);
-          const hidden = atThisRow.slice(2);
-          const baseTop = 4; // px from top of cell
-          const step = 18; // px vertical spacing per stacked chip
-          visible.forEach((info, idx) => {
-            const chip = makeChip(info.id, info.name, info.color);
-            chip.style.top = `${baseTop + idx * step}px`;
-            rails.appendChild(chip);
+        let linesCount = atThisRow.length;
+        if (linesCount > 0) {
+          atThisRow.forEach((info) => {
+            rails.appendChild(makeLine(info.color));
           });
-          if (hidden.length > 0) {
-            const more = document.createElement("div");
-            more.className = "branch-chip more-chip";
-            more.style.top = `${baseTop + visible.length * step}px`;
-            const label = document.createElement("span");
-            label.className = "chip-label";
-            label.textContent = `+${hidden.length}`;
-            more.appendChild(label);
-            const list = hidden.map((h) => h.name).join(", ");
-            more.title = list;
-            // Click opens first hidden var by default
-            const firstHiddenId = hidden[0].id;
-            more.addEventListener("click", (e) => {
-              e.stopPropagation();
-              try {
-                setActiveVariation(firstHiddenId);
-              } catch (_) {}
-            });
-            more.addEventListener("keydown", (e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                try {
-                  setActiveVariation(firstHiddenId);
-                } catch (_) {}
-              }
-            });
-            rails.appendChild(more);
-          }
         }
+        // Dynamically reserve right padding based on number of rails
+        try {
+          const pad = linesCount > 0 ? 15 + linesCount * 6 + Math.max(0, linesCount - 1) * 3 + 10 : 15;
+          actionCell.style.paddingRight = pad + "px";
+        } catch (_) {}
       } else {
-        // Variation view: single chip at its pivot
+        // Variation view: single line at its pivot
         const pv = pivotByVar.get(active) ?? -1;
         if (rowIndex === pv) {
           const v = activeVar;
-          const chip = makeChip(
-            active,
-            v?.name || "Variation",
-            v?.color || MAIN_COLOR
-          );
-          chip.style.top = `6px`;
-          rails.appendChild(chip);
+          rails.appendChild(makeLine(v?.color || MAIN_COLOR));
+          try { actionCell.style.paddingRight = (15 + 1 * 6 + 0 * 3 + 10) + "px"; } catch (_) {}
+        } else {
+          try { actionCell.style.paddingRight = "15px"; } catch (_) {}
         }
       }
-
-      varCell.appendChild(rails);
+      
+      actionCell.appendChild(rails);
 
       // Branch button overlay: place outside table aligned to row (only when viewing Main)
       // No per-row branch buttons anymore
@@ -943,13 +886,14 @@ function sanitizeVarName(s) {
 function ensureVariationHeader(table) {
   const headerRow = table.rows[0];
   if (!headerRow) return;
-  // Add rails column
-  if (headerRow.cells.length < 3) {
-    const th = document.createElement("th");
-    th.className = "var-col-header";
-    headerRow.appendChild(th);
+  // Remove any existing rails column so the table has only two columns
+  for (let i = headerRow.cells.length - 1; i >= 0; i--) {
+    const cell = headerRow.cells[i];
+    if (cell && cell.classList && cell.classList.contains("var-col-header")) {
+      headerRow.deleteCell(i);
+    }
   }
-  // Remove legacy branch button column if present (buttons now overlay outside table)
+  // Remove legacy branch button column if present
   const last = headerRow.cells[headerRow.cells.length - 1];
   if (last && last.classList.contains("var-branch-col-header")) {
     headerRow.deleteCell(headerRow.cells.length - 1);
@@ -1393,10 +1337,22 @@ function openVariationManager() {
       toDelete.forEach((id) => {
         const ed = getEditorById(id);
         if (ed) ed.remove();
+        // Also drop from in-memory state so they don't come back
+        try { variationState.byId.delete(id); } catch (_) {}
       });
     }
     // Apply new order to state and editors DOM
     variationState.order = newOrder;
+    // Ensure the preloaded fallback reflects the new order (or clears it)
+    try {
+      if (Array.isArray(window.zboPreloadedVariations)) {
+        window.zboPreloadedVariations = newOrder.map((id) => {
+          const vd = variationState.byId.get(id);
+          const name = vd?.name || getEditorById(id)?.dataset?.editorName || "Variation";
+          return { id, name };
+        });
+      }
+    } catch (_) {}
     if (stack) {
       const map = new Map();
       getAllEditors().forEach((ed) => map.set(ed.dataset.editorId, ed));
