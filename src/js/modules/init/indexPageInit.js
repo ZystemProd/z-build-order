@@ -38,7 +38,7 @@ import {
   syncToPublishedBuild,
 } from "../buildManagement.js";
 import { initializeAutoCorrect } from "../autoCorrect.js";
-import { populateBuildDetails, analyzeBuildOrder } from "../uiHandlers.js";
+import { populateBuildDetails, analyzeBuildOrder, ensureVariationTabsVisibleOnLoad } from "../uiHandlers.js";
 import { showToast } from "../toastHandler.js";
 import { updateYouTubeEmbed } from "../youtube.js";
 import {
@@ -70,35 +70,22 @@ import {
   renderFindClanUI,
   getUserClans,
 } from "../clan.js";
-// Dynamic imports for community, templates, and map modules
-async function loadCommunityModule() {
-  return import("../community.js");
-}
-
+// Static imports to avoid dynamic + static duplication warnings
+import {
+  populateCommunityBuilds,
+  checkPublishButtonVisibility,
+  searchCommunityBuilds,
+  filterCommunityBuilds,
+} from "../community.js";
+import {
+  initializeInteractiveMap,
+  initializeMapControls,
+  renderMapCards,
+  loadMapsOnDemand,
+} from "../interactive_map.js";
+// Dynamic import kept only for templates (not involved in warnings)
 async function loadTemplatesModule() {
   return import("../template.js");
-}
-
-async function loadMapModule() {
-  return import("../interactive_map.js");
-}
-
-// Wrapper functions so existing calls remain the same API
-async function populateCommunityBuilds(...args) {
-  const m = await loadCommunityModule();
-  return m.populateCommunityBuilds(...args);
-}
-async function checkPublishButtonVisibility(...args) {
-  const m = await loadCommunityModule();
-  return m.checkPublishButtonVisibility(...args);
-}
-async function searchCommunityBuilds(...args) {
-  const m = await loadCommunityModule();
-  return m.searchCommunityBuilds(...args);
-}
-async function filterCommunityBuilds(...args) {
-  const m = await loadCommunityModule();
-  return m.filterCommunityBuilds(...args);
 }
 
 // Template wrappers
@@ -1337,6 +1324,8 @@ export async function initializeIndexPage() {
   updateBuildInputVisibility();
   updateBuildInputPlaceholder();
   initializeTooltips();
+  // Ensure variation tabs are visible on initial load
+  try { ensureVariationTabsVisibleOnLoad(); } catch (_) {}
   setupCatActivationOnInput();
   // Position companion to avoid overlapping right-side buttons
   adjustCatPosition();
@@ -1396,13 +1385,12 @@ export async function initializeIndexPage() {
     let mapInitDone = false;
     async function ensureMapInitialized() {
       if (mapInitDone) return;
-      const m = await loadMapModule();
       // Create interactive map instance and controls
-      const inst = typeof m.initializeInteractiveMap === "function" ? m.initializeInteractiveMap() : null;
-      if (typeof m.initializeMapControls === "function") m.initializeMapControls(inst);
+      const inst = typeof initializeInteractiveMap === "function" ? initializeInteractiveMap() : null;
+      if (typeof initializeMapControls === "function") initializeMapControls(inst);
       // Render initial set of maps and lazy-load images
-      if (typeof m.renderMapCards === "function") await m.renderMapCards("current");
-      if (typeof m.loadMapsOnDemand === "function") m.loadMapsOnDemand();
+      if (typeof renderMapCards === "function") await renderMapCards("current");
+      if (typeof loadMapsOnDemand === "function") loadMapsOnDemand();
       mapInitDone = true;
     }
 

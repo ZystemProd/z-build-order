@@ -524,7 +524,8 @@ export async function analyzeBuildOrder(inputText) {
       const rails = document.createElement("div");
       rails.className = "var-rails";
       rails.style.width = "100%"; // use full var-cell width so chips can expand
-      const activeVar = active !== "main" ? variationState.byId.get(active) : null;
+      const activeVar =
+        active !== "main" ? variationState.byId.get(active) : null;
       const rowIndex = table.rows.length - 2; // zero-based row index within visible steps
 
       // helper: create an interactive chip
@@ -543,10 +544,20 @@ export async function analyzeBuildOrder(inputText) {
         chip.appendChild(label);
 
         const openVar = () => {
-          try { setActiveVariation(vid); } catch (_) {}
+          try {
+            setActiveVariation(vid);
+          } catch (_) {}
         };
-        chip.addEventListener("click", (e) => { e.stopPropagation(); openVar(); });
-        chip.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openVar(); } });
+        chip.addEventListener("click", (e) => {
+          e.stopPropagation();
+          openVar();
+        });
+        chip.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            openVar();
+          }
+        });
         return chip;
       };
 
@@ -557,7 +568,11 @@ export async function analyzeBuildOrder(inputText) {
           const pv = pivotByVar.get(vid) ?? -1;
           if (rowIndex === pv) {
             const v = variationState.byId.get(vid);
-            atThisRow.push({ id: vid, name: v?.name || "Variation", color: v?.color || MAIN_COLOR });
+            atThisRow.push({
+              id: vid,
+              name: v?.name || "Variation",
+              color: v?.color || MAIN_COLOR,
+            });
           }
         });
         if (atThisRow.length > 0) {
@@ -571,19 +586,31 @@ export async function analyzeBuildOrder(inputText) {
             rails.appendChild(chip);
           });
           if (hidden.length > 0) {
-            const more = document.createElement('div');
-            more.className = 'branch-chip more-chip';
+            const more = document.createElement("div");
+            more.className = "branch-chip more-chip";
             more.style.top = `${baseTop + visible.length * step}px`;
-            const label = document.createElement('span');
-            label.className = 'chip-label';
+            const label = document.createElement("span");
+            label.className = "chip-label";
             label.textContent = `+${hidden.length}`;
             more.appendChild(label);
-            const list = hidden.map(h => h.name).join(', ');
+            const list = hidden.map((h) => h.name).join(", ");
             more.title = list;
             // Click opens first hidden var by default
             const firstHiddenId = hidden[0].id;
-            more.addEventListener('click', (e)=>{ e.stopPropagation(); try{ setActiveVariation(firstHiddenId); }catch(_){} });
-            more.addEventListener('keydown', (e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); try{ setActiveVariation(firstHiddenId);}catch(_){} }});
+            more.addEventListener("click", (e) => {
+              e.stopPropagation();
+              try {
+                setActiveVariation(firstHiddenId);
+              } catch (_) {}
+            });
+            more.addEventListener("keydown", (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                try {
+                  setActiveVariation(firstHiddenId);
+                } catch (_) {}
+              }
+            });
             rails.appendChild(more);
           }
         }
@@ -592,7 +619,11 @@ export async function analyzeBuildOrder(inputText) {
         const pv = pivotByVar.get(active) ?? -1;
         if (rowIndex === pv) {
           const v = activeVar;
-          const chip = makeChip(active, v?.name || "Variation", v?.color || MAIN_COLOR);
+          const chip = makeChip(
+            active,
+            v?.name || "Variation",
+            v?.color || MAIN_COLOR
+          );
           chip.style.top = `6px`;
           rails.appendChild(chip);
         }
@@ -659,35 +690,6 @@ function ensureVariationUIContainers() {
   tabs.style.display = "flex";
 }
 
-// Deprecated: branch overlay removed
-
-async function loadVariationGroupContext() {
-  try {
-    const currentId = getCurrentBuildId();
-    const user = getAuth().currentUser;
-    if (!user || !currentId) return { variations: [], groupId: null };
-    const database = getFirestore();
-    const snap = await getDoc(
-      doc(database, `users/${user.uid}/builds/${currentId}`)
-    );
-    if (!snap.exists()) return { variations: [], groupId: null };
-    const { groupId } = snap.data();
-    if (!groupId) return { variations: [], groupId: null };
-    const siblings = await fetchVariationsForGroup(groupId);
-    // Normalize into simple structure
-    const variations = siblings
-      .map((b) => ({
-        id: b.id,
-        name: b.variantName || (b.isMain ? "Main" : "Variant"),
-        isMain: !!b.isMain,
-      }))
-      .sort((a, b) => (a.isMain === b.isMain ? 0 : a.isMain ? -1 : 1));
-    return { variations, groupId };
-  } catch (e) {
-    return { variations: [], groupId: null };
-  }
-}
-
 function renderVariationTabs(groupContext) {
   const tabs = document.getElementById("variationTabs");
   if (!tabs) return;
@@ -746,24 +748,57 @@ function renderVariationTabs(groupContext) {
     tabs.appendChild(makeTab(vid, v?.name || "Var", v?.color));
   });
 
-    // Always show Edit button (on Main and variations)
-  const editBtn = document.createElement('button');
-  editBtn.className = 'var-edit-btn';
-  editBtn.innerHTML = '<img src="./img/SVG/pencil.svg" alt="Edit" class="svg-icon">';
-  try { editBtn.setAttribute('data-tooltip', 'Manage variations'); } catch (_) {}
-  editBtn.addEventListener('click', () => openVariationManager());
+  // Always show a "+" branch button right after tabs (disabled when not allowed)
+  const canBranch =
+    (variationState.active || "main") === "main" &&
+    variationState.order.length < 5;
+  const branchBtn = document.createElement("button");
+  branchBtn.className = "var-branch-btn";
+  branchBtn.type = "button";
+  branchBtn.textContent = "+";
+  branchBtn.disabled = !canBranch;
+  try {
+    branchBtn.setAttribute(
+      "data-tooltip",
+      canBranch ? "Add variation" : "Switch to Main to add (max 5)"
+    );
+  } catch (_) {}
+  branchBtn.addEventListener("click", () => {
+    if (branchBtn.disabled) return;
+    startBranchSelectMode();
+  });
+  tabs.appendChild(branchBtn);
+
+  // Then the Edit button at the very end
+  const editBtn = document.createElement("button");
+  editBtn.className = "var-edit-btn";
+  editBtn.innerHTML =
+    '<img src="./img/SVG/pencil.svg" alt="Edit" class="svg-icon">';
+  try {
+    editBtn.setAttribute("data-tooltip", "Manage variations");
+  } catch (_) {}
+  editBtn.addEventListener("click", () => openVariationManager());
   tabs.appendChild(editBtn);
 
-  // Branch button only when Main is active and < 5 variations
-  if ((variationState.active || 'main') === 'main' && variationState.order.length < 5) {
-    const branchBtn = document.createElement('button');
-    branchBtn.className = 'var-branch-btn';
-    branchBtn.innerHTML = '<img src="./img/SVG/branch.svg" alt="Branch" class="svg-icon">';
-    try { branchBtn.setAttribute('data-tooltip', 'Branch'); } catch (_) {}
-    branchBtn.addEventListener('click', () => startBranchSelectMode());
-    tabs.appendChild(branchBtn);
-  }// Ensure custom tooltips attach to newly added elements
-  try { updateTooltips(); } catch (_) {}
+  // Ensure custom tooltips attach to newly added elements
+  try {
+    updateTooltips();
+  } catch (_) {}
+}
+
+// Public helper to show tabs on initial page load
+export function ensureVariationTabsVisibleOnLoad() {
+  try {
+    // Ensure the editor structure exists so Main is available
+    ensureEditorStack();
+    // Ensure the tabs container is placed and visible
+    ensureVariationUIContainers();
+    // Render tabs from current editor DOM state (Main + any existing variations)
+    const store = loadEditorsStateFromDOM();
+    renderVariationTabs(store);
+  } catch (e) {
+    console.warn("ensureVariationTabsVisibleOnLoad failed", e);
+  }
 }
 
 function setActiveVariation(id) {
@@ -875,7 +910,13 @@ function createBranchAtIndex(index) {
   ta.style.display = "none";
   ta.addEventListener("input", () => analyzeBuildOrder(ta.value));
   stack.appendChild(ta);
-  setActiveVariation(id); enableSaveButton(); const saveBtn = document.getElementById('saveBuildButton'); if (saveBtn) { saveBtn.disabled = false; saveBtn.style.backgroundColor=''; }
+  setActiveVariation(id);
+  enableSaveButton();
+  const saveBtn = document.getElementById("saveBuildButton");
+  if (saveBtn) {
+    saveBtn.disabled = false;
+    saveBtn.style.backgroundColor = "";
+  }
 }
 function findPivotIndex(mainLines, varLines) {
   const max = Math.min(mainLines.length, varLines.length);
@@ -910,7 +951,7 @@ function ensureVariationHeader(table) {
   }
   // Remove legacy branch button column if present (buttons now overlay outside table)
   const last = headerRow.cells[headerRow.cells.length - 1];
-  if (last && last.classList.contains('var-branch-col-header')) {
+  if (last && last.classList.contains("var-branch-col-header")) {
     headerRow.deleteCell(headerRow.cells.length - 1);
   }
 }
@@ -920,14 +961,14 @@ let branchSelectActive = false;
 let branchHintEl = null;
 function startBranchSelectMode() {
   if (branchSelectActive) return;
-  const table = document.getElementById('buildOrderTable');
+  const table = document.getElementById("buildOrderTable");
   if (!table) return;
   branchSelectActive = true;
-  document.body.classList.add('branch-select-mode');
+  document.body.classList.add("branch-select-mode");
   // Hint element that follows cursor
-  branchHintEl = document.createElement('div');
-  branchHintEl.className = 'branch-select-hint';
-  branchHintEl.textContent = 'Click a row to branch here • Esc to cancel';
+  branchHintEl = document.createElement("div");
+  branchHintEl.className = "branch-select-hint";
+  branchHintEl.textContent = "Select a row to create a branch";
   document.body.appendChild(branchHintEl);
 
   // Handlers
@@ -938,20 +979,22 @@ function startBranchSelectMode() {
   };
   const onTableClick = (e) => {
     if (!branchSelectActive) return;
-    const tr = e.target.closest('#buildOrderTable tr');
+    const tr = e.target.closest("#buildOrderTable tr");
     if (!tr || tr.rowIndex === 0) return; // ignore header
     e.stopPropagation();
     const idx = tr.rowIndex - 1; // zero-based data row index
-    try { createBranchAtIndex(idx); } catch (_) {}
+    try {
+      createBranchAtIndex(idx);
+    } catch (_) {}
     endBranchSelectMode();
   };
   const onDocClick = (e) => {
     if (!branchSelectActive) return;
-    if (e.target.closest('#buildOrderTable')) return; // inside table
+    if (e.target.closest("#buildOrderTable")) return; // inside table
     endBranchSelectMode();
   };
   const onKeyDown = (e) => {
-    if (e.key === 'Escape') endBranchSelectMode();
+    if (e.key === "Escape") endBranchSelectMode();
   };
 
   // Save to table for cleanup
@@ -960,23 +1003,24 @@ function startBranchSelectMode() {
   table.__branch_onDocClick = onDocClick;
   table.__branch_onKeyDown = onKeyDown;
 
-  document.addEventListener('mousemove', onMouseMove);
-  table.addEventListener('click', onTableClick, true);
-  document.addEventListener('click', onDocClick, true);
-  document.addEventListener('keydown', onKeyDown);
+  document.addEventListener("mousemove", onMouseMove);
+  table.addEventListener("click", onTableClick, true);
+  document.addEventListener("click", onDocClick, true);
+  document.addEventListener("keydown", onKeyDown);
 }
 function endBranchSelectMode() {
   if (!branchSelectActive) return;
   branchSelectActive = false;
-  document.body.classList.remove('branch-select-mode');
-  if (branchHintEl && branchHintEl.parentNode) branchHintEl.parentNode.removeChild(branchHintEl);
+  document.body.classList.remove("branch-select-mode");
+  if (branchHintEl && branchHintEl.parentNode)
+    branchHintEl.parentNode.removeChild(branchHintEl);
   branchHintEl = null;
-  const table = document.getElementById('buildOrderTable');
+  const table = document.getElementById("buildOrderTable");
   if (!table) return;
-  document.removeEventListener('mousemove', table.__branch_onMouseMove);
-  table.removeEventListener('click', table.__branch_onTableClick, true);
-  document.removeEventListener('click', table.__branch_onDocClick, true);
-  document.removeEventListener('keydown', table.__branch_onKeyDown);
+  document.removeEventListener("mousemove", table.__branch_onMouseMove);
+  table.removeEventListener("click", table.__branch_onTableClick, true);
+  document.removeEventListener("click", table.__branch_onDocClick, true);
+  document.removeEventListener("keydown", table.__branch_onKeyDown);
   delete table.__branch_onMouseMove;
   delete table.__branch_onTableClick;
   delete table.__branch_onDocClick;
@@ -1254,12 +1298,16 @@ export function createNotificationDot() {
 function openVariationManager() {
   const vars = variationState.order.map((vid) => {
     const v = variationState.byId.get(vid);
-    return { id: vid, name: v?.name || 'Variation', color: v?.color || MAIN_COLOR };
+    return {
+      id: vid,
+      name: v?.name || "Variation",
+      color: v?.color || MAIN_COLOR,
+    };
   });
-  const overlay = document.createElement('div');
-  overlay.className = 'zbo-modal-overlay';
-  const modal = document.createElement('div');
-  modal.className = 'zbo-modal';
+  const overlay = document.createElement("div");
+  overlay.className = "zbo-modal-overlay";
+  const modal = document.createElement("div");
+  modal.className = "zbo-modal";
   modal.innerHTML = `
     <div class="zbo-modal-header">
       <h3>Manage Variations</h3>
@@ -1275,14 +1323,17 @@ function openVariationManager() {
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
 
-  const list = modal.querySelector('#zboVarList');
+  const list = modal.querySelector("#zboVarList");
   const toDelete = new Set();
   // Enable Save when editing names or order inside manager
-  list.addEventListener("input", (e)=>{ if(e.target.classList && e.target.classList.contains("zbo-name")) enableSaveButton(); });
-  list.addEventListener("dragend", ()=> enableSaveButton());
+  list.addEventListener("input", (e) => {
+    if (e.target.classList && e.target.classList.contains("zbo-name"))
+      enableSaveButton();
+  });
+  list.addEventListener("dragend", () => enableSaveButton());
   vars.forEach((v) => {
-    const li = document.createElement('li');
-    li.className = 'zbo-var-item';
+    const li = document.createElement("li");
+    li.className = "zbo-var-item";
     li.draggable = false;
     li.dataset.varId = v.id;
     li.innerHTML = `\n      <span class="zbo-drag" draggable="true">≡</span>\n      <span class="zbo-color" style="background:${v.color}"></span>\n      <input type="text" class="zbo-name" maxlength="32" value="${v.name}">\n      <button type="button" class="zbo-remove" title="Remove" aria-label="Remove">×</button>\n    `;
@@ -1290,42 +1341,48 @@ function openVariationManager() {
   });
 
   let dragEl = null;
-  list.addEventListener('dragstart', (e)=>{
-    const handle = e.target.closest('.zbo-drag');
-    if (!handle) { e.preventDefault(); return; }
-    dragEl = handle.closest('.zbo-var-item');
-    e.dataTransfer.effectAllowed = 'move';
+  list.addEventListener("dragstart", (e) => {
+    const handle = e.target.closest(".zbo-drag");
+    if (!handle) {
+      e.preventDefault();
+      return;
+    }
+    dragEl = handle.closest(".zbo-var-item");
+    e.dataTransfer.effectAllowed = "move";
   });
-  list.addEventListener('dragover', (e)=>{
+  list.addEventListener("dragover", (e) => {
     e.preventDefault();
-    const over = e.target.closest('.zbo-var-item');
-    if (!over || over===dragEl) return;
+    const over = e.target.closest(".zbo-var-item");
+    if (!over || over === dragEl) return;
     const rect = over.getBoundingClientRect();
-    const before = (e.clientY - rect.top) < rect.height/2;
-    list.insertBefore(dragEl, before? over : over.nextSibling);
+    const before = e.clientY - rect.top < rect.height / 2;
+    list.insertBefore(dragEl, before ? over : over.nextSibling);
   });
 
   // Remove row / mark for deletion
-  list.addEventListener('click', (e)=>{
-    const btn = e.target.closest('.zbo-remove');
+  list.addEventListener("click", (e) => {
+    const btn = e.target.closest(".zbo-remove");
     if (!btn) return;
-    const li = btn.closest('.zbo-var-item');
+    const li = btn.closest(".zbo-var-item");
     if (!li) return;
     toDelete.add(li.dataset.varId);
     li.remove();
   });
 
-  const close = () => { overlay.remove(); };
-  modal.querySelector('.zbo-close').onclick = close;
-  modal.querySelector('#zboCancelVars').onclick = close;
-  modal.querySelector('#zboSaveVars').onclick = () => {
-    const items = Array.from(list.querySelectorAll('.zbo-var-item'));
+  const close = () => {
+    overlay.remove();
+  };
+  modal.querySelector(".zbo-close").onclick = close;
+  modal.querySelector("#zboCancelVars").onclick = close;
+  modal.querySelector("#zboSaveVars").onclick = () => {
+    const items = Array.from(list.querySelectorAll(".zbo-var-item"));
     const newOrder = [];
-    items.forEach((li)=>{
+    items.forEach((li) => {
       const id = li.dataset.varId;
-      const name = sanitizeVarName(li.querySelector('.zbo-name').value);
+      const name = sanitizeVarName(li.querySelector(".zbo-name").value);
       const ed = getEditorById(id);
-      if (ed) ed.dataset.editorName = name || ed.dataset.editorName || 'Variation';
+      if (ed)
+        ed.dataset.editorName = name || ed.dataset.editorName || "Variation";
       const vd = variationState.byId.get(id);
       if (vd) vd.name = name || vd.name;
       newOrder.push(id);
@@ -1333,60 +1390,32 @@ function openVariationManager() {
     // Remove deleted editors from DOM
     const stack = getEditorStack();
     if (stack && toDelete.size) {
-      toDelete.forEach(id => { const ed = getEditorById(id); if (ed) ed.remove(); });
+      toDelete.forEach((id) => {
+        const ed = getEditorById(id);
+        if (ed) ed.remove();
+      });
     }
     // Apply new order to state and editors DOM
     variationState.order = newOrder;
     if (stack) {
       const map = new Map();
-      getAllEditors().forEach(ed => map.set(ed.dataset.editorId, ed));
-      newOrder.forEach(id => { const ed = map.get(id); if (ed) stack.appendChild(ed); });
+      getAllEditors().forEach((ed) => map.set(ed.dataset.editorId, ed));
+      newOrder.forEach((id) => {
+        const ed = map.get(id);
+        if (ed) stack.appendChild(ed);
+      });
     }
     // Rebuild tabs to reflect order immediately
-    try { const store = loadEditorsStateFromDOM(); renderVariationTabs(store); } catch {}
+    try {
+      const store = loadEditorsStateFromDOM();
+      renderVariationTabs(store);
+    } catch {}
     enableSaveButton();
-    try { analyzeBuildOrder(getEditorById(variationState.active||'main')?.value || getMainText()); } catch(_){}
+    try {
+      analyzeBuildOrder(
+        getEditorById(variationState.active || "main")?.value || getMainText()
+      );
+    } catch (_) {}
     close();
   };
 }
-
-function openNamePromptModal(defaultName, onConfirm) {
-  const overlay = document.createElement('div');
-  overlay.className = 'zbo-modal-overlay';
-  const modal = document.createElement('div');
-  modal.className = 'zbo-mini-modal';
-  modal.innerHTML = `
-    <div class="zbo-modal-header"><h3>Name New Variation</h3></div>
-    <div class="zbo-modal-body"><input id="zboNewVarName" type="text" maxlength="32" placeholder="${defaultName}"></div>
-    <div class="zbo-modal-footer">
-      <button class="zbo-btn" id="zboConfirmNewVar">Create</button>
-      <button class="zbo-btn ghost" id="zboCancelNewVar">Cancel</button>
-    </div>`;
-  overlay.appendChild(modal);
-  document.body.appendChild(overlay);
-  const input = modal.querySelector('#zboNewVarName');
-  input.focus();
-  const close = ()=> overlay.remove();
-  modal.querySelector('#zboCancelNewVar').onclick = close;
-  modal.querySelector('#zboConfirmNewVar').onclick = ()=>{ onConfirm?.(sanitizeVarName(input.value)); close(); };
-  input.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ modal.querySelector('#zboConfirmNewVar').click(); } });
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

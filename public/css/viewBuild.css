@@ -2346,3 +2346,16 @@ body.modal-open {
   background: #2e3b55;
   border-color: #5fe5ff;
 }
+
+/* Desaturate inactive tabs so active stands out */
+.variation-tab:not(.active):not(.active-tab) {
+  filter: saturate(0.35);
+  transition: filter 0.15s ease;
+}
+.variation-tab.active,
+.variation-tab.active-tab {
+  filter: none;
+}
+.variation-tab:not(.active):not(.active-tab):hover {
+  filter: saturate(0.85);
+}

@@ -218,6 +218,13 @@ function setInlineActiveVariation(id) {
         : viewVariationState.inline[idx - 1]?.id === viewVariationState.active;
     if (isActive) btn.classList.add("active");
     else btn.classList.remove("active");
+    // Mirror active underline used in buildPreview/modal
+    try {
+      const color = idx === 0
+        ? MAIN_COLOR
+        : (viewVariationState.inline[idx - 1]?.color || VARIATION_COLORS[(idx - 1) % VARIATION_COLORS.length]);
+      btn.style.boxShadow = isActive ? `inset 0 -3px 0 0 ${color}` : "none";
+    } catch (_) {}
   });
 
   // Render steps
@@ -367,6 +374,7 @@ async function setupVariationTabsReadonly(currentId, build) {
           btn.textContent = label;
           try {
             btn.style.borderColor = color;
+            btn.style.boxShadow = isCurrent ? `inset 0 -3px 0 0 ${color}` : "none";
           } catch (_) {}
           btn.addEventListener("click", () => {
             if (docData.id === currentId) return;
@@ -402,6 +410,7 @@ async function setupVariationTabsReadonly(currentId, build) {
     mainBtn.textContent = "Main";
     try {
       mainBtn.style.borderColor = MAIN_COLOR;
+      mainBtn.style.boxShadow = `inset 0 -3px 0 0 ${MAIN_COLOR}`;
     } catch (_) {}
     mainBtn.addEventListener("click", () => setInlineActiveVariation("main"));
     tabsEl.appendChild(mainBtn);
@@ -424,6 +433,7 @@ async function setupVariationTabsReadonly(currentId, build) {
       btn.textContent = name;
       try {
         btn.style.borderColor = color;
+        btn.style.boxShadow = "none";
       } catch (_) {}
       btn.addEventListener("click", () => setInlineActiveVariation(id));
       tabsEl.appendChild(btn);
@@ -435,6 +445,7 @@ async function setupVariationTabsReadonly(currentId, build) {
     mainBtn.textContent = "Main";
     try {
       mainBtn.style.borderColor = MAIN_COLOR;
+      mainBtn.style.boxShadow = `inset 0 -3px 0 0 ${MAIN_COLOR}`;
     } catch (_) {}
     tabsEl.appendChild(mainBtn);
     tabsEl.style.display = "flex";
