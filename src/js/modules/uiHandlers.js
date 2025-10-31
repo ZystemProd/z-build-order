@@ -903,16 +903,23 @@ function ensureVariationHeader(table) {
 // --------- Branch selection (click a row to branch) ---------
 let branchSelectActive = false;
 let branchHintEl = null;
+let branchDimEl = null;
 function startBranchSelectMode() {
   if (branchSelectActive) return;
   const table = document.getElementById("buildOrderTable");
   if (!table) return;
   branchSelectActive = true;
   document.body.classList.add("branch-select-mode");
+  // Dim everything except the table
+  try {
+    branchDimEl = document.createElement("div");
+    branchDimEl.className = "branch-select-dim";
+    document.body.appendChild(branchDimEl);
+  } catch (_) {}
   // Hint element that follows cursor
   branchHintEl = document.createElement("div");
   branchHintEl.className = "branch-select-hint";
-  branchHintEl.textContent = "Select a row to create a branch";
+  branchHintEl.textContent = "Click a row to branch here • Esc to cancel";
   document.body.appendChild(branchHintEl);
 
   // Handlers
@@ -920,6 +927,19 @@ function startBranchSelectMode() {
     if (!branchSelectActive || !branchHintEl) return;
     branchHintEl.style.left = `${e.clientX + 12}px`;
     branchHintEl.style.top = `${e.clientY + 12}px`;
+    // Update hint + cursor depending on whether we're over the table
+    const overTable = !!e.target.closest("#buildOrderTable");
+    if (overTable) {
+      if (branchHintEl.__mode !== "inside") {
+        branchHintEl.textContent = "Click a row to branch here • Esc to cancel";
+        branchHintEl.__mode = "inside";
+      }
+    } else {
+      if (branchHintEl.__mode !== "outside") {
+        branchHintEl.textContent = "Cancel";
+        branchHintEl.__mode = "outside";
+      }
+    }
   };
   const onTableClick = (e) => {
     if (!branchSelectActive) return;
@@ -959,6 +979,9 @@ function endBranchSelectMode() {
   if (branchHintEl && branchHintEl.parentNode)
     branchHintEl.parentNode.removeChild(branchHintEl);
   branchHintEl = null;
+  if (branchDimEl && branchDimEl.parentNode)
+    branchDimEl.parentNode.removeChild(branchDimEl);
+  branchDimEl = null;
   const table = document.getElementById("buildOrderTable");
   if (!table) return;
   document.removeEventListener("mousemove", table.__branch_onMouseMove);

@@ -1097,12 +1097,25 @@ button:hover {
   font-size: 12px;
   line-height: 1;
   pointer-events: none;
-  z-index: 2000;
+  z-index: 2200;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.branch-select-dim {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 1200;
+  pointer-events: none; /* purely visual */
+}
+.branch-select-mode #buildOrderTable {
+  position: relative;
+  z-index: 2001; /* above the dim overlay */
+  box-shadow: 0 0 0 2px rgba(95, 229, 255, 0.25), 0 12px 36px rgba(0, 0, 0, 0.45);
 }
 .branch-select-mode #buildOrderTable {
   cursor: crosshair;
 }
+.branch-select-mode { cursor: not-allowed; }
 .branch-select-mode #buildOrderTable tr:hover td {
   background-color: rgba(255, 255, 255, 0.04);
 }
@@ -5415,6 +5428,7 @@ button.btn-small {
 
 .wide-privacy-modal {
   width: 80%;
+  height: 75%;
   max-width: 900px;
 }
 

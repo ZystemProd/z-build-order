@@ -18,9 +18,15 @@ export function setupCatActivationOnInput() {
   const tips = [
     "Tip: Write supply inside [brackets] and the action after",
     "Tip: Write 'Swap' swap to indicate swapping Terran addons",
-    "Tip: Write '-> Hatchery' to indicate a planned transition or next step.",
-    "Tip: Add 100% or @100% to mark when something is done — it shows a green check.",
-    "Tip: Write 50% or @50% to show progress — it gets an orange underline.",
+    "Tip: Write '-> Hatchery' to indicate a planned transition or next step. ->",
+    {
+      text: "Tip: Add 100% or @100% to mark when something is done — it shows a green check.",
+      literal: true,
+    },
+    {
+      text: "Tip: Write 50% or @50% to show progress — it gets an orange underline.",
+      literal: true,
+    },
   ];
 
   textElement.innerHTML = formatActionText(tips[0]);
@@ -62,7 +68,16 @@ export function setupCatActivationOnInput() {
 
       setTimeout(() => {
         currentTipIndex = (currentTipIndex + 1) % tips.length;
-        textElement.innerHTML = formatActionText(tips[currentTipIndex]);
+        const tip = tips[currentTipIndex];
+
+        const text = typeof tip === "string" ? tip : tip.text;
+
+        if (typeof tip === "object" && tip.literal) {
+          textElement.textContent = text; // no formatting
+        } else {
+          textElement.innerHTML = formatActionText(text); // apply formatting
+        }
+
         textElement.style.opacity = 1;
       }, 500); // match transition duration
     }, 10000);
