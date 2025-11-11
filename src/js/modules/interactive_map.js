@@ -72,6 +72,15 @@ export class MapAnnotations {
     this.initializeEventListeners();
   }
 
+  hasActiveMap() {
+    try {
+      const img = document.getElementById("map-preview-image");
+      return !!(img && img.getAttribute("src"));
+    } catch (_) {
+      return false;
+    }
+  }
+
   calculateCoordinates(event) {
     const rect = this.mapContainer.getBoundingClientRect();
     const x = ((event.clientX - rect.left) / rect.width) * 100;
@@ -212,6 +221,7 @@ export class MapAnnotations {
     this.mapContainer.removeEventListener("mouseleave", this.handleMouseLeave);
 
     this.handleMouseDown = (event) => {
+      if (!this.hasActiveMap()) return;
       let { x, y } = this.calculateCoordinates(event);
       ({ x, y } = this.snapToNearbyPoint(x, y));
       this.startX = x;
@@ -225,6 +235,7 @@ export class MapAnnotations {
     };
 
     this.handleMouseUp = (event) => {
+      if (!this.hasActiveMap()) return;
       clearTimeout(this.mousedownTimer);
       let { x, y } = this.calculateCoordinates(event);
       ({ x, y } = this.snapToNearbyPoint(x, y));
@@ -248,6 +259,7 @@ export class MapAnnotations {
     };
 
     this.handleMouseMove = (event) => {
+      if (!this.hasActiveMap()) return;
       if (this.isDrawingArrow && this.previewArrow) {
         let { x, y } = this.calculateCoordinates(event);
         ({ x, y } = this.snapToNearbyPoint(x, y));
@@ -290,12 +302,13 @@ export function initializeMapControls(mapAnnotations) {
 }
 
 export function initializeInteractiveMap() {
-  const mapAnnotations = new MapAnnotations(
-    "map-preview-container",
-    "map-annotations"
-  );
-  initializeMapControls(mapAnnotations);
-  return mapAnnotations;
+  if (window.mapAnnotations && window.mapAnnotations.mapContainer) {
+    return window.mapAnnotations;
+  }
+  const inst = new MapAnnotations("map-preview-container", "map-annotations");
+  initializeMapControls(inst);
+  window.mapAnnotations = inst;
+  return inst;
 }
 
 export function initializeMapSelection(mapAnnotations) {
@@ -421,20 +434,26 @@ export async function renderMapCards(folder = "current") {
 
     maps
       .filter((map) => {
-        // Only include "current" maps
-        if (!map.folder || !map.folder.startsWith("current")) return false;
-
+        if (!map.folder) return false;
+        // Respect requested folder (e.g., current or archive)
+        if (folder) {
+          // startsWith to allow subfolders like current/1v1, archive/1v1
+          if (!map.folder.startsWith(folder)) return false;
+        }
         // Ensure map mode matches selectedMode
-        const mapMode = Array.isArray(map.mode) ? map.mode : map.mode || "1v1";
-        if (Array.isArray(mapMode)) return mapMode.includes(selectedMode);
-        return mapMode === selectedMode;
+        const mapMode = Array.isArray(map.mode)
+          ? map.mode
+          : map.mode
+          ? [map.mode]
+          : ["1v1"];
+        return mapMode.includes(selectedMode);
       })
       .forEach((map) => {
         const fileName =
           map.file ||
           `${(map.name || "").replace(/\s+/g, "_").toLowerCase()}.webp`;
 
-        const dataMapPath = `img/maps/current/${selectedMode}/${fileName}`;
+        const dataMapPath = `img/maps/${map.folder}/${fileName}`;
 
         // Deduplicate by name + file
         const dedupeKey = `${(map.name || "").toLowerCase()}|${fileName}`;
@@ -445,7 +464,8 @@ export async function renderMapCards(folder = "current") {
         mapCard.className = "map-card";
 
         mapCard.dataset.mapName = map.name || "";
-        mapCard.dataset.folder = "current";
+        // store folder and mode on element for later use
+        mapCard.dataset.folder = folder || "current";
         mapCard.dataset.mode = selectedMode;
         mapCard.dataset.file = fileName;
         mapCard.setAttribute("data-map", dataMapPath);
@@ -484,10 +504,11 @@ toggleButtons.forEach((btn) => {
 
 // Safe export default mapAnnotations
 export const mapAnnotations =
-  document.getElementById("map-preview-container") &&
+  window.mapAnnotations ||
+  (document.getElementById("map-preview-container") &&
   document.getElementById("map-annotations")
     ? new MapAnnotations("map-preview-container", "map-annotations")
-    : null;
+    : null);
 
 if (mapAnnotations) {
   window.mapAnnotations = mapAnnotations;

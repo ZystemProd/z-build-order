@@ -1,0 +1,247 @@
+  const db = getFirestore();
+  const buildDocRef = doc(db, `users/${user.uid}/builds/${buildId}`);
+  const descriptionInput = document.getElementById("descriptionInput");
+  const videoInput = document.getElementById("videoInput");
+  const categoryDropdown = document.getElementById("buildCategoryDropdown");
+  const buildOrderInput = document.getElementById("buildOrderInput");
+  const replayInput = document.getElementById("replayLinkInput");
+  const mapImage = document.getElementById("map-preview-image");
+  const modeDropdown = document.getElementById("mapModeDropdown");
+  const mapMode = modeDropdown ? DOMPurify.sanitize(modeDropdown.value) : "1v1";
+
+  // Collect DOM variations on update as well
+  function collectDomVariations() {
+    const stack = document.getElementById("boEditorsStack");
+    if (!stack) return [];
+    const editors = Array.from(stack.querySelectorAll('.bo-editor'))
+      .filter((ed) => ed.dataset.editorId !== 'main');
+    return editors.slice(0, 5).map((ed, idx) => ({
+      id: ed.dataset.editorId || `var_${idx + 1}`,
+      name: ed.dataset.editorName || `Variation ${idx + 1}`,
+      text: String(ed.value || ""),
+      buildOrder: parseBuildOrder(String(ed.value || "")),
+    }));
+  }
+  const domVariations = collectDomVariations();
+
+  const updatedData = {
+    description: DOMPurify.sanitize(descriptionInput?.value.trim() || ""),
+    videoLink: DOMPurify.sanitize(videoInput?.value.trim() || ""),
+    replayUrl: DOMPurify.sanitize(replayInput?.value.trim() || ""),
+    buildOrder: parseBuildOrder(buildOrderInput.value),
+    variations: domVariations,
+    subcategory: DOMPurify.sanitize(categoryDropdown.value || ""),
+    mapMode, // ✅ add this line
+    interactiveMap: {
+      circles: mapAnnotations.circles.map(({ x, y }) => ({ x, y })),
+      arrows: mapAnnotations.arrows.map(({ startX, startY, endX, endY }) => ({
+        startX,
+        startY,
+        endX,
+        endY,
+      })),
+    },
+    timestamp: Date.now(),
+  };
+
+  // 🗺 Map name update (if selected)
+  if (mapImage?.src) {
+    const match = mapImage.src.match(/\/img\/maps\/(.+)\.webp/);
+    if (match) {
+      updatedData.map = match[1].replace(/_/g, " ");
+    }
+  }
+
+  // Preserve replay link from view button if input was empty
+  if (!updatedData.replayUrl) {
+    const replayBtn = document.getElementById("replayDownloadBtn");
+    const fallback = replayBtn?.getAttribute("href") || replayBtn?.href || "";
+    if (fallback) updatedData.replayUrl = DOMPurify.sanitize(fallback.trim());
+  }
+
+  // Robustly derive map name and folder
+  if (mapImage?.src) {
+    try {
+      const url = new URL(mapImage.src);
+      const parts = url.pathname.split("/");
+      const filename = parts.at(-1);
+      let mapName = "";
+      if (filename) {
+        const base = filename.replace(/\.[a-z]+$/i, "");
+        mapName = base.replace(/_/g, " ");
+      }
+      if (
+        mapName &&
+        mapName.toLowerCase() !== "index" &&
+        mapName.toLowerCase() !== "no map selected"
+      ) {
+        updatedData.map = mapName;
+        const folderMatch = url.pathname.match(/\/maps\/(.+)\/[\w\-.'%()]+\.(?:webp|png|jpg|jpeg)$/i);
+        if (folderMatch) updatedData.mapFolder = folderMatch[1];
+      }
+    } catch (_) {
+      // ignore parse errors
+    }
+  }
+
+  await setDoc(buildDocRef, updatedData, { merge: true });
+  const matchup = updatedData.subcategory || "";
+  const race = matchup.startsWith("Zv")
+    ? "Zerg"
+    : matchup.startsWith("Pv")
+    ? "Protoss"
+    : matchup.startsWith("Tv")
+    ? "Terran"
+    : "Unknown";
+  logAnalyticsEvent("build_updated", { race, matchup });
+
+  const localBuilds = getSavedBuilds();
+  const localIndex = localBuilds.findIndex((b) => b.id === buildId);
+  if (localIndex !== -1) {
+    localBuilds[localIndex] = {
+      ...localBuilds[localIndex],
+      ...updatedData,
+    };
+    saveSavedBuildsToLocalStorage();
+  }
+
+  // 🔄 Sync to published copy if needed
+  const updatedSnap = await getDoc(buildDocRef);
+  if (updatedSnap.exists()) {
+    await syncToPublishedBuild(buildId, updatedSnap.data());
+  }
+
+  checkPublishButtonVisibility();
+  return true;
+}
+
+export async function updateBuildFavorite(buildId, favorite) {
+  const user = getAuth().currentUser;
+  if (!user) return;
+  const db = getFirestore();
+  const buildRef = doc(db, `users/${user.uid}/builds/${buildId}`);
+  await updateDoc(buildRef, { favorite });
+}
+
+export async function loadClanBuilds() {
+  const user = auth.currentUser;
+  if (!user) return [];
+
+  const clansSnap = await getDocs(collection(db, "clans"));
+  const userClanIds = [];
+
+  clansSnap.forEach((doc) => {
+    const data = doc.data();
+    if (data.members?.includes(user.uid)) {
+      userClanIds.push(doc.id);
+    }
+  });
+
+  if (userClanIds.length === 0) return [];
+
+  const publishedSnap = await getDocs(collection(db, "publishedBuilds"));
+  const clanBuilds = [];
+
+  publishedSnap.forEach((doc) => {
+    const data = doc.data();
+    const isSharedToClan = data.sharedToClans?.some((clanId) =>
+      userClanIds.includes(clanId)
+    );
+    if (isSharedToClan) {
+      clanBuilds.push({
+        id: doc.id,
+        ...data,
+        source: "published",
+      });
+    }
+  });
+
+  return clanBuilds;
+}
+
+export async function fetchPublishedUserBuilds(filter = "all") {
+  const db = getFirestore();
+  const user = getAuth().currentUser;
+  if (!user) return [];
+
+  const baseRef = collection(db, "publishedBuilds");
+  let q;
+
+  if (filter === "all") {
+    q = query(baseRef, where("publisherId", "==", user.uid));
+  } else if (/^[zpt]v[zpt]$/i.test(filter)) {
+    q = query(
+      baseRef,
+      where("publisherId", "==", user.uid),
+      where("subcategoryLowercase", "==", filter)
+    );
+  } else {
+    q = query(
+      baseRef,
+      where("publisherId", "==", user.uid),
+      where("category", "==", filter)
+    );
+  }
+
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+}
+
+export async function syncToPublishedBuild(buildId, buildData) {
+  const db = getFirestore();
+  const user = getAuth().currentUser;
+  if (!user) return;
+
+  const publishedRef = doc(db, "publishedBuilds", buildId);
+  const existingSnap = await getDoc(publishedRef);
+
+  const shouldPublish =
+    buildData.isPublic || (buildData.sharedToClans || []).length > 0;
+
+  if (shouldPublish) {
+    const metrics = existingSnap.exists()
+      ? {
+          views: existingSnap.data().views || 0,
+          upvotes: existingSnap.data().upvotes || 0,
+          downvotes: existingSnap.data().downvotes || 0,
+          userVotes: existingSnap.data().userVotes || {},
+          datePublished: existingSnap.data().datePublished || Timestamp.now(),
+        }
+      : {
+          views: 0,
+          upvotes: 0,
+          downvotes: 0,
+          userVotes: {},
+          datePublished: Timestamp.now(),
+        };
+
+    let publisherClan = null;
+    try {
+      const clan = await getUserMainClanInfo(user.uid);
+      if (clan) {
+        publisherClan = {
+          name: clan.name,
+          tag: clan.abbreviation || clan.tag || "",
+          logoUrl: clan.logoUrl || null,
+        };
+      }
+    } catch (e) {
+      console.error("Failed to fetch main clan info", e);
+    }
+
+    await setDoc(
+      publishedRef,
+      {
+        ...buildData,
+        publisherId: user.uid,
+        username: buildData.publisher || buildData.username || "Unknown",
+        publisherClan,
+        ...metrics,
+      },
+      { merge: true }
+    );
+  } else if (existingSnap.exists()) {
+    await deleteDoc(publishedRef);
+  }
+}
+

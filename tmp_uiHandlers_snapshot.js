@@ -1,4 +1,42 @@
 import DOMPurify from "dompurify";
+}
+  return dot;
+function createBranchAtIndex(index) {
+  if (variationState.active !== "main") return;
+  const nextIdx = getNextVarIndex();
+  const suggested = `Variation ${nextIdx}`;
+  openNamePromptModal(suggested, (name) => doCreateBranchAtIndex(index, name || suggested));
+}
+
+function getNextVarIndex() {
+  return (getAllEditors().filter((ed) => ed.dataset.editorId !== "main").length + 1);
+}
+
+function sanitizeVarName(s) {
+  if (!s) return "";
+  return String(s).trim().slice(0, 32);
+}
+
+function doCreateBranchAtIndex(index, rawName) {
+  const mainText = getMainText();
+  const lines = splitLines(mainText);
+  const prefix = lines.slice(0, index + 1).join("\n");
+  const stack = getEditorStack();
+  if (!stack) return;
+  const id = `var_${getNextVarIndex()}`;
+  const name = sanitizeVarName(rawName) || `Variation ${getNextVarIndex()}`;
+  const ta = document.createElement("textarea");
+  ta.value = prefix;
+  ta.className = "bo-editor";
+  ta.dataset.editorId = id;
+  ta.dataset.editorName = name;
+  ta.style.display = "none";
+  ta.addEventListener("input", () => analyzeBuildOrder(ta.value));
+  stack.appendChild(ta);
+  setActiveVariation(id);
+}
+}
+import DOMPurify from "dompurify";
 
 import { getSavedBuilds } from "./buildStorage.js";
 import { closeModal, populateBuildList } from "./modal.js";
@@ -15,17 +53,6 @@ import { isBracketInputEnabled } from "./settings.js";
 import { updateTooltips } from "./tooltip.js";
 
 // Function to toggle the title input field
-
-// Enable the main Save button after any meaningful change
-function enableSaveButton() {
-  try {
-    const btn = document.getElementById("saveBuildButton");
-    if (btn) {
-      btn.disabled = false;
-      btn.style.backgroundColor = "";
-    }
-  } catch {}
-}
 export function toggleTitleInput(showInput) {
   const titleText = document.getElementById("buildOrderTitleText");
   const titleInput = document.getElementById("buildOrderTitleInput");
@@ -342,10 +369,11 @@ export function populateBuildDetails(index) {
   );
 
   if (!buildDetailsContainer) {
-    // Details container only exists in certain modals; skip gracefully if absent
-    // Do not early-return to avoid aborting the rest of the save/update flow
-  } else {
-    buildDetailsContainer.innerHTML = `
+    console.error("buildDetailsContainer not found!");
+    return;
+  }
+
+  buildDetailsContainer.innerHTML = `
   <h3>${DOMPurify.sanitize(build.title)}</h3>
   <p>${DOMPurify.sanitize(build.description || "No description provided.")}</p>
   <pre>${build.buildOrder
@@ -364,7 +392,6 @@ export function populateBuildDetails(index) {
       : ""
   }
 `;
-  }
 }
 
 // Function to load and display build order
@@ -459,7 +486,7 @@ export async function analyzeBuildOrder(inputText) {
     }
     renderVariationTabs(store);
 
-    // Ensure header has only Supply/Time and Action; rails render inside Action cells
+    // Prepare table header for a right-side rails column (3rd col)
     ensureVariationHeader(table);
 
     // Clear previous rows
@@ -516,63 +543,89 @@ export async function analyzeBuildOrder(inputText) {
         ADD_ATTR: ["style"],
       });
 
-      // Rails render inside the Action cell to avoid a dividing column
-      actionCell.classList.add("action-with-rails");
+      // Variation cell on the right: tight rails only
+      const varCell = row.insertCell(2);
+      varCell.className = "var-cell";
+
+      // New branch-chip system: show only a compact chip where a variation diverges from Main
       const rails = document.createElement("div");
       rails.className = "var-rails";
-      // Attach rails to the action cell (positioned absolute via CSS)
-      actionCell.style.position = "relative";
-      const activeVar =
-        active !== "main" ? variationState.byId.get(active) : null;
+      rails.style.width = "100%"; // use full var-cell width so chips can expand
+      const activeVar = active !== "main" ? variationState.byId.get(active) : null;
       const rowIndex = table.rows.length - 2; // zero-based row index within visible steps
 
-      // helper: create a non-interactive vertical line (chip-label replacement)
-      const makeLine = (color) => {
-        const line = document.createElement("div");
-        line.className = "var-label-line";
-        try { line.style.setProperty("--var-color", color || MAIN_COLOR); } catch (_) {}
-        line.style.backgroundColor = color || MAIN_COLOR;
-        return line;
+      // helper: create an interactive chip
+      const makeChip = (vid, name, color) => {
+        const chip = document.createElement("div");
+        chip.className = "branch-chip";
+        chip.style.setProperty("--chip-color", color || MAIN_COLOR);
+        chip.style.backgroundColor = color || MAIN_COLOR;
+        chip.title = name || "Variation";
+        chip.tabIndex = 0;
+        chip.setAttribute("role", "button");
+        chip.setAttribute("aria-label", `Open ${name}`);
+        const label = document.createElement("span");
+        label.className = "chip-label";
+        label.textContent = name || "Variation";
+        chip.appendChild(label);
+
+        const openVar = () => {
+          try { setActiveVariation(vid); } catch (_) {}
+        };
+        chip.addEventListener("click", (e) => { e.stopPropagation(); openVar(); });
+        chip.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openVar(); } });
+        return chip;
       };
 
       if (!activeVar) {
-        // Overview: gather all variations that branch on this row and render side-by-side lines
+        // Overview: gather all chips that branch on this row, then stack up to 2 and aggregate the rest
         const atThisRow = [];
         varIds.forEach((vid) => {
           const pv = pivotByVar.get(vid) ?? -1;
           if (rowIndex === pv) {
             const v = variationState.byId.get(vid);
-            atThisRow.push({
-              id: vid,
-              name: v?.name || "Variation",
-              color: v?.color || MAIN_COLOR,
-            });
+            atThisRow.push({ id: vid, name: v?.name || "Variation", color: v?.color || MAIN_COLOR });
           }
         });
-        let linesCount = atThisRow.length;
-        if (linesCount > 0) {
-          atThisRow.forEach((info) => {
-            rails.appendChild(makeLine(info.color));
+        if (atThisRow.length > 0) {
+          const visible = atThisRow.slice(0, 2);
+          const hidden = atThisRow.slice(2);
+          const baseTop = 4; // px from top of cell
+          const step = 18; // px vertical spacing per stacked chip
+          visible.forEach((info, idx) => {
+            const chip = makeChip(info.id, info.name, info.color);
+            chip.style.top = `${baseTop + idx * step}px`;
+            rails.appendChild(chip);
           });
+          if (hidden.length > 0) {
+            const more = document.createElement('div');
+            more.className = 'branch-chip more-chip';
+            more.style.top = `${baseTop + visible.length * step}px`;
+            const label = document.createElement('span');
+            label.className = 'chip-label';
+            label.textContent = `+${hidden.length}`;
+            more.appendChild(label);
+            const list = hidden.map(h => h.name).join(', ');
+            more.title = list;
+            // Click opens first hidden var by default
+            const firstHiddenId = hidden[0].id;
+            more.addEventListener('click', (e)=>{ e.stopPropagation(); try{ setActiveVariation(firstHiddenId); }catch(_){} });
+            more.addEventListener('keydown', (e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); try{ setActiveVariation(firstHiddenId);}catch(_){} }});
+            rails.appendChild(more);
+          }
         }
-        // Dynamically reserve right padding based on number of rails
-        try {
-          const pad = linesCount > 0 ? 15 + linesCount * 6 + Math.max(0, linesCount - 1) * 3 + 10 : 15;
-          actionCell.style.paddingRight = pad + "px";
-        } catch (_) {}
       } else {
-        // Variation view: single line at its pivot
+        // Variation view: single chip at its pivot
         const pv = pivotByVar.get(active) ?? -1;
         if (rowIndex === pv) {
           const v = activeVar;
-          rails.appendChild(makeLine(v?.color || MAIN_COLOR));
-          try { actionCell.style.paddingRight = (15 + 1 * 6 + 0 * 3 + 10) + "px"; } catch (_) {}
-        } else {
-          try { actionCell.style.paddingRight = "15px"; } catch (_) {}
+          const chip = makeChip(active, v?.name || "Variation", v?.color || MAIN_COLOR);
+          chip.style.top = `6px`;
+          rails.appendChild(chip);
         }
       }
-      
-      actionCell.appendChild(rails);
+
+      varCell.appendChild(rails);
 
       // Branch button overlay: place outside table aligned to row (only when viewing Main)
       // No per-row branch buttons anymore
@@ -633,6 +686,35 @@ function ensureVariationUIContainers() {
   tabs.style.display = "flex";
 }
 
+// Deprecated: branch overlay removed
+
+async function loadVariationGroupContext() {
+  try {
+    const currentId = getCurrentBuildId();
+    const user = getAuth().currentUser;
+    if (!user || !currentId) return { variations: [], groupId: null };
+    const database = getFirestore();
+    const snap = await getDoc(
+      doc(database, `users/${user.uid}/builds/${currentId}`)
+    );
+    if (!snap.exists()) return { variations: [], groupId: null };
+    const { groupId } = snap.data();
+    if (!groupId) return { variations: [], groupId: null };
+    const siblings = await fetchVariationsForGroup(groupId);
+    // Normalize into simple structure
+    const variations = siblings
+      .map((b) => ({
+        id: b.id,
+        name: b.variantName || (b.isMain ? "Main" : "Variant"),
+        isMain: !!b.isMain,
+      }))
+      .sort((a, b) => (a.isMain === b.isMain ? 0 : a.isMain ? -1 : 1));
+    return { variations, groupId };
+  } catch (e) {
+    return { variations: [], groupId: null };
+  }
+}
+
 function renderVariationTabs(groupContext) {
   const tabs = document.getElementById("variationTabs");
   if (!tabs) return;
@@ -691,57 +773,27 @@ function renderVariationTabs(groupContext) {
     tabs.appendChild(makeTab(vid, v?.name || "Var", v?.color));
   });
 
-  // Always show a "+" branch button right after tabs (disabled when not allowed)
-  const canBranch =
-    (variationState.active || "main") === "main" &&
-    variationState.order.length < 5;
-  const branchBtn = document.createElement("button");
-  branchBtn.className = "var-branch-btn";
-  branchBtn.type = "button";
-  branchBtn.textContent = "+";
-  branchBtn.disabled = !canBranch;
-  try {
-    branchBtn.setAttribute(
-      "data-tooltip",
-      canBranch ? "Add variation" : "Switch to Main to add (max 5)"
-    );
-  } catch (_) {}
-  branchBtn.addEventListener("click", () => {
-    if (branchBtn.disabled) return;
-    startBranchSelectMode();
-  });
-  tabs.appendChild(branchBtn);
+  // Add edit and branch buttons (only on Main). Hide branch when >=5 variations.
+  if ((variationState.active || 'main') === 'main') {
+    const editBtn = document.createElement('button');
+    editBtn.className = 'var-edit-btn';
+    editBtn.innerHTML = '<img src="./img/SVG/pencil.svg" alt="Edit" class="svg-icon">';
+    try { editBtn.setAttribute('data-tooltip', 'Manage variations'); } catch (_) {}
+    editBtn.addEventListener('click', () => openVariationManager());
+    tabs.appendChild(editBtn);
 
-  // Then the Edit button at the very end
-  const editBtn = document.createElement("button");
-  editBtn.className = "var-edit-btn";
-  editBtn.innerHTML =
-    '<img src="./img/SVG/pencil.svg" alt="Edit" class="svg-icon">';
-  try {
-    editBtn.setAttribute("data-tooltip", "Manage variations");
-  } catch (_) {}
-  editBtn.addEventListener("click", () => openVariationManager());
-  tabs.appendChild(editBtn);
+    if (variationState.order.length < 5) {
+      const branchBtn = document.createElement('button');
+      branchBtn.className = 'var-branch-btn';
+      branchBtn.innerHTML = '<img src="./img/SVG/branch.svg" alt="Branch" class="svg-icon">';
+      try { branchBtn.setAttribute('data-tooltip', 'Branch'); } catch (_) {}
+      branchBtn.addEventListener('click', () => startBranchSelectMode());
+      tabs.appendChild(branchBtn);
+    }
+  }
 
   // Ensure custom tooltips attach to newly added elements
-  try {
-    updateTooltips();
-  } catch (_) {}
-}
-
-// Public helper to show tabs on initial page load
-export function ensureVariationTabsVisibleOnLoad() {
-  try {
-    // Ensure the editor structure exists so Main is available
-    ensureEditorStack();
-    // Ensure the tabs container is placed and visible
-    ensureVariationUIContainers();
-    // Render tabs from current editor DOM state (Main + any existing variations)
-    const store = loadEditorsStateFromDOM();
-    renderVariationTabs(store);
-  } catch (e) {
-    console.warn("ensureVariationTabsVisibleOnLoad failed", e);
-  }
+  try { updateTooltips(); } catch (_) {}
 }
 
 function setActiveVariation(id) {
@@ -854,12 +906,6 @@ function createBranchAtIndex(index) {
   ta.addEventListener("input", () => analyzeBuildOrder(ta.value));
   stack.appendChild(ta);
   setActiveVariation(id);
-  enableSaveButton();
-  const saveBtn = document.getElementById("saveBuildButton");
-  if (saveBtn) {
-    saveBtn.disabled = false;
-    saveBtn.style.backgroundColor = "";
-  }
 }
 function findPivotIndex(mainLines, varLines) {
   const max = Math.min(mainLines.length, varLines.length);
@@ -877,25 +923,18 @@ function normalizeStep(line) {
     .toLowerCase();
 }
 
-// Sanitize variation names (limit 32 chars, collapse whitespace)
-function sanitizeVarName(s) {
-  if (!s) return "";
-  return String(s).replace(/\s+/g, " ").trim().slice(0, 32);
-}
-
 function ensureVariationHeader(table) {
   const headerRow = table.rows[0];
   if (!headerRow) return;
-  // Remove any existing rails column so the table has only two columns
-  for (let i = headerRow.cells.length - 1; i >= 0; i--) {
-    const cell = headerRow.cells[i];
-    if (cell && cell.classList && cell.classList.contains("var-col-header")) {
-      headerRow.deleteCell(i);
-    }
+  // Add rails column
+  if (headerRow.cells.length < 3) {
+    const th = document.createElement("th");
+    th.className = "var-col-header";
+    headerRow.appendChild(th);
   }
-  // Remove legacy branch button column if present
+  // Remove legacy branch button column if present (buttons now overlay outside table)
   const last = headerRow.cells[headerRow.cells.length - 1];
-  if (last && last.classList.contains("var-branch-col-header")) {
+  if (last && last.classList.contains('var-branch-col-header')) {
     headerRow.deleteCell(headerRow.cells.length - 1);
   }
 }
@@ -903,23 +942,16 @@ function ensureVariationHeader(table) {
 // --------- Branch selection (click a row to branch) ---------
 let branchSelectActive = false;
 let branchHintEl = null;
-let branchDimEl = null;
 function startBranchSelectMode() {
   if (branchSelectActive) return;
-  const table = document.getElementById("buildOrderTable");
+  const table = document.getElementById('buildOrderTable');
   if (!table) return;
   branchSelectActive = true;
-  document.body.classList.add("branch-select-mode");
-  // Dim everything except the table
-  try {
-    branchDimEl = document.createElement("div");
-    branchDimEl.className = "branch-select-dim";
-    document.body.appendChild(branchDimEl);
-  } catch (_) {}
+  document.body.classList.add('branch-select-mode');
   // Hint element that follows cursor
-  branchHintEl = document.createElement("div");
-  branchHintEl.className = "branch-select-hint";
-  branchHintEl.textContent = "Click a row to branch here • Esc to cancel";
+  branchHintEl = document.createElement('div');
+  branchHintEl.className = 'branch-select-hint';
+  branchHintEl.textContent = 'Click a row to branch here • Esc to cancel';
   document.body.appendChild(branchHintEl);
 
   // Handlers
@@ -927,38 +959,23 @@ function startBranchSelectMode() {
     if (!branchSelectActive || !branchHintEl) return;
     branchHintEl.style.left = `${e.clientX + 12}px`;
     branchHintEl.style.top = `${e.clientY + 12}px`;
-    // Update hint + cursor depending on whether we're over the table
-    const overTable = !!e.target.closest("#buildOrderTable");
-    if (overTable) {
-      if (branchHintEl.__mode !== "inside") {
-        branchHintEl.textContent = "Click a row to branch here • Esc to cancel";
-        branchHintEl.__mode = "inside";
-      }
-    } else {
-      if (branchHintEl.__mode !== "outside") {
-        branchHintEl.textContent = "Cancel";
-        branchHintEl.__mode = "outside";
-      }
-    }
   };
   const onTableClick = (e) => {
     if (!branchSelectActive) return;
-    const tr = e.target.closest("#buildOrderTable tr");
+    const tr = e.target.closest('#buildOrderTable tr');
     if (!tr || tr.rowIndex === 0) return; // ignore header
     e.stopPropagation();
     const idx = tr.rowIndex - 1; // zero-based data row index
-    try {
-      createBranchAtIndex(idx);
-    } catch (_) {}
+    try { createBranchAtIndex(idx); } catch (_) {}
     endBranchSelectMode();
   };
   const onDocClick = (e) => {
     if (!branchSelectActive) return;
-    if (e.target.closest("#buildOrderTable")) return; // inside table
+    if (e.target.closest('#buildOrderTable')) return; // inside table
     endBranchSelectMode();
   };
   const onKeyDown = (e) => {
-    if (e.key === "Escape") endBranchSelectMode();
+    if (e.key === 'Escape') endBranchSelectMode();
   };
 
   // Save to table for cleanup
@@ -967,27 +984,23 @@ function startBranchSelectMode() {
   table.__branch_onDocClick = onDocClick;
   table.__branch_onKeyDown = onKeyDown;
 
-  document.addEventListener("mousemove", onMouseMove);
-  table.addEventListener("click", onTableClick, true);
-  document.addEventListener("click", onDocClick, true);
-  document.addEventListener("keydown", onKeyDown);
+  document.addEventListener('mousemove', onMouseMove);
+  table.addEventListener('click', onTableClick, true);
+  document.addEventListener('click', onDocClick, true);
+  document.addEventListener('keydown', onKeyDown);
 }
 function endBranchSelectMode() {
   if (!branchSelectActive) return;
   branchSelectActive = false;
-  document.body.classList.remove("branch-select-mode");
-  if (branchHintEl && branchHintEl.parentNode)
-    branchHintEl.parentNode.removeChild(branchHintEl);
+  document.body.classList.remove('branch-select-mode');
+  if (branchHintEl && branchHintEl.parentNode) branchHintEl.parentNode.removeChild(branchHintEl);
   branchHintEl = null;
-  if (branchDimEl && branchDimEl.parentNode)
-    branchDimEl.parentNode.removeChild(branchDimEl);
-  branchDimEl = null;
-  const table = document.getElementById("buildOrderTable");
+  const table = document.getElementById('buildOrderTable');
   if (!table) return;
-  document.removeEventListener("mousemove", table.__branch_onMouseMove);
-  table.removeEventListener("click", table.__branch_onTableClick, true);
-  document.removeEventListener("click", table.__branch_onDocClick, true);
-  document.removeEventListener("keydown", table.__branch_onKeyDown);
+  document.removeEventListener('mousemove', table.__branch_onMouseMove);
+  table.removeEventListener('click', table.__branch_onTableClick, true);
+  document.removeEventListener('click', table.__branch_onDocClick, true);
+  document.removeEventListener('keydown', table.__branch_onKeyDown);
   delete table.__branch_onMouseMove;
   delete table.__branch_onTableClick;
   delete table.__branch_onDocClick;
@@ -1265,16 +1278,12 @@ export function createNotificationDot() {
 function openVariationManager() {
   const vars = variationState.order.map((vid) => {
     const v = variationState.byId.get(vid);
-    return {
-      id: vid,
-      name: v?.name || "Variation",
-      color: v?.color || MAIN_COLOR,
-    };
+    return { id: vid, name: v?.name || 'Variation', color: v?.color || MAIN_COLOR };
   });
-  const overlay = document.createElement("div");
-  overlay.className = "zbo-modal-overlay";
-  const modal = document.createElement("div");
-  modal.className = "zbo-modal";
+  const overlay = document.createElement('div');
+  overlay.className = 'zbo-modal-overlay';
+  const modal = document.createElement('div');
+  modal.className = 'zbo-modal';
   modal.innerHTML = `
     <div class="zbo-modal-header">
       <h3>Manage Variations</h3>
@@ -1290,111 +1299,71 @@ function openVariationManager() {
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
 
-  const list = modal.querySelector("#zboVarList");
-  const toDelete = new Set();
-  // Enable Save when editing names or order inside manager
-  list.addEventListener("input", (e) => {
-    if (e.target.classList && e.target.classList.contains("zbo-name"))
-      enableSaveButton();
-  });
-  list.addEventListener("dragend", () => enableSaveButton());
+  const list = modal.querySelector('#zboVarList');
   vars.forEach((v) => {
-    const li = document.createElement("li");
-    li.className = "zbo-var-item";
-    li.draggable = false;
+    const li = document.createElement('li');
+    li.className = 'zbo-var-item';
+    li.draggable = true;
     li.dataset.varId = v.id;
-    li.innerHTML = `\n      <span class="zbo-drag" draggable="true">≡</span>\n      <span class="zbo-color" style="background:${v.color}"></span>\n      <input type="text" class="zbo-name" maxlength="32" value="${v.name}">\n      <button type="button" class="zbo-remove" title="Remove" aria-label="Remove">×</button>\n    `;
+    li.innerHTML = `
+      <span class="zbo-drag">≡</span>
+      <span class="zbo-color" style="background:${v.color}"></span>
+      <input type="text" class="zbo-name" maxlength="32" value="${v.name}">
+    `;
     list.appendChild(li);
   });
 
   let dragEl = null;
-  list.addEventListener("dragstart", (e) => {
-    const handle = e.target.closest(".zbo-drag");
-    if (!handle) {
-      e.preventDefault();
-      return;
-    }
-    dragEl = handle.closest(".zbo-var-item");
-    e.dataTransfer.effectAllowed = "move";
-  });
-  list.addEventListener("dragover", (e) => {
+  list.addEventListener('dragstart', (e)=>{ dragEl = e.target.closest('.zbo-var-item'); e.dataTransfer.effectAllowed='move'; });
+  list.addEventListener('dragover', (e)=>{
     e.preventDefault();
-    const over = e.target.closest(".zbo-var-item");
-    if (!over || over === dragEl) return;
+    const over = e.target.closest('.zbo-var-item');
+    if (!over || over===dragEl) return;
     const rect = over.getBoundingClientRect();
-    const before = e.clientY - rect.top < rect.height / 2;
-    list.insertBefore(dragEl, before ? over : over.nextSibling);
+    const before = (e.clientY - rect.top) < rect.height/2;
+    list.insertBefore(dragEl, before? over : over.nextSibling);
   });
 
-  // Remove row / mark for deletion
-  list.addEventListener("click", (e) => {
-    const btn = e.target.closest(".zbo-remove");
-    if (!btn) return;
-    const li = btn.closest(".zbo-var-item");
-    if (!li) return;
-    toDelete.add(li.dataset.varId);
-    li.remove();
-  });
-
-  const close = () => {
-    overlay.remove();
-  };
-  modal.querySelector(".zbo-close").onclick = close;
-  modal.querySelector("#zboCancelVars").onclick = close;
-  modal.querySelector("#zboSaveVars").onclick = () => {
-    const items = Array.from(list.querySelectorAll(".zbo-var-item"));
+  const close = () => { overlay.remove(); };
+  modal.querySelector('.zbo-close').onclick = close;
+  modal.querySelector('#zboCancelVars').onclick = close;
+  modal.querySelector('#zboSaveVars').onclick = () => {
+    const items = Array.from(list.querySelectorAll('.zbo-var-item'));
     const newOrder = [];
-    items.forEach((li) => {
+    items.forEach((li)=>{
       const id = li.dataset.varId;
-      const name = sanitizeVarName(li.querySelector(".zbo-name").value);
+      const name = sanitizeVarName(li.querySelector('.zbo-name').value);
       const ed = getEditorById(id);
-      if (ed)
-        ed.dataset.editorName = name || ed.dataset.editorName || "Variation";
+      if (ed) ed.dataset.editorName = name || ed.dataset.editorName || 'Variation';
       const vd = variationState.byId.get(id);
       if (vd) vd.name = name || vd.name;
       newOrder.push(id);
     });
-    // Remove deleted editors from DOM
-    const stack = getEditorStack();
-    if (stack && toDelete.size) {
-      toDelete.forEach((id) => {
-        const ed = getEditorById(id);
-        if (ed) ed.remove();
-        // Also drop from in-memory state so they don't come back
-        try { variationState.byId.delete(id); } catch (_) {}
-      });
-    }
-    // Apply new order to state and editors DOM
     variationState.order = newOrder;
-    // Ensure the preloaded fallback reflects the new order (or clears it)
-    try {
-      if (Array.isArray(window.zboPreloadedVariations)) {
-        window.zboPreloadedVariations = newOrder.map((id) => {
-          const vd = variationState.byId.get(id);
-          const name = vd?.name || getEditorById(id)?.dataset?.editorName || "Variation";
-          return { id, name };
-        });
-      }
-    } catch (_) {}
-    if (stack) {
-      const map = new Map();
-      getAllEditors().forEach((ed) => map.set(ed.dataset.editorId, ed));
-      newOrder.forEach((id) => {
-        const ed = map.get(id);
-        if (ed) stack.appendChild(ed);
-      });
-    }
-    // Rebuild tabs to reflect order immediately
-    try {
-      const store = loadEditorsStateFromDOM();
-      renderVariationTabs(store);
-    } catch {}
-    enableSaveButton();
-    try {
-      analyzeBuildOrder(
-        getEditorById(variationState.active || "main")?.value || getMainText()
-      );
-    } catch (_) {}
+    try { analyzeBuildOrder(getEditorById(variationState.active||'main')?.value || getMainText()); } catch(_){}
     close();
   };
 }
+
+function openNamePromptModal(defaultName, onConfirm) {
+  const overlay = document.createElement('div');
+  overlay.className = 'zbo-modal-overlay';
+  const modal = document.createElement('div');
+  modal.className = 'zbo-mini-modal';
+  modal.innerHTML = `
+    <div class="zbo-modal-header"><h3>Name New Variation</h3></div>
+    <div class="zbo-modal-body"><input id="zboNewVarName" type="text" maxlength="32" placeholder="${defaultName}"></div>
+    <div class="zbo-modal-footer">
+      <button class="zbo-btn" id="zboConfirmNewVar">Create</button>
+      <button class="zbo-btn ghost" id="zboCancelNewVar">Cancel</button>
+    </div>`;
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+  const input = modal.querySelector('#zboNewVarName');
+  input.focus();
+  const close = ()=> overlay.remove();
+  modal.querySelector('#zboCancelNewVar').onclick = close;
+  modal.querySelector('#zboConfirmNewVar').onclick = ()=>{ onConfirm?.(sanitizeVarName(input.value)); close(); };
+  input.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ modal.querySelector('#zboConfirmNewVar').click(); } });
+}
+

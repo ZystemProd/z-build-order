@@ -21,6 +21,14 @@
   --hover-color: #504f4f;
   --active-color: #3b7493;
   --link-color: #fc0;
+  /* Rails sizing for right-edge variation lines */
+  --rails-line-width: 6px;     /* width of a single vertical label line */
+  --rails-gap: 3px;            /* gap between lines */
+  --rails-max-lines: 5;        /* we render up to 5 */
+  --rails-right-padding: calc(
+    var(--rails-line-width) * var(--rails-max-lines) +
+    var(--rails-gap) * (var(--rails-max-lines) - 1) + 10px
+  );
 }
 
 /* Dark mode for the main application */
@@ -60,7 +68,8 @@ body {
   border-radius: 16px;
   border: 2px dashed rgba(0, 188, 212, 0.8);
   background: rgba(14, 22, 28, 0.9);
-  box-shadow: 0 0 24px rgba(0, 188, 212, 0.35), 0 0 0 2px rgba(0, 188, 212, 0.25) inset;
+  box-shadow: 0 0 24px rgba(0, 188, 212, 0.35),
+    0 0 0 2px rgba(0, 188, 212, 0.25) inset;
 }
 
 .replay-drop-icon {
@@ -741,6 +750,500 @@ button:hover {
   word-wrap: break-word; /* Ensure long words break and don't overflow */
   overflow: hidden;
   text-overflow: ellipsis; /* Add ellipsis when text overflows */
+}
+
+/* ------------------------------
+   Variations (tabs + rails + pips)
+   ------------------------------ */
+.variation-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0 6px 0;
+  flex-wrap: wrap; /* allow wrapping so all chips fit */
+}
+.var-branch-btn {
+  background: transparent;
+  color: #e0e0e0;
+  border: 1px dashed #4a5368;
+  border-radius: 10px;
+  padding: 6px 30px;
+  cursor: pointer;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px; /* approx square */
+  line-height: 1;
+  box-shadow: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease,
+    transform 0.12s ease, opacity 0.15s ease;
+}
+.var-edit-btn {
+  margin-left: auto; /* push edit button to far right */
+  background: transparent;
+  color: #e0e0e0;
+  border: 1px solid #343b4d;
+  border-radius: 10px;
+  padding: 6px 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.var-edit-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: #3a4761;
+}
+.var-edit-btn img {
+  width: 16px;
+  height: 16px;
+  filter: brightness(0) invert(1);
+}
+.var-branch-btn img {
+  display: none;
+}
+.var-branch-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: #5b6a8a;
+}
+.var-branch-btn:active {
+  transform: scale(0.98);
+}
+.var-branch-btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: transparent;
+}
+.variation-tab {
+  background: #171717;
+  color: #e0e0e0;
+  border: 1px solid #343b4d; /* neutral default; per-tab border set inline */
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transform: none; /* prevent global button hover transforms */
+}
+.build-preview .variation-tab,
+#buildPreview .variation-tab,
+#communityBuildPreview .variation-tab {
+  background: transparent !important; /* override modal/button defaults */
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-weight: 600;
+}
+
+/* Build Preview specific tweaks */
+#buildPreview .variation-section-title,
+#communityBuildPreview .variation-section-title {
+  margin-top: 6px;
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: #9aa0a6;
+  letter-spacing: 0.2px;
+}
+
+#buildPreview .variation-divider,
+#communityBuildPreview .variation-divider {
+  height: 1px;
+  width: 100%;
+  background: #2b3342;
+  margin: 6px 0 10px 0;
+  opacity: 0.6;
+}
+
+/* Match community preview background for buildPreview container */
+#buildPreview {
+  background-color: #1e1e1e;
+  border: 1px solid #444;
+  border-radius: 8px;
+}
+
+/* Mobile: keep tabs on multiple per row, not one per row */
+@media (max-width: 768px) {
+  /* When variation tabs live inside the grid-based .form-container, force row layout */
+  .form-container #variationTabs {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    flex-direction: row !important;
+    gap: 10px;
+    align-items: center;
+    justify-content: flex-start;
+  }
+  .form-container #variationTabs .variation-tab {
+    display: inline-flex !important;
+    flex: 0 0 auto !important;
+    width: auto !important;
+    white-space: nowrap;
+    margin: 0;
+  }
+  .build-preview .variation-tabs,
+  #buildPreview .variation-tabs,
+  #communityBuildPreview .variation-tabs {
+    display: flex;
+    flex-wrap: wrap !important;
+    gap: 10px;
+    flex-direction: row !important;
+    justify-content: flex-start;
+  }
+  .build-preview .variation-tab,
+  #buildPreview .variation-tab,
+  #communityBuildPreview .variation-tab {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    width: auto !important;
+    max-width: 100%;
+    flex: 0 0 auto !important; /* prevent full-width stretching in flex rows */
+    max-width: 100%;
+    white-space: nowrap;
+    margin: 0; /* avoid block spacing rules from other button styles */
+  }
+}
+.variation-tab.active {
+  background: #171717; /* keep transparent for active as well */
+  border-color: #3a4761; /* will be overridden by inline border-color */
+}
+
+/* Remove global button hover effects from tabs */
+.variation-tab:hover {
+  background-color: #171717;
+  transform: none;
+}
+.variation-tab:active {
+  background-color: #171717;
+  transform: none;
+}
+
+/* Desaturate inactive variation tabs so the active tab stands out */
+.variation-tab:not(.active):not(.active-tab) {
+  filter: saturate(0.35);
+  transition: filter 0.15s ease;
+}
+.variation-tab.active,
+.variation-tab.active-tab {
+  filter: none;
+}
+.variation-tab:not(.active):not(.active-tab):hover {
+  filter: saturate(0.85);
+}
+
+/* Third column to host rails only */
+#buildOrderTable .var-col-header {
+  width: 96px;
+  min-width: 96px;
+}
+#buildOrderTable .var-cell {
+  position: relative;
+  width: 96px;
+  min-width: 96px;
+}
+
+/* When rails render inside the Action cell, reserve a small gutter so text doesn't collide */
+#buildOrderTable td.action-with-rails {
+  position: relative;
+  /* Default right padding; JS adjusts per-row when rails are present */
+  padding-right: 15px;
+  white-space: normal;
+  overflow-wrap: anywhere; /* wrap long sequences and emoji clusters if needed */
+}
+.var-rails {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  right: 6px; /* hug the action cell's right edge */
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--rails-gap); /* tight grouping like the mock */
+  pointer-events: none; /* purely visual, don't intercept row clicks */
+}
+.var-label-line {
+  height: 100%;
+  width: var(--rails-line-width);
+  min-width: var(--rails-line-width);
+  border-radius: 2px;
+  background: var(--var-color, #4cc9f0);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35) inset;
+}
+.var-rail {
+  width: 2px;
+  border-radius: 2px;
+  opacity: 0.35;
+}
+.var-rail.is-active {
+  opacity: 0.95;
+}
+.var-rail.is-faded {
+  opacity: 0.2;
+}
+.branch-chip {
+  position: absolute;
+  right: 0;
+  top: 6px; /* default; JS may override for stacking */
+  transform: none;
+  height: 16px;
+  min-width: 18px;
+  max-width: 140px;
+  border-radius: 10px 0 0 10px;
+  background-color: var(--chip-color, #4cc9f0);
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.16),
+    rgba(255, 255, 255, 0.06)
+  );
+  clip-path: polygon(100% 0, 18% 0, 0 50%, 18% 100%, 100% 100%);
+  color: #0b0f14;
+  font-weight: 700;
+  font-size: 11px;
+  line-height: 16px;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: max-width 180ms ease, padding 180ms ease, box-shadow 160ms ease,
+    filter 140ms ease;
+  padding-right: 8px;
+  cursor: pointer;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.12) inset,
+    0 0 0 1px rgba(0, 0, 0, 0.35);
+  z-index: 2;
+}
+.branch-chip .chip-label {
+  opacity: 0;
+  padding-left: 12px;
+  transition: opacity 120ms ease;
+}
+.branch-chip:hover,
+.branch-chip:focus-visible {
+  max-width: 160px;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.08) inset,
+    0 4px 18px rgba(0, 0, 0, 0.35);
+  filter: saturate(1.15);
+}
+.branch-chip:hover .chip-label,
+.branch-chip:focus-visible .chip-label {
+  opacity: 0.95;
+}
+
+.branch-chip.more-chip {
+  background: #232a36;
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.08),
+    rgba(255, 255, 255, 0.04)
+  );
+  color: #e6edf5;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 0 0 1px rgba(0, 0, 0, 0.45);
+}
+.var-connector {
+  position: absolute;
+  height: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #6aa9ff; /* color set inline per variation */
+  opacity: 0.9;
+}
+.var-node {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 2px solid #4cc9f0; /* color set inline per variation */
+  background: #1e1e1e; /* match app dark bg so rail shows through */
+  z-index: 2;
+}
+.var-branch-note {
+  opacity: 0.9;
+  font-weight: 600;
+  margin-left: 6px;
+}
+
+/* Row-level Branch buttons (rightmost column) */
+#buildOrderTable .var-branch-cell {
+  width: 96px;
+  min-width: 96px;
+  text-align: right;
+}
+.var-branch-row-btn {
+  background: #1b2130;
+  color: #e0e0e0;
+  border: 1px solid #2a3347;
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-weight: 600;
+  margin-right: 8px;
+}
+
+/* Utility: rotate inline SVGs used in branch button */
+.rotate-180 {
+  transform: rotate(180deg);
+  display: inline-block;
+}
+
+/* Branch select mode visuals */
+.branch-select-hint {
+  position: fixed;
+  left: 0;
+  top: 0;
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.8);
+  color: #e6edf5;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1;
+  pointer-events: none;
+  z-index: 2200;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.branch-select-dim {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 1200;
+  pointer-events: none; /* purely visual */
+}
+.branch-select-mode #buildOrderTable {
+  position: relative;
+  z-index: 2001; /* above the dim overlay */
+  box-shadow: 0 0 0 2px rgba(95, 229, 255, 0.25), 0 12px 36px rgba(0, 0, 0, 0.45);
+}
+.branch-select-mode #buildOrderTable {
+  cursor: crosshair;
+}
+.branch-select-mode { cursor: not-allowed; }
+.branch-select-mode #buildOrderTable tr:hover td {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+/* Variation Manager modal */
+.zbo-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.zbo-modal {
+  width: min(520px, 92vw);
+  background: #1f232a;
+  border: 1px solid #343b4d;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  color: #e6edf5;
+}
+.zbo-mini-modal {
+  width: min(420px, 90vw);
+  background: #1f232a;
+  border: 1px solid #343b4d;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  color: #e6edf5;
+  padding: 8px 0;
+}
+.zbo-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #2b3342;
+}
+.zbo-modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+}
+.zbo-close {
+  background: transparent;
+  border: 1px solid #3a4761;
+  color: #e6edf5;
+  border-radius: 8px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.zbo-modal-body {
+  padding: 12px 16px;
+  max-height: 60vh;
+  overflow: auto;
+}
+.zbo-modal-footer {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding: 12px 16px;
+  border-top: 1px solid #2b3342;
+}
+.zbo-btn {
+  background: #2b3342;
+  border: 1px solid #3a4761;
+  color: #e6edf5;
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.zbo-btn.ghost {
+  background: transparent;
+}
+.zbo-var-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.zbo-var-item {
+  display: grid;
+  grid-template-columns: 24px 16px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid #2b3342;
+  border-radius: 10px;
+  background: #181c22;
+}
+.zbo-drag {
+  cursor: grab;
+  user-select: none;
+  color: #9aa0a6;
+}
+.zbo-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+.zbo-name {
+  width: 100%;
+  background: #0f141a;
+  color: #e6edf5;
+  border: 1px solid #2b3342;
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+.zbo-remove {
+  background: transparent;
+  border: 1px solid #3a4761;
+  color: #e6edf5;
+  border-radius: 8px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1; /* prevent vertical offset */
+  font-size: 16px; /* slightly larger for optical balance */
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+}
+.zbo-remove:hover {
+  background: rgba(255, 255, 255, 0.06);
 }
 
 #buildOrderTable.hide-supply td:first-child,
@@ -2500,6 +3003,19 @@ body.modal-open {
   border-radius: 5px;
 }
 
+/* Map selection modal: enlarge cards and use square thumbnails */
+#mapSelectionModal .map-card {
+  width: 156px; /* 30% bigger than 120px */
+}
+
+#mapSelectionModal .map-card img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  height: auto;
+  object-fit: cover;
+  display: block;
+}
+
 @media screen and (max-width: 425px) {
   #content {
     margin: 0 auto;
@@ -2753,7 +3269,6 @@ td {
   position: relative;
   display: grid;
   grid-template-columns: 1fr 3fr; /* Allocate more space for table */
-  gap: 20px;
   align-items: flex-start;
   width: 100%;
 }
@@ -2777,6 +3292,17 @@ td {
   font-size: 14px;
   background: none;
   color: #e0e0e0;
+}
+
+/* Make communityBuildPreview text match buildPreview styling */
+#communityBuildPreview .preview-build-order,
+#communityBuildPreview #buildOrderOutput {
+  font-size: 14px;
+  color: #e0e0e0;
+  font-family: monospace; /* match buildPreview */
+}
+#communityBuildPreview #buildOrderOutput p {
+  margin: 0 0 6px;
 }
 
 .publish-btn {
@@ -3311,9 +3837,6 @@ td {
   display: flex;
   flex-direction: column;
   gap: 0px;
-  padding: 10px;
-  padding-left: 20px;
-  padding-right: 20px;
   max-height: 78vh;
   overflow-y: auto;
   overflow-x: hidden;
@@ -4918,6 +5441,7 @@ button.btn-small {
 
 .wide-privacy-modal {
   width: 80%;
+  height: 75%;
   max-width: 900px;
 }
 

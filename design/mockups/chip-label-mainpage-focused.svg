@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" role="img" aria-label="Main page UI mock with improved chip-label only">
+  <defs>
+    <linearGradient id="screenGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1b1b1b"/>
+      <stop offset="100%" stop-color="#141414"/>
+    </linearGradient>
+    <filter id="shadowSm" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000" flood-opacity="0.35"/>
+    </filter>
+    <style>
+      .bg { fill: url(#screenGrad); }
+      .title { font: 800 26px Inter, Roboto, Arial, sans-serif; fill: #dfe7ef; letter-spacing: 1px; }
+      .subtitle { font: 600 14px Inter, Roboto, Arial, sans-serif; fill: #9fb0cc; }
+      .panel { fill: #1f1f1f; stroke: #2e2e2e; }
+      .soft { fill: #222; stroke: #333; }
+      .btn { fill: #262a33; stroke: #3b4254; }
+      .btnText { font: 600 12px Inter, Roboto, Arial, sans-serif; fill: #dfe7ef; }
+      .muted { fill: #8fa0ba; font: 600 12px Inter, Roboto, Arial, sans-serif; }
+      .header { font: 700 12px Inter, Roboto, Arial, sans-serif; fill: #aebbd0; }
+      .cellText { font: 600 13px Inter, Roboto, Arial, sans-serif; fill: #e9f2ff; }
+      .mono { font: 600 12px ui-monospace, Menlo, Consolas, monospace; fill: #ffd88a; }
+
+      /* Existing rails column (unchanged UI) */
+      .railsCol { fill: #191d26; stroke: #2b3347; }
+
+      /* Improved chip-label (the only changed element) */
+      .chip { filter: url(#shadowSm); }
+      .chip-body { fill: #141a2a; stroke-width: 1; }
+      .chip-rail { stroke-width: 3; stroke-linecap: round; }
+      .chip-text { font: 700 11px Inter, Roboto, Arial, sans-serif; fill: #e6f0ff; letter-spacing: .2px; }
+      .chip-kbd { font: 700 10px ui-monospace, Menlo, Consolas, monospace; fill: #bfe9ff; }
+
+      .c-blue { stroke: #4CC9F0; }
+      .c-pink { stroke: #F72585; }
+      .c-green { stroke: #8AC926; }
+      .c-orange { stroke: #F19E39; }
+      .b-blue { stroke: #5fe5ff; }
+      .b-pink { stroke: #ff86bd; }
+      .b-green { stroke: #b2ff5a; }
+      .b-orange { stroke: #ffd084; }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1440" height="900"/>
+  <text class="title" x="40" y="52">Z‑BUILD ORDER</text>
+  <text class="subtitle" x="40" y="78">Main page UI kept intact — only the chip‑label style is updated below</text>
+
+  <!-- Input editor (unchanged) -->
+  <g transform="translate(40, 110)">
+    <rect class="panel" x="0" y="0" rx="8" width="1100" height="170"/>
+    <rect class="soft" x="12" y="12" rx="6" width="120" height="30"/>
+    <rect class="soft" x="148" y="12" rx="6" width="120" height="30"/>
+    <rect class="soft" x="284" y="12" rx="6" width="120" height="30"/>
+    <text class="mono" x="24" y="74">[15/14] hatchery</text>
+    <text class="mono" x="24" y="98">[15/14] overlord</text>
+    <text class="mono" x="24" y="122">[15/14] spawning pool</text>
+    <text class="mono" x="24" y="146">[20] 2 queen</text>
+  </g>
+
+  <!-- Title input (unchanged) -->
+  <text class="muted" x="540" y="318">Enter build order title here…</text>
+
+  <!-- Tabs row (unchanged) -->
+  <g transform="translate(40, 340)">
+    <rect class="btn" x="0" y="0" rx="10" width="68" height="30"/>
+    <text class="btnText" x="20" y="20">Main</text>
+    <rect class="btn" x="80" y="0" rx="10" width="102" height="30" stroke="#ff86bd"/>
+    <text class="btnText" x="100" y="20">Variation 1</text>
+    <rect class="btn" x="190" y="0" rx="10" width="34" height="30" stroke-dasharray="2,4" stroke="#5b6a8a"/>
+    <text class="btnText" x="202" y="20">+</text>
+    <rect class="btn" x="1060" y="0" rx="10" width="30" height="30"/>
+    <text class="btnText" x="1068" y="20">✎</text>
+  </g>
+
+  <!-- Build table (kept same) -->
+  <g transform="translate(40, 386)">
+    <!-- Header -->
+    <rect class="panel" x="0" y="0" rx="10" width="1100" height="380"/>
+    <rect x="0" y="0" width="1100" height="44" fill="#242a36"/>
+    <text class="header" x="20" y="28">Supply/Time</text>
+    <text class="header" x="170" y="28">Action</text>
+    <!-- Rails column on far right (unchanged) -->
+    <rect class="railsCol" x="1004" y="44" width="96" height="336"/>
+
+    <!-- Row 1 -->
+    <g transform="translate(0, 44)">
+      <rect x="0" y="0" width="1004" height="56" fill="#1a1f2b" stroke="#2a3347"/>
+      <text class="mono" x="22" y="34">15/14</text>
+      <text class="cellText" x="170" y="34" fill="#ffd88a">Hatchery</text>
+      <!-- Improved chip-label (only changed element) in rails col -->
+      <g class="chip" transform="translate(1014, 12)">
+        <rect class="chip-body b-pink" x="0" y="0" rx="9" width="78" height="32"/>
+        <line class="chip-rail c-pink" x1="8" y1="6" x2="8" y2="26"/>
+        <text class="chip-text" x="20" y="21">Var&nbsp;1</text>
+      </g>
+    </g>
+
+    <!-- Row 2 -->
+    <g transform="translate(0, 100)">
+      <rect x="0" y="0" width="1004" height="56" fill="#1a1f2b" stroke="#2a3347"/>
+      <text class="mono" x="22" y="34">15/14</text>
+      <text class="cellText" x="170" y="34" fill="#b896ff">Overlord</text>
+      <g class="chip" transform="translate(1014, 12)">
+        <rect class="chip-body b-green" x="0" y="0" rx="9" width="90" height="32"/>
+        <line class="chip-rail c-green" x1="8" y1="6" x2="8" y2="26"/>
+        <text class="chip-text" x="20" y="21">Var&nbsp;2</text>
+      </g>
+    </g>
+
+    <!-- Row 3 -->
+    <g transform="translate(0, 156)">
+      <rect x="0" y="0" width="1004" height="56" fill="#1a1f2b" stroke="#2a3347"/>
+      <text class="mono" x="22" y="34">15/14</text>
+      <text class="cellText" x="170" y="34" fill="#ffcf7a">Spawning pool</text>
+      <g class="chip" transform="translate(1014, 12)">
+        <rect class="chip-body b-orange" x="0" y="0" rx="9" width="98" height="32"/>
+        <line class="chip-rail c-orange" x1="8" y1="6" x2="8" y2="26"/>
+        <text class="chip-text" x="20" y="21">Var&nbsp;3</text>
+      </g>
+    </g>
+
+    <!-- Row 4 (Main) -->
+    <g transform="translate(0, 212)">
+      <rect x="0" y="0" width="1004" height="56" fill="#1a1f2b" stroke="#2a3347"/>
+      <text class="mono" x="22" y="34">20</text>
+      <text class="cellText" x="170" y="34" fill="#7dc7ff">2 Queen</text>
+      <g class="chip" transform="translate(1014, 12)">
+        <rect class="chip-body b-blue" x="0" y="0" rx="9" width="86" height="32"/>
+        <line class="chip-rail c-blue" x1="8" y1="6" x2="8" y2="26"/>
+        <text class="chip-text" x="20" y="21">Main</text>
+      </g>
+    </g>
+
+    <!-- Footer controls (unchanged) -->
+    <g transform="translate(12, 320)">
+      <rect class="btn" x="0" y="0" rx="8" width="110" height="32"/>
+      <text class="btnText" x="22" y="21">Save Build</text>
+      <rect class="btn" x="126" y="0" rx="8" width="90" height="32"/>
+      <text class="btnText" x="154" y="21">Share</text>
+    </g>
+  </g>
+
+  <!-- Callout for clarity -->
+  <text class="subtitle" x="40" y="820">Only the right‑side per‑row chip changed: compact pill, left color rail, crisp label; the rest of the UI mirrors the current layout.</text>
+</svg>
+

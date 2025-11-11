@@ -30,7 +30,7 @@ import {
   clearEditingPublishedBuild,
 } from "./states/buildState.js";
 import { loadBuilds } from "./buildService.js";
-import { fetchUserBuilds, updateBuildFavorite } from "./buildManagement.js";
+import { fetchUserBuilds, updateBuildFavorite, fetchVariationsForGroup } from "./buildManagement.js";
 import { setSavedBuilds } from "./buildStorage.js";
 import DOMPurify from "dompurify";
 import { updateTooltips } from "./tooltip.js";
@@ -361,7 +361,7 @@ export async function viewBuild(buildId) {
 
         mapUrl = folder
           ? `/img/maps/${folder}/${fileName}`
-          : `/img/maps/${(build.mapMode || "1v1")}/${fileName}`;
+          : `/img/maps/${build.mapMode || "1v1"}/${fileName}`;
       } catch (err) {
         console.warn("Could not load maps.json, falling back.");
         mapUrl = `/img/maps/${mapName.replace(/ /g, "_").toLowerCase()}.webp`;
@@ -895,7 +895,7 @@ export async function populateBuildList(
     // Hover + click preview
     buildEl.addEventListener("mouseover", () => {
       if (lastHoveredBuild !== build) {
-        updateBuildPreview(build);
+        updateBuildPreviewWithTabs(build);
         lastHoveredBuild = build;
       }
     });
@@ -907,8 +907,23 @@ export async function populateBuildList(
         showEditorUIForPublishedEdit();
         document.getElementById("buildsModal").style.display = "none";
       } else {
-        clearEditingPublishedBuild();
-        viewBuild(build.id);
+        // Open my own build directly into the editor with variations/tabs
+        try {
+          clearEditingPublishedBuild();
+          setCurrentBuildId(build.id);
+          loadBuildIntoEditor(build);
+          const saveBuildButton = document.getElementById("saveBuildButton");
+          if (saveBuildButton) {
+            saveBuildButton.innerText = "Update Build";
+            saveBuildButton.removeAttribute("data-tooltip");
+            void saveBuildButton.offsetWidth;
+            saveBuildButton.setAttribute("data-tooltip", "Update Current Build");
+          }
+          document.getElementById("buildsModal").style.display = "none";
+        } catch (e) {
+          // Fallback to legacy route if anything goes wrong
+          viewBuild(build.id);
+        }
       }
     });
 
@@ -1144,6 +1159,152 @@ export function hideBuildsModal() {
   buildsModal.style.display = "none";
 }
 
+// Enhanced preview with Variation tabs
+async function updateBuildPreviewWithTabs(build) {
+  const buildPreview = document.getElementById("buildPreview");
+  if (!buildPreview) return;
+
+  const publisherName = build.publisher || build.username || "Unknown";
+  const formattedBuildOrder = (build.buildOrder || [])
+    .map((step) => {
+      if (typeof step === "string") return formatActionText(step);
+      if (step && step.action) {
+        const bracket = step.workersOrTimestamp
+          ? `<strong>${formatWorkersOrTimestampText(step.workersOrTimestamp)}</strong> `
+          : "";
+        return `${bracket}${formatActionText(step.action)}`;
+      }
+      return "";
+    })
+    .join("<br>");
+
+  buildPreview.innerHTML = `
+    <h4>${DOMPurify.sanitize(build.title)}</h4>
+    <p class="build-publisher-line"><strong>Publisher:</strong> ${DOMPurify.sanitize(publisherName)}</p>
+    <div class="variation-section-title">Variations</div>
+    <div class="variation-tabs" id="buildPreviewTabs" aria-label="Build variations" role="tablist"></div>
+    <div class="variation-divider"></div>
+    <pre id="buildPreviewBody">${formattedBuildOrder}</pre>
+  `;
+
+  await setupVariationTabs(buildPreview, build);
+}
+
+async function setupVariationTabs(container, build) {
+  try {
+    const tabsHost = container.querySelector('#buildPreviewTabs');
+    const bodyEl = container.querySelector('#buildPreviewBody');
+    if (!tabsHost || !bodyEl) return;
+
+    let variations = Array.isArray(build.variations) ? build.variations : [];
+    if ((!variations || variations.length === 0) && build.groupId) {
+      try {
+        const grouped = await fetchVariationsForGroup(build.groupId);
+        variations = grouped.filter(v => v.id !== build.id);
+      } catch (e) {
+        console.warn('Failed to fetch grouped variations', e);
+      }
+    }
+
+    if (!Array.isArray(variations) || variations.length === 0) return;
+
+    tabsHost.innerHTML = '';
+
+    const MAX_TABS = 5;
+    const MAIN_COLOR = '#4CC9F0';
+    const VARIATION_COLORS = ['#F72585', '#8AC926', '#F19E39', '#B38CFF', '#3DD6D0'];
+    const tabModels = [{ id: 'main', name: 'Main', data: null, color: MAIN_COLOR }].concat(
+      variations.slice(0, MAX_TABS).map((v, i) => ({
+        id: v.id || `var_${i + 1}`,
+        name: v.variantName || v.name || v.title || `Variation ${i + 1}`,
+        data: v,
+        color: VARIATION_COLORS[i % VARIATION_COLORS.length]
+      }))
+    );
+
+    function formatBuildArray(arr) {
+      return (arr || [])
+        .map((step) => {
+          if (typeof step === 'string') return formatActionText(step);
+          if (step && step.action) {
+            const bracket = step.workersOrTimestamp
+              ? `<strong>${formatWorkersOrTimestampText(step.workersOrTimestamp)}</strong> `
+              : '';
+            return `${bracket}${formatActionText(step.action)}`;
+          }
+          return '';
+        })
+        .join('<br>');
+    }
+
+    function applyTab(tabId) {
+      if (tabId === 'main') {
+        bodyEl.innerHTML = formatBuildArray(build.buildOrder || []);
+        return;
+      }
+      const model = tabModels.find(t => t.id === tabId);
+      if (!model || !model.data) return;
+      const v = model.data;
+      let html = '';
+      if (Array.isArray(v.buildOrder) && v.buildOrder.length > 0) {
+        html = formatBuildArray(v.buildOrder);
+      } else if (typeof v.text === 'string' && v.text.trim()) {
+        html = DOMPurify.sanitize(
+          v.text
+            .split(/\r?\n/)
+            .filter(Boolean)
+            .map((ln) => ln.replace(/</g, '&lt;').replace(/>/g, '&gt;'))
+            .join('<br>')
+        );
+      }
+      if (html) bodyEl.innerHTML = html;
+    }
+
+    tabModels.forEach((m, idx) => {
+      const btn = document.createElement('button');
+      btn.className = 'variation-tab' + (idx === 0 ? ' active' : '');
+      btn.type = 'button';
+      btn.setAttribute('role', 'tab');
+      btn.setAttribute('data-var-id', m.id);
+      btn.title = m.name;
+      btn.textContent = m.name;
+      try { btn.style.borderColor = m.color || MAIN_COLOR; } catch (_) {}
+      // active underline like main page
+      try { btn.style.boxShadow = idx === 0 ? `inset 0 -3px 0 0 ${m.color || MAIN_COLOR}` : 'none'; } catch (_) {}
+      btn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        tabsHost.querySelectorAll('.variation-tab').forEach((b) => {
+          b.classList.remove('active');
+          // clear underline
+          try { b.style.boxShadow = 'none'; } catch (_) {}
+        });
+        btn.classList.add('active');
+        try { btn.style.boxShadow = `inset 0 -3px 0 0 ${m.color || MAIN_COLOR}`; } catch (_) {}
+        applyTab(m.id);
+      });
+      tabsHost.appendChild(btn);
+    });
+
+    container.addEventListener(
+      'mouseleave',
+      () => {
+        const mainBtn = tabsHost.querySelector('.variation-tab[data-var-id="main"]');
+        if (mainBtn) {
+          tabsHost.querySelectorAll('.variation-tab').forEach((b) => {
+            b.classList.remove('active');
+            try { b.style.boxShadow = 'none'; } catch (_) {}
+          });
+          mainBtn.classList.add('active');
+          try { mainBtn.style.boxShadow = `inset 0 -3px 0 0 ${MAIN_COLOR}`; } catch (_) {}
+          applyTab('main');
+        }
+      },
+      { passive: true }
+    );
+  } catch (e) {
+    console.warn('setupVariationTabs failed', e);
+  }
+}
 export function loadBuild(index) {
   const build = getSavedBuilds()[index];
   const inputField = document.getElementById("buildOrderInput");
@@ -1234,10 +1395,41 @@ function showEditorUIForPublishedEdit() {
   newButton.style.display = "inline-block";
 }
 
-function loadBuildIntoEditor(build) {
-  document.getElementById("buildOrderTitleInput").value = build.title || "";
-  document.getElementById("buildCategoryDropdown").value =
-    build.subcategory || "";
+async function loadBuildIntoEditor(build) {
+  const titleStr = build.title || "";
+  const titleInputEl = document.getElementById("buildOrderTitleInput");
+  if (titleInputEl) titleInputEl.value = titleStr;
+  const titleTextEl = document.getElementById("buildOrderTitleText");
+  if (titleTextEl) {
+    titleTextEl.textContent = titleStr || "Enter build order title here...";
+    if (titleStr) titleTextEl.classList.remove("dimmed");
+    else titleTextEl.classList.add("dimmed");
+  }
+  // Robustly apply matchup dropdown ignoring case
+  try {
+    const matchUpDropdown = document.getElementById("buildCategoryDropdown");
+    const subRaw = (build.subcategory || build.subcategoryLowercase || "").toString();
+    const subLower = subRaw.toLowerCase();
+    if (matchUpDropdown && subLower) {
+      let matched = false;
+      for (const opt of matchUpDropdown.options) {
+        if (String(opt.value).toLowerCase() === subLower) {
+          matchUpDropdown.value = opt.value;
+          matched = true;
+          break;
+        }
+      }
+      // Colorize like viewBuild
+      matchUpDropdown.style.color = subLower.startsWith("zv")
+        ? "#c07aeb"
+        : subLower.startsWith("pv")
+        ? "#5fe5ff"
+        : subLower.startsWith("tv")
+        ? "#ff3a30"
+        : "";
+      if (!matched) matchUpDropdown.selectedIndex = 0; // fallback
+    }
+  } catch (_) {}
   document.getElementById("descriptionInput").value = build.description || "";
   document.getElementById("videoInput").value = build.videoLink || "";
   document.getElementById("buildOrderInput").value = Array.isArray(
@@ -1250,7 +1442,98 @@ function loadBuildIntoEditor(build) {
         .join("\n")
     : "";
 
+  // Setup DOM-based variation editors so tabs appear for this build
+  try {
+    const main = document.getElementById("buildOrderInput");
+    if (main) {
+      // Ensure editor stack exists and main is registered
+      let stack = document.getElementById("boEditorsStack");
+      if (!stack) {
+        stack = document.createElement("div");
+        stack.id = "boEditorsStack";
+        const parent = main.parentElement;
+        if (parent) parent.insertBefore(stack, main);
+        stack.appendChild(main);
+      } else {
+        // Remove old variation editors if any
+        Array.from(stack.querySelectorAll(".bo-editor"))
+          .filter((ed) => ed !== main)
+          .forEach((ed) => ed.remove());
+      }
+      main.classList.add("bo-editor");
+      main.dataset.editorId = "main";
+      main.dataset.editorName = "Main";
+      main.style.display = "block";
+
+      const toText = (v) => {
+        if (Array.isArray(v?.buildOrder)) {
+          return v.buildOrder
+            .map((s) =>
+              `[${s.workersOrTimestamp || ""}] ${s.action || ""}`.trim()
+            )
+            .join("\n");
+        }
+        return String(v?.text || "");
+      };
+
+      let variations = Array.isArray(build.variations)
+        ? build.variations
+        : [];
+
+      // If build uses grouped variations (separate docs), fetch siblings
+      try {
+        if ((!variations || variations.length === 0) && build.groupId) {
+          const siblings = await fetchVariationsForGroup(build.groupId);
+          if (Array.isArray(siblings) && siblings.length) {
+            const mainDoc = siblings.find((b) => b.isMain) || build;
+            // Populate Main editor from the mainDoc
+            if (Array.isArray(mainDoc.buildOrder)) {
+              main.value = mainDoc.buildOrder
+                .map((s) => `[${s.workersOrTimestamp || ""}] ${s.action || ""}`.trim())
+                .join("\n");
+            } else if (typeof mainDoc.text === "string") {
+              main.value = String(mainDoc.text || "");
+            }
+            // Normalized variations from other siblings
+            const others = siblings.filter((b) => b.id !== (mainDoc.id || ""));
+            variations = others.map((b, idx) => ({
+              id: b.id || `var_${idx + 1}`,
+              name: b.variantName || b.name || `Variation ${idx + 1}`,
+              buildOrder: Array.isArray(b.buildOrder) ? b.buildOrder : undefined,
+              text: Array.isArray(b.buildOrder)
+                ? undefined
+                : (typeof b.text === "string" ? b.text : ""),
+            }));
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to fetch grouped variations", err);
+      }
+      // Expose list for analyze fallback
+      window.zboPreloadedVariations = variations.map((v, idx) => ({
+        id: v.id || `var_${idx + 1}`,
+        name: v.name || `Variation ${idx + 1}`,
+      }));
+      variations.slice(0, 5).forEach((v, idx) => {
+        const ta = document.createElement("textarea");
+        ta.value = toText(v);
+        ta.className = "bo-editor";
+        ta.dataset.editorId = v.id || `var_${idx + 1}`;
+        ta.dataset.editorName = v.name || `Variation ${idx + 1}`;
+        ta.style.display = "none";
+        stack.appendChild(ta);
+      });
+
+      // Trigger rendering/tabs for this build (uiHandlers will render tabs)
+      analyzeBuildOrder(main.value || "");
+    }
+  } catch (e) {
+    console.warn("Failed to create variation editors from build", e);
+    analyzeBuildOrder(document.getElementById("buildOrderInput").value || "");
+  }
+
   // Optional: Map annotations, replayUrl, etc.
 }
 
 export { closeBuildsModal };
+

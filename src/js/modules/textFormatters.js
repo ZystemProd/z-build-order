@@ -386,6 +386,10 @@ export function formatWorkersOrTimestampText(workersOrTimestamp) {
   const actorData = [
     { term: "minerals", category: "resource" },
     { term: "gas", category: "resource" },
+    // Include worker units so they get icons/colors in Supply/Time
+    { term: "drone", category: "unit" },
+    { term: "probe", category: "unit" },
+    { term: "scv", category: "unit" },
   ];
   const actorTrie = buildActorTrie(actorData);
 

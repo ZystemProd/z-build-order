@@ -353,13 +353,87 @@ function showBuildPreview(build) {
     <div class="preview-header">
       <h3>${build.title}</h3>
     </div>
+    <div class="variation-section-title">Variations</div>
+    <div class="variation-tabs" id="communityPreviewTabs" aria-label="Build variations" role="tablist"></div>
+    <div class="variation-divider"></div>
     <div class="preview-build-order">
-      <div id="buildOrderOutput">${formattedBuildOrder}</div>
+      <div id="buildOrderOutput"></div>
     </div>
   `;
 
   communityBuildPreview.style.display = "block";
+  try { setupCommunityVariationTabs(communityBuildPreview, build, formattedBuildOrder); } catch (_) {}
   updateTooltips();
+}
+
+function setupCommunityVariationTabs(container, build, mainHtml) {
+  const tabsHost = container.querySelector('#communityPreviewTabs');
+  const bodyEl = container.querySelector('#buildOrderOutput');
+  if (!tabsHost || !bodyEl) return;
+
+  const MAX_TABS = 5;
+  const MAIN_COLOR = '#4CC9F0';
+  const VARIATION_COLORS = ['#F72585', '#8AC926', '#F19E39', '#B38CFF', '#3DD6D0'];
+
+  const variations = Array.isArray(build.variations) ? build.variations.slice(0, MAX_TABS) : [];
+
+  function formatBuildArray(arr) {
+    return (arr || [])
+      .map((step) => {
+        if (typeof step === 'string') return formatActionText(step);
+        if (step && step.action) {
+          const bracket = step.workersOrTimestamp
+            ? `<strong>${formatWorkersOrTimestampText(step.workersOrTimestamp)}</strong> `
+            : '';
+          return `${bracket}${formatActionText(step.action)}`;
+        }
+        return '';
+      })
+      .join('');
+  }
+
+  const tabModels = [{ id: 'main', name: 'Main', color: MAIN_COLOR, data: null }].concat(
+    variations.map((v, i) => ({
+      id: v.id || `var_${i + 1}`,
+      name: v.name || v.variantName || v.title || `Variation ${i + 1}`,
+      color: VARIATION_COLORS[i % VARIATION_COLORS.length],
+      data: v,
+    }))
+  );
+
+  tabsHost.innerHTML = '';
+  tabModels.forEach((m, idx) => {
+    const btn = document.createElement('button');
+    btn.className = 'variation-tab' + (idx === 0 ? ' active' : '');
+    btn.type = 'button';
+    btn.setAttribute('role', 'tab');
+    btn.setAttribute('data-var-id', m.id);
+    btn.textContent = m.name;
+    try { btn.style.borderColor = m.color || MAIN_COLOR; } catch (_) {}
+    try { btn.style.boxShadow = idx === 0 ? `inset 0 -3px 0 0 ${m.color || MAIN_COLOR}` : 'none'; } catch (_) {}
+    btn.addEventListener('click', () => {
+      tabsHost.querySelectorAll('.variation-tab').forEach((b) => {
+        b.classList.remove('active');
+        try { b.style.boxShadow = 'none'; } catch (_) {}
+      });
+      btn.classList.add('active');
+      try { btn.style.boxShadow = `inset 0 -3px 0 0 ${m.color || MAIN_COLOR}`; } catch (_) {}
+      if (m.id === 'main') {
+        bodyEl.innerHTML = mainHtml;
+      } else if (m.data) {
+        const html = Array.isArray(m.data.buildOrder) && m.data.buildOrder.length > 0
+          ? formatBuildArray(m.data.buildOrder)
+          : (typeof m.data.text === 'string' && m.data.text.trim()
+              ? DOMPurify.sanitize(m.data.text.split(/\r?\n/).filter(Boolean).map((ln) => ln.replace(/</g, '&lt;').replace(/>/g, '&gt;')).join(''))
+              : '');
+        if (html) bodyEl.innerHTML = html; else bodyEl.innerHTML = '<p>No build order available.</p>';
+      }
+    });
+    tabsHost.appendChild(btn);
+  });
+
+  // Seed with main
+  bodyEl.innerHTML = mainHtml;
 }
 
 const communitySearchInput = document.getElementById("communitySearchBar");
@@ -658,7 +732,6 @@ window.publishBuildToCommunity = async function (
   buildToPublish.sharedToClans = sharedToClans;
 
   try {
-    const { getUserMainClanInfo } = await import("./clan.js");
     const clan = await getUserMainClanInfo(user.uid);
     if (clan) {
       buildToPublish.publisherClan = {

@@ -1,0 +1,165 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="900" viewBox="0 0 1280 900">
+  <defs>
+    <style>
+      .bg { fill: #0f1116; }
+      .panel { fill: #151922; stroke: #232a36; stroke-width: 1; }
+      .table { fill: #11151d; stroke: #232a36; stroke-width: 1; }
+      .header { fill: #1b2130; }
+      .text { fill: #e5ecff; font: 600 15px Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+      .muted { fill: #9fb0d0; font: 500 13px Inter, system-ui; }
+      .dim { fill: #70809f; font: 500 13px Inter, system-ui; }
+      .mono { fill: #cfe0ff; font: 500 13px ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+      .tab { fill: #1b2130; stroke: #2a3347; stroke-width: 1; rx: 10; ry: 10; }
+      .tab-active { fill: #2a3347; stroke: #3a4761; }
+      .pill { fill: #0f1116; stroke: #3a4761; stroke-width: 1; rx: 6; ry: 6; }
+      .row-line { stroke: #232a36; stroke-width: 1; }
+      .sep { fill: #3a4761; }
+      .accent { fill: #99f8fd; }
+      .branch-diamond { fill: #1b2130; stroke: #5c6b87; stroke-width: 2; transform: rotate(45deg); transform-origin: center; }
+      .railA { stroke: #4CC9F0; stroke-width: 3; }
+      .railB { stroke: #F72585; stroke-width: 3; }
+      .railC { stroke: #F19E39; stroke-width: 3; }
+      .chipA { fill: #16222a; stroke: #4CC9F0; }
+      .chipB { fill: #241624; stroke: #F72585; }
+      .chipC { fill: #261d12; stroke: #F19E39; }
+      .chipText { fill: #e5ecff; font: 600 12px Inter, system-ui; }
+      .title { fill: #e5ecff; font: 700 18px Inter, system-ui; }
+      .note { fill: #b8c7e8; font: 500 12px Inter, system-ui; }
+      .ok { fill: #75FB4C; }
+      .warn { fill: #F19E39; }
+      .purple { fill: #b68cff; }
+      .blue { fill: #8cc2ff; }
+      .red { fill: #ff8c8c; }
+      .green { fill: #99f8fd; }
+    </style>
+  </defs>
+
+  <!-- Background -->
+  <rect class="bg" x="0" y="0" width="1280" height="900"/>
+
+  <!-- Top input panel mock -->
+  <rect class="panel" x="40" y="30" width="1200" height="160" rx="12"/>
+  <text class="title" x="60" y="62">Build Variations — Concept Mock</text>
+  <rect class="table" x="60" y="80" width="560" height="90" rx="8"/>
+  <text class="muted" x="76" y="105">[44 probe] Extractor trick</text>
+  <text class="muted" x="76" y="126">[15/14] Overlord</text>
+  <text class="muted" x="76" y="147">[16] Hatchery (b2)</text>
+  <text class="dim" x="640" y="110">Enter build order title here…</text>
+
+  <!-- Tabs for variations -->
+  <g transform="translate(40,210)">
+    <rect class="tab-active" x="0" y="0" width="120" height="34" rx="10"/>
+    <text class="text" x="20" y="22">Main</text>
+    <rect class="tab" x="130" y="0" width="190" height="34" rx="10"/>
+    <text class="text" x="150" y="22">2‑Base Pressure</text>
+    <rect class="tab" x="330" y="0" width="170" height="34" rx="10"/>
+    <text class="text" x="350" y="22">Greedy Third</text>
+    <rect class="tab" x="510" y="0" width="170" height="34" rx="10"/>
+    <text class="text" x="530" y="22">Safety Bane</text>
+  </g>
+
+  <!-- Table area -->
+  <g transform="translate(40,260)">
+    <rect class="table" x="0" y="0" width="1200" height="560" rx="12"/>
+
+    <!-- Header row -->
+    <rect class="header" x="0" y="0" width="1200" height="44" rx="12"/>
+    <text class="text" x="24" y="28">Supply/Time</text>
+    <text class="text" x="190" y="28">Action</text>
+
+    <!-- Column separator -->
+    <rect class="sep" x="165" y="8" width="1" height="540" opacity="0.4"/>
+
+    <!-- Rows -->
+    <g class="row" transform="translate(0,44)">
+      <!-- row 1 -->
+      <line class="row-line" x1="0" y1="44" x2="1200" y2="44"/>
+      <text class="mono" x="24" y="28">44 Probe</text>
+      <text class="text" x="190" y="28">Extractor <tspan class="muted">trick</tspan></text>
+
+      <!-- row 2 -->
+      <g transform="translate(0,44)">
+        <line class="row-line" x1="0" y1="44" x2="1200" y2="44"/>
+        <text class="mono" x="24" y="28"><tspan class="red">15/14</tspan></text>
+        <text class="text" x="190" y="28"><tspan class="purple">Overlord</tspan></text>
+      </g>
+
+      <!-- row 3 (branch point) -->
+      <g transform="translate(0,88)">
+        <line class="row-line" x1="0" y1="44" x2="1200" y2="44"/>
+        <text class="mono" x="24" y="28">16</text>
+        <text class="text" x="190" y="28"><tspan class="green">Hatchery</tspan> <tspan class="muted">(2nd base)</tspan></text>
+
+        <!-- Branch marker diamond -->
+        <rect class="branch-diamond" x="170" y="12" width="16" height="16"/>
+        <text class="muted" x="192" y="24">Branch point</text>
+
+        <!-- Colored rails flowing down from branch -->
+        <path class="railA" d="M 182 22 C 182 120, 182 200, 182 520"/>
+        <path class="railB" d="M 188 22 C 250 140, 300 220, 360 520"/>
+        <path class="railC" d="M 176 22 C 130 140, 120 220, 100 520"/>
+      </g>
+
+      <!-- row 4 -->
+      <g transform="translate(0,132)">
+        <line class="row-line" x1="0" y1="44" x2="1200" y2="44"/>
+        <text class="mono" x="24" y="28">18</text>
+        <text class="text" x="190" y="28">Extractor <tspan class="muted">(1st)</tspan></text>
+      </g>
+
+      <!-- row 5 -->
+      <g transform="translate(0,176)">
+        <line class="row-line" x1="0" y1="44" x2="1200" y2="44"/>
+        <text class="mono" x="24" y="28">17</text>
+        <text class="text" x="190" y="28">Spawning Pool</text>
+      </g>
+
+      <!-- row 6 (timeline sample with badges) -->
+      <g transform="translate(0,220)">
+        <line class="row-line" x1="0" y1="44" x2="1200" y2="44"/>
+        <text class="mono" x="24" y="28">2:00</text>
+        <text class="text" x="190" y="28">✔ <tspan class="green">Spawning Pool</tspan> ➜ 2 Queen <tspan class="muted">(1 inject &amp; 1 Creep tumor)</tspan></text>
+      </g>
+
+      <!-- row 7 (variation labels shown inline to the right) -->
+      <g transform="translate(0,264)">
+        <line class="row-line" x1="0" y1="44" x2="1200" y2="44"/>
+        <text class="mono" x="24" y="28">25</text>
+        <text class="text" x="190" y="28">4 Zergling</text>
+
+        <!-- Chips to denote row belongs to a variation when that track is visible -->
+        <rect class="pill chipA" x="980" y="10" width="110" height="24" rx="6"/>
+        <text class="chipText" x="990" y="26">2‑Base Pressure</text>
+
+        <rect class="pill chipB" x="820" y="10" width="130" height="24" rx="6"/>
+        <text class="chipText" x="830" y="26">Greedy Third</text>
+
+        <rect class="pill chipC" x="680" y="10" width="120" height="24" rx="6"/>
+        <text class="chipText" x="690" y="26">Safety Bane</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- Legend / Notes -->
+  <g transform="translate(40,840)">
+    <text class="note" x="0" y="0">Legend:</text>
+    <circle cx="110" cy="-6" r="5" fill="#4CC9F0"/>
+    <text class="note" x="122" y="0">2‑Base Pressure track</text>
+    <circle cx="300" cy="-6" r="5" fill="#F72585"/>
+    <text class="note" x="312" y="0">Greedy Third track</text>
+    <circle cx="470" cy="-6" r="5" fill="#F19E39"/>
+    <text class="note" x="482" y="0">Safety Bane track</text>
+  </g>
+
+  <!-- Side annotation cards -->
+  <g transform="translate(900,210)">
+    <rect class="panel" x="0" y="0" width="340" height="34" rx="8"/>
+    <text class="muted" x="12" y="22">Show/Hide tracks</text>
+
+    <rect class="panel" x="0" y="46" width="340" height="120" rx="8"/>
+    <text class="note" x="12" y="72">• Tabs switch the active variation</text>
+    <text class="note" x="12" y="92">• Colored rails mark where a variation branches</text>
+    <text class="note" x="12" y="112">• Chips tag rows unique to a variation</text>
+  </g>
+</svg>
+

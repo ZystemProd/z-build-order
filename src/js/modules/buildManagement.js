@@ -28,6 +28,7 @@ import { mapAnnotations } from "./interactive_map.js";
 import { checkPublishButtonVisibility } from "./community.js";
 import { logAnalyticsEvent } from "./analyticsHelper.js";
 import { getUserMainClanInfo } from "./clan.js";
+import { getCurrentBuildId, setCurrentBuildId } from "./states/buildState.js";
 
 import DOMPurify from "dompurify";
 
@@ -114,6 +115,21 @@ export async function saveCurrentBuild() {
     .replace(/([a-z])([a-z])/g, (match, p1, p2) => `${p1.toUpperCase()}${p2}`);
 
   const buildOrder = parseBuildOrder(buildOrderInput.value);
+
+  // Collect DOM-based variations (hidden textareas)
+  function collectDomVariations() {
+    const stack = document.getElementById("boEditorsStack");
+    if (!stack) return [];
+    const editors = Array.from(stack.querySelectorAll('.bo-editor'))
+      .filter((ed) => ed.dataset.editorId !== 'main');
+    return editors.slice(0, 5).map((ed, idx) => ({
+      id: ed.dataset.editorId || `var_${idx + 1}`,
+      name: ed.dataset.editorName || `Variation ${idx + 1}`,
+      text: String(ed.value || ""),
+      buildOrder: parseBuildOrder(String(ed.value || "")),
+    }));
+  }
+  const domVariations = collectDomVariations();
 
   // ✅ Robust map name parsing
   let mapName = "No map selected";
@@ -220,6 +236,7 @@ export async function saveCurrentBuild() {
     videoLink: DOMPurify.sanitize(videoInput?.value.trim() || ""),
     replayUrl,
     buildOrder,
+    variations: domVariations,
     map: mapName,
     mapFolder,
     mapMode: mapMode,
@@ -258,11 +275,171 @@ export async function saveCurrentBuild() {
     }
 
     filterBuilds("all");
+    // Set the current build context if not already set
+    try { setCurrentBuildId(docRef.id); } catch (_) {}
+
     return docRef.id;
   } catch (error) {
     console.error("Error saving to Firestore:", error);
     showToast("❌ Failed to save build.", "error");
     return null;
+  }
+}
+
+// --- Variations / Branching helpers ---
+
+function genId(prefix = "grp_") {
+  const part = Math.random().toString(36).slice(2, 10);
+  return `${prefix}${part}`;
+}
+
+/**
+ * Fetch builds that share the same groupId (variations of a build)
+ */
+export async function fetchVariationsForGroup(groupId) {
+  const user = getAuth().currentUser;
+  if (!user || !groupId) return [];
+  const database = getFirestore();
+  const baseRef = collection(database, `users/${user.uid}/builds`);
+  const q = query(baseRef, where("groupId", "==", groupId));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
+/**
+ * Create a new branch build from the current editor state.
+ * - Ensures the current build is saved as the main (if not already)
+ * - Assigns/propagates a groupId
+ * - Prompts for a branch name and creates a new build with that suffix in title
+ * Returns the new branch build id on success.
+ */
+export async function branchCurrentBuild() {
+  const authObj = getAuth();
+  const user = authObj.currentUser;
+  if (!user) {
+    showToast("You must sign in to branch a build.", "error");
+    return null;
+  }
+
+  // Read inputs
+  const titleInput = document.getElementById("buildOrderTitleInput");
+  const titleText = document.getElementById("buildOrderTitleText");
+  const origTitle = (titleInput?.value || "").trim();
+  if (!origTitle) {
+    showToast("Please enter a title before branching.", "error");
+    return null;
+  }
+
+  // Ensure original is saved
+  let mainId = getCurrentBuildId();
+  if (!mainId) {
+    mainId = await saveCurrentBuild();
+    if (!mainId) return null;
+  }
+
+  // Ensure original has a groupId
+  const database = getFirestore();
+  const mainRef = doc(database, `users/${user.uid}/builds/${mainId}`);
+  const mainSnap = await getDoc(mainRef);
+  if (!mainSnap.exists()) return null;
+  let groupId = mainSnap.data().groupId;
+  if (!groupId) {
+    groupId = genId();
+    await setDoc(
+      mainRef,
+      { groupId, isMain: true, variantName: "Main", parentId: null },
+      { merge: true }
+    );
+  }
+
+  // Prompt for branch name
+  let branchName = window.prompt("Name this branch", "Variation");
+  if (!branchName) return null;
+  branchName = branchName.trim();
+  if (!branchName) return null;
+
+  // Compose new title (keep simple suffix)
+  const newTitle = `${origTitle} — ${branchName}`;
+
+  // Update UI title fields to new branch title for saving
+  if (titleInput) titleInput.value = newTitle;
+  if (titleText) {
+    titleText.textContent = newTitle;
+    titleText.classList.remove("dimmed");
+  }
+
+  // Save the branch as a new build
+  const branchId = await saveCurrentBuild();
+  if (!branchId) return null;
+
+  // Tag the branch with linkage
+  const branchRef = doc(database, `users/${user.uid}/builds/${branchId}`);
+  await setDoc(
+    branchRef,
+    {
+      groupId,
+      parentId: mainId,
+      isMain: false,
+      variantName: branchName,
+    },
+    { merge: true }
+  );
+
+  // Keep editing the branch
+  try { setCurrentBuildId(branchId); } catch (_) {}
+
+  showToast("Branch created — now editing branch.", "success");
+  return branchId;
+}
+
+// --- Local Variations -> DB save on demand ---
+function getLocalVarKey(idOverride = null) {
+  const id = idOverride || getCurrentBuildId() || "unsaved";
+  return "zbo_variations_" + id;
+}
+async function saveLocalVariationsAsBuilds({ mainId, baseBuild }) {
+  try {
+    const authObj = getAuth();
+    const user = authObj.currentUser;
+    if (!user) return;
+    const database = getFirestore();
+
+    // Read variations from DOM editors (hide/show approach)
+    const stack = document.getElementById("boEditorsStack");
+    if (!stack) return;
+    const editors = Array.from(stack.querySelectorAll('.bo-editor')).filter(ed => ed.dataset.editorId !== 'main');
+    if (editors.length === 0) return;
+
+    // Assign/ensure groupId on main
+    let groupId = genId();
+    const mainRef = doc(database, `users/${user.uid}/builds/${mainId}`);
+    await setDoc(
+      mainRef,
+      { groupId, isMain: true, variantName: "Main", parentId: null },
+      { merge: true }
+    );
+
+    // Create each variation as a separate build
+    const buildsRef = collection(database, `users/${user.uid}/builds`);
+    for (let i = 0; i < Math.min(5, editors.length); i++) {
+      const ed = editors[i];
+      const title = `${baseBuild.title} — ${ed.dataset.editorName || `Variation ${i + 1}`}`;
+      const buildOrder = parseBuildOrder(String(ed.value || ""));
+      const newBuild = {
+        ...baseBuild,
+        title,
+        buildOrder,
+        timestamp: Date.now(),
+      };
+      const ref = await addDoc(buildsRef, newBuild);
+      await setDoc(
+        doc(database, `users/${user.uid}/builds/${ref.id}`),
+        { groupId, isMain: false, variantName: ed.dataset.editorName || `Variation ${i + 1}`, parentId: mainId },
+        { merge: true }
+      );
+    }
+  } catch (_) {
+    // silent fail to avoid breaking save
   }
 }
 
@@ -332,11 +509,27 @@ export async function updateCurrentBuild(buildId) {
   const modeDropdown = document.getElementById("mapModeDropdown");
   const mapMode = modeDropdown ? DOMPurify.sanitize(modeDropdown.value) : "1v1";
 
+  // Collect DOM variations on update as well
+  function collectDomVariations() {
+    const stack = document.getElementById("boEditorsStack");
+    if (!stack) return [];
+    const editors = Array.from(stack.querySelectorAll('.bo-editor'))
+      .filter((ed) => ed.dataset.editorId !== 'main');
+    return editors.slice(0, 5).map((ed, idx) => ({
+      id: ed.dataset.editorId || `var_${idx + 1}`,
+      name: ed.dataset.editorName || `Variation ${idx + 1}`,
+      text: String(ed.value || ""),
+      buildOrder: parseBuildOrder(String(ed.value || "")),
+    }));
+  }
+  const domVariations = collectDomVariations();
+
   const updatedData = {
     description: DOMPurify.sanitize(descriptionInput?.value.trim() || ""),
     videoLink: DOMPurify.sanitize(videoInput?.value.trim() || ""),
     replayUrl: DOMPurify.sanitize(replayInput?.value.trim() || ""),
     buildOrder: parseBuildOrder(buildOrderInput.value),
+    variations: domVariations,
     subcategory: DOMPurify.sanitize(categoryDropdown.value || ""),
     mapMode, // ✅ add this line
     interactiveMap: {
@@ -536,10 +729,21 @@ export async function syncToPublishedBuild(buildId, buildData) {
       console.error("Failed to fetch main clan info", e);
     }
 
+    // Explicitly propagate variation metadata needed by the View page
+    const variationMeta = {
+      groupId: buildData.groupId || null,
+      isMain: buildData.isMain || false,
+      variantName: buildData.variantName || null,
+      parentId: buildData.parentId || null,
+      // Inline variations array for published fallback (read-only)
+      variations: Array.isArray(buildData.variations) ? buildData.variations.slice(0, 5) : [],
+    };
+
     await setDoc(
       publishedRef,
       {
         ...buildData,
+        ...variationMeta,
         publisherId: user.uid,
         username: buildData.publisher || buildData.username || "Unknown",
         publisherClan,

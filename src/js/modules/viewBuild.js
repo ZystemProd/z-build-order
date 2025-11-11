@@ -25,10 +25,9 @@ import {
 } from "../modules/textFormatters.js"; // ✅ Format build steps
 import {
   MapAnnotations,
-  renderMapCards,
-  loadMapsOnDemand,
 } from "./interactive_map.js"; // ✅ Map support
 import { updateYouTubeEmbed, clearYouTubeEmbed } from "./youtube.js";
+import { addVariationTabListeners } from "./init/viewBuildPageInit.js";
 import { getPublisherClanInfo } from "./community.js";
 import { showToast } from "./toastHandler.js";
 import { bannedWords } from "../data/bannedWords.js";
@@ -68,6 +67,27 @@ const REPLY_BATCH_SIZE = 10;
 let cachedMapsList = null;
 let mapsListPromise = null;
 
+// ---------------- Variations (read-only on view page) -----------------
+const MAIN_COLOR = "#4CC9F0";
+const VARIATION_COLORS = [
+  "#F72585",
+  "#8AC926",
+  "#F19E39",
+  "#B38CFF",
+  "#3DD6D0",
+];
+
+const viewVariationState = {
+  mode: "none", // "group" | "inline" | "none"
+  active: "main",
+  // group mode: tabs = [{ id, label, color, isCurrent }]
+  // inline mode: inline = [{ id, label, color, buildOrder }]
+  tabs: [],
+  inline: [],
+};
+
+let currentPublishedBuildData = null;
+
 async function getCachedMapsList() {
   if (Array.isArray(cachedMapsList)) {
     return cachedMapsList;
@@ -97,6 +117,339 @@ async function getCachedMapsList() {
   }
 
   return [];
+}
+
+// Build pretty URL for a published build document
+function buildPrettyUrlForPublished(docId, data) {
+  try {
+    const matchup = String(data?.subcategory || "unknown").toLowerCase();
+    const slug = String(data?.title || "untitled")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)+/g, "");
+    return `/build/${matchup}/${slug}/${docId}`;
+  } catch (_) {
+    return `/build/${docId}`;
+  }
+}
+
+// Safer HTML renderer using DOMPurify when injecting actions
+function makeSafeStepsHtmlFromArray(orderArray) {
+  if (!Array.isArray(orderArray) || orderArray.length === 0)
+    return "<p>No build order available.</p>";
+
+  const rows = [];
+  for (const step of orderArray) {
+    if (typeof step === "string") {
+      const action = DOMPurify.sanitize(formatActionText(step));
+      rows.push(
+        `<p><span class=\"bo-prefix\"></span><span class=\"bo-action\">${action}</span></p>`
+      );
+      continue;
+    }
+    if (
+      step &&
+      typeof step === "object" &&
+      step.action &&
+      step.action.trim() !== ""
+    ) {
+      const prefix = step.workersOrTimestamp
+        ? `<span class=\"bo-prefix\"><strong>${formatWorkersOrTimestampText(
+            step.workersOrTimestamp
+          )}</strong></span>`
+        : `<span class=\"bo-prefix\"></span>`;
+      const action = DOMPurify.sanitize(formatActionText(step.action));
+      rows.push(`<p>${prefix}<span class=\"bo-action\">${action}</span></p>`);
+    }
+  }
+  return rows.length ? rows.join("") : "<p>No build order available.</p>";
+}
+
+function makeStepsHtmlFromArray(orderArray) {
+  if (!Array.isArray(orderArray) || orderArray.length === 0)
+    return "<p>No build order available.</p>";
+
+  const parts = [];
+  orderArray.forEach((step) => {
+    if (typeof step === "string") {
+      parts.push(
+        `<p><span class="bo-prefix"></span><span class="bo-action">${formatActionText(
+          step
+        )}</span></p>`
+      );
+      return;
+    }
+    if (
+      step &&
+      typeof step === "object" &&
+      step.action &&
+      step.action.trim() !== ""
+    ) {
+      const prefix = step.workersOrTimestamp
+        ? `<span class=\"bo-prefix\"><strong>${formatWorkersOrTimestampText(
+            step.workersOrTimestamp
+          )}</strong></span>`
+        : `<span class=\"bo-prefix\"></span>`;
+      parts.push(
+        `<p>${prefix}<span class="bo-action">${formatActionText(
+          step.action
+        )}</span></p>`
+      );
+    }
+  });
+  return parts.length > 0 ? parts.join("") : "<p>No build order available.</p>";
+}
+
+
+
+function setInlineActiveVariation(id) {
+  const tabsEl = document.getElementById("variationTabs");
+  const container = document.getElementById("buildOrder");
+  if (!tabsEl || !container) return;
+
+  viewVariationState.active = id || "main";
+
+  // Update active class on tabs
+  Array.from(tabsEl.querySelectorAll(".variation-tab")).forEach((btn, idx) => {
+    // index 0 is Main
+    const isActive =
+      idx === 0
+        ? viewVariationState.active === "main"
+        : viewVariationState.inline[idx - 1]?.id === viewVariationState.active;
+    if (isActive) btn.classList.add("active");
+    else btn.classList.remove("active");
+    // Mirror active underline used in buildPreview/modal
+    try {
+      const color = idx === 0
+        ? MAIN_COLOR
+        : (viewVariationState.inline[idx - 1]?.color || VARIATION_COLORS[(idx - 1) % VARIATION_COLORS.length]);
+      btn.style.boxShadow = isActive ? `inset 0 -3px 0 0 ${color}` : "none";
+    } catch (_) {}
+  });
+
+  // Render steps
+  if (viewVariationState.active === "main") {
+    container.innerHTML = makeStepsHtmlFromArray(
+      currentPublishedBuildData?.buildOrder || []
+    );
+  } else {
+    const found = viewVariationState.inline.find(
+      (v) => v.id === viewVariationState.active
+    );
+    container.innerHTML = makeStepsHtmlFromArray(found?.buildOrder || []);
+  }
+}
+
+// ---------------- Simple Tabs for inline variations -----------------
+export function showVariation(index, build) {
+  const container = document.getElementById("buildOrder");
+  if (!container) return;
+  if (!build || typeof index !== "number") return;
+
+  if (index === 0) {
+    container.innerHTML = makeSafeStepsHtmlFromArray(build.buildOrder || []);
+    return;
+  }
+
+  const variations = Array.isArray(build.variations) ? build.variations : [];
+  const v = variations[index - 1];
+  if (!v) {
+    container.innerHTML = makeSafeStepsHtmlFromArray(build.buildOrder || []);
+    return;
+  }
+  if (Array.isArray(v.buildOrder)) {
+    container.innerHTML = makeSafeStepsHtmlFromArray(v.buildOrder);
+    return;
+  }
+  if (typeof v.text === "string" && v.text.trim()) {
+    const safeLines = v.text
+      .split(/\r?\n/)
+      .map((ln) => ln.trim())
+      .filter(Boolean)
+      .map(
+        (ln) =>
+          `<p><span class=\"bo-prefix\"></span><span class=\"bo-action\">${DOMPurify.sanitize(
+            ln
+          )}</span></p>`
+      );
+    container.innerHTML = safeLines.length
+      ? safeLines.join("")
+      : "<p>No build order available.</p>";
+    return;
+  }
+  container.innerHTML = "<p>No build order available.</p>";
+}
+
+export function renderVariationTabs(build) {
+  const tabsEl = document.getElementById("variationTabs");
+  if (!tabsEl) return;
+  const variations = Array.isArray(build?.variations) ? build.variations : [];
+  if (!variations.length) {
+    tabsEl.innerHTML = "";
+    tabsEl.style.display = "none";
+    return;
+  }
+  const frag = document.createDocumentFragment();
+  function makeBtn(label, idx) {
+    const btn = document.createElement("button");
+    btn.className = "variation-tab" + (idx === 0 ? " active-tab" : "");
+    btn.type = "button";
+    btn.dataset.varIndex = String(idx);
+    btn.textContent = DOMPurify.sanitize(String(label || "Variation"));
+    return btn;
+  }
+  frag.appendChild(makeBtn("Main", 0));
+  variations.slice(0, 5).forEach((v, i) => {
+    const label = v?.name || `Variation ${i + 1}`;
+    frag.appendChild(makeBtn(label, i + 1));
+  });
+  tabsEl.innerHTML = "";
+  tabsEl.appendChild(frag);
+  tabsEl.style.display = "flex";
+  // delegate listeners to eventHandlers.js
+  try {
+    addVariationTabListeners(build, showVariation);
+  } catch (_) {}
+}
+
+// Prefer inline variations; fallback to published group siblings
+// Unified setup that prefers group siblings; falls back to inline
+async function setupVariationTabsReadonly(currentId, build) {
+  const tabsEl = document.getElementById("variationTabs");
+  const inlineCount = Array.isArray(build?.variations) ? build.variations.length : 0;
+  console.log("✅ setupVariationTabsReadonly invoked", { groupId: build?.groupId || null, inlineCount, hasTabsEl: !!tabsEl });
+  if (!tabsEl) return;
+
+  // Reset container
+  tabsEl.innerHTML = "";
+  tabsEl.style.display = "none";
+  viewVariationState.mode = "none";
+  viewVariationState.active = "main";
+  viewVariationState.tabs = [];
+  viewVariationState.inline = [];
+
+  const groupId = build?.groupId;
+  if (groupId) {
+    try {
+      const siblingsQ = query(
+        collection(db, "publishedBuilds"),
+        where("groupId", "==", groupId)
+      );
+      const snap = await getDocs(siblingsQ);
+      const siblings = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      console.log(
+        "Variation(setup) groupId=",
+        groupId,
+        "siblings:",
+        siblings.length
+      );
+      if (Array.isArray(siblings) && siblings.length > 1) {
+        // Render group tabs when there are siblings
+        // Sort main first
+        siblings.sort((a, b) => {
+          const am = a.isMain ? 0 : 1;
+          const bm = b.isMain ? 0 : 1;
+          if (am !== bm) return am - bm;
+          const an = String(a.variantName || a.title || "").toLowerCase();
+          const bn = String(b.variantName || b.title || "").toLowerCase();
+          return an.localeCompare(bn);
+        });
+
+        viewVariationState.mode = "group";
+        viewVariationState.active = currentId;
+
+        let colorIdx = 0;
+        tabsEl.style.display = "flex";
+        siblings.forEach((docData) => {
+          const isMain = !!docData.isMain;
+          const label = isMain
+            ? "Main"
+            : docData.variantName || docData.title || "Variation";
+          const color = isMain
+            ? MAIN_COLOR
+            : VARIATION_COLORS[colorIdx++ % VARIATION_COLORS.length];
+          const isCurrent = docData.id === currentId;
+          const btn = document.createElement("button");
+          btn.className = "variation-tab" + (isCurrent ? " active" : "");
+          btn.textContent = label;
+          try {
+            btn.style.borderColor = color;
+            btn.style.boxShadow = isCurrent ? `inset 0 -3px 0 0 ${color}` : "none";
+          } catch (_) {}
+          btn.addEventListener("click", () => {
+            if (docData.id === currentId) return;
+            const targetUrl = buildPrettyUrlForPublished(docData.id, docData);
+            try {
+              window.history.pushState({}, "", targetUrl);
+              loadBuild();
+            } catch (_) {
+              window.location.href = targetUrl;
+            }
+          });
+          tabsEl.appendChild(btn);
+        });
+        return; // done (group tabs rendered)
+      }
+      console.warn("⚠️ No siblings found, proceeding to inline fallback");
+    } catch (e) {
+      console.warn("Failed to load group variations (will try inline)", e);
+    }
+  }
+
+  // Fallback: inline variations embedded in this doc
+  const inlineVars = Array.isArray(build?.variations)
+    ? build.variations.slice(0, 5)
+    : [];
+  if (inlineVars.length > 0) {
+    console.log("🟢 Inline variation fallback used:", inlineVars.length);
+    // Reuse existing inline renderer by priming state and building buttons
+    tabsEl.style.display = "flex";
+    // Always render Main
+    const mainBtn = document.createElement("button");
+    mainBtn.className = "variation-tab active";
+    mainBtn.textContent = "Main";
+    try {
+      mainBtn.style.borderColor = MAIN_COLOR;
+      mainBtn.style.boxShadow = `inset 0 -3px 0 0 ${MAIN_COLOR}`;
+    } catch (_) {}
+    mainBtn.addEventListener("click", () => setInlineActiveVariation("main"));
+    tabsEl.appendChild(mainBtn);
+
+    viewVariationState.mode = "inline";
+    viewVariationState.active = "main";
+    viewVariationState.inline = [];
+    inlineVars.forEach((v, idx) => {
+      const id = v.id || `var_${idx + 1}`;
+      const name = v.name || `Variation ${idx + 1}`;
+      const color = VARIATION_COLORS[idx % VARIATION_COLORS.length];
+      viewVariationState.inline.push({
+        id,
+        label: name,
+        color,
+        buildOrder: Array.isArray(v.buildOrder) ? v.buildOrder : [],
+      });
+      const btn = document.createElement("button");
+      btn.className = "variation-tab";
+      btn.textContent = name;
+      try {
+        btn.style.borderColor = color;
+        btn.style.boxShadow = "none";
+      } catch (_) {}
+      btn.addEventListener("click", () => setInlineActiveVariation(id));
+      tabsEl.appendChild(btn);
+    });
+  } else {
+    // Still show a single Main tab so the area is discoverable
+    const mainBtn = document.createElement("button");
+    mainBtn.className = "variation-tab active";
+    mainBtn.textContent = "Main";
+    try {
+      mainBtn.style.borderColor = MAIN_COLOR;
+      mainBtn.style.boxShadow = `inset 0 -3px 0 0 ${MAIN_COLOR}`;
+    } catch (_) {}
+    tabsEl.appendChild(mainBtn);
+    tabsEl.style.display = "flex";
+  }
 }
 
 const commentThreadState = {
@@ -2560,8 +2913,21 @@ async function loadBuild() {
 
   if (buildSnapshot.exists()) {
     const build = buildSnapshot.data();
+    currentPublishedBuildData = build;
+    console.log("🧩 currentPublishedBuildData =", currentPublishedBuildData);
+
     await incrementBuildViews(buildId);
-    console.log("✅ Build Loaded:", build);
+
+    console.log("🧠 Loaded build:", {
+      id: buildId,
+      title: build.title,
+      hasVariations: Array.isArray(build.variations)
+        ? build.variations.length
+        : 0,
+      groupId: build.groupId || null,
+      isMain: build.isMain || null,
+      variantName: build.variantName || null,
+    });
 
     // Set basic build info
     document.getElementById("buildTitle").innerText =
@@ -2651,6 +3017,13 @@ async function loadBuild() {
         if (viewContainer) viewContainer.classList.add("is-loaded");
       });
     }
+    // ✅ Setup variation tabs (inline fallback or group-based)
+    try {
+      await setupVariationTabsReadonly(buildId, build);
+      console.log("✅ Variation tabs initialized");
+    } catch (e) {
+      console.warn("❌ Variation tab setup failed:", e);
+    }
 
     // Set build order
     const buildOrderContainer = document.getElementById("buildOrder");
@@ -2700,6 +3073,11 @@ async function loadBuild() {
     } else {
       buildOrderContainer.innerHTML = "<p>No build order available.</p>";
     }
+
+    // Ensure consistent rendering and enable inline variation switching
+    try {
+      buildOrderContainer.innerHTML = makeStepsHtmlFromArray(build.buildOrder);
+    } catch (_) {}
 
     // Set replay link
     const replayWrapper = document.getElementById("replayViewWrapper");
@@ -3394,3 +3772,5 @@ document.addEventListener("keydown", (event) => {
 window.addEventListener("popstate", () => {
   loadBuild();
 });
+
+
