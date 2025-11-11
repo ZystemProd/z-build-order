@@ -3003,6 +3003,19 @@ body.modal-open {
   border-radius: 5px;
 }
 
+/* Map selection modal: enlarge cards and use square thumbnails */
+#mapSelectionModal .map-card {
+  width: 156px; /* 30% bigger than 120px */
+}
+
+#mapSelectionModal .map-card img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  height: auto;
+  object-fit: cover;
+  display: block;
+}
+
 @media screen and (max-width: 425px) {
   #content {
     margin: 0 auto;

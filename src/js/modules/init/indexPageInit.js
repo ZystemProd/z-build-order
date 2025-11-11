@@ -83,6 +83,21 @@ import {
   renderMapCards,
   loadMapsOnDemand,
 } from "../interactive_map.js";
+// Ensure map modal content is initialized exactly once,
+// regardless of whether it's opened via the toolbar button
+// or by clicking the map preview area.
+let __mapInitDone = false;
+async function ensureMapInitialized() {
+  if (__mapInitDone) return;
+  const inst =
+    typeof initializeInteractiveMap === "function"
+      ? initializeInteractiveMap()
+      : null;
+  if (typeof initializeMapControls === "function") initializeMapControls(inst);
+  if (typeof renderMapCards === "function") await renderMapCards("current");
+  if (typeof loadMapsOnDemand === "function") loadMapsOnDemand();
+  __mapInitDone = true;
+}
 // Dynamic import kept only for templates (not involved in warnings)
 async function loadTemplatesModule() {
   return import("../template.js");
@@ -1379,20 +1394,9 @@ export async function initializeIndexPage() {
     replayView.style.display = "none";
   }
 
-  // --- Map Setup (lazy) — avoid fetching maps.json until needed
+  // --- Map Setup (lazy) - avoid fetching maps.json until needed
   if (document.getElementById("map-preview-container")) {
     setupMapModalListeners();
-    let mapInitDone = false;
-    async function ensureMapInitialized() {
-      if (mapInitDone) return;
-      // Create interactive map instance and controls
-      const inst = typeof initializeInteractiveMap === "function" ? initializeInteractiveMap() : null;
-      if (typeof initializeMapControls === "function") initializeMapControls(inst);
-      // Render initial set of maps and lazy-load images
-      if (typeof renderMapCards === "function") await renderMapCards("current");
-      if (typeof loadMapsOnDemand === "function") loadMapsOnDemand();
-      mapInitDone = true;
-    }
 
     // Open button should trigger lazy init + show modal
     safeAdd("openMapModalButton", "click", async () => {
@@ -1914,9 +1918,10 @@ export async function initializeIndexPage() {
 
     const mapPreviewImage = document.getElementById("map-preview-image");
 
-    mapPreview.addEventListener("click", () => {
+    mapPreview.addEventListener("click", async () => {
       const hasMap = mapPreviewImage && mapPreviewImage.getAttribute("src");
       if (!hasMap) {
+        await ensureMapInitialized();
         mapModal.style.display = "block";
       }
     });
