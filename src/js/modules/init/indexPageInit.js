@@ -82,6 +82,7 @@ import {
   initializeMapControls,
   renderMapCards,
   loadMapsOnDemand,
+  initializeMapSelection,
 } from "../interactive_map.js";
 // Ensure map modal content is initialized exactly once,
 // regardless of whether it's opened via the toolbar button
@@ -94,6 +95,8 @@ async function ensureMapInitialized() {
       ? initializeInteractiveMap()
       : null;
   if (typeof initializeMapControls === "function") initializeMapControls(inst);
+  // Ensure selection modal wiring (mode dropdown + selection handlers)
+  if (typeof initializeMapSelection === "function") initializeMapSelection(inst);
   if (typeof renderMapCards === "function") await renderMapCards("current");
   if (typeof loadMapsOnDemand === "function") loadMapsOnDemand();
   __mapInitDone = true;

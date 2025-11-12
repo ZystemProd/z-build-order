@@ -94,7 +94,7 @@ async function getCachedMapsList() {
   }
 
   if (!mapsListPromise) {
-    mapsListPromise = fetch("/data/maps.json")
+    mapsListPromise = fetch("/data/maps.json", { cache: "no-store" })
       .then((response) => {
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);
