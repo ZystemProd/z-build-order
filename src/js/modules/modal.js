@@ -348,7 +348,7 @@ export async function viewBuild(buildId) {
       let mapUrl = "";
 
       try {
-        const response = await fetch("/data/maps.json");
+        const response = await fetch("/data/maps.json", { cache: "no-store" });
         const maps = await response.json();
         const mapEntry = maps.find(
           (m) => m.name.toLowerCase() === mapName.toLowerCase()

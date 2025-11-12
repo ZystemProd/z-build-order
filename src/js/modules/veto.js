@@ -887,7 +887,7 @@ function undoLastAction() {
 // Load maps by mode (only current maps)
 async function loadMapsByMode(mode) {
   try {
-    const response = await fetch("/data/maps.json");
+    const response = await fetch("/data/maps.json", { cache: "no-store" });
     const allMaps = await response.json();
 
     // Filter maps: current maps only, matching mode

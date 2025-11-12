@@ -1,56 +1,111 @@
 [
   {
+    "name": "10,000 Feet",
+    "file": "10000_feet.webp",
+    "folder": "current/1v1",
+    "mode": "1v1"
+  },
+  {
+    "name": "Celestial Enclave",
+    "file": "celestial_enclave.webp",
+    "folder": "current/1v1",
+    "mode": "1v1"
+  },
+  {
+    "name": "Mothership",
+    "file": "mothership.webp",
+    "folder": "current/1v1",
+    "mode": "1v1"
+  },
+  {
+    "name": "Old Republic",
+    "file": "old_republic.webp",
+    "folder": "current/1v1",
+    "mode": "1v1"
+  },
+  {
+    "name": "Ruby Rock",
+    "file": "ruby_rock.webp",
+    "folder": "current/1v1",
+    "mode": "1v1"
+  },
+  {
+    "name": "Taito Citadel",
+    "file": "taito_citadel.webp",
+    "folder": "current/1v1",
+    "mode": "1v1"
+  },
+  {
+    "name": "Tourmaline",
+    "file": "tourmaline.webp",
+    "folder": "current/1v1",
+    "mode": "1v1"
+  },
+  {
+    "name": "White Rabbit",
+    "file": "white_rabbit.webp",
+    "folder": "current/1v1",
+    "mode": "1v1"
+  },
+  {
+    "name": "Winter Madness",
+    "file": "winter_madness.webp",
+    "folder": "current/1v1",
+    "mode": "1v1"
+  },
+
+  {
     "name": "Incorporeal",
     "file": "incorporeal.webp",
-    "folder": "current/1v1",
+    "folder": "archive/1v1",
     "mode": "1v1"
   },
   {
     "name": "Last Fantasy",
     "file": "last_fantasy.webp",
-    "folder": "current/1v1",
+    "folder": "archive/1v1",
     "mode": "1v1"
   },
   {
     "name": "Ley Lines",
     "file": "ley_lines.webp",
-    "folder": "current/1v1",
+    "folder": "archive/1v1",
     "mode": "1v1"
   },
   {
     "name": "Magannatha",
     "file": "magannatha.webp",
-    "folder": "current/1v1",
+    "folder": "archive/1v1",
     "mode": "1v1"
   },
   {
     "name": "Persephone",
     "file": "persephone.webp",
-    "folder": "current/1v1",
+    "folder": "archive/1v1",
     "mode": "1v1"
   },
   {
     "name": "Pylon",
     "file": "pylon.webp",
-    "folder": "current/1v1",
+    "folder": "archive/1v1",
     "mode": "1v1"
   },
   {
     "name": "Tokamak",
     "file": "tokamak.webp",
-    "folder": "current/1v1",
+    "folder": "archive/1v1",
     "mode": "1v1"
   },
   {
     "name": "Torches",
     "file": "torches.webp",
-    "folder": "current/1v1",
+    "folder": "archive/1v1",
     "mode": "1v1"
   },
   {
     "name": "Ultralove",
     "file": "ultralove.webp",
-    "folder": "current/1v1",
+    "folder": "archive/1v1",
     "mode": "1v1"
   },
 

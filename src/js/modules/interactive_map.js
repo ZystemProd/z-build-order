@@ -356,7 +356,8 @@ export function initializeMapSelection(mapAnnotations) {
   modal.addEventListener("change", (e) => {
     if (!e.target || e.target.id !== "mapModeDropdown") return;
     const selectedMode = e.target.value;
-    renderMapCards("current").then(() => loadMapsOnDemand());
+    // Re-render using whichever folder tab is active (current/archive)
+    renderMapCards(getActiveFolder()).then(() => loadMapsOnDemand());
   });
 
   // Map card clicks — set preview + attach metadata (folder/mode/name) on the preview image
@@ -417,14 +418,19 @@ export function initializeMapSelection(mapAnnotations) {
 }
 
 export async function renderMapCards(folder = "current") {
-  const buildsContainer = document.querySelector(".builds-container");
+  // Prefer the map modal's container to avoid clashing with other .builds-container sections
+  const mapModal = document.getElementById("mapSelectionModal");
+  const buildsContainer =
+    mapModal?.querySelector(".builds-container") ||
+    document.querySelector("#mapSelectionModal .builds-container") ||
+    document.querySelector(".builds-container");
   const modeDropdown = document.getElementById("mapModeDropdown");
   const selectedMode = modeDropdown ? modeDropdown.value : "1v1";
 
   if (!buildsContainer) return;
 
   try {
-    const response = await fetch("/data/maps.json");
+    const response = await fetch("/data/maps.json", { cache: "no-store" });
     const maps = await response.json();
 
     // Clear container
@@ -432,15 +438,15 @@ export async function renderMapCards(folder = "current") {
 
     const seen = new Set();
 
-    maps
+    const pathFolder = `${folder}/${selectedMode}`;
+    let list = maps
       .filter((map) => {
         if (!map.folder) return false;
-        // Respect requested folder (e.g., current or archive)
-        if (folder) {
-          // startsWith to allow subfolders like current/1v1, archive/1v1
-          if (!map.folder.startsWith(folder)) return false;
-        }
-        // Ensure map mode matches selectedMode
+        // For archive, show all maps under the selected mode folder regardless of map.mode value
+        const isArchive = folder === "archive";
+        const folderMatch = map.folder === pathFolder || map.folder.startsWith(pathFolder);
+        if (!folderMatch) return false;
+        if (isArchive) return true;
         const mapMode = Array.isArray(map.mode)
           ? map.mode
           : map.mode
@@ -448,7 +454,15 @@ export async function renderMapCards(folder = "current") {
           : ["1v1"];
         return mapMode.includes(selectedMode);
       })
-      .forEach((map) => {
+      // Stable sort by name for predictable ordering
+      .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+
+    console.debug(
+      `[MapCards] folder=${folder} mode=${selectedMode} -> ${list.length} maps`,
+      list.map((m) => m.name)
+    );
+
+    list.forEach((map) => {
         const fileName =
           map.file ||
           `${(map.name || "").replace(/\s+/g, "_").toLowerCase()}.webp`;
