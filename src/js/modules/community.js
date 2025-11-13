@@ -966,8 +966,20 @@ function renderCommunityBuildBatch(builds) {
     buildEntry.classList.add("build-entry");
     buildEntry.dataset.id = build.id;
 
-    buildEntry.addEventListener("click", async () => {
-      await incrementBuildViews(db, build.id);
+    buildEntry.addEventListener("click", () => {
+      // Store the build so viewBuild can hydrate instantly
+      try {
+        sessionStorage.setItem(
+          `preload-build:${build.id}`,
+          JSON.stringify({ cachedAt: Date.now(), build })
+        );
+      } catch (err) {
+        console.warn("Failed to cache preload build", err);
+      }
+
+      incrementBuildViews(db, build.id).catch((err) =>
+        console.warn("Deferred view increment failed", err)
+      );
 
       const matchup = build.subcategory?.toLowerCase() || "unknown";
       const slug = slugify(build.title || "untitled");
@@ -982,11 +994,11 @@ function renderCommunityBuildBatch(builds) {
       localStorage.getItem("communityBuildType") === "clan" && build.clanInfo
         ? `<span class="meta-chip clan-chip"><img src="${
             build.clanInfo.logoUrl || "./img/clan/logo.webp"
-          }" alt="${
+          }" alt="${DOMPurify.sanitize(
             build.clanInfo.name
-          }" class="meta-icon" style="width:16px;height:16px;">${DOMPurify.sanitize(
-            build.clanInfo.name
-          )}</span>`
+          )}" class="meta-icon" width="16" height="16" loading="lazy" decoding="async">${
+            DOMPurify.sanitize(build.clanInfo.name)
+          }</span>`
         : "";
 
     buildEntry.innerHTML = `
@@ -1001,7 +1013,7 @@ function renderCommunityBuildBatch(builds) {
           <span class="meta-chip publisher-chip">
             <img src="${
               build.publisherClan?.logoUrl || "./img/SVG/user-svgrepo-com.svg"
-            }" alt="Publisher" class="meta-icon" style="width:16px;height:16px;">
+            }" alt="Publisher" class="meta-icon" width="16" height="16" loading="lazy" decoding="async">
             ${DOMPurify.sanitize(build.publisher)}
           </span>
           <span class="meta-chip">

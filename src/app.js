@@ -12,13 +12,16 @@ import {
   browserLocalPersistence,
 } from "firebase/auth";
 import {
-  getFirestore,
+  initializeFirestore,
   getDocs,
   collection,
   doc,
   getDoc,
   setDoc,
   deleteDoc,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  memoryLocalCache,
 } from "firebase/firestore";
 import { bannedWords } from "./js/data/bannedWords.js";
 import { showToast } from "./js/modules/toastHandler.js";
@@ -54,7 +57,14 @@ document.addEventListener("DOMContentLoaded", () => {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getFirestore(app);
+const db = initializeFirestore(app, {
+  localCache:
+    typeof window === "undefined"
+      ? memoryLocalCache()
+      : persistentLocalCache({
+          tabManager: persistentMultipleTabManager(),
+        }),
+});
 const provider = new GoogleAuthProvider();
 
 const appCheck = initializeAppCheck(app, {
