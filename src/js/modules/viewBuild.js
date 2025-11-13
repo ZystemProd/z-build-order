@@ -60,6 +60,9 @@ let pendingCommentsListHtml = null;
 let hasPendingCommentsListHtml = false;
 let commentShellInitialized = false;
 const userProfileCache = new Map();
+let commentsLoadRequested = false;
+let deferredCommentsBuildId = null;
+let deferredCommentsObserver = null;
 
 const MAX_THREAD_DEPTH = 7;
 const REPLY_BATCH_SIZE = 10;
@@ -87,6 +90,21 @@ const viewVariationState = {
 };
 
 let currentPublishedBuildData = null;
+
+function consumePreloadedBuild(buildId) {
+  if (typeof window === "undefined" || !buildId) return null;
+  try {
+    const key = `preload-build:${buildId}`;
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    sessionStorage.removeItem(key);
+    const payload = JSON.parse(raw);
+    return payload?.build || null;
+  } catch (err) {
+    console.warn("Failed to read preloaded build cache", err);
+    return null;
+  }
+}
 
 async function getCachedMapsList() {
   if (Array.isArray(cachedMapsList)) {
@@ -699,13 +717,176 @@ function ensureCommentSectionStructure() {
   };
 }
 
+function scheduleCommentsLoad(buildId) {
+  if (!buildId) return;
+  if (commentsLoadRequested && currentBuildId === buildId) return;
+
+  deferredCommentsBuildId = buildId;
+
+  const triggerLoad = () => {
+    if (commentsLoadRequested || !deferredCommentsBuildId) return;
+    const targetId = deferredCommentsBuildId;
+    deferredCommentsBuildId = null;
+    commentsLoadRequested = true;
+    loadComments(targetId);
+  };
+
+  if (typeof window === "undefined") {
+    triggerLoad();
+    return;
+  }
+
+  const structure = ensureCommentSectionStructure();
+  const commentSection = structure?.section;
+
+  if ("IntersectionObserver" in window && commentSection) {
+    if (deferredCommentsObserver) deferredCommentsObserver.disconnect();
+    deferredCommentsObserver = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          deferredCommentsObserver.disconnect();
+          deferredCommentsObserver = null;
+          triggerLoad();
+        }
+      },
+      { rootMargin: "200px" }
+    );
+    deferredCommentsObserver.observe(commentSection);
+  }
+
+  const idleInvoke = () => triggerLoad();
+  if ("requestIdleCallback" in window) {
+    window.requestIdleCallback(idleInvoke, { timeout: 3000 });
+  } else {
+    window.setTimeout(idleInvoke, 2500);
+  }
+}
+
 const pageBackButton = document.getElementById("pageBackButton");
 const ratingItem = document.getElementById("ratingItem");
 const infoGrid = document.querySelector(".build-info-grid");
 const FADE_TARGET_SELECTOR = "[data-fade-target]";
+const MATCHUP_ACCENT_CLASSES = ["matchup-zvx", "matchup-tvx", "matchup-pvx"];
 
 function getViewBuildContainer() {
   return document.querySelector(".view-build-container");
+}
+
+function applyMatchupTheme(matchupText) {
+  if (!matchupText) return;
+  const viewContainer = getViewBuildContainer();
+  if (infoGrid) infoGrid.classList.remove(...MATCHUP_ACCENT_CLASSES);
+  if (viewContainer) viewContainer.classList.remove(...MATCHUP_ACCENT_CLASSES);
+
+  const matchupKey = matchupText.trim().toLowerCase();
+  if (matchupKey.startsWith("zv")) {
+    if (infoGrid) infoGrid.classList.add("matchup-zvx");
+    if (viewContainer) viewContainer.classList.add("matchup-zvx");
+  } else if (matchupKey.startsWith("tv")) {
+    if (infoGrid) infoGrid.classList.add("matchup-tvx");
+    if (viewContainer) viewContainer.classList.add("matchup-tvx");
+  } else if (matchupKey.startsWith("pv")) {
+    if (infoGrid) infoGrid.classList.add("matchup-pvx");
+    if (viewContainer) viewContainer.classList.add("matchup-pvx");
+  }
+}
+
+function renderOptimisticBuild(build) {
+  if (!build) return;
+
+  const titleEl = document.getElementById("buildTitle");
+  if (titleEl && build.title) titleEl.innerText = build.title;
+
+  const publisherText = build.publisher || build.username || "Anonymous";
+  const publisherEl = document.getElementById("buildPublisher");
+  if (publisherEl) publisherEl.innerText = publisherText;
+  const publisherElMobile = document.getElementById("buildPublisherMobile");
+  if (publisherElMobile) publisherElMobile.innerText = publisherText;
+
+  const matchupText =
+    build.subcategory ||
+    build.matchup ||
+    (typeof build.category === "string" ? build.category : "Unknown");
+  const matchupEl = document.getElementById("buildMatchup");
+  if (matchupEl && matchupText) matchupEl.innerText = matchupText;
+  const matchupElMobile = document.getElementById("buildMatchupMobile");
+  if (matchupElMobile && matchupText) matchupElMobile.innerText = matchupText;
+  if (matchupText) applyMatchupTheme(matchupText);
+
+  const dateLabel =
+    build.datePublished ||
+    (build.datePublishedRaw
+      ? LONG_DATE_FORMATTER.format(new Date(build.datePublishedRaw))
+      : "");
+  const dateEl = document.getElementById("buildDate");
+  if (dateEl && dateLabel) dateEl.innerText = dateLabel;
+  const dateElMobile = document.getElementById("buildDateMobile");
+  if (dateElMobile && dateLabel) dateElMobile.innerText = dateLabel;
+
+  const iconSrc =
+    build.publisherIcon ||
+    build.publisherAvatarUrl ||
+    build.publisherClan?.logoUrl ||
+    build.publisherClan?.logo ||
+    DEFAULT_AVATAR_URL;
+  const iconEl = document.getElementById("buildPublisherIcon");
+  if (iconEl && iconSrc) {
+    iconEl.src = iconSrc;
+    iconEl.loading = "lazy";
+    iconEl.decoding = "async";
+  }
+  const iconElMob = document.getElementById("buildPublisherIconMobile");
+  if (iconElMob && iconSrc) {
+    iconElMob.src = iconSrc;
+    iconElMob.loading = "lazy";
+    iconElMob.decoding = "async";
+  }
+
+  if (Array.isArray(build.buildOrder) && build.buildOrder.length) {
+    const buildOrderContainer = document.getElementById("buildOrder");
+    if (buildOrderContainer) {
+      try {
+        buildOrderContainer.innerHTML = makeStepsHtmlFromArray(
+          build.buildOrder
+        );
+      } catch (err) {
+        console.warn("Failed to render optimistic build order", err);
+      }
+    }
+  }
+
+  setBuildViewLoading(false);
+}
+
+function scheduleVariationTabsSetup(buildId, build) {
+  if (!buildId) return;
+  let executed = false;
+
+  const runSetup = () => {
+    if (executed) return;
+    executed = true;
+    setupVariationTabsReadonly(buildId, build)
+      .then(() => console.log("? Variation tabs initialized"))
+      .catch((e) => console.warn("? Variation tab setup failed:", e));
+  };
+
+  if (typeof window === "undefined") {
+    runSetup();
+    return;
+  }
+
+  const tabsEl = document.getElementById("variationTabs");
+  if (tabsEl) {
+    ["pointerenter", "focusin", "click"].forEach((evt) =>
+      tabsEl.addEventListener(evt, runSetup, { once: true })
+    );
+  }
+
+  if ("requestIdleCallback" in window) {
+    window.requestIdleCallback(runSetup, { timeout: 2000 });
+  } else {
+    window.setTimeout(runSetup, 400);
+  }
 }
 
 function updateButtonLabel(button, text) {
@@ -2619,6 +2800,13 @@ function loadComments(buildId) {
     return;
   }
 
+  commentsLoadRequested = true;
+  deferredCommentsBuildId = null;
+  if (deferredCommentsObserver) {
+    deferredCommentsObserver.disconnect();
+    deferredCommentsObserver = null;
+  }
+
   if (currentBuildId === buildId && commentsUnsubscribe) {
     renderComments();
     return;
@@ -2857,6 +3045,17 @@ async function incrementBuildViews(buildId) {
   }
 }
 
+function deferIncrementBuildViews(buildId) {
+  if (!buildId) return;
+  if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+    window.requestIdleCallback(() => incrementBuildViews(buildId), {
+      timeout: 2000,
+    });
+  } else {
+    setTimeout(() => incrementBuildViews(buildId), 500);
+  }
+}
+
 function getBuildId() {
   const path = window.location.pathname;
   const prettyMatch = path.match(/\/build\/[^/]+\/[^/]+\/([^/]+)/);
@@ -2888,19 +3087,35 @@ async function loadBuild() {
 
   const viewContainer = document.querySelector(".view-build-container");
 
+  if (currentBuildId !== buildId) {
+    commentsLoadRequested = false;
+    deferredCommentsBuildId = null;
+    if (deferredCommentsObserver) {
+      deferredCommentsObserver.disconnect();
+      deferredCommentsObserver = null;
+    }
+  }
+
+  const preloadedBuild = consumePreloadedBuild(buildId);
+  if (preloadedBuild) {
+    try {
+      renderOptimisticBuild(preloadedBuild);
+    } catch (err) {
+      console.warn("Failed to render preloaded build data", err);
+    }
+  }
+
   setBuildViewLoading(true);
 
-  const matchupAccentClasses = ["matchup-zvx", "matchup-tvx", "matchup-pvx"];
-
   if (infoGrid) {
-    infoGrid.classList.remove("is-loaded", ...matchupAccentClasses);
+    infoGrid.classList.remove("is-loaded", ...MATCHUP_ACCENT_CLASSES);
   }
 
   if (viewContainer) {
-    viewContainer.classList.remove("is-loaded", ...matchupAccentClasses);
+    viewContainer.classList.remove("is-loaded", ...MATCHUP_ACCENT_CLASSES);
   }
 
-  loadComments(buildId);
+  scheduleCommentsLoad(buildId);
 
   // Clear existing map annotations and image before loading new build
   const existingMapImage = document.getElementById("map-preview-image");
@@ -2916,7 +3131,7 @@ async function loadBuild() {
     currentPublishedBuildData = build;
     console.log("🧩 currentPublishedBuildData =", currentPublishedBuildData);
 
-    await incrementBuildViews(buildId);
+    deferIncrementBuildViews(buildId);
 
     console.log("🧠 Loaded build:", {
       id: buildId,
@@ -2975,26 +3190,7 @@ async function loadBuild() {
 
     document.getElementById("buildMatchup").innerText = matchupText;
     if (typeof matchupText === "string") {
-      const matchupKey = matchupText.trim().toLowerCase();
-
-      if (infoGrid) {
-        infoGrid.classList.remove(...matchupAccentClasses);
-      }
-
-      if (viewContainer) {
-        viewContainer.classList.remove(...matchupAccentClasses);
-      }
-
-      if (matchupKey.startsWith("zv")) {
-        if (infoGrid) infoGrid.classList.add("matchup-zvx");
-        if (viewContainer) viewContainer.classList.add("matchup-zvx");
-      } else if (matchupKey.startsWith("tv")) {
-        if (infoGrid) infoGrid.classList.add("matchup-tvx");
-        if (viewContainer) viewContainer.classList.add("matchup-tvx");
-      } else if (matchupKey.startsWith("pv")) {
-        if (infoGrid) infoGrid.classList.add("matchup-pvx");
-        if (viewContainer) viewContainer.classList.add("matchup-pvx");
-      }
+      applyMatchupTheme(matchupText);
     }
     document.getElementById("buildPublisher").innerText = publisherText;
     document.getElementById("buildDate").innerText = dateText;
@@ -3018,12 +3214,7 @@ async function loadBuild() {
       });
     }
     // ✅ Setup variation tabs (inline fallback or group-based)
-    try {
-      await setupVariationTabsReadonly(buildId, build);
-      console.log("✅ Variation tabs initialized");
-    } catch (e) {
-      console.warn("❌ Variation tab setup failed:", e);
-    }
+    scheduleVariationTabsSetup(buildId, build);
 
     // Set build order
     const buildOrderContainer = document.getElementById("buildOrder");
@@ -3607,10 +3798,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     const buildId = getBuildId();
     if (buildId) {
       updateVoteButtonIcons(buildId);
-      if (!commentsUnsubscribe || currentBuildId !== buildId) {
-        loadComments(buildId);
+      if (commentsLoadRequested) {
+        if (!commentsUnsubscribe || currentBuildId !== buildId) {
+          loadComments(buildId);
+        } else {
+          renderComments();
+        }
       } else {
-        renderComments();
+        scheduleCommentsLoad(buildId);
       }
     }
   });
