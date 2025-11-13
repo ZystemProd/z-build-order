@@ -902,6 +902,7 @@ function updateButtonLabel(button, text) {
 function setBuildViewLoading(isLoading) {
   const container = getViewBuildContainer();
   if (!container) return;
+  const overlay = document.getElementById("viewLoadingOverlay");
 
   container.classList.toggle("is-loading", isLoading);
 
@@ -911,6 +912,18 @@ function setBuildViewLoading(isLoading) {
     });
   } else {
     container.classList.remove("is-loaded");
+  }
+
+  if (overlay) {
+    if (isLoading) {
+      overlay.classList.remove("hidden");
+      overlay.setAttribute("aria-busy", "true");
+      document.body?.classList.add("view-loading-active");
+    } else {
+      overlay.setAttribute("aria-busy", "false");
+      overlay.classList.add("hidden");
+      document.body?.classList.remove("view-loading-active");
+    }
   }
 
   container.querySelectorAll(FADE_TARGET_SELECTOR).forEach((node) => {
