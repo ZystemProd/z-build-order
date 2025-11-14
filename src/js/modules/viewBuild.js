@@ -3283,16 +3283,24 @@ async function loadBuild() {
       buildOrderContainer.innerHTML = makeStepsHtmlFromArray(build.buildOrder);
     } catch (_) {}
 
-    // Set replay link
+    // Set replay link (hide if missing/invalid)
     const replayWrapper = document.getElementById("replayViewWrapper");
     const replayHeader = document.getElementById("replayHeader");
     const replayBtn = document.getElementById("replayDownloadBtn");
     if (replayWrapper && replayHeader && replayBtn) {
-      if (build.replayUrl && build.replayUrl.trim() !== "") {
-        replayBtn.href = build.replayUrl;
+      const rawReplayUrl = (build.replayUrl || "").trim();
+      const validReplayPattern = /^https:\/\/drop\.sc\/replay\/\d+$/;
+      const hasValidReplay =
+        rawReplayUrl &&
+        rawReplayUrl !== "#" &&
+        validReplayPattern.test(rawReplayUrl);
+
+      if (hasValidReplay) {
+        replayBtn.href = rawReplayUrl;
         replayWrapper.style.display = "block";
         replayHeader.style.display = "block";
       } else {
+        replayBtn.removeAttribute("href");
         replayWrapper.style.display = "none";
         replayHeader.style.display = "none";
       }
