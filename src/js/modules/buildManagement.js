@@ -556,7 +556,11 @@ export async function updateCurrentBuild(buildId) {
   if (!updatedData.replayUrl) {
     const replayBtn = document.getElementById("replayDownloadBtn");
     const fallback = replayBtn?.getAttribute("href") || replayBtn?.href || "";
-    if (fallback) updatedData.replayUrl = DOMPurify.sanitize(fallback.trim());
+    const cleanedFallback = (fallback || "").trim();
+    const validReplayPattern = /^https:\/\/drop\.sc\/replay\/\d+$/;
+    if (cleanedFallback && validReplayPattern.test(cleanedFallback)) {
+      updatedData.replayUrl = DOMPurify.sanitize(cleanedFallback);
+    }
   }
 
   // Robustly derive map name and folder
