@@ -370,6 +370,29 @@ export async function viewBuild(buildId) {
       if (mapImage) mapImage.src = mapUrl;
       if (selectedMapText) selectedMapText.innerText = formattedMapName;
 
+      // Fallback: derive image path when maps.json name does not match stored map
+      if (mapImage && mapName) {
+        const baseName = mapName
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "_")
+          .replace(/_+/g, "_")
+          .replace(/^_+|_+$/g, "");
+        const folder = build.mapFolder;
+        if (baseName && folder) {
+          try {
+            const currentUrl = new URL(
+              mapImage.src || "",
+              window.location.origin
+            );
+            if (!currentUrl.pathname.includes(`/maps/${folder}/`)) {
+              mapImage.src = `/img/maps/${folder}/${baseName}.webp`;
+            }
+          } catch (_) {
+            mapImage.src = `/img/maps/${folder}/${baseName}.webp`;
+          }
+        }
+      }
+
       const clearBtn = document.querySelector(".clear-annotations-button");
       if (clearBtn) clearBtn.style.display = "inline-block";
 

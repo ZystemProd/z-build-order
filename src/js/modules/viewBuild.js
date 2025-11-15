@@ -70,6 +70,13 @@ const REPLY_BATCH_SIZE = 10;
 let cachedMapsList = null;
 let mapsListPromise = null;
 
+function normalizeMapNameKey(name) {
+  return (name || "")
+    .toString()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+}
+
 // ---------------- Variations (read-only on view page) -----------------
 const MAIN_COLOR = "#4CC9F0";
 const VARIATION_COLORS = [
@@ -3382,19 +3389,48 @@ async function loadBuild() {
       mapName.toLowerCase() !== "no map selected";
 
     let mapExists = false;
+    let resolvedMapName = "";
+
     // Map display for view-only
     if (mapImage) {
       if (isValidMap) {
         let mapPath = "";
+        let matchedEntry = null;
         const maps = await getCachedMapsList();
 
         if (Array.isArray(maps) && maps.length > 0) {
-          const entry = maps.find(
-            (m) => m.name.toLowerCase() === mapName.toLowerCase()
-          );
+          const targetKey = normalizeMapNameKey(mapName);
+          matchedEntry =
+            maps.find(
+              (m) =>
+                normalizeMapNameKey(m.name || "") === targetKey &&
+                m.folder &&
+                m.file
+            ) ||
+            maps.find(
+              (m) =>
+                (m.name || "").toLowerCase() === mapName.toLowerCase() &&
+                m.folder &&
+                m.file
+            );
 
-          if (entry) {
-            mapPath = `img/maps/${entry.folder}/${entry.file}`;
+          if (matchedEntry) {
+            mapPath = `img/maps/${matchedEntry.folder}/${matchedEntry.file}`;
+            resolvedMapName = matchedEntry.name || mapName;
+          }
+        }
+
+        // Fallback: derive from stored folder + map text
+        if (!mapPath && build.mapFolder) {
+          const folder = build.mapFolder;
+          const base = mapName
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "_")
+            .replace(/_+/g, "_")
+            .replace(/^_+|_+$/g, "");
+          if (base) {
+            mapPath = `img/maps/${folder}/${base}.webp`;
+            resolvedMapName = resolvedMapName || mapName;
           }
         }
 
@@ -3411,9 +3447,19 @@ async function loadBuild() {
     }
 
     if (selectedMapText) {
-      const name = isValidMap && mapExists ? mapName : "";
-      const pretty = name ? name.charAt(0).toUpperCase() + name.slice(1) : "";
-      selectedMapText.innerText = pretty;
+      let displayName = "";
+      if (isValidMap && (mapExists || mapName)) {
+        const baseName = (resolvedMapName || mapName).trim();
+        if (baseName) {
+          displayName = baseName
+            .split(" ")
+            .map((word) =>
+              word ? word.charAt(0).toUpperCase() + word.slice(1) : word
+            )
+            .join(" ");
+        }
+      }
+      selectedMapText.innerText = displayName;
     }
 
     const mapContainerWrapper = document.getElementById("map-container");
