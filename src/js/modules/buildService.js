@@ -60,11 +60,24 @@ export async function loadBuilds({
     const publishedSnap = await getDocs(
       query(publishedRef, where("publisherId", "==", user.uid))
     );
-    const publishedIds = new Set(publishedSnap.docs.map((d) => d.id));
-    builds = builds.map((b) => ({
-      ...b,
-      isPublished: b.isPublished || publishedIds.has(b.id),
-    }));
+    const publishedMap = new Map(
+      publishedSnap.docs.map((d) => [d.id, d.data()])
+    );
+    const publishedIds = new Set(publishedMap.keys());
+
+    builds = builds.map((b) => {
+      const published = publishedMap.get(b.id);
+      return {
+        ...b,
+        isPublished: b.isPublished || publishedIds.has(b.id),
+        // If the user copy is missing map metadata but the published copy has it,
+        // hydrate the local build with the published values so editor/map preview work.
+        map: b.map || published?.map || "",
+        mapFolder: b.mapFolder || published?.mapFolder || "",
+        mapMode: b.mapMode || published?.mapMode || "",
+        interactiveMap: b.interactiveMap || published?.interactiveMap || null,
+      };
+    });
   }
 
   builds.sort((a, b) => {

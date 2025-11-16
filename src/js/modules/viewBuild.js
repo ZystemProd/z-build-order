@@ -3560,6 +3560,12 @@ async function loadBuild() {
           });
         }
 
+        if (typeof viewMapAnnotations.refreshArrowPositions === "function") {
+          requestAnimationFrame(() => {
+            viewMapAnnotations.refreshArrowPositions();
+          });
+        }
+
         annotationsContainer.style.pointerEvents = "none";
       };
 

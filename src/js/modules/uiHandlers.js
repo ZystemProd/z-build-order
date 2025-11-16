@@ -311,6 +311,11 @@ export function populateBuildDetails(index) {
                 mapAnnotations.createArrow(startX, startY, endX, endY)
             );
             mapAnnotations.updateCircleNumbers?.();
+            if (typeof mapAnnotations.refreshArrowPositions === "function") {
+              requestAnimationFrame(() => {
+                mapAnnotations.refreshArrowPositions();
+              });
+            }
           }
         };
         if (mapImage && mapImage.complete && mapImage.naturalWidth > 0) {

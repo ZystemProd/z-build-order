@@ -171,6 +171,20 @@ export class MapAnnotations {
     });
   }
 
+  refreshArrowPositions() {
+    if (!this.mapContainer || !this.arrows || this.arrows.length === 0) return;
+    this.arrows.forEach((arrowData) => {
+      if (!arrowData || !arrowData.element) return;
+      this.updateArrow(
+        arrowData.element,
+        arrowData.startX,
+        arrowData.startY,
+        arrowData.endX,
+        arrowData.endY
+      );
+    });
+  }
+
   createArrow(startX, startY, endX, endY) {
     const arrow = document.createElement("div");
     arrow.classList.add("annotation-arrow");
