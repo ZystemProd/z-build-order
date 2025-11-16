@@ -37,6 +37,13 @@ import { updateTooltips } from "./tooltip.js";
 import { getMainClanId } from "./settings.js";
 import { getClanInfo } from "./clan.js";
 
+function normalizeMapNameKey(name) {
+  return (name || "")
+    .toString()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+}
+
 // --- Firestore Pagination State
 let lastVisibleBuild = null;
 let isLoadingMoreBuilds = false;
@@ -1464,6 +1471,119 @@ async function loadBuildIntoEditor(build) {
         )
         .join("\n")
     : "";
+
+  // Map preview + annotations when loading from My Builds
+  try {
+    const mapImage = document.getElementById("map-preview-image");
+    const selectedMapText = document.getElementById("selected-map-text");
+    const modeDropdown = document.getElementById("mapModeDropdown");
+
+    if (modeDropdown && build.mapMode) {
+      modeDropdown.value = build.mapMode;
+    }
+
+    const mapNameRaw = (build.map || "").trim();
+    const hasValidMap =
+      mapNameRaw &&
+      mapNameRaw.toLowerCase() !== "index" &&
+      mapNameRaw.toLowerCase() !== "no map selected";
+
+    const capitalizeWords = (str) =>
+      (str || "")
+        .split(" ")
+        .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
+        .join(" ");
+
+    if (hasValidMap) {
+      const formattedName = capitalizeWords(mapNameRaw);
+      let mapUrl = "";
+      try {
+        const folder = build.mapFolder || `current/${build.mapMode || "1v1"}`;
+        const baseName = mapNameRaw
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "_")
+          .replace(/_+/g, "_")
+          .replace(/^_+|_+$/g, "");
+        const fileName = baseName ? `${baseName}.webp` : "";
+        mapUrl = folder && fileName ? `/img/maps/${folder}/${fileName}` : "";
+      } catch (_) {
+        mapUrl = "";
+      }
+
+      if (mapImage) {
+        if (mapUrl) mapImage.src = mapUrl;
+        else mapImage.removeAttribute("src");
+      }
+      if (selectedMapText) selectedMapText.innerText = formattedName;
+
+      if (mapAnnotations && mapAnnotations.annotationsContainer) {
+        mapAnnotations.annotationsContainer.innerHTML = "";
+        mapAnnotations.circles = [];
+        mapAnnotations.arrows = [];
+        const applyAnnotations = () => {
+          if (build.interactiveMap) {
+            (build.interactiveMap.circles || []).forEach(({ x, y }) =>
+              mapAnnotations.createCircle(x, y)
+            );
+            (build.interactiveMap.arrows || []).forEach(
+              ({ startX, startY, endX, endY }) =>
+                mapAnnotations.createArrow(startX, startY, endX, endY)
+            );
+            mapAnnotations.updateCircleNumbers?.();
+            if (typeof mapAnnotations.refreshArrowPositions === "function") {
+              requestAnimationFrame(() => {
+                mapAnnotations.refreshArrowPositions();
+              });
+            }
+          }
+        };
+        const runWithLayout = () => {
+          // Ensure Additional Settings (map section) is visible so layout is correct
+          try {
+            const secondRow = document.getElementById("secondRow");
+            const secondRowHeader = document.querySelector(
+              '[data-section="secondRow"]'
+            );
+            if (secondRow) {
+              secondRow.classList.remove("hidden");
+              secondRow.classList.add("visible");
+            }
+            if (secondRowHeader) {
+              const arrowIcon = secondRowHeader.querySelector(".arrow");
+              if (arrowIcon) arrowIcon.classList.add("open");
+            }
+          } catch (_) {}
+
+          applyAnnotations();
+        };
+
+        if (mapImage && mapImage.complete && mapImage.naturalWidth > 0) {
+          // Defer one frame so container can relayout after being shown
+          requestAnimationFrame(runWithLayout);
+        } else if (mapImage) {
+          mapImage.addEventListener(
+            "load",
+            () => requestAnimationFrame(runWithLayout),
+            { once: true }
+          );
+        }
+      }
+    } else {
+      if (selectedMapText) selectedMapText.innerText = "No map selected";
+      if (mapImage) {
+        mapImage.removeAttribute("src");
+        delete mapImage.dataset.mapName;
+        delete mapImage.dataset.mapMode;
+      }
+      if (mapAnnotations && mapAnnotations.annotationsContainer) {
+        mapAnnotations.annotationsContainer.innerHTML = "";
+        mapAnnotations.circles = [];
+        mapAnnotations.arrows = [];
+      }
+    }
+  } catch (_) {
+    // Non-fatal for editor load
+  }
 
   // Setup DOM-based variation editors so tabs appear for this build
   try {
