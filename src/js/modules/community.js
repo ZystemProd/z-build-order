@@ -120,7 +120,15 @@ async function updateTotalBuildCount(filter = "all") {
       lowerFilter
     )
   ) {
-    constraints.push(where("subcategoryLowercase", "==", lowerFilter));
+    const variants =
+      lowerFilter[0] === "z"
+        ? [lowerFilter, "zvx"]
+        : lowerFilter[0] === "p"
+        ? [lowerFilter, "pvx"]
+        : lowerFilter[0] === "t"
+        ? [lowerFilter, "tvx"]
+        : [lowerFilter];
+    constraints.push(where("subcategoryLowercase", "in", variants));
   } else if (["zerg", "protoss", "terran"].includes(lowerFilter)) {
     constraints.push(where("category", "==", capitalize(lowerFilter)));
   }
@@ -951,13 +959,13 @@ function renderCommunityBuildBatch(builds) {
     let matchupImage = "./img/race/unknown.webp";
     let matchupClass = "matchup-unknown";
 
-    if (["ZvZ", "ZvT", "ZvP"].includes(matchup)) {
+    if (["ZvZ", "ZvT", "ZvP", "ZvX"].includes(matchup)) {
       matchupImage = "./img/race/zerg2.webp";
       matchupClass = "matchup-zerg";
-    } else if (["PvP", "PvZ", "PvT"].includes(matchup)) {
+    } else if (["PvP", "PvZ", "PvT", "PvX"].includes(matchup)) {
       matchupImage = "./img/race/protoss2.webp";
       matchupClass = "matchup-protoss";
-    } else if (["TvP", "TvT", "TvZ"].includes(matchup)) {
+    } else if (["TvP", "TvT", "TvZ", "TvX"].includes(matchup)) {
       matchupImage = "./img/race/terran2.webp";
       matchupClass = "matchup-terran";
     }
@@ -1112,7 +1120,15 @@ export async function filterCommunityBuilds(filter = "all") {
       lowerFilter
     )
   ) {
-    constraints.push(where("subcategoryLowercase", "==", lowerFilter));
+    const variants =
+      lowerFilter[0] === "z"
+        ? [lowerFilter, "zvx"]
+        : lowerFilter[0] === "p"
+        ? [lowerFilter, "pvx"]
+        : lowerFilter[0] === "t"
+        ? [lowerFilter, "tvx"]
+        : [lowerFilter];
+    constraints.push(where("subcategoryLowercase", "in", variants));
   }
 
   // ✅ Race category filter (Zerg, Protoss, Terran)
