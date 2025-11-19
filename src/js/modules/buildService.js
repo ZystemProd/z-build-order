@@ -70,12 +70,12 @@ export async function loadBuilds({
       return {
         ...b,
         isPublished: b.isPublished || publishedIds.has(b.id),
-        // If the user copy is missing map metadata but the published copy has it,
-        // hydrate the local build with the published values so editor/map preview work.
+        // If the user copy is missing map metadata or replay, hydrate from published.
         map: b.map || published?.map || "",
         mapFolder: b.mapFolder || published?.mapFolder || "",
         mapMode: b.mapMode || published?.mapMode || "",
         interactiveMap: b.interactiveMap || published?.interactiveMap || null,
+        replayUrl: b.replayUrl || published?.replayUrl || "",
       };
     });
   }

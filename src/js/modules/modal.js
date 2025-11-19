@@ -1462,6 +1462,28 @@ async function loadBuildIntoEditor(build) {
   } catch (_) {}
   document.getElementById("descriptionInput").value = build.description || "";
   document.getElementById("videoInput").value = build.videoLink || "";
+
+  // Replay URL + download link in main editor
+  try {
+    const replayUrl = (build.replayUrl || "").trim();
+    const replayWrapper = document.getElementById("replayInputWrapper");
+    const replayView = document.getElementById("replayViewWrapper");
+    const replayBtn = document.getElementById("replayDownloadBtn");
+    const replayInput = document.getElementById("replayLinkInput");
+
+    if (replayWrapper) replayWrapper.style.display = "flex";
+    if (replayInput) replayInput.value = replayUrl || "";
+
+    if (replayUrl && replayView && replayBtn) {
+      replayView.style.display = "block";
+      replayBtn.href = replayUrl;
+      replayBtn.innerText = "Download Replay";
+    } else if (replayView && replayBtn) {
+      replayView.style.display = "none";
+      replayBtn.removeAttribute("href");
+    }
+  } catch (_) {}
+
   document.getElementById("buildOrderInput").value = Array.isArray(
     build.buildOrder
   )
