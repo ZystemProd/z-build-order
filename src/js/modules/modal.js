@@ -151,6 +151,9 @@ export async function filterBuilds(categoryOrSubcategory = "all") {
             "tvp",
             "tvt",
             "tvz",
+            "zvx",
+            "pvx",
+            "tvx",
           ].includes(currentBuildFilter)
             ? formatMatchup(currentBuildFilter)
             : capitalize(currentBuildFilter)

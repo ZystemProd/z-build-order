@@ -36,7 +36,16 @@ export async function loadBuilds({
     const lower = filter.toLowerCase();
 
     if (/^[zpt]v[zpt]$/.test(lower)) {
-      conditions.push(where("subcategoryLowercase", "==", lower));
+      // Include race-generic matchups (e.g., ZvX) when filtering by specific ones (e.g., ZvP)
+      const variants =
+        lower[0] === "z"
+          ? [lower, "zvx"]
+          : lower[0] === "p"
+          ? [lower, "pvx"]
+          : lower[0] === "t"
+          ? [lower, "tvx"]
+          : [lower];
+      conditions.push(where("subcategoryLowercase", "in", variants));
     } else if (["zerg", "protoss", "terran"].includes(lower)) {
       conditions.push(where("category", "==", capitalize(lower)));
     } else {
