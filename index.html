@@ -739,6 +739,28 @@
           </button>
         </div>
         <hr class="settings-divider" />
+        <div class="settings-username-section">
+          <label for="settingsUsernameInput" class="settings-label">Username</label>
+          <div class="settings-username-row">
+            <input
+              id="settingsUsernameInput"
+              class="settings-input"
+              type="text"
+              maxlength="20"
+              placeholder="New username"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <button type="button" class="settings-username-button" id="saveUsernameButton">
+              <img src="img/SVG/pencil.svg" class="menu-icon" alt="" aria-hidden="true" />
+              Update
+            </button>
+          </div>
+          <p id="settingsUsernameStatus" class="settings-helper-text">
+            Use 3-20 letters, numbers, or underscores.
+          </p>
+        </div>
+        <hr class="settings-divider" />
         <div class="publish-checkbox-row">
           <span>Enable Bracket Input</span>
           <div class="checkbox-wrapper-59">
