@@ -6431,6 +6431,79 @@ optgroup[label="Terran"] {
   margin: 18px 0;
 }
 
+.settings-username-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 6px 0 14px;
+}
+
+.settings-label {
+  font-weight: 600;
+  color: #e6e6e6;
+}
+
+.settings-username-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-input {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #0f0f0f;
+  color: #f0f0f0;
+  font-size: 1rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.settings-input:focus {
+  outline: none;
+  border-color: rgba(0, 188, 212, 0.55);
+  box-shadow: 0 0 0 3px rgba(0, 188, 212, 0.12);
+}
+
+.settings-username-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: none;
+  background: linear-gradient(135deg, #4cc9f0, #4895ef);
+  color: #0b0b0b;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  white-space: nowrap;
+}
+
+.settings-username-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(72, 149, 239, 0.25);
+}
+
+.settings-helper-text {
+  margin: 0;
+  color: #b0b0b0;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 640px) {
+  .settings-username-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .settings-username-button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 .avatar-modal-content {
   background: #1e1e1e;
   max-width: 600px;
