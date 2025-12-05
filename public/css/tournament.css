@@ -532,13 +532,17 @@ a {
   border-color: var(--accent-2);
 }
 
-/* Challonge-style simplified bracket */
-.challonge-bracket {
+/* Bracket tree layout */
+.tree-wrapper {
+  position: relative;
+}
+
+.tree-bracket {
   position: relative;
   min-height: 400px;
 }
 
-.challonge-bracket .row-title {
+.tree-bracket .row-title {
   position: absolute;
   top: -26px;
   width: var(--card-width, 240px);
@@ -547,7 +551,7 @@ a {
   font-weight: 600;
 }
 
-.match-card.challonge {
+.match-card.tree {
   position: absolute;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -556,7 +560,7 @@ a {
   overflow: hidden;
 }
 
-.match-card.challonge .row {
+.match-card.tree .row {
   padding: 8px 10px;
   display: grid;
   grid-template-columns: 1fr 70px;
@@ -564,12 +568,51 @@ a {
   gap: 8px;
 }
 
-.match-card.challonge .score,
-.match-card.challonge .score-select {
+.match-card.tree .score,
+.match-card.tree .score-select {
   justify-self: end;
   width: 70px;
   background: rgba(255, 255, 255, 0.08);
   color: var(--accent);
+}
+
+.match-card.tree .name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.row.highlight-player .name-text {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.race-strip {
+  width: 8px;
+  height: 18px;
+  border-radius: 4px;
+  background: #6c7385;
+  display: inline-block;
+}
+
+.race-terran {
+  background: #ff4d4f; /* red */
+}
+
+.race-protoss {
+  background: #4096ff; /* blue */
+}
+
+.race-zerg {
+  background: #a06bff; /* purple */
+}
+
+.race-random {
+  background: #e8edf7; /* white */
+}
+
+.race-unknown {
+  background: #6c7385;
 }
 
 .connector.h {

@@ -215,7 +215,11 @@ async function handleRegistration(event) {
     rebuildBracket(true, "Roster updated");
   } else {
     setSeedingNotice(true);
-    renderAll();
+    if (!state.bracket || !state.bracket.winners?.length) {
+      rebuildBracket(true, "Initial bracket");
+    } else {
+      renderAll();
+    }
   }
 
   event.target.reset();
@@ -320,9 +324,14 @@ async function fetchMmrFromPulse(link, statusEl) {
     const response = await fetch(url, { method: "GET" });
     if (!response.ok) throw new Error(`Status ${response.status}`);
     const text = await response.text();
-    const match = text.match(/mmr[^0-9]*([0-9]{3,5})/i) || text.match(/rating[^0-9]*([0-9]{3,5})/i);
-    if (match && match[1]) {
-      return Number(match[1]);
+    // Try to get "last" or "current" MMR from the stats section
+    const mmrMatch =
+      text.match(/"last":\s*([0-9]{3,5})/i) ||
+      text.match(/"current":\s*([0-9]{3,5})/i) ||
+      text.match(/mmr[^0-9]*([0-9]{3,5})/i) ||
+      text.match(/rating[^0-9]*([0-9]{3,5})/i);
+    if (mmrMatch && mmrMatch[1]) {
+      return Number(mmrMatch[1]);
     }
     setStatus(statusEl, "Could not find MMR in the page. Enter it manually.", true);
     return 0;
@@ -727,13 +736,15 @@ function renderBracket() {
 
   const lowerRounds = state.bracket.losers || [];
   const lower = lowerRounds.length
-    ? layoutBracketSection(lowerRounds, "Lower", lookup, playersById, 0, upper.height + 80)
+    ? layoutBracketSection(lowerRounds, "Lower", lookup, playersById, 0, upper.height + 10)
     : { html: "", height: 0 };
 
-  grid.innerHTML = `<div class="challonge-wrapper">
+  grid.innerHTML = `<div class="tree-wrapper">
     ${upper.html}
     ${lower.html}
   </div>`;
+
+  attachMatchHoverHandlers();
 }
 
 function renderMatchCard(match, lookup, playersById) {
@@ -996,6 +1007,7 @@ function layoutUpperBracket(bracket, lookup, playersById) {
 
   const connectors = [];
   const matchCards = [];
+  const renderedMatches = new Set();
   let maxY = 0;
 
   winners.forEach((round, rIdx) => {
@@ -1011,7 +1023,7 @@ function layoutUpperBracket(bracket, lookup, playersById) {
         const srcs = match.sources
           .map((src) => (src?.type === "match" ? positions.get(src.matchId) : null))
           .filter(Boolean);
-        if (srcs.length === 2) {
+        if (srcs.length === 2 && matchCards.some((m) => m.includes(`data-match-id="${match.id}"`))) {
           const midY1 = srcs[0].y + CARD_HEIGHT / 2;
           const midY2 = srcs[1].y + CARD_HEIGHT / 2;
           const childMidY = pos.y + CARD_HEIGHT / 2;
@@ -1034,7 +1046,7 @@ function layoutUpperBracket(bracket, lookup, playersById) {
     )
     .join("");
 
-  return `<div class="challonge-bracket" style="height:${maxY + CARD_HEIGHT}px">
+  return `<div class="tree-bracket" style="height:${maxY + CARD_HEIGHT}px">
     ${titles}
     ${matchCards.join("")}
     ${connectors.join("")}
@@ -1066,6 +1078,9 @@ function layoutBracketSection(rounds, titlePrefix, lookup, playersById, offsetX,
   const positions = new Map();
   let maxY = 0;
   let maxX = 0;
+  const connectors = [];
+  const matchCards = [];
+  const renderedMatches = new Set();
 
   rounds.forEach((round, rIdx) => {
     round.forEach((match, mIdx) => {
@@ -1092,32 +1107,75 @@ function layoutBracketSection(rounds, titlePrefix, lookup, playersById, offsetX,
     });
   });
 
-  const connectors = [];
-  const matchCards = [];
-
   rounds.forEach((round, rIdx) => {
     round.forEach((match) => {
       const pos = positions.get(match.id);
       if (!pos) return;
       const participants = resolveParticipants(match, lookup, playersById);
       const [pA, pB] = participants;
-      matchCards.push(
-        renderSimpleMatch(match, pA, pB, pos.x, pos.y, CARD_HEIGHT, CARD_WIDTH, titlePrefix)
-      );
+
+      // If one side is still TBD, keep it pending with zeroed scores
+      if (!pA || !pB) {
+        match.winnerId = null;
+        match.loserId = null;
+        match.status = "pending";
+        match.walkover = null;
+        match.scores = [0, 0];
+      }
+
+      // Auto-advance byes only in the first round
+      const hasOne = (pA && !pB) || (!pA && pB);
+      if (rIdx === 0 && hasOne) {
+        const winner = pA || pB;
+        if (winner) {
+          match.winnerId = winner.id;
+          match.loserId = null;
+          match.status = "complete";
+          match.scores = [0, 0];
+          match.walkover = "bye";
+        }
+      } else {
+        matchCards.push(
+          renderSimpleMatch(match, pA, pB, pos.x, pos.y, CARD_HEIGHT, CARD_WIDTH, titlePrefix)
+        );
+        renderedMatches.add(match.id);
+      }
 
       if (rIdx > 0) {
-        const srcs = match.sources
-          .map((src) => (src?.type === "match" ? positions.get(src.matchId) : null))
+        const sources = Array.isArray(match.sources) ? match.sources : [];
+        const parentInfos = sources
+          .map((src) => {
+            if (src?.type !== "match") return null;
+            const p = positions.get(src.matchId);
+            if (!p) return null;
+            return { pos: p, rendered: renderedMatches.has(src.matchId) };
+          })
           .filter(Boolean);
-        if (srcs.length === 2) {
-          const midY1 = srcs[0].y + CARD_HEIGHT / 2;
-          const midY2 = srcs[1].y + CARD_HEIGHT / 2;
-          const childMidY = pos.y + CARD_HEIGHT / 2;
-          const junctionX = pos.x - 30;
-          connectors.push(makeConnector(srcs[0].x + CARD_WIDTH, midY1, junctionX, midY1));
-          connectors.push(makeConnector(srcs[1].x + CARD_WIDTH, midY2, junctionX, midY2));
-          connectors.push(makeVConnector(junctionX, midY1, midY2));
-          connectors.push(makeConnector(junctionX, childMidY, pos.x, childMidY));
+        const renderedParents = parentInfos.filter((p) => p.rendered);
+
+        if (renderedMatches.has(match.id)) {
+          if (renderedParents.length === 2) {
+            const midY1 = renderedParents[0].pos.y + CARD_HEIGHT / 2;
+            const midY2 = renderedParents[1].pos.y + CARD_HEIGHT / 2;
+            const childMidY = pos.y + CARD_HEIGHT / 2;
+            const junctionX = pos.x - 30;
+            connectors.push(
+              makeConnector(renderedParents[0].pos.x + CARD_WIDTH, midY1, junctionX, midY1)
+            );
+            connectors.push(
+              makeConnector(renderedParents[1].pos.x + CARD_WIDTH, midY2, junctionX, midY2)
+            );
+            connectors.push(makeVConnector(junctionX, midY1, midY2));
+            connectors.push(makeConnector(junctionX, childMidY, pos.x, childMidY));
+          } else if (renderedParents.length === 1) {
+            const midY = renderedParents[0].pos.y + CARD_HEIGHT / 2;
+            const childMidY = pos.y + CARD_HEIGHT / 2;
+            const junctionX = pos.x - 30;
+            const parentEndX = renderedParents[0].pos.x + CARD_WIDTH;
+            connectors.push(makeConnector(parentEndX, midY, junctionX, midY));
+            connectors.push(makeVConnector(junctionX, midY, childMidY));
+            connectors.push(makeConnector(junctionX, childMidY, pos.x, childMidY));
+          }
         }
       }
     });
@@ -1132,7 +1190,7 @@ function layoutBracketSection(rounds, titlePrefix, lookup, playersById, offsetX,
     )
     .join("");
 
-  const html = `<div class="challonge-bracket" style="height:${maxY + 40}px; margin-top:${
+  const html = `<div class="tree-bracket" style="height:${maxY + 40}px; margin-top:${
     titlePrefix === "Lower" ? 40 : 0
   }px;">
     ${titles}
@@ -1146,26 +1204,65 @@ function layoutBracketSection(rounds, titlePrefix, lookup, playersById, offsetX,
 function renderSimpleMatch(match, pA, pB, x, y, h, w, prefix = "") {
   const aName = pA ? pA.name : "TBD";
   const bName = pB ? pB.name : "TBD";
+  const raceClassA = raceClassName(pA?.race);
+  const raceClassB = raceClassName(pB?.race);
+  const showScores = !!(pA && pB);
   const scoreOptions = Array.from({ length: 6 }).map(
     (_, v) => `<option value="${v}" ${match.scores?.[0] === v ? "selected" : ""}>${v}</option>`
   );
   const scoreOptionsB = Array.from({ length: 6 }).map(
     (_, v) => `<option value="${v}" ${match.scores?.[1] === v ? "selected" : ""}>${v}</option>`
   );
-  return `<div class="match-card challonge" data-match-id="${match.id}" style="top:${y}px; left:${x}px; width:${w}px; height:${h}px;">
-    <div class="row">
-      <span class="name">${escapeHtml(aName)}</span>
-      <select class="score-select" data-match-id="${match.id}" data-player-idx="0">
+  return `<div class="match-card tree" data-match-id="${match.id}" style="top:${y}px; left:${x}px; width:${w}px; height:${h}px;">
+    <div class="row" data-player-id="${pA?.id || ""}">
+      <span class="name"><span class="race-strip ${raceClassA}"></span><span class="name-text">${escapeHtml(aName)}</span></span>
+      <select class="score-select" data-match-id="${match.id}" data-player-idx="0" ${
+    showScores ? "" : 'style="display:none;"'
+  }>
         ${scoreOptions.join("")}
       </select>
     </div>
-    <div class="row">
-      <span class="name">${escapeHtml(bName)}</span>
-      <select class="score-select" data-match-id="${match.id}" data-player-idx="1">
+    <div class="row" data-player-id="${pB?.id || ""}">
+      <span class="name"><span class="race-strip ${raceClassB}"></span><span class="name-text">${escapeHtml(bName)}</span></span>
+      <select class="score-select" data-match-id="${match.id}" data-player-idx="1" ${
+    showScores ? "" : 'style="display:none;"'
+  }>
         ${scoreOptionsB.join("")}
       </select>
     </div>
   </div>`;
+}
+
+function raceClassName(race) {
+  const r = (race || "").toString().toLowerCase();
+  if (r.startsWith("z")) return "race-zerg";
+  if (r.startsWith("p")) return "race-protoss";
+  if (r.startsWith("t")) return "race-terran";
+  if (r.startsWith("r")) return "race-random";
+  return "race-unknown";
+}
+
+function attachMatchHoverHandlers() {
+  const grid = document.getElementById("bracketGrid");
+  if (!grid) return;
+
+  grid.addEventListener("mouseover", (e) => {
+    const target = e.target.closest(".row[data-player-id]");
+    if (!target) return;
+    const pid = target.dataset.playerId;
+    if (!pid) return;
+    document.querySelectorAll(`.row[data-player-id]`).forEach((row) => {
+      if (row.dataset.playerId === pid) row.classList.add("highlight-player");
+    });
+  });
+
+  grid.addEventListener("mouseout", (e) => {
+    if (e.target.closest(".row[data-player-id]")) {
+      document
+        .querySelectorAll(".row[data-player-id].highlight-player")
+        .forEach((row) => row.classList.remove("highlight-player"));
+    }
+  });
 }
 
 function getMatchLookupForTesting() {
