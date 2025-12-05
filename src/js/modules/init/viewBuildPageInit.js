@@ -34,6 +34,11 @@ export function initializeViewBuildPage() {
     if (userMenu) userMenu.style.display = "none";
     window.location.href = "/veto.html";
   });
+  safeAdd("tournamentBtn", "click", () => {
+    const userMenu = document.getElementById("userMenu");
+    if (userMenu) userMenu.style.display = "none";
+    window.location.href = "/tournament/";
+  });
 
   // These modals live on index.html; set a flag and route there
   safeAdd("showClanModalButton", "click", () => {

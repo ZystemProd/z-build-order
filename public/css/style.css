@@ -282,8 +282,9 @@ body.dark .transpose-group {
   transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
-/* Map Veto tile matches auth-container styling */
-#mapVetoTile.map-veto-tile {
+/* Floating utility tiles beside auth-container */
+#mapVetoTile.map-veto-tile,
+#tournamentTile.tournament-tile {
   position: fixed;
   top: 10px;
   right: 10px; /* Will be adjusted via JS to sit left of auth-container */
@@ -303,13 +304,21 @@ body.dark .transpose-group {
   transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
-#mapVetoTile.map-veto-tile:hover {
+#mapVetoTile.map-veto-tile:hover,
+#tournamentTile.tournament-tile:hover {
   transform: none;
   box-shadow: 0 0 10px #00bfff78;
 }
 
-/* Inline header veto button is hidden by default (desktop uses floating tile) */
-#mapVetoBtn {
+#tournamentTile.tournament-tile {
+  background: linear-gradient(135deg, #3a2b55, #253358);
+  border: 1px solid rgba(255, 193, 7, 0.35);
+  box-shadow: 0 0 12px rgba(255, 193, 7, 0.25);
+}
+
+/* Inline header buttons are hidden by default (desktop uses floating tiles) */
+#mapVetoBtn,
+#tournamentBtn {
   display: none;
 }
 
@@ -5794,17 +5803,20 @@ button.btn-small {
   }
   #showBuildsButton,
   #showCommunityModalButton,
-  #mapVetoBtn {
+  #mapVetoBtn,
+  #tournamentBtn {
     transform: scale(1.4);
     margin: 5px;
   }
   /* Show inline veto button and hide floating tile on mobile */
-  #mapVetoBtn {
+  #mapVetoBtn,
+  #tournamentBtn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
   }
-  #mapVetoTile {
+  #mapVetoTile,
+  #tournamentTile {
     display: none !important;
   }
   .filters-wrapper {

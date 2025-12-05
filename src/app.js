@@ -57,8 +57,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   setupUsernameSettingsSection();
 
-  // Position the Map Veto tile relative to auth-container
-  try { updateMapVetoPosition(); } catch (_) {}
+  // Position the floating utility tiles relative to auth-container
+  try { updateFloatingTilePositions(); } catch (_) {}
 });
 
 // Initialize Firebase
@@ -79,12 +79,13 @@ const appCheck = initializeAppCheck(app, {
   isTokenAutoRefreshEnabled: true, // auto refresh recommended
 });
 
-function updateMapVetoPosition() {
+function updateFloatingTilePositions() {
   const authEl = document.getElementById("auth-container");
   const vetoEl = document.getElementById("mapVetoTile");
-  if (!authEl || !vetoEl) return;
+  const tournamentEl = document.getElementById("tournamentTile");
+  if (!authEl) return;
 
-  // Skip on mobile (tile is hidden there)
+  // Skip on mobile (tiles are hidden there)
   if (window.matchMedia && window.matchMedia("(max-width: 768px)").matches) {
     return;
   }
@@ -94,20 +95,27 @@ function updateMapVetoPosition() {
 
   const rect = authEl.getBoundingClientRect();
   if (!rect || rect.width === 0) {
-    vetoEl.style.right = "10px";
+    if (vetoEl) vetoEl.style.right = "10px";
+    if (tournamentEl) tournamentEl.style.right = "10px";
     return;
   }
 
-  // Place tile to the left of auth container with a fixed gap
-  const targetRight = Math.max(10, window.innerWidth - rect.left + gap);
-  vetoEl.style.right = `${targetRight}px`;
+  // Place tiles to the left of auth container with a fixed gap
+  let currentRight = Math.max(10, window.innerWidth - rect.left + gap);
+  if (vetoEl) {
+    vetoEl.style.right = `${currentRight}px`;
+    currentRight += (vetoEl.offsetWidth || 150) + gap;
+  }
+  if (tournamentEl) {
+    tournamentEl.style.right = `${currentRight}px`;
+  }
 }
 
 window.addEventListener("resize", () => {
-  try { updateMapVetoPosition(); } catch (_) {}
+  try { updateFloatingTilePositions(); } catch (_) {}
 });
 window.addEventListener("load", () => {
-  try { updateMapVetoPosition(); } catch (_) {}
+  try { updateFloatingTilePositions(); } catch (_) {}
 });
 
 function initCookieConsent() {
@@ -877,7 +885,7 @@ export function initializeAuthUI() {
       if (deleteAccountMenuItem)
         deleteAccountMenuItem.style.display = "inline-flex";
       menuDividers.forEach((d) => (d.style.display = "block"));
-      try { updateMapVetoPosition(); } catch (_) {}
+      try { updateFloatingTilePositions(); } catch (_) {}
     } else {
       const authContainerEl = document.getElementById("auth-container");
       if (authContainerEl) authContainerEl.classList.remove("is-auth");
@@ -908,14 +916,14 @@ export function initializeAuthUI() {
       if (deleteAccountMenuItem) deleteAccountMenuItem.style.display = "none";
       menuDividers.forEach((d) => (d.style.display = "none"));
       resetBuildInputs();
-      try { updateMapVetoPosition(); } catch (_) {}
+      try { updateFloatingTilePositions(); } catch (_) {}
     }
 
     if (authLoadingWrapper) authLoadingWrapper.style.display = "none";
     if (userName) userName.style.display = "inline";
     if (userNameMenu) userNameMenu.style.display = "inline-block";
     if (userPhoto) userPhoto.style.display = "inline";
-    try { updateMapVetoPosition(); } catch (_) {}
+   try { updateFloatingTilePositions(); } catch (_) {}
   });
 }
 

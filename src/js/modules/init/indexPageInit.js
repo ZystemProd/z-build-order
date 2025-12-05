@@ -1438,6 +1438,12 @@ export async function initializeIndexPage() {
   document.getElementById("mapVetoTile")?.addEventListener("click", () => {
     window.location.href = "/veto.html";
   });
+  document.getElementById("tournamentBtn")?.addEventListener("click", () => {
+    window.location.href = "/tournament/";
+  });
+  document.getElementById("tournamentTile")?.addEventListener("click", () => {
+    window.location.href = "/tournament/";
+  });
 
   document.getElementById("showStatsButton")?.addEventListener("click", () => {
     const userMenu = document.getElementById("userMenu");

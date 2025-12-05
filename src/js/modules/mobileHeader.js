@@ -5,6 +5,7 @@ export function setupMobileHeader() {
   const communityBtn = document.getElementById('showCommunityModalButton');
   const buildsBtn = document.getElementById('showBuildsButton');
   const vetoBtn = document.getElementById('mapVetoBtn');
+  const tournamentBtn = document.getElementById('tournamentBtn');
 
   if (!mainHeader || !authContainer || !gameSelect) return;
 
@@ -18,6 +19,8 @@ export function setupMobileHeader() {
   const buildsPlaceholder = document.createComment('builds-placeholder');
   const vetoParent = vetoBtn ? vetoBtn.parentNode : null;
   const vetoPlaceholder = document.createComment('veto-placeholder');
+  const tournamentParent = tournamentBtn ? tournamentBtn.parentNode : null;
+  const tournamentPlaceholder = document.createComment('tournament-placeholder');
 
   function moveToHeader() {
     if (!mainHeader.contains(gameSelect)) {
@@ -35,6 +38,10 @@ export function setupMobileHeader() {
     if (vetoBtn && !mainHeader.contains(vetoBtn)) {
       vetoParent.insertBefore(vetoPlaceholder, vetoBtn);
       mainHeader.appendChild(vetoBtn);
+    }
+    if (tournamentBtn && tournamentParent && !mainHeader.contains(tournamentBtn)) {
+      tournamentParent.insertBefore(tournamentPlaceholder, tournamentBtn);
+      mainHeader.appendChild(tournamentBtn);
     }
     if (!mainHeader.contains(authContainer)) {
       authParent.insertBefore(authPlaceholder, authContainer);
@@ -62,6 +69,10 @@ export function setupMobileHeader() {
     if (vetoBtn && mainHeader.contains(vetoBtn) && vetoPlaceholder.parentNode) {
       vetoPlaceholder.parentNode.insertBefore(vetoBtn, vetoPlaceholder);
       vetoPlaceholder.remove();
+    }
+    if (tournamentBtn && mainHeader.contains(tournamentBtn) && tournamentPlaceholder.parentNode) {
+      tournamentPlaceholder.parentNode.insertBefore(tournamentBtn, tournamentPlaceholder);
+      tournamentPlaceholder.remove();
     }
   }
 
