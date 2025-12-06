@@ -102,16 +102,21 @@
       </div>
     </div>
 
-    <div class="card">
-      <div class="card-header">
-        <div>
-          <p class="eyebrow">Browse</p>
-          <h3>Open tournaments</h3>
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <p class="eyebrow">Browse</p>
+            <h3>Open tournaments</h3>
+          </div>
+          <button id="refreshTournaments" class="cta ghost small">Refresh</button>
         </div>
-        <button id="refreshTournaments" class="cta ghost small">Refresh</button>
+        <div class="list-tabs" id="tournamentListTabs">
+          <button class="list-tab active" data-list-filter="open">Open tournaments</button>
+          <button class="list-tab" data-list-filter="mine">My tournaments</button>
+          <button class="list-tab" data-list-filter="hosted">Hosted tournaments</button>
+        </div>
+        <ul id="tournamentList" class="tournament-list"></ul>
       </div>
-      <ul id="tournamentList" class="tournament-list"></ul>
-    </div>
   </section>
 
   <!-- Tournament detail -->
@@ -151,19 +156,40 @@
     <main class="page-stack">
       <div class="tab-bar" id="tabBar">
         <button class="tab-btn active" data-tab="bracketTab">Bracket</button>
-        <button class="tab-btn" data-tab="descriptionTab">Description</button>
+        <button class="tab-btn" data-tab="descriptionTab">Description &amp; Rules</button>
+        <button class="tab-btn" data-tab="mapsTab">Maps</button>
         <button class="tab-btn" data-tab="registrationTab" id="adminTabBtn">Registration</button>
+        <button class="tab-btn" data-tab="settingsTab" id="settingsTabBtn" data-admin-only="true" style="display:none;">Settings</button>
       </div>
 
       <section id="descriptionTab" class="tab-panel">
         <div class="card">
           <div class="card-header">
             <div>
-              <p class="eyebrow">Overview</p>
               <h3>Description</h3>
             </div>
           </div>
           <div id="tournamentDescriptionBody" class="helper"></div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3>Rules</h3>
+            </div>
+          </div>
+          <div id="tournamentRulesBody" class="helper"></div>
+        </div>
+      </section>
+
+      <section id="mapsTab" class="tab-panel">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3>Map Pool</h3>
+              <p class="helper">Fixed for this event (non-interactive)</p>
+            </div>
+          </div>
+          <div id="tournamentMapGrid" class="map-pool-grid"></div>
         </div>
       </section>
 
@@ -264,61 +290,233 @@
           </div>
         </div>
       </section>
+
+      <section id="settingsTab" class="tab-panel" data-admin-only="true">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <p class="eyebrow">Admin</p>
+              <h3>Edit tournament settings</h3>
+            </div>
+          </div>
+          <div class="settings-tabs" id="settingsTabs">
+            <button class="settings-tab-btn active" data-settings-tab="settingsGeneral">General</button>
+            <button class="settings-tab-btn" data-settings-tab="settingsDesc">Description &amp; Rules</button>
+            <button class="settings-tab-btn" data-settings-tab="settingsMaps">Maps</button>
+            <button class="settings-tab-btn" data-settings-tab="settingsFormat">Format</button>
+          </div>
+          <div class="settings-panel active" id="settingsGeneral">
+            <label>Tournament name
+              <input type="text" id="settingsNameInput" placeholder="My Weekly Cup" />
+            </label>
+            <label>Custom URL slug
+              <div class="inline-row">
+                <span class="muted">https://zbuildorder.com/tournament/</span>
+                <input type="text" id="settingsSlugInput" placeholder="my-weekly-cup" disabled />
+              </div>
+              <p class="helper">Slug changes are locked for existing tournaments.</p>
+            </label>
+            <label>Start time
+            <input type="datetime-local" id="settingsStartInput" />
+            </label>
+            <label>Max players
+              <input type="number" id="settingsMaxPlayersInput" min="2" max="512" placeholder="32" />
+            </label>
+          </div>
+          <div class="settings-panel" id="settingsDesc">
+            <label>Description
+              <div class="markdown-editor">
+                <div class="markdown-toolbar">
+                  <button type="button" class="toolbar-btn" data-settings-desc-action="heading">H2</button>
+                  <button type="button" class="toolbar-btn" data-settings-desc-action="bold"><strong>B</strong></button>
+                  <button type="button" class="toolbar-btn" data-settings-desc-action="italic"><em>I</em></button>
+                  <button type="button" class="toolbar-btn" data-settings-desc-action="bullet">- List</button>
+                  <button type="button" class="toolbar-btn" data-settings-desc-action="numbered">1. List</button>
+                  <button type="button" class="toolbar-btn" data-settings-desc-action="quote">" "</button>
+                  <button type="button" class="toolbar-btn" data-settings-desc-action="link">Link</button>
+                  <button type="button" class="toolbar-btn" data-settings-desc-action="image">Image</button>
+                  <button type="button" class="toolbar-btn" data-settings-desc-action="code">&lt;/&gt;</button>
+                </div>
+                <textarea id="settingsDescriptionInput" class="markdown-input" rows="8" placeholder="Describe the event..."></textarea>
+              </div>
+            </label>
+            <label>Rules
+              <div class="markdown-editor">
+                <div class="markdown-toolbar">
+                  <button type="button" class="toolbar-btn" data-settings-rules-action="heading">H2</button>
+                  <button type="button" class="toolbar-btn" data-settings-rules-action="bold"><strong>B</strong></button>
+                  <button type="button" class="toolbar-btn" data-settings-rules-action="italic"><em>I</em></button>
+                  <button type="button" class="toolbar-btn" data-settings-rules-action="bullet">- List</button>
+                  <button type="button" class="toolbar-btn" data-settings-rules-action="numbered">1. List</button>
+                  <button type="button" class="toolbar-btn" data-settings-rules-action="quote">" "</button>
+                  <button type="button" class="toolbar-btn" data-settings-rules-action="link">Link</button>
+                  <button type="button" class="toolbar-btn" data-settings-rules-action="image">Image</button>
+                  <button type="button" class="toolbar-btn" data-settings-rules-action="code">&lt;/&gt;</button>
+                </div>
+                <textarea id="settingsRulesInput" class="markdown-input" rows="8" placeholder="Add eligibility, format, communication, and fair play rules..."></textarea>
+              </div>
+            </label>
+            <div class="markdown-preview">
+              <p class="eyebrow">Description Preview</p>
+              <div id="settingsDescriptionPreview" class="helper"></div>
+            </div>
+            <div class="markdown-preview">
+              <p class="eyebrow">Rules Preview</p>
+              <div id="settingsRulesPreview" class="helper"></div>
+            </div>
+          </div>
+      <div class="settings-panel" id="settingsMaps">
+        <div class="map-pool-picker">
+          <div class="picker-header">
+            <div>
+              <p class="eyebrow">Maps</p>
+              <h4>Chosen map pool</h4>
+            </div>
+            <div class="picker-actions">
+              <button type="button" class="cta small ghost" id="settingsUseLadderMapsBtn">All ladder maps</button>
+              <button type="button" class="cta small subtle" id="settingsClearMapPoolBtn">Custom</button>
+            </div>
+          </div>
+          <div id="settingsChosenMapList" class="map-pool-grid chosen-grid"></div>
+          <div class="picker-header" style="margin-top:12px;">
+            <div>
+              <h4>All 1v1 maps</h4>
+              <p class="helper">Click to add/remove</p>
+            </div>
+          </div>
+          <div id="settingsMapPoolPicker" class="map-pool-grid selectable"></div>
+        </div>
+      </div>
+          <div class="settings-panel" id="settingsFormat">
+            <label>Format
+              <select id="settingsFormatSelect">
+                <option value="Double Elimination">Double Elimination</option>
+                <option value="Single Elimination">Single Elimination</option>
+                <option value="Round Robin">Round Robin</option>
+                <option value="Swiss">Swiss</option>
+              </select>
+            </label>
+          </div>
+          <div class="form-actions" style="margin-top:16px;">
+            <button class="cta primary" id="saveSettingsBtn">Save settings</button>
+          </div>
+        </div>
+      </section>
     </main>
   </section>
 
   <!-- Create tournament modal -->
   <div id="createTournamentModal" class="modal create-modal" style="display:none;">
     <div class="modal-content">
-      <h3>Create tournament</h3>
-      <label>Tournament name
-        <input type="text" id="tournamentNameInput" placeholder="My Weekly Cup" />
-      </label>
-      <label>Custom URL slug
-        <div class="inline-row">
-          <span class="muted">https://zbuildorder.com/tournament/</span>
-          <input type="text" id="tournamentSlugInput" placeholder="my-weekly-cup" />
-          <button type="button" class="cta small ghost" id="generateSlugBtn">Random</button>
+      <div class="modal-title-row">
+        <h3>Create tournament</h3>
+        <div class="form-actions inline-actions">
+          <button class="cta primary" id="saveTournamentBtn">Create</button>
         </div>
-        <p class="helper" id="slugStatus"></p>
-      </label>
-      <label>Description
-        <div class="markdown-editor">
-          <div class="markdown-toolbar">
-            <button type="button" class="toolbar-btn" data-desc-action="heading">H2</button>
-            <button type="button" class="toolbar-btn" data-desc-action="bold"><strong>B</strong></button>
-            <button type="button" class="toolbar-btn" data-desc-action="italic"><em>I</em></button>
-            <button type="button" class="toolbar-btn" data-desc-action="bullet">• List</button>
-            <button type="button" class="toolbar-btn" data-desc-action="numbered">1. List</button>
-            <button type="button" class="toolbar-btn" data-desc-action="quote">“ ”</button>
-            <button type="button" class="toolbar-btn" data-desc-action="link">Link</button>
-            <button type="button" class="toolbar-btn" data-desc-action="image">Image</button>
-            <button type="button" class="toolbar-btn" data-desc-action="code">&lt;/&gt;</button>
-          </div>
-          <textarea id="tournamentDescriptionInput" class="markdown-input" rows="10" placeholder="Write rules, schedule, map pool..."></textarea>
-        </div>
-      </label>
-      <div class="markdown-preview">
-        <p class="eyebrow">Preview</p>
-        <div id="tournamentDescriptionPreview" class="helper"></div>
       </div>
-      <label>Format
-        <select id="tournamentFormatSelect">
-          <option value="Double Elimination">Double Elimination</option>
-          <option value="Single Elimination">Single Elimination</option>
-          <option value="Round Robin">Round Robin</option>
-          <option value="Swiss">Swiss</option>
-        </select>
+      <div class="settings-tabs" id="createTabs">
+        <button class="settings-tab-btn active" data-create-tab="createGeneral">General</button>
+        <button class="settings-tab-btn" data-create-tab="createDesc">Description &amp; Rules</button>
+        <button class="settings-tab-btn" data-create-tab="createMaps">Maps</button>
+        <button class="settings-tab-btn" data-create-tab="createFormat">Format</button>
+      </div>
+      <div class="settings-panel active" id="createGeneral">
+        <label>Tournament name
+          <input type="text" id="tournamentNameInput" placeholder="My Weekly Cup" />
+        </label>
+        <label>Custom URL slug
+          <div class="inline-row">
+            <span class="muted">https://zbuildorder.com/tournament/</span>
+            <div class="slug-input-wrapper">
+              <input type="text" id="tournamentSlugInput" placeholder="my-weekly-cup" />
+              <button type="button" class="icon-btn slug-generate-btn" id="generateSlugBtn" aria-label="Generate random slug">↻</button>
+            </div>
+          </div>
+          <p class="helper" id="slugStatus"></p>
+        </label>
+        <label>Start time
+        <input type="datetime-local" id="tournamentStartInput" class="datetime-input" />
       </label>
-      <label>Max players
-        <input type="number" id="tournamentMaxPlayersInput" min="2" max="512" placeholder="32" />
-      </label>
-      <label>Start time
-        <input type="datetime-local" id="tournamentStartInput" />
-      </label>
+        <label>Max players
+          <input type="number" id="tournamentMaxPlayersInput" min="2" max="512" placeholder="32" />
+        </label>
+      </div>
+      <div class="settings-panel" id="createDesc">
+        <label>Description
+          <div class="markdown-editor">
+            <div class="markdown-toolbar">
+              <button type="button" class="toolbar-btn" data-desc-action="heading">H2</button>
+              <button type="button" class="toolbar-btn" data-desc-action="bold"><strong>B</strong></button>
+              <button type="button" class="toolbar-btn" data-desc-action="italic"><em>I</em></button>
+              <button type="button" class="toolbar-btn" data-desc-action="bullet">- List</button>
+              <button type="button" class="toolbar-btn" data-desc-action="numbered">1. List</button>
+              <button type="button" class="toolbar-btn" data-desc-action="quote">" "</button>
+              <button type="button" class="toolbar-btn" data-desc-action="link">Link</button>
+              <button type="button" class="toolbar-btn" data-desc-action="image">Image</button>
+              <button type="button" class="toolbar-btn" data-desc-action="code">&lt;/&gt;</button>
+            </div>
+            <textarea id="tournamentDescriptionInput" class="markdown-input" rows="10" placeholder="Write rules, schedule, map pool..."></textarea>
+          </div>
+        </label>
+        <label>Rules
+          <div class="markdown-editor">
+            <div class="markdown-toolbar">
+              <button type="button" class="toolbar-btn" data-rules-action="heading">H2</button>
+              <button type="button" class="toolbar-btn" data-rules-action="bold"><strong>B</strong></button>
+              <button type="button" class="toolbar-btn" data-rules-action="italic"><em>I</em></button>
+              <button type="button" class="toolbar-btn" data-rules-action="bullet">- List</button>
+              <button type="button" class="toolbar-btn" data-rules-action="numbered">1. List</button>
+              <button type="button" class="toolbar-btn" data-rules-action="quote">" "</button>
+              <button type="button" class="toolbar-btn" data-rules-action="link">Link</button>
+              <button type="button" class="toolbar-btn" data-rules-action="image">Image</button>
+              <button type="button" class="toolbar-btn" data-rules-action="code">&lt;/&gt;</button>
+            </div>
+            <textarea id="tournamentRulesInput" class="markdown-input" rows="10" placeholder="Add eligibility, format, communication, and fair play rules..."></textarea>
+          </div>
+        </label>
+        <div class="markdown-preview">
+          <p class="eyebrow">Description Preview</p>
+          <div id="tournamentDescriptionPreview" class="helper"></div>
+        </div>
+        <div class="markdown-preview">
+          <p class="eyebrow">Rules Preview</p>
+          <div id="tournamentRulesPreview" class="helper"></div>
+        </div>
+      </div>
+      <div class="settings-panel" id="createMaps">
+        <div class="map-pool-picker">
+          <div class="picker-header">
+            <div>
+              <p class="eyebrow">Maps</p>
+              <h4>Chosen map pool</h4>
+            </div>
+            <div class="picker-actions">
+              <button type="button" class="cta small ghost" id="useLadderMapsBtn">All ladder maps</button>
+              <button type="button" class="cta small subtle" id="clearMapPoolBtn">Custom</button>
+            </div>
+          </div>
+          <div id="chosenMapList" class="map-pool-grid chosen-grid"></div>
+          <div class="picker-header" style="margin-top:12px;">
+            <div>
+              <h4>All 1v1 maps</h4>
+              <p class="helper">Click to add/remove</p>
+            </div>
+          </div>
+          <div id="mapPoolPicker" class="map-pool-grid selectable"></div>
+        </div>
+      </div>
+      <div class="settings-panel" id="createFormat">
+        <label>Format
+          <select id="tournamentFormatSelect">
+            <option value="Double Elimination">Double Elimination</option>
+            <option value="Single Elimination">Single Elimination</option>
+            <option value="Round Robin">Round Robin</option>
+            <option value="Swiss">Swiss</option>
+          </select>
+        </label>
+      </div>
       <div class="form-actions">
         <button class="cta subtle" id="closeCreateTournament">Cancel</button>
-        <button class="cta primary" id="saveTournamentBtn">Create</button>
       </div>
     </div>
   </div>
@@ -327,3 +525,5 @@
 </body>
 
 </html>
+
+

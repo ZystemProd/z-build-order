@@ -14,6 +14,19 @@ const BROADCAST_NAME = "zboTournamentLive";
 const TOURNAMENT_REGISTRY_KEY = "zboTournamentRegistryV1";
 const TOURNAMENT_COLLECTION = "tournaments";
 const TOURNAMENT_STATE_COLLECTION = "tournamentStates";
+const MAPS_JSON_URL = "/data/maps.json";
+// Fallback if map json fails
+const FALLBACK_LADDER_MAPS = [
+  { name: "10,000 Feet", file: "10000_feet.webp", folder: "current/1v1", mode: "1v1" },
+  { name: "Celestial Enclave", file: "celestial_enclave.webp", folder: "current/1v1", mode: "1v1" },
+  { name: "Mothership", file: "mothership.webp", folder: "current/1v1", mode: "1v1" },
+  { name: "Old Republic", file: "old_republic.webp", folder: "current/1v1", mode: "1v1" },
+  { name: "Ruby Rock", file: "ruby_rock.webp", folder: "current/1v1", mode: "1v1" },
+  { name: "Taito Citadel", file: "taito_citadel.webp", folder: "current/1v1", mode: "1v1" },
+  { name: "Tourmaline", file: "tourmaline.webp", folder: "current/1v1", mode: "1v1" },
+  { name: "White Rabbit", file: "white_rabbit.webp", folder: "current/1v1", mode: "1v1" },
+  { name: "Winter Madness", file: "winter_madness.webp", folder: "current/1v1", mode: "1v1" },
+];
 
 const defaultState = {
   players: [],
@@ -31,6 +44,11 @@ let derivedRace = null;
 let derivedMmr = null;
 let isAdmin = false;
 let registryCache = null;
+let currentTournamentMeta = null;
+let mapPoolSelection = new Set(FALLBACK_LADDER_MAPS.map((m) => m.name));
+let mapCatalog = [];
+let mapCatalogLoaded = false;
+let currentMapPoolMode = "ladder"; // ladder | custom
 const broadcast =
   typeof BroadcastChannel !== "undefined"
     ? new BroadcastChannel(BROADCAST_NAME)
@@ -43,6 +61,8 @@ if (typeof window !== "undefined") {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+  await loadMapCatalog();
+  setMapPoolSelection(getDefaultMapPoolNames());
   initializeAuthUI();
   hydratePulseFromState(getPulseState());
   bindUI();
@@ -73,6 +93,10 @@ window.addEventListener("storage", (event) => {
   }
 });
 
+window.addEventListener("popstate", () => {
+  handlePopState();
+});
+
 function bindUI() {
   const registrationForm = document.getElementById("registrationForm");
   const rebuildBtn = document.getElementById("rebuildBracketBtn");
@@ -95,6 +119,22 @@ function bindUI() {
   const generateSlugBtn = document.getElementById("generateSlugBtn");
   const descriptionInput = document.getElementById("tournamentDescriptionInput");
   const descToolbarBtns = document.querySelectorAll("[data-desc-action]");
+  const rulesInput = document.getElementById("tournamentRulesInput");
+  const rulesToolbarBtns = document.querySelectorAll("[data-rules-action]");
+  const mapPoolPicker = document.getElementById("mapPoolPicker");
+  const useLadderMapsBtn = document.getElementById("useLadderMapsBtn");
+  const clearMapPoolBtn = document.getElementById("clearMapPoolBtn");
+  const settingsTabBtns = document.querySelectorAll("[data-settings-tab]");
+  const settingsPanels = document.querySelectorAll("#settingsTab .settings-panel");
+  const createTabBtns = document.querySelectorAll("[data-create-tab]");
+  const createPanels = document.querySelectorAll("#createTournamentModal .settings-panel");
+  const settingsUseLadderMapsBtn = document.getElementById("settingsUseLadderMapsBtn");
+  const settingsClearMapPoolBtn = document.getElementById("settingsClearMapPoolBtn");
+  const settingsMapPoolPicker = document.getElementById("settingsMapPoolPicker");
+  const saveSettingsBtn = document.getElementById("saveSettingsBtn");
+  const settingsDescToolbarBtns = document.querySelectorAll("[data-settings-desc-action]");
+  const settingsRulesToolbarBtns = document.querySelectorAll("[data-settings-rules-action]");
+  const slugInput = document.getElementById("tournamentSlugInput");
 
   registrationForm?.addEventListener("submit", handleRegistration);
   rebuildBtn?.addEventListener("click", () => rebuildBracket(true, "Manual reseed"));
@@ -123,17 +163,73 @@ function bindUI() {
   closeCreateTournament?.addEventListener("click", () => {
     if (createModal) createModal.style.display = "none";
   });
+  window.addEventListener("mousedown", (e) => {
+    if (createModal && createModal.style.display === "flex" && e.target === createModal) {
+      createModal.style.display = "none";
+    }
+  });
   saveTournamentBtn?.addEventListener("click", handleCreateTournament);
   refreshTournaments?.addEventListener("click", () => renderTournamentList());
   generateSlugBtn?.addEventListener("click", async () => {
     const slugInput = document.getElementById("tournamentSlugInput");
     if (slugInput) slugInput.value = await generateUniqueSlug();
     await validateSlug();
+    updateSlugPreview();
+  });
+  slugInput?.addEventListener("input", () => {
+    updateSlugPreview();
+  });
+  createTabBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const target = btn.dataset.createTab;
+      if (!target) return;
+      createTabBtns.forEach((b) => b.classList.toggle("active", b === btn));
+      createPanels.forEach((panel) => {
+        panel.classList.toggle("active", panel.id === target);
+      });
+    });
+  });
+  settingsTabBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const target = btn.dataset.settingsTab;
+      if (!target) return;
+      settingsTabBtns.forEach((b) => b.classList.toggle("active", b === btn));
+      settingsPanels.forEach((panel) => {
+        panel.classList.toggle("active", panel.id === target);
+      });
+    });
   });
   descriptionInput?.addEventListener("input", updateDescriptionPreview);
+  rulesInput?.addEventListener("input", updateRulesPreview);
   descToolbarBtns.forEach((btn) => {
-    btn.addEventListener("click", () => applyDescFormatting(btn.dataset.descAction));
+    btn.addEventListener("click", () => applyFormatting(btn.dataset.descAction, "tournamentDescriptionInput"));
   });
+  rulesToolbarBtns.forEach((btn) => {
+    btn.addEventListener("click", () => applyFormatting(btn.dataset.rulesAction, "tournamentRulesInput"));
+  });
+  settingsDescToolbarBtns.forEach((btn) => {
+    btn.addEventListener("click", () => applyFormatting(btn.dataset.settingsDescAction, "settingsDescriptionInput"));
+  });
+  settingsRulesToolbarBtns.forEach((btn) => {
+    btn.addEventListener("click", () => applyFormatting(btn.dataset.settingsRulesAction, "settingsRulesInput"));
+  });
+  document.getElementById("settingsDescriptionInput")?.addEventListener("input", updateSettingsDescriptionPreview);
+  document.getElementById("settingsRulesInput")?.addEventListener("input", updateSettingsRulesPreview);
+  useLadderMapsBtn?.addEventListener("click", () => setMapPoolSelection(getDefaultMapPoolNames()));
+  clearMapPoolBtn?.addEventListener("click", () => setMapPoolSelection([]));
+  mapPoolPicker?.addEventListener("click", (e) => {
+    const card = e.target.closest(".tournament-map-card");
+    if (!card) return;
+    toggleMapSelection(card.dataset.mapName);
+  });
+  settingsUseLadderMapsBtn?.addEventListener("click", () => setMapPoolSelection(getDefaultMapPoolNames()));
+  settingsClearMapPoolBtn?.addEventListener("click", () => setMapPoolSelection([]));
+  settingsMapPoolPicker?.addEventListener("click", (e) => {
+    const card = e.target.closest(".tournament-map-card");
+    if (!card) return;
+    toggleMapSelection(card.dataset.mapName);
+  });
+  saveSettingsBtn?.addEventListener("click", handleSaveSettings);
 
   jumpToRegistration?.addEventListener("click", () => {
     switchTab("registrationTab");
@@ -177,6 +273,20 @@ function bindUI() {
       switchTab(target);
     });
   });
+
+  document.querySelectorAll("#tournamentListTabs .list-tab").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("#tournamentListTabs .list-tab").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      renderTournamentList();
+    });
+  });
+
+  renderMapPoolPicker();
+  renderMapPoolPicker("settingsMapPoolPicker");
+  renderChosenMaps("chosenMapList");
+  renderChosenMaps("settingsChosenMapList");
+  updateMapButtons();
 }
 
 function switchTab(targetId) {
@@ -396,6 +506,8 @@ async function handleRegistration(event) {
   saveState(nextState);
   addActivity(`${newPlayer.name} saved (${newPlayer.mmr || "MMR?"} MMR, ${newPlayer.points} pts)`);
 
+  markRegisteredTournament(currentSlug);
+
   const shouldAutoRebuild = !hasCompletedMatches;
   if (shouldAutoRebuild) {
     rebuildBracket(true, "Roster updated");
@@ -475,9 +587,16 @@ async function enterTournament(slug) {
   state = loadState();
   const registry = await loadTournamentRegistry(true);
   const tournament = registry.find((t) => t.slug === slug);
+  currentTournamentMeta = tournament || null;
+  if (tournament?.mapPool?.length) {
+    setMapPoolSelection(tournament.mapPool);
+  } else {
+    setMapPoolSelection(getDefaultMapPoolNames());
+  }
   setTournamentHeader(tournament);
   isAdmin = !!(tournament && auth.currentUser && tournament.createdBy === auth.currentUser.uid);
   toggleAdminUI(isAdmin);
+  populateSettingsPanel(tournament);
   if (landing) landing.style.display = "none";
   if (tournamentView) tournamentView.style.display = "block";
   if (!state.bracket && state.players.length) {
@@ -492,27 +611,82 @@ function setTournamentHeader(tournament) {
   const title = document.getElementById("tournamentTitle");
   const desc = document.getElementById("tournamentDescription");
   const descBody = document.getElementById("tournamentDescriptionBody");
+  const rulesBody = document.getElementById("tournamentRulesBody");
   const format = document.getElementById("tournamentFormat");
   const start = document.getElementById("tournamentStart");
   const bracketTitle = document.getElementById("bracketTitle");
   const renderedDesc = tournament ? renderMarkdown(tournament.description || "") : "";
+  const renderedRules = tournament ? renderMarkdown(tournament.rules || "") : "";
   if (title) title.textContent = tournament?.name || "Tournament";
   if (desc) desc.innerHTML = renderedDesc || "No description yet.";
   if (descBody) descBody.innerHTML = renderedDesc || "<p class=\"helper\">No description yet.</p>";
+  if (rulesBody) rulesBody.innerHTML = renderedRules || "<p class=\"helper\">No rules yet.</p>";
   if (format) format.textContent = tournament?.format || "Tournament";
   if (start) start.textContent = tournament?.startTime
     ? new Date(tournament.startTime).toLocaleString()
     : "TBD";
   if (bracketTitle) bracketTitle.textContent = tournament?.format || "Bracket";
 }
+
+async function handleSaveSettings(event) {
+  event?.preventDefault?.();
+  if (!currentTournamentMeta?.slug) return;
+  const name = document.getElementById("settingsNameInput")?.value?.trim();
+  const description = document.getElementById("settingsDescriptionInput")?.value || "";
+  const rules = document.getElementById("settingsRulesInput")?.value || "";
+  const format = document.getElementById("settingsFormatSelect")?.value || "Double Elimination";
+  const maxPlayersRaw = document.getElementById("settingsMaxPlayersInput")?.value;
+  const maxPlayers = maxPlayersRaw ? Math.max(2, Number(maxPlayersRaw)) : null;
+  const startTime = document.getElementById("settingsStartInput")?.value || "";
+  const mapPool = mapPoolSelection.size ? Array.from(mapPoolSelection) : getDefaultMapPoolNames();
+  if (!name) return;
+
+  const payload = {
+    name,
+    description,
+    rules,
+    mapPool,
+    format,
+    maxPlayers,
+    startTime: startTime ? new Date(startTime).toISOString() : null,
+    updatedAt: Date.now(),
+  };
+
+  try {
+    await setDoc(
+      doc(db, TOURNAMENT_COLLECTION, currentTournamentMeta.slug),
+      {
+        ...payload,
+        startTime: payload.startTime ? new Date(payload.startTime) : null,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+  } catch (err) {
+    console.error("Failed to save tournament settings", err);
+    showToast?.("Could not update tournament settings.", "error");
+    return;
+  }
+
+  currentTournamentMeta = {
+    ...currentTournamentMeta,
+    ...payload,
+  };
+  cacheTournamentRegistry(null);
+  setTournamentHeader(currentTournamentMeta);
+  renderMapsTab(currentTournamentMeta);
+  showToast?.("Tournament settings saved.", "success");
+}
 function toggleAdminUI(isAdminUser) {
   const adminTabBtn = document.getElementById("adminTabBtn");
+  const settingsTabBtn = document.getElementById("settingsTabBtn");
   const registrationTab = document.getElementById("registrationTab");
   const jumpToReg = document.getElementById("jumpToRegistration");
   const openRegisterBtn = document.getElementById("openRegisterBtn");
   const seedingCard = document.getElementById("seedingCard");
   const autoFillBtn = document.getElementById("autoFillBtn");
   if (adminTabBtn) adminTabBtn.style.display = "inline-flex";
+  if (settingsTabBtn) settingsTabBtn.style.display = isAdminUser ? "inline-flex" : "none";
   if (registrationTab) registrationTab.style.display = "";
   if (!isAdminUser) {
     switchTab("bracketTab");
@@ -527,9 +701,27 @@ async function renderTournamentList() {
   const listEl = document.getElementById("tournamentList");
   if (!listEl) return;
   const registry = await loadTournamentRegistry(true);
+  const currentUserId = auth.currentUser?.uid || null;
+  const registeredSlugs = getRegisteredTournamentSlugs();
   updateLandingStats(registry);
-  const items = registry.map((t) => {
-    const start = t.startTime ? new Date(t.startTime).toLocaleString() : "TBD";
+  const filter = document.querySelector(".list-tab.active")?.dataset.listFilter || "open";
+  const filtered = registry.filter((t) => {
+    if (filter === "hosted") return currentUserId && t.createdBy === currentUserId;
+    if (filter === "mine") return registeredSlugs.has(t.slug) || (currentUserId && t.createdBy === currentUserId);
+    return true;
+  });
+  const items = filtered.map((t) => {
+    const start = t.startTime
+      ? new Date(t.startTime).toLocaleString(undefined, {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        })
+      : "TBD";
+    const creator = t.createdByName ? escapeHtml(t.createdByName) : "Host";
     return `<li class="tournament-card">
       <div>
         <h4>${escapeHtml(t.name)}</h4>
@@ -537,6 +729,7 @@ async function renderTournamentList() {
           <span>${escapeHtml(t.format)}</span>
           <span>${t.maxPlayers || "?"} players</span>
           <span>${start}</span>
+          <span>Host: ${creator}</span>
           <span>${t.slug}</span>
         </div>
       </div>
@@ -544,7 +737,7 @@ async function renderTournamentList() {
   });
   listEl.innerHTML = items.join("") || `<li class="helper">No tournaments yet.</li>`;
   listEl.querySelectorAll(".tournament-card").forEach((card, idx) => {
-    const slug = registry[idx]?.slug;
+    const slug = filtered[idx]?.slug;
     if (!slug) return;
     card.addEventListener("click", () => {
       history.pushState({}, "", `/tournament/${slug}`);
@@ -579,16 +772,20 @@ async function populateCreateForm() {
   const slugInput = document.getElementById("tournamentSlugInput");
   const nameInput = document.getElementById("tournamentNameInput");
   const descInput = document.getElementById("tournamentDescriptionInput");
+  const rulesInput = document.getElementById("tournamentRulesInput");
   const formatSelect = document.getElementById("tournamentFormatSelect");
   const maxInput = document.getElementById("tournamentMaxPlayersInput");
   const startInput = document.getElementById("tournamentStartInput");
   if (slugInput) slugInput.value = await generateUniqueSlug();
   if (nameInput) nameInput.value = "";
   if (descInput) descInput.value = "";
+  if (rulesInput) rulesInput.value = "";
   if (formatSelect) formatSelect.value = "Double Elimination";
   if (maxInput) maxInput.value = "";
   if (startInput) startInput.value = "";
   updateDescriptionPreview();
+  updateRulesPreview();
+  setMapPoolSelection(getDefaultMapPoolNames());
   await validateSlug();
 }
 
@@ -631,16 +828,21 @@ async function handleCreateTournament(event) {
   const slugIsValid = await validateSlug();
   const slug = slugIsValid ? slugInput.value.trim() : "";
   const description = document.getElementById("tournamentDescriptionInput")?.value || "";
+  const rules = document.getElementById("tournamentRulesInput")?.value || "";
   const format = document.getElementById("tournamentFormatSelect")?.value || "Double Elimination";
   const maxPlayersRaw = document.getElementById("tournamentMaxPlayersInput")?.value;
   const maxPlayers = maxPlayersRaw ? Math.max(2, Number(maxPlayersRaw)) : null;
   const startTime = document.getElementById("tournamentStartInput")?.value || "";
   if (!name || !slug) return;
+  const selectedMaps =
+    mapPoolSelection.size > 0 ? Array.from(mapPoolSelection) : getDefaultMapPoolNames();
 
   const payload = {
     name,
     slug,
     description,
+    rules,
+    mapPool: selectedMaps,
     format,
     maxPlayers,
     startTime: startTime ? new Date(startTime).toISOString() : null,
@@ -685,10 +887,13 @@ async function loadTournamentRegistry(force = false) {
         slug: data.slug || d.id,
         name: data.name || d.id,
         description: data.description || "",
+        rules: data.rules || "",
+        mapPool: data.mapPool?.length ? data.mapPool : getDefaultMapPoolNames(),
         format: data.format || "Tournament",
         maxPlayers: data.maxPlayers || null,
         startTime: startTime || null,
         createdBy: data.createdBy || null,
+        createdByName: data.createdByName || data.hostName || null,
       };
     });
     registryCache = list;
@@ -723,11 +928,44 @@ function loadTournamentRegistryCache() {
   }
 }
 
+function getRegisteredTournamentSlugs() {
+  try {
+    const raw = localStorage.getItem("registeredTournaments");
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw);
+    return new Set(Array.isArray(parsed) ? parsed : []);
+  } catch (_) {
+    return new Set();
+  }
+}
+
+function markRegisteredTournament(slug) {
+  if (!slug) return;
+  try {
+    const set = getRegisteredTournamentSlugs();
+    set.add(slug);
+    localStorage.setItem("registeredTournaments", JSON.stringify(Array.from(set)));
+  } catch (_) {
+    // ignore storage errors
+  }
+}
+
 function getSlugFromPath() {
   const path = window.location.pathname || "";
   const parts = path.split("/").filter(Boolean);
   if (parts[0] !== "tournament") return null;
   return parts[1] || null;
+}
+
+async function handlePopState() {
+  const slugFromUrl = getSlugFromPath();
+  if (slugFromUrl) {
+    await enterTournament(slugFromUrl);
+  } else {
+    currentSlug = null;
+    state = loadState();
+    await showLanding();
+  }
 }
 
 function renderMarkdown(md) {
@@ -745,8 +983,117 @@ function updateDescriptionPreview() {
   preview.innerHTML = renderMarkdown(descInput?.value || "");
 }
 
-function applyDescFormatting(action) {
-  const textarea = document.getElementById("tournamentDescriptionInput");
+function updateRulesPreview() {
+  const rulesInput = document.getElementById("tournamentRulesInput");
+  const preview = document.getElementById("tournamentRulesPreview");
+  if (!preview) return;
+  preview.innerHTML = renderMarkdown(rulesInput?.value || "");
+}
+
+function updateSettingsDescriptionPreview() {
+  const descInput = document.getElementById("settingsDescriptionInput");
+  const preview = document.getElementById("settingsDescriptionPreview");
+  if (!preview) return;
+  preview.innerHTML = renderMarkdown(descInput?.value || "");
+}
+
+function updateSettingsRulesPreview() {
+  const rulesInput = document.getElementById("settingsRulesInput");
+  const preview = document.getElementById("settingsRulesPreview");
+  if (!preview) return;
+  preview.innerHTML = renderMarkdown(rulesInput?.value || "");
+}
+
+async function loadMapCatalog() {
+  if (mapCatalogLoaded) return mapCatalog;
+  try {
+    const resp = await fetch(MAPS_JSON_URL, { cache: "no-cache" });
+    const data = await resp.json();
+    if (Array.isArray(data)) {
+      mapCatalog = data;
+      mapCatalogLoaded = true;
+      return mapCatalog;
+    }
+  } catch (err) {
+    console.warn("Falling back to bundled ladder map list", err);
+  }
+  mapCatalog = FALLBACK_LADDER_MAPS;
+  mapCatalogLoaded = true;
+  return mapCatalog;
+}
+
+function getLadderMaps() {
+  const source = mapCatalog.length ? mapCatalog : FALLBACK_LADDER_MAPS;
+  const currentOnly = source.filter((m) => (m.folder || "").toLowerCase().includes("current/1v1"));
+  if (currentOnly.length) return currentOnly;
+  const explicitCurrent = source.filter((m) => (m.folder || "").toLowerCase().includes("current"));
+  return explicitCurrent.length ? explicitCurrent : FALLBACK_LADDER_MAPS;
+}
+
+function getAll1v1Maps() {
+  const source = mapCatalog.length ? mapCatalog : FALLBACK_LADDER_MAPS;
+  const all = source.filter((m) => (m.mode || "").toLowerCase() === "1v1" || (m.folder || "").includes("1v1"));
+  return all.length ? all : FALLBACK_LADDER_MAPS;
+}
+
+function updateSlugPreview() {
+  // Preview removed per design change
+}
+
+function getDefaultMapPoolNames() {
+  return getLadderMaps().map((m) => m.name);
+}
+
+function getMapByName(name) {
+  return getAll1v1Maps().find((m) => m.name === name) || null;
+}
+
+function setMapPoolSelection(names) {
+  mapPoolSelection = new Set((names || []).filter(Boolean));
+  currentMapPoolMode = isDefaultLadderSelection() ? "ladder" : "custom";
+  renderMapPoolPicker();
+  renderMapPoolPicker("settingsMapPoolPicker");
+  renderChosenMaps("chosenMapList");
+  renderChosenMaps("settingsChosenMapList");
+  updateMapButtons();
+}
+
+function toggleMapSelection(name) {
+  if (!name) return;
+  if (mapPoolSelection.has(name)) {
+    mapPoolSelection.delete(name);
+  } else {
+    mapPoolSelection.add(name);
+  }
+  currentMapPoolMode = isDefaultLadderSelection() ? "ladder" : "custom";
+  renderMapPoolPicker();
+  renderMapPoolPicker("settingsMapPoolPicker");
+  renderChosenMaps("chosenMapList");
+  renderChosenMaps("settingsChosenMapList");
+  updateMapButtons();
+}
+
+function renderMapPoolPicker(targetId = "mapPoolPicker") {
+  const picker = document.getElementById(targetId);
+  if (!picker) return;
+  const cards = getAll1v1Maps().map((map) => {
+    const selected = mapPoolSelection.has(map.name);
+    const imgPath = `img/maps/${map.folder}/${map.file}`;
+    return `<div class="tournament-map-card ${selected ? "selected" : ""}" data-map-name="${escapeHtml(
+      map.name
+    )}">
+      <div class="map-thumb" style="background-image:url('${imgPath}')"></div>
+      <div class="map-meta">
+        <div class="map-name">${escapeHtml(map.name)}</div>
+        <span class="map-mode">${map.mode || "1v1"}</span>
+      </div>
+    </div>`;
+  });
+  picker.innerHTML = cards.join("");
+}
+
+function applyFormatting(action, textareaId) {
+  const textarea = document.getElementById(textareaId);
   if (!textarea) return;
   const start = textarea.selectionStart;
   const end = textarea.selectionEnd;
@@ -1251,6 +1598,7 @@ function renderAll() {
   renderBracket();
   renderActivity();
   updateStats();
+  renderMapsTab(currentTournamentMeta);
 }
 
 function renderPlayersTable() {
@@ -1302,6 +1650,98 @@ function renderBracket() {
   </div>`;
 
   attachMatchHoverHandlers();
+}
+
+function renderMapsTab(tournament) {
+  const grid = document.getElementById("tournamentMapGrid");
+  if (!grid) return;
+  const poolNames =
+    tournament?.mapPool && tournament.mapPool.length ? tournament.mapPool : getDefaultMapPoolNames();
+  if (!poolNames.length) {
+    grid.innerHTML = `<p class="helper">No maps selected yet.</p>`;
+    return;
+  }
+  const cards = poolNames.map((name) => {
+    const map = getMapByName(name);
+    const imgPath = map ? `img/maps/${map.folder}/${map.file}` : null;
+    return `<div class="tournament-map-card">
+      <div class="map-thumb"${imgPath ? ` style="background-image:url('${imgPath}')"` : ""}></div>
+      <div class="map-meta">
+        <div class="map-name">${escapeHtml(name)}</div>
+        <span class="map-mode">${escapeHtml(map?.mode || "1v1")}</span>
+      </div>
+    </div>`;
+  });
+  grid.innerHTML = cards.join("");
+}
+
+function renderChosenMaps(targetId = "chosenMapList") {
+  const container = document.getElementById(targetId);
+  if (!container) return;
+  const selectedNames = Array.from(mapPoolSelection);
+  if (!selectedNames.length) {
+    container.innerHTML = `<p class="helper">No maps selected.</p>`;
+    return;
+  }
+  const cards = selectedNames.map((name) => {
+    const map = getMapByName(name);
+    const imgPath = map ? `img/maps/${map.folder}/${map.file}` : null;
+    return `<div class="tournament-map-card selected">
+      <div class="map-thumb"${imgPath ? ` style="background-image:url('${imgPath}')"` : ""}></div>
+      <div class="map-meta">
+        <div class="map-name">${escapeHtml(name)}</div>
+        <span class="map-mode">${escapeHtml(map?.mode || "1v1")}</span>
+      </div>
+    </div>`;
+  });
+  container.innerHTML = cards.join("");
+}
+
+function isDefaultLadderSelection() {
+  const defaults = getDefaultMapPoolNames();
+  if (defaults.length !== mapPoolSelection.size) return false;
+  return defaults.every((name) => mapPoolSelection.has(name));
+}
+
+function updateMapPoolStatus(primaryEl, secondaryEl) {
+  updateMapButtons(primaryEl, secondaryEl);
+}
+
+function updateMapButtons() {
+  const ladderBtns = [
+    document.getElementById("useLadderMapsBtn"),
+    document.getElementById("settingsUseLadderMapsBtn"),
+  ];
+  const customBtns = [
+    document.getElementById("clearMapPoolBtn"),
+    document.getElementById("settingsClearMapPoolBtn"),
+  ];
+  const isLadder = currentMapPoolMode === "ladder";
+  ladderBtns.forEach((btn) => btn?.classList.toggle("active", isLadder));
+  customBtns.forEach((btn) => btn?.classList.toggle("active", !isLadder));
+}
+
+function populateSettingsPanel(tournament) {
+  if (!tournament) return;
+  const nameInput = document.getElementById("settingsNameInput");
+  const slugInput = document.getElementById("settingsSlugInput");
+  const descInput = document.getElementById("settingsDescriptionInput");
+  const rulesInput = document.getElementById("settingsRulesInput");
+  const formatSelect = document.getElementById("settingsFormatSelect");
+  const maxInput = document.getElementById("settingsMaxPlayersInput");
+  const startInput = document.getElementById("settingsStartInput");
+  if (nameInput) nameInput.value = tournament.name || "";
+  if (slugInput) slugInput.value = tournament.slug || "";
+  if (descInput) descInput.value = tournament.description || "";
+  if (rulesInput) rulesInput.value = tournament.rules || "";
+  if (formatSelect) formatSelect.value = tournament.format || "Double Elimination";
+  if (maxInput) maxInput.value = tournament.maxPlayers || "";
+  if (startInput) {
+    startInput.value = tournament.startTime ? new Date(tournament.startTime).toISOString().slice(0, 16) : "";
+  }
+  setMapPoolSelection(tournament.mapPool?.length ? tournament.mapPool : getDefaultMapPoolNames());
+  updateSettingsDescriptionPreview();
+  updateSettingsRulesPreview();
 }
 
 function renderMatchCard(match, lookup, playersById) {

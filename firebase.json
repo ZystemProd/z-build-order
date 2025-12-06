@@ -59,6 +59,7 @@
       { "source": "/sitemap.xml", "function": "sitemap" },
       { "source": "/veto", "destination": "/veto.html" },
       { "source": "/viewBuild", "destination": "/viewBuild.html" },
+      { "source": "/tournament/**", "destination": "/tournament/index.html" },
       { "source": "**", "destination": "/index.html" }
     ]
   },
