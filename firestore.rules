@@ -181,6 +181,27 @@ service cloud.firestore {
       }
     }
 
+    // ? TOURNAMENTS
+    match /tournaments/{slug} {
+      // Public read; adjust to restrict if needed
+      allow read: if true;
+
+      // Any signed-in user can create
+      allow create: if request.auth != null;
+
+      // Only creator can update/delete
+      allow update, delete: if request.auth != null &&
+        request.auth.uid == resource.data.createdBy;
+    }
+
+    // ? TOURNAMENT STATE (players, bracket, activity)
+    match /tournamentStates/{slug} {
+      // Allow public reads (adjust if you want private)
+      allow read: if true;
+      // Allow signed-in users to sync state; tighten if needed
+      allow write: if request.auth != null;
+    }
+
 
   }
 }

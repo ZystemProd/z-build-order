@@ -1,7 +1,19 @@
-import { auth, getCurrentUsername, getPulseState, initializeAuthUI } from "../../app.js";
+import { auth, db, getCurrentUsername, getPulseState, initializeAuthUI } from "../../app.js";
+import { showToast } from "./toastHandler.js";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  serverTimestamp,
+  setDoc,
+} from "firebase/firestore";
 
 const STORAGE_KEY = "zboTournamentStateV1";
 const BROADCAST_NAME = "zboTournamentLive";
+const TOURNAMENT_REGISTRY_KEY = "zboTournamentRegistryV1";
+const TOURNAMENT_COLLECTION = "tournaments";
+const TOURNAMENT_STATE_COLLECTION = "tournamentStates";
 
 const defaultState = {
   players: [],
@@ -12,10 +24,13 @@ const defaultState = {
   lastUpdated: Date.now(),
 };
 
-let state = loadState();
+let currentSlug = null;
+let state = { ...defaultState };
 let pulseProfile = null;
 let derivedRace = null;
 let derivedMmr = null;
+let isAdmin = false;
+let registryCache = null;
 const broadcast =
   typeof BroadcastChannel !== "undefined"
     ? new BroadcastChannel(BROADCAST_NAME)
@@ -27,25 +42,28 @@ if (typeof window !== "undefined") {
   });
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   initializeAuthUI();
   hydratePulseFromState(getPulseState());
   bindUI();
-  if (!state.bracket && state.players.length) {
-    rebuildBracket(true, "Loaded saved players");
+  const slugFromUrl = getSlugFromPath();
+  if (slugFromUrl) {
+    await enterTournament(slugFromUrl);
   } else {
-    renderAll();
+    await showLanding();
   }
 });
 
 if (broadcast) {
   broadcast.addEventListener("message", (event) => {
-    syncFromRemote(event.data);
+    const { slug, payload } = event.data || {};
+    if (slug && slug !== currentSlug) return;
+    syncFromRemote(payload || event.data);
   });
 }
 
 window.addEventListener("storage", (event) => {
-  if (event.key === STORAGE_KEY && event.newValue) {
+  if (event.key === getStorageKey() && event.newValue) {
     try {
       const incoming = JSON.parse(event.newValue);
       syncFromRemote(incoming);
@@ -68,6 +86,15 @@ function bindUI() {
   const signOutBtn = document.getElementById("signOutBtn");
   const switchAccountBtn = document.getElementById("switchAccountBtn");
   const raceSelect = document.getElementById("raceSelect");
+  const openRegisterBtn = document.getElementById("openRegisterBtn");
+  const openCreateTournament = document.getElementById("openCreateTournament");
+  const createModal = document.getElementById("createTournamentModal");
+  const closeCreateTournament = document.getElementById("closeCreateTournament");
+  const saveTournamentBtn = document.getElementById("saveTournamentBtn");
+  const refreshTournaments = document.getElementById("refreshTournaments");
+  const generateSlugBtn = document.getElementById("generateSlugBtn");
+  const descriptionInput = document.getElementById("tournamentDescriptionInput");
+  const descToolbarBtns = document.querySelectorAll("[data-desc-action]");
 
   registrationForm?.addEventListener("submit", handleRegistration);
   rebuildBtn?.addEventListener("click", () => rebuildBracket(true, "Manual reseed"));
@@ -84,6 +111,29 @@ function bindUI() {
     derivedMmr = mmrForRace(normalizedRace);
     updateMmrDisplay(statusEl);
   });
+  openRegisterBtn?.addEventListener("click", () => {
+    switchTab("registrationTab");
+    document.getElementById("registrationCard")?.scrollIntoView({ behavior: "smooth" });
+  });
+
+  openCreateTournament?.addEventListener("click", async () => {
+    await populateCreateForm();
+    if (createModal) createModal.style.display = "flex";
+  });
+  closeCreateTournament?.addEventListener("click", () => {
+    if (createModal) createModal.style.display = "none";
+  });
+  saveTournamentBtn?.addEventListener("click", handleCreateTournament);
+  refreshTournaments?.addEventListener("click", () => renderTournamentList());
+  generateSlugBtn?.addEventListener("click", async () => {
+    const slugInput = document.getElementById("tournamentSlugInput");
+    if (slugInput) slugInput.value = await generateUniqueSlug();
+    await validateSlug();
+  });
+  descriptionInput?.addEventListener("input", updateDescriptionPreview);
+  descToolbarBtns.forEach((btn) => {
+    btn.addEventListener("click", () => applyDescFormatting(btn.dataset.descAction));
+  });
 
   jumpToRegistration?.addEventListener("click", () => {
     switchTab("registrationTab");
@@ -95,6 +145,7 @@ function bindUI() {
   });
 
   playersTable?.addEventListener("input", (e) => {
+    if (!isAdmin) return;
     if (e.target.matches(".points-input")) {
       const id = e.target.dataset.playerId;
       const value = Math.max(0, Number(e.target.value) || 0);
@@ -103,6 +154,7 @@ function bindUI() {
   });
 
   playersTable?.addEventListener("click", (e) => {
+    if (!isAdmin) return;
     if (e.target.matches(".remove-player")) {
       const id = e.target.dataset.playerId;
       removePlayer(id);
@@ -128,11 +180,17 @@ function bindUI() {
 }
 
 function switchTab(targetId) {
+  const targetPanel = document.getElementById(targetId);
+  if (targetPanel && targetPanel.dataset.adminOnly === "true" && !isAdmin) {
+    return;
+  }
   document.querySelectorAll(".tab-btn").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.tab === targetId);
   });
   document.querySelectorAll(".tab-panel").forEach((panel) => {
-    panel.classList.toggle("active", panel.id === targetId);
+    const isTarget = panel.id === targetId;
+    panel.classList.toggle("active", isTarget);
+    panel.style.display = isTarget ? "block" : "none";
   });
 }
 
@@ -382,7 +440,7 @@ function updateMmrDisplay(statusEl) {
   }
 
   if (!pulseProfile?.url) {
-    setStatus(statusEl, "Connect your SC2Pulse link in Settings to auto-fill race and MMR.", true);
+    setStatus(statusEl, "Set your SC2Pulse link in Settings to load race and MMR.", true);
     return;
   }
 
@@ -400,6 +458,344 @@ function populatePlayerNameFromProfile() {
   if (!input || input.value.trim()) return;
   const username = getCurrentUsername?.() || auth.currentUser?.displayName || "";
   if (username) input.value = username;
+}
+
+async function showLanding() {
+  const landing = document.getElementById("landingView");
+  const tournamentView = document.getElementById("tournamentView");
+  if (landing) landing.style.display = "block";
+  if (tournamentView) tournamentView.style.display = "none";
+  await renderTournamentList();
+}
+
+async function enterTournament(slug) {
+  const landing = document.getElementById("landingView");
+  const tournamentView = document.getElementById("tournamentView");
+  currentSlug = slug;
+  state = loadState();
+  const registry = await loadTournamentRegistry(true);
+  const tournament = registry.find((t) => t.slug === slug);
+  setTournamentHeader(tournament);
+  isAdmin = !!(tournament && auth.currentUser && tournament.createdBy === auth.currentUser.uid);
+  toggleAdminUI(isAdmin);
+  if (landing) landing.style.display = "none";
+  if (tournamentView) tournamentView.style.display = "block";
+  if (!state.bracket && state.players.length) {
+    rebuildBracket(true, "Loaded saved players");
+  } else {
+    renderAll();
+  }
+  hydrateStateFromRemote(slug);
+}
+
+function setTournamentHeader(tournament) {
+  const title = document.getElementById("tournamentTitle");
+  const desc = document.getElementById("tournamentDescription");
+  const descBody = document.getElementById("tournamentDescriptionBody");
+  const format = document.getElementById("tournamentFormat");
+  const start = document.getElementById("tournamentStart");
+  const bracketTitle = document.getElementById("bracketTitle");
+  const renderedDesc = tournament ? renderMarkdown(tournament.description || "") : "";
+  if (title) title.textContent = tournament?.name || "Tournament";
+  if (desc) desc.innerHTML = renderedDesc || "No description yet.";
+  if (descBody) descBody.innerHTML = renderedDesc || "<p class=\"helper\">No description yet.</p>";
+  if (format) format.textContent = tournament?.format || "Tournament";
+  if (start) start.textContent = tournament?.startTime
+    ? new Date(tournament.startTime).toLocaleString()
+    : "TBD";
+  if (bracketTitle) bracketTitle.textContent = tournament?.format || "Bracket";
+}
+function toggleAdminUI(isAdminUser) {
+  const adminTabBtn = document.getElementById("adminTabBtn");
+  const registrationTab = document.getElementById("registrationTab");
+  const jumpToReg = document.getElementById("jumpToRegistration");
+  const openRegisterBtn = document.getElementById("openRegisterBtn");
+  const seedingCard = document.getElementById("seedingCard");
+  const autoFillBtn = document.getElementById("autoFillBtn");
+  if (adminTabBtn) adminTabBtn.style.display = "inline-flex";
+  if (registrationTab) registrationTab.style.display = "";
+  if (!isAdminUser) {
+    switchTab("bracketTab");
+  }
+  if (jumpToReg) jumpToReg.style.display = isAdminUser ? "inline-flex" : "none";
+  if (openRegisterBtn) openRegisterBtn.style.display = isAdminUser ? "none" : "inline-flex";
+  if (seedingCard) seedingCard.style.display = isAdminUser ? "block" : "none";
+  if (autoFillBtn) autoFillBtn.style.display = isAdminUser ? "inline-flex" : "none";
+}
+
+async function renderTournamentList() {
+  const listEl = document.getElementById("tournamentList");
+  if (!listEl) return;
+  const registry = await loadTournamentRegistry(true);
+  updateLandingStats(registry);
+  const items = registry.map((t) => {
+    const start = t.startTime ? new Date(t.startTime).toLocaleString() : "TBD";
+    return `<li class="tournament-card">
+      <div>
+        <h4>${escapeHtml(t.name)}</h4>
+        <div class="meta">
+          <span>${escapeHtml(t.format)}</span>
+          <span>${t.maxPlayers || "?"} players</span>
+          <span>${start}</span>
+          <span>${t.slug}</span>
+        </div>
+      </div>
+    </li>`;
+  });
+  listEl.innerHTML = items.join("") || `<li class="helper">No tournaments yet.</li>`;
+  listEl.querySelectorAll(".tournament-card").forEach((card, idx) => {
+    const slug = registry[idx]?.slug;
+    if (!slug) return;
+    card.addEventListener("click", () => {
+      history.pushState({}, "", `/tournament/${slug}`);
+      enterTournament(slug);
+    });
+    card.tabIndex = 0;
+    card.addEventListener("keypress", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        history.pushState({}, "", `/tournament/${slug}`);
+        enterTournament(slug);
+      }
+    });
+  });
+  const stat = document.getElementById("statTournaments");
+  if (stat) stat.textContent = String(registry.length);
+}
+
+function updateLandingStats(registry = []) {
+  const statNextStart = document.getElementById("statNextStart");
+  const futureStarts = registry
+    .map((t) => (t.startTime ? new Date(t.startTime).getTime() : null))
+    .filter((ts) => ts && ts > Date.now())
+    .sort((a, b) => a - b);
+  const next = futureStarts[0];
+  if (statNextStart) {
+    statNextStart.textContent = next ? new Date(next).toLocaleString() : "TBD";
+  }
+}
+
+async function populateCreateForm() {
+  const slugInput = document.getElementById("tournamentSlugInput");
+  const nameInput = document.getElementById("tournamentNameInput");
+  const descInput = document.getElementById("tournamentDescriptionInput");
+  const formatSelect = document.getElementById("tournamentFormatSelect");
+  const maxInput = document.getElementById("tournamentMaxPlayersInput");
+  const startInput = document.getElementById("tournamentStartInput");
+  if (slugInput) slugInput.value = await generateUniqueSlug();
+  if (nameInput) nameInput.value = "";
+  if (descInput) descInput.value = "";
+  if (formatSelect) formatSelect.value = "Double Elimination";
+  if (maxInput) maxInput.value = "";
+  if (startInput) startInput.value = "";
+  updateDescriptionPreview();
+  await validateSlug();
+}
+
+async function generateUniqueSlug() {
+  const registry = await loadTournamentRegistry(true);
+  let slug = "";
+  const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
+  do {
+    slug = Array.from({ length: 6 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join("");
+  } while (registry.some((t) => t.slug === slug));
+  return slug;
+}
+
+async function validateSlug() {
+  const slugInput = document.getElementById("tournamentSlugInput");
+  const status = document.getElementById("slugStatus");
+  const registry = await loadTournamentRegistry(true);
+  const value = slugInput?.value?.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-") || "";
+  if (slugInput) slugInput.value = value;
+  let exists = registry.some((t) => t.slug === value);
+  if (!exists && value) {
+    try {
+      const snap = await getDoc(doc(db, TOURNAMENT_COLLECTION, value));
+      exists = snap.exists();
+    } catch (_) {
+      // network issues ignored
+    }
+  }
+  if (status) {
+    status.textContent = exists ? "Slug is already taken." : "Slug is available.";
+    status.style.color = exists ? "#ff8b8b" : "var(--muted)";
+  }
+  return !exists && value;
+}
+
+async function handleCreateTournament(event) {
+  event?.preventDefault?.();
+  const name = document.getElementById("tournamentNameInput")?.value?.trim();
+  const slugInput = document.getElementById("tournamentSlugInput");
+  const slugIsValid = await validateSlug();
+  const slug = slugIsValid ? slugInput.value.trim() : "";
+  const description = document.getElementById("tournamentDescriptionInput")?.value || "";
+  const format = document.getElementById("tournamentFormatSelect")?.value || "Double Elimination";
+  const maxPlayersRaw = document.getElementById("tournamentMaxPlayersInput")?.value;
+  const maxPlayers = maxPlayersRaw ? Math.max(2, Number(maxPlayersRaw)) : null;
+  const startTime = document.getElementById("tournamentStartInput")?.value || "";
+  if (!name || !slug) return;
+
+  const payload = {
+    name,
+    slug,
+    description,
+    format,
+    maxPlayers,
+    startTime: startTime ? new Date(startTime).toISOString() : null,
+    createdBy: auth.currentUser?.uid || "anon",
+    createdAt: Date.now(),
+  };
+
+  try {
+    await setDoc(doc(db, TOURNAMENT_COLLECTION, slug), {
+      ...payload,
+      startTime: payload.startTime ? new Date(payload.startTime) : null,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    registryCache = null;
+    cacheTournamentRegistry(null);
+  } catch (_) {
+    console.error("Failed to save tournament to Firestore", _);
+    showToast?.("Could not save tournament to Firestore. Using local cache only.", "error");
+  }
+
+  const registry = await loadTournamentRegistry(true);
+  const merged = registry.some((t) => t.slug === slug) ? registry : registry.concat(payload);
+  registryCache = merged;
+  cacheTournamentRegistry(merged);
+  document.getElementById("createTournamentModal").style.display = "none";
+  renderTournamentList();
+  history.pushState({}, "", `/tournament/${slug}`);
+  enterTournament(slug);
+}
+
+async function loadTournamentRegistry(force = false) {
+  if (!force && registryCache) return registryCache;
+  const fallback = loadTournamentRegistryCache();
+  try {
+    const snap = await getDocs(collection(db, TOURNAMENT_COLLECTION));
+    const list = snap.docs.map((d) => {
+      const data = d.data() || {};
+      const startTime = data.startTime?.toMillis ? data.startTime.toMillis() : data.startTime;
+      return {
+        id: d.id,
+        slug: data.slug || d.id,
+        name: data.name || d.id,
+        description: data.description || "",
+        format: data.format || "Tournament",
+        maxPlayers: data.maxPlayers || null,
+        startTime: startTime || null,
+        createdBy: data.createdBy || null,
+      };
+    });
+    registryCache = list;
+    cacheTournamentRegistry(list);
+    return list;
+  } catch (_) {
+    registryCache = fallback;
+    return fallback || [];
+  }
+}
+
+function cacheTournamentRegistry(registry) {
+  try {
+    if (!registry) {
+      localStorage.removeItem(TOURNAMENT_REGISTRY_KEY);
+    } else {
+      localStorage.setItem(TOURNAMENT_REGISTRY_KEY, JSON.stringify(registry));
+    }
+  } catch (_) {
+    // ignore
+  }
+}
+
+function loadTournamentRegistryCache() {
+  try {
+    const raw = localStorage.getItem(TOURNAMENT_REGISTRY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function getSlugFromPath() {
+  const path = window.location.pathname || "";
+  const parts = path.split("/").filter(Boolean);
+  if (parts[0] !== "tournament") return null;
+  return parts[1] || null;
+}
+
+function renderMarkdown(md) {
+  if (!md) return "";
+  const escaped = escapeHtml(md);
+  const bold = escaped.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  const italics = bold.replace(/\*(.+?)\*/g, "<em>$1</em>");
+  return italics.replace(/\n/g, "<br>");
+}
+
+function updateDescriptionPreview() {
+  const descInput = document.getElementById("tournamentDescriptionInput");
+  const preview = document.getElementById("tournamentDescriptionPreview");
+  if (!preview) return;
+  preview.innerHTML = renderMarkdown(descInput?.value || "");
+}
+
+function applyDescFormatting(action) {
+  const textarea = document.getElementById("tournamentDescriptionInput");
+  if (!textarea) return;
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const value = textarea.value;
+  const selected = value.slice(start, end);
+  const before = value.slice(0, start);
+  const after = value.slice(end);
+
+  const wrap = (prefix, suffix = prefix) => {
+    textarea.value = `${before}${prefix}${selected || ""}${suffix}${after}`;
+    const cursor = before.length + prefix.length + (selected ? selected.length : 0);
+    textarea.setSelectionRange(cursor, cursor);
+  };
+
+  switch (action) {
+    case "bold":
+      wrap("**", "**");
+      break;
+    case "italic":
+      wrap("*", "*");
+      break;
+    case "heading":
+      textarea.value = `${before}## ${selected || "Heading"}${after}`;
+      textarea.setSelectionRange(before.length + 3, before.length + 3 + (selected || "Heading").length);
+      break;
+    case "bullet":
+      textarea.value = `${before}- ${selected || "List item"}${after}`;
+      break;
+    case "numbered":
+      textarea.value = `${before}1. ${selected || "List item"}${after}`;
+      break;
+    case "quote":
+      textarea.value = `${before}> ${selected || "Quote"}${after}`;
+      break;
+    case "link":
+      wrap("[", `](${selected ? "https://example.com" : "https://example.com"})`);
+      break;
+    case "image":
+      textarea.value = `${before}![alt text](${selected || "https://example.com/image.png"})${after}`;
+      break;
+    case "code":
+      wrap("`", "`");
+      break;
+    default:
+      break;
+  }
+
+  textarea.dispatchEvent(new Event("input"));
+  textarea.focus();
 }
 
 function createOrUpdatePlayer(payload) {
@@ -1069,19 +1465,25 @@ function syncFromRemote(incoming) {
   renderAll();
 }
 
-function saveState(next) {
-  state = { ...state, ...next, lastUpdated: Date.now() };
+function saveState(next, options = {}) {
+  const timestamp =
+    options.keepTimestamp && typeof next?.lastUpdated === "number" ? next.lastUpdated : Date.now();
+  state = { ...state, ...next, lastUpdated: timestamp };
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(getStorageKey(), JSON.stringify(state));
   } catch (_) {
     // storage may be unavailable
   }
-  broadcast?.postMessage(state);
+  broadcast?.postMessage({ slug: currentSlug, payload: state });
+  if (!options.skipRemote) {
+    persistTournamentStateRemote(state);
+  }
 }
 
 function loadState() {
+  if (!currentSlug) return { ...defaultState };
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(getStorageKey());
     if (!raw) return { ...defaultState };
     const parsed = JSON.parse(raw);
     return {
@@ -1093,6 +1495,83 @@ function loadState() {
   } catch (_) {
     return { ...defaultState };
   }
+}
+
+async function hydrateStateFromRemote(slug) {
+  if (!slug) return;
+  const remote = await loadTournamentStateRemote(slug);
+  if (!remote) return;
+  const merged = {
+    ...defaultState,
+    ...remote,
+    players: applySeeding(remote.players || []),
+    activity: remote.activity || [],
+    bracket: deserializeBracket(remote.bracket),
+  };
+  saveState(merged, { skipRemote: true, keepTimestamp: true });
+  renderAll();
+}
+
+async function loadTournamentStateRemote(slug) {
+  try {
+    const snap = await getDoc(doc(db, TOURNAMENT_STATE_COLLECTION, slug));
+    if (!snap.exists()) return null;
+    const data = snap.data() || {};
+    const lastUpdated = data.lastUpdated?.toMillis ? data.lastUpdated.toMillis() : data.lastUpdated;
+    return { ...data, lastUpdated: lastUpdated || Date.now() };
+  } catch (_) {
+    return null;
+  }
+}
+
+async function persistTournamentStateRemote(snapshot) {
+  if (!currentSlug) return;
+  try {
+    const ref = doc(db, TOURNAMENT_STATE_COLLECTION, currentSlug);
+    const bracket = snapshot.bracket ? serializeBracket(snapshot.bracket) : null;
+    const payload = { ...snapshot, bracket, lastUpdated: snapshot.lastUpdated || Date.now() };
+    await setDoc(ref, payload, { merge: true });
+  } catch (_) {
+    console.error("Failed to persist tournament state to Firestore", _);
+    showToast?.("Could not sync tournament state to Firestore. Changes stay local.", "error");
+  }
+}
+
+function serializeBracket(bracket) {
+  if (!bracket || typeof bracket !== "object") return bracket;
+  const toObj = (arr) =>
+    Array.isArray(arr)
+      ? arr.reduce((acc, round, idx) => {
+          acc[idx] = round;
+          return acc;
+        }, {})
+      : arr || {};
+  return {
+    ...bracket,
+    winners: toObj(bracket.winners),
+    losers: toObj(bracket.losers),
+  };
+}
+
+function deserializeBracket(bracket) {
+  if (!bracket || typeof bracket !== "object") return bracket || null;
+  const toArr = (obj) =>
+    Array.isArray(obj)
+      ? obj
+      : obj && typeof obj === "object"
+      ? Object.keys(obj)
+          .sort((a, b) => Number(a) - Number(b))
+          .map((key) => obj[key])
+      : [];
+  return {
+    ...bracket,
+    winners: toArr(bracket.winners),
+    losers: toArr(bracket.losers),
+  };
+}
+
+function getStorageKey() {
+  return currentSlug ? `${STORAGE_KEY}:${currentSlug}` : STORAGE_KEY;
 }
 
 function pow2(n) {

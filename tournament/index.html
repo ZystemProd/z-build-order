@@ -5,12 +5,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <base href="/" />
-  <title>Z-Build Order | Tournament Bracket</title>
+  <title>Z-Build Order | Tournament Center</title>
   <meta name="description"
-    content="Run double-elimination StarCraft 2 tournaments with live brackets, auto-seeding from SC2Pulse MMR, and walkover handling.">
+    content="Find, create, and run StarCraft 2 tournaments with live brackets, registration, and SC2Pulse seeding." />
   <meta property="og:title" content="Z-Build Order Tournament Bracket" />
   <meta property="og:description"
-    content="Register players, seed by points and MMR, and track a live double-elimination bracket with walkover support." />
+    content="Register players, seed by points and MMR, and track live brackets for your tournaments." />
   <meta property="og:type" content="website" />
   <meta property="og:image" content="https://zbuildorder.com/img/og-image.webp" />
   <link rel="icon" type="image/x-icon" href="/img/favicon.ico" />
@@ -78,145 +78,250 @@
     </div>
   </div>
 
-  <header class="hero">
-    <div class="hero-main">
-      <a class="ghost-link" href="/index.html">← Back to Z-Build Order</a>
-      <p class="eyebrow">Tournament Control · Beta</p>
-      <h1>Run fair SC2 events with live brackets.</h1>
-      <p class="lede">
-        Register players with their <strong>SC2Pulse</strong> profile to grab MMR, seed by cumulative points first,
-        then MMR, and keep a double-elimination bracket that updates as soon as scores or walkovers are entered.
-      </p>
-      <div class="hero-actions">
-        <button id="jumpToRegistration" class="cta primary">Add a player</button>
-        <button id="jumpToBracket" class="cta ghost">View bracket</button>
+  <!-- Landing: list & create -->
+  <section id="landingView" class="landing" style="display:none;">
+    <div class="hero landing-hero">
+      <div class="hero-main">
+        <a class="ghost-link" href="/index.html">Back to Z-Build Order</a>
+        <p class="eyebrow">Tournament Center</p>
+        <h1>Find or host your SC2 tournament.</h1>
+        <p class="lede">Browse tournaments or spin up a new one with custom links and formats.</p>
+        <div class="hero-actions">
+          <button id="openCreateTournament" class="cta primary">Create a tournament</button>
+        </div>
       </div>
-      <div class="pill-row">
-        <span class="pill">Auto-seed (points → MMR)</span>
-        <span class="pill">Live sync (tabs)</span>
-        <span class="pill">Walkover-ready</span>
+      <div class="hero-stats">
+        <div class="stat-card">
+          <p>Active tournaments</p>
+          <h2 id="statTournaments">0</h2>
+        </div>
+        <div class="stat-card accent">
+          <p>Next start</p>
+          <h2 id="statNextStart">TBD</h2>
+        </div>
       </div>
     </div>
-    <div class="hero-stats">
-      <div class="stat-card">
-        <p>Registered</p>
-        <h2 id="statPlayers">0</h2>
+
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <p class="eyebrow">Browse</p>
+          <h3>Open tournaments</h3>
+        </div>
+        <button id="refreshTournaments" class="cta ghost small">Refresh</button>
       </div>
-      <div class="stat-card">
-        <p>Bracket Size</p>
-        <h2 id="statBracket">0</h2>
+      <ul id="tournamentList" class="tournament-list"></ul>
+    </div>
+  </section>
+
+  <!-- Tournament detail -->
+  <section id="tournamentView" style="display:none;">
+    <header class="hero">
+      <div class="hero-main">
+        <a class="ghost-link" href="/tournament">All tournaments</a>
+        <p class="eyebrow" id="tournamentFormat">Tournament</p>
+        <h1 id="tournamentTitle">Tournament</h1>
+        <div class="hero-actions">
+          <button id="jumpToRegistration" class="cta primary">Add a player</button>
+          <button id="openRegisterBtn" class="cta ghost" style="display:none;">Register</button>
+          <button id="jumpToBracket" class="cta ghost">View bracket</button>
+        </div>
+        <div class="pill-row">
+          <span class="pill">Auto-seed (points → MMR)</span>
+          <span class="pill">Live sync (tabs)</span>
+          <span class="pill">Walkover-ready</span>
+        </div>
       </div>
-      <div class="stat-card accent">
-        <p>Status</p>
-        <h2 id="statLive">Live</h2>
+      <div class="hero-stats">
+        <div class="stat-card">
+          <p>Registered</p>
+          <h2 id="statPlayers">0</h2>
+        </div>
+        <div class="stat-card">
+          <p>Bracket Size</p>
+          <h2 id="statBracket">0</h2>
+        </div>
+        <div class="stat-card accent">
+          <p>Start</p>
+          <h2 id="tournamentStart">TBD</h2>
+        </div>
+      </div>
+    </header>
+
+    <main class="page-stack">
+      <div class="tab-bar" id="tabBar">
+        <button class="tab-btn active" data-tab="bracketTab">Bracket</button>
+        <button class="tab-btn" data-tab="descriptionTab">Description</button>
+        <button class="tab-btn" data-tab="registrationTab" id="adminTabBtn">Registration</button>
+      </div>
+
+      <section id="descriptionTab" class="tab-panel">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <p class="eyebrow">Overview</p>
+              <h3>Description</h3>
+            </div>
+          </div>
+          <div id="tournamentDescriptionBody" class="helper"></div>
+        </div>
+      </section>
+
+      <section id="bracketTab" class="tab-panel active">
+        <div class="card bracket-card">
+          <div class="card-header">
+            <div>
+              <p class="eyebrow">Bracket</p>
+              <h3 id="bracketTitle">Double elimination</h3>
+            </div>
+            <div class="live-dot">Live</div>
+          </div>
+          <div id="bracketGrid" class="bracket-grid">
+            <div class="placeholder">No players yet. Add players to generate the bracket.</div>
+          </div>
+        </div>
+        <div class="card activity-card">
+          <div class="card-header">
+            <div>
+              <p class="eyebrow">Stream View</p>
+              <h3>Live updates</h3>
+            </div>
+            <span class="badge muted">Local + cross-tab</span>
+          </div>
+          <ul id="activityList" class="activity-list"></ul>
+        </div>
+      </section>
+
+      <section id="registrationTab" class="tab-panel">
+        <div class="card" id="registrationCard">
+          <div class="card-header">
+            <div>
+              <p class="eyebrow">Registration</p>
+              <h3>Add or update players</h3>
+            </div>
+            <span class="badge muted">SC2Pulse × MMR</span>
+          </div>
+          <form id="registrationForm" class="form-grid">
+            <label>
+              Player name
+              <input id="playerNameInput" type="text" placeholder="e.g. Hydralisk" required />
+            </label>
+            <label>
+              Race
+              <select id="raceSelect" disabled>
+                <option value="Zerg">Zerg</option>
+                <option value="Protoss">Protoss</option>
+                <option value="Terran">Terran</option>
+                <option value="Random">Random</option>
+              </select>
+            </label>
+            <label class="readonly-field">
+              SC2Pulse profile (set in Settings)
+              <input id="pulseLinkDisplay" type="text" placeholder="Add your SC2Pulse link in Settings" readonly />
+            </label>
+            <label class="readonly-field">
+              MMR (auto)
+              <input id="mmrDisplay" type="text" placeholder="MMR will load from SC2Pulse" readonly />
+            </label>
+            <label>
+              Starting points (optional)
+              <input id="pointsInput" type="number" inputmode="numeric" min="0" placeholder="0" />
+            </label>
+            <div class="form-actions">
+              <button type="submit" class="cta primary">Register</button>
+              <button type="button" id="autoFillBtn" class="cta small ghost">Dev: Auto-fill 12 players</button>
+            </div>
+            <p id="mmrStatus" class="helper">Race and MMR load from your SC2Pulse profile in Settings.</p>
+          </form>
+        </div>
+
+        <div class="card" id="seedingCard">
+          <div class="card-header">
+            <div>
+              <p class="eyebrow">Seeding</p>
+              <h3>Points-first ranking</h3>
+            </div>
+            <div class="seed-actions">
+              <span id="seedingNotice" class="badge warning" style="display:none;">Seeding changed - rebuild needed</span>
+              <button id="rebuildBracketBtn" class="cta small ghost">Apply to bracket</button>
+              <button id="resetTournamentBtn" class="cta small subtle">Reset tournament</button>
+            </div>
+          </div>
+          <div class="table-wrapper">
+            <table class="players-table">
+              <thead>
+                <tr>
+                  <th>Seed</th>
+                  <th>Player</th>
+                  <th>Points</th>
+                  <th>MMR</th>
+                  <th>SC2Pulse</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="playersTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+  </section>
+
+  <!-- Create tournament modal -->
+  <div id="createTournamentModal" class="modal create-modal" style="display:none;">
+    <div class="modal-content">
+      <h3>Create tournament</h3>
+      <label>Tournament name
+        <input type="text" id="tournamentNameInput" placeholder="My Weekly Cup" />
+      </label>
+      <label>Custom URL slug
+        <div class="inline-row">
+          <span class="muted">https://zbuildorder.com/tournament/</span>
+          <input type="text" id="tournamentSlugInput" placeholder="my-weekly-cup" />
+          <button type="button" class="cta small ghost" id="generateSlugBtn">Random</button>
+        </div>
+        <p class="helper" id="slugStatus"></p>
+      </label>
+      <label>Description
+        <div class="markdown-editor">
+          <div class="markdown-toolbar">
+            <button type="button" class="toolbar-btn" data-desc-action="heading">H2</button>
+            <button type="button" class="toolbar-btn" data-desc-action="bold"><strong>B</strong></button>
+            <button type="button" class="toolbar-btn" data-desc-action="italic"><em>I</em></button>
+            <button type="button" class="toolbar-btn" data-desc-action="bullet">• List</button>
+            <button type="button" class="toolbar-btn" data-desc-action="numbered">1. List</button>
+            <button type="button" class="toolbar-btn" data-desc-action="quote">“ ”</button>
+            <button type="button" class="toolbar-btn" data-desc-action="link">Link</button>
+            <button type="button" class="toolbar-btn" data-desc-action="image">Image</button>
+            <button type="button" class="toolbar-btn" data-desc-action="code">&lt;/&gt;</button>
+          </div>
+          <textarea id="tournamentDescriptionInput" class="markdown-input" rows="10" placeholder="Write rules, schedule, map pool..."></textarea>
+        </div>
+      </label>
+      <div class="markdown-preview">
+        <p class="eyebrow">Preview</p>
+        <div id="tournamentDescriptionPreview" class="helper"></div>
+      </div>
+      <label>Format
+        <select id="tournamentFormatSelect">
+          <option value="Double Elimination">Double Elimination</option>
+          <option value="Single Elimination">Single Elimination</option>
+          <option value="Round Robin">Round Robin</option>
+          <option value="Swiss">Swiss</option>
+        </select>
+      </label>
+      <label>Max players
+        <input type="number" id="tournamentMaxPlayersInput" min="2" max="512" placeholder="32" />
+      </label>
+      <label>Start time
+        <input type="datetime-local" id="tournamentStartInput" />
+      </label>
+      <div class="form-actions">
+        <button class="cta subtle" id="closeCreateTournament">Cancel</button>
+        <button class="cta primary" id="saveTournamentBtn">Create</button>
       </div>
     </div>
-  </header>
-
-  <main class="page-stack">
-    <div class="tab-bar">
-      <button class="tab-btn active" data-tab="bracketTab">Bracket</button>
-      <button class="tab-btn" data-tab="registrationTab">Registration</button>
-    </div>
-
-    <section id="bracketTab" class="tab-panel active">
-      <div class="card bracket-card">
-        <div class="card-header">
-          <div>
-            <p class="eyebrow">Bracket</p>
-            <h3>Double elimination</h3>
-          </div>
-          <div class="live-dot">Live</div>
-        </div>
-        <div id="bracketGrid" class="bracket-grid">
-          <div class="placeholder">No players yet. Add players to generate the bracket.</div>
-        </div>
-      </div>
-      <div class="card activity-card">
-        <div class="card-header">
-          <div>
-            <p class="eyebrow">Stream View</p>
-            <h3>Live updates</h3>
-          </div>
-          <span class="badge muted">Local + cross-tab</span>
-        </div>
-        <ul id="activityList" class="activity-list"></ul>
-      </div>
-    </section>
-
-    <section id="registrationTab" class="tab-panel">
-      <div class="card" id="registrationCard">
-        <div class="card-header">
-          <div>
-            <p class="eyebrow">Registration</p>
-            <h3>Add or update players</h3>
-          </div>
-          <span class="badge muted">SC2Pulse → MMR</span>
-        </div>
-        <form id="registrationForm" class="form-grid">
-          <label>
-            Player name
-            <input id="playerNameInput" type="text" placeholder="e.g. Hydralisk" required />
-          </label>
-          <label>
-            Race
-            <select id="raceSelect" disabled>
-              <option value="Zerg">Zerg</option>
-              <option value="Protoss">Protoss</option>
-              <option value="Terran">Terran</option>
-              <option value="Random">Random</option>
-            </select>
-          </label>
-          <label class="readonly-field">
-            SC2Pulse profile (set in Settings)
-            <input id="pulseLinkDisplay" type="text" placeholder="Add your SC2Pulse link in Settings" readonly />
-          </label>
-          <label class="readonly-field">
-            MMR (auto)
-            <input id="mmrDisplay" type="text" placeholder="MMR will load from SC2Pulse" readonly />
-          </label>
-          <label>
-            Starting points (optional)
-            <input id="pointsInput" type="number" inputmode="numeric" min="0" placeholder="0" />
-          </label>
-          <div class="form-actions">
-            <button type="submit" class="cta primary">Save player</button>
-            <button type="button" id="autoFillBtn" class="cta small ghost">Dev: Auto-fill 12 players</button>
-          </div>
-          <p id="mmrStatus" class="helper">Connect your SC2Pulse link in Settings to auto-fill race and MMR.</p>
-        </form>
-      </div>
-
-      <div class="card">
-        <div class="card-header">
-          <div>
-            <p class="eyebrow">Seeding</p>
-            <h3>Points-first ranking</h3>
-          </div>
-          <div class="seed-actions">
-            <span id="seedingNotice" class="badge warning" style="display:none;">Seeding changed — rebuild needed</span>
-            <button id="rebuildBracketBtn" class="cta small ghost">Apply to bracket</button>
-            <button id="resetTournamentBtn" class="cta small subtle">Reset tournament</button>
-          </div>
-        </div>
-        <div class="table-wrapper">
-          <table class="players-table">
-            <thead>
-              <tr>
-                <th>Seed</th>
-                <th>Player</th>
-                <th>Points</th>
-                <th>MMR</th>
-                <th>SC2Pulse</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody id="playersTableBody"></tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-  </main>
+  </div>
 
   <script type="module" src="/src/js/modules/tournament.js"></script>
 </body>
