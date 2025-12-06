@@ -1428,21 +1428,21 @@ export async function initializeIndexPage() {
       document.getElementById("userNameMenu").innerText = username;
       const mmrEl = document.getElementById("userMmrMenu");
       const byRace = data?.pulse?.lastMmrByRace || data?.lastKnownMMRByRace || null;
-      const overall = Number(data?.pulse?.lastMmr ?? data?.pulse?.mmr ?? data?.lastKnownMMR);
-      if (mmrEl) {
-        const parts = [];
-        const labels = { zerg: "Zerg", terran: "Terran", protoss: "Protoss", random: "Random" };
+      const overall = (() => {
         if (byRace && typeof byRace === "object") {
-          ["zerg", "terran", "protoss", "random"].forEach((k) => {
-            if (Number.isFinite(byRace[k])) parts.push(`${labels[k]}: ${byRace[k]} MMR`);
-          });
+          const vals = Object.values(byRace).filter((v) => Number.isFinite(v));
+          if (vals.length) return Math.max(...vals);
         }
-        if (!parts.length && Number.isFinite(overall)) {
-          parts.push(`${Math.round(overall)} MMR`);
-        }
-        if (parts.length) {
-          mmrEl.textContent = parts.join("\n");
-          mmrEl.style.whiteSpace = "pre-line";
+        const n = Number(data?.pulse?.lastMmr ?? data?.pulse?.mmr ?? data?.lastKnownMMR);
+        return Number.isFinite(n) ? n : null;
+      })();
+      if (mmrEl) {
+        const badges = window.buildMmrBadges
+          ? window.buildMmrBadges(byRace, overall, data?.lastMmrUpdated?.toMillis?.())
+          : null;
+        mmrEl.innerHTML = "";
+        if (badges) {
+          mmrEl.appendChild(badges);
           mmrEl.style.display = "block";
         } else {
           mmrEl.style.display = "none";

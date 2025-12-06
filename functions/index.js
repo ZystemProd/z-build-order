@@ -209,16 +209,32 @@ function absoluteCanonical(host, path) {
 
 function normalizePulseUrl(rawUrl) {
   if (!rawUrl) return "";
-  const cleaned = sanitizeText(rawUrl, "").replace(/\s+/g, "");
+  const cleaned = sanitizeText(rawUrl, "").trim();
   const withProtocol = /^https?:\/\//i.test(cleaned)
     ? cleaned
     : `https://${cleaned}`;
 
   try {
     const url = new URL(withProtocol);
-    if (!["http:", "https:"].includes(url.protocol)) return "";
+    if (url.protocol !== "https:") return "";
     if (!PULSE_ALLOWED_HOSTS.has(url.hostname)) return "";
-    return url.toString();
+
+    // Keep only whitelisted params
+    const allowedParams = new Set(["type", "id", "characterId", "accountId", "m"]);
+    const kept = new URLSearchParams();
+    for (const [k, v] of url.searchParams.entries()) {
+      if (allowedParams.has(k)) kept.append(k, v);
+    }
+
+    // Default type if missing
+    if (!kept.has("type")) kept.set("type", "character");
+
+    const normalized = new URL(
+      `${url.protocol}//${url.host}${url.pathname}`
+    );
+    normalized.search = kept.toString();
+    // strip hash
+    return normalized.toString();
   } catch (_) {
     return "";
   }
@@ -1435,7 +1451,10 @@ exports.fetchPulseMmr = onRequest({ region: "us-central1" }, async (req, res) =>
     }
 
     const normalized = normalizePulseUrl(sc2PulseUrl);
-    const details = parsePulseUrlDetails(normalized || sc2PulseUrl);
+    if (!normalized) {
+      return res.status(400).json({ error: "Invalid SC2Pulse URL." });
+    }
+    const details = parsePulseUrlDetails(normalized);
 
     functions.logger.info(`Fetching SC2Pulse MMR for uid=${uid}`, {
       pulseId: details.id,
@@ -1466,15 +1485,21 @@ exports.fetchPulseMmr = onRequest({ region: "us-central1" }, async (req, res) =>
     }
 
     if (!mmrInRange(mmr)) {
-      const statusCode = lastStatus === 404 ? 404 : 500;
-      return res
-        .status(statusCode)
-        .json({ error: "Could not parse MMR from SC2Pulse API." });
+      let statusCode = 500;
+      let message = "Could not parse MMR from SC2Pulse API.";
+      if (lastStatus === 404) {
+        statusCode = 404;
+        message = "Profile not found on SC2Pulse.";
+      } else if (lastStatus && lastStatus >= 500) {
+        statusCode = 502;
+        message = "SC2Pulse is unavailable. Please try again later.";
+      }
+      return res.status(statusCode).json({ error: message });
     }
 
     await userRef.set(
       {
-        sc2PulseUrl: sc2PulseUrl,
+        sc2PulseUrl: normalized,
         lastKnownMMRByRace: byRace,
         lastMmrUpdated: admin.firestore.FieldValue.serverTimestamp(),
       },

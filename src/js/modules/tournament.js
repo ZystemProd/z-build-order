@@ -1,3 +1,5 @@
+import { auth, getCurrentUsername, getPulseState, initializeAuthUI } from "../../app.js";
+
 const STORAGE_KEY = "zboTournamentStateV1";
 const BROADCAST_NAME = "zboTournamentLive";
 
@@ -11,12 +13,23 @@ const defaultState = {
 };
 
 let state = loadState();
+let pulseProfile = null;
+let derivedRace = null;
+let derivedMmr = null;
 const broadcast =
   typeof BroadcastChannel !== "undefined"
     ? new BroadcastChannel(BROADCAST_NAME)
     : null;
 
+if (typeof window !== "undefined") {
+  window.addEventListener("pulse-state-changed", (event) => {
+    hydratePulseFromState(event.detail);
+  });
+}
+
 document.addEventListener("DOMContentLoaded", () => {
+  initializeAuthUI();
+  hydratePulseFromState(getPulseState());
   bindUI();
   if (!state.bracket && state.players.length) {
     rebuildBracket(true, "Loaded saved players");
@@ -44,7 +57,6 @@ window.addEventListener("storage", (event) => {
 
 function bindUI() {
   const registrationForm = document.getElementById("registrationForm");
-  const fetchMmrBtn = document.getElementById("fetchMmrBtn");
   const rebuildBtn = document.getElementById("rebuildBracketBtn");
   const resetBtn = document.getElementById("resetTournamentBtn");
   const jumpToRegistration = document.getElementById("jumpToRegistration");
@@ -52,12 +64,26 @@ function bindUI() {
   const bracketGrid = document.getElementById("bracketGrid");
   const playersTable = document.getElementById("playersTableBody");
   const autoFillBtn = document.getElementById("autoFillBtn");
+  const signInBtn = document.getElementById("signInBtn");
+  const signOutBtn = document.getElementById("signOutBtn");
+  const switchAccountBtn = document.getElementById("switchAccountBtn");
+  const raceSelect = document.getElementById("raceSelect");
 
   registrationForm?.addEventListener("submit", handleRegistration);
-  fetchMmrBtn?.addEventListener("click", tryFetchMmrForForm);
   rebuildBtn?.addEventListener("click", () => rebuildBracket(true, "Manual reseed"));
   resetBtn?.addEventListener("click", resetTournament);
   autoFillBtn?.addEventListener("click", autoFillPlayers);
+
+  signInBtn?.addEventListener("click", () => window.handleSignIn?.());
+  signOutBtn?.addEventListener("click", () => window.handleSignOut?.());
+  switchAccountBtn?.addEventListener("click", () => window.handleSwitchAccount?.());
+  raceSelect?.addEventListener("change", () => {
+    const statusEl = document.getElementById("mmrStatus");
+    const normalizedRace = normalizeRaceLabel(raceSelect.value);
+    derivedRace = normalizedRace || derivedRace;
+    derivedMmr = mmrForRace(normalizedRace);
+    updateMmrDisplay(statusEl);
+  });
 
   jumpToRegistration?.addEventListener("click", () => {
     switchTab("registrationTab");
@@ -110,6 +136,90 @@ function switchTab(targetId) {
   });
 }
 
+function hydratePulseFromState(pulseState) {
+  const raceSelect = document.getElementById("raceSelect");
+  const mmrDisplay = document.getElementById("mmrDisplay");
+  const pulseLinkDisplay = document.getElementById("pulseLinkDisplay");
+  const statusEl = document.getElementById("mmrStatus");
+
+  const byRace =
+    pulseState && typeof pulseState.byRace === "object" ? pulseState.byRace : null;
+  const normalizedUrl = sanitizeUrl(pulseState?.url || "");
+  const overallMmr = Number.isFinite(pulseState?.mmr) ? Math.round(pulseState.mmr) : null;
+  const { race: bestRace, mmr: bestMmr } = pickBestRace(byRace, overallMmr);
+
+  pulseProfile =
+    pulseState && (normalizedUrl || overallMmr || bestRace)
+      ? { ...pulseState, url: normalizedUrl, byRace, mmr: overallMmr }
+      : null;
+
+  const existingSelection = pulseProfile ? normalizeRaceLabel(raceSelect?.value) : "";
+  derivedRace = existingSelection || (pulseProfile ? bestRace : null);
+  derivedMmr = pulseProfile
+    ? derivedRace
+      ? mmrForRace(derivedRace)
+      : bestMmr ?? overallMmr ?? null
+    : null;
+
+  if (raceSelect) {
+    raceSelect.disabled = !pulseProfile;
+    if (derivedRace) {
+      raceSelect.value = derivedRace;
+    } else {
+      raceSelect.value = "";
+    }
+  }
+  if (mmrDisplay) {
+    if (derivedRace) {
+      mmrDisplay.value = Number.isFinite(derivedMmr) ? `${derivedMmr} MMR` : "No rank";
+    } else {
+      mmrDisplay.value = "";
+    }
+  }
+  if (pulseLinkDisplay) {
+    pulseLinkDisplay.value = normalizedUrl || "";
+  }
+
+  updateMmrDisplay(statusEl);
+  populatePlayerNameFromProfile();
+}
+
+function pickBestRace(byRace = null, fallbackMmr = null) {
+  const entries = Object.entries(byRace || {}).map(([race, value]) => ({
+    race: normalizeRaceLabel(race),
+    key: normalizeRaceKey(race),
+    mmr: Number(value),
+  }));
+  const valid = entries
+    .filter((entry) => entry.key && Number.isFinite(entry.mmr) && entry.mmr > 0)
+    .sort((a, b) => b.mmr - a.mmr);
+
+  if (valid.length) {
+    return { race: valid[0].race, mmr: Math.round(valid[0].mmr) };
+  }
+
+  const mmr = Number.isFinite(fallbackMmr) ? Math.round(Math.max(0, fallbackMmr)) : null;
+  return { race: null, mmr };
+}
+
+function normalizeRaceLabel(raw) {
+  const val = (raw || "").toString().toLowerCase();
+  if (val.startsWith("z")) return "Zerg";
+  if (val.startsWith("p")) return "Protoss";
+  if (val.startsWith("t")) return "Terran";
+  if (val.startsWith("r")) return "Random";
+  return "";
+}
+
+function normalizeRaceKey(raw) {
+  const val = (raw || "").toString().toLowerCase();
+  if (val.startsWith("z")) return "zerg";
+  if (val.startsWith("p")) return "protoss";
+  if (val.startsWith("t")) return "terran";
+  if (val.startsWith("r")) return "random";
+  return "";
+}
+
 function autoFillPlayers() {
   const names = [
     "Zephyr",
@@ -160,18 +270,24 @@ function autoFillPlayers() {
 async function handleRegistration(event) {
   event.preventDefault();
   const name = document.getElementById("playerNameInput")?.value.trim();
-  const race = document.getElementById("raceSelect")?.value || "";
-  const sc2Link = document.getElementById("sc2PulseInput")?.value.trim();
-  const mmrInput = document.getElementById("mmrInput");
-  const pointsField = document.getElementById("pointsInput");
   const statusEl = document.getElementById("mmrStatus");
+  const raceSelect = document.getElementById("raceSelect");
+  const selectedRace = normalizeRaceLabel(raceSelect?.value) || derivedRace || "";
+  const race = selectedRace;
+  const sc2Link = pulseProfile?.url ? sanitizeUrl(pulseProfile.url) : "";
+  const mmr = mmrForRace(race);
+  const pointsField = document.getElementById("pointsInput");
+
+  if (!auth.currentUser) {
+    setStatus(statusEl, "Sign in and add your SC2Pulse link in Settings first.", true);
+    return;
+  }
 
   if (!name) {
     setStatus(statusEl, "Player name is required.", true);
     return;
   }
 
-  let mmr = Number(mmrInput?.value || "");
   const rawPoints = pointsField?.value ?? "";
   const requestedPoints =
     rawPoints === "" || rawPoints === null || rawPoints === undefined
@@ -184,19 +300,31 @@ async function handleRegistration(event) {
       ? Math.max(0, requestedPoints)
       : null;
 
-  if (!mmr && sc2Link) {
-    setStatus(statusEl, "Fetching MMR from SC2Pulse…", false);
-    mmr = await fetchMmrFromPulse(sc2Link, statusEl);
+  if (!sc2Link) {
+    setStatus(statusEl, "Add your SC2Pulse link in Settings to register.", true);
+    return;
   }
 
-  mmr = Number.isFinite(mmr) ? Math.max(0, mmr) : 0;
-  setStatus(statusEl, mmr ? `Using MMR ${mmr}` : "MMR missing — you can fill it manually.", !mmr);
+  if (!race) {
+    setStatus(statusEl, "Could not load your MMR. Refresh SC2Pulse in Settings.", true);
+    return;
+  }
+
+  if (raceSelect) {
+    raceSelect.value = race;
+  }
+
+  if (Number.isFinite(mmr)) {
+    setStatus(statusEl, `Using ${race} @ ${mmr} MMR from SC2Pulse.`, false);
+  } else {
+    setStatus(statusEl, `No rank found for ${race} — seeding as 0.`, true);
+  }
 
   const newPlayer = createOrUpdatePlayer({
     name,
     race,
     sc2Link,
-    mmr,
+    mmr: Number.isFinite(mmr) ? mmr : 0,
     points: startingPoints,
   });
 
@@ -223,22 +351,55 @@ async function handleRegistration(event) {
   }
 
   event.target.reset();
+  hydratePulseFromState(pulseProfile);
 }
 
-async function tryFetchMmrForForm() {
-  const link = document.getElementById("sc2PulseInput")?.value.trim();
-  const statusEl = document.getElementById("mmrStatus");
-  if (!link) {
-    setStatus(statusEl, "Add a SC2Pulse link first.", true);
+function mmrForRace(raceLabel) {
+  const key = normalizeRaceKey(raceLabel);
+  const byRace = pulseProfile?.byRace || null;
+  if (key && byRace && Number.isFinite(byRace[key])) {
+    return Math.round(byRace[key]);
+  }
+  return null;
+}
+
+function updateMmrDisplay(statusEl) {
+  const mmrDisplay = document.getElementById("mmrDisplay");
+  if (mmrDisplay) {
+    if (derivedRace) {
+      mmrDisplay.value = Number.isFinite(derivedMmr) ? `${derivedMmr} MMR` : "No rank";
+    } else {
+      mmrDisplay.value = "";
+    }
+  }
+
+  if (!statusEl) statusEl = document.getElementById("mmrStatus");
+  if (!statusEl) return;
+
+  if (!auth.currentUser) {
+    setStatus(statusEl, "Sign in and set your SC2Pulse link in Settings to register.", true);
     return;
   }
-  setStatus(statusEl, "Fetching MMR…", false);
-  const mmr = await fetchMmrFromPulse(link, statusEl);
-  if (mmr) {
-    const mmrInput = document.getElementById("mmrInput");
-    if (mmrInput) mmrInput.value = mmr;
-    setStatus(statusEl, `Found ${mmr} MMR`, false);
+
+  if (!pulseProfile?.url) {
+    setStatus(statusEl, "Connect your SC2Pulse link in Settings to auto-fill race and MMR.", true);
+    return;
   }
+
+  if (derivedRace && Number.isFinite(derivedMmr)) {
+    setStatus(statusEl, `Using ${derivedRace} @ ${derivedMmr} MMR from SC2Pulse.`, false);
+  } else if (derivedRace) {
+    setStatus(statusEl, `No rank found for ${derivedRace} — seeding as 0.`, true);
+  } else if (pulseProfile?.url) {
+    setStatus(statusEl, "Waiting for MMR. Refresh SC2Pulse in Settings.", true);
+  }
+}
+
+function populatePlayerNameFromProfile() {
+  const input = document.getElementById("playerNameInput");
+  if (!input || input.value.trim()) return;
+  const username = getCurrentUsername?.() || auth.currentUser?.displayName || "";
+  if (username) input.value = username;
 }
 
 function createOrUpdatePlayer(payload) {

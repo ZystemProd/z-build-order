@@ -14,10 +14,70 @@
   <meta property="og:type" content="website" />
   <meta property="og:image" content="https://zbuildorder.com/img/og-image.webp" />
   <link rel="icon" type="image/x-icon" href="/img/favicon.ico" />
+  <link rel="stylesheet" href="/public/css/showToast.css" />
   <link rel="stylesheet" href="/public/css/tournament.css" />
 </head>
 
 <body class="tournament-body">
+  <div id="toast-container"></div>
+
+  <div id="auth-container" class="auth-floating">
+    <div class="auth-info">
+      <div id="authLoadingWrapper" class="auth-loading">
+        <div id="authLoading" class="spinner"></div>
+        <span id="authLoadingText">Loading user...</span>
+      </div>
+
+      <div class="user-details">
+        <p id="userName" class="user-name fade-in" style="display: none;">Guest</p>
+      </div>
+
+      <img id="userPhoto" class="user-avatar fade-in" src="img/avatar/marine_avatar_1.webp" alt="User Avatar"
+        style="display: none;" />
+
+      <div id="userMenu" class="user-menu" style="display: none;">
+        <div class="menu-section">
+          <p id="userNameMenu" class="user-name fade-in">Guest</p>
+          <p id="userMmrMenu" class="user-mmr" style="display: none;">MMR: --</p>
+          <hr id="userNameDivider" class="menu-divider" />
+          <button class="menu-item" id="mapVetoBtn">
+            <img src="img/SVG/map-solid.svg" class="menu-icon" /> Map Veto
+          </button>
+          <hr class="menu-divider" />
+          <button class="menu-item" id="showClanModalButton">
+            <img src="img/SVG/clan.svg" class="menu-icon" /> Clans
+          </button>
+          <hr class="menu-divider" />
+          <button id="showStatsButton" class="menu-item">
+            <img src="img/SVG/stats.svg" class="menu-icon" /> My Stats
+          </button>
+          <hr class="menu-divider" />
+          <button class="menu-item" id="settingsBtn">
+            <img src="img/SVG/settings.svg" class="menu-icon" /> Settings
+          </button>
+          <hr class="menu-divider" />
+          <button class="menu-item" id="switchAccountBtn">
+            <img src="img/SVG/switch.svg" class="menu-icon" /> Switch Account
+          </button>
+          <button class="menu-item" id="signOutBtn">
+            <img src="img/SVG/logout.svg" class="menu-icon" /> Sign Out
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <button id="signInBtn" class="auth-button">Sign In</button>
+  </div>
+
+  <div id="usernameModal" class="modal" style="display: none">
+    <div class="modal-content">
+      <h3>Choose a Username</h3>
+      <input type="text" id="usernameInput" placeholder="Enter your username" />
+      <br /><br />
+      <button id="confirmUsernameButton">Confirm</button>
+    </div>
+  </div>
+
   <header class="hero">
     <div class="hero-main">
       <a class="ghost-link" href="/index.html">← Back to Z-Build Order</a>
@@ -100,32 +160,30 @@
           </label>
           <label>
             Race
-            <select id="raceSelect">
-              <option value="">Select race</option>
+            <select id="raceSelect" disabled>
               <option value="Zerg">Zerg</option>
               <option value="Protoss">Protoss</option>
               <option value="Terran">Terran</option>
               <option value="Random">Random</option>
             </select>
           </label>
-          <label>
-            SC2Pulse profile link
-            <input id="sc2PulseInput" type="url" placeholder="https://sc2pulse.nephest.com/player/12345" />
+          <label class="readonly-field">
+            SC2Pulse profile (set in Settings)
+            <input id="pulseLinkDisplay" type="text" placeholder="Add your SC2Pulse link in Settings" readonly />
           </label>
-          <label>
-            MMR (auto if link provided)
-            <input id="mmrInput" type="number" inputmode="numeric" min="0" placeholder="4500" />
+          <label class="readonly-field">
+            MMR (auto)
+            <input id="mmrDisplay" type="text" placeholder="MMR will load from SC2Pulse" readonly />
           </label>
           <label>
             Starting points (optional)
             <input id="pointsInput" type="number" inputmode="numeric" min="0" placeholder="0" />
           </label>
           <div class="form-actions">
-            <button type="button" id="fetchMmrBtn" class="cta ghost">Fetch MMR</button>
             <button type="submit" class="cta primary">Save player</button>
             <button type="button" id="autoFillBtn" class="cta small ghost">Dev: Auto-fill 12 players</button>
           </div>
-          <p id="mmrStatus" class="helper"></p>
+          <p id="mmrStatus" class="helper">Connect your SC2Pulse link in Settings to auto-fill race and MMR.</p>
         </form>
       </div>
 

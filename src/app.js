@@ -186,6 +186,12 @@ const normalizedBannedWords = bannedWords.map((word) =>
 );
 const DEFAULT_PULSE_STATUS =
   "Paste your SC2Pulse profile link to sync your latest MMR.";
+const RACE_UI = {
+  zerg: { label: "Zerg", icon: "img/race/zerg2.webp", color: "#d16ba5" },
+  terran: { label: "Terran", icon: "img/race/terran2.webp", color: "#4cc9f0" },
+  protoss: { label: "Protoss", icon: "img/race/protoss2.webp", color: "#f6c177" },
+  random: { label: "Random", icon: "img/race/terran2.webp", color: "#a0aec0" }, // fallback icon
+};
 let pulseState = { url: "", mmr: null, fetchedAt: null, byRace: null };
 let pulseUiInitialized = false;
 let pulseHelpInitialized = false;
@@ -574,7 +580,7 @@ function parsePulseTimestamp(value) {
   return null;
 }
 
-function setPulseStatus(message, tone = "muted") {
+function setPulseStatus(message, tone = "muted", extraNode = null) {
   const statusEl = document.getElementById("pulseStatusText");
   if (!statusEl) return;
   let color = "#b0b0b0";
@@ -582,9 +588,15 @@ function setPulseStatus(message, tone = "muted") {
   else if (tone === "success") color = "#9ae6b4";
   else if (tone === "info") color = "#8be9fd";
 
+  statusEl.innerHTML = "";
   statusEl.style.whiteSpace = "pre-line";
-  statusEl.textContent = message || DEFAULT_PULSE_STATUS;
   statusEl.style.color = color;
+  const span = document.createElement("span");
+  span.textContent = message || DEFAULT_PULSE_STATUS;
+  statusEl.appendChild(span);
+  if (extraNode) {
+    statusEl.appendChild(extraNode);
+  }
 }
 
 function setPulseControlsDisabled(isDisabled) {
@@ -594,70 +606,125 @@ function setPulseControlsDisabled(isDisabled) {
   if (connectBtn) connectBtn.disabled = isDisabled;
 }
 
-function formatMmrList(byRace, fallback) {
+function deriveOverallMmr(byRace, fallback) {
   if (byRace && typeof byRace === "object") {
-    const order = ["zerg", "terran", "protoss", "random"];
-    const labels = {
-      zerg: "Zerg",
-      terran: "Terran",
-      protoss: "Protoss",
-      random: "Random",
-    };
-    const parts = order
-      .map((k) => (Number.isFinite(byRace[k]) ? `${labels[k]}: ${byRace[k]} MMR` : null))
-      .filter(Boolean);
-    if (parts.length) return parts.join("\n");
+    const vals = Object.values(byRace).filter((v) => Number.isFinite(v));
+    if (vals.length) return Math.max(...vals);
   }
-  if (Number.isFinite(fallback)) {
-    return `${fallback} MMR`;
-  }
-  return "";
+  return Number.isFinite(fallback) ? fallback : null;
 }
 
-function updateUserMmrBadge(mmr, byRace = null) {
+function buildMmrBadges(byRace, overall, updatedAt) {
+  const order = ["zerg", "terran", "protoss", "random"];
+  const frag = document.createDocumentFragment();
+  const list = document.createElement("div");
+  list.className = "mmr-badge-list";
+  let hasBadges = false;
+
+  order.forEach((race) => {
+    const val = byRace && Number.isFinite(byRace[race]) ? Math.round(byRace[race]) : null;
+    if (!val) return;
+    const meta = RACE_UI[race] || { label: race, icon: "", color: "#9ae6b4" };
+    const badge = document.createElement("div");
+    badge.className = "mmr-badge";
+    badge.style.setProperty("--race-color", meta.color || "#9ae6b4");
+
+    if (meta.icon) {
+      const img = document.createElement("img");
+      img.className = "mmr-badge-icon";
+      img.src = meta.icon;
+      img.alt = `${meta.label} icon`;
+      badge.appendChild(img);
+    }
+
+    const text = document.createElement("span");
+    text.textContent = `${meta.label}: ${val} MMR`;
+    badge.appendChild(text);
+
+    list.appendChild(badge);
+    hasBadges = true;
+  });
+
+  if (!hasBadges && Number.isFinite(overall)) {
+    const badge = document.createElement("div");
+    badge.className = "mmr-badge";
+    const text = document.createElement("span");
+    text.textContent = `${Math.round(overall)} MMR`;
+    badge.appendChild(text);
+    list.appendChild(badge);
+    hasBadges = true;
+  }
+
+  if (hasBadges) {
+    frag.appendChild(list);
+    if (updatedAt) {
+      const date = new Date(updatedAt);
+      if (!Number.isNaN(date.getTime())) {
+        const updatedEl = document.createElement("div");
+        updatedEl.className = "mmr-updated";
+        updatedEl.textContent = `Last updated ${date.toLocaleDateString()}`;
+        frag.appendChild(updatedEl);
+      }
+    }
+  }
+
+  return hasBadges ? frag : null;
+}
+// Expose for other modules that run before module bundling combines scope
+if (typeof window !== "undefined") {
+  window.buildMmrBadges = buildMmrBadges;
+}
+
+function updateUserMmrBadge(mmr, byRace = null, updatedAt = null) {
   const mmrEl = document.getElementById("userMmrMenu");
   if (!mmrEl) return;
-  const text = formatMmrList(byRace, mmr);
-  if (text) {
-    mmrEl.textContent = text;
-    mmrEl.style.whiteSpace = "pre-line";
+  const badges = buildMmrBadges(byRace, mmr, updatedAt);
+  mmrEl.innerHTML = "";
+  if (badges) {
+    mmrEl.appendChild(badges);
     mmrEl.style.display = "block";
   } else {
     mmrEl.style.display = "none";
-    mmrEl.textContent = "";
   }
 }
 
 function applyPulseStateFromProfile(pulseData = {}) {
-  const mmrValue = Number(pulseData.lastMmr ?? pulseData.mmr);
-  const fetchedAt = parsePulseTimestamp(pulseData.fetchedAt);
+  const byRace =
+    pulseData.lastMmrByRace && typeof pulseData.lastMmrByRace === "object"
+      ? pulseData.lastMmrByRace
+      : pulseData.byRace && typeof pulseData.byRace === "object"
+      ? pulseData.byRace
+      : null;
+  const mmrValue = deriveOverallMmr(byRace, Number(pulseData.lastMmr ?? pulseData.mmr));
+  const fetchedAt =
+    parsePulseTimestamp(pulseData.fetchedAt) ||
+    parsePulseTimestamp(pulseData.lastMmrUpdated);
   pulseState = {
     url: typeof pulseData.url === "string" ? pulseData.url : "",
     mmr: Number.isFinite(mmrValue) && mmrValue > 0 ? Math.round(mmrValue) : null,
     fetchedAt,
-    byRace:
-      pulseData.lastMmrByRace && typeof pulseData.lastMmrByRace === "object"
-        ? pulseData.lastMmrByRace
-        : pulseData.byRace && typeof pulseData.byRace === "object"
-        ? pulseData.byRace
-        : null,
+    byRace,
   };
 
   const input = document.getElementById("sc2PulseInput");
   if (input) input.value = pulseState.url || "";
 
-  updateUserMmrBadge(pulseState.mmr, pulseState.byRace);
+  updateUserMmrBadge(pulseState.mmr, pulseState.byRace, pulseState.fetchedAt);
 
   if (pulseState.url && pulseState.mmr) {
-    const dateLabel = pulseState.fetchedAt
-      ? `\nUpdated ${new Date(pulseState.fetchedAt).toLocaleDateString()}`
-      : "";
-    setPulseStatus(`Connected. Last MMR: ${pulseState.mmr}${dateLabel}`, "success");
+    const badgeFrag = buildMmrBadges(
+      pulseState.byRace,
+      pulseState.mmr,
+      pulseState.fetchedAt
+    );
+    setPulseStatus("Connected.", "success", badgeFrag);
   } else if (pulseState.url) {
     setPulseStatus("Link saved. Click Update to refresh your MMR.", "info");
   } else {
     setPulseStatus(DEFAULT_PULSE_STATUS, "muted");
   }
+
+  dispatchPulseState();
 }
 
 function resetPulseUi() {
@@ -666,6 +733,16 @@ function resetPulseUi() {
   const input = document.getElementById("sc2PulseInput");
   if (input) input.value = "";
   setPulseStatus(DEFAULT_PULSE_STATUS, "muted");
+  dispatchPulseState();
+}
+
+function dispatchPulseState() {
+  if (typeof window === "undefined" || typeof window.dispatchEvent !== "function") return;
+  window.dispatchEvent(
+    new CustomEvent("pulse-state-changed", {
+      detail: { ...pulseState },
+    })
+  );
 }
 
 function setupPulseSettingsSection() {
@@ -800,11 +877,12 @@ async function handleConnectPulse(event) {
 
   try {
     const payload = await fetchPulseMmrFromBackend(normalizedUrl);
+    const byRace = payload.byRace || null;
+    const overall = deriveOverallMmr(byRace, Number(payload.mmr));
     const pulsePayload = {
       url: payload.url || normalizedUrl,
-      lastMmr: Number(payload.mmr),
       fetchedAt: Date.now(),
-      lastMmrByRace: payload.byRace || null,
+      lastMmrByRace: byRace,
     };
 
     await setDoc(
@@ -814,8 +892,8 @@ async function handleConnectPulse(event) {
     );
 
     applyPulseStateFromProfile(pulsePayload);
-    const summary = formatMmrList(pulsePayload.lastMmrByRace, pulsePayload.lastMmr);
-    setPulseStatus(summary ? `Connected.\n${summary}` : `Connected.`, "success");
+    const badgeFrag = buildMmrBadges(byRace, overall, pulsePayload.fetchedAt);
+    setPulseStatus("Connected.", "success", badgeFrag);
     showToast("? SC2Pulse connected and MMR updated.", "success");
   } catch (error) {
     console.error("SC2Pulse fetch failed:", error);
@@ -1166,7 +1244,11 @@ export function initializeAuthUI() {
       );
 
       currentUserAvatarUrl = resolveUserAvatar(userData);
-      applyPulseStateFromProfile(userData?.pulse || {});
+      const pulseMerged = {
+        ...(userData?.pulse || {}),
+        lastMmrUpdated: userData?.lastMmrUpdated,
+      };
+      applyPulseStateFromProfile(pulseMerged);
       setPulseControlsDisabled(false);
 
       if (userName) userName.innerText = username || "Guest";
@@ -1442,7 +1524,15 @@ async function handleCancelUsername() {
   await signOut(auth);
 }
 
-export { app, auth, db };
+function getPulseState() {
+  return { ...pulseState };
+}
+
+function getCurrentUsername() {
+  return currentUsername || auth.currentUser?.displayName || "";
+}
+
+export { app, auth, db, getPulseState, getCurrentUsername };
 window.handleSignIn = handleSignIn;
 window.handleSignOut = handleSignOut;
 window.handleSwitchAccount = handleSwitchAccount;
