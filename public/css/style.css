@@ -1626,7 +1626,8 @@ body.modal-open {
   margin: 10% auto; /* 10% from the top and centered */
   padding: 20px;
   border: 1px solid #888;
-  max-width: 70%; /* Width of the modal */
+  max-width: 80%; /* Width of the modal */
+  width: 560px;
   height: 70%;
   border-radius: 8px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
@@ -4213,6 +4214,13 @@ td {
   animation: softPulse 1.5s ease-in-out infinite;
 }
 
+/* SC2Pulse help icon in settings: tighter sizing, no extra margin */
+#pulseHelpBtn {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+}
+
 @keyframes softPulse {
   0% {
     box-shadow: 0 0 10px rgba(0, 191, 255, 0.4);
@@ -4602,6 +4610,16 @@ td {
   text-align: center;
   padding: 0 12px 6px;
   word-break: break-word;
+}
+
+.user-menu .user-mmr {
+  display: none;
+  text-align: center;
+  padding: 0 12px 6px;
+  margin-top: -4px;
+  color: #9ae6b4;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .menu-item {
@@ -6453,6 +6471,12 @@ optgroup[label="Terran"] {
 .settings-label {
   font-weight: 600;
   color: #e6e6e6;
+}
+
+.settings-label-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .settings-username-row {

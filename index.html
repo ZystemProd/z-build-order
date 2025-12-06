@@ -108,6 +108,7 @@
 
         <div class="menu-section">
           <p id="userNameMenu" class="user-name fade-in">Guest</p>
+          <p id="userMmrMenu" class="user-mmr" style="display: none;">MMR: --</p>
           <hr id="userNameDivider" class="menu-divider" />
           <button class="menu-item" id="showClanModalButton">
             <img src="img/SVG/clan.svg" class="menu-icon" /> Clans
@@ -767,6 +768,49 @@
           <p id="settingsUsernameStatus" class="settings-helper-text">
             Use 3-20 letters, numbers, or underscores.
           </p>
+        </div>
+        <hr class="settings-divider" />
+        <div class="settings-username-section">
+          <div class="settings-label-row">
+            <label for="sc2PulseInput" class="settings-label">SC2Pulse Link</label>
+            <button
+              type="button"
+              class="help-circle animated-help"
+              id="pulseHelpBtn"
+              aria-label="How to find your SC2Pulse link"
+              title="How to find your SC2Pulse link"
+            >
+              ?
+            </button>
+          </div>
+          <div class="settings-username-row">
+            <input
+              id="sc2PulseInput"
+              class="settings-input"
+              type="url"
+              placeholder="https://sc2pulse.nephest.com/sc2/?type=character&id=..."
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <button type="button" class="settings-username-button" id="connectPulseBtn">
+              <img src="img/SVG/stats.svg" class="menu-icon" alt="" aria-hidden="true" />
+              Update
+            </button>
+          </div>
+          <p id="pulseStatusText" class="settings-helper-text">
+            Paste your SC2Pulse profile link to sync your latest MMR.
+          </p>
+          <div id="pulseHelpModal" class="modal">
+            <div class="modal-content">
+              <span class="close" id="closePulseHelp">&times;</span>
+              <h3>How to find your SC2Pulse link</h3>
+              <ol>
+                <li>Open your SC2Pulse profile and go to the MMR tab.</li>
+                <li>Copy the URL from the address bar (looks like <code>https://sc2pulse.nephest.com/sc2/?type=character&id=579686&m=1</code>).</li>
+                <li>Paste that URL here and click Update.</li>
+              </ol>
+            </div>
+          </div>
         </div>
         <hr class="settings-divider" />
         <div class="publish-checkbox-row">

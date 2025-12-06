@@ -19,6 +19,7 @@ import {
   getDoc,
   setDoc,
   deleteDoc,
+  deleteField,
   runTransaction,
   writeBatch,
   query,
@@ -56,6 +57,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (userMenu) userMenu.style.display = "none";
 
   setupUsernameSettingsSection();
+  setupPulseSettingsSection();
 
   // Position the floating utility tiles relative to auth-container
   try { updateFloatingTilePositions(); } catch (_) {}
@@ -182,6 +184,19 @@ let usernameFormInitialized = false;
 const normalizedBannedWords = bannedWords.map((word) =>
   (word || "").toLowerCase()
 );
+const DEFAULT_PULSE_STATUS =
+  "Paste your SC2Pulse profile link to sync your latest MMR.";
+let pulseState = { url: "", mmr: null, fetchedAt: null, byRace: null };
+let pulseUiInitialized = false;
+let pulseHelpInitialized = false;
+const PULSE_ENDPOINTS = (() => {
+  const endpoints = ["/api/pulse-mmr"];
+  if (typeof window !== "undefined" && window.location.hostname === "localhost") {
+    endpoints.push("http://localhost:5001/z-build-order/us-central1/fetchPulseMmr");
+  }
+  endpoints.push("https://us-central1-z-build-order.cloudfunctions.net/fetchPulseMmr");
+  return endpoints;
+})();
 
 const avatarModalElements = {
   changeBtn: null,
@@ -529,6 +544,290 @@ function setupUsernameSettingsSection() {
   usernameFormInitialized = true;
 }
 
+function normalizePulseUrlClient(raw) {
+  if (!raw) return "";
+  const trimmed = raw.trim();
+  const withProtocol = /^https?:\/\//i.test(trimmed)
+    ? trimmed
+    : `https://${trimmed}`;
+  try {
+    const url = new URL(withProtocol);
+    if (!["http:", "https:"].includes(url.protocol)) return "";
+    if (url.hostname !== "sc2pulse.nephest.com") return "";
+    return url.toString();
+  } catch (_) {
+    return "";
+  }
+}
+
+function parsePulseTimestamp(value) {
+  if (!value) return null;
+  if (typeof value === "number") return value;
+  if (typeof value?.toMillis === "function") {
+    try {
+      return value.toMillis();
+    } catch (_) {
+      return null;
+    }
+  }
+  if (value?.seconds) return value.seconds * 1000;
+  return null;
+}
+
+function setPulseStatus(message, tone = "muted") {
+  const statusEl = document.getElementById("pulseStatusText");
+  if (!statusEl) return;
+  let color = "#b0b0b0";
+  if (tone === "error") color = "#ff9a9a";
+  else if (tone === "success") color = "#9ae6b4";
+  else if (tone === "info") color = "#8be9fd";
+
+  statusEl.style.whiteSpace = "pre-line";
+  statusEl.textContent = message || DEFAULT_PULSE_STATUS;
+  statusEl.style.color = color;
+}
+
+function setPulseControlsDisabled(isDisabled) {
+  const input = document.getElementById("sc2PulseInput");
+  const connectBtn = document.getElementById("connectPulseBtn");
+  if (input) input.disabled = isDisabled;
+  if (connectBtn) connectBtn.disabled = isDisabled;
+}
+
+function formatMmrList(byRace, fallback) {
+  if (byRace && typeof byRace === "object") {
+    const order = ["zerg", "terran", "protoss", "random"];
+    const labels = {
+      zerg: "Zerg",
+      terran: "Terran",
+      protoss: "Protoss",
+      random: "Random",
+    };
+    const parts = order
+      .map((k) => (Number.isFinite(byRace[k]) ? `${labels[k]}: ${byRace[k]} MMR` : null))
+      .filter(Boolean);
+    if (parts.length) return parts.join("\n");
+  }
+  if (Number.isFinite(fallback)) {
+    return `${fallback} MMR`;
+  }
+  return "";
+}
+
+function updateUserMmrBadge(mmr, byRace = null) {
+  const mmrEl = document.getElementById("userMmrMenu");
+  if (!mmrEl) return;
+  const text = formatMmrList(byRace, mmr);
+  if (text) {
+    mmrEl.textContent = text;
+    mmrEl.style.whiteSpace = "pre-line";
+    mmrEl.style.display = "block";
+  } else {
+    mmrEl.style.display = "none";
+    mmrEl.textContent = "";
+  }
+}
+
+function applyPulseStateFromProfile(pulseData = {}) {
+  const mmrValue = Number(pulseData.lastMmr ?? pulseData.mmr);
+  const fetchedAt = parsePulseTimestamp(pulseData.fetchedAt);
+  pulseState = {
+    url: typeof pulseData.url === "string" ? pulseData.url : "",
+    mmr: Number.isFinite(mmrValue) && mmrValue > 0 ? Math.round(mmrValue) : null,
+    fetchedAt,
+    byRace:
+      pulseData.lastMmrByRace && typeof pulseData.lastMmrByRace === "object"
+        ? pulseData.lastMmrByRace
+        : pulseData.byRace && typeof pulseData.byRace === "object"
+        ? pulseData.byRace
+        : null,
+  };
+
+  const input = document.getElementById("sc2PulseInput");
+  if (input) input.value = pulseState.url || "";
+
+  updateUserMmrBadge(pulseState.mmr, pulseState.byRace);
+
+  if (pulseState.url && pulseState.mmr) {
+    const dateLabel = pulseState.fetchedAt
+      ? `\nUpdated ${new Date(pulseState.fetchedAt).toLocaleDateString()}`
+      : "";
+    setPulseStatus(`Connected. Last MMR: ${pulseState.mmr}${dateLabel}`, "success");
+  } else if (pulseState.url) {
+    setPulseStatus("Link saved. Click Update to refresh your MMR.", "info");
+  } else {
+    setPulseStatus(DEFAULT_PULSE_STATUS, "muted");
+  }
+}
+
+function resetPulseUi() {
+  pulseState = { url: "", mmr: null, fetchedAt: null, byRace: null };
+  updateUserMmrBadge(null, null);
+  const input = document.getElementById("sc2PulseInput");
+  if (input) input.value = "";
+  setPulseStatus(DEFAULT_PULSE_STATUS, "muted");
+}
+
+function setupPulseSettingsSection() {
+  if (pulseUiInitialized) return;
+  const input = document.getElementById("sc2PulseInput");
+  const connectBtn = document.getElementById("connectPulseBtn");
+  if (!input || !connectBtn) return;
+
+  connectBtn.addEventListener("click", handleConnectPulse);
+  input.addEventListener("input", () => {
+    if (!input.value.trim()) {
+      setPulseStatus(DEFAULT_PULSE_STATUS, "muted");
+    }
+  });
+
+  setupPulseHelpModal();
+
+  pulseUiInitialized = true;
+}
+
+function setupPulseHelpModal() {
+  if (pulseHelpInitialized) return;
+  const openBtn = document.getElementById("pulseHelpBtn");
+  const modal = document.getElementById("pulseHelpModal");
+  const closeBtn = document.getElementById("closePulseHelp");
+  if (!openBtn || !modal) return;
+
+  const hide = () => {
+    modal.style.display = "none";
+  };
+  const show = () => {
+    modal.style.display = "block";
+  };
+
+  openBtn.addEventListener("click", show);
+  if (closeBtn) closeBtn.addEventListener("click", hide);
+  window.addEventListener("mousedown", (e) => {
+    if (e.target === modal) hide();
+  });
+
+  pulseHelpInitialized = true;
+}
+
+async function fetchPulseMmrFromBackend(url) {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error("Please sign in first.");
+  }
+
+  let lastError = null;
+
+  for (const endpoint of PULSE_ENDPOINTS) {
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uid: user.uid, url }),
+      });
+
+      let payload = {};
+      try {
+        payload = await response.json();
+      } catch (_) {
+        // ignore json parse errors; handled below
+      }
+
+      if (!response.ok) {
+        const message =
+          (payload && payload.error) ||
+          `Failed to fetch MMR (status ${response.status}).`;
+        lastError = new Error(message);
+        // Try next endpoint (helps when local dev lacks hosting rewrite)
+        continue;
+      }
+
+      if (!Number.isFinite(payload?.mmr)) {
+        lastError = new Error("Could not read MMR from SC2Pulse.");
+        continue;
+      }
+
+      return payload;
+    } catch (err) {
+      lastError = err;
+      continue;
+    }
+  }
+
+  throw lastError || new Error("Failed to fetch MMR from SC2Pulse.");
+}
+
+async function handleConnectPulse(event) {
+  if (event?.preventDefault) event.preventDefault();
+
+  const input = document.getElementById("sc2PulseInput");
+  const connectBtn = document.getElementById("connectPulseBtn");
+  if (!input || !connectBtn) return;
+
+  const user = auth.currentUser;
+  if (!user) {
+    setPulseStatus("Sign in to connect your SC2Pulse link.", "error");
+    showToast("? Please sign in to connect SC2Pulse.", "error");
+    return;
+  }
+
+  const rawUrl = (input.value || "").trim();
+  if (!rawUrl) {
+    try {
+      await setDoc(
+        doc(db, "users", user.uid),
+        { pulse: deleteField(), sc2PulseUrl: deleteField() },
+        { merge: true }
+      );
+    } catch (err) {
+      console.error("Failed to clear SC2Pulse link:", err);
+    }
+    resetPulseUi();
+    setPulseStatus("SC2Pulse link removed.", "info");
+    showToast("? SC2Pulse link removed.", "success");
+    return;
+  }
+
+  const normalizedUrl = normalizePulseUrlClient(rawUrl);
+  if (!normalizedUrl) {
+    setPulseStatus("Please paste a full sc2pulse.nephest.com link.", "error");
+    return;
+  }
+
+  connectBtn.disabled = true;
+  const originalHtml = connectBtn.innerHTML;
+  connectBtn.textContent = "Fetching...";
+  setPulseStatus("Fetching MMR from SC2Pulse...", "info");
+
+  try {
+    const payload = await fetchPulseMmrFromBackend(normalizedUrl);
+    const pulsePayload = {
+      url: payload.url || normalizedUrl,
+      lastMmr: Number(payload.mmr),
+      fetchedAt: Date.now(),
+      lastMmrByRace: payload.byRace || null,
+    };
+
+    await setDoc(
+      doc(db, "users", user.uid),
+      { pulse: pulsePayload, sc2PulseUrl: normalizedUrl },
+      { merge: true }
+    );
+
+    applyPulseStateFromProfile(pulsePayload);
+    const summary = formatMmrList(pulsePayload.lastMmrByRace, pulsePayload.lastMmr);
+    setPulseStatus(summary ? `Connected.\n${summary}` : `Connected.`, "success");
+    showToast("? SC2Pulse connected and MMR updated.", "success");
+  } catch (error) {
+    console.error("SC2Pulse fetch failed:", error);
+    const message = error?.message || "Failed to fetch MMR from SC2Pulse.";
+    setPulseStatus(message.replace("?", "").trim(), "error");
+    showToast(message.startsWith("?") ? message : `? ${message}`, "error");
+  } finally {
+    connectBtn.disabled = false;
+    connectBtn.innerHTML = originalHtml;
+  }
+}
+
 async function writeInBatches(docSnaps, updater) {
   if (!Array.isArray(docSnaps) || docSnaps.length === 0) return;
 
@@ -867,6 +1166,8 @@ export function initializeAuthUI() {
       );
 
       currentUserAvatarUrl = resolveUserAvatar(userData);
+      applyPulseStateFromProfile(userData?.pulse || {});
+      setPulseControlsDisabled(false);
 
       if (userName) userName.innerText = username || "Guest";
       if (userNameMenu) userNameMenu.innerText = username || "Guest";
@@ -904,6 +1205,9 @@ export function initializeAuthUI() {
         "Sign in to update your username.",
         "muted"
       );
+      resetPulseUi();
+      setPulseControlsDisabled(true);
+      setPulseStatus("Sign in to connect your SC2Pulse link.", "muted");
       if (userMenu) userMenu.style.display = "none";
       if (signInBtn) signInBtn.style.display = "inline-block";
       if (showClanBtn) showClanBtn.disabled = true;

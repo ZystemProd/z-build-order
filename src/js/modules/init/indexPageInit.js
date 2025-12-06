@@ -1426,6 +1426,29 @@ export async function initializeIndexPage() {
         "img/avatar/marine_avatar_1.webp";
       document.getElementById("userPhoto").src = avatarUrl;
       document.getElementById("userNameMenu").innerText = username;
+      const mmrEl = document.getElementById("userMmrMenu");
+      const byRace = data?.pulse?.lastMmrByRace || data?.lastKnownMMRByRace || null;
+      const overall = Number(data?.pulse?.lastMmr ?? data?.pulse?.mmr ?? data?.lastKnownMMR);
+      if (mmrEl) {
+        const parts = [];
+        const labels = { zerg: "Zerg", terran: "Terran", protoss: "Protoss", random: "Random" };
+        if (byRace && typeof byRace === "object") {
+          ["zerg", "terran", "protoss", "random"].forEach((k) => {
+            if (Number.isFinite(byRace[k])) parts.push(`${labels[k]}: ${byRace[k]} MMR`);
+          });
+        }
+        if (!parts.length && Number.isFinite(overall)) {
+          parts.push(`${Math.round(overall)} MMR`);
+        }
+        if (parts.length) {
+          mmrEl.textContent = parts.join("\n");
+          mmrEl.style.whiteSpace = "pre-line";
+          mmrEl.style.display = "block";
+        } else {
+          mmrEl.style.display = "none";
+          mmrEl.textContent = "";
+        }
+      }
     } else {
       // Handle case when user data doesn't exist
       console.log("No user data found!");
