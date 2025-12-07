@@ -396,6 +396,25 @@
                 <option value="Swiss">Swiss</option>
               </select>
             </label>
+            <div class="inline-row">
+              <label style="flex:1;">Upper bracket best of
+                <input type="number" id="settingsBestOfUpper" min="1" max="9" placeholder="3" />
+              </label>
+              <label style="flex:1;">Lower bracket best of
+                <input type="number" id="settingsBestOfLower" min="1" max="9" placeholder="3" />
+              </label>
+            </div>
+            <div class="inline-row">
+              <label style="flex:1;">Quarterfinals best of
+                <input type="number" id="settingsBestOfQuarter" min="1" max="9" placeholder="5" />
+              </label>
+              <label style="flex:1;">Semifinals best of
+                <input type="number" id="settingsBestOfSemi" min="1" max="9" placeholder="5" />
+              </label>
+              <label style="flex:1;">Finals best of
+                <input type="number" id="settingsBestOfFinal" min="1" max="9" placeholder="7" />
+              </label>
+            </div>
           </div>
           <div class="form-actions" style="margin-top:16px;">
             <button class="cta primary" id="saveSettingsBtn">Save settings</button>
@@ -514,6 +533,25 @@
             <option value="Swiss">Swiss</option>
           </select>
         </label>
+        <div class="inline-row">
+          <label style="flex:1;">Upper bracket best of
+            <input type="number" id="bestOfUpperInput" min="1" max="9" placeholder="3" />
+          </label>
+          <label style="flex:1;">Lower bracket best of
+            <input type="number" id="bestOfLowerInput" min="1" max="9" placeholder="3" />
+          </label>
+        </div>
+        <div class="inline-row">
+          <label style="flex:1;">Quarterfinals best of
+            <input type="number" id="bestOfQuarterInput" min="1" max="9" placeholder="5" />
+          </label>
+          <label style="flex:1;">Semifinals best of
+            <input type="number" id="bestOfSemiInput" min="1" max="9" placeholder="5" />
+          </label>
+          <label style="flex:1;">Finals best of
+            <input type="number" id="bestOfFinalInput" min="1" max="9" placeholder="7" />
+          </label>
+        </div>
       </div>
       <div class="form-actions">
         <button class="cta subtle" id="closeCreateTournament">Cancel</button>
@@ -522,6 +560,23 @@
   </div>
 
   <script type="module" src="/src/js/modules/tournament.js"></script>
+
+  <!-- Match Veto Modal -->
+  <div id="vetoModal" class="modal" style="display:none;">
+    <div class="modal-content veto-modal">
+      <div class="modal-header">
+        <h3>Map veto</h3>
+        <button class="icon-btn" id="closeVetoModal" aria-label="Close veto modal">×</button>
+      </div>
+      <p class="helper" id="vetoMatchLabel"></p>
+      <p class="helper" id="vetoBestOfLabel"></p>
+      <div id="vetoMapPool" class="map-pool-grid selectable"></div>
+      <div id="vetoSelections" class="selected-maps"></div>
+      <div class="form-actions" style="margin-top:12px;">
+        <button class="cta primary" id="saveVetoBtn">Save veto</button>
+      </div>
+    </div>
+  </div>
 </body>
 
 </html>

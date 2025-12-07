@@ -35,6 +35,7 @@ const defaultState = {
   needsReseed: false,
   activity: [],
   lastUpdated: Date.now(),
+  matchVetoes: {},
 };
 
 let currentSlug = null;
@@ -49,6 +50,15 @@ let mapPoolSelection = new Set(FALLBACK_LADDER_MAPS.map((m) => m.name));
 let mapCatalog = [];
 let mapCatalogLoaded = false;
 let currentMapPoolMode = "ladder"; // ladder | custom
+const defaultBestOf = {
+  upper: 3,
+  lower: 3,
+  quarter: 5,
+  semi: 5,
+  final: 7,
+};
+let currentVetoMatchId = null;
+let vetoState = null;
 const broadcast =
   typeof BroadcastChannel !== "undefined"
     ? new BroadcastChannel(BROADCAST_NAME)
@@ -135,6 +145,19 @@ function bindUI() {
   const settingsDescToolbarBtns = document.querySelectorAll("[data-settings-desc-action]");
   const settingsRulesToolbarBtns = document.querySelectorAll("[data-settings-rules-action]");
   const slugInput = document.getElementById("tournamentSlugInput");
+  const bestOfUpperInput = document.getElementById("bestOfUpperInput");
+  const bestOfLowerInput = document.getElementById("bestOfLowerInput");
+  const bestOfQuarterInput = document.getElementById("bestOfQuarterInput");
+  const bestOfSemiInput = document.getElementById("bestOfSemiInput");
+  const bestOfFinalInput = document.getElementById("bestOfFinalInput");
+  const settingsBestOfUpper = document.getElementById("settingsBestOfUpper");
+  const settingsBestOfLower = document.getElementById("settingsBestOfLower");
+  const settingsBestOfQuarter = document.getElementById("settingsBestOfQuarter");
+  const settingsBestOfSemi = document.getElementById("settingsBestOfSemi");
+  const settingsBestOfFinal = document.getElementById("settingsBestOfFinal");
+  const vetoModal = document.getElementById("vetoModal");
+  const closeVetoModal = document.getElementById("closeVetoModal");
+  const saveVetoBtn = document.getElementById("saveVetoBtn");
 
   registrationForm?.addEventListener("submit", handleRegistration);
   rebuildBtn?.addEventListener("click", () => rebuildBracket(true, "Manual reseed"));
@@ -230,6 +253,16 @@ function bindUI() {
     toggleMapSelection(card.dataset.mapName);
   });
   saveSettingsBtn?.addEventListener("click", handleSaveSettings);
+  [bestOfUpperInput, bestOfLowerInput, bestOfQuarterInput, bestOfSemiInput, bestOfFinalInput].forEach((el) => {
+    el?.addEventListener("input", () => {});
+  });
+  [settingsBestOfUpper, settingsBestOfLower, settingsBestOfQuarter, settingsBestOfSemi, settingsBestOfFinal].forEach(
+    (el) => {
+      el?.addEventListener("input", () => {});
+    }
+  );
+  closeVetoModal?.addEventListener("click", () => hideVetoModal());
+  saveVetoBtn?.addEventListener("click", () => saveVetoSelection());
 
   jumpToRegistration?.addEventListener("click", () => {
     switchTab("registrationTab");
@@ -262,8 +295,8 @@ function bindUI() {
       const matchId = e.target.dataset.matchId;
       if (!matchId) return;
       const selects = document.querySelectorAll(`.score-select[data-match-id="${matchId}"]`);
-      const vals = Array.from(selects).map((s) => Number(s.value) || 0);
-      updateMatchScore(matchId, vals[0] ?? 0, vals[1] ?? 0);
+      const vals = Array.from(selects).map((s) => s.value || "0");
+      updateMatchScore(matchId, vals[0], vals[1]);
     }
   });
 
@@ -588,6 +621,9 @@ async function enterTournament(slug) {
   const registry = await loadTournamentRegistry(true);
   const tournament = registry.find((t) => t.slug === slug);
   currentTournamentMeta = tournament || null;
+  if (currentTournamentMeta && !currentTournamentMeta.bestOf) {
+    currentTournamentMeta.bestOf = { ...defaultBestOf };
+  }
   if (tournament?.mapPool?.length) {
     setMapPoolSelection(tournament.mapPool);
   } else {
@@ -638,6 +674,7 @@ async function handleSaveSettings(event) {
   const maxPlayersRaw = document.getElementById("settingsMaxPlayersInput")?.value;
   const maxPlayers = maxPlayersRaw ? Math.max(2, Number(maxPlayersRaw)) : null;
   const startTime = document.getElementById("settingsStartInput")?.value || "";
+  const bestOf = readBestOfFromForm("settings");
   const mapPool = mapPoolSelection.size ? Array.from(mapPoolSelection) : getDefaultMapPoolNames();
   if (!name) return;
 
@@ -648,6 +685,7 @@ async function handleSaveSettings(event) {
     mapPool,
     format,
     maxPlayers,
+    bestOf,
     startTime: startTime ? new Date(startTime).toISOString() : null,
     updatedAt: Date.now(),
   };
@@ -776,6 +814,11 @@ async function populateCreateForm() {
   const formatSelect = document.getElementById("tournamentFormatSelect");
   const maxInput = document.getElementById("tournamentMaxPlayersInput");
   const startInput = document.getElementById("tournamentStartInput");
+  const upperInput = document.getElementById("bestOfUpperInput");
+  const lowerInput = document.getElementById("bestOfLowerInput");
+  const quarterInput = document.getElementById("bestOfQuarterInput");
+  const semiInput = document.getElementById("bestOfSemiInput");
+  const finalInput = document.getElementById("bestOfFinalInput");
   if (slugInput) slugInput.value = await generateUniqueSlug();
   if (nameInput) nameInput.value = "";
   if (descInput) descInput.value = "";
@@ -783,6 +826,11 @@ async function populateCreateForm() {
   if (formatSelect) formatSelect.value = "Double Elimination";
   if (maxInput) maxInput.value = "";
   if (startInput) startInput.value = "";
+  if (upperInput) upperInput.value = defaultBestOf.upper;
+  if (lowerInput) lowerInput.value = defaultBestOf.lower;
+  if (quarterInput) quarterInput.value = defaultBestOf.quarter;
+  if (semiInput) semiInput.value = defaultBestOf.semi;
+  if (finalInput) finalInput.value = defaultBestOf.final;
   updateDescriptionPreview();
   updateRulesPreview();
   setMapPoolSelection(getDefaultMapPoolNames());
@@ -833,6 +881,7 @@ async function handleCreateTournament(event) {
   const maxPlayersRaw = document.getElementById("tournamentMaxPlayersInput")?.value;
   const maxPlayers = maxPlayersRaw ? Math.max(2, Number(maxPlayersRaw)) : null;
   const startTime = document.getElementById("tournamentStartInput")?.value || "";
+  const bestOf = readBestOfFromForm("create");
   if (!name || !slug) return;
   const selectedMaps =
     mapPoolSelection.size > 0 ? Array.from(mapPoolSelection) : getDefaultMapPoolNames();
@@ -845,8 +894,10 @@ async function handleCreateTournament(event) {
     mapPool: selectedMaps,
     format,
     maxPlayers,
+    bestOf,
     startTime: startTime ? new Date(startTime).toISOString() : null,
     createdBy: auth.currentUser?.uid || "anon",
+    createdByName: getCurrentUsername?.() || auth.currentUser?.displayName || "Host",
     createdAt: Date.now(),
   };
 
@@ -894,6 +945,7 @@ async function loadTournamentRegistry(force = false) {
         startTime: startTime || null,
         createdBy: data.createdBy || null,
         createdByName: data.createdByName || data.hostName || null,
+        bestOf: data.bestOf || defaultBestOf,
       };
     });
     registryCache = list;
@@ -1046,6 +1098,37 @@ function getDefaultMapPoolNames() {
 
 function getMapByName(name) {
   return getAll1v1Maps().find((m) => m.name === name) || null;
+}
+
+function readBestOfFromForm(prefix) {
+  const ids =
+    prefix === "settings"
+      ? {
+          upper: "settingsBestOfUpper",
+          lower: "settingsBestOfLower",
+          quarter: "settingsBestOfQuarter",
+          semi: "settingsBestOfSemi",
+          final: "settingsBestOfFinal",
+        }
+      : {
+          upper: "bestOfUpperInput",
+          lower: "bestOfLowerInput",
+          quarter: "bestOfQuarterInput",
+          semi: "bestOfSemiInput",
+          final: "bestOfFinalInput",
+        };
+  const getVal = (id, fallback) => {
+    const el = document.getElementById(id);
+    const num = Number(el?.value);
+    return Number.isFinite(num) && num > 0 ? num : fallback;
+  };
+  return {
+    upper: getVal(ids.upper, defaultBestOf.upper),
+    lower: getVal(ids.lower, defaultBestOf.lower),
+    quarter: getVal(ids.quarter, defaultBestOf.quarter),
+    semi: getVal(ids.semi, defaultBestOf.semi),
+    final: getVal(ids.final, defaultBestOf.final),
+  };
 }
 
 function setMapPoolSelection(names) {
@@ -1488,8 +1571,9 @@ function applyMatchInputs(card) {
 }
 
 function parseResult(value) {
-  if (value === "W") return { type: "walkover" };
-  const num = Number(value);
+  const v = String(value || "").trim().toUpperCase();
+  if (v === "W" || v === "W/O") return { type: "walkover" };
+  const num = Number(v);
   return { type: "score", value: Number.isFinite(num) ? Math.max(0, num) : 0 };
 }
 
@@ -1504,6 +1588,8 @@ function updateMatchScore(matchId, valA, valB) {
   const prevWinner = match.winnerId;
   const resA = parseResult(valA);
   const resB = parseResult(valB);
+  const bestOf = getBestOfForMatch(match);
+  const needed = Math.ceil((bestOf || 1) / 2);
 
   if (!pA || !pB) {
     finalizeMatchResult(match, {
@@ -1525,21 +1611,27 @@ function updateMatchScore(matchId, valA, valB) {
   let walkoverValue = null;
 
   if (resA.type === "walkover" && resB.type !== "walkover") {
-    winnerId = pA.id;
-    loserId = pB.id;
-    status = "complete";
-    finalScores = [1, 0];
-    walkoverValue = "b";
-  } else if (resB.type === "walkover" && resA.type !== "walkover") {
+    // Player A forfeits -> Player B wins
     winnerId = pB.id;
     loserId = pA.id;
     status = "complete";
-    finalScores = [0, 1];
+    finalScores = [0, needed];
     walkoverValue = "a";
-  } else if (resA.type === "score" && resB.type === "score" && resA.value !== resB.value) {
-    winnerId = resA.value > resB.value ? pA.id : pB.id;
-    loserId = resA.value > resB.value ? pB.id : pA.id;
+  } else if (resB.type === "walkover" && resA.type !== "walkover") {
+    // Player B forfeits -> Player A wins
+    winnerId = pA.id;
+    loserId = pB.id;
     status = "complete";
+    finalScores = [needed, 0];
+    walkoverValue = "b";
+  } else if (resA.type === "score" && resB.type === "score" && resA.value !== resB.value) {
+    if (resA.value >= needed || resB.value >= needed) {
+      winnerId = resA.value > resB.value ? pA.id : pB.id;
+      loserId = resA.value > resB.value ? pB.id : pA.id;
+      status = "complete";
+    } else {
+      status = "pending";
+    }
   }
 
   if (prevWinner && prevWinner !== winnerId) {
@@ -1650,6 +1742,9 @@ function renderBracket() {
   </div>`;
 
   attachMatchHoverHandlers();
+  attachMatchActionHandlers();
+  clampScoreSelectOptions();
+  annotateConnectorPlayers(lookup, playersById);
 }
 
 function renderMapsTab(tournament) {
@@ -1721,6 +1816,226 @@ function updateMapButtons() {
   customBtns.forEach((btn) => btn?.classList.toggle("active", !isLadder));
 }
 
+function openVetoModal(matchId) {
+  currentVetoMatchId = matchId;
+  const modal = document.getElementById("vetoModal");
+  const label = document.getElementById("vetoMatchLabel");
+  const bestOfLabel = document.getElementById("vetoBestOfLabel");
+  const lookup = getMatchLookup(state.bracket || {});
+  const match = lookup.get(matchId);
+  const bestOf = getBestOfForMatch(match || { bracket: "winners", round: 1 });
+  const pool = (currentTournamentMeta?.mapPool && currentTournamentMeta.mapPool.length
+    ? currentTournamentMeta.mapPool
+    : getDefaultMapPoolNames()
+  ).map((name) => getMapByName(name) || { name, folder: "", file: "", mode: "1v1" });
+
+  // Determine lower/higher seed by seed number (higher number = lower seed)
+  const playersById = getPlayersMap();
+  const [pA, pB] = resolveParticipants(match, lookup, playersById);
+  const ordered = [pA, pB].filter(Boolean).sort((a, b) => (b.seed || 999) - (a.seed || 999));
+  const lower = ordered[0] || null; // worse seed
+  const higher = ordered[1] || ordered[0] || null; // better seed
+
+  const saved = state.matchVetoes?.[matchId];
+  if (saved) {
+    const usedNames = new Set([...(saved.maps || []).map((m) => m.map), ...(saved.vetoed || []).map((m) => m.map)]);
+    const remaining = pool.filter((m) => !usedNames.has(m.name));
+    vetoState = {
+      stage: "done",
+      turn: "done",
+      bestOf: saved.bestOf || (saved.maps?.length || bestOf),
+      remaining,
+      vetoed: saved.vetoed || [],
+      picks: saved.maps || [],
+      lowerName: saved.participants?.lower || lower?.name || "Lower seed",
+      higherName: saved.participants?.higher || higher?.name || "Higher seed",
+    };
+  } else {
+    vetoState = {
+      stage: pool.length <= bestOf ? "pick" : "veto",
+      turn: "low",
+      bestOf,
+      remaining: [...pool],
+      vetoed: [],
+      picks: [],
+      lowerName: lower?.name || "Lower seed",
+      higherName: higher?.name || "Higher seed",
+    };
+  }
+
+  if (label) label.textContent = `Match ${matchId || ""}`;
+  if (bestOfLabel) bestOfLabel.textContent = "";
+
+  renderVetoPoolGrid(pool);
+  renderVetoSelectionList();
+  renderVetoStatus();
+  modal.style.display = "flex";
+  modal.dataset.bestOf = vetoState.bestOf;
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) hideVetoModal();
+  });
+  document.getElementById("vetoMapPool")?.addEventListener("click", handleVetoPoolClick);
+}
+
+function handleVetoPoolClick(e) {
+  const card = e.target.closest(".tournament-map-card");
+  if (!card) return;
+  const name = card.dataset.mapName;
+  if (!vetoState || vetoState.stage === "done") return;
+  const turnLabel = vetoState.turn;
+  const picker =
+    turnLabel === "low" ? vetoState.lowerName || "Player A" : vetoState.higherName || "Player B";
+
+  if (vetoState.stage === "veto") {
+    const remainingCount = vetoState.remaining.length;
+    if (remainingCount <= vetoState.bestOf) return;
+    const idx = vetoState.remaining.findIndex((m) => m.name === name);
+    if (idx === -1) return;
+    const [removed] = vetoState.remaining.splice(idx, 1);
+    vetoState.vetoed.push({ map: removed.name, picker, action: "veto" });
+    const newRemaining = vetoState.remaining.length;
+    if (newRemaining <= vetoState.bestOf) {
+      vetoState.stage = "pick";
+      vetoState.turn = "low";
+    } else {
+      vetoState.turn = vetoState.turn === "low" ? "high" : "low";
+    }
+  } else if (vetoState.stage === "pick") {
+    const idx = vetoState.remaining.findIndex((m) => m.name === name);
+    if (idx === -1) return;
+    const [picked] = vetoState.remaining.splice(idx, 1);
+    vetoState.picks.push({ map: picked.name, picker, action: "pick" });
+    if (vetoState.picks.length >= vetoState.bestOf) {
+      vetoState.stage = "done";
+    } else {
+      vetoState.turn = vetoState.turn === "low" ? "high" : "low";
+    }
+  }
+
+  renderVetoPoolGrid();
+  renderVetoSelectionList();
+  renderVetoStatus();
+}
+
+function renderVetoSelectionList() {
+  const container = document.getElementById("vetoSelections");
+  if (!container) return;
+  container.innerHTML = "";
+}
+
+function hideVetoModal() {
+  const modal = document.getElementById("vetoModal");
+  const poolEl = document.getElementById("vetoMapPool");
+  if (modal) modal.style.display = "none";
+  if (poolEl) poolEl.removeEventListener("click", handleVetoPoolClick);
+  currentVetoMatchId = null;
+  vetoState = null;
+}
+
+function saveVetoSelection() {
+  if (!currentVetoMatchId || !vetoState) return;
+  if (vetoState.stage !== "done" && vetoState.picks.length < vetoState.bestOf) {
+    showToast?.("Finish picks before saving.", "warning");
+    return;
+  }
+  const trimmed = vetoState.picks.slice(0, vetoState.bestOf);
+  state.matchVetoes = state.matchVetoes || {};
+  state.matchVetoes[currentVetoMatchId] = {
+    maps: trimmed,
+    vetoed: vetoState.vetoed || [],
+    bestOf: vetoState.bestOf,
+    participants: {
+      lower: vetoState.lowerName,
+      higher: vetoState.higherName,
+    },
+  };
+  saveState({ matchVetoes: state.matchVetoes });
+  renderBracket();
+  hideVetoModal();
+}
+
+function renderVetoPoolGrid(poolOverride = null) {
+  const poolEl = document.getElementById("vetoMapPool");
+  const pool =
+    poolOverride ||
+    (currentTournamentMeta?.mapPool && currentTournamentMeta.mapPool.length
+      ? currentTournamentMeta.mapPool.map((name) => getMapByName(name) || { name, folder: "", file: "", mode: "1v1" })
+      : getDefaultMapPoolNames().map((name) => getMapByName(name) || { name, folder: "", file: "", mode: "1v1" }));
+  if (!poolEl) return;
+  const remainingNames = vetoState?.remaining?.map((m) => m.name) || [];
+  poolEl.innerHTML = pool
+    .map((map) => {
+      const isRemaining = remainingNames.includes(map.name);
+      const pickedIdx = vetoState?.picks?.findIndex((m) => m.map === map.name) ?? -1;
+      const vetoIdx = vetoState?.vetoed?.findIndex((m) => m.map === map.name) ?? -1;
+      const imgPath = map.folder ? `img/maps/${map.folder}/${map.file}` : "";
+      const stateClass = pickedIdx !== -1 ? "selected" : vetoIdx !== -1 ? "vetoed" : "";
+      const helper =
+        pickedIdx !== -1
+          ? `Pick ${pickedIdx + 1}`
+          : vetoIdx !== -1
+          ? `Veto`
+          : isRemaining
+          ? ""
+          : "Unavailable";
+      return `<div class="tournament-map-card ${stateClass}" data-map-name="${escapeHtml(map.name)}">
+        <div class="map-thumb"${imgPath ? ` style="background-image:url('${imgPath}')"` : ""}></div>
+        <div class="map-meta">
+          <div class="map-name">${escapeHtml(map.name)}</div>
+          <span class="map-mode">${escapeHtml(map.mode || "1v1")}</span>
+        </div>
+        <div class="helper">${helper}</div>
+      </div>`;
+    })
+    .join("");
+  renderVetoStatus();
+}
+
+function showVetoInfo(matchId) {
+  const data = state.matchVetoes?.[matchId];
+  if (!data || !data.maps?.length) {
+    showToast?.("No veto data for this match yet.", "info");
+    return;
+  }
+  const lines = data.maps.map((m, idx) => `${idx + 1}. ${m.map} (${m.picker || "Player"})`);
+  alert(`Picked maps (Bo${data.bestOf || data.maps.length}):\n${lines.join("\n")}`);
+}
+
+function applyBestOfToSettings(bestOf) {
+  const upperInput = document.getElementById("settingsBestOfUpper");
+  const lowerInput = document.getElementById("settingsBestOfLower");
+  const quarterInput = document.getElementById("settingsBestOfQuarter");
+  const semiInput = document.getElementById("settingsBestOfSemi");
+  const finalInput = document.getElementById("settingsBestOfFinal");
+  if (upperInput) upperInput.value = bestOf.upper ?? defaultBestOf.upper;
+  if (lowerInput) lowerInput.value = bestOf.lower ?? defaultBestOf.lower;
+  if (quarterInput) quarterInput.value = bestOf.quarter ?? defaultBestOf.quarter;
+  if (semiInput) semiInput.value = bestOf.semi ?? defaultBestOf.semi;
+  if (finalInput) finalInput.value = bestOf.final ?? defaultBestOf.final;
+}
+
+function renderVetoStatus() {
+  const status = document.getElementById("vetoBestOfLabel");
+  const turnLabel = document.getElementById("vetoMatchLabel");
+  if (!vetoState) {
+    if (status) status.textContent = "";
+    if (turnLabel) turnLabel.textContent = "";
+    return;
+  }
+  const { stage, turn, bestOf, lowerName, higherName, remaining } = vetoState;
+  const turnName = turn === "low" ? lowerName || "Lower seed" : higherName || "Higher seed";
+  if (status) status.textContent = `Best of ${bestOf}. ${remaining.length} maps remaining. Stage: ${stage}.`;
+  if (turnLabel) {
+    if (stage === "done") {
+      turnLabel.textContent = `Map order locked.`;
+    } else if (stage === "pick") {
+      turnLabel.textContent = `Pick phase - ${turnName} to pick`;
+    } else {
+      turnLabel.textContent = `Veto phase - ${turnName} to veto`;
+    }
+  }
+}
+
 function populateSettingsPanel(tournament) {
   if (!tournament) return;
   const nameInput = document.getElementById("settingsNameInput");
@@ -1730,6 +2045,12 @@ function populateSettingsPanel(tournament) {
   const formatSelect = document.getElementById("settingsFormatSelect");
   const maxInput = document.getElementById("settingsMaxPlayersInput");
   const startInput = document.getElementById("settingsStartInput");
+  const bestOf = tournament.bestOf || defaultBestOf;
+  const upperInput = document.getElementById("settingsBestOfUpper");
+  const lowerInput = document.getElementById("settingsBestOfLower");
+  const quarterInput = document.getElementById("settingsBestOfQuarter");
+  const semiInput = document.getElementById("settingsBestOfSemi");
+  const finalInput = document.getElementById("settingsBestOfFinal");
   if (nameInput) nameInput.value = tournament.name || "";
   if (slugInput) slugInput.value = tournament.slug || "";
   if (descInput) descInput.value = tournament.description || "";
@@ -1742,6 +2063,12 @@ function populateSettingsPanel(tournament) {
   setMapPoolSelection(tournament.mapPool?.length ? tournament.mapPool : getDefaultMapPoolNames());
   updateSettingsDescriptionPreview();
   updateSettingsRulesPreview();
+  if (upperInput) upperInput.value = bestOf.upper ?? defaultBestOf.upper;
+  if (lowerInput) lowerInput.value = bestOf.lower ?? defaultBestOf.lower;
+  if (quarterInput) quarterInput.value = bestOf.quarter ?? defaultBestOf.quarter;
+  if (semiInput) semiInput.value = bestOf.semi ?? defaultBestOf.semi;
+  if (finalInput) finalInput.value = bestOf.final ?? defaultBestOf.final;
+  applyBestOfToSettings(tournament.bestOf || defaultBestOf);
 }
 
 function renderMatchCard(match, lookup, playersById) {
@@ -1762,23 +2089,62 @@ function renderMatchCard(match, lookup, playersById) {
 
   const valA = displayValueFor(match, 0);
   const valB = displayValueFor(match, 1);
+  const canVeto = Boolean(pA && pB && match.status !== "complete");
+  const bestOf = getBestOfForMatch(match);
+  const vetoData = state.matchVetoes?.[match.id] || null;
+  const vetoSummary = vetoData?.maps?.length
+    ? `<div class="veto-summary">${vetoData.maps
+        .map((m, idx) => `<span class="pill">${idx + 1}. ${escapeHtml(m.map)} (${escapeHtml(m.picker || "Player")})</span>`)
+        .join("")}</div>`
+    : "";
+  const selectValA = getSelectValue(match, 0, bestOf);
+  const selectValB = getSelectValue(match, 1, bestOf);
+  const hasPlayers = Boolean(pA && pB);
 
   return `<div class="${cls.join(" ")}" data-match-id="${match.id}">
     <div class="match-meta">
       <span>${match.id}</span>
       <span>${statusTag}</span>
+      <div class="match-actions">
+        <span class="badge muted">Bo${bestOf}</span>
+        <button class="icon-btn info-btn" data-match-id="${match.id}" aria-label="View map picks">i</button>
+      </div>
     </div>
-    ${renderPlayerRow(pA, valA, "A")}
-    ${renderPlayerRow(pB, valB, "B")}
+    ${renderPlayerRow(pA, selectValA, "A", bestOf)}
+    ${renderPlayerRow(pB, selectValB, "B", bestOf)}
+    <div class="match-footer">
+      ${
+        canVeto
+          ? `<button class="cta small ghost veto-btn" data-match-id="${match.id}">Veto / pick maps</button>`
+          : match.status === "complete"
+          ? `<span class="helper">Match complete</span>`
+          : hasPlayers
+          ? `<span class="helper">In progress</span>`
+          : `<span class="helper">Waiting for players</span>`
+      }
+    </div>
+    ${vetoSummary}
   </div>`;
 }
 
 function displayValueFor(match, idx) {
   if (match.walkover === "a") {
-    return idx === 1 ? "W" : 0;
+    return idx === 0 ? "w/o" : match.scores?.[1] ?? 0;
   }
   if (match.walkover === "b") {
-    return idx === 0 ? "W" : 0;
+    return idx === 1 ? "w/o" : match.scores?.[0] ?? 0;
+  }
+  return match.scores?.[idx] ?? 0;
+}
+
+function getSelectValue(match, idx, bestOf = 3) {
+  if (!match) return 0;
+  const needed = Math.max(1, Math.ceil((bestOf || 1) / 2));
+  if (match.walkover === "a") {
+    return idx === 0 ? "W" : String(match.scores?.[1] ?? needed);
+  }
+  if (match.walkover === "b") {
+    return idx === 1 ? "W" : String(match.scores?.[0] ?? needed);
   }
   return match.scores?.[idx] ?? 0;
 }
@@ -1800,20 +2166,99 @@ function renderPlayerRow(player, score, label) {
         <div class="helper">${player.points || 0} pts • ${player.mmr || 0} MMR</div>
       </div>
     </div>
-    <select class="result-select" data-player="${label}">
-      ${renderScoreOptions(score)}
+    <select class="result-select" name="score-${label}" data-player="${label}">
+      ${renderScoreOptions(score, bestOf)}
     </select>
   </div>`;
 }
 
-function renderScoreOptions(current) {
-  const isWalkover = String(current) === "W";
-  const options = [0, 1, 2, 3, 4, 5].map(
-    (val) =>
-      `<option value="${val}" ${Number(current) === val ? "selected" : ""}>${val}</option>`
+function renderScoreOptions(current, bestOf = 3) {
+  const isWalkover = String(current).toUpperCase() === "W";
+  const maxWins = Math.max(1, Math.ceil((bestOf || 1) / 2));
+  const options = Array.from({ length: maxWins + 1 }).map(
+    (_, val) => `<option value="${val}" ${Number(current) === val ? "selected" : ""}>${val}</option>`
   );
-  options.push(`<option value="W" ${isWalkover ? "selected" : ""}>Walkover</option>`);
+  options.push(`<option value="W" ${isWalkover ? "selected" : ""}>w/o</option>`);
   return options.join("");
+}
+
+function clampScoreSelectOptions() {
+  if (!state?.bracket) return;
+  const lookup = getMatchLookup(state.bracket);
+  document.querySelectorAll(".score-select").forEach((sel) => {
+    const matchId = sel.dataset.matchId;
+    const match = lookup.get(matchId);
+    const bestOf = getBestOfForMatch(match || { bracket: "winners", round: 1 });
+    const maxWins = Math.max(1, Math.ceil((bestOf || 1) / 2));
+    const prev = sel.value;
+    sel.innerHTML = Array.from({ length: maxWins + 1 })
+      .map((_, val) => `<option value="${val}">${val}</option>`)
+      .join("")
+      .concat(`<option value="W">w/o</option>`);
+    const forIdx = Number(sel.dataset.playerIdx || "0");
+    const needed = maxWins;
+    if (match?.walkover === "a") {
+      sel.value = forIdx === 0 ? "W" : String(needed);
+    } else if (match?.walkover === "b") {
+      sel.value = forIdx === 1 ? "W" : String(needed);
+    } else if ([...sel.options].some((o) => o.value === prev)) {
+      sel.value = prev;
+    } else {
+      sel.value = "0";
+    }
+  });
+}
+
+function annotateConnectorPlayers(lookup, playersById) {
+  const map = lookup || getMatchLookup(state.bracket);
+  const pMap = playersById || getPlayersMap();
+
+  const participantIds = (match) => {
+    if (!match || match.walkover === "bye") return new Set();
+    const [a, b] = resolveParticipants(match, map, pMap);
+    const ids = [a?.id, b?.id, match.winnerId, match.loserId].filter(Boolean);
+    return new Set(ids);
+  };
+
+  document.querySelectorAll(".connector").forEach((el) => {
+    const fromId = el.dataset.from;
+    const toId = el.dataset.to;
+    const parentIds = (el.dataset.parents || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const toMatch = toId ? map.get(toId) : null;
+    if (!toMatch) {
+      el.dataset.players = "";
+      return;
+    }
+
+    const toSet = participantIds(toMatch);
+    let fromUnion = new Set();
+
+    if (fromId) {
+      const fromMatch = map.get(fromId);
+      if (fromMatch) fromUnion = participantIds(fromMatch);
+    } else if (parentIds.length) {
+      parentIds.forEach((pid) => {
+        const m = map.get(pid);
+        participantIds(m).forEach((id) => fromUnion.add(id));
+      });
+    }
+
+    let shared = Array.from(fromUnion).filter((id) => toSet.has(id));
+    if (!shared.length && toMatch.walkover !== "bye" && toMatch.winnerId && fromUnion.has(toMatch.winnerId)) {
+      shared = [toMatch.winnerId];
+    }
+    if (!shared.length && fromUnion.size === 1) {
+      shared = Array.from(fromUnion);
+    }
+    if (!shared.length && toSet.size === 1) {
+      shared = Array.from(toSet);
+    }
+    el.dataset.players = shared.join(",");
+  });
 }
 
 function renderActivity() {
@@ -1918,6 +2363,27 @@ function saveState(next, options = {}) {
   if (!options.skipRemote) {
     persistTournamentStateRemote(state);
   }
+}
+
+function attachMatchActionHandlers() {
+  document.querySelectorAll(".veto-btn").forEach((btn) => {
+    btn.addEventListener("click", () => openVetoModal(btn.dataset.matchId));
+  });
+  document.querySelectorAll(".info-btn").forEach((btn) => {
+    btn.addEventListener("click", () => showVetoInfo(btn.dataset.matchId));
+  });
+}
+
+function getBestOfForMatch(match) {
+  const bestOf = currentTournamentMeta?.bestOf || defaultBestOf;
+  const winnersRounds = state.bracket?.winners?.length || 0;
+  if (match.bracket === "winners") {
+    if (match.round === winnersRounds) return bestOf.final || defaultBestOf.final;
+    if (match.round === winnersRounds - 1) return bestOf.semi || defaultBestOf.semi;
+    if (match.round === winnersRounds - 2) return bestOf.quarter || defaultBestOf.quarter;
+    return bestOf.upper || defaultBestOf.upper;
+  }
+  return bestOf.lower || defaultBestOf.lower;
 }
 
 function loadState() {
@@ -2057,7 +2523,7 @@ function layoutUpperBracket(bracket, lookup, playersById) {
     return `<div class="placeholder">Add players to generate the bracket.</div>`;
   }
 
-  const CARD_HEIGHT = 96;
+  const CARD_HEIGHT = 140;
   const CARD_WIDTH = 240;
   const V_GAP = 28;
   const H_GAP = 140;
@@ -2103,15 +2569,45 @@ function layoutUpperBracket(bracket, lookup, playersById) {
         const srcs = match.sources
           .map((src) => (src?.type === "match" ? positions.get(src.matchId) : null))
           .filter(Boolean);
+        const parentIds = (match.sources || [])
+          .map((s) => (s?.type === "match" ? s.matchId : null))
+          .filter(Boolean);
         if (srcs.length === 2 && matchCards.some((m) => m.includes(`data-match-id="${match.id}"`))) {
           const midY1 = srcs[0].y + CARD_HEIGHT / 2;
           const midY2 = srcs[1].y + CARD_HEIGHT / 2;
           const childMidY = pos.y + CARD_HEIGHT / 2;
           const junctionX = pos.x - 30;
-          connectors.push(makeConnector(srcs[0].x + CARD_WIDTH, midY1, junctionX, midY1));
-          connectors.push(makeConnector(srcs[1].x + CARD_WIDTH, midY2, junctionX, midY2));
-          connectors.push(makeVConnector(junctionX, midY1, midY2));
-          connectors.push(makeConnector(junctionX, childMidY, pos.x, childMidY));
+          connectors.push(
+            makeConnector(srcs[0].x + CARD_WIDTH, midY1, junctionX, midY1, {
+              from: parentIds[0],
+              to: match.id,
+            })
+          );
+          connectors.push(
+            makeConnector(srcs[1].x + CARD_WIDTH, midY2, junctionX, midY2, {
+              from: parentIds[1],
+              to: match.id,
+            })
+          );
+          connectors.push(
+            makeVConnector(junctionX, midY1, childMidY, {
+              from: parentIds[0],
+              to: match.id,
+            })
+          );
+          connectors.push(
+            makeVConnector(junctionX, midY2, childMidY, {
+              from: parentIds[1],
+              to: match.id,
+            })
+          );
+          connectors.push(
+            makeConnector(junctionX, childMidY, pos.x, childMidY, {
+              from: match.id,
+              to: match.id,
+              parents: parentIds.join(","),
+            })
+          );
         }
       }
     });
@@ -2133,14 +2629,24 @@ function layoutUpperBracket(bracket, lookup, playersById) {
   </div>`;
 }
 
-function makeConnector(x1, y1, x2, y2) {
-  return `<div class="connector h" style="left:${Math.min(x1, x2)}px; top:${y1}px; width:${Math.abs(
+function formatConnectorMeta(meta = {}) {
+  const attrs = [];
+  if (meta.from) attrs.push(`data-from="${meta.from}"`);
+  if (meta.to) attrs.push(`data-to="${meta.to}"`);
+  if (meta.parents) attrs.push(`data-parents="${meta.parents}"`);
+  return attrs.join(" ");
+}
+
+function makeConnector(x1, y1, x2, y2, meta = {}) {
+  const attr = formatConnectorMeta(meta);
+  return `<div class="connector h" ${attr} style="left:${Math.min(x1, x2)}px; top:${y1}px; width:${Math.abs(
     x2 - x1
   )}px;"></div>`;
 }
 
-function makeVConnector(x, y1, y2) {
-  return `<div class="connector v" style="left:${x}px; top:${Math.min(y1, y2)}px; height:${Math.abs(
+function makeVConnector(x, y1, y2, meta = {}) {
+  const attr = formatConnectorMeta(meta);
+  return `<div class="connector v" ${attr} style="left:${x}px; top:${Math.min(y1, y2)}px; height:${Math.abs(
     y2 - y1
   )}px;"></div>`;
 }
@@ -2150,7 +2656,7 @@ function layoutBracketSection(rounds, titlePrefix, lookup, playersById, offsetX,
     return { html: "", height: 0 };
   }
 
-  const CARD_HEIGHT = 96;
+  const CARD_HEIGHT = 140;
   const CARD_WIDTH = 240;
   const V_GAP = 28;
   const H_GAP = 140;
@@ -2231,6 +2737,9 @@ function layoutBracketSection(rounds, titlePrefix, lookup, playersById, offsetX,
             return { pos: p, rendered: renderedMatches.has(src.matchId) };
           })
           .filter(Boolean);
+        const parentIds = (match.sources || [])
+          .map((s) => (s?.type === "match" ? s.matchId : null))
+          .filter(Boolean);
         const renderedParents = parentInfos.filter((p) => p.rendered);
 
         if (renderedMatches.has(match.id)) {
@@ -2240,21 +2749,42 @@ function layoutBracketSection(rounds, titlePrefix, lookup, playersById, offsetX,
             const childMidY = pos.y + CARD_HEIGHT / 2;
             const junctionX = pos.x - 30;
             connectors.push(
-              makeConnector(renderedParents[0].pos.x + CARD_WIDTH, midY1, junctionX, midY1)
+              makeConnector(renderedParents[0].pos.x + CARD_WIDTH, midY1, junctionX, midY1, {
+                from: parentIds[0],
+                to: match.id,
+              })
             );
             connectors.push(
-              makeConnector(renderedParents[1].pos.x + CARD_WIDTH, midY2, junctionX, midY2)
+              makeConnector(renderedParents[1].pos.x + CARD_WIDTH, midY2, junctionX, midY2, {
+                from: parentIds[1],
+                to: match.id,
+              })
             );
-            connectors.push(makeVConnector(junctionX, midY1, midY2));
-            connectors.push(makeConnector(junctionX, childMidY, pos.x, childMidY));
+            connectors.push(makeVConnector(junctionX, midY1, childMidY, { from: parentIds[0], to: match.id }));
+            connectors.push(makeVConnector(junctionX, midY2, childMidY, { from: parentIds[1], to: match.id }));
+            connectors.push(
+              makeConnector(junctionX, childMidY, pos.x, childMidY, {
+                from: match.id,
+                to: match.id,
+                parents: parentIds.join(","),
+              })
+            );
           } else if (renderedParents.length === 1) {
             const midY = renderedParents[0].pos.y + CARD_HEIGHT / 2;
             const childMidY = pos.y + CARD_HEIGHT / 2;
             const junctionX = pos.x - 30;
             const parentEndX = renderedParents[0].pos.x + CARD_WIDTH;
-            connectors.push(makeConnector(parentEndX, midY, junctionX, midY));
-            connectors.push(makeVConnector(junctionX, midY, childMidY));
-            connectors.push(makeConnector(junctionX, childMidY, pos.x, childMidY));
+            connectors.push(
+              makeConnector(parentEndX, midY, junctionX, midY, { from: parentIds[0], to: match.id })
+            );
+            connectors.push(makeVConnector(junctionX, midY, childMidY, { from: parentIds[0], to: match.id }));
+            connectors.push(
+              makeConnector(junctionX, childMidY, pos.x, childMidY, {
+                from: match.id,
+                to: match.id,
+                parents: parentIds.join(","),
+              })
+            );
           }
         }
       }
@@ -2287,29 +2817,55 @@ function renderSimpleMatch(match, pA, pB, x, y, h, w, prefix = "") {
   const raceClassA = raceClassName(pA?.race);
   const raceClassB = raceClassName(pB?.race);
   const showScores = !!(pA && pB);
-  const scoreOptions = Array.from({ length: 6 }).map(
-    (_, v) => `<option value="${v}" ${match.scores?.[0] === v ? "selected" : ""}>${v}</option>`
-  );
-  const scoreOptionsB = Array.from({ length: 6 }).map(
-    (_, v) => `<option value="${v}" ${match.scores?.[1] === v ? "selected" : ""}>${v}</option>`
-  );
+  const bestOf = getBestOfForMatch(match);
+  const selectValA = getSelectValue(match, 0, bestOf);
+  const selectValB = getSelectValue(match, 1, bestOf);
+  const canVeto = Boolean(pA && pB && match.status !== "complete");
+  const vetoData = state.matchVetoes?.[match.id] || null;
+  const summary =
+    vetoData?.maps?.length && showScores
+      ? `<div class="veto-summary">${vetoData.maps
+          .map((m, idx) => `<span class="pill">${idx + 1}. ${escapeHtml(m.map)} (${escapeHtml(m.picker || "Player")})</span>`)
+          .join("")}</div>`
+      : "";
+  const hasPlayers = Boolean(pA && pB);
+
   return `<div class="match-card tree" data-match-id="${match.id}" style="top:${y}px; left:${x}px; width:${w}px; height:${h}px;">
-    <div class="row" data-player-id="${pA?.id || ""}">
+    <div class="match-meta">
+      <span>${prefix}${match.id}</span>
+      <div class="match-actions">
+        <span class="badge muted">Bo${bestOf}</span>
+        <button class="icon-btn info-btn" data-match-id="${match.id}" aria-label="View map picks">i</button>
+      </div>
+    </div>
+    <div class="row ${match.winnerId === pA?.id ? "winner" : ""}" data-player-id="${pA?.id || ""}">
       <span class="name"><span class="race-strip ${raceClassA}"></span><span class="name-text">${escapeHtml(aName)}</span></span>
-      <select class="score-select" data-match-id="${match.id}" data-player-idx="0" ${
+      <select class="score-select ${match.winnerId === pA?.id ? "winner" : ""}" name="score-${match.id}-A" data-match-id="${match.id}" data-player-idx="0" ${
     showScores ? "" : 'style="display:none;"'
   }>
-        ${scoreOptions.join("")}
+        ${renderScoreOptions(selectValA, bestOf)}
       </select>
     </div>
-    <div class="row" data-player-id="${pB?.id || ""}">
+    <div class="row ${match.winnerId === pB?.id ? "winner" : ""}" data-player-id="${pB?.id || ""}">
       <span class="name"><span class="race-strip ${raceClassB}"></span><span class="name-text">${escapeHtml(bName)}</span></span>
-      <select class="score-select" data-match-id="${match.id}" data-player-idx="1" ${
+      <select class="score-select ${match.winnerId === pB?.id ? "winner" : ""}" name="score-${match.id}-B" data-match-id="${match.id}" data-player-idx="1" ${
     showScores ? "" : 'style="display:none;"'
   }>
-        ${scoreOptionsB.join("")}
+        ${renderScoreOptions(selectValB, bestOf)}
       </select>
     </div>
+    <div class="match-footer">
+      ${
+        canVeto
+          ? `<button class="cta small ghost veto-btn" data-match-id="${match.id}">Veto / pick maps</button>`
+          : match.status === "complete"
+          ? `<span class="helper">Match complete</span>`
+          : hasPlayers
+          ? `<span class="helper">In progress</span>`
+          : `<span class="helper">Waiting for players</span>`
+      }
+    </div>
+    ${summary}
   </div>`;
 }
 
@@ -2331,16 +2887,16 @@ function attachMatchHoverHandlers() {
     if (!target) return;
     const pid = target.dataset.playerId;
     if (!pid) return;
-    document.querySelectorAll(`.row[data-player-id]`).forEach((row) => {
-      if (row.dataset.playerId === pid) row.classList.add("highlight-player");
+
+    document.querySelectorAll(".connector").forEach((c) => {
+      const players = (c.dataset.players || "").split(",").filter(Boolean);
+      if (players.includes(pid)) c.classList.add("highlight");
     });
   });
 
   grid.addEventListener("mouseout", (e) => {
     if (e.target.closest(".row[data-player-id]")) {
-      document
-        .querySelectorAll(".row[data-player-id].highlight-player")
-        .forEach((row) => row.classList.remove("highlight-player"));
+      document.querySelectorAll(".connector.highlight").forEach((c) => c.classList.remove("highlight"));
     }
   });
 }
