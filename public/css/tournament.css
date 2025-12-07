@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap");
 
 :root {
   --bg: #080a12;
@@ -23,10 +23,22 @@
 
 body.tournament-body {
   margin: 0;
-  font-family: 'Space Grotesk', 'Inter', system-ui, -apple-system, sans-serif;
-  background: radial-gradient(circle at 20% 20%, rgba(78, 213, 255, 0.08), transparent 30%),
-    radial-gradient(circle at 80% 10%, rgba(245, 197, 66, 0.08), transparent 25%),
-    radial-gradient(circle at 50% 70%, rgba(78, 213, 255, 0.07), transparent 30%),
+  font-family: "Space Grotesk", "Inter", system-ui, -apple-system, sans-serif;
+  background: radial-gradient(
+      circle at 20% 20%,
+      rgba(78, 213, 255, 0.08),
+      transparent 30%
+    ),
+    radial-gradient(
+      circle at 80% 10%,
+      rgba(245, 197, 66, 0.08),
+      transparent 25%
+    ),
+    radial-gradient(
+      circle at 50% 70%,
+      rgba(78, 213, 255, 0.07),
+      transparent 30%
+    ),
     #080a12;
   color: var(--text);
   min-height: 100vh;
@@ -44,8 +56,13 @@ a {
   padding: 24px;
   border: 1px solid var(--stroke);
   border-radius: 20px;
-  background: linear-gradient(135deg, rgba(78, 213, 255, 0.08), rgba(15, 20, 33, 0.9));
-  box-shadow: 0 12px 60px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.03);
+  background: linear-gradient(
+    135deg,
+    rgba(78, 213, 255, 0.08),
+    rgba(15, 20, 33, 0.9)
+  );
+  box-shadow: 0 12px 60px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(255, 255, 255, 0.03);
   margin-bottom: 26px;
 }
 
@@ -128,13 +145,18 @@ a {
 }
 
 .stat-card.accent {
-  background: linear-gradient(135deg, rgba(245, 197, 66, 0.15), rgba(17, 24, 43, 0.95));
+  background: linear-gradient(
+    135deg,
+    rgba(245, 197, 66, 0.15),
+    rgba(17, 24, 43, 0.95)
+  );
   border: 1px solid rgba(245, 197, 66, 0.5);
 }
 
 .tournament-list .tournament-card {
   cursor: pointer;
-  transition: border-color 120ms ease, box-shadow 140ms ease, transform 120ms ease;
+  transition: border-color 120ms ease, box-shadow 140ms ease,
+    transform 120ms ease;
 }
 
 .list-tabs {
@@ -173,7 +195,8 @@ a {
   padding: 10px 14px;
   cursor: pointer;
   font-weight: 600;
-  transition: transform 120ms ease, box-shadow 160ms ease, border-color 160ms ease;
+  transition: transform 120ms ease, box-shadow 160ms ease,
+    border-color 160ms ease;
 }
 
 .cta.primary {
@@ -235,7 +258,11 @@ a {
 }
 
 .tab-btn.active {
-  background: linear-gradient(135deg, rgba(78, 213, 255, 0.12), rgba(78, 213, 255, 0.04));
+  background: linear-gradient(
+    135deg,
+    rgba(78, 213, 255, 0.12),
+    rgba(78, 213, 255, 0.04)
+  );
   color: var(--text);
   border-color: rgba(78, 213, 255, 0.35);
   box-shadow: 0 6px 18px rgba(78, 213, 255, 0.15);
@@ -296,7 +323,7 @@ a {
 }
 
 .live-dot::before {
-  content: '';
+  content: "";
   width: 10px;
   height: 10px;
   border-radius: 50%;
@@ -417,7 +444,7 @@ a {
 .round-row {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(190px, 1fr);
+  grid-auto-columns: minmax(170px, 1fr);
   gap: 12px;
   align-items: start;
   position: relative;
@@ -428,7 +455,11 @@ a {
 .round-column {
   border: 1px solid var(--stroke);
   border-radius: 12px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.01));
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.02),
+    rgba(255, 255, 255, 0.01)
+  );
   padding: 8px;
   min-height: 80px;
   position: relative;
@@ -460,21 +491,6 @@ a {
 }
 
 .round-column.placeholder * {
-  display: none;
-}
-
-.match-card::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  right: -28px;
-  width: 34px;
-  border-top: 2px solid rgba(255, 255, 255, 0.2);
-  transform: translateY(-50%);
-  opacity: 0.65;
-}
-
-.round-column:last-child .match-card::after {
   display: none;
 }
 
@@ -578,35 +594,56 @@ a {
 
 .tree-bracket {
   position: relative;
-  min-height: 400px;
+  min-height: 200px;
+  --card-width: 140px;
 }
 
 .tree-bracket .row-title {
   position: absolute;
-  top: -26px;
-  width: var(--card-width, 240px);
+  top: -22px;
+  width: var(--card-width, 200px);
   text-align: left;
   color: var(--muted);
   font-weight: 600;
 }
 
+.round-title .round-bo {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  padding: 2px 6px;
+  border: 1px solid var(--stroke);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 11px;
+  color: var(--muted);
+}
+
 .match-card.tree {
   position: absolute;
-  border-radius: 10px;
+  border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
   background: var(--panel);
+  padding: 6px 8px;
   overflow: visible;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  row-gap: 4px;
+  align-items: center;
 }
 
 .match-card.tree .row {
-  padding: 8px 10px;
+  padding: 0;
   display: grid;
-  grid-template-columns: 1fr 70px;
+  grid-template-columns: 1fr auto;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  font-size: 13px;
+  grid-column: 2;
 }
 
 .match-card.tree .row.winner .name-text {
@@ -617,10 +654,44 @@ a {
 .match-card.tree .score,
 .match-card.tree .score-select {
   justify-self: end;
-  width: 70px;
+  min-width: 44px;
+  width: 48px;
+  padding: 3px;
   background: rgba(255, 255, 255, 0.08);
   color: var(--text);
   border: 1px solid var(--stroke);
+  border-radius: 0;
+}
+
+.match-card.tree .row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.match-card.tree .match-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  grid-row: 1 / span 2;
+  grid-column: 1;
+  min-width: 28px;
+  height: 100%;
+  padding: 2px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--stroke);
+  background: rgba(255, 255, 255, 0.05);
+  font-weight: 700;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.match-card.tree .match-info-col {
+  grid-row: 1 / span 2;
+  grid-column: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .result-select,
@@ -643,18 +714,9 @@ a {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 10px 4px 10px;
-  font-size: 12px;
+  padding: 4px 8px 2px 8px;
+  font-size: 11px;
   color: var(--muted);
-}
-
-.match-footer {
-  padding: 8px 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
 }
 
 .match-actions {
@@ -664,16 +726,16 @@ a {
 }
 
 .veto-summary {
-  padding: 6px 10px;
+  padding: 4px 8px;
   display: flex;
-  gap: 6px;
+  gap: 4px;
   flex-wrap: wrap;
 }
 
 .match-card.tree .name {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .row.highlight-player .name-text {
@@ -1055,7 +1117,11 @@ a {
 
 .toolbar-btn {
   border: 1px solid var(--stroke);
-  background: linear-gradient(135deg, rgba(78, 213, 255, 0.12), rgba(78, 213, 255, 0.04));
+  background: linear-gradient(
+    135deg,
+    rgba(78, 213, 255, 0.12),
+    rgba(78, 213, 255, 0.04)
+  );
   color: var(--text);
   padding: 6px 12px;
   border-radius: 10px;
@@ -1080,7 +1146,7 @@ a {
   background: var(--panel-2);
   color: var(--text);
   padding: 10px;
-  font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+  font-family: "Space Grotesk", "Inter", system-ui, sans-serif;
   resize: vertical;
 }
 
@@ -1398,4 +1464,3 @@ label {
 .settings-panel.active {
   display: flex;
 }
-

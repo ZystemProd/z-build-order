@@ -1733,7 +1733,7 @@ function renderBracket() {
 
   const lowerRounds = state.bracket.losers || [];
   const lower = lowerRounds.length
-    ? layoutBracketSection(lowerRounds, "Lower", lookup, playersById, 0, upper.height + 10)
+    ? layoutBracketSection(lowerRounds, "Lower", lookup, playersById, 0, 0)
     : { html: "", height: 0 };
 
   grid.innerHTML = `<div class="tree-wrapper">
@@ -2523,10 +2523,10 @@ function layoutUpperBracket(bracket, lookup, playersById) {
     return `<div class="placeholder">Add players to generate the bracket.</div>`;
   }
 
-  const CARD_HEIGHT = 140;
+  const CARD_HEIGHT = 90;
   const CARD_WIDTH = 240;
-  const V_GAP = 28;
-  const H_GAP = 140;
+  const V_GAP = 8;
+  const H_GAP = 90;
 
   const positions = new Map(); // matchId -> {x,y}
 
@@ -2614,15 +2614,16 @@ function layoutUpperBracket(bracket, lookup, playersById) {
   });
 
   const titles = winners
-    .map(
-      (round, idx) =>
-        `<div class="round-title row-title" style="left:${idx * (CARD_WIDTH + H_GAP)}px;">${
-          round.name || `Round ${idx + 1}`
-        }</div>`
-    )
+    .map((round, idx) => {
+      const bestOfLabel = round?.length ? getBestOfForMatch(round[0]) : null;
+      const boBadge = bestOfLabel ? `<span class="round-bo">Bo${bestOfLabel}</span>` : "";
+      return `<div class="round-title row-title" style="left:${idx * (CARD_WIDTH + H_GAP)}px;">${
+        round.name || `Round ${idx + 1}`
+      } ${boBadge}</div>`;
+    })
     .join("");
 
-  return `<div class="tree-bracket" style="height:${maxY + CARD_HEIGHT}px">
+  return `<div class="tree-bracket" style="height:${maxY + 20}px">
     ${titles}
     ${matchCards.join("")}
     ${connectors.join("")}
@@ -2656,10 +2657,10 @@ function layoutBracketSection(rounds, titlePrefix, lookup, playersById, offsetX,
     return { html: "", height: 0 };
   }
 
-  const CARD_HEIGHT = 140;
+  const CARD_HEIGHT = 90;
   const CARD_WIDTH = 240;
-  const V_GAP = 28;
-  const H_GAP = 140;
+  const V_GAP = 8;
+  const H_GAP = 90;
 
   const positions = new Map();
   let maxY = 0;
@@ -2792,16 +2793,17 @@ function layoutBracketSection(rounds, titlePrefix, lookup, playersById, offsetX,
   });
 
   const titles = rounds
-    .map(
-      (round, idx) =>
-        `<div class="round-title row-title" style="left:${
-          offsetX + idx * (CARD_WIDTH + H_GAP)
-        }px;">${round.name || `${titlePrefix} Round ${idx + 1}`}</div>`
-    )
+    .map((round, idx) => {
+      const bestOfLabel = round?.length ? getBestOfForMatch(round[0]) : null;
+      const boBadge = bestOfLabel ? `<span class="round-bo">Bo${bestOfLabel}</span>` : "";
+      return `<div class="round-title row-title" style="left:${
+        offsetX + idx * (CARD_WIDTH + H_GAP)
+      }px;">${round.name || `${titlePrefix} Round ${idx + 1}`} ${boBadge}</div>`;
+    })
     .join("");
 
-  const html = `<div class="tree-bracket" style="height:${maxY + 40}px; margin-top:${
-    titlePrefix === "Lower" ? 40 : 0
+  const html = `<div class="tree-bracket" style="height:${maxY + 20}px; margin-top:${
+    titlePrefix === "Lower" ? 16 : 0
   }px;">
     ${titles}
     ${matchCards.join("")}
@@ -2829,44 +2831,46 @@ function renderSimpleMatch(match, pA, pB, x, y, h, w, prefix = "") {
           .join("")}</div>`
       : "";
   const hasPlayers = Boolean(pA && pB);
+  const matchNumber = parseMatchNumber(match.id);
+
+  const matchNumberLabel =
+    matchNumber !== null ? matchNumber : escapeHtml(prefix ? `${prefix}${match.id}` : match.id);
 
   return `<div class="match-card tree" data-match-id="${match.id}" style="top:${y}px; left:${x}px; width:${w}px; height:${h}px;">
-    <div class="match-meta">
-      <span>${prefix}${match.id}</span>
-      <div class="match-actions">
-        <span class="badge muted">Bo${bestOf}</span>
-        <button class="icon-btn info-btn" data-match-id="${match.id}" aria-label="View map picks">i</button>
-      </div>
-    </div>
+    <span class="match-number">${matchNumberLabel}</span>
     <div class="row ${match.winnerId === pA?.id ? "winner" : ""}" data-player-id="${pA?.id || ""}">
       <span class="name"><span class="race-strip ${raceClassA}"></span><span class="name-text">${escapeHtml(aName)}</span></span>
-      <select class="score-select ${match.winnerId === pA?.id ? "winner" : ""}" name="score-${match.id}-A" data-match-id="${match.id}" data-player-idx="0" ${
+      <div class="row-actions">
+        <select class="score-select ${match.winnerId === pA?.id ? "winner" : ""}" name="score-${match.id}-A" data-match-id="${match.id}" data-player-idx="0" ${
     showScores ? "" : 'style="display:none;"'
   }>
-        ${renderScoreOptions(selectValA, bestOf)}
-      </select>
+          ${renderScoreOptions(selectValA, bestOf)}
+        </select>
+      </div>
     </div>
     <div class="row ${match.winnerId === pB?.id ? "winner" : ""}" data-player-id="${pB?.id || ""}">
       <span class="name"><span class="race-strip ${raceClassB}"></span><span class="name-text">${escapeHtml(bName)}</span></span>
-      <select class="score-select ${match.winnerId === pB?.id ? "winner" : ""}" name="score-${match.id}-B" data-match-id="${match.id}" data-player-idx="1" ${
+      <div class="row-actions">
+        <select class="score-select ${match.winnerId === pB?.id ? "winner" : ""}" name="score-${match.id}-B" data-match-id="${match.id}" data-player-idx="1" ${
     showScores ? "" : 'style="display:none;"'
   }>
-        ${renderScoreOptions(selectValB, bestOf)}
-      </select>
+          ${renderScoreOptions(selectValB, bestOf)}
+        </select>
+      </div>
     </div>
-    <div class="match-footer">
-      ${
-        canVeto
-          ? `<button class="cta small ghost veto-btn" data-match-id="${match.id}">Veto / pick maps</button>`
-          : match.status === "complete"
-          ? `<span class="helper">Match complete</span>`
-          : hasPlayers
-          ? `<span class="helper">In progress</span>`
-          : `<span class="helper">Waiting for players</span>`
-      }
+    <div class="match-info-col">
+      <button class="icon-btn info-btn" data-match-id="${match.id}" aria-label="View map picks">i</button>
     </div>
     ${summary}
   </div>`;
+}
+
+function parseMatchNumber(id) {
+  if (!id) return null;
+  const matchPart = id.match(/M(\d+)/i);
+  if (matchPart && matchPart[1]) return Number(matchPart[1]);
+  const trailingDigits = id.match(/(\d+)/);
+  return trailingDigits && trailingDigits[1] ? Number(trailingDigits[1]) : null;
 }
 
 function raceClassName(race) {
