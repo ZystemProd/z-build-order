@@ -1,4 +1,10 @@
-import { auth, db, getCurrentUsername, getPulseState, initializeAuthUI } from "../../app.js";
+import {
+  auth,
+  db,
+  getCurrentUsername,
+  getPulseState,
+  initializeAuthUI,
+} from "../../app.js";
 import { showToast } from "./toastHandler.js";
 import {
   collection,
@@ -17,15 +23,60 @@ const TOURNAMENT_STATE_COLLECTION = "tournamentStates";
 const MAPS_JSON_URL = "/data/maps.json";
 // Fallback if map json fails
 const FALLBACK_LADDER_MAPS = [
-  { name: "10,000 Feet", file: "10000_feet.webp", folder: "current/1v1", mode: "1v1" },
-  { name: "Celestial Enclave", file: "celestial_enclave.webp", folder: "current/1v1", mode: "1v1" },
-  { name: "Mothership", file: "mothership.webp", folder: "current/1v1", mode: "1v1" },
-  { name: "Old Republic", file: "old_republic.webp", folder: "current/1v1", mode: "1v1" },
-  { name: "Ruby Rock", file: "ruby_rock.webp", folder: "current/1v1", mode: "1v1" },
-  { name: "Taito Citadel", file: "taito_citadel.webp", folder: "current/1v1", mode: "1v1" },
-  { name: "Tourmaline", file: "tourmaline.webp", folder: "current/1v1", mode: "1v1" },
-  { name: "White Rabbit", file: "white_rabbit.webp", folder: "current/1v1", mode: "1v1" },
-  { name: "Winter Madness", file: "winter_madness.webp", folder: "current/1v1", mode: "1v1" },
+  {
+    name: "10,000 Feet",
+    file: "10000_feet.webp",
+    folder: "current/1v1",
+    mode: "1v1",
+  },
+  {
+    name: "Celestial Enclave",
+    file: "celestial_enclave.webp",
+    folder: "current/1v1",
+    mode: "1v1",
+  },
+  {
+    name: "Mothership",
+    file: "mothership.webp",
+    folder: "current/1v1",
+    mode: "1v1",
+  },
+  {
+    name: "Old Republic",
+    file: "old_republic.webp",
+    folder: "current/1v1",
+    mode: "1v1",
+  },
+  {
+    name: "Ruby Rock",
+    file: "ruby_rock.webp",
+    folder: "current/1v1",
+    mode: "1v1",
+  },
+  {
+    name: "Taito Citadel",
+    file: "taito_citadel.webp",
+    folder: "current/1v1",
+    mode: "1v1",
+  },
+  {
+    name: "Tourmaline",
+    file: "tourmaline.webp",
+    folder: "current/1v1",
+    mode: "1v1",
+  },
+  {
+    name: "White Rabbit",
+    file: "white_rabbit.webp",
+    folder: "current/1v1",
+    mode: "1v1",
+  },
+  {
+    name: "Winter Madness",
+    file: "winter_madness.webp",
+    folder: "current/1v1",
+    mode: "1v1",
+  },
 ];
 
 const defaultState = {
@@ -123,11 +174,15 @@ function bindUI() {
   const openRegisterBtn = document.getElementById("openRegisterBtn");
   const openCreateTournament = document.getElementById("openCreateTournament");
   const createModal = document.getElementById("createTournamentModal");
-  const closeCreateTournament = document.getElementById("closeCreateTournament");
+  const closeCreateTournament = document.getElementById(
+    "closeCreateTournament"
+  );
   const saveTournamentBtn = document.getElementById("saveTournamentBtn");
   const refreshTournaments = document.getElementById("refreshTournaments");
   const generateSlugBtn = document.getElementById("generateSlugBtn");
-  const descriptionInput = document.getElementById("tournamentDescriptionInput");
+  const descriptionInput = document.getElementById(
+    "tournamentDescriptionInput"
+  );
   const descToolbarBtns = document.querySelectorAll("[data-desc-action]");
   const rulesInput = document.getElementById("tournamentRulesInput");
   const rulesToolbarBtns = document.querySelectorAll("[data-rules-action]");
@@ -135,15 +190,29 @@ function bindUI() {
   const useLadderMapsBtn = document.getElementById("useLadderMapsBtn");
   const clearMapPoolBtn = document.getElementById("clearMapPoolBtn");
   const settingsTabBtns = document.querySelectorAll("[data-settings-tab]");
-  const settingsPanels = document.querySelectorAll("#settingsTab .settings-panel");
+  const settingsPanels = document.querySelectorAll(
+    "#settingsTab .settings-panel"
+  );
   const createTabBtns = document.querySelectorAll("[data-create-tab]");
-  const createPanels = document.querySelectorAll("#createTournamentModal .settings-panel");
-  const settingsUseLadderMapsBtn = document.getElementById("settingsUseLadderMapsBtn");
-  const settingsClearMapPoolBtn = document.getElementById("settingsClearMapPoolBtn");
-  const settingsMapPoolPicker = document.getElementById("settingsMapPoolPicker");
+  const createPanels = document.querySelectorAll(
+    "#createTournamentModal .settings-panel"
+  );
+  const settingsUseLadderMapsBtn = document.getElementById(
+    "settingsUseLadderMapsBtn"
+  );
+  const settingsClearMapPoolBtn = document.getElementById(
+    "settingsClearMapPoolBtn"
+  );
+  const settingsMapPoolPicker = document.getElementById(
+    "settingsMapPoolPicker"
+  );
   const saveSettingsBtn = document.getElementById("saveSettingsBtn");
-  const settingsDescToolbarBtns = document.querySelectorAll("[data-settings-desc-action]");
-  const settingsRulesToolbarBtns = document.querySelectorAll("[data-settings-rules-action]");
+  const settingsDescToolbarBtns = document.querySelectorAll(
+    "[data-settings-desc-action]"
+  );
+  const settingsRulesToolbarBtns = document.querySelectorAll(
+    "[data-settings-rules-action]"
+  );
   const slugInput = document.getElementById("tournamentSlugInput");
   const bestOfUpperInput = document.getElementById("bestOfUpperInput");
   const bestOfLowerInput = document.getElementById("bestOfLowerInput");
@@ -152,7 +221,9 @@ function bindUI() {
   const bestOfFinalInput = document.getElementById("bestOfFinalInput");
   const settingsBestOfUpper = document.getElementById("settingsBestOfUpper");
   const settingsBestOfLower = document.getElementById("settingsBestOfLower");
-  const settingsBestOfQuarter = document.getElementById("settingsBestOfQuarter");
+  const settingsBestOfQuarter = document.getElementById(
+    "settingsBestOfQuarter"
+  );
   const settingsBestOfSemi = document.getElementById("settingsBestOfSemi");
   const settingsBestOfFinal = document.getElementById("settingsBestOfFinal");
   const vetoModal = document.getElementById("vetoModal");
@@ -160,13 +231,17 @@ function bindUI() {
   const saveVetoBtn = document.getElementById("saveVetoBtn");
 
   registrationForm?.addEventListener("submit", handleRegistration);
-  rebuildBtn?.addEventListener("click", () => rebuildBracket(true, "Manual reseed"));
+  rebuildBtn?.addEventListener("click", () =>
+    rebuildBracket(true, "Manual reseed")
+  );
   resetBtn?.addEventListener("click", resetTournament);
   autoFillBtn?.addEventListener("click", autoFillPlayers);
 
   signInBtn?.addEventListener("click", () => window.handleSignIn?.());
   signOutBtn?.addEventListener("click", () => window.handleSignOut?.());
-  switchAccountBtn?.addEventListener("click", () => window.handleSwitchAccount?.());
+  switchAccountBtn?.addEventListener("click", () =>
+    window.handleSwitchAccount?.()
+  );
   raceSelect?.addEventListener("change", () => {
     const statusEl = document.getElementById("mmrStatus");
     const normalizedRace = normalizeRaceLabel(raceSelect.value);
@@ -176,7 +251,9 @@ function bindUI() {
   });
   openRegisterBtn?.addEventListener("click", () => {
     switchTab("registrationTab");
-    document.getElementById("registrationCard")?.scrollIntoView({ behavior: "smooth" });
+    document
+      .getElementById("registrationCard")
+      ?.scrollIntoView({ behavior: "smooth" });
   });
 
   openCreateTournament?.addEventListener("click", async () => {
@@ -187,7 +264,11 @@ function bindUI() {
     if (createModal) createModal.style.display = "none";
   });
   window.addEventListener("mousedown", (e) => {
-    if (createModal && createModal.style.display === "flex" && e.target === createModal) {
+    if (
+      createModal &&
+      createModal.style.display === "flex" &&
+      e.target === createModal
+    ) {
       createModal.style.display = "none";
     }
   });
@@ -225,52 +306,87 @@ function bindUI() {
   descriptionInput?.addEventListener("input", updateDescriptionPreview);
   rulesInput?.addEventListener("input", updateRulesPreview);
   descToolbarBtns.forEach((btn) => {
-    btn.addEventListener("click", () => applyFormatting(btn.dataset.descAction, "tournamentDescriptionInput"));
+    btn.addEventListener("click", () =>
+      applyFormatting(btn.dataset.descAction, "tournamentDescriptionInput")
+    );
   });
   rulesToolbarBtns.forEach((btn) => {
-    btn.addEventListener("click", () => applyFormatting(btn.dataset.rulesAction, "tournamentRulesInput"));
+    btn.addEventListener("click", () =>
+      applyFormatting(btn.dataset.rulesAction, "tournamentRulesInput")
+    );
   });
   settingsDescToolbarBtns.forEach((btn) => {
-    btn.addEventListener("click", () => applyFormatting(btn.dataset.settingsDescAction, "settingsDescriptionInput"));
+    btn.addEventListener("click", () =>
+      applyFormatting(
+        btn.dataset.settingsDescAction,
+        "settingsDescriptionInput"
+      )
+    );
   });
   settingsRulesToolbarBtns.forEach((btn) => {
-    btn.addEventListener("click", () => applyFormatting(btn.dataset.settingsRulesAction, "settingsRulesInput"));
+    btn.addEventListener("click", () =>
+      applyFormatting(btn.dataset.settingsRulesAction, "settingsRulesInput")
+    );
   });
-  document.getElementById("settingsDescriptionInput")?.addEventListener("input", updateSettingsDescriptionPreview);
-  document.getElementById("settingsRulesInput")?.addEventListener("input", updateSettingsRulesPreview);
-  useLadderMapsBtn?.addEventListener("click", () => setMapPoolSelection(getDefaultMapPoolNames()));
+  document
+    .getElementById("settingsDescriptionInput")
+    ?.addEventListener("input", updateSettingsDescriptionPreview);
+  document
+    .getElementById("settingsRulesInput")
+    ?.addEventListener("input", updateSettingsRulesPreview);
+  useLadderMapsBtn?.addEventListener("click", () =>
+    setMapPoolSelection(getDefaultMapPoolNames())
+  );
   clearMapPoolBtn?.addEventListener("click", () => setMapPoolSelection([]));
   mapPoolPicker?.addEventListener("click", (e) => {
     const card = e.target.closest(".tournament-map-card");
     if (!card) return;
     toggleMapSelection(card.dataset.mapName);
   });
-  settingsUseLadderMapsBtn?.addEventListener("click", () => setMapPoolSelection(getDefaultMapPoolNames()));
-  settingsClearMapPoolBtn?.addEventListener("click", () => setMapPoolSelection([]));
+  settingsUseLadderMapsBtn?.addEventListener("click", () =>
+    setMapPoolSelection(getDefaultMapPoolNames())
+  );
+  settingsClearMapPoolBtn?.addEventListener("click", () =>
+    setMapPoolSelection([])
+  );
   settingsMapPoolPicker?.addEventListener("click", (e) => {
     const card = e.target.closest(".tournament-map-card");
     if (!card) return;
     toggleMapSelection(card.dataset.mapName);
   });
   saveSettingsBtn?.addEventListener("click", handleSaveSettings);
-  [bestOfUpperInput, bestOfLowerInput, bestOfQuarterInput, bestOfSemiInput, bestOfFinalInput].forEach((el) => {
+  [
+    bestOfUpperInput,
+    bestOfLowerInput,
+    bestOfQuarterInput,
+    bestOfSemiInput,
+    bestOfFinalInput,
+  ].forEach((el) => {
     el?.addEventListener("input", () => {});
   });
-  [settingsBestOfUpper, settingsBestOfLower, settingsBestOfQuarter, settingsBestOfSemi, settingsBestOfFinal].forEach(
-    (el) => {
-      el?.addEventListener("input", () => {});
-    }
-  );
+  [
+    settingsBestOfUpper,
+    settingsBestOfLower,
+    settingsBestOfQuarter,
+    settingsBestOfSemi,
+    settingsBestOfFinal,
+  ].forEach((el) => {
+    el?.addEventListener("input", () => {});
+  });
   closeVetoModal?.addEventListener("click", () => hideVetoModal());
   saveVetoBtn?.addEventListener("click", () => saveVetoSelection());
 
   jumpToRegistration?.addEventListener("click", () => {
     switchTab("registrationTab");
-    document.getElementById("registrationCard")?.scrollIntoView({ behavior: "smooth" });
+    document
+      .getElementById("registrationCard")
+      ?.scrollIntoView({ behavior: "smooth" });
   });
   jumpToBracket?.addEventListener("click", () => {
     switchTab("bracketTab");
-    document.getElementById("bracketGrid")?.scrollIntoView({ behavior: "smooth" });
+    document
+      .getElementById("bracketGrid")
+      ?.scrollIntoView({ behavior: "smooth" });
   });
 
   playersTable?.addEventListener("input", (e) => {
@@ -294,7 +410,9 @@ function bindUI() {
     if (e.target.matches(".score-select")) {
       const matchId = e.target.dataset.matchId;
       if (!matchId) return;
-      const selects = document.querySelectorAll(`.score-select[data-match-id="${matchId}"]`);
+      const selects = document.querySelectorAll(
+        `.score-select[data-match-id="${matchId}"]`
+      );
       const vals = Array.from(selects).map((s) => s.value || "0");
       updateMatchScore(matchId, vals[0], vals[1]);
     }
@@ -309,7 +427,9 @@ function bindUI() {
 
   document.querySelectorAll("#tournamentListTabs .list-tab").forEach((btn) => {
     btn.addEventListener("click", () => {
-      document.querySelectorAll("#tournamentListTabs .list-tab").forEach((b) => b.classList.remove("active"));
+      document
+        .querySelectorAll("#tournamentListTabs .list-tab")
+        .forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
       renderTournamentList();
     });
@@ -344,9 +464,13 @@ function hydratePulseFromState(pulseState) {
   const statusEl = document.getElementById("mmrStatus");
 
   const byRace =
-    pulseState && typeof pulseState.byRace === "object" ? pulseState.byRace : null;
+    pulseState && typeof pulseState.byRace === "object"
+      ? pulseState.byRace
+      : null;
   const normalizedUrl = sanitizeUrl(pulseState?.url || "");
-  const overallMmr = Number.isFinite(pulseState?.mmr) ? Math.round(pulseState.mmr) : null;
+  const overallMmr = Number.isFinite(pulseState?.mmr)
+    ? Math.round(pulseState.mmr)
+    : null;
   const { race: bestRace, mmr: bestMmr } = pickBestRace(byRace, overallMmr);
 
   pulseProfile =
@@ -354,7 +478,9 @@ function hydratePulseFromState(pulseState) {
       ? { ...pulseState, url: normalizedUrl, byRace, mmr: overallMmr }
       : null;
 
-  const existingSelection = pulseProfile ? normalizeRaceLabel(raceSelect?.value) : "";
+  const existingSelection = pulseProfile
+    ? normalizeRaceLabel(raceSelect?.value)
+    : "";
   derivedRace = existingSelection || (pulseProfile ? bestRace : null);
   derivedMmr = pulseProfile
     ? derivedRace
@@ -372,7 +498,9 @@ function hydratePulseFromState(pulseState) {
   }
   if (mmrDisplay) {
     if (derivedRace) {
-      mmrDisplay.value = Number.isFinite(derivedMmr) ? `${derivedMmr} MMR` : "No rank";
+      mmrDisplay.value = Number.isFinite(derivedMmr)
+        ? `${derivedMmr} MMR`
+        : "No rank";
     } else {
       mmrDisplay.value = "";
     }
@@ -399,7 +527,9 @@ function pickBestRace(byRace = null, fallbackMmr = null) {
     return { race: valid[0].race, mmr: Math.round(valid[0].mmr) };
   }
 
-  const mmr = Number.isFinite(fallbackMmr) ? Math.round(Math.max(0, fallbackMmr)) : null;
+  const mmr = Number.isFinite(fallbackMmr)
+    ? Math.round(Math.max(0, fallbackMmr))
+    : null;
   return { race: null, mmr };
 }
 
@@ -473,14 +603,19 @@ async function handleRegistration(event) {
   const name = document.getElementById("playerNameInput")?.value.trim();
   const statusEl = document.getElementById("mmrStatus");
   const raceSelect = document.getElementById("raceSelect");
-  const selectedRace = normalizeRaceLabel(raceSelect?.value) || derivedRace || "";
+  const selectedRace =
+    normalizeRaceLabel(raceSelect?.value) || derivedRace || "";
   const race = selectedRace;
   const sc2Link = pulseProfile?.url ? sanitizeUrl(pulseProfile.url) : "";
   const mmr = mmrForRace(race);
   const pointsField = document.getElementById("pointsInput");
 
   if (!auth.currentUser) {
-    setStatus(statusEl, "Sign in and add your SC2Pulse link in Settings first.", true);
+    setStatus(
+      statusEl,
+      "Sign in and add your SC2Pulse link in Settings first.",
+      true
+    );
     return;
   }
 
@@ -502,12 +637,20 @@ async function handleRegistration(event) {
       : null;
 
   if (!sc2Link) {
-    setStatus(statusEl, "Add your SC2Pulse link in Settings to register.", true);
+    setStatus(
+      statusEl,
+      "Add your SC2Pulse link in Settings to register.",
+      true
+    );
     return;
   }
 
   if (!race) {
-    setStatus(statusEl, "Could not load your MMR. Refresh SC2Pulse in Settings.", true);
+    setStatus(
+      statusEl,
+      "Could not load your MMR. Refresh SC2Pulse in Settings.",
+      true
+    );
     return;
   }
 
@@ -537,7 +680,11 @@ async function handleRegistration(event) {
   };
 
   saveState(nextState);
-  addActivity(`${newPlayer.name} saved (${newPlayer.mmr || "MMR?"} MMR, ${newPlayer.points} pts)`);
+  addActivity(
+    `${newPlayer.name} saved (${newPlayer.mmr || "MMR?"} MMR, ${
+      newPlayer.points
+    } pts)`
+  );
 
   markRegisteredTournament(currentSlug);
 
@@ -570,7 +717,9 @@ function updateMmrDisplay(statusEl) {
   const mmrDisplay = document.getElementById("mmrDisplay");
   if (mmrDisplay) {
     if (derivedRace) {
-      mmrDisplay.value = Number.isFinite(derivedMmr) ? `${derivedMmr} MMR` : "No rank";
+      mmrDisplay.value = Number.isFinite(derivedMmr)
+        ? `${derivedMmr} MMR`
+        : "No rank";
     } else {
       mmrDisplay.value = "";
     }
@@ -580,19 +729,35 @@ function updateMmrDisplay(statusEl) {
   if (!statusEl) return;
 
   if (!auth.currentUser) {
-    setStatus(statusEl, "Sign in and set your SC2Pulse link in Settings to register.", true);
+    setStatus(
+      statusEl,
+      "Sign in and set your SC2Pulse link in Settings to register.",
+      true
+    );
     return;
   }
 
   if (!pulseProfile?.url) {
-    setStatus(statusEl, "Set your SC2Pulse link in Settings to load race and MMR.", true);
+    setStatus(
+      statusEl,
+      "Set your SC2Pulse link in Settings to load race and MMR.",
+      true
+    );
     return;
   }
 
   if (derivedRace && Number.isFinite(derivedMmr)) {
-    setStatus(statusEl, `Using ${derivedRace} @ ${derivedMmr} MMR from SC2Pulse.`, false);
+    setStatus(
+      statusEl,
+      `Using ${derivedRace} @ ${derivedMmr} MMR from SC2Pulse.`,
+      false
+    );
   } else if (derivedRace) {
-    setStatus(statusEl, `No rank found for ${derivedRace} — seeding as 0.`, true);
+    setStatus(
+      statusEl,
+      `No rank found for ${derivedRace} — seeding as 0.`,
+      true
+    );
   } else if (pulseProfile?.url) {
     setStatus(statusEl, "Waiting for MMR. Refresh SC2Pulse in Settings.", true);
   }
@@ -601,7 +766,8 @@ function updateMmrDisplay(statusEl) {
 function populatePlayerNameFromProfile() {
   const input = document.getElementById("playerNameInput");
   if (!input || input.value.trim()) return;
-  const username = getCurrentUsername?.() || auth.currentUser?.displayName || "";
+  const username =
+    getCurrentUsername?.() || auth.currentUser?.displayName || "";
   if (username) input.value = username;
 }
 
@@ -630,7 +796,11 @@ async function enterTournament(slug) {
     setMapPoolSelection(getDefaultMapPoolNames());
   }
   setTournamentHeader(tournament);
-  isAdmin = !!(tournament && auth.currentUser && tournament.createdBy === auth.currentUser.uid);
+  isAdmin = !!(
+    tournament &&
+    auth.currentUser &&
+    tournament.createdBy === auth.currentUser.uid
+  );
   toggleAdminUI(isAdmin);
   populateSettingsPanel(tournament);
   if (landing) landing.style.display = "none";
@@ -651,16 +821,25 @@ function setTournamentHeader(tournament) {
   const format = document.getElementById("tournamentFormat");
   const start = document.getElementById("tournamentStart");
   const bracketTitle = document.getElementById("bracketTitle");
-  const renderedDesc = tournament ? renderMarkdown(tournament.description || "") : "";
-  const renderedRules = tournament ? renderMarkdown(tournament.rules || "") : "";
+  const renderedDesc = tournament
+    ? renderMarkdown(tournament.description || "")
+    : "";
+  const renderedRules = tournament
+    ? renderMarkdown(tournament.rules || "")
+    : "";
   if (title) title.textContent = tournament?.name || "Tournament";
   if (desc) desc.innerHTML = renderedDesc || "No description yet.";
-  if (descBody) descBody.innerHTML = renderedDesc || "<p class=\"helper\">No description yet.</p>";
-  if (rulesBody) rulesBody.innerHTML = renderedRules || "<p class=\"helper\">No rules yet.</p>";
+  if (descBody)
+    descBody.innerHTML =
+      renderedDesc || '<p class="helper">No description yet.</p>';
+  if (rulesBody)
+    rulesBody.innerHTML =
+      renderedRules || '<p class="helper">No rules yet.</p>';
   if (format) format.textContent = tournament?.format || "Tournament";
-  if (start) start.textContent = tournament?.startTime
-    ? new Date(tournament.startTime).toLocaleString()
-    : "TBD";
+  if (start)
+    start.textContent = tournament?.startTime
+      ? new Date(tournament.startTime).toLocaleString()
+      : "TBD";
   if (bracketTitle) bracketTitle.textContent = tournament?.format || "Bracket";
 }
 
@@ -668,14 +847,21 @@ async function handleSaveSettings(event) {
   event?.preventDefault?.();
   if (!currentTournamentMeta?.slug) return;
   const name = document.getElementById("settingsNameInput")?.value?.trim();
-  const description = document.getElementById("settingsDescriptionInput")?.value || "";
+  const description =
+    document.getElementById("settingsDescriptionInput")?.value || "";
   const rules = document.getElementById("settingsRulesInput")?.value || "";
-  const format = document.getElementById("settingsFormatSelect")?.value || "Double Elimination";
-  const maxPlayersRaw = document.getElementById("settingsMaxPlayersInput")?.value;
+  const format =
+    document.getElementById("settingsFormatSelect")?.value ||
+    "Double Elimination";
+  const maxPlayersRaw = document.getElementById(
+    "settingsMaxPlayersInput"
+  )?.value;
   const maxPlayers = maxPlayersRaw ? Math.max(2, Number(maxPlayersRaw)) : null;
   const startTime = document.getElementById("settingsStartInput")?.value || "";
   const bestOf = readBestOfFromForm("settings");
-  const mapPool = mapPoolSelection.size ? Array.from(mapPoolSelection) : getDefaultMapPoolNames();
+  const mapPool = mapPoolSelection.size
+    ? Array.from(mapPoolSelection)
+    : getDefaultMapPoolNames();
   if (!name) return;
 
   const payload = {
@@ -724,15 +910,18 @@ function toggleAdminUI(isAdminUser) {
   const seedingCard = document.getElementById("seedingCard");
   const autoFillBtn = document.getElementById("autoFillBtn");
   if (adminTabBtn) adminTabBtn.style.display = "inline-flex";
-  if (settingsTabBtn) settingsTabBtn.style.display = isAdminUser ? "inline-flex" : "none";
+  if (settingsTabBtn)
+    settingsTabBtn.style.display = isAdminUser ? "inline-flex" : "none";
   if (registrationTab) registrationTab.style.display = "";
   if (!isAdminUser) {
     switchTab("bracketTab");
   }
   if (jumpToReg) jumpToReg.style.display = isAdminUser ? "inline-flex" : "none";
-  if (openRegisterBtn) openRegisterBtn.style.display = isAdminUser ? "none" : "inline-flex";
+  if (openRegisterBtn)
+    openRegisterBtn.style.display = isAdminUser ? "none" : "inline-flex";
   if (seedingCard) seedingCard.style.display = isAdminUser ? "block" : "none";
-  if (autoFillBtn) autoFillBtn.style.display = isAdminUser ? "inline-flex" : "none";
+  if (autoFillBtn)
+    autoFillBtn.style.display = isAdminUser ? "inline-flex" : "none";
 }
 
 async function renderTournamentList() {
@@ -742,10 +931,16 @@ async function renderTournamentList() {
   const currentUserId = auth.currentUser?.uid || null;
   const registeredSlugs = getRegisteredTournamentSlugs();
   updateLandingStats(registry);
-  const filter = document.querySelector(".list-tab.active")?.dataset.listFilter || "open";
+  const filter =
+    document.querySelector(".list-tab.active")?.dataset.listFilter || "open";
   const filtered = registry.filter((t) => {
-    if (filter === "hosted") return currentUserId && t.createdBy === currentUserId;
-    if (filter === "mine") return registeredSlugs.has(t.slug) || (currentUserId && t.createdBy === currentUserId);
+    if (filter === "hosted")
+      return currentUserId && t.createdBy === currentUserId;
+    if (filter === "mine")
+      return (
+        registeredSlugs.has(t.slug) ||
+        (currentUserId && t.createdBy === currentUserId)
+      );
     return true;
   });
   const items = filtered.map((t) => {
@@ -773,7 +968,8 @@ async function renderTournamentList() {
       </div>
     </li>`;
   });
-  listEl.innerHTML = items.join("") || `<li class="helper">No tournaments yet.</li>`;
+  listEl.innerHTML =
+    items.join("") || `<li class="helper">No tournaments yet.</li>`;
   listEl.querySelectorAll(".tournament-card").forEach((card, idx) => {
     const slug = filtered[idx]?.slug;
     if (!slug) return;
@@ -842,7 +1038,10 @@ async function generateUniqueSlug() {
   let slug = "";
   const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
   do {
-    slug = Array.from({ length: 6 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join("");
+    slug = Array.from(
+      { length: 6 },
+      () => alphabet[Math.floor(Math.random() * alphabet.length)]
+    ).join("");
   } while (registry.some((t) => t.slug === slug));
   return slug;
 }
@@ -851,7 +1050,11 @@ async function validateSlug() {
   const slugInput = document.getElementById("tournamentSlugInput");
   const status = document.getElementById("slugStatus");
   const registry = await loadTournamentRegistry(true);
-  const value = slugInput?.value?.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-") || "";
+  const value =
+    slugInput?.value
+      ?.trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, "-") || "";
   if (slugInput) slugInput.value = value;
   let exists = registry.some((t) => t.slug === value);
   if (!exists && value) {
@@ -863,7 +1066,9 @@ async function validateSlug() {
     }
   }
   if (status) {
-    status.textContent = exists ? "Slug is already taken." : "Slug is available.";
+    status.textContent = exists
+      ? "Slug is already taken."
+      : "Slug is available.";
     status.style.color = exists ? "#ff8b8b" : "var(--muted)";
   }
   return !exists && value;
@@ -875,16 +1080,24 @@ async function handleCreateTournament(event) {
   const slugInput = document.getElementById("tournamentSlugInput");
   const slugIsValid = await validateSlug();
   const slug = slugIsValid ? slugInput.value.trim() : "";
-  const description = document.getElementById("tournamentDescriptionInput")?.value || "";
+  const description =
+    document.getElementById("tournamentDescriptionInput")?.value || "";
   const rules = document.getElementById("tournamentRulesInput")?.value || "";
-  const format = document.getElementById("tournamentFormatSelect")?.value || "Double Elimination";
-  const maxPlayersRaw = document.getElementById("tournamentMaxPlayersInput")?.value;
+  const format =
+    document.getElementById("tournamentFormatSelect")?.value ||
+    "Double Elimination";
+  const maxPlayersRaw = document.getElementById(
+    "tournamentMaxPlayersInput"
+  )?.value;
   const maxPlayers = maxPlayersRaw ? Math.max(2, Number(maxPlayersRaw)) : null;
-  const startTime = document.getElementById("tournamentStartInput")?.value || "";
+  const startTime =
+    document.getElementById("tournamentStartInput")?.value || "";
   const bestOf = readBestOfFromForm("create");
   if (!name || !slug) return;
   const selectedMaps =
-    mapPoolSelection.size > 0 ? Array.from(mapPoolSelection) : getDefaultMapPoolNames();
+    mapPoolSelection.size > 0
+      ? Array.from(mapPoolSelection)
+      : getDefaultMapPoolNames();
 
   const payload = {
     name,
@@ -897,7 +1110,8 @@ async function handleCreateTournament(event) {
     bestOf,
     startTime: startTime ? new Date(startTime).toISOString() : null,
     createdBy: auth.currentUser?.uid || "anon",
-    createdByName: getCurrentUsername?.() || auth.currentUser?.displayName || "Host",
+    createdByName:
+      getCurrentUsername?.() || auth.currentUser?.displayName || "Host",
     createdAt: Date.now(),
   };
 
@@ -912,11 +1126,16 @@ async function handleCreateTournament(event) {
     cacheTournamentRegistry(null);
   } catch (_) {
     console.error("Failed to save tournament to Firestore", _);
-    showToast?.("Could not save tournament to Firestore. Using local cache only.", "error");
+    showToast?.(
+      "Could not save tournament to Firestore. Using local cache only.",
+      "error"
+    );
   }
 
   const registry = await loadTournamentRegistry(true);
-  const merged = registry.some((t) => t.slug === slug) ? registry : registry.concat(payload);
+  const merged = registry.some((t) => t.slug === slug)
+    ? registry
+    : registry.concat(payload);
   registryCache = merged;
   cacheTournamentRegistry(merged);
   document.getElementById("createTournamentModal").style.display = "none";
@@ -932,7 +1151,9 @@ async function loadTournamentRegistry(force = false) {
     const snap = await getDocs(collection(db, TOURNAMENT_COLLECTION));
     const list = snap.docs.map((d) => {
       const data = d.data() || {};
-      const startTime = data.startTime?.toMillis ? data.startTime.toMillis() : data.startTime;
+      const startTime = data.startTime?.toMillis
+        ? data.startTime.toMillis()
+        : data.startTime;
       return {
         id: d.id,
         slug: data.slug || d.id,
@@ -996,7 +1217,10 @@ function markRegisteredTournament(slug) {
   try {
     const set = getRegisteredTournamentSlugs();
     set.add(slug);
-    localStorage.setItem("registeredTournaments", JSON.stringify(Array.from(set)));
+    localStorage.setItem(
+      "registeredTournaments",
+      JSON.stringify(Array.from(set))
+    );
   } catch (_) {
     // ignore storage errors
   }
@@ -1076,15 +1300,22 @@ async function loadMapCatalog() {
 
 function getLadderMaps() {
   const source = mapCatalog.length ? mapCatalog : FALLBACK_LADDER_MAPS;
-  const currentOnly = source.filter((m) => (m.folder || "").toLowerCase().includes("current/1v1"));
+  const currentOnly = source.filter((m) =>
+    (m.folder || "").toLowerCase().includes("current/1v1")
+  );
   if (currentOnly.length) return currentOnly;
-  const explicitCurrent = source.filter((m) => (m.folder || "").toLowerCase().includes("current"));
+  const explicitCurrent = source.filter((m) =>
+    (m.folder || "").toLowerCase().includes("current")
+  );
   return explicitCurrent.length ? explicitCurrent : FALLBACK_LADDER_MAPS;
 }
 
 function getAll1v1Maps() {
   const source = mapCatalog.length ? mapCatalog : FALLBACK_LADDER_MAPS;
-  const all = source.filter((m) => (m.mode || "").toLowerCase() === "1v1" || (m.folder || "").includes("1v1"));
+  const all = source.filter(
+    (m) =>
+      (m.mode || "").toLowerCase() === "1v1" || (m.folder || "").includes("1v1")
+  );
   return all.length ? all : FALLBACK_LADDER_MAPS;
 }
 
@@ -1162,9 +1393,9 @@ function renderMapPoolPicker(targetId = "mapPoolPicker") {
   const cards = getAll1v1Maps().map((map) => {
     const selected = mapPoolSelection.has(map.name);
     const imgPath = `img/maps/${map.folder}/${map.file}`;
-    return `<div class="tournament-map-card ${selected ? "selected" : ""}" data-map-name="${escapeHtml(
-      map.name
-    )}">
+    return `<div class="tournament-map-card ${
+      selected ? "selected" : ""
+    }" data-map-name="${escapeHtml(map.name)}">
       <div class="map-thumb" style="background-image:url('${imgPath}')"></div>
       <div class="map-meta">
         <div class="map-name">${escapeHtml(map.name)}</div>
@@ -1187,7 +1418,8 @@ function applyFormatting(action, textareaId) {
 
   const wrap = (prefix, suffix = prefix) => {
     textarea.value = `${before}${prefix}${selected || ""}${suffix}${after}`;
-    const cursor = before.length + prefix.length + (selected ? selected.length : 0);
+    const cursor =
+      before.length + prefix.length + (selected ? selected.length : 0);
     textarea.setSelectionRange(cursor, cursor);
   };
 
@@ -1200,7 +1432,10 @@ function applyFormatting(action, textareaId) {
       break;
     case "heading":
       textarea.value = `${before}## ${selected || "Heading"}${after}`;
-      textarea.setSelectionRange(before.length + 3, before.length + 3 + (selected || "Heading").length);
+      textarea.setSelectionRange(
+        before.length + 3,
+        before.length + 3 + (selected || "Heading").length
+      );
       break;
     case "bullet":
       textarea.value = `${before}- ${selected || "List item"}${after}`;
@@ -1212,10 +1447,15 @@ function applyFormatting(action, textareaId) {
       textarea.value = `${before}> ${selected || "Quote"}${after}`;
       break;
     case "link":
-      wrap("[", `](${selected ? "https://example.com" : "https://example.com"})`);
+      wrap(
+        "[",
+        `](${selected ? "https://example.com" : "https://example.com"})`
+      );
       break;
     case "image":
-      textarea.value = `${before}![alt text](${selected || "https://example.com/image.png"})${after}`;
+      textarea.value = `${before}![alt text](${
+        selected || "https://example.com/image.png"
+      })${after}`;
       break;
     case "code":
       wrap("`", "`");
@@ -1241,7 +1481,9 @@ function createOrUpdatePlayer(payload) {
       : payload.points;
 
   const base = {
-    id: crypto.randomUUID ? crypto.randomUUID() : `p-${Date.now()}-${Math.random()}`,
+    id: crypto.randomUUID
+      ? crypto.randomUUID()
+      : `p-${Date.now()}-${Math.random()}`,
     createdAt: Date.now(),
     seed: 0,
     points: resolvedPoints,
@@ -1305,7 +1547,11 @@ async function fetchMmrFromPulse(link, statusEl) {
   try {
     const url = sanitizeUrl(link);
     if (!url) {
-      setStatus(statusEl, "Invalid SC2Pulse link. Please double-check the URL.", true);
+      setStatus(
+        statusEl,
+        "Invalid SC2Pulse link. Please double-check the URL.",
+        true
+      );
       return 0;
     }
     const response = await fetch(url, { method: "GET" });
@@ -1320,7 +1566,11 @@ async function fetchMmrFromPulse(link, statusEl) {
     if (mmrMatch && mmrMatch[1]) {
       return Number(mmrMatch[1]);
     }
-    setStatus(statusEl, "Could not find MMR in the page. Enter it manually.", true);
+    setStatus(
+      statusEl,
+      "Could not find MMR in the page. Enter it manually.",
+      true
+    );
     return 0;
   } catch (err) {
     setStatus(
@@ -1439,59 +1689,118 @@ function buildLosersBracket(winners) {
   const losers = [];
   if (!winners.length) return losers;
 
-  // Round 1: losers from winners round 1 face each other
-  const w1 = winners[0];
-  const l1 = [];
-  for (let i = 0; i < w1.length; i += 2) {
-    l1.push(
-      createMatch(
-        "losers",
-        1,
-        l1.length + 1,
-        loserSource(w1[i]),
-        loserSource(w1[i + 1])
-      )
+  const addMatchIfNeeded = (arr, round, index, sourceA, sourceB) => {
+    if (!sourceA && !sourceB) return null;
+    const m = createMatch("losers", round, index, sourceA, sourceB);
+    arr.push(m);
+    return m;
+  };
+
+  // Total LB rounds: two per WB round minus one (Challonge-style-ish)
+  const totalLbRounds = Math.max(1, 2 * winners.length - 1);
+
+  // LB Round 1 - losers from WB round 1 (only from real, non-bye matches)
+  const firstRound = [];
+  const wbRound1 = winners[0] || [];
+  for (let i = 0; i < wbRound1.length; i += 2) {
+    addMatchIfNeeded(
+      firstRound,
+      1,
+      firstRound.length + 1,
+      safeLoserSource(wbRound1[i]),
+      safeLoserSource(wbRound1[i + 1])
     );
   }
-  if (l1.length) losers.push(l1);
+  if (firstRound.length) losers.push(firstRound);
 
-  const totalLbRounds = Math.max(0, 2 * (winners.length - 1));
-  for (let lbRoundNum = 2; lbRoundNum <= totalLbRounds; lbRoundNum++) {
-    const previous = losers[losers.length - 1];
-    if (lbRoundNum % 2 === 0) {
-      // even: winners from previous LB round face losers from current WB round
-      const wbRound = winners[lbRoundNum / 2] || [];
-      const matches = [];
-      const count = Math.max(previous?.length || 0, wbRound.length);
-      for (let i = 0; i < count; i++) {
-        matches.push(
-          createMatch(
-            "losers",
-            lbRoundNum,
-            i + 1,
-            previous?.[i] ? winnerSource(previous[i]) : null,
-            wbRound[i] ? loserSource(wbRound[i]) : null
-          )
+  // Track sources waiting to be paired in the next LB step
+  let pendingSources = firstRound
+    .map((m) => safeWinnerSource(m))
+    .filter(Boolean);
+
+  // Subsequent LB rounds
+  for (let wbRound = 2; wbRound <= winners.length; wbRound++) {
+    const dropRoundNum = 2 * (wbRound - 1);
+    const consolidateRoundNum = dropRoundNum - 1;
+
+    // Odd LB round: consolidate winners from previous LB round
+    if (consolidateRoundNum > 1 && pendingSources.length > 1) {
+      const consolidate = [];
+      const nextSources = [];
+      while (pendingSources.length >= 2) {
+        const srcA = pendingSources.shift();
+        const srcB = pendingSources.shift();
+        const m = addMatchIfNeeded(
+          consolidate,
+          consolidateRoundNum,
+          consolidate.length + 1,
+          srcA,
+          srcB
         );
+        if (m) nextSources.push(safeWinnerSource(m));
       }
-      if (matches.length) losers.push(matches);
-    } else {
-      // odd: winners from previous LB round face each other
-      const matches = [];
-      for (let i = 0; i < previous.length; i += 2) {
-        matches.push(
-          createMatch(
-            "losers",
-            lbRoundNum,
-            i / 2 + 1,
-            winnerSource(previous[i]),
-            winnerSource(previous[i + 1])
-          )
-        );
+      if (consolidate.length) {
+        losers.push(consolidate);
       }
-      if (matches.length) losers.push(matches);
+      // Carry forward winners plus any leftover unpaired entrant
+      pendingSources = nextSources.concat(pendingSources);
     }
+
+    // Even LB round: winners from carry vs losers from WB[wbRound-1]
+    const dropIns = winners[wbRound - 1] || [];
+    const dropRound = [];
+
+    const entrants = [
+      ...pendingSources,
+      ...dropIns.map((m) => safeLoserSource(m)).filter(Boolean),
+    ];
+
+    const nextPending = [];
+    while (entrants.length >= 2) {
+      const srcA = entrants.shift();
+      const srcB = entrants.shift();
+      const m = addMatchIfNeeded(
+        dropRound,
+        dropRoundNum,
+        dropRound.length + 1,
+        srcA,
+        srcB
+      );
+      if (m) nextPending.push(safeWinnerSource(m));
+    }
+    // If one entrant remains, bubble it forward instead of creating a single-source match
+    if (entrants.length === 1) {
+      nextPending.push(entrants.shift());
+    }
+
+    if (dropRound.length) {
+      losers.push(dropRound);
+    }
+    pendingSources = nextPending;
   }
+
+  // Final consolidation: ensure a single LB winner if needed
+  const lastRoundNum = totalLbRounds;
+  while (pendingSources.length > 1) {
+    const finalRound = [];
+    const nextPending = [];
+    while (pendingSources.length >= 2) {
+      const m = addMatchIfNeeded(
+        finalRound,
+        lastRoundNum,
+        finalRound.length + 1,
+        pendingSources.shift(),
+        pendingSources.shift()
+      );
+      if (m) nextPending.push(safeWinnerSource(m));
+    }
+    if (finalRound.length) {
+      losers.push(finalRound);
+    }
+    pendingSources = nextPending.concat(pendingSources);
+    if (!finalRound.length) break; // safety to avoid potential infinite loops
+  }
+
   return losers;
 }
 
@@ -1526,6 +1835,20 @@ function loserSource(match) {
   return { type: "match", matchId: match.id, outcome: "loser" };
 }
 
+function safeWinnerSource(match) {
+  if (!match) return null;
+  return winnerSource(match);
+}
+
+function safeLoserSource(match) {
+  if (!match) return null;
+  const sources = Array.isArray(match.sources) ? match.sources : [];
+  const nonNullSources = sources.filter(Boolean).length;
+  const hasRealLoser = nonNullSources >= 2 || !!match.loserId;
+  if (!hasRealLoser) return null;
+  return loserSource(match);
+}
+
 function autoResolveByes(bracket) {
   const matches = getAllMatches(bracket);
   const lookup = getMatchLookup(bracket);
@@ -1535,9 +1858,19 @@ function autoResolveByes(bracket) {
     if (match.status === "complete") return;
     const [pA, pB] = resolveParticipants(match, lookup, playersById);
     if (pA && !pB) {
-      finalizeMatchResult(match, { winnerId: pA.id, loserId: null, scores: [1, 0], walkover: "b" });
+      finalizeMatchResult(match, {
+        winnerId: pA.id,
+        loserId: null,
+        scores: [1, 0],
+        walkover: "b",
+      });
     } else if (!pA && pB) {
-      finalizeMatchResult(match, { winnerId: pB.id, loserId: null, scores: [0, 1], walkover: "a" });
+      finalizeMatchResult(match, {
+        winnerId: pB.id,
+        loserId: null,
+        scores: [0, 1],
+        walkover: "a",
+      });
     }
   });
 }
@@ -1571,7 +1904,9 @@ function applyMatchInputs(card) {
 }
 
 function parseResult(value) {
-  const v = String(value || "").trim().toUpperCase();
+  const v = String(value || "")
+    .trim()
+    .toUpperCase();
   if (v === "W" || v === "W/O") return { type: "walkover" };
   const num = Number(v);
   return { type: "score", value: Number.isFinite(num) ? Math.max(0, num) : 0 };
@@ -1624,7 +1959,11 @@ function updateMatchScore(matchId, valA, valB) {
     status = "complete";
     finalScores = [needed, 0];
     walkoverValue = "b";
-  } else if (resA.type === "score" && resB.type === "score" && resA.value !== resB.value) {
+  } else if (
+    resA.type === "score" &&
+    resB.type === "score" &&
+    resA.value !== resB.value
+  ) {
     if (resA.value >= needed || resB.value >= needed) {
       winnerId = resA.value > resB.value ? pA.id : pB.id;
       loserId = resA.value > resB.value ? pB.id : pA.id;
@@ -1675,7 +2014,10 @@ function clearDownstream(matchId) {
   });
 }
 
-function finalizeMatchResult(match, { winnerId, loserId, scores, walkover, status }) {
+function finalizeMatchResult(
+  match,
+  { winnerId, loserId, scores, walkover, status }
+) {
   match.winnerId = winnerId ?? null;
   match.loserId = loserId ?? null;
   match.scores = scores ?? match.scores;
@@ -1704,14 +2046,22 @@ function renderPlayersTable() {
     return `
       <tr>
         <td>#${p.seed || "?"}</td>
-        <td><strong>${escapeHtml(p.name)}</strong> <span class="helper">${p.race || ""}</span></td>
-        <td><input class="points-input" type="number" min="0" data-player-id="${p.id}" value="${p.points || 0}"/></td>
+        <td><strong>${escapeHtml(p.name)}</strong> <span class="helper">${
+      p.race || ""
+    }</span></td>
+        <td><input class="points-input" type="number" min="0" data-player-id="${
+          p.id
+        }" value="${p.points || 0}"/></td>
         <td>${p.mmr || 0}</td>
         <td>${link}</td>
-        <td><button class="cta small ghost remove-player" data-player-id="${p.id}">Remove</button></td>
+        <td><button class="cta small ghost remove-player" data-player-id="${
+          p.id
+        }">Remove</button></td>
       </tr>`;
   });
-  tbody.innerHTML = rows.join("") || `<tr><td colspan="6" class="helper">No players yet.</td></tr>`;
+  tbody.innerHTML =
+    rows.join("") ||
+    `<tr><td colspan="6" class="helper">No players yet.</td></tr>`;
 }
 
 function renderBracket() {
@@ -1729,7 +2079,14 @@ function renderBracket() {
     upperRounds.push([{ ...state.bracket.finals, name: "Finals" }]);
   }
 
-  const upper = layoutBracketSection(upperRounds, "Upper", lookup, playersById, 0, 0);
+  const upper = layoutBracketSection(
+    upperRounds,
+    "Upper",
+    lookup,
+    playersById,
+    0,
+    0
+  );
 
   const lowerRounds = state.bracket.losers || [];
   const lower = lowerRounds.length
@@ -1751,7 +2108,9 @@ function renderMapsTab(tournament) {
   const grid = document.getElementById("tournamentMapGrid");
   if (!grid) return;
   const poolNames =
-    tournament?.mapPool && tournament.mapPool.length ? tournament.mapPool : getDefaultMapPoolNames();
+    tournament?.mapPool && tournament.mapPool.length
+      ? tournament.mapPool
+      : getDefaultMapPoolNames();
   if (!poolNames.length) {
     grid.innerHTML = `<p class="helper">No maps selected yet.</p>`;
     return;
@@ -1760,7 +2119,9 @@ function renderMapsTab(tournament) {
     const map = getMapByName(name);
     const imgPath = map ? `img/maps/${map.folder}/${map.file}` : null;
     return `<div class="tournament-map-card">
-      <div class="map-thumb"${imgPath ? ` style="background-image:url('${imgPath}')"` : ""}></div>
+      <div class="map-thumb"${
+        imgPath ? ` style="background-image:url('${imgPath}')"` : ""
+      }></div>
       <div class="map-meta">
         <div class="map-name">${escapeHtml(name)}</div>
         <span class="map-mode">${escapeHtml(map?.mode || "1v1")}</span>
@@ -1782,7 +2143,9 @@ function renderChosenMaps(targetId = "chosenMapList") {
     const map = getMapByName(name);
     const imgPath = map ? `img/maps/${map.folder}/${map.file}` : null;
     return `<div class="tournament-map-card selected">
-      <div class="map-thumb"${imgPath ? ` style="background-image:url('${imgPath}')"` : ""}></div>
+      <div class="map-thumb"${
+        imgPath ? ` style="background-image:url('${imgPath}')"` : ""
+      }></div>
       <div class="map-meta">
         <div class="map-name">${escapeHtml(name)}</div>
         <span class="map-mode">${escapeHtml(map?.mode || "1v1")}</span>
@@ -1824,26 +2187,34 @@ function openVetoModal(matchId) {
   const lookup = getMatchLookup(state.bracket || {});
   const match = lookup.get(matchId);
   const bestOf = getBestOfForMatch(match || { bracket: "winners", round: 1 });
-  const pool = (currentTournamentMeta?.mapPool && currentTournamentMeta.mapPool.length
-    ? currentTournamentMeta.mapPool
-    : getDefaultMapPoolNames()
-  ).map((name) => getMapByName(name) || { name, folder: "", file: "", mode: "1v1" });
+  const pool = (
+    currentTournamentMeta?.mapPool && currentTournamentMeta.mapPool.length
+      ? currentTournamentMeta.mapPool
+      : getDefaultMapPoolNames()
+  ).map(
+    (name) => getMapByName(name) || { name, folder: "", file: "", mode: "1v1" }
+  );
 
   // Determine lower/higher seed by seed number (higher number = lower seed)
   const playersById = getPlayersMap();
   const [pA, pB] = resolveParticipants(match, lookup, playersById);
-  const ordered = [pA, pB].filter(Boolean).sort((a, b) => (b.seed || 999) - (a.seed || 999));
+  const ordered = [pA, pB]
+    .filter(Boolean)
+    .sort((a, b) => (b.seed || 999) - (a.seed || 999));
   const lower = ordered[0] || null; // worse seed
   const higher = ordered[1] || ordered[0] || null; // better seed
 
   const saved = state.matchVetoes?.[matchId];
   if (saved) {
-    const usedNames = new Set([...(saved.maps || []).map((m) => m.map), ...(saved.vetoed || []).map((m) => m.map)]);
+    const usedNames = new Set([
+      ...(saved.maps || []).map((m) => m.map),
+      ...(saved.vetoed || []).map((m) => m.map),
+    ]);
     const remaining = pool.filter((m) => !usedNames.has(m.name));
     vetoState = {
       stage: "done",
       turn: "done",
-      bestOf: saved.bestOf || (saved.maps?.length || bestOf),
+      bestOf: saved.bestOf || saved.maps?.length || bestOf,
       remaining,
       vetoed: saved.vetoed || [],
       picks: saved.maps || [],
@@ -1874,7 +2245,9 @@ function openVetoModal(matchId) {
   modal.addEventListener("click", (e) => {
     if (e.target === modal) hideVetoModal();
   });
-  document.getElementById("vetoMapPool")?.addEventListener("click", handleVetoPoolClick);
+  document
+    .getElementById("vetoMapPool")
+    ?.addEventListener("click", handleVetoPoolClick);
 }
 
 function handleVetoPoolClick(e) {
@@ -1884,7 +2257,9 @@ function handleVetoPoolClick(e) {
   if (!vetoState || vetoState.stage === "done") return;
   const turnLabel = vetoState.turn;
   const picker =
-    turnLabel === "low" ? vetoState.lowerName || "Player A" : vetoState.higherName || "Player B";
+    turnLabel === "low"
+      ? vetoState.lowerName || "Player A"
+      : vetoState.higherName || "Player B";
 
   if (vetoState.stage === "veto") {
     const remainingCount = vetoState.remaining.length;
@@ -1959,17 +2334,26 @@ function renderVetoPoolGrid(poolOverride = null) {
   const pool =
     poolOverride ||
     (currentTournamentMeta?.mapPool && currentTournamentMeta.mapPool.length
-      ? currentTournamentMeta.mapPool.map((name) => getMapByName(name) || { name, folder: "", file: "", mode: "1v1" })
-      : getDefaultMapPoolNames().map((name) => getMapByName(name) || { name, folder: "", file: "", mode: "1v1" }));
+      ? currentTournamentMeta.mapPool.map(
+          (name) =>
+            getMapByName(name) || { name, folder: "", file: "", mode: "1v1" }
+        )
+      : getDefaultMapPoolNames().map(
+          (name) =>
+            getMapByName(name) || { name, folder: "", file: "", mode: "1v1" }
+        ));
   if (!poolEl) return;
   const remainingNames = vetoState?.remaining?.map((m) => m.name) || [];
   poolEl.innerHTML = pool
     .map((map) => {
       const isRemaining = remainingNames.includes(map.name);
-      const pickedIdx = vetoState?.picks?.findIndex((m) => m.map === map.name) ?? -1;
-      const vetoIdx = vetoState?.vetoed?.findIndex((m) => m.map === map.name) ?? -1;
+      const pickedIdx =
+        vetoState?.picks?.findIndex((m) => m.map === map.name) ?? -1;
+      const vetoIdx =
+        vetoState?.vetoed?.findIndex((m) => m.map === map.name) ?? -1;
       const imgPath = map.folder ? `img/maps/${map.folder}/${map.file}` : "";
-      const stateClass = pickedIdx !== -1 ? "selected" : vetoIdx !== -1 ? "vetoed" : "";
+      const stateClass =
+        pickedIdx !== -1 ? "selected" : vetoIdx !== -1 ? "vetoed" : "";
       const helper =
         pickedIdx !== -1
           ? `Pick ${pickedIdx + 1}`
@@ -1978,8 +2362,12 @@ function renderVetoPoolGrid(poolOverride = null) {
           : isRemaining
           ? ""
           : "Unavailable";
-      return `<div class="tournament-map-card ${stateClass}" data-map-name="${escapeHtml(map.name)}">
-        <div class="map-thumb"${imgPath ? ` style="background-image:url('${imgPath}')"` : ""}></div>
+      return `<div class="tournament-map-card ${stateClass}" data-map-name="${escapeHtml(
+        map.name
+      )}">
+        <div class="map-thumb"${
+          imgPath ? ` style="background-image:url('${imgPath}')"` : ""
+        }></div>
         <div class="map-meta">
           <div class="map-name">${escapeHtml(map.name)}</div>
           <span class="map-mode">${escapeHtml(map.mode || "1v1")}</span>
@@ -1997,8 +2385,12 @@ function showVetoInfo(matchId) {
     showToast?.("No veto data for this match yet.", "info");
     return;
   }
-  const lines = data.maps.map((m, idx) => `${idx + 1}. ${m.map} (${m.picker || "Player"})`);
-  alert(`Picked maps (Bo${data.bestOf || data.maps.length}):\n${lines.join("\n")}`);
+  const lines = data.maps.map(
+    (m, idx) => `${idx + 1}. ${m.map} (${m.picker || "Player"})`
+  );
+  alert(
+    `Picked maps (Bo${data.bestOf || data.maps.length}):\n${lines.join("\n")}`
+  );
 }
 
 function applyBestOfToSettings(bestOf) {
@@ -2009,7 +2401,8 @@ function applyBestOfToSettings(bestOf) {
   const finalInput = document.getElementById("settingsBestOfFinal");
   if (upperInput) upperInput.value = bestOf.upper ?? defaultBestOf.upper;
   if (lowerInput) lowerInput.value = bestOf.lower ?? defaultBestOf.lower;
-  if (quarterInput) quarterInput.value = bestOf.quarter ?? defaultBestOf.quarter;
+  if (quarterInput)
+    quarterInput.value = bestOf.quarter ?? defaultBestOf.quarter;
   if (semiInput) semiInput.value = bestOf.semi ?? defaultBestOf.semi;
   if (finalInput) finalInput.value = bestOf.final ?? defaultBestOf.final;
 }
@@ -2023,8 +2416,10 @@ function renderVetoStatus() {
     return;
   }
   const { stage, turn, bestOf, lowerName, higherName, remaining } = vetoState;
-  const turnName = turn === "low" ? lowerName || "Lower seed" : higherName || "Higher seed";
-  if (status) status.textContent = `Best of ${bestOf}. ${remaining.length} maps remaining. Stage: ${stage}.`;
+  const turnName =
+    turn === "low" ? lowerName || "Lower seed" : higherName || "Higher seed";
+  if (status)
+    status.textContent = `Best of ${bestOf}. ${remaining.length} maps remaining. Stage: ${stage}.`;
   if (turnLabel) {
     if (stage === "done") {
       turnLabel.textContent = `Map order locked.`;
@@ -2055,17 +2450,23 @@ function populateSettingsPanel(tournament) {
   if (slugInput) slugInput.value = tournament.slug || "";
   if (descInput) descInput.value = tournament.description || "";
   if (rulesInput) rulesInput.value = tournament.rules || "";
-  if (formatSelect) formatSelect.value = tournament.format || "Double Elimination";
+  if (formatSelect)
+    formatSelect.value = tournament.format || "Double Elimination";
   if (maxInput) maxInput.value = tournament.maxPlayers || "";
   if (startInput) {
-    startInput.value = tournament.startTime ? new Date(tournament.startTime).toISOString().slice(0, 16) : "";
+    startInput.value = tournament.startTime
+      ? new Date(tournament.startTime).toISOString().slice(0, 16)
+      : "";
   }
-  setMapPoolSelection(tournament.mapPool?.length ? tournament.mapPool : getDefaultMapPoolNames());
+  setMapPoolSelection(
+    tournament.mapPool?.length ? tournament.mapPool : getDefaultMapPoolNames()
+  );
   updateSettingsDescriptionPreview();
   updateSettingsRulesPreview();
   if (upperInput) upperInput.value = bestOf.upper ?? defaultBestOf.upper;
   if (lowerInput) lowerInput.value = bestOf.lower ?? defaultBestOf.lower;
-  if (quarterInput) quarterInput.value = bestOf.quarter ?? defaultBestOf.quarter;
+  if (quarterInput)
+    quarterInput.value = bestOf.quarter ?? defaultBestOf.quarter;
   if (semiInput) semiInput.value = bestOf.semi ?? defaultBestOf.semi;
   if (finalInput) finalInput.value = bestOf.final ?? defaultBestOf.final;
   applyBestOfToSettings(tournament.bestOf || defaultBestOf);
@@ -2094,7 +2495,12 @@ function renderMatchCard(match, lookup, playersById) {
   const vetoData = state.matchVetoes?.[match.id] || null;
   const vetoSummary = vetoData?.maps?.length
     ? `<div class="veto-summary">${vetoData.maps
-        .map((m, idx) => `<span class="pill">${idx + 1}. ${escapeHtml(m.map)} (${escapeHtml(m.picker || "Player")})</span>`)
+        .map(
+          (m, idx) =>
+            `<span class="pill">${idx + 1}. ${escapeHtml(m.map)} (${escapeHtml(
+              m.picker || "Player"
+            )})</span>`
+        )
         .join("")}</div>`
     : "";
   const selectValA = getSelectValue(match, 0, bestOf);
@@ -2107,7 +2513,9 @@ function renderMatchCard(match, lookup, playersById) {
       <span>${statusTag}</span>
       <div class="match-actions">
         <span class="badge muted">Bo${bestOf}</span>
-        <button class="icon-btn info-btn" data-match-id="${match.id}" aria-label="View map picks">i</button>
+        <button class="icon-btn info-btn" data-match-id="${
+          match.id
+        }" aria-label="View map picks">i</button>
       </div>
     </div>
     ${renderPlayerRow(pA, selectValA, "A", bestOf)}
@@ -2163,7 +2571,9 @@ function renderPlayerRow(player, score, label) {
       <span class="seed-chip">#${player.seed || "?"}</span>
       <div>
         <strong>${escapeHtml(player.name)}</strong>
-        <div class="helper">${player.points || 0} pts • ${player.mmr || 0} MMR</div>
+        <div class="helper">${player.points || 0} pts • ${
+    player.mmr || 0
+  } MMR</div>
       </div>
     </div>
     <select class="result-select" name="score-${label}" data-player="${label}">
@@ -2176,9 +2586,14 @@ function renderScoreOptions(current, bestOf = 3) {
   const isWalkover = String(current).toUpperCase() === "W";
   const maxWins = Math.max(1, Math.ceil((bestOf || 1) / 2));
   const options = Array.from({ length: maxWins + 1 }).map(
-    (_, val) => `<option value="${val}" ${Number(current) === val ? "selected" : ""}>${val}</option>`
+    (_, val) =>
+      `<option value="${val}" ${
+        Number(current) === val ? "selected" : ""
+      }>${val}</option>`
   );
-  options.push(`<option value="W" ${isWalkover ? "selected" : ""}>w/o</option>`);
+  options.push(
+    `<option value="W" ${isWalkover ? "selected" : ""}>w/o</option>`
+  );
   return options.join("");
 }
 
@@ -2248,7 +2663,12 @@ function annotateConnectorPlayers(lookup, playersById) {
     }
 
     let shared = Array.from(fromUnion).filter((id) => toSet.has(id));
-    if (!shared.length && toMatch.walkover !== "bye" && toMatch.winnerId && fromUnion.has(toMatch.winnerId)) {
+    if (
+      !shared.length &&
+      toMatch.walkover !== "bye" &&
+      toMatch.winnerId &&
+      fromUnion.has(toMatch.winnerId)
+    ) {
       shared = [toMatch.winnerId];
     }
     if (!shared.length && fromUnion.size === 1) {
@@ -2269,7 +2689,9 @@ function renderActivity() {
     .reverse()
     .map(
       (entry) =>
-        `<li><strong>${escapeHtml(entry.message)}</strong><span class="helper">${formatTime(
+        `<li><strong>${escapeHtml(
+          entry.message
+        )}</strong><span class="helper">${formatTime(
           entry.timestamp
         )}</span></li>`
     );
@@ -2352,7 +2774,9 @@ function syncFromRemote(incoming) {
 
 function saveState(next, options = {}) {
   const timestamp =
-    options.keepTimestamp && typeof next?.lastUpdated === "number" ? next.lastUpdated : Date.now();
+    options.keepTimestamp && typeof next?.lastUpdated === "number"
+      ? next.lastUpdated
+      : Date.now();
   state = { ...state, ...next, lastUpdated: timestamp };
   try {
     localStorage.setItem(getStorageKey(), JSON.stringify(state));
@@ -2378,9 +2802,12 @@ function getBestOfForMatch(match) {
   const bestOf = currentTournamentMeta?.bestOf || defaultBestOf;
   const winnersRounds = state.bracket?.winners?.length || 0;
   if (match.bracket === "winners") {
-    if (match.round === winnersRounds) return bestOf.final || defaultBestOf.final;
-    if (match.round === winnersRounds - 1) return bestOf.semi || defaultBestOf.semi;
-    if (match.round === winnersRounds - 2) return bestOf.quarter || defaultBestOf.quarter;
+    if (match.round === winnersRounds)
+      return bestOf.final || defaultBestOf.final;
+    if (match.round === winnersRounds - 1)
+      return bestOf.semi || defaultBestOf.semi;
+    if (match.round === winnersRounds - 2)
+      return bestOf.quarter || defaultBestOf.quarter;
     return bestOf.upper || defaultBestOf.upper;
   }
   return bestOf.lower || defaultBestOf.lower;
@@ -2423,7 +2850,9 @@ async function loadTournamentStateRemote(slug) {
     const snap = await getDoc(doc(db, TOURNAMENT_STATE_COLLECTION, slug));
     if (!snap.exists()) return null;
     const data = snap.data() || {};
-    const lastUpdated = data.lastUpdated?.toMillis ? data.lastUpdated.toMillis() : data.lastUpdated;
+    const lastUpdated = data.lastUpdated?.toMillis
+      ? data.lastUpdated.toMillis()
+      : data.lastUpdated;
     return { ...data, lastUpdated: lastUpdated || Date.now() };
   } catch (_) {
     return null;
@@ -2434,12 +2863,21 @@ async function persistTournamentStateRemote(snapshot) {
   if (!currentSlug) return;
   try {
     const ref = doc(db, TOURNAMENT_STATE_COLLECTION, currentSlug);
-    const bracket = snapshot.bracket ? serializeBracket(snapshot.bracket) : null;
-    const payload = { ...snapshot, bracket, lastUpdated: snapshot.lastUpdated || Date.now() };
+    const bracket = snapshot.bracket
+      ? serializeBracket(snapshot.bracket)
+      : null;
+    const payload = {
+      ...snapshot,
+      bracket,
+      lastUpdated: snapshot.lastUpdated || Date.now(),
+    };
     await setDoc(ref, payload, { merge: true });
   } catch (_) {
     console.error("Failed to persist tournament state to Firestore", _);
-    showToast?.("Could not sync tournament state to Firestore. Changes stay local.", "error");
+    showToast?.(
+      "Could not sync tournament state to Firestore. Changes stay local.",
+      "error"
+    );
   }
 }
 
@@ -2489,7 +2927,8 @@ function sanitizeUrl(url) {
   try {
     const normalized = url.startsWith("http") ? url : `https://${url}`;
     const safe = new URL(normalized);
-    if (!["http:", "https:"].includes(safe.protocol)) throw new Error("Invalid protocol");
+    if (!["http:", "https:"].includes(safe.protocol))
+      throw new Error("Invalid protocol");
     return safe.toString();
   } catch (_) {
     return "";
@@ -2538,7 +2977,9 @@ function layoutUpperBracket(bracket, lookup, playersById) {
         positions.set(match.id, { x, y });
       } else {
         const parents = match.sources
-          .map((src) => (src?.type === "match" ? positions.get(src.matchId) : null))
+          .map((src) =>
+            src?.type === "match" ? positions.get(src.matchId) : null
+          )
           .filter(Boolean);
         const parentYs = parents.map((p) => p.y + CARD_HEIGHT / 2);
         const yCenter =
@@ -2563,16 +3004,23 @@ function layoutUpperBracket(bracket, lookup, playersById) {
       maxY = Math.max(maxY, pos.y + CARD_HEIGHT);
       const participants = resolveParticipants(match, lookup, playersById);
       const [pA, pB] = participants;
-      matchCards.push(renderSimpleMatch(match, pA, pB, pos.x, pos.y, CARD_HEIGHT, CARD_WIDTH));
+      matchCards.push(
+        renderSimpleMatch(match, pA, pB, pos.x, pos.y, CARD_HEIGHT, CARD_WIDTH)
+      );
 
       if (rIdx > 0) {
         const srcs = match.sources
-          .map((src) => (src?.type === "match" ? positions.get(src.matchId) : null))
+          .map((src) =>
+            src?.type === "match" ? positions.get(src.matchId) : null
+          )
           .filter(Boolean);
         const parentIds = (match.sources || [])
           .map((s) => (s?.type === "match" ? s.matchId : null))
           .filter(Boolean);
-        if (srcs.length === 2 && matchCards.some((m) => m.includes(`data-match-id="${match.id}"`))) {
+        if (
+          srcs.length === 2 &&
+          matchCards.some((m) => m.includes(`data-match-id="${match.id}"`))
+        ) {
           const midY1 = srcs[0].y + CARD_HEIGHT / 2;
           const midY2 = srcs[1].y + CARD_HEIGHT / 2;
           const childMidY = pos.y + CARD_HEIGHT / 2;
@@ -2616,10 +3064,12 @@ function layoutUpperBracket(bracket, lookup, playersById) {
   const titles = winners
     .map((round, idx) => {
       const bestOfLabel = round?.length ? getBestOfForMatch(round[0]) : null;
-      const boBadge = bestOfLabel ? `<span class="round-bo">Bo${bestOfLabel}</span>` : "";
-      return `<div class="round-title row-title" style="left:${idx * (CARD_WIDTH + H_GAP)}px;">${
-        round.name || `Round ${idx + 1}`
-      } ${boBadge}</div>`;
+      const boBadge = bestOfLabel
+        ? `<span class="round-bo">Bo${bestOfLabel}</span>`
+        : "";
+      return `<div class="round-title row-title" style="left:${
+        idx * (CARD_WIDTH + H_GAP)
+      }px;">${round.name || `Round ${idx + 1}`} ${boBadge}</div>`;
     })
     .join("");
 
@@ -2640,19 +3090,28 @@ function formatConnectorMeta(meta = {}) {
 
 function makeConnector(x1, y1, x2, y2, meta = {}) {
   const attr = formatConnectorMeta(meta);
-  return `<div class="connector h" ${attr} style="left:${Math.min(x1, x2)}px; top:${y1}px; width:${Math.abs(
-    x2 - x1
-  )}px;"></div>`;
+  return `<div class="connector h" ${attr} style="left:${Math.min(
+    x1,
+    x2
+  )}px; top:${y1}px; width:${Math.abs(x2 - x1)}px;"></div>`;
 }
 
 function makeVConnector(x, y1, y2, meta = {}) {
   const attr = formatConnectorMeta(meta);
-  return `<div class="connector v" ${attr} style="left:${x}px; top:${Math.min(y1, y2)}px; height:${Math.abs(
-    y2 - y1
-  )}px;"></div>`;
+  return `<div class="connector v" ${attr} style="left:${x}px; top:${Math.min(
+    y1,
+    y2
+  )}px; height:${Math.abs(y2 - y1)}px;"></div>`;
 }
 
-function layoutBracketSection(rounds, titlePrefix, lookup, playersById, offsetX, offsetY) {
+function layoutBracketSection(
+  rounds,
+  titlePrefix,
+  lookup,
+  playersById,
+  offsetX,
+  offsetY
+) {
   if (!rounds?.length) {
     return { html: "", height: 0 };
   }
@@ -2679,13 +3138,17 @@ function layoutBracketSection(rounds, titlePrefix, lookup, playersById, offsetX,
         maxX = Math.max(maxX, x + CARD_WIDTH);
       } else {
         const parents = match.sources
-          .map((src) => (src?.type === "match" ? positions.get(src.matchId) : null))
+          .map((src) =>
+            src?.type === "match" ? positions.get(src.matchId) : null
+          )
           .filter(Boolean);
         const parentYs = parents.map((p) => p.y + CARD_HEIGHT / 2);
+        const baseY = offsetY + mIdx * (CARD_HEIGHT + V_GAP);
+        const baseCenter = baseY + CARD_HEIGHT / 2;
         const yCenter =
           parentYs.length === 2
             ? (parentYs[0] + parentYs[1]) / 2
-            : parentYs[0] || offsetY + mIdx * (CARD_HEIGHT + V_GAP);
+            : baseCenter; // snap to grid when fewer than 2 parents to avoid overlap
         const y = yCenter - CARD_HEIGHT / 2;
         positions.set(match.id, { x, y, parents });
         maxY = Math.max(maxY, y + CARD_HEIGHT);
@@ -2700,6 +3163,7 @@ function layoutBracketSection(rounds, titlePrefix, lookup, playersById, offsetX,
       if (!pos) return;
       const participants = resolveParticipants(match, lookup, playersById);
       const [pA, pB] = participants;
+      const sources = Array.isArray(match.sources) ? match.sources : [];
 
       // If one side is still TBD, keep it pending with zeroed scores
       if (!pA || !pB) {
@@ -2710,9 +3174,11 @@ function layoutBracketSection(rounds, titlePrefix, lookup, playersById, offsetX,
         match.scores = [0, 0];
       }
 
-      // Auto-advance byes only in the first round
+      // Auto-advance structural byes (missing source entirely)
       const hasOne = (pA && !pB) || (!pA && pB);
-      if (rIdx === 0 && hasOne) {
+      const isStructuralBye =
+        hasOne && (!sources[0] || !sources[1]); // one side has no source at all
+      if (isStructuralBye) {
         const winner = pA || pB;
         if (winner) {
           match.winnerId = winner.id;
@@ -2723,7 +3189,16 @@ function layoutBracketSection(rounds, titlePrefix, lookup, playersById, offsetX,
         }
       } else {
         matchCards.push(
-          renderSimpleMatch(match, pA, pB, pos.x, pos.y, CARD_HEIGHT, CARD_WIDTH, titlePrefix)
+          renderSimpleMatch(
+            match,
+            pA,
+            pB,
+            pos.x,
+            pos.y,
+            CARD_HEIGHT,
+            CARD_WIDTH,
+            titlePrefix
+          )
         );
         renderedMatches.add(match.id);
       }
@@ -2750,19 +3225,41 @@ function layoutBracketSection(rounds, titlePrefix, lookup, playersById, offsetX,
             const childMidY = pos.y + CARD_HEIGHT / 2;
             const junctionX = pos.x - 30;
             connectors.push(
-              makeConnector(renderedParents[0].pos.x + CARD_WIDTH, midY1, junctionX, midY1, {
+              makeConnector(
+                renderedParents[0].pos.x + CARD_WIDTH,
+                midY1,
+                junctionX,
+                midY1,
+                {
+                  from: parentIds[0],
+                  to: match.id,
+                }
+              )
+            );
+            connectors.push(
+              makeConnector(
+                renderedParents[1].pos.x + CARD_WIDTH,
+                midY2,
+                junctionX,
+                midY2,
+                {
+                  from: parentIds[1],
+                  to: match.id,
+                }
+              )
+            );
+            connectors.push(
+              makeVConnector(junctionX, midY1, childMidY, {
                 from: parentIds[0],
                 to: match.id,
               })
             );
             connectors.push(
-              makeConnector(renderedParents[1].pos.x + CARD_WIDTH, midY2, junctionX, midY2, {
+              makeVConnector(junctionX, midY2, childMidY, {
                 from: parentIds[1],
                 to: match.id,
               })
             );
-            connectors.push(makeVConnector(junctionX, midY1, childMidY, { from: parentIds[0], to: match.id }));
-            connectors.push(makeVConnector(junctionX, midY2, childMidY, { from: parentIds[1], to: match.id }));
             connectors.push(
               makeConnector(junctionX, childMidY, pos.x, childMidY, {
                 from: match.id,
@@ -2776,9 +3273,17 @@ function layoutBracketSection(rounds, titlePrefix, lookup, playersById, offsetX,
             const junctionX = pos.x - 30;
             const parentEndX = renderedParents[0].pos.x + CARD_WIDTH;
             connectors.push(
-              makeConnector(parentEndX, midY, junctionX, midY, { from: parentIds[0], to: match.id })
+              makeConnector(parentEndX, midY, junctionX, midY, {
+                from: parentIds[0],
+                to: match.id,
+              })
             );
-            connectors.push(makeVConnector(junctionX, midY, childMidY, { from: parentIds[0], to: match.id }));
+            connectors.push(
+              makeVConnector(junctionX, midY, childMidY, {
+                from: parentIds[0],
+                to: match.id,
+              })
+            );
             connectors.push(
               makeConnector(junctionX, childMidY, pos.x, childMidY, {
                 from: match.id,
@@ -2795,16 +3300,20 @@ function layoutBracketSection(rounds, titlePrefix, lookup, playersById, offsetX,
   const titles = rounds
     .map((round, idx) => {
       const bestOfLabel = round?.length ? getBestOfForMatch(round[0]) : null;
-      const boBadge = bestOfLabel ? `<span class="round-bo">Bo${bestOfLabel}</span>` : "";
+      const boBadge = bestOfLabel
+        ? `<span class="round-bo">Bo${bestOfLabel}</span>`
+        : "";
       return `<div class="round-title row-title" style="left:${
         offsetX + idx * (CARD_WIDTH + H_GAP)
-      }px;">${round.name || `${titlePrefix} Round ${idx + 1}`} ${boBadge}</div>`;
+      }px;">${
+        round.name || `${titlePrefix} Round ${idx + 1}`
+      } ${boBadge}</div>`;
     })
     .join("");
 
-  const html = `<div class="tree-bracket" style="height:${maxY + 20}px; margin-top:${
-    titlePrefix === "Lower" ? 16 : 0
-  }px;">
+  const html = `<div class="tree-bracket" style="height:${
+    maxY + 20
+  }px; margin-top:${titlePrefix === "Lower" ? 16 : 0}px;">
     ${titles}
     ${matchCards.join("")}
     ${connectors.join("")}
@@ -2827,39 +3336,62 @@ function renderSimpleMatch(match, pA, pB, x, y, h, w, prefix = "") {
   const summary =
     vetoData?.maps?.length && showScores
       ? `<div class="veto-summary">${vetoData.maps
-          .map((m, idx) => `<span class="pill">${idx + 1}. ${escapeHtml(m.map)} (${escapeHtml(m.picker || "Player")})</span>`)
+          .map(
+            (m, idx) =>
+              `<span class="pill">${idx + 1}. ${escapeHtml(
+                m.map
+              )} (${escapeHtml(m.picker || "Player")})</span>`
+          )
           .join("")}</div>`
       : "";
   const hasPlayers = Boolean(pA && pB);
   const matchNumber = parseMatchNumber(match.id);
 
   const matchNumberLabel =
-    matchNumber !== null ? matchNumber : escapeHtml(prefix ? `${prefix}${match.id}` : match.id);
+    matchNumber !== null
+      ? matchNumber
+      : escapeHtml(prefix ? `${prefix}${match.id}` : match.id);
 
-  return `<div class="match-card tree" data-match-id="${match.id}" style="top:${y}px; left:${x}px; width:${w}px; height:${h}px;">
+  return `<div class="match-card tree" data-match-id="${
+    match.id
+  }" style="top:${y}px; left:${x}px; width:${w}px; height:${h}px;">
     <span class="match-number">${matchNumberLabel}</span>
-    <div class="row ${match.winnerId === pA?.id ? "winner" : ""}" data-player-id="${pA?.id || ""}">
-      <span class="name"><span class="race-strip ${raceClassA}"></span><span class="name-text">${escapeHtml(aName)}</span></span>
+    <div class="row ${
+      match.winnerId === pA?.id ? "winner" : ""
+    }" data-player-id="${pA?.id || ""}">
+      <span class="name"><span class="race-strip ${raceClassA}"></span><span class="name-text">${escapeHtml(
+    aName
+  )}</span></span>
       <div class="row-actions">
-        <select class="score-select ${match.winnerId === pA?.id ? "winner" : ""}" name="score-${match.id}-A" data-match-id="${match.id}" data-player-idx="0" ${
-    showScores ? "" : 'style="display:none;"'
-  }>
+        <select class="score-select ${
+          match.winnerId === pA?.id ? "winner" : ""
+        }" name="score-${match.id}-A" data-match-id="${
+    match.id
+  }" data-player-idx="0" ${showScores ? "" : 'style="display:none;"'}>
           ${renderScoreOptions(selectValA, bestOf)}
         </select>
       </div>
     </div>
-    <div class="row ${match.winnerId === pB?.id ? "winner" : ""}" data-player-id="${pB?.id || ""}">
-      <span class="name"><span class="race-strip ${raceClassB}"></span><span class="name-text">${escapeHtml(bName)}</span></span>
+    <div class="row ${
+      match.winnerId === pB?.id ? "winner" : ""
+    }" data-player-id="${pB?.id || ""}">
+      <span class="name"><span class="race-strip ${raceClassB}"></span><span class="name-text">${escapeHtml(
+    bName
+  )}</span></span>
       <div class="row-actions">
-        <select class="score-select ${match.winnerId === pB?.id ? "winner" : ""}" name="score-${match.id}-B" data-match-id="${match.id}" data-player-idx="1" ${
-    showScores ? "" : 'style="display:none;"'
-  }>
+        <select class="score-select ${
+          match.winnerId === pB?.id ? "winner" : ""
+        }" name="score-${match.id}-B" data-match-id="${
+    match.id
+  }" data-player-idx="1" ${showScores ? "" : 'style="display:none;"'}>
           ${renderScoreOptions(selectValB, bestOf)}
         </select>
       </div>
     </div>
     <div class="match-info-col">
-      <button class="icon-btn info-btn" data-match-id="${match.id}" aria-label="View map picks">i</button>
+      <button class="icon-btn info-btn" data-match-id="${
+        match.id
+      }" aria-label="View map picks">i</button>
     </div>
     ${summary}
   </div>`;
@@ -2900,7 +3432,9 @@ function attachMatchHoverHandlers() {
 
   grid.addEventListener("mouseout", (e) => {
     if (e.target.closest(".row[data-player-id]")) {
-      document.querySelectorAll(".connector.highlight").forEach((c) => c.classList.remove("highlight"));
+      document
+        .querySelectorAll(".connector.highlight")
+        .forEach((c) => c.classList.remove("highlight"));
     }
   });
 }
@@ -2909,7 +3443,4 @@ function getMatchLookupForTesting() {
   return getMatchLookup(state.bracket);
 }
 
-export {
-  getMatchLookupForTesting,
-  rebuildBracket,
-};
+export { getMatchLookupForTesting, rebuildBracket };

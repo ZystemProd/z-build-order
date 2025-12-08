@@ -595,7 +595,7 @@ a {
 .tree-bracket {
   position: relative;
   min-height: 200px;
-  --card-width: 140px;
+  --card-width: 260px;
 }
 
 .tree-bracket .row-title {
@@ -692,6 +692,8 @@ a {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .result-select,
@@ -736,6 +738,20 @@ a {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+.match-card.tree .seed-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--stroke);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .row.highlight-player .name-text {
