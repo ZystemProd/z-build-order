@@ -1616,45 +1616,59 @@ function buildBracket(players) {
   }
   const bracketSize = Math.max(4, pow2(players.length));
 
-  // Generate standard top/bottom seed placement (1 at top, 2 at bottom, etc.)
+  // Seed placement array (size = bracketSize) with nulls for byes
   const seedPositions = generateSeedPositions(bracketSize);
   const seedMap = new Map(players.map((p) => [p.seed, p]));
   const placedPlayers = seedPositions.map((seed) => seedMap.get(seed) || null);
 
-  const pairings = [];
-  for (let i = 0; i < bracketSize; i += 2) {
-    pairings.push([placedPlayers[i], placedPlayers[i + 1]]);
-  }
-
+  // Build winners bracket compressing structural byes (skip creating matches
+  // where both sides are empty, and auto-advance single players without
+  // generating a bye match). This mirrors Challonge when entrants don't fill
+  // the bracket (e.g., 9 players -> first WB round has only one real match).
   const winners = [];
-  const round1 = pairings.map((pair, idx) =>
-    createMatch(
-      "winners",
-      1,
-      idx + 1,
-      playerSource(pair[0]),
-      playerSource(pair[1])
-    )
-  );
-  winners.push(round1);
+  let current = placedPlayers.map((p) => playerSource(p));
+  let roundNumber = 1;
 
-  let previousRound = round1;
-  let roundNumber = 2;
-  while (previousRound.length > 1) {
+  while (current.length > 1) {
     const next = [];
-    for (let i = 0; i < previousRound.length / 2; i++) {
-      next.push(
-        createMatch(
-          "winners",
-          roundNumber,
-          i + 1,
-          winnerSource(previousRound[2 * i]),
-          winnerSource(previousRound[2 * i + 1])
-        )
+    const round = [];
+    for (let i = 0; i < current.length; i += 2) {
+      const srcA = current[i] || null;
+      const srcB = current[i + 1] || null;
+
+      if (!srcA && !srcB) {
+        next.push(null);
+        continue;
+      }
+
+      if (srcA && !srcB) {
+        // bye: auto-advance A without creating a match
+        next.push(srcA);
+        continue;
+      }
+
+      if (!srcA && srcB) {
+        // bye: auto-advance B without creating a match
+        next.push(srcB);
+        continue;
+      }
+
+      // Real match
+      const match = createMatch(
+        "winners",
+        roundNumber,
+        round.length + 1,
+        srcA,
+        srcB
       );
+      round.push(match);
+      next.push(winnerSource(match));
     }
-    winners.push(next);
-    previousRound = next;
+
+    if (round.length) {
+      winners.push(round);
+    }
+    current = next;
     roundNumber++;
   }
 
@@ -1689,116 +1703,89 @@ function buildLosersBracket(winners) {
   const losers = [];
   if (!winners.length) return losers;
 
-  const addMatchIfNeeded = (arr, round, index, sourceA, sourceB) => {
-    if (!sourceA && !sourceB) return null;
-    const m = createMatch("losers", round, index, sourceA, sourceB);
-    arr.push(m);
-    return m;
+  // Desired LB match counts follow Challonge minor/major cadence based on the
+  // effective power-of-two bracket size (excluding play-in round), with a
+  // prepended play-in loss round when present.
+  const effectiveSize = Math.max(2, pow2(Math.min(winners.length > 1 ? winners[1].length * 2 : winners[0]?.length * 2 || 2, 64)));
+  const k = Math.max(1, Math.round(Math.log2(effectiveSize)));
+  const templateCounts = [];
+  for (let i = k - 2; i >= 0; i--) {
+    const val = 1 << i;
+    templateCounts.push(val);
+    templateCounts.push(val);
+  }
+  const playInMatches = winners[0]?.length || 0;
+  const desiredCounts =
+    playInMatches && templateCounts.length
+      ? [playInMatches, ...templateCounts]
+      : templateCounts.length
+      ? templateCounts
+      : playInMatches
+      ? [playInMatches]
+      : [];
+
+  // Collect losers per WB round
+  const losersByRound = winners.map((round) =>
+    (round || []).map((m) => safeLoserSource(m)).filter(Boolean)
+  );
+
+  const pairRound = (entrants, roundNum, matchCount) => {
+    const round = [];
+    for (let i = 0; i < matchCount; i++) {
+      const a = entrants.shift() || null;
+      const b = entrants.shift() || null;
+      round.push(
+        createMatch(
+          "losers",
+          roundNum,
+          round.length + 1,
+          a,
+          b
+        )
+      );
+    }
+    losers.push(round);
+    // winners advance
+    return round.map((m) => safeWinnerSource(m)).filter(Boolean);
   };
 
-  // Total LB rounds: two per WB round minus one (Challonge-style-ish)
-  const totalLbRounds = Math.max(1, 2 * winners.length - 1);
+  let roundNum = 1;
+  let wbIdx = 0;
+  let carry = [];
 
-  // LB Round 1 - losers from WB round 1 (only from real, non-bye matches)
-  const firstRound = [];
-  const wbRound1 = winners[0] || [];
-  for (let i = 0; i < wbRound1.length; i += 2) {
-    addMatchIfNeeded(
-      firstRound,
-      1,
-      firstRound.length + 1,
-      safeLoserSource(wbRound1[i]),
-      safeLoserSource(wbRound1[i + 1])
-    );
-  }
-  if (firstRound.length) losers.push(firstRound);
+  desiredCounts.forEach((matchCount) => {
+    const neededEntrants = matchCount * 2;
+    const entrants = [];
 
-  // Track sources waiting to be paired in the next LB step
-  let pendingSources = firstRound
-    .map((m) => safeWinnerSource(m))
-    .filter(Boolean);
+    // bring carry first
+    if (carry.length) {
+      entrants.push(...carry);
+      carry = [];
+    }
 
-  // Subsequent LB rounds
-  for (let wbRound = 2; wbRound <= winners.length; wbRound++) {
-    const dropRoundNum = 2 * (wbRound - 1);
-    const consolidateRoundNum = dropRoundNum - 1;
-
-    // Odd LB round: consolidate winners from previous LB round
-    if (consolidateRoundNum > 1 && pendingSources.length > 1) {
-      const consolidate = [];
-      const nextSources = [];
-      while (pendingSources.length >= 2) {
-        const srcA = pendingSources.shift();
-        const srcB = pendingSources.shift();
-        const m = addMatchIfNeeded(
-          consolidate,
-          consolidateRoundNum,
-          consolidate.length + 1,
-          srcA,
-          srcB
-        );
-        if (m) nextSources.push(safeWinnerSource(m));
+    // pull losers from WB rounds until we have enough entrants or we exhaust
+    while (entrants.length < neededEntrants && wbIdx < losersByRound.length) {
+      const pool = losersByRound[wbIdx];
+      while (entrants.length < neededEntrants && pool.length) {
+        entrants.push(pool.shift());
       }
-      if (consolidate.length) {
-        losers.push(consolidate);
-      }
-      // Carry forward winners plus any leftover unpaired entrant
-      pendingSources = nextSources.concat(pendingSources);
+      if (!pool.length) wbIdx++;
+      else break;
     }
 
-    // Even LB round: winners from carry vs losers from WB[wbRound-1]
-    const dropIns = winners[wbRound - 1] || [];
-    const dropRound = [];
-
-    const entrants = [
-      ...pendingSources,
-      ...dropIns.map((m) => safeLoserSource(m)).filter(Boolean),
-    ];
-
-    const nextPending = [];
-    while (entrants.length >= 2) {
-      const srcA = entrants.shift();
-      const srcB = entrants.shift();
-      const m = addMatchIfNeeded(
-        dropRound,
-        dropRoundNum,
-        dropRound.length + 1,
-        srcA,
-        srcB
-      );
-      if (m) nextPending.push(safeWinnerSource(m));
-    }
-    // If one entrant remains, bubble it forward instead of creating a single-source match
-    if (entrants.length === 1) {
-      nextPending.push(entrants.shift());
+    // If still short, leave as TBD (nulls) to keep bracket slots; pair only up to matchCount
+    while (entrants.length < neededEntrants) {
+      entrants.push(null);
     }
 
-    if (dropRound.length) {
-      losers.push(dropRound);
-    }
-    pendingSources = nextPending;
-  }
+    // Pair into this LB round
+    carry = pairRound(entrants, roundNum++, matchCount);
+  });
 
-  // Final consolidation: ensure a single LB winner if needed
-  const lastRoundNum = totalLbRounds;
-  while (pendingSources.length > 1) {
-    const finalRound = [];
-    const nextPending = [];
-    while (pendingSources.length >= 2) {
-      const m = addMatchIfNeeded(
-        finalRound,
-        lastRoundNum,
-        finalRound.length + 1,
-        pendingSources.shift(),
-        pendingSources.shift()
-      );
-      if (m) nextPending.push(safeWinnerSource(m));
-    }
-    if (finalRound.length) {
-      losers.push(finalRound);
-    }
-    pendingSources = nextPending.concat(pendingSources);
-    if (!finalRound.length) break; // safety to avoid potential infinite loops
+  // Consolidate any remaining carry
+  while (carry.length >= 2) {
+    const matchCount = Math.floor(carry.length / 2);
+    carry = pairRound([...carry], roundNum++, matchCount);
   }
 
   return losers;
@@ -3005,7 +2992,17 @@ function layoutUpperBracket(bracket, lookup, playersById) {
       const participants = resolveParticipants(match, lookup, playersById);
       const [pA, pB] = participants;
       matchCards.push(
-        renderSimpleMatch(match, pA, pB, pos.x, pos.y, CARD_HEIGHT, CARD_WIDTH)
+        renderSimpleMatch(
+          match,
+          pA,
+          pB,
+          pos.x,
+          pos.y,
+          CARD_HEIGHT,
+          CARD_WIDTH,
+          "",
+          ""
+        )
       );
 
       if (rIdx > 0) {
@@ -3150,6 +3147,7 @@ function layoutBracketSection(
             ? (parentYs[0] + parentYs[1]) / 2
             : baseCenter; // snap to grid when fewer than 2 parents to avoid overlap
         const y = yCenter - CARD_HEIGHT / 2;
+
         positions.set(match.id, { x, y, parents });
         maxY = Math.max(maxY, y + CARD_HEIGHT);
         maxX = Math.max(maxX, x + CARD_WIDTH);
@@ -3165,43 +3163,43 @@ function layoutBracketSection(
       const [pA, pB] = participants;
       const sources = Array.isArray(match.sources) ? match.sources : [];
 
-      // If one side is still TBD, keep it pending with zeroed scores
-      if (!pA || !pB) {
-        match.winnerId = null;
-        match.loserId = null;
-        match.status = "pending";
-        match.walkover = null;
-        match.scores = [0, 0];
-      }
-
-      // Auto-advance structural byes (missing source entirely)
+      // Auto-advance structural byes so downstream slots fill
       const hasOne = (pA && !pB) || (!pA && pB);
       const isStructuralBye =
-        hasOne && (!sources[0] || !sources[1]); // one side has no source at all
-      if (isStructuralBye) {
+        hasOne && (!sources[0] || !sources[1]); // missing a source entirely
+      if (isStructuralBye && match.status !== "complete") {
         const winner = pA || pB;
         if (winner) {
-          match.winnerId = winner.id;
-          match.loserId = null;
-          match.status = "complete";
-          match.scores = [0, 0];
-          match.walkover = "bye";
+          finalizeMatchResult(match, {
+            winnerId: winner.id,
+            loserId: null,
+            scores: [0, 0],
+            walkover: "bye",
+            status: "complete",
+          });
         }
-      } else {
-        matchCards.push(
-          renderSimpleMatch(
-            match,
-            pA,
-            pB,
-            pos.x,
-            pos.y,
-            CARD_HEIGHT,
-            CARD_WIDTH,
-            titlePrefix
-          )
-        );
-        renderedMatches.add(match.id);
       }
+
+      // Hide only WB Round 1 structural byes; keep other TBD matches visible
+      const hideMatch =
+        isStructuralBye &&
+        match.bracket === "winners" &&
+        match.round === 1;
+      const styleHide = hideMatch ? "visibility:hidden;" : "";
+      matchCards.push(
+        renderSimpleMatch(
+          match,
+          pA,
+          pB,
+          pos.x,
+          pos.y,
+          CARD_HEIGHT,
+          CARD_WIDTH,
+          titlePrefix,
+          styleHide
+        )
+      );
+      renderedMatches.add(match.id);
 
       if (rIdx > 0) {
         const sources = Array.isArray(match.sources) ? match.sources : [];
@@ -3322,7 +3320,17 @@ function layoutBracketSection(
   return { html, height: maxY };
 }
 
-function renderSimpleMatch(match, pA, pB, x, y, h, w, prefix = "") {
+function renderSimpleMatch(
+  match,
+  pA,
+  pB,
+  x,
+  y,
+  h,
+  w,
+  prefix = "",
+  extraStyle = ""
+) {
   const aName = pA ? pA.name : "TBD";
   const bName = pB ? pB.name : "TBD";
   const raceClassA = raceClassName(pA?.race);
@@ -3354,12 +3362,12 @@ function renderSimpleMatch(match, pA, pB, x, y, h, w, prefix = "") {
 
   return `<div class="match-card tree" data-match-id="${
     match.id
-  }" style="top:${y}px; left:${x}px; width:${w}px; height:${h}px;">
+  }" style="top:${y}px; left:${x}px; width:${w}px; height:${h}px; ${extraStyle}">
     <span class="match-number">${matchNumberLabel}</span>
     <div class="row ${
       match.winnerId === pA?.id ? "winner" : ""
     }" data-player-id="${pA?.id || ""}">
-      <span class="name"><span class="race-strip ${raceClassA}"></span><span class="name-text">${escapeHtml(
+      <span class="name">${pA ? `<span class="seed-chip">#${pA.seed || "?"}</span>` : ""}<span class="race-strip ${raceClassA}"></span><span class="name-text">${escapeHtml(
     aName
   )}</span></span>
       <div class="row-actions">
@@ -3375,7 +3383,7 @@ function renderSimpleMatch(match, pA, pB, x, y, h, w, prefix = "") {
     <div class="row ${
       match.winnerId === pB?.id ? "winner" : ""
     }" data-player-id="${pB?.id || ""}">
-      <span class="name"><span class="race-strip ${raceClassB}"></span><span class="name-text">${escapeHtml(
+      <span class="name">${pB ? `<span class="seed-chip">#${pB.seed || "?"}</span>` : ""}<span class="race-strip ${raceClassB}"></span><span class="name-text">${escapeHtml(
     bName
   )}</span></span>
       <div class="row-actions">
