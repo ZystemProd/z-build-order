@@ -1611,23 +1611,135 @@ function rebuildBracket(force = false, reason = "") {
 
 function buildBracket(players) {
   const seedOrder = players.map((p) => p.id);
-  if (!players.length) {
+  const total = players.length;
+
+  if (!total) {
     return { winners: [], losers: [], finals: null, seedOrder };
   }
-  const bracketSize = Math.max(4, pow2(players.length));
 
-  // Seed placement array (size = bracketSize) with nulls for byes
-  const seedPositions = generateSeedPositions(bracketSize);
+  // Map seed -> player for convenience
   const seedMap = new Map(players.map((p) => [p.seed, p]));
-  const placedPlayers = seedPositions.map((seed) => seedMap.get(seed) || null);
 
-  // Build winners bracket compressing structural byes (skip creating matches
-  // where both sides are empty, and auto-advance single players without
-  // generating a bye match). This mirrors Challonge when entrants don't fill
-  // the bracket (e.g., 9 players -> first WB round has only one real match).
+  // If we have 4 or fewer players, keep the old “simple” behaviour:
+  // just fill up to the next power of two with byes.
+  if (total <= 4) {
+    const bracketSize = Math.max(2, pow2(total));
+    const seedPositions = generateSeedPositions(bracketSize);
+    const placedPlayers = seedPositions.map(
+      (seed) => seedMap.get(seed) || null
+    );
+
+    const winners = [];
+    let current = placedPlayers.map((p) => playerSource(p));
+    let roundNumber = 1;
+
+    while (current.length > 1) {
+      const next = [];
+      const round = [];
+      for (let i = 0; i < current.length; i += 2) {
+        const srcA = current[i] || null;
+        const srcB = current[i + 1] || null;
+
+        if (!srcA && !srcB) {
+          next.push(null);
+          continue;
+        }
+        if (srcA && !srcB) {
+          next.push(srcA);
+          continue;
+        }
+        if (!srcA && srcB) {
+          next.push(srcB);
+          continue;
+        }
+
+        const match = createMatch(
+          "winners",
+          roundNumber,
+          round.length + 1,
+          srcA,
+          srcB
+        );
+        round.push(match);
+        next.push(winnerSource(match));
+      }
+      if (round.length) winners.push(round);
+      current = next;
+      roundNumber++;
+    }
+
+    const losers = buildLosersBracket(winners, bracketSize);
+    const finals = createMatch(
+      "finals",
+      1,
+      1,
+      winnerSource(winners[winners.length - 1][0]),
+      losers.length ? winnerSource(losers[losers.length - 1][0]) : null
+    );
+
+    return { winners, losers, finals, seedOrder };
+  }
+
+  // --- Option A: power-of-two core + play-ins for total > 4 ---
+
+  // Largest power of two <= total (8 for 9–16, 4 for 5–8, etc)
+  const baseSize = 1 << Math.floor(Math.log2(total));
+  const numPlayIns = total - baseSize; // how many play-in matches we need
+
+  // Standard seeding positions for the core bracket (size = baseSize)
+  const seedPositions = generateSeedPositions(baseSize);
+
   const winners = [];
-  let current = placedPlayers.map((p) => playerSource(p));
+  const seedToSource = new Map();
   let roundNumber = 1;
+
+  // 1) Play-in round (Winners Round 1) if we have extra players
+  // Lowest seeds play in; winners “become” the lower core seeds.
+  //
+  // Example for 9 players (baseSize = 8, numPlayIns = 1):
+  //   highSeed = 8, lowSeed = 9  -> winner becomes seed 8.
+  //
+  if (numPlayIns > 0) {
+    const playInRound = [];
+
+    for (let i = 0; i < numPlayIns; i++) {
+      const highSeed = baseSize - numPlayIns + 1 + i;
+      const lowSeed = baseSize + 1 + i;
+
+      const playerHigh = seedMap.get(highSeed) || null;
+      const playerLow = seedMap.get(lowSeed) || null;
+
+      const srcA = playerSource(playerHigh);
+      const srcB = playerSource(playerLow);
+
+      const match = createMatch(
+        "winners",
+        roundNumber,
+        playInRound.length + 1,
+        srcA,
+        srcB
+      );
+      playInRound.push(match);
+
+      // The winner of this play-in will occupy the core seed slot
+      seedToSource.set(highSeed, winnerSource(match));
+    }
+
+    if (playInRound.length) {
+      winners.push(playInRound);
+    }
+    roundNumber++; // next winners round will be the “real” core R1
+  }
+
+  // 2) All core seeds that are NOT part of play-ins are direct entrants
+  for (let seed = 1; seed <= baseSize; seed++) {
+    if (seedToSource.has(seed)) continue; // already mapped from play-ins
+    const p = seedMap.get(seed) || null;
+    seedToSource.set(seed, playerSource(p));
+  }
+
+  // 3) Build the main winners bracket using the core seeding pattern
+  let current = seedPositions.map((seed) => seedToSource.get(seed) || null);
 
   while (current.length > 1) {
     const next = [];
@@ -1640,20 +1752,15 @@ function buildBracket(players) {
         next.push(null);
         continue;
       }
-
       if (srcA && !srcB) {
-        // bye: auto-advance A without creating a match
         next.push(srcA);
         continue;
       }
-
       if (!srcA && srcB) {
-        // bye: auto-advance B without creating a match
         next.push(srcB);
         continue;
       }
 
-      // Real match
       const match = createMatch(
         "winners",
         roundNumber,
@@ -1672,7 +1779,9 @@ function buildBracket(players) {
     roundNumber++;
   }
 
-  const losers = buildLosersBracket(winners);
+  // 4) Losers bracket uses the core size (baseSize) as the template
+  const losers = buildLosersBracket(winners, baseSize);
+
   const finals = createMatch(
     "finals",
     1,
@@ -1699,93 +1808,237 @@ function generateSeedPositions(size) {
   return positions.slice(0, size);
 }
 
-function buildLosersBracket(winners) {
+function buildLosersBracket(winners, baseSize) {
   const losers = [];
   if (!winners.length) return losers;
 
-  // Desired LB match counts follow Challonge minor/major cadence based on the
-  // effective power-of-two bracket size (excluding play-in round), with a
-  // prepended play-in loss round when present.
-  const effectiveSize = Math.max(2, pow2(Math.min(winners.length > 1 ? winners[1].length * 2 : winners[0]?.length * 2 || 2, 64)));
-  const k = Math.max(1, Math.round(Math.log2(effectiveSize)));
-  const templateCounts = [];
-  for (let i = k - 2; i >= 0; i--) {
-    const val = 1 << i;
-    templateCounts.push(val);
-    templateCounts.push(val);
+  // --- Special case: 9 players (8-core + 1 play-in) ---
+  // A = play-in, B–E = WB QFs, F–G = WB SFs, H = WB Final
+  if (
+    baseSize === 8 &&
+    winners.length >= 4 &&
+    winners[0].length === 1 &&
+    winners[1].length === 4 &&
+    winners[2].length === 2 &&
+    winners[3].length === 1
+  ) {
+    const A = winners[0][0];
+    const [B, C, D, E] = winners[1];
+    const [F, G] = winners[2];
+    const [H] = winners[3];
+
+    // L1: K = loser of E vs loser of A
+    const K = createMatch(
+      "losers",
+      1,
+      1,
+      safeLoserSource(E),
+      safeLoserSource(A)
+    );
+    losers.push([K]);
+
+    // L2:
+    //  L = winner of K vs loser of D
+    //  M = loser of C vs loser of B
+    const L = createMatch(
+      "losers",
+      2,
+      1,
+      safeWinnerSource(K),
+      safeLoserSource(D)
+    );
+    const M = createMatch(
+      "losers",
+      2,
+      2,
+      safeLoserSource(C),
+      safeLoserSource(B)
+    );
+    losers.push([L, M]);
+
+    // L3 (LQF):
+    //  N = loser of F vs winner of L
+    //  O = loser of G vs winner of M
+    const N = createMatch(
+      "losers",
+      3,
+      1,
+      safeLoserSource(F),
+      safeWinnerSource(L)
+    );
+    const O = createMatch(
+      "losers",
+      3,
+      2,
+      safeLoserSource(G),
+      safeWinnerSource(M)
+    );
+    losers.push([N, O]);
+
+    // L4 (LSF): P = winner of N vs winner of O
+    const P = createMatch(
+      "losers",
+      4,
+      1,
+      safeWinnerSource(N),
+      safeWinnerSource(O)
+    );
+    losers.push([P]);
+
+    // L5 (LFinal): Q = loser of H vs winner of P
+    const Q = createMatch(
+      "losers",
+      5,
+      1,
+      safeLoserSource(H),
+      safeWinnerSource(P)
+    );
+    losers.push([Q]);
+
+    return losers;
   }
-  const playInMatches = winners[0]?.length || 0;
-  const desiredCounts =
-    playInMatches && templateCounts.length
-      ? [playInMatches, ...templateCounts]
-      : templateCounts.length
-      ? templateCounts
-      : playInMatches
-      ? [playInMatches]
-      : [];
 
-  // Collect losers per WB round
-  const losersByRound = winners.map((round) =>
-    (round || []).map((m) => safeLoserSource(m)).filter(Boolean)
-  );
+  // --- Special case: 10 players (8-core + 2 play-ins) ---
+  // A,B = play-ins, C–F = WB QFs, G,H = WB SFs, I = WB Final
+  if (
+    baseSize === 8 &&
+    winners.length >= 4 &&
+    winners[0].length === 2 &&
+    winners[1].length === 4 &&
+    winners[2].length === 2 &&
+    winners[3].length === 1
+  ) {
+    const [A, B] = winners[0];
+    const [C, D, E, F] = winners[1];
+    const [G, H] = winners[2];
+    const [I] = winners[3];
 
-  const pairRound = (entrants, roundNum, matchCount) => {
+    // L1 (Losers Round 1):
+    //  K = loser of F vs loser of A
+    //  Lm = loser of D vs loser of B
+    const K = createMatch(
+      "losers",
+      1,
+      1,
+      safeLoserSource(F),
+      safeLoserSource(A)
+    );
+    const Lm = createMatch(
+      "losers",
+      1,
+      2,
+      safeLoserSource(D),
+      safeLoserSource(B)
+    );
+    losers.push([K, Lm]);
+
+    // L2 (Losers Round 2):
+    //  M = winner of K vs loser of E
+    //  N = loser of C vs winner of Lm
+    const M = createMatch(
+      "losers",
+      2,
+      1,
+      safeWinnerSource(K),
+      safeLoserSource(E)
+    );
+    const N = createMatch(
+      "losers",
+      2,
+      2,
+      safeLoserSource(C),
+      safeWinnerSource(Lm)
+    );
+    losers.push([M, N]);
+
+    // L3 (Losers Quarter-Final):
+    //  O = loser of G vs winner of M
+    //  P = loser of H vs winner of N
+    const O = createMatch(
+      "losers",
+      3,
+      1,
+      safeLoserSource(G),
+      safeWinnerSource(M)
+    );
+    const P = createMatch(
+      "losers",
+      3,
+      2,
+      safeLoserSource(H),
+      safeWinnerSource(N)
+    );
+    losers.push([O, P]);
+
+    // L4 (Losers Semi-Final): R = winner of O vs winner of P
+    const R = createMatch(
+      "losers",
+      4,
+      1,
+      safeWinnerSource(O),
+      safeWinnerSource(P)
+    );
+    losers.push([R]);
+
+    // L5 (Losers Final): S = loser of I vs winner of R
+    const S = createMatch(
+      "losers",
+      5,
+      1,
+      safeLoserSource(I),
+      safeWinnerSource(R)
+    );
+    losers.push([S]);
+
+    return losers;
+  }
+
+  // --- Generic fallback for all other cases (pure 8, 16, etc.) ---
+
+  const collectLosers = (round) =>
+    (round || []).map((m) => safeLoserSource(m)).filter(Boolean);
+
+  function pairAll(entrants, roundNum) {
     const round = [];
-    for (let i = 0; i < matchCount; i++) {
-      const a = entrants.shift() || null;
-      const b = entrants.shift() || null;
-      round.push(
-        createMatch(
-          "losers",
-          roundNum,
-          round.length + 1,
-          a,
-          b
-        )
-      );
+    const queue = [...entrants];
+
+    while (queue.length >= 2) {
+      const a = queue.shift();
+      const b = queue.shift();
+      round.push(createMatch("losers", roundNum, round.length + 1, a, b));
     }
-    losers.push(round);
-    // winners advance
-    return round.map((m) => safeWinnerSource(m)).filter(Boolean);
-  };
+
+    if (round.length) losers.push(round);
+
+    const winnersNext = round.map((m) => safeWinnerSource(m)).filter(Boolean);
+    const leftover = queue; // at most 1
+    return [...winnersNext, ...leftover];
+  }
 
   let roundNum = 1;
-  let wbIdx = 0;
-  let carry = [];
 
-  desiredCounts.forEach((matchCount) => {
-    const neededEntrants = matchCount * 2;
-    const entrants = [];
+  // L1: losers from Winners Round 1
+  let carry = collectLosers(winners[0]);
+  if (carry.length) {
+    carry = pairAll(carry, roundNum++);
+  }
 
-    // bring carry first
-    if (carry.length) {
-      entrants.push(...carry);
-      carry = [];
+  // Later winners rounds
+  for (let w = 1; w < winners.length; w++) {
+    const dropIns = collectLosers(winners[w]);
+
+    const minorEntrants = [...carry, ...dropIns];
+    if (minorEntrants.length) {
+      carry = pairAll(minorEntrants, roundNum++);
     }
 
-    // pull losers from WB rounds until we have enough entrants or we exhaust
-    while (entrants.length < neededEntrants && wbIdx < losersByRound.length) {
-      const pool = losersByRound[wbIdx];
-      while (entrants.length < neededEntrants && pool.length) {
-        entrants.push(pool.shift());
-      }
-      if (!pool.length) wbIdx++;
-      else break;
+    if (carry.length > 2) {
+      carry = pairAll(carry, roundNum++);
     }
+  }
 
-    // If still short, leave as TBD (nulls) to keep bracket slots; pair only up to matchCount
-    while (entrants.length < neededEntrants) {
-      entrants.push(null);
-    }
-
-    // Pair into this LB round
-    carry = pairRound(entrants, roundNum++, matchCount);
-  });
-
-  // Consolidate any remaining carry
-  while (carry.length >= 2) {
-    const matchCount = Math.floor(carry.length / 2);
-    carry = pairRound([...carry], roundNum++, matchCount);
+  while (carry.length > 1) {
+    carry = pairAll(carry, roundNum++);
   }
 
   return losers;
@@ -1843,20 +2096,22 @@ function autoResolveByes(bracket) {
 
   matches.forEach((match) => {
     if (match.status === "complete") return;
+    // Only auto-advance free wins in Winners Round 1; elsewhere keep matches pending.
+    if (!(match.bracket === "winners" && match.round === 1)) return;
     const [pA, pB] = resolveParticipants(match, lookup, playersById);
     if (pA && !pB) {
       finalizeMatchResult(match, {
         winnerId: pA.id,
         loserId: null,
-        scores: [1, 0],
-        walkover: "b",
+        scores: [0, 0],
+        walkover: null,
       });
     } else if (!pA && pB) {
       finalizeMatchResult(match, {
         winnerId: pB.id,
         loserId: null,
-        scores: [0, 1],
-        walkover: "a",
+        scores: [0, 0],
+        walkover: null,
       });
     }
   });
@@ -2616,7 +2871,7 @@ function annotateConnectorPlayers(lookup, playersById) {
   const pMap = playersById || getPlayersMap();
 
   const participantIds = (match) => {
-    if (!match || match.walkover === "bye") return new Set();
+    if (!match) return new Set();
     const [a, b] = resolveParticipants(match, map, pMap);
     const ids = [a?.id, b?.id, match.winnerId, match.loserId].filter(Boolean);
     return new Set(ids);
@@ -2652,7 +2907,7 @@ function annotateConnectorPlayers(lookup, playersById) {
     let shared = Array.from(fromUnion).filter((id) => toSet.has(id));
     if (
       !shared.length &&
-      toMatch.walkover !== "bye" &&
+      toMatch &&
       toMatch.winnerId &&
       fromUnion.has(toMatch.winnerId)
     ) {
@@ -3119,6 +3374,7 @@ function layoutBracketSection(
   const H_GAP = 90;
 
   const positions = new Map();
+  const roundPositions = rounds.map(() => []);
   let maxY = 0;
   let maxX = 0;
   const connectors = [];
@@ -3130,6 +3386,7 @@ function layoutBracketSection(
       const x = offsetX + rIdx * (CARD_WIDTH + H_GAP);
       if (rIdx === 0) {
         const y = offsetY + mIdx * (CARD_HEIGHT + V_GAP);
+        roundPositions[rIdx].push(y);
         positions.set(match.id, { x, y });
         maxY = Math.max(maxY, y + CARD_HEIGHT);
         maxX = Math.max(maxX, x + CARD_WIDTH);
@@ -3143,10 +3400,22 @@ function layoutBracketSection(
         const baseY = offsetY + mIdx * (CARD_HEIGHT + V_GAP);
         const baseCenter = baseY + CARD_HEIGHT / 2;
         const yCenter =
-          parentYs.length === 2
-            ? (parentYs[0] + parentYs[1]) / 2
-            : baseCenter; // snap to grid when fewer than 2 parents to avoid overlap
-        const y = yCenter - CARD_HEIGHT / 2;
+          parentYs.length === 2 ? (parentYs[0] + parentYs[1]) / 2 : baseCenter; // snap to grid when fewer than 2 parents to avoid overlap
+        let y = yCenter - CARD_HEIGHT / 2;
+
+        // Prevent overlapping cards within the same round
+        const occupied = roundPositions[rIdx];
+        const band = CARD_HEIGHT + V_GAP;
+        const overlaps = (yPos) =>
+          occupied.some(
+            (otherY) =>
+              Math.abs(otherY + CARD_HEIGHT / 2 - (yPos + CARD_HEIGHT / 2)) <
+              band
+          );
+        while (overlaps(y)) {
+          y += band;
+        }
+        occupied.push(y);
 
         positions.set(match.id, { x, y, parents });
         maxY = Math.max(maxY, y + CARD_HEIGHT);
@@ -3165,16 +3434,21 @@ function layoutBracketSection(
 
       // Auto-advance structural byes so downstream slots fill
       const hasOne = (pA && !pB) || (!pA && pB);
-      const isStructuralBye =
-        hasOne && (!sources[0] || !sources[1]); // missing a source entirely
-      if (isStructuralBye && match.status !== "complete") {
+      const isStructuralBye = hasOne && (!sources[0] || !sources[1]); // missing a source entirely
+      // Only auto-advance structural byes for Winners Round 1; otherwise leave pending
+      if (
+        isStructuralBye &&
+        match.status !== "complete" &&
+        match.bracket === "winners" &&
+        match.round === 1
+      ) {
         const winner = pA || pB;
         if (winner) {
           finalizeMatchResult(match, {
             winnerId: winner.id,
             loserId: null,
             scores: [0, 0],
-            walkover: "bye",
+            walkover: null,
             status: "complete",
           });
         }
@@ -3182,9 +3456,7 @@ function layoutBracketSection(
 
       // Hide only WB Round 1 structural byes; keep other TBD matches visible
       const hideMatch =
-        isStructuralBye &&
-        match.bracket === "winners" &&
-        match.round === 1;
+        isStructuralBye && match.bracket === "winners" && match.round === 1;
       const styleHide = hideMatch ? "visibility:hidden;" : "";
       matchCards.push(
         renderSimpleMatch(
@@ -3367,7 +3639,9 @@ function renderSimpleMatch(
     <div class="row ${
       match.winnerId === pA?.id ? "winner" : ""
     }" data-player-id="${pA?.id || ""}">
-      <span class="name">${pA ? `<span class="seed-chip">#${pA.seed || "?"}</span>` : ""}<span class="race-strip ${raceClassA}"></span><span class="name-text">${escapeHtml(
+      <span class="name">${
+        pA ? `<span class="seed-chip">#${pA.seed || "?"}</span>` : ""
+      }<span class="race-strip ${raceClassA}"></span><span class="name-text">${escapeHtml(
     aName
   )}</span></span>
       <div class="row-actions">
@@ -3383,7 +3657,9 @@ function renderSimpleMatch(
     <div class="row ${
       match.winnerId === pB?.id ? "winner" : ""
     }" data-player-id="${pB?.id || ""}">
-      <span class="name">${pB ? `<span class="seed-chip">#${pB.seed || "?"}</span>` : ""}<span class="race-strip ${raceClassB}"></span><span class="name-text">${escapeHtml(
+      <span class="name">${
+        pB ? `<span class="seed-chip">#${pB.seed || "?"}</span>` : ""
+      }<span class="race-strip ${raceClassB}"></span><span class="name-text">${escapeHtml(
     bName
   )}</span></span>
       <div class="row-actions">
