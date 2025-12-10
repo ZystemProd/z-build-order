@@ -6,6 +6,7 @@ import {
   initializeAuthUI,
 } from "../../app.js";
 import { showToast } from "./toastHandler.js";
+import { LOSERS_TEMPLATES } from "./bracketLosersTemplates.js";
 import {
   collection,
   doc,
@@ -110,6 +111,10 @@ const defaultBestOf = {
 };
 let currentVetoMatchId = null;
 let vetoState = null;
+const bracketTestHarness = {
+  active: false,
+  count: 16,
+};
 const broadcast =
   typeof BroadcastChannel !== "undefined"
     ? new BroadcastChannel(BROADCAST_NAME)
@@ -159,6 +164,7 @@ window.addEventListener("popstate", () => {
 });
 
 function bindUI() {
+  ensureTestHarnessPanel();
   const registrationForm = document.getElementById("registrationForm");
   const rebuildBtn = document.getElementById("rebuildBracketBtn");
   const resetBtn = document.getElementById("resetTournamentBtn");
@@ -180,6 +186,9 @@ function bindUI() {
   const saveTournamentBtn = document.getElementById("saveTournamentBtn");
   const refreshTournaments = document.getElementById("refreshTournaments");
   const generateSlugBtn = document.getElementById("generateSlugBtn");
+  const testBracketStartBtn = document.getElementById("testBracketStart");
+  const testBracketPrevBtn = document.getElementById("testBracketPrev");
+  const testBracketNextBtn = document.getElementById("testBracketNext");
   const descriptionInput = document.getElementById(
     "tournamentDescriptionInput"
   );
@@ -355,6 +364,15 @@ function bindUI() {
     toggleMapSelection(card.dataset.mapName);
   });
   saveSettingsBtn?.addEventListener("click", handleSaveSettings);
+  testBracketStartBtn?.addEventListener("click", () =>
+    setTestBracketCount(16)
+  );
+  testBracketPrevBtn?.addEventListener("click", () =>
+    cycleTestBracketCount(-1)
+  );
+  testBracketNextBtn?.addEventListener("click", () =>
+    cycleTestBracketCount(1)
+  );
   [
     bestOfUpperInput,
     bestOfLowerInput,
@@ -440,6 +458,38 @@ function bindUI() {
   renderChosenMaps("chosenMapList");
   renderChosenMaps("settingsChosenMapList");
   updateMapButtons();
+  ensureTestHarnessPanel();
+}
+
+function ensureTestHarnessPanel() {
+  const host =
+    document.getElementById("bracketTab") ||
+    document.getElementById("seedingCard") ||
+    document.getElementById("adminTab") ||
+    document.getElementById("registrationCard") ||
+    document.body;
+  if (!host) return;
+  if (document.getElementById("testBracketPanel")) {
+    updateTestHarnessLabel();
+    return;
+  }
+  const panel = document.createElement("div");
+  panel.id = "testBracketPanel";
+  panel.style.marginTop = "8px";
+  panel.innerHTML = `
+    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+      <button class="cta small ghost" id="testBracketStart">Start 1-16 Test</button>
+      <button class="cta small ghost" id="testBracketPrev">Prev</button>
+      <button class="cta small ghost" id="testBracketNext">Next</button>
+      <span class="helper" id="testBracketLabel">Test harness not started</span>
+    </div>
+  `;
+  if (host.firstChild) {
+    host.insertBefore(panel, host.firstChild);
+  } else {
+    host.appendChild(panel);
+  }
+  updateTestHarnessLabel();
 }
 
 function switchTab(targetId) {
@@ -596,6 +646,72 @@ function autoFillPlayers() {
   saveState({ players: seededPlayers, needsReseed: false });
   rebuildBracket(true, "Dev auto-fill");
   addActivity("Auto-filled 12 players for testing.");
+}
+
+function buildTestPlayers(count) {
+  const names = [
+    "Zephyr",
+    "Pulsefire",
+    "CryoCore",
+    "Flux",
+    "Titanfall",
+    "Skyforge",
+    "Nightfall",
+    "Vortex",
+    "NovaWing",
+    "Starlance",
+    "WarpDrive",
+    "Astra",
+    "Helix",
+    "Frostbyte",
+    "IonBlade",
+    "RubyRock",
+  ];
+  const races = ["Zerg", "Protoss", "Terran", "Random"];
+  const createdAt = Date.now();
+  return Array.from({ length: count }, (_, idx) => ({
+    id: `test-${idx + 1}`,
+    name: `${names[idx % names.length]}_${idx + 1}`,
+    race: races[idx % races.length],
+    sc2Link: "",
+    mmr: 4000 - idx * 25,
+    points: 1000 - idx,
+    seed: idx + 1,
+    createdAt,
+  }));
+}
+
+function updateTestHarnessLabel() {
+  const label = document.getElementById("testBracketLabel");
+  if (!label) return;
+  label.textContent = bracketTestHarness.active
+    ? `Testing ${bracketTestHarness.count} players`
+    : "Test harness not started";
+}
+
+function setTestBracketCount(count) {
+  const clamped = Math.max(1, Math.min(16, count));
+  bracketTestHarness.active = true;
+  bracketTestHarness.count = clamped;
+  const testPlayers = buildTestPlayers(clamped);
+  const ledger = {};
+  testPlayers.forEach((p) => {
+    ledger[playerKey(p.name, p.sc2Link)] = p.points ?? 0;
+  });
+  state.players = testPlayers;
+  state.pointsLedger = ledger;
+  const seededPlayers = applySeeding(state.players);
+  saveState({ players: seededPlayers, needsReseed: false });
+  rebuildBracket(true, `Test harness (${clamped} players)`);
+  updateTestHarnessLabel();
+}
+
+function cycleTestBracketCount(delta) {
+  if (!bracketTestHarness.active) {
+    setTestBracketCount(16);
+    return;
+  }
+  setTestBracketCount(bracketTestHarness.count + delta);
 }
 
 async function handleRegistration(event) {
@@ -922,6 +1038,8 @@ function toggleAdminUI(isAdminUser) {
   if (seedingCard) seedingCard.style.display = isAdminUser ? "block" : "none";
   if (autoFillBtn)
     autoFillBtn.style.display = isAdminUser ? "inline-flex" : "none";
+  const testPanel = document.getElementById("testBracketPanel");
+  if (testPanel) testPanel.style.display = isAdminUser ? "block" : "none";
 }
 
 async function renderTournamentList() {
@@ -1620,11 +1738,11 @@ function buildBracket(players) {
   // Map seed -> player for convenience
   const seedMap = new Map(players.map((p) => [p.seed, p]));
 
-  // If we have 4 or fewer players, keep the old “simple” behaviour:
+  // If we have 4 or fewer players, keep the old "simple" behaviour:
   // just fill up to the next power of two with byes.
   if (total <= 4) {
-    const bracketSize = Math.max(2, pow2(total));
-    const seedPositions = generateSeedPositions(bracketSize);
+    const baseSize = Math.max(2, pow2(total));
+    const seedPositions = generateSeedPositions(baseSize);
     const placedPlayers = seedPositions.map(
       (seed) => seedMap.get(seed) || null
     );
@@ -1668,7 +1786,7 @@ function buildBracket(players) {
       roundNumber++;
     }
 
-    const losers = buildLosersBracket(winners, bracketSize);
+    const losers = buildLosersBracket(winners, baseSize, total, numPlayIns);
     const finals = createMatch(
       "finals",
       1,
@@ -1680,11 +1798,21 @@ function buildBracket(players) {
     return { winners, losers, finals, seedOrder };
   }
 
-  // --- Option A: power-of-two core + play-ins for total > 4 ---
+  // --- Power-of-two core bracket (nearest pow-2), with play-ins if we exceed it ---
 
-  // Largest power of two <= total (8 for 9–16, 4 for 5–8, etc)
-  const baseSize = 1 << Math.floor(Math.log2(total));
-  const numPlayIns = total - baseSize; // how many play-in matches we need
+  // Pick the closest power of two; on ties, prefer the higher power (start.gg style)
+  const lowerPow = 1 << Math.floor(Math.log2(total));
+  const upperPow = lowerPow * 2;
+  let baseSize;
+  const lowerGap = total - lowerPow;
+  const upperGap = upperPow - total;
+  if (total === 12 || total === 13 || total === 14 || total === 15) {
+    // start.gg uses an 8-slot core with 4-7 play-ins for 12-15 players
+    baseSize = lowerPow; // 8
+  } else {
+    baseSize = lowerGap < upperGap ? lowerPow : upperPow;
+  }
+  const numPlayIns = Math.max(0, total - baseSize); // extra players beyond core
 
   // Standard seeding positions for the core bracket (size = baseSize)
   const seedPositions = generateSeedPositions(baseSize);
@@ -1703,7 +1831,9 @@ function buildBracket(players) {
     const playInRound = [];
 
     for (let i = 0; i < numPlayIns; i++) {
-      const highSeed = baseSize - numPlayIns + 1 + i;
+      // Pair lowest core seeds against each extra entrant, starting from the bottom:
+      // e.g., for 11 players (base 8, 3 play-ins): 8v9, 7v10, 6v11.
+      const highSeed = baseSize - i;
       const lowSeed = baseSize + 1 + i;
 
       const playerHigh = seedMap.get(highSeed) || null;
@@ -1780,7 +1910,7 @@ function buildBracket(players) {
   }
 
   // 4) Losers bracket uses the core size (baseSize) as the template
-  const losers = buildLosersBracket(winners, baseSize);
+  const losers = buildLosersBracket(winners, baseSize, total, numPlayIns);
 
   const finals = createMatch(
     "finals",
@@ -1808,193 +1938,41 @@ function generateSeedPositions(size) {
   return positions.slice(0, size);
 }
 
-function buildLosersBracket(winners, baseSize) {
+function buildLosersFromTemplate(winners, template) {
   const losers = [];
-  if (!winners.length) return losers;
+  const lbMatches = [];
 
-  // --- Special case: 9 players (8-core + 1 play-in) ---
-  // A = play-in, B–E = WB QFs, F–G = WB SFs, H = WB Final
-  if (
-    baseSize === 8 &&
-    winners.length >= 4 &&
-    winners[0].length === 1 &&
-    winners[1].length === 4 &&
-    winners[2].length === 2 &&
-    winners[3].length === 1
-  ) {
-    const A = winners[0][0];
-    const [B, C, D, E] = winners[1];
-    const [F, G] = winners[2];
-    const [H] = winners[3];
+  const resolveRef = (ref) => {
+    if (!ref) return null;
+    const { from, r, m, res } = ref;
+    let match;
+    if (from === "W") {
+      match = winners[r]?.[m];
+    } else {
+      match = lbMatches[r]?.[m];
+    }
+    if (!match) return null;
+    return res === "L" ? safeLoserSource(match) : safeWinnerSource(match);
+  };
 
-    // L1: K = loser of E vs loser of A
-    const K = createMatch(
-      "losers",
-      1,
-      1,
-      safeLoserSource(E),
-      safeLoserSource(A)
-    );
-    losers.push([K]);
+  template.forEach((roundTpl, rIndex) => {
+    const round = [];
+    lbMatches[rIndex] = lbMatches[rIndex] || [];
+    roundTpl.forEach((mtpl, mIndex) => {
+      const srcA = resolveRef(mtpl.a);
+      const srcB = resolveRef(mtpl.b);
+      const match = createMatch("losers", rIndex + 1, mIndex + 1, srcA, srcB);
+      round.push(match);
+      lbMatches[rIndex][mIndex] = match;
+    });
+    if (round.length) losers.push(round);
+  });
 
-    // L2:
-    //  L = winner of K vs loser of D
-    //  M = loser of C vs loser of B
-    const L = createMatch(
-      "losers",
-      2,
-      1,
-      safeWinnerSource(K),
-      safeLoserSource(D)
-    );
-    const M = createMatch(
-      "losers",
-      2,
-      2,
-      safeLoserSource(C),
-      safeLoserSource(B)
-    );
-    losers.push([L, M]);
+  return losers;
+}
 
-    // L3 (LQF):
-    //  N = loser of F vs winner of L
-    //  O = loser of G vs winner of M
-    const N = createMatch(
-      "losers",
-      3,
-      1,
-      safeLoserSource(F),
-      safeWinnerSource(L)
-    );
-    const O = createMatch(
-      "losers",
-      3,
-      2,
-      safeLoserSource(G),
-      safeWinnerSource(M)
-    );
-    losers.push([N, O]);
-
-    // L4 (LSF): P = winner of N vs winner of O
-    const P = createMatch(
-      "losers",
-      4,
-      1,
-      safeWinnerSource(N),
-      safeWinnerSource(O)
-    );
-    losers.push([P]);
-
-    // L5 (LFinal): Q = loser of H vs winner of P
-    const Q = createMatch(
-      "losers",
-      5,
-      1,
-      safeLoserSource(H),
-      safeWinnerSource(P)
-    );
-    losers.push([Q]);
-
-    return losers;
-  }
-
-  // --- Special case: 10 players (8-core + 2 play-ins) ---
-  // A,B = play-ins, C–F = WB QFs, G,H = WB SFs, I = WB Final
-  if (
-    baseSize === 8 &&
-    winners.length >= 4 &&
-    winners[0].length === 2 &&
-    winners[1].length === 4 &&
-    winners[2].length === 2 &&
-    winners[3].length === 1
-  ) {
-    const [A, B] = winners[0];
-    const [C, D, E, F] = winners[1];
-    const [G, H] = winners[2];
-    const [I] = winners[3];
-
-    // L1 (Losers Round 1):
-    //  K = loser of F vs loser of A
-    //  Lm = loser of D vs loser of B
-    const K = createMatch(
-      "losers",
-      1,
-      1,
-      safeLoserSource(F),
-      safeLoserSource(A)
-    );
-    const Lm = createMatch(
-      "losers",
-      1,
-      2,
-      safeLoserSource(D),
-      safeLoserSource(B)
-    );
-    losers.push([K, Lm]);
-
-    // L2 (Losers Round 2):
-    //  M = winner of K vs loser of E
-    //  N = loser of C vs winner of Lm
-    const M = createMatch(
-      "losers",
-      2,
-      1,
-      safeWinnerSource(K),
-      safeLoserSource(E)
-    );
-    const N = createMatch(
-      "losers",
-      2,
-      2,
-      safeLoserSource(C),
-      safeWinnerSource(Lm)
-    );
-    losers.push([M, N]);
-
-    // L3 (Losers Quarter-Final):
-    //  O = loser of G vs winner of M
-    //  P = loser of H vs winner of N
-    const O = createMatch(
-      "losers",
-      3,
-      1,
-      safeLoserSource(G),
-      safeWinnerSource(M)
-    );
-    const P = createMatch(
-      "losers",
-      3,
-      2,
-      safeLoserSource(H),
-      safeWinnerSource(N)
-    );
-    losers.push([O, P]);
-
-    // L4 (Losers Semi-Final): R = winner of O vs winner of P
-    const R = createMatch(
-      "losers",
-      4,
-      1,
-      safeWinnerSource(O),
-      safeWinnerSource(P)
-    );
-    losers.push([R]);
-
-    // L5 (Losers Final): S = loser of I vs winner of R
-    const S = createMatch(
-      "losers",
-      5,
-      1,
-      safeLoserSource(I),
-      safeWinnerSource(R)
-    );
-    losers.push([S]);
-
-    return losers;
-  }
-
-  // --- Generic fallback for all other cases (pure 8, 16, etc.) ---
-
+function buildGenericLosers(winners) {
+  const losers = [];
   const collectLosers = (round) =>
     (round || []).map((m) => safeLoserSource(m)).filter(Boolean);
 
@@ -2011,27 +1989,22 @@ function buildLosersBracket(winners, baseSize) {
     if (round.length) losers.push(round);
 
     const winnersNext = round.map((m) => safeWinnerSource(m)).filter(Boolean);
-    const leftover = queue; // at most 1
+    const leftover = queue;
     return [...winnersNext, ...leftover];
   }
 
   let roundNum = 1;
-
-  // L1: losers from Winners Round 1
   let carry = collectLosers(winners[0]);
   if (carry.length) {
     carry = pairAll(carry, roundNum++);
   }
 
-  // Later winners rounds
   for (let w = 1; w < winners.length; w++) {
     const dropIns = collectLosers(winners[w]);
-
     const minorEntrants = [...carry, ...dropIns];
     if (minorEntrants.length) {
       carry = pairAll(minorEntrants, roundNum++);
     }
-
     if (carry.length > 2) {
       carry = pairAll(carry, roundNum++);
     }
@@ -2042,6 +2015,63 @@ function buildLosersBracket(winners, baseSize) {
   }
 
   return losers;
+}
+
+function buildLosersBracket(
+  winners,
+  baseSize,
+  totalPlayers = baseSize,
+  numPlayInsHint = null
+) {
+  // How many WB matches in round 1
+  const firstRoundMatches = winners[0]?.length || 0;
+  let numPlayIns =
+    numPlayInsHint !== null && Number.isFinite(numPlayInsHint)
+      ? Math.max(0, numPlayInsHint)
+      : 0;
+
+  if (baseSize && firstRoundMatches && numPlayIns === 0) {
+    // Full bracket (8 players → 4 matches, 16 → 8, etc) → no play-ins
+    if (baseSize === firstRoundMatches * 2) {
+      numPlayIns = 0;
+    } else {
+      // For future non-full brackets you can refine this,
+      // but keeping a reasonable default:
+      const coreMatches = baseSize / 2;
+      numPlayIns = Math.max(0, firstRoundMatches - coreMatches);
+    }
+  }
+
+  const normalizedTotal = Number.isFinite(totalPlayers)
+    ? Math.max(0, totalPlayers)
+    : baseSize;
+  const numByes = Math.max(0, baseSize - normalizedTotal);
+  if (numPlayIns === 0 && normalizedTotal > baseSize) {
+    numPlayIns = normalizedTotal - baseSize;
+  }
+
+  // Prefer bye-aware templates when available (e.g., 6-player bracket in an 8-slot core)
+  let template =
+    numByes > 0 ? LOSERS_TEMPLATES[baseSize]?.byes?.[numByes] : null;
+
+  // If no bye template matched, fall back to play-in template (legacy path)
+  if (!template) {
+    template = LOSERS_TEMPLATES[baseSize]?.[numPlayIns];
+  }
+
+  // As a final guard, if we still didn't pick a template and we have missing slots,
+  // try the bye bucket using the raw difference. This protects odd cases where numPlayIns=0.
+  if (!template && normalizedTotal < baseSize) {
+    const byeCount = baseSize - normalizedTotal;
+    template = LOSERS_TEMPLATES[baseSize]?.byes?.[byeCount] || null;
+  }
+
+  if (template) {
+    return buildLosersFromTemplate(winners, template);
+  }
+
+  // fallback for sizes without a template yet
+  return buildGenericLosers(winners);
 }
 
 function createMatch(bracket, round, index, sourceA, sourceB) {
