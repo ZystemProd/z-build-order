@@ -364,15 +364,11 @@ function bindUI() {
     toggleMapSelection(card.dataset.mapName);
   });
   saveSettingsBtn?.addEventListener("click", handleSaveSettings);
-  testBracketStartBtn?.addEventListener("click", () =>
-    setTestBracketCount(16)
-  );
+  testBracketStartBtn?.addEventListener("click", () => setTestBracketCount(16));
   testBracketPrevBtn?.addEventListener("click", () =>
     cycleTestBracketCount(-1)
   );
-  testBracketNextBtn?.addEventListener("click", () =>
-    cycleTestBracketCount(1)
-  );
+  testBracketNextBtn?.addEventListener("click", () => cycleTestBracketCount(1));
   [
     bestOfUpperInput,
     bestOfLowerInput,
@@ -3386,6 +3382,76 @@ function makeVConnector(x, y1, y2, meta = {}) {
   )}px; height:${Math.abs(y2 - y1)}px;"></div>`;
 }
 
+// --- Round ordering helper to reduce crossing connectors --------------------
+
+function getParentOrderKey(match, prevIndexMap) {
+  if (!match || !Array.isArray(match.sources)) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+  const indices = match.sources
+    .filter((src) => src && src.type === "match")
+    .map((src) => {
+      const idx = prevIndexMap.get(src.matchId);
+      return typeof idx === "number" ? idx : Number.MAX_SAFE_INTEGER;
+    });
+
+  if (!indices.length) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+  return Math.min(...indices);
+}
+
+/**
+ * Reorders matches in each round so that matches whose parents are
+ * higher in the previous round also appear higher in this round.
+ * This keeps connector lines from crossing as much as possible.
+ */
+function sortRoundsByParents(rounds) {
+  if (!Array.isArray(rounds) || rounds.length === 0) {
+    return [];
+  }
+
+  const ordered = [];
+
+  for (let rIdx = 0; rIdx < rounds.length; rIdx++) {
+    const round = Array.isArray(rounds[rIdx]) ? [...rounds[rIdx]] : [];
+
+    // First round: keep original order
+    if (rIdx === 0) {
+      ordered.push(round);
+      continue;
+    }
+
+    const prevRound = ordered[rIdx - 1] || rounds[rIdx - 1] || [];
+    const prevIndexMap = new Map(prevRound.map((m, idx) => [m.id, idx]));
+
+    const decorated = round.map((match, i) => ({
+      match,
+      key: getParentOrderKey(match, prevIndexMap),
+      originalIndex: i,
+    }));
+
+    const hasRealParents = decorated.some(
+      (d) => d.key !== Number.MAX_SAFE_INTEGER
+    );
+
+    if (!hasRealParents) {
+      // Nothing to sort against – keep original order
+      ordered.push(round);
+      continue;
+    }
+
+    decorated.sort((a, b) => {
+      if (a.key !== b.key) return a.key - b.key;
+      return a.originalIndex - b.originalIndex;
+    });
+
+    ordered.push(decorated.map((d) => d.match));
+  }
+
+  return ordered;
+}
+
 function layoutBracketSection(
   rounds,
   titlePrefix,
@@ -3403,91 +3469,128 @@ function layoutBracketSection(
   const V_GAP = 8;
   const H_GAP = 90;
 
-  const positions = new Map();
-  const roundPositions = rounds.map(() => []);
+  // --- 1) Clone & order rounds so parents that share a child are adjacent ---
+
+  // Shallow copy each round so we don't mutate state.bracket
+  const clonedRounds = rounds.map((round) => round.slice());
+
+  // parentId -> [{ roundIndex, matchIndex }]
+  const parentChildren = new Map();
+  clonedRounds.forEach((round, rIdx) => {
+    round.forEach((match, mIdx) => {
+      (match.sources || []).forEach((src) => {
+        if (src && src.type === "match" && src.matchId) {
+          if (!parentChildren.has(src.matchId)) {
+            parentChildren.set(src.matchId, []);
+          }
+          parentChildren.get(src.matchId).push({
+            roundIndex: rIdx,
+            matchIndex: mIdx,
+          });
+        }
+      });
+    });
+  });
+
+  // For each round, group matches by "earliest child" so parents for the same
+  // child match are placed next to each other (reduces crossing lines).
+  const orderedRounds = clonedRounds.map((round, rIdx) => {
+    const groups = new Map(); // key -> [matches]
+
+    round.forEach((match, mIdx) => {
+      const children = parentChildren.get(match.id) || [];
+
+      let groupKey;
+      if (!children.length) {
+        // No children inside this section – push these to the end of the round
+        groupKey = `z-${String(rIdx).padStart(2, "0")}-${String(mIdx).padStart(
+          2,
+          "0"
+        )}`;
+      } else {
+        // Use the earliest (round, matchIndex) child as the group key
+        let best = children[0];
+        for (let i = 1; i < children.length; i++) {
+          const c = children[i];
+          if (
+            c.roundIndex < best.roundIndex ||
+            (c.roundIndex === best.roundIndex && c.matchIndex < best.matchIndex)
+          ) {
+            best = c;
+          }
+        }
+        groupKey = `${String(best.roundIndex).padStart(2, "0")}-${String(
+          best.matchIndex
+        ).padStart(2, "0")}`;
+      }
+
+      if (!groups.has(groupKey)) groups.set(groupKey, []);
+      groups.get(groupKey).push(match);
+    });
+
+    const sortedKeys = Array.from(groups.keys()).sort();
+    const newRound = [];
+    sortedKeys.forEach((key) => {
+      groups.get(key).forEach((m) => newRound.push(m));
+    });
+    return newRound;
+  });
+
+  // --- 2) Compute card positions ---
+
+  const positions = new Map(); // matchId -> { x, y }
   let maxY = 0;
   let maxX = 0;
-  const connectors = [];
-  const matchCards = [];
-  const renderedMatches = new Set();
 
-  rounds.forEach((round, rIdx) => {
+  orderedRounds.forEach((round, rIdx) => {
     round.forEach((match, mIdx) => {
       const x = offsetX + rIdx * (CARD_WIDTH + H_GAP);
+
       if (rIdx === 0) {
+        // First round: simple grid
         const y = offsetY + mIdx * (CARD_HEIGHT + V_GAP);
-        roundPositions[rIdx].push(y);
         positions.set(match.id, { x, y });
         maxY = Math.max(maxY, y + CARD_HEIGHT);
         maxX = Math.max(maxX, x + CARD_WIDTH);
       } else {
-        const parents = match.sources
+        const parents = (match.sources || [])
           .map((src) =>
-            src?.type === "match" ? positions.get(src.matchId) : null
+            src && src.type === "match" ? positions.get(src.matchId) : null
           )
           .filter(Boolean);
+
         const parentYs = parents.map((p) => p.y + CARD_HEIGHT / 2);
         const baseY = offsetY + mIdx * (CARD_HEIGHT + V_GAP);
         const baseCenter = baseY + CARD_HEIGHT / 2;
-        const yCenter =
-          parentYs.length === 2 ? (parentYs[0] + parentYs[1]) / 2 : baseCenter; // snap to grid when fewer than 2 parents to avoid overlap
-        let y = yCenter - CARD_HEIGHT / 2;
 
-        // Prevent overlapping cards within the same round
-        const occupied = roundPositions[rIdx];
-        const band = CARD_HEIGHT + V_GAP;
-        const overlaps = (yPos) =>
-          occupied.some(
-            (otherY) =>
-              Math.abs(otherY + CARD_HEIGHT / 2 - (yPos + CARD_HEIGHT / 2)) <
-              band
-          );
-        while (overlaps(y)) {
-          y += band;
+        let yCenter;
+        if (parentYs.length === 2) {
+          // Child in the middle of its two parents
+          yCenter = (parentYs[0] + parentYs[1]) / 2;
+        } else if (parentYs.length === 1) {
+          // Single parent: keep center aligned so we can draw a straight line
+          yCenter = parentYs[0];
+        } else {
+          // Fallback – use grid position
+          yCenter = baseCenter;
         }
-        occupied.push(y);
 
-        positions.set(match.id, { x, y, parents });
+        const y = yCenter - CARD_HEIGHT / 2;
+        positions.set(match.id, { x, y });
         maxY = Math.max(maxY, y + CARD_HEIGHT);
         maxX = Math.max(maxX, x + CARD_WIDTH);
       }
     });
   });
 
-  rounds.forEach((round, rIdx) => {
+  // --- 3) Render match cards ---
+
+  const matchCards = [];
+  orderedRounds.forEach((round) => {
     round.forEach((match) => {
       const pos = positions.get(match.id);
       if (!pos) return;
-      const participants = resolveParticipants(match, lookup, playersById);
-      const [pA, pB] = participants;
-      const sources = Array.isArray(match.sources) ? match.sources : [];
-
-      // Auto-advance structural byes so downstream slots fill
-      const hasOne = (pA && !pB) || (!pA && pB);
-      const isStructuralBye = hasOne && (!sources[0] || !sources[1]); // missing a source entirely
-      // Only auto-advance structural byes for Winners Round 1; otherwise leave pending
-      if (
-        isStructuralBye &&
-        match.status !== "complete" &&
-        match.bracket === "winners" &&
-        match.round === 1
-      ) {
-        const winner = pA || pB;
-        if (winner) {
-          finalizeMatchResult(match, {
-            winnerId: winner.id,
-            loserId: null,
-            scores: [0, 0],
-            walkover: null,
-            status: "complete",
-          });
-        }
-      }
-
-      // Hide only WB Round 1 structural byes; keep other TBD matches visible
-      const hideMatch =
-        isStructuralBye && match.bracket === "winners" && match.round === 1;
-      const styleHide = hideMatch ? "visibility:hidden;" : "";
+      const [pA, pB] = resolveParticipants(match, lookup, playersById);
       matchCards.push(
         renderSimpleMatch(
           match,
@@ -3497,107 +3600,133 @@ function layoutBracketSection(
           pos.y,
           CARD_HEIGHT,
           CARD_WIDTH,
-          titlePrefix,
-          styleHide
+          "",
+          ""
         )
       );
-      renderedMatches.add(match.id);
+    });
+  });
 
-      if (rIdx > 0) {
-        const sources = Array.isArray(match.sources) ? match.sources : [];
-        const parentInfos = sources
-          .map((src) => {
-            if (src?.type !== "match") return null;
-            const p = positions.get(src.matchId);
-            if (!p) return null;
-            return { pos: p, rendered: renderedMatches.has(src.matchId) };
+  // --- 4) Build connectors (lines) ---
+
+  const connectors = [];
+
+  orderedRounds.forEach((round, rIdx) => {
+    if (rIdx === 0) return;
+
+    round.forEach((match) => {
+      const pos = positions.get(match.id);
+      if (!pos) return;
+
+      const parentIds = (match.sources || [])
+        .filter((src) => src && src.type === "match" && src.matchId)
+        .map((src) => src.matchId);
+
+      const renderedParents = parentIds
+        .map((id) => {
+          const pPos = positions.get(id);
+          return pPos ? { id, pos: pPos } : null;
+        })
+        .filter(Boolean);
+
+      if (!renderedParents.length) return;
+
+      if (renderedParents.length === 2) {
+        // Two parents: classic elbow connector
+        const midY1 = renderedParents[0].pos.y + CARD_HEIGHT / 2;
+        const midY2 = renderedParents[1].pos.y + CARD_HEIGHT / 2;
+        const childMidY = pos.y + CARD_HEIGHT / 2;
+        const junctionX = pos.x - 30;
+
+        connectors.push(
+          makeConnector(
+            renderedParents[0].pos.x + CARD_WIDTH,
+            midY1,
+            junctionX,
+            midY1,
+            {
+              from: parentIds[0],
+              to: match.id,
+            }
+          )
+        );
+        connectors.push(
+          makeConnector(
+            renderedParents[1].pos.x + CARD_WIDTH,
+            midY2,
+            junctionX,
+            midY2,
+            {
+              from: parentIds[1],
+              to: match.id,
+            }
+          )
+        );
+        connectors.push(
+          makeVConnector(junctionX, midY1, childMidY, {
+            from: parentIds[0],
+            to: match.id,
           })
-          .filter(Boolean);
-        const parentIds = (match.sources || [])
-          .map((s) => (s?.type === "match" ? s.matchId : null))
-          .filter(Boolean);
-        const renderedParents = parentInfos.filter((p) => p.rendered);
+        );
+        connectors.push(
+          makeVConnector(junctionX, midY2, childMidY, {
+            from: parentIds[1],
+            to: match.id,
+          })
+        );
+        connectors.push(
+          makeConnector(junctionX, childMidY, pos.x, childMidY, {
+            from: match.id,
+            to: match.id,
+            parents: parentIds.join(","),
+          })
+        );
+      } else if (renderedParents.length === 1) {
+        // One parent: try to make a straight horizontal line
+        const parent = renderedParents[0];
+        const midY = parent.pos.y + CARD_HEIGHT / 2;
+        const childMidY = pos.y + CARD_HEIGHT / 2;
+        const parentEndX = parent.pos.x + CARD_WIDTH;
 
-        if (renderedMatches.has(match.id)) {
-          if (renderedParents.length === 2) {
-            const midY1 = renderedParents[0].pos.y + CARD_HEIGHT / 2;
-            const midY2 = renderedParents[1].pos.y + CARD_HEIGHT / 2;
-            const childMidY = pos.y + CARD_HEIGHT / 2;
-            const junctionX = pos.x - 30;
-            connectors.push(
-              makeConnector(
-                renderedParents[0].pos.x + CARD_WIDTH,
-                midY1,
-                junctionX,
-                midY1,
-                {
-                  from: parentIds[0],
-                  to: match.id,
-                }
-              )
-            );
-            connectors.push(
-              makeConnector(
-                renderedParents[1].pos.x + CARD_WIDTH,
-                midY2,
-                junctionX,
-                midY2,
-                {
-                  from: parentIds[1],
-                  to: match.id,
-                }
-              )
-            );
-            connectors.push(
-              makeVConnector(junctionX, midY1, childMidY, {
-                from: parentIds[0],
-                to: match.id,
-              })
-            );
-            connectors.push(
-              makeVConnector(junctionX, midY2, childMidY, {
-                from: parentIds[1],
-                to: match.id,
-              })
-            );
-            connectors.push(
-              makeConnector(junctionX, childMidY, pos.x, childMidY, {
-                from: match.id,
-                to: match.id,
-                parents: parentIds.join(","),
-              })
-            );
-          } else if (renderedParents.length === 1) {
-            const midY = renderedParents[0].pos.y + CARD_HEIGHT / 2;
-            const childMidY = pos.y + CARD_HEIGHT / 2;
-            const junctionX = pos.x - 30;
-            const parentEndX = renderedParents[0].pos.x + CARD_WIDTH;
-            connectors.push(
-              makeConnector(parentEndX, midY, junctionX, midY, {
-                from: parentIds[0],
-                to: match.id,
-              })
-            );
-            connectors.push(
-              makeVConnector(junctionX, midY, childMidY, {
-                from: parentIds[0],
-                to: match.id,
-              })
-            );
-            connectors.push(
-              makeConnector(junctionX, childMidY, pos.x, childMidY, {
-                from: match.id,
-                to: match.id,
-                parents: parentIds.join(","),
-              })
-            );
-          }
+        if (Math.abs(midY - childMidY) < 0.5) {
+          // Perfectly aligned – draw a simple straight connector
+          connectors.push(
+            makeConnector(parentEndX, midY, pos.x, midY, {
+              from: parent.id,
+              to: match.id,
+              parents: parent.id,
+            })
+          );
+        } else {
+          // Fallback elbow if for some reason centers don't line up
+          const junctionX = pos.x - 30;
+          connectors.push(
+            makeConnector(parentEndX, midY, junctionX, midY, {
+              from: parent.id,
+              to: match.id,
+            })
+          );
+          connectors.push(
+            makeVConnector(junctionX, midY, childMidY, {
+              from: parent.id,
+              to: match.id,
+            })
+          );
+          connectors.push(
+            makeConnector(junctionX, childMidY, pos.x, childMidY, {
+              from: match.id,
+              to: match.id,
+              parents: parent.id,
+            })
+          );
         }
       }
     });
   });
 
-  const titles = rounds
+  // --- 5) Titles + wrapper HTML ---
+
+  const titles = orderedRounds
     .map((round, idx) => {
       const bestOfLabel = round?.length ? getBestOfForMatch(round[0]) : null;
       const boBadge = bestOfLabel
