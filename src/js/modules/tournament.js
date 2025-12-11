@@ -1011,6 +1011,7 @@ async function handleSaveSettings(event) {
   cacheTournamentRegistry(null);
   setTournamentHeader(currentTournamentMeta);
   renderMapsTab(currentTournamentMeta);
+  renderBracket();
   showToast?.("Tournament settings saved.", "success");
 }
 function toggleAdminUI(isAdminUser) {
@@ -2335,14 +2336,24 @@ function renderPlayersTable() {
 function renderBracket() {
   const grid = document.getElementById("bracketGrid");
   if (!grid) return;
+
   if (!state.bracket || !state.players.length) {
     grid.innerHTML = `<div class="placeholder">Add players to generate the bracket.</div>`;
     return;
   }
 
+  // Read format from tournament meta (driven by settingsFormatSelect)
+  const format = (
+    currentTournamentMeta?.format || "Double Elimination"
+  ).toLowerCase();
+  const isSingleElimination = format.startsWith("single");
+
   const lookup = getMatchLookup(state.bracket);
   const playersById = getPlayersMap();
+
+  // --- Upper bracket + finals (always shown) ---
   const upperRounds = [...(state.bracket.winners || [])];
+
   if (state.bracket.finals) {
     upperRounds.push([{ ...state.bracket.finals, name: "Finals" }]);
   }
@@ -2356,10 +2367,15 @@ function renderBracket() {
     0
   );
 
-  const lowerRounds = state.bracket.losers || [];
-  const lower = lowerRounds.length
-    ? layoutBracketSection(lowerRounds, "Lower", lookup, playersById, 0, 0)
-    : { html: "", height: 0 };
+  // --- Lower bracket (hidden for Single Elimination) ---
+  let lower = { html: "", height: 0 };
+
+  if (!isSingleElimination) {
+    const lowerRounds = state.bracket.losers || [];
+    lower = lowerRounds.length
+      ? layoutBracketSection(lowerRounds, "Lower", lookup, playersById, 0, 0)
+      : { html: "", height: 0 };
+  }
 
   grid.innerHTML = `<div class="tree-wrapper">
     ${upper.html}
@@ -3452,6 +3468,27 @@ function sortRoundsByParents(rounds) {
   return ordered;
 }
 
+// Helper: pretty round titles (Final / Semi-final / Lower Final, etc.)
+function getRoundLabel(titlePrefix, idx, totalRounds) {
+  // idx is 0-based, totalRounds is the number of columns in this section
+  const fromEnd = totalRounds - idx; // 1 = last round, 2 = second last, ...
+
+  if (titlePrefix === "Upper") {
+    if (fromEnd === 1) return "Final";
+    if (fromEnd === 2) return "Semi-final";
+    return `Upper Round ${idx + 1}`;
+  }
+
+  if (titlePrefix === "Lower") {
+    if (fromEnd === 1) return "Lower Final";
+    if (fromEnd === 2) return "Lower Semi-final";
+    return `Lower Round ${idx + 1}`;
+  }
+
+  // Fallback for any other prefix
+  return `${titlePrefix} Round ${idx + 1}`;
+}
+
 function layoutBracketSection(
   rounds,
   titlePrefix,
@@ -3536,50 +3573,95 @@ function layoutBracketSection(
     return newRound;
   });
 
-  // --- 2) Compute card positions ---
+  // --- 2) Compute card positions (parents-aligned & column-centered) ---
 
   const positions = new Map(); // matchId -> { x, y }
   let maxY = 0;
   let maxX = 0;
 
+  // Tallest round in this section (used for vertical band height)
+  const maxMatchesPerRound = orderedRounds.reduce(
+    (max, round) => Math.max(max, round.length || 0),
+    0
+  );
+  const SECTION_HEIGHT =
+    maxMatchesPerRound > 0
+      ? maxMatchesPerRound * (CARD_HEIGHT + V_GAP) - V_GAP
+      : 0;
+
   orderedRounds.forEach((round, rIdx) => {
-    round.forEach((match, mIdx) => {
-      const x = offsetX + rIdx * (CARD_WIDTH + H_GAP);
+    const x = offsetX + rIdx * (CARD_WIDTH + H_GAP);
+    if (!round.length) return;
 
-      if (rIdx === 0) {
-        // First round: simple grid
-        const y = offsetY + mIdx * (CARD_HEIGHT + V_GAP);
+    // Helper: starting Y for a round’s own “ideal grid” if we need a fallback
+    const roundHeight = round.length * (CARD_HEIGHT + V_GAP) - V_GAP;
+    const baseStartY = offsetY + (SECTION_HEIGHT - roundHeight) / 2;
+
+    if (rIdx === 0) {
+      // First round: evenly spaced grid, centered in section
+      round.forEach((match, mIdx) => {
+        const y = baseStartY + mIdx * (CARD_HEIGHT + V_GAP);
         positions.set(match.id, { x, y });
         maxY = Math.max(maxY, y + CARD_HEIGHT);
         maxX = Math.max(maxX, x + CARD_WIDTH);
+      });
+      return;
+    }
+
+    // Later rounds:
+    // 1) compute desired center from parents
+    // 2) keep relative positions
+    // 3) shift whole round so its centers are centered in the section
+    const desired = round.map((match, mIdx) => {
+      const parents = (match.sources || [])
+        .map((src) =>
+          src && src.type === "match" ? positions.get(src.matchId) : null
+        )
+        .filter(Boolean);
+
+      const parentCenters = parents.map((p) => p.y + CARD_HEIGHT / 2);
+
+      // Fallback center if no parents (e.g. weird template edge cases)
+      const fallbackCenter =
+        baseStartY + mIdx * (CARD_HEIGHT + V_GAP) + CARD_HEIGHT / 2;
+
+      let center;
+      if (parentCenters.length === 2) {
+        // EXACT middle between the two parents
+        center = (parentCenters[0] + parentCenters[1]) / 2;
+      } else if (parentCenters.length === 1) {
+        // Align directly with single parent
+        center = parentCenters[0];
       } else {
-        const parents = (match.sources || [])
-          .map((src) =>
-            src && src.type === "match" ? positions.get(src.matchId) : null
-          )
-          .filter(Boolean);
-
-        const parentYs = parents.map((p) => p.y + CARD_HEIGHT / 2);
-        const baseY = offsetY + mIdx * (CARD_HEIGHT + V_GAP);
-        const baseCenter = baseY + CARD_HEIGHT / 2;
-
-        let yCenter;
-        if (parentYs.length === 2) {
-          // Child in the middle of its two parents
-          yCenter = (parentYs[0] + parentYs[1]) / 2;
-        } else if (parentYs.length === 1) {
-          // Single parent: keep center aligned so we can draw a straight line
-          yCenter = parentYs[0];
-        } else {
-          // Fallback – use grid position
-          yCenter = baseCenter;
-        }
-
-        const y = yCenter - CARD_HEIGHT / 2;
-        positions.set(match.id, { x, y });
-        maxY = Math.max(maxY, y + CARD_HEIGHT);
-        maxX = Math.max(maxX, x + CARD_WIDTH);
+        // No parents -> just use grid position
+        center = fallbackCenter;
       }
+
+      return { match, center };
+    });
+
+    // Keep order top-to-bottom by center (already mostly ordered)
+    desired.sort((a, b) => a.center - b.center);
+
+    // Shift all centers so this round is centered in the section band
+    let minCenter = desired[0].center;
+    let maxCenter = desired[0].center;
+    for (let i = 1; i < desired.length; i++) {
+      const c = desired[i].center;
+      if (c < minCenter) minCenter = c;
+      if (c > maxCenter) maxCenter = c;
+    }
+
+    const bandMid = offsetY + SECTION_HEIGHT / 2;
+    const spanMid = (minCenter + maxCenter) / 2;
+    const delta = bandMid - spanMid;
+
+    desired.forEach((item) => {
+      const shiftedCenter = item.center + delta;
+      const y = shiftedCenter - CARD_HEIGHT / 2;
+      positions.set(item.match.id, { x, y });
+      maxY = Math.max(maxY, y + CARD_HEIGHT);
+      maxX = Math.max(maxX, x + CARD_WIDTH);
     });
   });
 
@@ -3726,17 +3808,21 @@ function layoutBracketSection(
 
   // --- 5) Titles + wrapper HTML ---
 
+  const totalRounds = orderedRounds.length;
+
   const titles = orderedRounds
     .map((round, idx) => {
       const bestOfLabel = round?.length ? getBestOfForMatch(round[0]) : null;
       const boBadge = bestOfLabel
         ? `<span class="round-bo">Bo${bestOfLabel}</span>`
         : "";
+
+      // Use our helper to decide the text: Final, Semi-final, Lower Final, etc.
+      const label = getRoundLabel(titlePrefix, idx, totalRounds);
+
       return `<div class="round-title row-title" style="left:${
         offsetX + idx * (CARD_WIDTH + H_GAP)
-      }px;">${
-        round.name || `${titlePrefix} Round ${idx + 1}`
-      } ${boBadge}</div>`;
+      }px;">${label} ${boBadge}</div>`;
     })
     .join("");
 
