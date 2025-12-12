@@ -396,6 +396,21 @@
                 <option value="Swiss">Swiss</option>
               </select>
             </label>
+            <div class="inline-row" data-format-scope="settings-roundrobin">
+              <label style="flex:1;">Number of groups
+                <input type="number" id="settingsRoundRobinGroups" min="1" />
+              </label>
+              <label style="flex:1;">Advance per group
+                <input type="number" id="settingsRoundRobinAdvance" min="0" />
+              </label>
+              <label style="flex:1;">Playoffs
+                <select id="settingsRoundRobinPlayoffs">
+                  <option value="Double Elimination">Double Elimination</option>
+                  <option value="Single Elimination">Single Elimination</option>
+                  <option value="None">None</option>
+                </select>
+              </label>
+            </div>
 
             <div class="format-diagram">
 
@@ -651,6 +666,21 @@
             <option value="Swiss">Swiss</option>
           </select>
         </label>
+        <div class="inline-row" data-format-scope="create-roundrobin">
+          <label style="flex:1;">Number of groups
+            <input type="number" id="roundRobinGroupsInput" min="1" />
+          </label>
+          <label style="flex:1;">Advance per group
+            <input type="number" id="roundRobinAdvanceInput" min="0" />
+          </label>
+          <label style="flex:1;">Playoffs
+            <select id="roundRobinPlayoffsSelect">
+              <option value="Double Elimination">Double Elimination</option>
+              <option value="Single Elimination">Single Elimination</option>
+              <option value="None">None</option>
+            </select>
+          </label>
+        </div>
         <div class="inline-row">
           <label style="flex:1;">Upper bracket best of
             <input type="number" id="bestOfUpperInput" min="1" max="9" placeholder="3" />
