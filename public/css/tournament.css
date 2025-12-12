@@ -103,21 +103,6 @@ a {
   margin: 0 0 4px;
 }
 
-.pill-row {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.pill {
-  border: 1px solid var(--stroke);
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 999px;
-  padding: 6px 10px;
-  color: var(--muted);
-  font-size: 13px;
-}
-
 .hero-stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
@@ -469,9 +454,33 @@ a {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
+
+  /* 🧱 Spacing */
+  padding: 8px 10px;
+  margin: 0 0 10px 0;
+
+  /* 🎨 Background */
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.06),
+    rgba(255, 255, 255, 0.02)
+  );
+
+  /* 🪟 Shape */
+  border-radius: 10px;
+  border: 1px solid var(--stroke);
+
+  /* ✍️ Text */
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   color: var(--muted);
-  font-size: 13px;
-  margin-bottom: 6px;
+
+  /* Depth */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 4px 14px rgba(0, 0, 0, 0.35);
 }
 
 .match-card {
@@ -600,11 +609,20 @@ a {
 
 .tree-bracket .row-title {
   position: absolute;
-  top: -22px;
+  top: 4px;
   width: var(--card-width, 200px);
   text-align: left;
   color: var(--muted);
   font-weight: 600;
+  user-select: none;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.tree-bracket .tree-match-layer {
+  position: relative;
+  width: 100%;
+  height: 100%;
 }
 
 .round-title .round-bo {
@@ -634,6 +652,7 @@ a {
   column-gap: 8px;
   row-gap: 4px;
   align-items: center;
+  z-index: 1;
 }
 
 .match-card.tree .row {
@@ -1228,6 +1247,7 @@ a {
   background-size: cover;
   background-position: center;
   width: 100%;
+  user-select: none;
 }
 
 .tournament-map-card .map-meta {
@@ -1479,4 +1499,143 @@ label {
 
 .settings-panel.active {
   display: flex;
+}
+/* ===== Settings: Best-of diagram (Upper / Lower + QF/SF/F) ===== */
+
+.format-diagram {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin-top: 10px;
+  max-width: 30%;
+  margin-inline: auto; /* center inside the panel */
+}
+
+/* Upper & lower rows – center content */
+.format-row {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  align-items: center;
+}
+
+.format-row--lower {
+  margin-top: 4px;
+}
+
+.format-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* center boxes + labels */
+  gap: 6px;
+  position: relative; /* needed for connectors */
+}
+
+.format-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(235, 241, 255, 0.8);
+}
+
+/* Big "rest of bracket" boxes */
+
+.format-box {
+  position: relative; /* for connector line */
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  min-width: 120px;
+  user-select: none;
+}
+
+.format-box--big {
+  height: 48px; /* bigger "rest of bracket" box */
+}
+
+.format-box--small {
+  height: 24px; /* quarter boxes */
+}
+
+.format-box--medium {
+  height: 32px; /* semis / finals */
+}
+
+/* Connector lines between boxes – anchored to box center */
+.format-row .format-col:not(:first-child) .format-box::before {
+  content: "";
+  position: absolute;
+  left: -18px; /* length of connector */
+  top: 50%;
+  transform: translateY(-50%); /* center vertically on box */
+  width: 18px;
+  border-top: 2px solid var(--line, rgba(255, 255, 255, 0.25));
+  opacity: 0.7;
+}
+
+/* Upper vs lower color tints */
+
+.format-box--upper {
+  background: linear-gradient(
+    90deg,
+    rgba(54, 183, 255, 0.18),
+    rgba(54, 183, 255, 0.05)
+  );
+}
+
+.format-box--lower {
+  background: linear-gradient(
+    90deg,
+    rgba(154, 163, 182, 0.25),
+    rgba(154, 163, 182, 0.06)
+  );
+}
+
+.format-box--qf {
+  background: rgba(78, 213, 255, 0.1);
+}
+
+.format-box--semi {
+  background: rgba(78, 213, 255, 0.16);
+}
+
+.format-box--final,
+.format-box--lb-final {
+  background: radial-gradient(
+    circle at 50% 0%,
+    rgba(245, 197, 66, 0.35),
+    rgba(11, 10, 5, 0.96)
+  );
+  border-color: rgba(245, 197, 66, 0.85);
+}
+
+.format-box--lb-semi {
+  background: rgba(154, 163, 182, 0.25);
+}
+
+/* Inputs below each box */
+
+.format-input {
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* Narrow BoX dropdowns */
+.format-input select {
+  max-width: 70px;
+  padding-inline: 6px;
+  font-size: 12px;
+}
+
+/* Optional spacer – no longer needed visually, keep hidden if present */
+.format-col--spacer {
+  display: none;
+}
+
+/* Optional: on very small screens, let it use full width instead of 30% */
+@media (max-width: 900px) {
+  .format-diagram {
+    max-width: 100%;
+  }
 }

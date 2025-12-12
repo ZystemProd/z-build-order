@@ -102,21 +102,21 @@
       </div>
     </div>
 
-      <div class="card">
-        <div class="card-header">
-          <div>
-            <p class="eyebrow">Browse</p>
-            <h3>Open tournaments</h3>
-          </div>
-          <button id="refreshTournaments" class="cta ghost small">Refresh</button>
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <p class="eyebrow">Browse</p>
+          <h3>Open tournaments</h3>
         </div>
-        <div class="list-tabs" id="tournamentListTabs">
-          <button class="list-tab active" data-list-filter="open">Open tournaments</button>
-          <button class="list-tab" data-list-filter="mine">My tournaments</button>
-          <button class="list-tab" data-list-filter="hosted">Hosted tournaments</button>
-        </div>
-        <ul id="tournamentList" class="tournament-list"></ul>
+        <button id="refreshTournaments" class="cta ghost small">Refresh</button>
       </div>
+      <div class="list-tabs" id="tournamentListTabs">
+        <button class="list-tab active" data-list-filter="open">Open tournaments</button>
+        <button class="list-tab" data-list-filter="mine">My tournaments</button>
+        <button class="list-tab" data-list-filter="hosted">Hosted tournaments</button>
+      </div>
+      <ul id="tournamentList" class="tournament-list"></ul>
+    </div>
   </section>
 
   <!-- Tournament detail -->
@@ -130,11 +130,6 @@
           <button id="jumpToRegistration" class="cta primary">Add a player</button>
           <button id="openRegisterBtn" class="cta ghost" style="display:none;">Register</button>
           <button id="jumpToBracket" class="cta ghost">View bracket</button>
-        </div>
-        <div class="pill-row">
-          <span class="pill">Auto-seed (points → MMR)</span>
-          <span class="pill">Live sync (tabs)</span>
-          <span class="pill">Walkover-ready</span>
         </div>
       </div>
       <div class="hero-stats">
@@ -159,7 +154,8 @@
         <button class="tab-btn" data-tab="descriptionTab">Description &amp; Rules</button>
         <button class="tab-btn" data-tab="mapsTab">Maps</button>
         <button class="tab-btn" data-tab="registrationTab" id="adminTabBtn">Registration</button>
-        <button class="tab-btn" data-tab="settingsTab" id="settingsTabBtn" data-admin-only="true" style="display:none;">Settings</button>
+        <button class="tab-btn" data-tab="settingsTab" id="settingsTabBtn" data-admin-only="true"
+          style="display:none;">Settings</button>
       </div>
 
       <section id="descriptionTab" class="tab-panel">
@@ -268,7 +264,8 @@
               <h3>Points-first ranking</h3>
             </div>
             <div class="seed-actions">
-              <span id="seedingNotice" class="badge warning" style="display:none;">Seeding changed - rebuild needed</span>
+              <span id="seedingNotice" class="badge warning" style="display:none;">Seeding changed - rebuild
+                needed</span>
               <button id="rebuildBracketBtn" class="cta small ghost">Apply to bracket</button>
               <button id="resetTournamentBtn" class="cta small subtle">Reset tournament</button>
             </div>
@@ -317,7 +314,7 @@
               <p class="helper">Slug changes are locked for existing tournaments.</p>
             </label>
             <label>Start time
-            <input type="datetime-local" id="settingsStartInput" />
+              <input type="datetime-local" id="settingsStartInput" />
             </label>
             <label>Max players
               <input type="number" id="settingsMaxPlayersInput" min="2" max="512" placeholder="32" />
@@ -337,14 +334,16 @@
                   <button type="button" class="toolbar-btn" data-settings-desc-action="image">Image</button>
                   <button type="button" class="toolbar-btn" data-settings-desc-action="code">&lt;/&gt;</button>
                 </div>
-                <textarea id="settingsDescriptionInput" class="markdown-input" rows="8" placeholder="Describe the event..."></textarea>
+                <textarea id="settingsDescriptionInput" class="markdown-input" rows="8"
+                  placeholder="Describe the event..."></textarea>
               </div>
             </label>
             <label>Rules
               <div class="markdown-editor">
                 <div class="markdown-toolbar">
                   <button type="button" class="toolbar-btn" data-settings-rules-action="heading">H2</button>
-                  <button type="button" class="toolbar-btn" data-settings-rules-action="bold"><strong>B</strong></button>
+                  <button type="button" class="toolbar-btn"
+                    data-settings-rules-action="bold"><strong>B</strong></button>
                   <button type="button" class="toolbar-btn" data-settings-rules-action="italic"><em>I</em></button>
                   <button type="button" class="toolbar-btn" data-settings-rules-action="bullet">- List</button>
                   <button type="button" class="toolbar-btn" data-settings-rules-action="numbered">1. List</button>
@@ -353,7 +352,8 @@
                   <button type="button" class="toolbar-btn" data-settings-rules-action="image">Image</button>
                   <button type="button" class="toolbar-btn" data-settings-rules-action="code">&lt;/&gt;</button>
                 </div>
-                <textarea id="settingsRulesInput" class="markdown-input" rows="8" placeholder="Add eligibility, format, communication, and fair play rules..."></textarea>
+                <textarea id="settingsRulesInput" class="markdown-input" rows="8"
+                  placeholder="Add eligibility, format, communication, and fair play rules..."></textarea>
               </div>
             </label>
             <div class="markdown-preview">
@@ -365,28 +365,28 @@
               <div id="settingsRulesPreview" class="helper"></div>
             </div>
           </div>
-      <div class="settings-panel" id="settingsMaps">
-        <div class="map-pool-picker">
-          <div class="picker-header">
-            <div>
-              <p class="eyebrow">Maps</p>
-              <h4>Chosen map pool</h4>
-            </div>
-            <div class="picker-actions">
-              <button type="button" class="cta small ghost" id="settingsUseLadderMapsBtn">All ladder maps</button>
-              <button type="button" class="cta small subtle" id="settingsClearMapPoolBtn">Custom</button>
+          <div class="settings-panel" id="settingsMaps">
+            <div class="map-pool-picker">
+              <div class="picker-header">
+                <div>
+                  <p class="eyebrow">Maps</p>
+                  <h4>Chosen map pool</h4>
+                </div>
+                <div class="picker-actions">
+                  <button type="button" class="cta small ghost" id="settingsUseLadderMapsBtn">All ladder maps</button>
+                  <button type="button" class="cta small subtle" id="settingsClearMapPoolBtn">Custom</button>
+                </div>
+              </div>
+              <div id="settingsChosenMapList" class="map-pool-grid chosen-grid"></div>
+              <div class="picker-header" style="margin-top:12px;">
+                <div>
+                  <h4>All 1v1 maps</h4>
+                  <p class="helper">Click to add/remove</p>
+                </div>
+              </div>
+              <div id="settingsMapPoolPicker" class="map-pool-grid selectable"></div>
             </div>
           </div>
-          <div id="settingsChosenMapList" class="map-pool-grid chosen-grid"></div>
-          <div class="picker-header" style="margin-top:12px;">
-            <div>
-              <h4>All 1v1 maps</h4>
-              <p class="helper">Click to add/remove</p>
-            </div>
-          </div>
-          <div id="settingsMapPoolPicker" class="map-pool-grid selectable"></div>
-        </div>
-      </div>
           <div class="settings-panel" id="settingsFormat">
             <label>Format
               <select id="settingsFormatSelect">
@@ -396,26 +396,141 @@
                 <option value="Swiss">Swiss</option>
               </select>
             </label>
-            <div class="inline-row">
-              <label style="flex:1;">Upper bracket best of
-                <input type="number" id="settingsBestOfUpper" min="1" max="9" placeholder="3" />
-              </label>
-              <label style="flex:1;">Lower bracket best of
-                <input type="number" id="settingsBestOfLower" min="1" max="9" placeholder="3" />
-              </label>
-            </div>
-            <div class="inline-row">
-              <label style="flex:1;">Quarterfinals best of
-                <input type="number" id="settingsBestOfQuarter" min="1" max="9" placeholder="5" />
-              </label>
-              <label style="flex:1;">Semifinals best of
-                <input type="number" id="settingsBestOfSemi" min="1" max="9" placeholder="5" />
-              </label>
-              <label style="flex:1;">Finals best of
-                <input type="number" id="settingsBestOfFinal" min="1" max="9" placeholder="7" />
-              </label>
+
+            <div class="format-diagram">
+
+              <!-- UPPER ROW -->
+              <div class="format-row format-row--upper">
+                <!-- Upper bracket (long box) -->
+                <div class="format-col format-col--upper-main">
+                  <div class="format-title">Upper bracket</div>
+                  <div class="format-box format-box--big format-box--upper"></div>
+                  <label class="format-input">
+                    Best of
+                    <select id="settingsBestOfUpper">
+                      <option value="1">Bo1</option>
+                      <option value="3">Bo3</option>
+                      <option value="5">Bo5</option>
+                      <option value="7">Bo7</option>
+                      <option value="9">Bo9</option>
+                    </select>
+                  </label>
+
+                </div>
+
+                <!-- Quarterfinals (single big box) -->
+                <div class="format-col format-col--quarter">
+                  <div class="format-title">Quarterfinals</div>
+                  <div class="format-box format-box--big format-box--qf"></div>
+                  <label class="format-input">
+                    Best of
+                    <select id="settingsBestOfQuarter">
+                      <option value="1">Bo1</option>
+                      <option value="3">Bo3</option>
+                      <option value="5">Bo5</option>
+                      <option value="7">Bo7</option>
+                      <option value="9">Bo9</option>
+                    </select>
+                  </label>
+                </div>
+
+
+                <!-- Semi-finals -->
+                <div class="format-col format-col--semi">
+                  <div class="format-title">Semi-finals</div>
+                  <div class="format-box format-box--medium format-box--semi"></div>
+                  <label class="format-input">
+                    Best of
+                    <select id="settingsBestOfSemi">
+                      <option value="1">Bo1</option>
+                      <option value="3">Bo3</option>
+                      <option value="5">Bo5</option>
+                      <option value="7">Bo7</option>
+                      <option value="9">Bo9</option>
+                    </select>
+                  </label>
+
+                </div>
+
+                <!-- Finals -->
+                <div class="format-col format-col--final">
+                  <div class="format-title">Finals</div>
+                  <div class="format-box format-box--medium format-box--final"></div>
+                  <label class="format-input">
+                    Best of
+                    <select id="settingsBestOfFinal">
+                      <option value="1">Bo1</option>
+                      <option value="3">Bo3</option>
+                      <option value="5">Bo5</option>
+                      <option value="7">Bo7</option>
+                      <option value="9">Bo9</option>
+                    </select>
+                  </label>
+
+                </div>
+              </div>
+
+              <!-- LOWER ROW -->
+              <div class="format-row format-row--lower">
+                <!-- Lower bracket (long box) -->
+                <div class="format-col format-col--lower-main">
+                  <div class="format-title">Lower bracket</div>
+                  <div class="format-box format-box--big format-box--lower"></div>
+                  <label class="format-input">
+                    Best of
+                    <select id="settingsBestOfLower">
+                      <option value="1">Bo1</option>
+                      <option value="3">Bo3</option>
+                      <option value="5">Bo5</option>
+                      <option value="7">Bo7</option>
+                      <option value="9">Bo9</option>
+                    </select>
+                  </label>
+
+                </div>
+
+                <!-- LB Semi-finals -->
+                <div class="format-col format-col--lb-extra">
+                  <div class="format-title">LB Semi-finals</div>
+                  <div class="format-box format-box--medium format-box--lb-semi"></div>
+                  <label class="format-input">
+                    Best of
+                    <select id="settingsBestOfLowerSemi">
+                      <option value="1">Bo1</option>
+                      <option value="3">Bo3</option>
+                      <option value="5">Bo5</option>
+                      <option value="7">Bo7</option>
+                      <option value="9">Bo9</option>
+                    </select>
+                  </label>
+                </div>
+
+                <!-- LB Finals -->
+                <div class="format-col format-col--lb-extra">
+                  <div class="format-title">LB Finals</div>
+                  <div class="format-box format-box--medium format-box--lb-final"></div>
+                  <label class="format-input">
+                    Best of
+                    <select id="settingsBestOfLowerFinal">
+                      <option value="1">Bo1</option>
+                      <option value="3">Bo3</option>
+                      <option value="5">Bo5</option>
+                      <option value="7">Bo7</option>
+                      <option value="9">Bo9</option>
+                    </select>
+                  </label>
+                </div>
+
+                <!-- spacer no longer needed, but keep hidden by CSS if you want -->
+                <div class="format-col format-col--spacer"></div>
+
+              </div>
+
             </div>
           </div>
+
+
+
           <div class="form-actions" style="margin-top:16px;">
             <button class="cta primary" id="saveSettingsBtn">Save settings</button>
           </div>
@@ -448,14 +563,15 @@
             <span class="muted">https://zbuildorder.com/tournament/</span>
             <div class="slug-input-wrapper">
               <input type="text" id="tournamentSlugInput" placeholder="my-weekly-cup" />
-              <button type="button" class="icon-btn slug-generate-btn" id="generateSlugBtn" aria-label="Generate random slug">↻</button>
+              <button type="button" class="icon-btn slug-generate-btn" id="generateSlugBtn"
+                aria-label="Generate random slug">↻</button>
             </div>
           </div>
           <p class="helper" id="slugStatus"></p>
         </label>
         <label>Start time
-        <input type="datetime-local" id="tournamentStartInput" class="datetime-input" />
-      </label>
+          <input type="datetime-local" id="tournamentStartInput" class="datetime-input" />
+        </label>
         <label>Max players
           <input type="number" id="tournamentMaxPlayersInput" min="2" max="512" placeholder="32" />
         </label>
@@ -474,7 +590,8 @@
               <button type="button" class="toolbar-btn" data-desc-action="image">Image</button>
               <button type="button" class="toolbar-btn" data-desc-action="code">&lt;/&gt;</button>
             </div>
-            <textarea id="tournamentDescriptionInput" class="markdown-input" rows="10" placeholder="Write rules, schedule, map pool..."></textarea>
+            <textarea id="tournamentDescriptionInput" class="markdown-input" rows="10"
+              placeholder="Write rules, schedule, map pool..."></textarea>
           </div>
         </label>
         <label>Rules
@@ -490,7 +607,8 @@
               <button type="button" class="toolbar-btn" data-rules-action="image">Image</button>
               <button type="button" class="toolbar-btn" data-rules-action="code">&lt;/&gt;</button>
             </div>
-            <textarea id="tournamentRulesInput" class="markdown-input" rows="10" placeholder="Add eligibility, format, communication, and fair play rules..."></textarea>
+            <textarea id="tournamentRulesInput" class="markdown-input" rows="10"
+              placeholder="Add eligibility, format, communication, and fair play rules..."></textarea>
           </div>
         </label>
         <div class="markdown-preview">
@@ -580,5 +698,3 @@
 </body>
 
 </html>
-
-

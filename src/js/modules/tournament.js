@@ -103,11 +103,15 @@ let mapCatalog = [];
 let mapCatalogLoaded = false;
 let currentMapPoolMode = "ladder"; // ladder | custom
 const defaultBestOf = {
+  // upper bracket
   upper: 3,
-  lower: 3,
-  quarter: 5,
-  semi: 5,
-  final: 7,
+  quarter: 3,
+  semi: 3,
+  final: 5,
+  // lower bracket
+  lower: 1,
+  lowerSemi: 3,
+  lowerFinal: 5,
 };
 let currentVetoMatchId = null;
 let vetoState = null;
@@ -403,12 +407,20 @@ function bindUI() {
       ?.scrollIntoView({ behavior: "smooth" });
   });
 
-  playersTable?.addEventListener("input", (e) => {
+  // Let admins type freely; only reseed when the input is committed (blur/enter)
+  playersTable?.addEventListener("change", (e) => {
     if (!isAdmin) return;
     if (e.target.matches(".points-input")) {
       const id = e.target.dataset.playerId;
-      const value = Math.max(0, Number(e.target.value) || 0);
-      updatePlayerPoints(id, value);
+      const raw = e.target.value;
+
+      // If they clear the field, treat it as 0 when they leave the input
+      const value = raw === "" ? 0 : Math.max(0, Number(raw) || 0);
+
+      // Normalize display so it never stays blank
+      if (raw === "") e.target.value = String(value);
+
+      updatePlayerPoints(id, value); // this reseeds + resorts
     }
   });
 
@@ -598,6 +610,7 @@ function normalizeRaceKey(raw) {
 }
 
 function autoFillPlayers() {
+  // 32 clean names (no numbers)
   const names = [
     "Zephyr",
     "Astra",
@@ -615,18 +628,34 @@ function autoFillPlayers() {
     "Helix",
     "Frostbyte",
     "Titanfall",
+    "RubyRock",
+    "Solaris",
+    "VoidReaper",
+    "Tempest",
+    "IronWarden",
+    "Starweaver",
+    "NeonViper",
+    "GrimNova",
+    "ArcRunner",
+    "Quantum",
+    "NightOwl",
+    "DriftKing",
+    "ShadowFox",
+    "LunarEdge",
+    "StormRider",
+    "CoreSync",
   ];
+
   const races = ["Zerg", "Protoss", "Terran", "Random"];
 
-  const picks = [];
-  while (picks.length < 12) {
-    const base = names[Math.floor(Math.random() * names.length)];
-    const suffix = Math.floor(Math.random() * 900 + 100);
-    const name = `${base}_${suffix}`;
+  // shuffle names so the order changes each click
+  const shuffled = [...names].sort(() => Math.random() - 0.5);
+
+  const picks = shuffled.slice(0, 32).map((name) => {
     const race = races[Math.floor(Math.random() * races.length)];
     const mmr = Math.floor(Math.random() * (4000 - 3000 + 1)) + 3000;
-    picks.push({ name, race, mmr, points: 0 });
-  }
+    return { name, race, mmr, points: 0 };
+  });
 
   picks.forEach((p) => {
     createOrUpdatePlayer({
@@ -641,34 +670,57 @@ function autoFillPlayers() {
   const seededPlayers = applySeeding(state.players);
   saveState({ players: seededPlayers, needsReseed: false });
   rebuildBracket(true, "Dev auto-fill");
-  addActivity("Auto-filled 12 players for testing.");
+  addActivity("Auto-filled 32 players for testing.");
 }
 
 function buildTestPlayers(count) {
-  const names = [
+  // 32 clean names (no numbers in the display name)
+  const pool = [
     "Zephyr",
+    "Astra",
+    "Nexus",
+    "Starlance",
+    "Vortex",
+    "Nightfall",
+    "IonBlade",
+    "WarpDrive",
     "Pulsefire",
+    "Skyforge",
+    "NovaWing",
     "CryoCore",
     "Flux",
-    "Titanfall",
-    "Skyforge",
-    "Nightfall",
-    "Vortex",
-    "NovaWing",
-    "Starlance",
-    "WarpDrive",
-    "Astra",
     "Helix",
     "Frostbyte",
-    "IonBlade",
+    "Titanfall",
     "RubyRock",
+    "Solaris",
+    "VoidReaper",
+    "Tempest",
+    "IronWarden",
+    "Starweaver",
+    "NeonViper",
+    "GrimNova",
+    "ArcRunner",
+    "Quantum",
+    "NightOwl",
+    "DriftKing",
+    "ShadowFox",
+    "LunarEdge",
+    "StormRider",
+    "CoreSync",
   ];
+
   const races = ["Zerg", "Protoss", "Terran", "Random"];
   const createdAt = Date.now();
-  return Array.from({ length: count }, (_, idx) => ({
-    id: `test-${idx + 1}`,
-    name: `${names[idx % names.length]}_${idx + 1}`,
-    race: races[idx % races.length],
+
+  // Shuffle and pick `count` unique names
+  const shuffled = [...pool].sort(() => Math.random() - 0.5);
+  const picked = shuffled.slice(0, Math.min(count, shuffled.length));
+
+  return picked.map((name, idx) => ({
+    id: `test-${idx + 1}`, // ✅ UNIQUE ID (critical!)
+    name, // ✅ No numbers
+    race: races[Math.floor(Math.random() * races.length)],
     sc2Link: "",
     mmr: 4000 - idx * 25,
     points: 1000 - idx,
@@ -1455,6 +1507,8 @@ function readBestOfFromForm(prefix) {
           quarter: "settingsBestOfQuarter",
           semi: "settingsBestOfSemi",
           final: "settingsBestOfFinal",
+          lowerSemi: "settingsBestOfLowerSemi",
+          lowerFinal: "settingsBestOfLowerFinal",
         }
       : {
           upper: "bestOfUpperInput",
@@ -1462,18 +1516,24 @@ function readBestOfFromForm(prefix) {
           quarter: "bestOfQuarterInput",
           semi: "bestOfSemiInput",
           final: "bestOfFinalInput",
+          lowerSemi: "bestOfLowerSemiInput",
+          lowerFinal: "bestOfLowerFinalInput",
         };
+
   const getVal = (id, fallback) => {
     const el = document.getElementById(id);
     const num = Number(el?.value);
     return Number.isFinite(num) && num > 0 ? num : fallback;
   };
+
   return {
     upper: getVal(ids.upper, defaultBestOf.upper),
     lower: getVal(ids.lower, defaultBestOf.lower),
     quarter: getVal(ids.quarter, defaultBestOf.quarter),
     semi: getVal(ids.semi, defaultBestOf.semi),
     final: getVal(ids.final, defaultBestOf.final),
+    lowerSemi: getVal(ids.lowerSemi, defaultBestOf.lowerSemi),
+    lowerFinal: getVal(ids.lowerFinal, defaultBestOf.lowerFinal),
   };
 }
 
@@ -2358,13 +2418,14 @@ function renderBracket() {
     upperRounds.push([{ ...state.bracket.finals, name: "Finals" }]);
   }
 
+  const ROUND_TITLE_BAND = 60;
   const upper = layoutBracketSection(
     upperRounds,
     "Upper",
     lookup,
     playersById,
     0,
-    0
+    ROUND_TITLE_BAND
   );
 
   // --- Lower bracket (hidden for Single Elimination) ---
@@ -2373,7 +2434,14 @@ function renderBracket() {
   if (!isSingleElimination) {
     const lowerRounds = state.bracket.losers || [];
     lower = lowerRounds.length
-      ? layoutBracketSection(lowerRounds, "Lower", lookup, playersById, 0, 0)
+      ? layoutBracketSection(
+          lowerRounds,
+          "Lower",
+          lookup,
+          playersById,
+          0,
+          ROUND_TITLE_BAND
+        )
       : { html: "", height: 0 };
   }
 
@@ -2683,12 +2751,19 @@ function applyBestOfToSettings(bestOf) {
   const quarterInput = document.getElementById("settingsBestOfQuarter");
   const semiInput = document.getElementById("settingsBestOfSemi");
   const finalInput = document.getElementById("settingsBestOfFinal");
+  const lbSemiInput = document.getElementById("settingsBestOfLowerSemi");
+  const lbFinalInput = document.getElementById("settingsBestOfLowerFinal");
+
   if (upperInput) upperInput.value = bestOf.upper ?? defaultBestOf.upper;
   if (lowerInput) lowerInput.value = bestOf.lower ?? defaultBestOf.lower;
   if (quarterInput)
     quarterInput.value = bestOf.quarter ?? defaultBestOf.quarter;
   if (semiInput) semiInput.value = bestOf.semi ?? defaultBestOf.semi;
   if (finalInput) finalInput.value = bestOf.final ?? defaultBestOf.final;
+  if (lbSemiInput)
+    lbSemiInput.value = bestOf.lowerSemi ?? defaultBestOf.lowerSemi;
+  if (lbFinalInput)
+    lbFinalInput.value = bestOf.lowerFinal ?? defaultBestOf.lowerFinal;
 }
 
 function renderVetoStatus() {
@@ -2724,12 +2799,17 @@ function populateSettingsPanel(tournament) {
   const formatSelect = document.getElementById("settingsFormatSelect");
   const maxInput = document.getElementById("settingsMaxPlayersInput");
   const startInput = document.getElementById("settingsStartInput");
-  const bestOf = tournament.bestOf || defaultBestOf;
+  const bestOf = {
+    ...defaultBestOf,
+    ...(tournament.bestOf || {}),
+  };
   const upperInput = document.getElementById("settingsBestOfUpper");
   const lowerInput = document.getElementById("settingsBestOfLower");
   const quarterInput = document.getElementById("settingsBestOfQuarter");
   const semiInput = document.getElementById("settingsBestOfSemi");
   const finalInput = document.getElementById("settingsBestOfFinal");
+  const lbSemiInput = document.getElementById("settingsBestOfLowerSemi");
+  const lbFinalInput = document.getElementById("settingsBestOfLowerFinal");
   if (nameInput) nameInput.value = tournament.name || "";
   if (slugInput) slugInput.value = tournament.slug || "";
   if (descInput) descInput.value = tournament.description || "";
@@ -2753,7 +2833,15 @@ function populateSettingsPanel(tournament) {
     quarterInput.value = bestOf.quarter ?? defaultBestOf.quarter;
   if (semiInput) semiInput.value = bestOf.semi ?? defaultBestOf.semi;
   if (finalInput) finalInput.value = bestOf.final ?? defaultBestOf.final;
-  applyBestOfToSettings(tournament.bestOf || defaultBestOf);
+  if (lbSemiInput)
+    lbSemiInput.value = bestOf.lowerSemi ?? defaultBestOf.lowerSemi;
+  if (lbFinalInput)
+    lbFinalInput.value = bestOf.lowerFinal ?? defaultBestOf.lowerFinal;
+
+  applyBestOfToSettings({
+    ...defaultBestOf,
+    ...(tournament.bestOf || {}),
+  });
 }
 
 function renderMatchCard(match, lookup, playersById) {
@@ -3085,16 +3173,38 @@ function attachMatchActionHandlers() {
 function getBestOfForMatch(match) {
   const bestOf = currentTournamentMeta?.bestOf || defaultBestOf;
   const winnersRounds = state.bracket?.winners?.length || 0;
+
   if (match.bracket === "winners") {
     if (match.round === winnersRounds)
-      return bestOf.final || defaultBestOf.final;
+      return bestOf.final ?? defaultBestOf.final;
     if (match.round === winnersRounds - 1)
-      return bestOf.semi || defaultBestOf.semi;
+      return bestOf.semi ?? defaultBestOf.semi;
     if (match.round === winnersRounds - 2)
-      return bestOf.quarter || defaultBestOf.quarter;
-    return bestOf.upper || defaultBestOf.upper;
+      return bestOf.quarter ?? defaultBestOf.quarter;
+    return bestOf.upper ?? defaultBestOf.upper;
   }
-  return bestOf.lower || defaultBestOf.lower;
+
+  if (match.bracket === "losers") {
+    const losersRounds = state.bracket?.losers?.length || 0;
+    if (match.round === losersRounds)
+      return (
+        bestOf.lowerFinal ??
+        bestOf.lower ??
+        defaultBestOf.lowerFinal ??
+        defaultBestOf.lower
+      );
+    if (match.round === losersRounds - 1)
+      return (
+        bestOf.lowerSemi ??
+        bestOf.lower ??
+        defaultBestOf.lowerSemi ??
+        defaultBestOf.lower
+      );
+    return bestOf.lower ?? defaultBestOf.lower;
+  }
+
+  // Finals or anything else
+  return bestOf.final ?? defaultBestOf.final;
 }
 
 function loadState() {
@@ -3150,11 +3260,12 @@ async function persistTournamentStateRemote(snapshot) {
     const bracket = snapshot.bracket
       ? serializeBracket(snapshot.bracket)
       : null;
-    const payload = {
+    const payload = stripUndefinedDeep({
       ...snapshot,
       bracket,
       lastUpdated: snapshot.lastUpdated || Date.now(),
-    };
+    });
+
     await setDoc(ref, payload, { merge: true });
   } catch (_) {
     console.error("Failed to persist tournament state to Firestore", _);
@@ -3163,6 +3274,26 @@ async function persistTournamentStateRemote(snapshot) {
       "error"
     );
   }
+}
+
+function stripUndefinedDeep(value) {
+  if (Array.isArray(value)) {
+    // ✅ Firestore cannot store `undefined` array items either
+    return value.map(stripUndefinedDeep).filter((v) => v !== undefined);
+  }
+
+  if (value && typeof value === "object") {
+    const out = {};
+    for (const [k, v] of Object.entries(value)) {
+      if (v === undefined) continue; // 🔥 Firestore cannot store undefined
+      const cleaned = stripUndefinedDeep(v);
+      if (cleaned === undefined) continue;
+      out[k] = cleaned;
+    }
+    return out;
+  }
+
+  return value;
 }
 
 function serializeBracket(bracket) {
@@ -3495,7 +3626,7 @@ function layoutBracketSection(
   lookup,
   playersById,
   offsetX,
-  offsetY
+  matchLayerOffset = 0
 ) {
   if (!rounds?.length) {
     return { html: "", height: 0 };
@@ -3595,7 +3726,7 @@ function layoutBracketSection(
 
     // Helper: starting Y for a round’s own “ideal grid” if we need a fallback
     const roundHeight = round.length * (CARD_HEIGHT + V_GAP) - V_GAP;
-    const baseStartY = offsetY + (SECTION_HEIGHT - roundHeight) / 2;
+    const baseStartY = (SECTION_HEIGHT - roundHeight) / 2;
 
     if (rIdx === 0) {
       // First round: evenly spaced grid, centered in section
@@ -3652,7 +3783,7 @@ function layoutBracketSection(
       if (c > maxCenter) maxCenter = c;
     }
 
-    const bandMid = offsetY + SECTION_HEIGHT / 2;
+    const bandMid = SECTION_HEIGHT / 2;
     const spanMid = (minCenter + maxCenter) / 2;
     const delta = bandMid - spanMid;
 
@@ -3827,11 +3958,13 @@ function layoutBracketSection(
     .join("");
 
   const html = `<div class="tree-bracket" style="height:${
-    maxY + 20
+    maxY + 20 + matchLayerOffset
   }px; margin-top:${titlePrefix === "Lower" ? 16 : 0}px;">
     ${titles}
-    ${matchCards.join("")}
-    ${connectors.join("")}
+    <div class="tree-match-layer" style="transform: translateY(${matchLayerOffset}px); height:${maxY}px;">
+      ${matchCards.join("")}
+      ${connectors.join("")}
+    </div>
   </div>`;
 
   return { html, height: maxY };
