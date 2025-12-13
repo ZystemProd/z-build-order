@@ -17,6 +17,7 @@ import {
   setDoc,
 } from "firebase/firestore";
 import { initUserSettingsModal } from "./settingsModalInit.js";
+import DOMPurify from "dompurify";
 
 const STORAGE_KEY = "zboTournamentStateV1";
 const BROADCAST_NAME = "zboTournamentLive";
@@ -561,9 +562,21 @@ function hydratePulseFromState(pulseState) {
     : null;
   const { race: bestRace, mmr: bestMmr } = pickBestRace(byRace, overallMmr);
 
+  const secondary =
+    pulseState && Array.isArray(pulseState.secondary)
+      ? pulseState.secondary
+      : [];
+
   pulseProfile =
-    pulseState && (normalizedUrl || overallMmr || bestRace)
-      ? { ...pulseState, url: normalizedUrl, byRace, mmr: overallMmr }
+    pulseState &&
+    (normalizedUrl || overallMmr || bestRace || secondary.length)
+      ? {
+          ...pulseState,
+          url: normalizedUrl,
+          byRace,
+          mmr: overallMmr,
+          secondary,
+        }
       : null;
 
   const existingSelection = pulseProfile
@@ -882,7 +895,16 @@ async function handleRegistration(event) {
   }
   const twitchUrl =
     document.getElementById("settingsTwitchInput")?.value?.trim() || "";
-  const secondaryPulseLinks = collectSecondaryPulseLinks();
+  let secondaryPulseLinks = collectSecondaryPulseLinks();
+  const secondaryPulseProfiles =
+    Array.isArray(pulseProfile?.secondary) && pulseProfile.secondary.length
+      ? pulseProfile.secondary
+      : [];
+  if (!secondaryPulseLinks.length && secondaryPulseProfiles.length) {
+    secondaryPulseLinks = secondaryPulseProfiles
+      .map((entry) => (entry && typeof entry === "object" ? entry.url : ""))
+      .filter(Boolean);
+  }
   const mmrByRace = pulseProfile?.byRace ? { ...pulseProfile.byRace } : null;
   const mainClanSelect = document.getElementById("mainClanSelect");
   const selectedClanOption = mainClanSelect?.selectedOptions?.[0];
@@ -911,6 +933,7 @@ async function handleRegistration(event) {
     avatarUrl,
     twitchUrl,
     secondaryPulseLinks,
+    secondaryPulseProfiles,
     mmrByRace,
     clan: clanName === "None" ? "" : clanName,
     clanAbbreviation: clanAbbreviation || "",
@@ -1071,20 +1094,38 @@ function attachPlayerDetailHandlers() {
   playersTable?.addEventListener("click", handler);
 }
 
-function formatPulseLinks(list = []) {
+function formatPulseLinks(list = [], linkClass = "secondary-pulse-link") {
   if (!Array.isArray(list) || !list.length) {
-    return `<p class="helper">No secondary links</p>`;
+    return DOMPurify.sanitize(`<p class="helper">No secondary links</p>`);
   }
-  return list
-    .slice(0, MAX_SECONDARY_PULSE_LINKS)
-    .map(
-      (link, idx) =>
-        `<div class="secondary-pulse-row readonly"><span class="pill">#${idx + 1
-        }</span><a href="${link}" target="_blank" rel="noopener">${escapeHtml(
-          link
-        )}</a></div>`
-    )
-    .join("");
+
+  const items = list.slice(0, MAX_SECONDARY_PULSE_LINKS).map((entry, idx) => {
+    const normalized =
+      typeof entry === "string"
+        ? { url: entry }
+        : entry && typeof entry === "object"
+        ? entry
+        : {};
+    const url = normalized.url || "";
+    const name =
+      (normalized.name && escapeHtml(String(normalized.name))) ||
+      `SC2Pulse #${idx + 1}`;
+    if (!url) {
+      return `<div class="secondary-pulse-row readonly"><span class="pill">${name}</span><span class="muted">No link</span></div>`;
+    }
+    return `<div class="secondary-pulse-row readonly"><a class="${escapeHtml(
+      linkClass
+    )}" href="${escapeHtml(
+      url
+    )}" target="_blank" rel="noopener">${name}</a></div>`;
+  });
+
+  const html = `
+    <div class="secondary-section-header">Secondary Accounts</div>
+    ${items.join("")}
+  `;
+
+  return DOMPurify.sanitize(html, { ADD_ATTR: ["target", "rel"] });
 }
 
 function formatMmrByRace(player) {
@@ -1098,7 +1139,7 @@ function formatMmrByRace(player) {
     const display = value !== null ? `${value}` : "No MMR";
     return `<li><span class="pill">${race}</span><strong>${display}</strong></li>`;
   });
-  list.innerHTML = rows.join("");
+  list.innerHTML = DOMPurify.sanitize(rows.join(""));
 }
 
 function resolvePlayerAvatar(player) {
@@ -1155,7 +1196,15 @@ function openPlayerDetailModal(player) {
   }
 
   if (secondaryEl) {
-    secondaryEl.innerHTML = formatPulseLinks(player?.secondaryPulseLinks || []);
+    const secondaryProfiles =
+      player?.secondaryPulseProfiles && player.secondaryPulseProfiles.length
+        ? player.secondaryPulseProfiles
+        : player?.secondaryPulseLinks && player.secondaryPulseLinks.length
+        ? player.secondaryPulseLinks
+        : [];
+    const linkClass =
+      (mainPulseEl && mainPulseEl.className) || "secondary-pulse-link";
+    secondaryEl.innerHTML = formatPulseLinks(secondaryProfiles, linkClass);
   }
 
   if (twitchEl) {
@@ -2038,6 +2087,9 @@ function createOrUpdatePlayer(payload) {
     secondaryPulseLinks: Array.isArray(payload.secondaryPulseLinks)
       ? payload.secondaryPulseLinks.slice(0, MAX_SECONDARY_PULSE_LINKS)
       : [],
+    secondaryPulseProfiles: Array.isArray(payload.secondaryPulseProfiles)
+      ? payload.secondaryPulseProfiles.slice(0, MAX_SECONDARY_PULSE_LINKS)
+      : [],
     mmrByRace: payload.mmrByRace || null,
     achievements: payload.achievements || [],
     pulseName: payload.pulseName || "",
@@ -2070,6 +2122,11 @@ function createOrUpdatePlayer(payload) {
         payload.secondaryPulseLinks.length
           ? payload.secondaryPulseLinks.slice(0, MAX_SECONDARY_PULSE_LINKS)
           : state.players[existingIndex].secondaryPulseLinks || [],
+      secondaryPulseProfiles:
+        Array.isArray(payload.secondaryPulseProfiles) &&
+        payload.secondaryPulseProfiles.length
+          ? payload.secondaryPulseProfiles.slice(0, MAX_SECONDARY_PULSE_LINKS)
+          : state.players[existingIndex].secondaryPulseProfiles || [],
       mmrByRace: payload.mmrByRace ?? state.players[existingIndex].mmrByRace,
       achievements:
         payload.achievements?.length === 0 ||

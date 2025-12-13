@@ -2055,6 +2055,24 @@ label {
   object-fit: cover;
 }
 
+.secondary-section-header {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 11px;
+  color: var(--muted);
+  margin: 16px 0 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--stroke);
+}
+
+.secondary-pulse-row {
+  margin-bottom: 6px;
+}
+
+.secondary-pulse-row:last-child {
+  margin-bottom: 0;
+}
+
 .match-card .row[data-player-id],
 .group-block .player-detail-trigger,
 .player-name.player-detail-trigger {

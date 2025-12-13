@@ -64,7 +64,9 @@ document.addEventListener("DOMContentLoaded", () => {
   setupSecondaryPulseModal();
 
   // Position the floating utility tiles relative to auth-container
-  try { updateFloatingTilePositions(); } catch (_) {}
+  try {
+    updateFloatingTilePositions();
+  } catch (_) {}
 });
 
 // Initialize Firebase
@@ -118,10 +120,14 @@ function updateFloatingTilePositions() {
 }
 
 window.addEventListener("resize", () => {
-  try { updateFloatingTilePositions(); } catch (_) {}
+  try {
+    updateFloatingTilePositions();
+  } catch (_) {}
 });
 window.addEventListener("load", () => {
-  try { updateFloatingTilePositions(); } catch (_) {}
+  try {
+    updateFloatingTilePositions();
+  } catch (_) {}
 });
 
 function initCookieConsent() {
@@ -198,20 +204,37 @@ let secondaryPulseModalInitialized = false;
 const RACE_UI = {
   zerg: { label: "Zerg", icon: "img/race/zerg2.webp", color: "#d16ba5" },
   terran: { label: "Terran", icon: "img/race/terran2.webp", color: "#4cc9f0" },
-  protoss: { label: "Protoss", icon: "img/race/protoss2.webp", color: "#f6c177" },
+  protoss: {
+    label: "Protoss",
+    icon: "img/race/protoss2.webp",
+    color: "#f6c177",
+  },
   random: { label: "Random", icon: "img/race/terran2.webp", color: "#a0aec0" }, // fallback icon
 };
-let pulseState = { url: "", mmr: null, fetchedAt: null, byRace: null };
+let pulseState = {
+  url: "",
+  mmr: null,
+  fetchedAt: null,
+  byRace: null,
+  secondary: [],
+};
 let pulseUiInitialized = false;
 let pulseHelpInitialized = false;
 let twitchFormInitialized = false;
 let countrySelectInitialized = false;
 const PULSE_ENDPOINTS = (() => {
   const endpoints = ["/api/pulse-mmr"];
-  if (typeof window !== "undefined" && window.location.hostname === "localhost") {
-    endpoints.push("http://localhost:5001/z-build-order/us-central1/fetchPulseMmr");
+  if (
+    typeof window !== "undefined" &&
+    window.location.hostname === "localhost"
+  ) {
+    endpoints.push(
+      "http://localhost:5001/z-build-order/us-central1/fetchPulseMmr"
+    );
   }
-  endpoints.push("https://us-central1-z-build-order.cloudfunctions.net/fetchPulseMmr");
+  endpoints.push(
+    "https://us-central1-z-build-order.cloudfunctions.net/fetchPulseMmr"
+  );
   return endpoints;
 })();
 
@@ -652,11 +675,10 @@ function setCountrySelectValue(value) {
 function populateCountrySelectOptions() {
   const select = document.getElementById("settingsCountrySelect");
   if (!select || select.dataset.filled === "true") return;
-  const options = ["<option value=\"\">Prefer not to say</option>"]
+  const options = ['<option value="">Prefer not to say</option>']
     .concat(
       ISO_COUNTRIES.map(
-        (country) =>
-          `<option value="${country.code}">${country.name}</option>`
+        (country) => `<option value="${country.code}">${country.name}</option>`
       )
     )
     .join("");
@@ -746,7 +768,8 @@ function setupCountrySelector() {
 }
 
 async function handleCountrySelection(event) {
-  const select = event?.target || document.getElementById("settingsCountrySelect");
+  const select =
+    event?.target || document.getElementById("settingsCountrySelect");
   if (!select) return;
   const code = select.value;
   const user = auth.currentUser;
@@ -793,7 +816,8 @@ function buildMmrBadges(byRace, overall, updatedAt) {
   let hasBadges = false;
 
   order.forEach((race) => {
-    const val = byRace && Number.isFinite(byRace[race]) ? Math.round(byRace[race]) : null;
+    const val =
+      byRace && Number.isFinite(byRace[race]) ? Math.round(byRace[race]) : null;
     if (!val) return;
     const meta = RACE_UI[race] || { label: race, icon: "", color: "#9ae6b4" };
     const badge = document.createElement("div");
@@ -866,18 +890,27 @@ function applyPulseStateFromProfile(pulseData = {}) {
       : pulseData.byRace && typeof pulseData.byRace === "object"
       ? pulseData.byRace
       : null;
-  const mmrValue = deriveOverallMmr(byRace, Number(pulseData.lastMmr ?? pulseData.mmr));
+  const mmrValue = deriveOverallMmr(
+    byRace,
+    Number(pulseData.lastMmr ?? pulseData.mmr)
+  );
   const fetchedAt =
     parsePulseTimestamp(pulseData.fetchedAt) ||
     parsePulseTimestamp(pulseData.lastMmrUpdated);
   const accountName =
     (pulseData.name && pulseData.name.toString().trim()) || "";
+  const secondary =
+    Array.isArray(pulseData.secondary) && pulseData.secondary.length
+      ? pulseData.secondary.slice(0, MAX_SECONDARY_PULSE_LINKS)
+      : [];
   pulseState = {
     url: typeof pulseData.url === "string" ? pulseData.url : "",
-    mmr: Number.isFinite(mmrValue) && mmrValue > 0 ? Math.round(mmrValue) : null,
+    mmr:
+      Number.isFinite(mmrValue) && mmrValue > 0 ? Math.round(mmrValue) : null,
     fetchedAt,
     byRace,
     accountName,
+    secondary,
   };
 
   const input = document.getElementById("sc2PulseInput");
@@ -902,7 +935,13 @@ function applyPulseStateFromProfile(pulseData = {}) {
 }
 
 function resetPulseUi() {
-  pulseState = { url: "", mmr: null, fetchedAt: null, byRace: null };
+  pulseState = {
+    url: "",
+    mmr: null,
+    fetchedAt: null,
+    byRace: null,
+    secondary: [],
+  };
   updateUserMmrBadge(null, null);
   const input = document.getElementById("sc2PulseInput");
   if (input) input.value = "";
@@ -911,7 +950,11 @@ function resetPulseUi() {
 }
 
 function dispatchPulseState() {
-  if (typeof window === "undefined" || typeof window.dispatchEvent !== "function") return;
+  if (
+    typeof window === "undefined" ||
+    typeof window.dispatchEvent !== "function"
+  )
+    return;
   window.dispatchEvent(
     new CustomEvent("pulse-state-changed", {
       detail: { ...pulseState },
@@ -971,13 +1014,26 @@ function setupSecondaryPulseModal() {
   const helper = document.getElementById("secondaryPulseHelper");
   if (!openBtn || !modal || !listEl) return;
 
+  const extractUrls = (secondary) =>
+    Array.isArray(secondary)
+      ? secondary
+          .map((entry) =>
+            typeof entry === "string"
+              ? entry
+              : entry && typeof entry === "object"
+              ? entry.url || ""
+              : ""
+          )
+          .filter(Boolean)
+      : [];
+
   const createRow = (value = "") => {
     const row = document.createElement("div");
     row.className = "secondary-pulse-row";
     const input = document.createElement("input");
     input.type = "url";
     input.className = "settings-input secondary-pulse-input";
-    input.placeholder = "https://sc2pulse.nephest.com/sc2/?type=character&id=...";
+    input.placeholder = "add link here...";
     input.autocomplete = "off";
     input.spellcheck = false;
     input.value = value;
@@ -1026,12 +1082,114 @@ function setupSecondaryPulseModal() {
     updateAddButtonState();
   };
 
-  const showModal = () => {
+  const collectValues = () =>
+    Array.from(listEl.querySelectorAll("input.secondary-pulse-input"))
+      .map((input) => input.value.trim())
+      .filter(Boolean)
+      .slice(0, MAX_SECONDARY_PULSE_LINKS);
+
+  const prefillFromState = async () => {
+    const urlsFromState = extractUrls(pulseState.secondary);
+    let urls = [...urlsFromState];
+
+    if (auth.currentUser) {
+      try {
+        const snap = await getDoc(doc(db, "users", auth.currentUser.uid));
+        const secondary =
+          snap.exists() && Array.isArray(snap.data()?.pulse?.secondary)
+            ? snap.data().pulse.secondary
+            : [];
+        const urlsFromDb = extractUrls(secondary);
+        if (urlsFromDb.length) {
+          urls = Array.from(new Set([...urlsFromDb, ...urls]));
+          applyPulseStateFromProfile({
+            ...pulseState,
+            secondary,
+          });
+        }
+      } catch (err) {
+        console.warn("Could not prefill secondary links from Firestore", err);
+      }
+    }
+
+    if (!urls.length) return;
+    listEl.innerHTML = "";
+    urls.forEach((url) => addSecondaryRow(url));
+  };
+
+  const buildSecondaryProfiles = (links) =>
+    links
+      .map((link) => normalizePulseUrlClient(link))
+      .filter(Boolean)
+      .map((url) => ({ url }));
+
+  const enrichSecondaryProfiles = async (profiles) => {
+    const enriched = [];
+    for (const profile of profiles) {
+      const enrichedProfile = { ...profile };
+      try {
+        const payload = await fetchPulseMmrFromBackend(profile.url);
+        const byRace = payload.byRace || null;
+        const mmr = deriveOverallMmr(byRace, Number(payload.mmr));
+        enrichedProfile.name = (payload.pulseName || "").toString();
+        enrichedProfile.lastMmrByRace = byRace;
+        enrichedProfile.lastMmr = Number.isFinite(mmr) ? Math.round(mmr) : null;
+        enrichedProfile.fetchedAt = Date.now();
+      } catch (err) {
+        console.warn("Failed to fetch secondary SC2Pulse link", err);
+      }
+      enriched.push(enrichedProfile);
+    }
+    return enriched;
+  };
+
+  const persistSecondaryProfiles = async (links) => {
+    if (!auth.currentUser) {
+      showToast("? Please sign in to save secondary links.", "error");
+      return [];
+    }
+    const baseProfiles = buildSecondaryProfiles(links);
+    // Always persist URLs, even if enrichment fails
+    let profilesToSave = baseProfiles;
+    try {
+      profilesToSave = await enrichSecondaryProfiles(baseProfiles);
+    } catch (_) {
+      profilesToSave = baseProfiles;
+    }
+
+    try {
+      await setDoc(
+        doc(db, "users", auth.currentUser.uid),
+        { pulse: { secondary: profilesToSave } },
+        { merge: true }
+      );
+    } catch (err) {
+      console.error("Failed to save secondary SC2Pulse links", err);
+      throw err;
+    }
+    // Update local state + downstream listeners
+    applyPulseStateFromProfile({ ...pulseState, secondary: profilesToSave });
+    return profilesToSave;
+  };
+
+  const showModal = async () => {
     modal.style.display = "block";
+    await prefillFromState();
     ensureMinRows();
     updateHelper();
     updateAddButtonState();
   };
+
+  // Keep inputs in sync when pulse state changes (e.g., after reload)
+  window.addEventListener("pulse-state-changed", (event) => {
+    const urls = extractUrls(event?.detail?.secondary);
+    if (!urls.length) return;
+    listEl.innerHTML = "";
+    urls.forEach((url) => addSecondaryRow(url));
+    ensureMinRows();
+    updateHelper();
+    updateAddButtonState();
+  });
 
   const hideModal = () => {
     modal.style.display = "none";
@@ -1054,19 +1212,26 @@ function setupSecondaryPulseModal() {
     });
   }
   if (saveBtn) {
-    saveBtn.addEventListener("click", () => {
-      const values = Array.from(
-        listEl.querySelectorAll("input.secondary-pulse-input")
-      )
-        .map((input) => input.value.trim())
-        .filter(Boolean);
-      showToast(
-        `Saved ${values.length} secondary link${
-          values.length === 1 ? "" : "s"
-        }.`,
-        "success"
-      );
-      hideModal();
+    saveBtn.addEventListener("click", async () => {
+      const values = collectValues();
+      const original = saveBtn.textContent;
+      saveBtn.disabled = true;
+      saveBtn.textContent = "Saving...";
+      try {
+        const profiles = await persistSecondaryProfiles(values);
+        showToast(
+          `Saved ${profiles.length} secondary link${
+            profiles.length === 1 ? "" : "s"
+          }.`,
+          "success"
+        );
+        hideModal();
+      } catch (err) {
+        showToast("Failed to save secondary links.", "error");
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = original;
+      }
     });
   }
 
@@ -1174,6 +1339,7 @@ async function handleConnectPulse(event) {
       fetchedAt: Date.now(),
       lastMmrByRace: byRace,
       name: payload.pulseName || "",
+      secondary: pulseState.secondary || [],
     };
 
     await setDoc(
@@ -1266,11 +1432,17 @@ async function propagateUsernameChange(userId, newUsername) {
   let hadError = false;
   const tasks = [
     updateUserBuildUsernames(userId, newUsername).catch((err) => {
-      console.error("? Failed to update personal builds with new username", err);
+      console.error(
+        "? Failed to update personal builds with new username",
+        err
+      );
       hadError = true;
     }),
     updatePublishedBuildUsernames(userId, newUsername).catch((err) => {
-      console.error("? Failed to update published builds with new username", err);
+      console.error(
+        "? Failed to update published builds with new username",
+        err
+      );
       hadError = true;
     }),
     updateUserCommentsUsername(userId, newUsername).catch((err) => {
@@ -1318,7 +1490,10 @@ async function handleUsernameUpdate() {
 
   const user = auth.currentUser;
   if (!user) {
-    setSettingsUsernameStatus("Please sign in to change your username.", "error");
+    setSettingsUsernameStatus(
+      "Please sign in to change your username.",
+      "error"
+    );
     showToast("? Please sign in to change your username.", "error");
     return;
   }
@@ -1373,10 +1548,7 @@ async function handleUsernameUpdate() {
       );
       transaction.set(usernameRef, { userId: user.uid });
 
-      if (
-        existingUsername &&
-        existingUsername !== desiredUsername
-      ) {
+      if (existingUsername && existingUsername !== desiredUsername) {
         transaction.delete(doc(db, "usernames", existingUsername));
       }
     });
@@ -1569,7 +1741,9 @@ export function initializeAuthUI() {
       if (deleteAccountMenuItem)
         deleteAccountMenuItem.style.display = "inline-flex";
       menuDividers.forEach((d) => (d.style.display = "block"));
-      try { updateFloatingTilePositions(); } catch (_) {}
+      try {
+        updateFloatingTilePositions();
+      } catch (_) {}
     } else {
       const authContainerEl = document.getElementById("auth-container");
       if (authContainerEl) authContainerEl.classList.remove("is-auth");
@@ -1588,10 +1762,7 @@ export function initializeAuthUI() {
       setCountryStatus("Sign in to set your country.", "muted");
       setSettingsUsernameDisabled(true);
       setSettingsUsernameValue("");
-      setSettingsUsernameStatus(
-        "Sign in to update your username.",
-        "muted"
-      );
+      setSettingsUsernameStatus("Sign in to update your username.", "muted");
       resetPulseUi();
       setPulseControlsDisabled(true);
       setPulseStatus("Sign in to connect your SC2Pulse link.", "muted");
@@ -1607,14 +1778,18 @@ export function initializeAuthUI() {
       if (deleteAccountMenuItem) deleteAccountMenuItem.style.display = "none";
       menuDividers.forEach((d) => (d.style.display = "none"));
       resetBuildInputs();
-      try { updateFloatingTilePositions(); } catch (_) {}
+      try {
+        updateFloatingTilePositions();
+      } catch (_) {}
     }
 
     if (authLoadingWrapper) authLoadingWrapper.style.display = "none";
     if (userName) userName.style.display = "inline";
     if (userNameMenu) userNameMenu.style.display = "inline-block";
     if (userPhoto) userPhoto.style.display = "inline";
-   try { updateFloatingTilePositions(); } catch (_) {}
+    try {
+      updateFloatingTilePositions();
+    } catch (_) {}
   });
 }
 
@@ -1841,7 +2016,14 @@ function getCurrentUserAvatarUrl() {
   return currentUserAvatarUrl;
 }
 
-export { app, auth, db, getPulseState, getCurrentUsername, getCurrentUserAvatarUrl };
+export {
+  app,
+  auth,
+  db,
+  getPulseState,
+  getCurrentUsername,
+  getCurrentUserAvatarUrl,
+};
 window.handleSignIn = handleSignIn;
 window.handleSignOut = handleSignOut;
 window.handleSwitchAccount = handleSwitchAccount;
