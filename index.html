@@ -742,8 +742,8 @@
           <div class="settings-avatar-preview">
             <img id="settingsCurrentAvatar" src="img/avatar/marine_avatar_1.webp" alt="Current avatar" />
           </div>
-          <button type="button" class="settings-avatar-button" id="changeAvatarBtn">
-            <img src="img/SVG/user-svgrepo-com.svg" class="menu-icon" alt="" aria-hidden="true" />
+        <button type="button" class="settings-avatar-button" id="changeAvatarBtn">
+          <img id="settingsAvatarButtonImage" src="img/SVG/user-svgrepo-com.svg" class="menu-icon" alt="" aria-hidden="true" />
             Change Avatar
           </button>
         </div>
@@ -770,10 +770,10 @@
           </p>
         </div>
         <hr class="settings-divider" />
-        <div class="settings-username-section">
-          <div class="settings-label-row">
-            <label for="sc2PulseInput" class="settings-label">SC2Pulse Link</label>
-            <button
+          <div class="settings-username-section">
+            <div class="settings-label-row">
+              <label for="sc2PulseInput" class="settings-label">SC2Pulse Link</label>
+              <button
               type="button"
               class="help-circle animated-help"
               id="pulseHelpBtn"
@@ -783,34 +783,83 @@
               ?
             </button>
           </div>
-          <div class="settings-username-row">
-            <input
-              id="sc2PulseInput"
-              class="settings-input"
-              type="url"
-              placeholder="https://sc2pulse.nephest.com/sc2/?type=character&id=..."
-              autocomplete="off"
-              spellcheck="false"
-            />
-            <button type="button" class="settings-username-button" id="connectPulseBtn">
-              <img src="img/SVG/stats.svg" class="menu-icon" alt="" aria-hidden="true" />
-              Update
-            </button>
-          </div>
-          <p id="pulseStatusText" class="settings-helper-text">
-            Paste your SC2Pulse profile link to sync your latest MMR.
-          </p>
-          <div id="pulseHelpModal" class="modal">
-            <div class="modal-content">
-              <span class="close" id="closePulseHelp">&times;</span>
-              <h3>How to find your SC2Pulse link</h3>
+        <div class="settings-username-row">
+          <input
+            id="sc2PulseInput"
+            class="settings-input"
+            type="url"
+            placeholder="https://sc2pulse.nephest.com/sc2/?type=character&id=..."
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button type="button" class="settings-username-button" id="connectPulseBtn">
+            <img src="img/SVG/stats.svg" class="menu-icon" alt="" aria-hidden="true" />
+            Update
+          </button>
+        </div>
+        <p id="pulseStatusText" class="settings-helper-text">
+          Paste your SC2Pulse profile link to sync your latest MMR.
+        </p>
+        <div class="settings-secondary-pulse">
+          <button type="button" class="secondary-pulse-button" id="openSecondaryPulseModalBtn">
+            Manage secondary SC2Pulse links
+          </button>
+        </div>
+        <div class="settings-username-section">
+          <label for="settingsTwitchInput" class="settings-label">Twitch Channel</label>
+              <div class="settings-username-row">
+                <input
+                  id="settingsTwitchInput"
+                  class="settings-input"
+                  type="text"
+                  placeholder="https://www.twitch.tv/username"
+                />
+                <button type="button" class="settings-username-button" id="saveTwitchButton">
+                  <img src="img/SVG/twitch.svg" class="menu-icon" alt="" aria-hidden="true" />
+                  Save
+                </button>
+              </div>
+              <p id="settingsTwitchStatus" class="settings-helper-text">
+                Add your Twitch channel to link your stream.
+              </p>
+            </div>
+            <div class="settings-username-section">
+              <label for="settingsCountrySelect" class="settings-label">Country</label>
+              <select id="settingsCountrySelect" class="settings-input styled-dropdown"></select>
+              <p id="settingsCountryStatus" class="settings-helper-text">
+                Select where you are from.
+              </p>
+            </div>
+      <div id="pulseHelpModal" class="modal">
+        <div class="modal-content">
+          <span class="close" id="closePulseHelp">&times;</span>
+          <h3>How to find your SC2Pulse link</h3>
               <ol>
                 <li>Open your SC2Pulse profile and go to the MMR tab.</li>
                 <li>Copy the URL from the address bar (looks like <code>https://sc2pulse.nephest.com/sc2/?type=character&id=579686&m=1</code>).</li>
-                <li>Paste that URL here and click Update.</li>
-              </ol>
-            </div>
+            <li>Paste that URL here and click Update.</li>
+          </ol>
+        </div>
+      </div>
+      <div id="secondaryPulseModal" class="modal">
+        <div class="modal-content small-modal">
+          <span class="close-modal" id="closeSecondaryPulseModal">&times;</span>
+          <h3>Secondary SC2Pulse links</h3>
+          <p class="helper settings-helper-text">Add up to five optional SC2Pulse profiles.</p>
+          <div id="secondaryPulseList" class="secondary-pulse-list"></div>
+          <div class="secondary-actions">
+            <button type="button" class="cta small ghost" id="secondaryAddInputBtn">
+              Add another link
+            </button>
+            <button type="button" class="cta primary" id="saveSecondaryPulseBtn">
+              Save links
+            </button>
           </div>
+          <p id="secondaryPulseHelper" class="settings-helper-text">
+            You can save up to 5 secondary SC2Pulse links.
+          </p>
+        </div>
+      </div>
         </div>
         <hr class="settings-divider" />
         <div class="publish-checkbox-row">

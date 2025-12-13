@@ -154,6 +154,7 @@
         <button class="tab-btn" data-tab="descriptionTab">Description &amp; Rules</button>
         <button class="tab-btn" data-tab="mapsTab">Maps</button>
         <button class="tab-btn" data-tab="registrationTab" id="adminTabBtn">Registration</button>
+        <button class="tab-btn" data-tab="seedingTab" id="seedingTabBtn" style="display:none;">Seeding</button>
         <button class="tab-btn" data-tab="settingsTab" id="settingsTabBtn" data-admin-only="true"
           style="display:none;">Settings</button>
       </div>
@@ -239,7 +240,7 @@
             </label>
             <label class="readonly-field">
               SC2Pulse profile (set in Settings)
-              <input id="pulseLinkDisplay" type="text" placeholder="Add your SC2Pulse link in Settings" readonly />
+              <input id="pulseLinkDisplay" type="text" placeholder="Add your SC2Pulse link in Settings" />
             </label>
             <label class="readonly-field">
               MMR (auto)
@@ -257,6 +258,9 @@
           </form>
         </div>
 
+      </section>
+
+      <section id="seedingTab" class="tab-panel" data-admin-only="true">
         <div class="card" id="seedingCard">
           <div class="card-header">
             <div>
@@ -319,6 +323,16 @@
             <label>Max players
               <input type="number" id="settingsMaxPlayersInput" min="2" max="512" placeholder="32" />
             </label>
+            <div class="publish-checkbox-row">
+              <span>Require SC2Pulse link for registration</span>
+              <div class="checkbox-wrapper-59">
+                <label class="switch">
+                  <input type="checkbox" id="settingsRequirePulseLink" checked />
+                  <span class="slider"></span>
+                </label>
+              </div>
+            </div>
+            <p class="helper">When enabled, players must submit their SC2Pulse link to register.</p>
           </div>
           <div class="settings-panel" id="settingsDesc">
             <label>Description
@@ -707,7 +721,179 @@
     </div>
   </div>
 
+  <script type="module" src="/src/app.js"></script>
   <script type="module" src="/src/js/modules/tournament.js"></script>
+
+  <div id="settingsModal" class="modal">
+    <div class="modal-content small-modal">
+      <span class="close-modal" id="closeSettingsModal">&times;</span>
+      <h3>Settings</h3>
+      <div class="settings-avatar-section">
+        <div class="settings-avatar-preview">
+          <img id="settingsCurrentAvatar" src="img/avatar/marine_avatar_1.webp" alt="Current avatar" />
+        </div>
+        <button type="button" class="settings-avatar-button" id="changeAvatarBtn">
+          <img id="settingsAvatarButtonImage" src="img/SVG/user-svgrepo-com.svg" class="menu-icon" alt="" aria-hidden="true" />
+          Change Avatar
+        </button>
+      </div>
+      <hr class="settings-divider" />
+      <div class="settings-username-section">
+        <label for="settingsUsernameInput" class="settings-label">Username</label>
+        <div class="settings-username-row">
+          <input id="settingsUsernameInput" class="settings-input" type="text" maxlength="20" placeholder="New username"
+            autocomplete="off" spellcheck="false" />
+          <button type="button" class="settings-username-button" id="saveUsernameButton">
+            <img src="img/SVG/pencil.svg" class="menu-icon" alt="" aria-hidden="true" />
+            Update
+          </button>
+        </div>
+        <p id="settingsUsernameStatus" class="settings-helper-text">
+          Use 3-20 letters, numbers, or underscores.
+        </p>
+      </div>
+      <hr class="settings-divider" />
+      <div class="settings-username-section">
+        <div class="settings-label-row">
+          <label for="sc2PulseInput" class="settings-label">SC2Pulse Link</label>
+          <button type="button" class="help-circle animated-help" id="pulseHelpBtn"
+            aria-label="How to find your SC2Pulse link" title="How to find your SC2Pulse link">
+            ?
+          </button>
+        </div>
+        <div class="settings-username-row">
+          <input id="sc2PulseInput" class="settings-input" type="url"
+            placeholder="https://sc2pulse.nephest.com/sc2/?type=character&id=..." autocomplete="off" spellcheck="false" />
+          <button type="button" class="settings-username-button" id="connectPulseBtn">
+            <img src="img/SVG/stats.svg" class="menu-icon" alt="" aria-hidden="true" />
+            Update
+          </button>
+        </div>
+        <p id="pulseStatusText" class="settings-helper-text">
+          Paste your SC2Pulse profile link to sync your latest MMR.
+        </p>
+        <div class="settings-secondary-pulse">
+          <button type="button" class="secondary-pulse-button" id="openSecondaryPulseModalBtn">
+            Manage secondary SC2Pulse links
+          </button>
+        </div>
+        <div class="settings-username-section">
+          <label for="settingsTwitchInput" class="settings-label">Twitch Channel</label>
+          <div class="settings-username-row">
+            <input
+              id="settingsTwitchInput"
+              class="settings-input"
+              type="text"
+              placeholder="https://www.twitch.tv/username"
+            />
+            <button type="button" class="settings-username-button" id="saveTwitchButton">
+              <img src="img/SVG/glitch_flat_purple.svg" class="menu-icon" alt="" aria-hidden="true" />
+              Save
+            </button>
+          </div>
+          <p id="settingsTwitchStatus" class="settings-helper-text">
+            Add your Twitch channel to link your stream.
+          </p>
+        </div>
+        <div class="settings-username-section">
+          <label for="settingsCountrySelect" class="settings-label">Country</label>
+          <select id="settingsCountrySelect" class="settings-input styled-dropdown"></select>
+          <p id="settingsCountryStatus" class="settings-helper-text">
+            Select where you are from.
+          </p>
+        </div>
+        <div id="pulseHelpModal" class="modal">
+          <div class="modal-content">
+            <span class="close" id="closePulseHelp">&times;</span>
+            <h3>How to find your SC2Pulse link</h3>
+            <ol>
+              <li>Open your SC2Pulse profile and go to the MMR tab.</li>
+              <li>Copy the URL from the address bar (looks like <code>https://sc2pulse.nephest.com/sc2/?type=character&id=579686&m=1</code>).
+              </li>
+            <li>Paste that URL here and click Update.</li>
+          </ol>
+        </div>
+      </div>
+      <div id="secondaryPulseModal" class="modal">
+        <div class="modal-content small-modal">
+          <span class="close-modal" id="closeSecondaryPulseModal">&times;</span>
+          <h3>Secondary SC2Pulse links</h3>
+          <p class="helper settings-helper-text">Add up to five optional SC2Pulse profiles.</p>
+          <div id="secondaryPulseList" class="secondary-pulse-list"></div>
+          <div class="secondary-actions">
+            <button type="button" class="cta small ghost" id="secondaryAddInputBtn">
+              Add another link
+            </button>
+            <button type="button" class="cta primary" id="saveSecondaryPulseBtn">
+              Save links
+            </button>
+          </div>
+          <p id="secondaryPulseHelper" class="settings-helper-text">
+            You can save up to 5 secondary SC2Pulse links.
+          </p>
+        </div>
+      </div>
+      </div>
+      <hr class="settings-divider" />
+      <div class="publish-checkbox-row">
+        <span>Enable Bracket Input</span>
+        <div class="checkbox-wrapper-59">
+          <label class="switch">
+            <input type="checkbox" id="bracketInputToggle" checked />
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+      <div class="publish-checkbox-row">
+        <span>Show Build Input</span>
+        <div class="checkbox-wrapper-59">
+          <label class="switch">
+            <input type="checkbox" id="buildInputToggle" checked />
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+      <div class="publish-checkbox-row">
+        <span>Main Clan</span>
+        <select id="mainClanSelect" class="styled-dropdown"></select>
+      </div>
+      <hr class="settings-divider" />
+      <div class="settings-danger-zone">
+        <button type="button" class="settings-danger-button" id="deleteAccountBtn">
+          <img src="img/SVG/trash.svg" class="menu-icon" alt="" aria-hidden="true" />
+          Delete Account
+        </button>
+        <p class="settings-danger-note">This action will permanently remove your account.</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="avatarModal" class="modal" style="display: none;">
+    <div class="modal-content avatar-modal-content">
+      <button id="closeAvatarModal" class="modal-close-button" aria-label="Close avatar selector">&times;</button>
+      <h3>Select an Avatar</h3>
+      <div id="avatarGrid" class="avatar-grid"></div>
+    </div>
+  </div>
+
+  <div id="deleteAccountModal" class="modal">
+    <div class="modal-content">
+      <h3>?? Confirm Account Deletion</h3>
+      <p>This will permanently delete your account and personal builds.</p>
+      <div class="publish-checkbox-row">
+        <span>Also delete my published community builds</span>
+        <div class="checkbox-wrapper-59">
+          <label class="switch">
+            <input type="checkbox" id="deleteCommunityBuildsCheckbox" />
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+      <br /><br />
+      <button id="confirmDeleteAccountButton" class="auth-button">Yes, Delete My Account</button>
+      <button id="cancelDeleteAccountButton" class="auth-button">Cancel</button>
+    </div>
+  </div>
 
   <!-- Match Veto Modal -->
   <div id="vetoModal" class="modal" style="display:none;">
@@ -725,6 +911,46 @@
       </div>
     </div>
   </div>
+  <div id="playerDetailModal" class="modal" style="display:none;">
+    <div class="modal-content player-detail-card">
+      <button class="modal-close-button" id="closePlayerDetailModal" aria-label="Close player details">&times;</button>
+      <div class="player-detail-header">
+        <img id="playerDetailAvatar" src="img/avatar/marine_avatar_1.webp" alt="Player avatar" />
+        <div class="player-detail-meta">
+          <h3 id="playerDetailName">Player</h3>
+          <div class="player-detail-tags">
+            <span id="playerDetailClan" class="badge muted" style="display:none;"></span>
+            <span id="playerDetailRace" class="badge muted"></span>
+          </div>
+          <div id="playerDetailPoints" class="helper"></div>
+        </div>
+      </div>
+      <div class="player-detail-grid">
+        <div class="player-detail-section">
+          <p class="eyebrow">SC2Pulse</p>
+          <div id="playerDetailPulseName" class="helper"></div>
+          <a id="playerDetailMainPulse" class="pill-link" target="_blank" rel="noopener">Not provided</a>
+          <div id="playerDetailSecondary" class="secondary-pulse-list"></div>
+        </div>
+        <div class="player-detail-section">
+          <p class="eyebrow">Twitch</p>
+          <a id="playerDetailTwitch" class="pill-link" target="_blank" rel="noopener">
+            <img src="img/SVG/glitch_flat_purple.svg" class="menu-icon" aria-hidden="true" />
+            Not provided
+          </a>
+        </div>
+        <div class="player-detail-section">
+          <p class="eyebrow">MMR by race</p>
+          <ul id="playerDetailMmrList" class="mmr-list"></ul>
+        </div>
+        <div class="player-detail-section">
+          <p class="eyebrow">Achievements</p>
+          <div id="playerDetailAchievements" class="helper">Coming soon.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </body>
 
 </html>

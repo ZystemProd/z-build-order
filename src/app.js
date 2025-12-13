@@ -30,6 +30,7 @@ import {
   memoryLocalCache,
 } from "firebase/firestore";
 import { bannedWords } from "./js/data/bannedWords.js";
+import countries from "./js/data/countries.json" assert { type: "json" };
 import { showToast } from "./js/modules/toastHandler.js";
 import { resetBuildInputs } from "./js/modules/utils.js";
 
@@ -58,6 +59,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   setupUsernameSettingsSection();
   setupPulseSettingsSection();
+  setupTwitchSettingsSection();
+  setupCountrySelector();
+  setupSecondaryPulseModal();
 
   // Position the floating utility tiles relative to auth-container
   try { updateFloatingTilePositions(); } catch (_) {}
@@ -186,6 +190,11 @@ const normalizedBannedWords = bannedWords.map((word) =>
 );
 const DEFAULT_PULSE_STATUS =
   "Paste your SC2Pulse profile link to sync your latest MMR.";
+const ISO_COUNTRIES = Array.isArray(countries) ? countries : [];
+const MAX_SECONDARY_PULSE_LINKS = 5;
+const MIN_SECONDARY_PULSE_LINKS = 2;
+let secondaryPulseModalInitialized = false;
+
 const RACE_UI = {
   zerg: { label: "Zerg", icon: "img/race/zerg2.webp", color: "#d16ba5" },
   terran: { label: "Terran", icon: "img/race/terran2.webp", color: "#4cc9f0" },
@@ -195,6 +204,8 @@ const RACE_UI = {
 let pulseState = { url: "", mmr: null, fetchedAt: null, byRace: null };
 let pulseUiInitialized = false;
 let pulseHelpInitialized = false;
+let twitchFormInitialized = false;
+let countrySelectInitialized = false;
 const PULSE_ENDPOINTS = (() => {
   const endpoints = ["/api/pulse-mmr"];
   if (typeof window !== "undefined" && window.location.hostname === "localhost") {
@@ -237,6 +248,10 @@ function emitAvatarUpdate(avatarUrl) {
   const settingsPreview = document.getElementById("settingsCurrentAvatar");
   if (settingsPreview) {
     settingsPreview.src = sanitized;
+  }
+  const buttonPreview = document.getElementById("settingsAvatarButtonImage");
+  if (buttonPreview) {
+    buttonPreview.src = sanitized;
   }
 
   window.dispatchEvent(
@@ -599,6 +614,162 @@ function setPulseStatus(message, tone = "muted", extraNode = null) {
   }
 }
 
+function updateSettingsHelperText(id, message, tone = "muted") {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = message;
+  let color = "#b0b0b0";
+  if (tone === "error") color = "#ff9a9a";
+  else if (tone === "success") color = "#9ae6b4";
+  else if (tone === "info") color = "#8be9fd";
+  el.style.color = color;
+}
+
+function setTwitchStatus(message, tone = "muted") {
+  updateSettingsHelperText("settingsTwitchStatus", message, tone);
+}
+
+function setCountryStatus(message, tone = "muted") {
+  updateSettingsHelperText("settingsCountryStatus", message, tone);
+}
+
+function setTwitchInputValue(value) {
+  const input = document.getElementById("settingsTwitchInput");
+  if (input) input.value = value || "";
+}
+
+function setCountrySelectValue(value) {
+  const select = document.getElementById("settingsCountrySelect");
+  if (!select) return;
+  if (!select.querySelector(`option[value="${value}"]`)) {
+    // No matching option; leave blank
+    select.value = "";
+    return;
+  }
+  select.value = value || "";
+}
+
+function populateCountrySelectOptions() {
+  const select = document.getElementById("settingsCountrySelect");
+  if (!select || select.dataset.filled === "true") return;
+  const options = ["<option value=\"\">Prefer not to say</option>"]
+    .concat(
+      ISO_COUNTRIES.map(
+        (country) =>
+          `<option value="${country.code}">${country.name}</option>`
+      )
+    )
+    .join("");
+  select.innerHTML = options;
+  select.dataset.filled = "true";
+}
+
+function normalizeTwitchUrl(raw) {
+  if (!raw) return "";
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  const usernameMatch = trimmed.match(/^@?([a-zA-Z0-9_]{3,25})$/);
+  if (usernameMatch) {
+    return `https://www.twitch.tv/${usernameMatch[1]}`;
+  }
+  try {
+    const url = new URL(
+      trimmed.includes("://") ? trimmed : `https://${trimmed}`
+    );
+    const host = url.hostname.replace(/^www\./i, "").toLowerCase();
+    if (!host.endsWith("twitch.tv")) return "";
+    const path = url.pathname.replace(/\/+$/, "");
+    return `https://${host}${path}`;
+  } catch (_) {
+    return "";
+  }
+}
+
+function setupTwitchSettingsSection() {
+  if (twitchFormInitialized) return;
+  const button = document.getElementById("saveTwitchButton");
+  if (!button) return;
+  button.addEventListener("click", handleTwitchUpdate);
+  twitchFormInitialized = true;
+}
+
+async function handleTwitchUpdate(event) {
+  if (event?.preventDefault) event.preventDefault();
+  const input = document.getElementById("settingsTwitchInput");
+  const button = document.getElementById("saveTwitchButton");
+  if (!input || !button) return;
+  const rawUrl = (input.value || "").trim();
+  const normalized = rawUrl ? normalizeTwitchUrl(rawUrl) : "";
+  if (rawUrl && !normalized) {
+    setTwitchStatus("Enter a valid Twitch username or URL.", "error");
+    return;
+  }
+  const user = auth.currentUser;
+  if (!user) {
+    setTwitchStatus("Sign in to save your Twitch channel.", "error");
+    showToast("? Please sign in to save Twitch.", "error");
+    return;
+  }
+  button.disabled = true;
+  const originalHtml = button.innerHTML;
+  button.textContent = "Saving...";
+  const payload = normalized
+    ? { twitchUrl: normalized }
+    : { twitchUrl: deleteField() };
+  try {
+    await setDoc(doc(db, "users", user.uid), payload, { merge: true });
+    setTwitchStatus(
+      normalized ? "Twitch link saved." : "Twitch link removed.",
+      normalized ? "success" : "muted"
+    );
+    showToast(
+      normalized ? "? Twitch channel saved." : "? Twitch channel removed.",
+      "success"
+    );
+  } catch (err) {
+    console.error("Failed to save Twitch link", err);
+    setTwitchStatus("Failed to save Twitch channel.", "error");
+    showToast("? Failed to save Twitch channel.", "error");
+  } finally {
+    button.disabled = false;
+    button.innerHTML = originalHtml;
+  }
+}
+
+function setupCountrySelector() {
+  if (countrySelectInitialized) return;
+  const select = document.getElementById("settingsCountrySelect");
+  if (!select) return;
+  populateCountrySelectOptions();
+  select.addEventListener("change", handleCountrySelection);
+  countrySelectInitialized = true;
+}
+
+async function handleCountrySelection(event) {
+  const select = event?.target || document.getElementById("settingsCountrySelect");
+  if (!select) return;
+  const code = select.value;
+  const user = auth.currentUser;
+  if (!user) {
+    setCountryStatus("Sign in to set your country.", "error");
+    showToast("? Please sign in to set your country.", "error");
+    return;
+  }
+  const payload = code ? { country: code } : { country: deleteField() };
+  try {
+    await setDoc(doc(db, "users", user.uid), payload, { merge: true });
+    setCountryStatus(
+      code ? "Country saved." : "Country cleared.",
+      code ? "success" : "muted"
+    );
+    showToast("? Country updated.", "success");
+  } catch (err) {
+    console.error("Failed to save country", err);
+    setCountryStatus("Failed to save country.", "error");
+    showToast("? Failed to save country.", "error");
+  }
+}
+
 function setPulseControlsDisabled(isDisabled) {
   const input = document.getElementById("sc2PulseInput");
   const connectBtn = document.getElementById("connectPulseBtn");
@@ -699,11 +870,14 @@ function applyPulseStateFromProfile(pulseData = {}) {
   const fetchedAt =
     parsePulseTimestamp(pulseData.fetchedAt) ||
     parsePulseTimestamp(pulseData.lastMmrUpdated);
+  const accountName =
+    (pulseData.name && pulseData.name.toString().trim()) || "";
   pulseState = {
     url: typeof pulseData.url === "string" ? pulseData.url : "",
     mmr: Number.isFinite(mmrValue) && mmrValue > 0 ? Math.round(mmrValue) : null,
     fetchedAt,
     byRace,
+    accountName,
   };
 
   const input = document.getElementById("sc2PulseInput");
@@ -784,6 +958,122 @@ function setupPulseHelpModal() {
   });
 
   pulseHelpInitialized = true;
+}
+
+function setupSecondaryPulseModal() {
+  if (secondaryPulseModalInitialized) return;
+  const openBtn = document.getElementById("openSecondaryPulseModalBtn");
+  const modal = document.getElementById("secondaryPulseModal");
+  const closeBtn = document.getElementById("closeSecondaryPulseModal");
+  const addBtn = document.getElementById("secondaryAddInputBtn");
+  const saveBtn = document.getElementById("saveSecondaryPulseBtn");
+  const listEl = document.getElementById("secondaryPulseList");
+  const helper = document.getElementById("secondaryPulseHelper");
+  if (!openBtn || !modal || !listEl) return;
+
+  const createRow = (value = "") => {
+    const row = document.createElement("div");
+    row.className = "secondary-pulse-row";
+    const input = document.createElement("input");
+    input.type = "url";
+    input.className = "settings-input secondary-pulse-input";
+    input.placeholder = "https://sc2pulse.nephest.com/sc2/?type=character&id=...";
+    input.autocomplete = "off";
+    input.spellcheck = false;
+    input.value = value;
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "secondary-remove-btn";
+    removeBtn.textContent = "Remove";
+    removeBtn.addEventListener("click", () => {
+      if (listEl.contains(row)) {
+        row.remove();
+        ensureMinRows();
+        updateHelper();
+        updateAddButtonState();
+      }
+    });
+    row.append(input, removeBtn);
+    return row;
+  };
+
+  const ensureMinRows = () => {
+    while (listEl.children.length < MIN_SECONDARY_PULSE_LINKS) {
+      listEl.appendChild(createRow());
+    }
+  };
+
+  const updateHelper = () => {
+    if (!helper) return;
+    const remaining = Math.max(
+      0,
+      MAX_SECONDARY_PULSE_LINKS - listEl.children.length
+    );
+    helper.textContent = `You can add up to ${MAX_SECONDARY_PULSE_LINKS} secondary SC2Pulse links. ${remaining} slot${
+      remaining === 1 ? "" : "s"
+    } remaining.`;
+  };
+
+  const updateAddButtonState = () => {
+    if (!addBtn) return;
+    addBtn.disabled = listEl.children.length >= MAX_SECONDARY_PULSE_LINKS;
+  };
+
+  const addSecondaryRow = (value = "") => {
+    if (listEl.children.length >= MAX_SECONDARY_PULSE_LINKS) return;
+    listEl.appendChild(createRow(value));
+    updateHelper();
+    updateAddButtonState();
+  };
+
+  const showModal = () => {
+    modal.style.display = "block";
+    ensureMinRows();
+    updateHelper();
+    updateAddButtonState();
+  };
+
+  const hideModal = () => {
+    modal.style.display = "none";
+  };
+
+  openBtn.addEventListener("click", (event) => {
+    event.preventDefault();
+    showModal();
+  });
+  if (closeBtn) closeBtn.addEventListener("click", hideModal);
+  window.addEventListener("mousedown", (event) => {
+    if (event.target === modal) {
+      hideModal();
+    }
+  });
+  if (addBtn) {
+    addBtn.addEventListener("click", (event) => {
+      event.preventDefault();
+      addSecondaryRow();
+    });
+  }
+  if (saveBtn) {
+    saveBtn.addEventListener("click", () => {
+      const values = Array.from(
+        listEl.querySelectorAll("input.secondary-pulse-input")
+      )
+        .map((input) => input.value.trim())
+        .filter(Boolean);
+      showToast(
+        `Saved ${values.length} secondary link${
+          values.length === 1 ? "" : "s"
+        }.`,
+        "success"
+      );
+      hideModal();
+    });
+  }
+
+  ensureMinRows();
+  updateHelper();
+  updateAddButtonState();
+  secondaryPulseModalInitialized = true;
 }
 
 async function fetchPulseMmrFromBackend(url) {
@@ -883,6 +1173,7 @@ async function handleConnectPulse(event) {
       url: payload.url || normalizedUrl,
       fetchedAt: Date.now(),
       lastMmrByRace: byRace,
+      name: payload.pulseName || "",
     };
 
     await setDoc(
@@ -1209,6 +1500,8 @@ export function initializeAuthUI() {
 
   setupUsernameSettingsSection();
   setupAvatarModal();
+  setupTwitchSettingsSection();
+  setupCountrySelector();
 
   // ✅ IMMEDIATE HIDE to prevent any flashing before Firebase loads
   if (userMenu) userMenu.style.display = "none";
@@ -1257,6 +1550,14 @@ export function initializeAuthUI() {
       if (settingsAvatarImg) settingsAvatarImg.src = currentUserAvatarUrl;
       updateAvatarSelectionHighlight(currentUserAvatarUrl);
       emitAvatarUpdate(currentUserAvatarUrl);
+      setTwitchInputValue(userData?.twitchUrl || "");
+      setTwitchStatus(
+        userData?.twitchUrl
+          ? "Twitch channel loaded."
+          : "Add your Twitch channel to link your stream.",
+        userData?.twitchUrl ? "info" : "muted"
+      );
+      setCountrySelectValue(userData?.country || "");
       if (signInBtn) signInBtn.style.display = "none";
       if (showClanBtn) showClanBtn.disabled = false;
       // map veto inline button visibility handled via CSS media queries
@@ -1281,6 +1582,10 @@ export function initializeAuthUI() {
       if (userNameMenu) userNameMenu.innerText = "Guest";
       if (userPhoto) userPhoto.src = DEFAULT_AVATAR_URL;
       if (settingsAvatarImg) settingsAvatarImg.src = DEFAULT_AVATAR_URL;
+      setTwitchInputValue("");
+      setTwitchStatus("Sign in to add your Twitch channel.", "muted");
+      setCountrySelectValue("");
+      setCountryStatus("Sign in to set your country.", "muted");
       setSettingsUsernameDisabled(true);
       setSettingsUsernameValue("");
       setSettingsUsernameStatus(
@@ -1532,7 +1837,11 @@ function getCurrentUsername() {
   return currentUsername || auth.currentUser?.displayName || "";
 }
 
-export { app, auth, db, getPulseState, getCurrentUsername };
+function getCurrentUserAvatarUrl() {
+  return currentUserAvatarUrl;
+}
+
+export { app, auth, db, getPulseState, getCurrentUsername, getCurrentUserAvatarUrl };
 window.handleSignIn = handleSignIn;
 window.handleSignOut = handleSignOut;
 window.handleSwitchAccount = handleSwitchAccount;

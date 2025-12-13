@@ -2,6 +2,7 @@ import {
   auth,
   db,
   getCurrentUsername,
+  getCurrentUserAvatarUrl,
   getPulseState,
   initializeAuthUI,
 } from "../../app.js";
@@ -15,6 +16,7 @@ import {
   serverTimestamp,
   setDoc,
 } from "firebase/firestore";
+import { initUserSettingsModal } from "./settingsModalInit.js";
 
 const STORAGE_KEY = "zboTournamentStateV1";
 const BROADCAST_NAME = "zboTournamentLive";
@@ -98,10 +100,19 @@ let derivedMmr = null;
 let isAdmin = false;
 let registryCache = null;
 let currentTournamentMeta = null;
+let requirePulseLinkSetting = true;
 let mapPoolSelection = new Set(FALLBACK_LADDER_MAPS.map((m) => m.name));
 let mapCatalog = [];
 let mapCatalogLoaded = false;
 let currentMapPoolMode = "ladder"; // ladder | custom
+const DEFAULT_PLAYER_AVATAR = "img/avatar/marine_avatar_1.webp";
+const MAX_SECONDARY_PULSE_LINKS = 5;
+const MIN_SECONDARY_PULSE_LINKS = 2;
+const GOOGLE_AVATAR_PATTERNS = [
+  /googleusercontent\\.com/i,
+  /lh3\\.googleusercontent\\.com/i,
+];
+let playerDetailModalInitialized = false;
 const defaultBestOf = {
   // upper bracket
   upper: 3,
@@ -174,6 +185,7 @@ window.addEventListener("popstate", () => {
 
 function bindUI() {
   ensureTestHarnessPanel();
+  initUserSettingsModal();
   const registrationForm = document.getElementById("registrationForm");
   const rebuildBtn = document.getElementById("rebuildBracketBtn");
   const resetBtn = document.getElementById("resetTournamentBtn");
@@ -474,6 +486,7 @@ function bindUI() {
     });
   });
 
+  attachPlayerDetailHandlers();
   renderMapPoolPicker();
   renderMapPoolPicker("settingsMapPoolPicker");
   renderChosenMaps("chosenMapList");
@@ -535,6 +548,8 @@ function hydratePulseFromState(pulseState) {
   const mmrDisplay = document.getElementById("mmrDisplay");
   const pulseLinkDisplay = document.getElementById("pulseLinkDisplay");
   const statusEl = document.getElementById("mmrStatus");
+  const requirePulseLinkEnabled =
+    currentTournamentMeta?.requirePulseLink ?? requirePulseLinkSetting;
 
   const byRace =
     pulseState && typeof pulseState.byRace === "object"
@@ -561,12 +576,14 @@ function hydratePulseFromState(pulseState) {
       : bestMmr ?? overallMmr ?? null
     : null;
 
+  const hasProfileUrl = Boolean(pulseProfile?.url);
   if (raceSelect) {
-    raceSelect.disabled = !pulseProfile;
+    const shouldDisable = requirePulseLinkEnabled && !hasProfileUrl;
+    raceSelect.disabled = shouldDisable;
     if (derivedRace) {
       raceSelect.value = derivedRace;
-    } else {
-      raceSelect.value = "";
+    } else if (!shouldDisable) {
+      raceSelect.value = raceSelect.value || "";
     }
   }
   if (mmrDisplay) {
@@ -579,7 +596,9 @@ function hydratePulseFromState(pulseState) {
     }
   }
   if (pulseLinkDisplay) {
-    pulseLinkDisplay.value = normalizedUrl || "";
+    if (normalizedUrl) {
+      pulseLinkDisplay.value = normalizedUrl;
+    }
   }
 
   updateMmrDisplay(statusEl);
@@ -787,6 +806,15 @@ async function handleRegistration(event) {
   const race = selectedRace;
   const sc2Link = pulseProfile?.url ? sanitizeUrl(pulseProfile.url) : "";
   const mmr = mmrForRace(race);
+  const pulseLinkInput = document.getElementById("pulseLinkDisplay");
+  const manualPulseLink = pulseLinkInput?.value?.trim() || "";
+  const sc2LinkInput = sc2Link
+    ? sc2Link
+    : manualPulseLink
+    ? sanitizeUrl(manualPulseLink)
+    : "";
+  const requirePulseLinkEnabled =
+    currentTournamentMeta?.requirePulseLink ?? requirePulseLinkSetting;
   const pointsField = document.getElementById("pointsInput");
 
   if (!auth.currentUser) {
@@ -815,10 +843,10 @@ async function handleRegistration(event) {
       ? Math.max(0, requestedPoints)
       : null;
 
-  if (!sc2Link) {
+  if (requirePulseLinkEnabled && !sc2LinkInput) {
     setStatus(
       statusEl,
-      "Add your SC2Pulse link in Settings to register.",
+      "This tournament requires your SC2Pulse link.",
       true
     );
     return;
@@ -843,12 +871,50 @@ async function handleRegistration(event) {
     setStatus(statusEl, `No rank found for ${race} — seeding as 0.`, true);
   }
 
+  const avatarUrl = getCurrentUserAvatarUrl();
+  if (!avatarUrl || isGoogleAvatarUrl(avatarUrl)) {
+    setStatus(
+      statusEl,
+      "Choose your Z-Build Order avatar in Settings before registering (Google profile pictures are not allowed).",
+      true
+    );
+    return;
+  }
+  const twitchUrl =
+    document.getElementById("settingsTwitchInput")?.value?.trim() || "";
+  const secondaryPulseLinks = collectSecondaryPulseLinks();
+  const mmrByRace = pulseProfile?.byRace ? { ...pulseProfile.byRace } : null;
+  const mainClanSelect = document.getElementById("mainClanSelect");
+  const selectedClanOption = mainClanSelect?.selectedOptions?.[0];
+  const selectedClanId = mainClanSelect?.value || "";
+  let clanName = selectedClanOption?.textContent || "";
+  let clanAbbreviation = selectedClanOption?.dataset?.abbr || "";
+  if (selectedClanId) {
+    try {
+      const clanDoc = await getDoc(doc(db, "clans", selectedClanId));
+      if (clanDoc.exists()) {
+        const clanData = clanDoc.data();
+        clanName = clanData?.name || clanName;
+        clanAbbreviation = clanData?.abbreviation || clanAbbreviation;
+      }
+    } catch (err) {
+      console.warn("Could not fetch clan abbreviation", err);
+    }
+  }
+
   const newPlayer = createOrUpdatePlayer({
     name,
     race,
-    sc2Link,
+    sc2Link: sc2LinkInput,
     mmr: Number.isFinite(mmr) ? mmr : 0,
     points: startingPoints,
+    avatarUrl,
+    twitchUrl,
+    secondaryPulseLinks,
+    mmrByRace,
+    clan: clanName === "None" ? "" : clanName,
+    clanAbbreviation: clanAbbreviation || "",
+    pulseName: pulseProfile?.accountName || "",
   });
 
   const hasCompletedMatches = bracketHasResults();
@@ -942,6 +1008,185 @@ function updateMmrDisplay(statusEl) {
   }
 }
 
+function collectSecondaryPulseLinks() {
+  const inputs = document.querySelectorAll(
+    "#secondaryPulseList .secondary-pulse-input"
+  );
+  const links = [];
+  inputs.forEach((input) => {
+    const normalized = sanitizeUrl(input.value.trim());
+    if (normalized && links.length < MAX_SECONDARY_PULSE_LINKS) {
+      links.push(normalized);
+    }
+  });
+  return links;
+}
+
+function isGoogleAvatarUrl(url = "") {
+  if (!url) return false;
+  return GOOGLE_AVATAR_PATTERNS.some((pattern) => pattern.test(url));
+}
+
+function setupPlayerDetailModal() {
+  if (playerDetailModalInitialized) return;
+  const modal = document.getElementById("playerDetailModal");
+  if (!modal) return;
+  const closeBtn = document.getElementById("closePlayerDetailModal");
+
+  const hide = () => {
+    modal.style.display = "none";
+  };
+  const show = () => {
+    modal.style.display = "block";
+  };
+
+  closeBtn?.addEventListener("click", hide);
+  window.addEventListener("mousedown", (e) => {
+    if (e.target === modal) hide();
+  });
+
+  modal.dataset.ready = "true";
+  modal.showModal = show;
+  playerDetailModalInitialized = true;
+}
+
+function attachPlayerDetailHandlers() {
+  setupPlayerDetailModal();
+  const bracketGrid = document.getElementById("bracketGrid");
+  const playersTable = document.getElementById("playersTableBody");
+
+  const handler = (e) => {
+    if (e.target.closest("select") || e.target.closest(".remove-player")) return;
+    const trigger = e.target.closest("[data-player-id]");
+    if (!trigger) return;
+    const pid = trigger.dataset.playerId;
+    if (!pid) return;
+    const player = getPlayersMap().get(pid);
+    if (player) {
+      openPlayerDetailModal(player);
+    }
+  };
+
+  bracketGrid?.addEventListener("click", handler);
+  playersTable?.addEventListener("click", handler);
+}
+
+function formatPulseLinks(list = []) {
+  if (!Array.isArray(list) || !list.length) {
+    return `<p class="helper">No secondary links</p>`;
+  }
+  return list
+    .slice(0, MAX_SECONDARY_PULSE_LINKS)
+    .map(
+      (link, idx) =>
+        `<div class="secondary-pulse-row readonly"><span class="pill">#${idx + 1
+        }</span><a href="${link}" target="_blank" rel="noopener">${escapeHtml(
+          link
+        )}</a></div>`
+    )
+    .join("");
+}
+
+function formatMmrByRace(player) {
+  const list = document.getElementById("playerDetailMmrList");
+  if (!list) return;
+  const mmrByRace = player?.mmrByRace || {};
+  const races = ["Zerg", "Protoss", "Terran", "Random"];
+  const rows = races.map((race) => {
+    const key = normalizeRaceKey(race);
+    const value = Number.isFinite(mmrByRace?.[key]) ? Math.round(mmrByRace[key]) : null;
+    const display = value !== null ? `${value}` : "No MMR";
+    return `<li><span class="pill">${race}</span><strong>${display}</strong></li>`;
+  });
+  list.innerHTML = rows.join("");
+}
+
+function resolvePlayerAvatar(player) {
+  const userPhoto = document.getElementById("userPhoto")?.src;
+  return player?.avatarUrl || userPhoto || DEFAULT_PLAYER_AVATAR;
+}
+
+function openPlayerDetailModal(player) {
+  const modal = document.getElementById("playerDetailModal");
+  if (!modal) return;
+  const avatar = document.getElementById("playerDetailAvatar");
+  const nameEl = document.getElementById("playerDetailName");
+  const clanEl = document.getElementById("playerDetailClan");
+  const raceEl = document.getElementById("playerDetailRace");
+  const pointsEl = document.getElementById("playerDetailPoints");
+  const mainPulseEl = document.getElementById("playerDetailMainPulse");
+  const pulseNameEl = document.getElementById("playerDetailPulseName");
+  const secondaryEl = document.getElementById("playerDetailSecondary");
+  const twitchEl = document.getElementById("playerDetailTwitch");
+  const achievementsEl = document.getElementById("playerDetailAchievements");
+
+  const avatarUrl = resolvePlayerAvatar(player);
+  if (avatar) avatar.src = avatarUrl;
+  if (nameEl) {
+    const abbr = player?.clanAbbreviation;
+    const displayName = player?.pulseName || player?.name;
+    const safeName = displayName || "Player";
+    nameEl.textContent = abbr ? `[${abbr}] ${safeName}` : safeName;
+  }
+  if (clanEl) {
+    const clan = player?.clan || "";
+    clanEl.textContent = clan || "No clan";
+    clanEl.style.display = clan ? "inline-flex" : "none";
+  }
+  if (raceEl) raceEl.textContent = player?.race || "";
+  if (pointsEl)
+    pointsEl.textContent = `${player?.points || 0} pts • ${
+      player?.mmr || 0
+    } MMR`;
+
+  if (mainPulseEl) {
+    const displayName = player?.pulseName || "Main SC2Pulse";
+    if (player?.sc2Link) {
+      mainPulseEl.href = player.sc2Link;
+      mainPulseEl.textContent = displayName;
+    } else {
+      mainPulseEl.removeAttribute("href");
+      mainPulseEl.textContent = "Not provided";
+    }
+  }
+  if (pulseNameEl) {
+    pulseNameEl.textContent = player?.pulseName || "";
+    pulseNameEl.style.display = player?.pulseName ? "block" : "none";
+  }
+
+  if (secondaryEl) {
+    secondaryEl.innerHTML = formatPulseLinks(player?.secondaryPulseLinks || []);
+  }
+
+  if (twitchEl) {
+    const twitchUrl = player?.twitchUrl || "";
+    if (twitchUrl) {
+      twitchEl.href = twitchUrl;
+      twitchEl.innerHTML = `<img src="img/SVG/glitch_flat_purple.svg" class="menu-icon settings-list-icon" aria-hidden="true" /> ${escapeHtml(
+        twitchUrl
+      )}`;
+    } else {
+      twitchEl.removeAttribute("href");
+      twitchEl.textContent = "Not provided";
+    }
+  }
+
+  formatMmrByRace(player);
+
+  if (achievementsEl) {
+    if (Array.isArray(player?.achievements) && player.achievements.length) {
+      achievementsEl.innerHTML = player.achievements
+        .map((a) => `<div class="pill">${escapeHtml(String(a))}</div>`)
+        .join("");
+    } else {
+      achievementsEl.textContent =
+        "Coming soon: tournament wins and milestones.";
+    }
+  }
+
+  modal.style.display = "block";
+}
+
 function populatePlayerNameFromProfile() {
   const input = document.getElementById("playerNameInput");
   if (!input || input.value.trim()) return;
@@ -966,6 +1211,8 @@ async function enterTournament(slug) {
   const registry = await loadTournamentRegistry(true);
   const tournament = registry.find((t) => t.slug === slug);
   currentTournamentMeta = tournament || null;
+  requirePulseLinkSetting =
+    currentTournamentMeta?.requirePulseLink ?? requirePulseLinkSetting;
   if (currentTournamentMeta && !currentTournamentMeta.bestOf) {
     currentTournamentMeta.bestOf = { ...defaultBestOf };
   }
@@ -1042,6 +1289,8 @@ async function handleSaveSettings(event) {
   const startTime = document.getElementById("settingsStartInput")?.value || "";
   const bestOf = readBestOfFromForm("settings");
   const roundRobin = readRoundRobinSettings("settings");
+  const requirePulseLink =
+    document.getElementById("settingsRequirePulseLink")?.checked ?? true;
   const mapPool = mapPoolSelection.size
     ? Array.from(mapPoolSelection)
     : getDefaultMapPoolNames();
@@ -1057,6 +1306,7 @@ async function handleSaveSettings(event) {
     bestOf,
     roundRobin,
     startTime: startTime ? new Date(startTime).toISOString() : null,
+    requirePulseLink,
     updatedAt: Date.now(),
   };
 
@@ -1083,6 +1333,7 @@ async function handleSaveSettings(event) {
     ...currentTournamentMeta,
     ...payload,
   };
+  requirePulseLinkSetting = payload.requirePulseLink;
   cacheTournamentRegistry(null);
   setTournamentHeader(currentTournamentMeta);
   renderMapsTab(currentTournamentMeta);
@@ -1096,13 +1347,15 @@ async function handleSaveSettings(event) {
 }
 function toggleAdminUI(isAdminUser) {
   const adminTabBtn = document.getElementById("adminTabBtn");
+  const seedingTabBtn = document.getElementById("seedingTabBtn");
   const settingsTabBtn = document.getElementById("settingsTabBtn");
   const registrationTab = document.getElementById("registrationTab");
   const jumpToReg = document.getElementById("jumpToRegistration");
   const openRegisterBtn = document.getElementById("openRegisterBtn");
   const seedingCard = document.getElementById("seedingCard");
   const autoFillBtn = document.getElementById("autoFillBtn");
-  if (adminTabBtn) adminTabBtn.style.display = "inline-flex";
+    if (adminTabBtn) adminTabBtn.style.display = "inline-flex";
+    if (seedingTabBtn) seedingTabBtn.style.display = isAdminUser ? "inline-flex" : "none";
   if (settingsTabBtn)
     settingsTabBtn.style.display = isAdminUser ? "inline-flex" : "none";
   if (registrationTab) registrationTab.style.display = "";
@@ -1318,6 +1571,7 @@ async function handleCreateTournament(event) {
     createdByName:
       getCurrentUsername?.() || auth.currentUser?.displayName || "Host",
     createdAt: Date.now(),
+    requirePulseLink: true,
   };
 
   try {
@@ -1777,6 +2031,16 @@ function createOrUpdatePlayer(payload) {
     createdAt: Date.now(),
     seed: 0,
     points: resolvedPoints,
+    avatarUrl: payload.avatarUrl || DEFAULT_PLAYER_AVATAR,
+    clan: payload.clan || "",
+    clanAbbreviation: payload.clanAbbreviation || "",
+    twitchUrl: payload.twitchUrl || "",
+    secondaryPulseLinks: Array.isArray(payload.secondaryPulseLinks)
+      ? payload.secondaryPulseLinks.slice(0, MAX_SECONDARY_PULSE_LINKS)
+      : [],
+    mmrByRace: payload.mmrByRace || null,
+    achievements: payload.achievements || [],
+    pulseName: payload.pulseName || "",
     ...payload,
   };
 
@@ -1790,6 +2054,30 @@ function createOrUpdatePlayer(payload) {
         payload.points === null || payload.points === undefined
           ? state.players[existingIndex].points ?? savedPoints
           : payload.points,
+      avatarUrl:
+        payload.avatarUrl ||
+        state.players[existingIndex].avatarUrl ||
+        DEFAULT_PLAYER_AVATAR,
+      clan: payload.clan ?? state.players[existingIndex].clan ?? "",
+      clanAbbreviation:
+        payload.clanAbbreviation ??
+        state.players[existingIndex].clanAbbreviation ??
+        "",
+      twitchUrl:
+        payload.twitchUrl ?? state.players[existingIndex].twitchUrl ?? "",
+      secondaryPulseLinks:
+        Array.isArray(payload.secondaryPulseLinks) &&
+        payload.secondaryPulseLinks.length
+          ? payload.secondaryPulseLinks.slice(0, MAX_SECONDARY_PULSE_LINKS)
+          : state.players[existingIndex].secondaryPulseLinks || [],
+      mmrByRace: payload.mmrByRace ?? state.players[existingIndex].mmrByRace,
+      achievements:
+        payload.achievements?.length === 0 ||
+        Array.isArray(payload.achievements)
+          ? payload.achievements
+          : state.players[existingIndex].achievements || [],
+      pulseName:
+        payload.pulseName ?? state.players[existingIndex].pulseName ?? "",
     };
     state.players[existingIndex] = updatedPlayer;
   } else {
@@ -2774,7 +3062,9 @@ function renderPlayersTable() {
     return `
       <tr>
         <td>#${p.seed || "?"}</td>
-        <td><strong>${escapeHtml(p.name)}</strong> <span class="helper">${
+        <td><span class="player-detail-trigger" data-player-id="${
+          p.id
+        }"><strong>${escapeHtml(p.name)}</strong></span> <span class="helper">${
       p.race || ""
     }</span></td>
         <td><input class="points-input" type="number" min="0" data-player-id="${
@@ -2896,9 +3186,15 @@ function renderGroupBlock(group, bracket, lookup, playersById) {
         const player = playersById.get(row.playerId);
         const diff =
           row.mapDiff > 0 ? `+${row.mapDiff}` : String(row.mapDiff || 0);
+        const pid = player?.id || "";
+        const nameCell = player
+          ? `<span class="player-detail-trigger" data-player-id="${pid}">${escapeHtml(
+              player.name
+            )}</span>`
+          : "TBD";
         return `<tr>
           <td>${idx + 1}</td>
-          <td>${player ? escapeHtml(player.name) : "TBD"}</td>
+          <td>${nameCell}</td>
           <td>${row.wins}-${row.losses}</td>
           <td>${diff}</td>
           <td>${row.mapFor}:${row.mapAgainst}</td>
@@ -3367,6 +3663,9 @@ function populateSettingsPanel(tournament) {
       ? new Date(tournament.startTime).toISOString().slice(0, 16)
       : "";
   }
+  const requirePulseInput = document.getElementById("settingsRequirePulseLink");
+  if (requirePulseInput)
+    requirePulseInput.checked = tournament.requirePulseLink ?? true;
   setMapPoolSelection(
     tournament.mapPool?.length ? tournament.mapPool : getDefaultMapPoolNames()
   );
@@ -3489,7 +3788,7 @@ function renderPlayerRow(player, score, label) {
     </div>`;
   }
   return `<div class="player-row">
-    <div class="player-name">
+    <div class="player-name player-detail-trigger" data-player-id="${player.id || ""}">
       <span class="seed-chip">#${player.seed || "?"}</span>
       <div>
         <strong>${escapeHtml(player.name)}</strong>

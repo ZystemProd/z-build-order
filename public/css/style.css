@@ -22,12 +22,12 @@
   --active-color: #3b7493;
   --link-color: #fc0;
   /* Rails sizing for right-edge variation lines */
-  --rails-line-width: 6px;     /* width of a single vertical label line */
-  --rails-gap: 3px;            /* gap between lines */
-  --rails-max-lines: 5;        /* we render up to 5 */
+  --rails-line-width: 6px; /* width of a single vertical label line */
+  --rails-gap: 3px; /* gap between lines */
+  --rails-max-lines: 5; /* we render up to 5 */
   --rails-right-padding: calc(
-    var(--rails-line-width) * var(--rails-max-lines) +
-    var(--rails-gap) * (var(--rails-max-lines) - 1) + 10px
+    var(--rails-line-width) * var(--rails-max-lines) + var(--rails-gap) *
+      (var(--rails-max-lines) - 1) + 10px
   );
 }
 
@@ -41,6 +41,18 @@ body {
   overflow-y: scroll; /* Show vertical scrollbar */
   overflow-x: hidden;
   min-height: 100%;
+}
+
+#landingView {
+  margin-top: 65px;
+}
+
+.card-header {
+  user-select: none;
+}
+
+.ghost-link {
+  user-select: none;
 }
 
 /* Replay drag-and-drop overlay */
@@ -280,6 +292,7 @@ body.dark .transpose-group {
   border: 2px solid transparent;
   cursor: pointer; /* Make the whole container clickable */
   transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  user-select: none;
 }
 
 /* Floating utility tiles beside auth-container */
@@ -1119,12 +1132,15 @@ button:hover {
 .branch-select-mode #buildOrderTable {
   position: relative;
   z-index: 2001; /* above the dim overlay */
-  box-shadow: 0 0 0 2px rgba(95, 229, 255, 0.25), 0 12px 36px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 0 0 2px rgba(95, 229, 255, 0.25),
+    0 12px 36px rgba(0, 0, 0, 0.45);
 }
 .branch-select-mode #buildOrderTable {
   cursor: crosshair;
 }
-.branch-select-mode { cursor: not-allowed; }
+.branch-select-mode {
+  cursor: not-allowed;
+}
 .branch-select-mode #buildOrderTable tr:hover td {
   background-color: rgba(255, 255, 255, 0.04);
 }
@@ -4599,6 +4615,7 @@ td {
   z-index: 1000;
   display: none;
   animation: fadeIn 0.2s ease-in-out;
+  user-select: none;
 }
 
 .user-menu .menu-section {
@@ -6448,6 +6465,9 @@ optgroup[label="Terran"] {
   font-weight: 600;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  width: auto;
+  min-width: 0;
+  text-transform: none;
 }
 
 .settings-avatar-button:hover {
@@ -6466,6 +6486,70 @@ optgroup[label="Terran"] {
   flex-direction: column;
   gap: 8px;
   margin: 6px 0 14px;
+}
+
+.settings-secondary-pulse {
+  margin-top: 6px;
+}
+
+.secondary-pulse-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+  color: #f5f4f1;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+  font-size: 0.9rem;
+  user-select: none;
+}
+
+.secondary-pulse-button:hover {
+  border-color: rgba(0, 188, 212, 0.6);
+  background: rgba(0, 188, 212, 0.08);
+}
+
+.secondary-pulse-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.secondary-pulse-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.secondary-pulse-row input {
+  flex: 1;
+}
+
+.secondary-remove-btn {
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.05);
+  color: #e86363;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.secondary-remove-btn:hover {
+  border-color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.12);
+}
+
+.secondary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 6px;
 }
 
 .settings-label {

@@ -4,6 +4,7 @@ import { initializeSectionToggles } from "../uiHandlers.js";
 import { doc, getDoc, setDoc, getDocs, collection, query, where } from "firebase/firestore";
 import { logAnalyticsEvent } from "../analyticsHelper.js";
 import { showToast } from "../toastHandler.js";
+import { initUserSettingsModal } from "../settingsModalInit.js";
 
 function getBuildId() {
   const path = window.location.pathname;
@@ -27,6 +28,7 @@ export function initializeViewBuildPage() {
   safeAdd("signOutBtn", "click", window.handleSignOut);
   safeAdd("switchAccountBtn", "click", window.handleSwitchAccount);
   safeAdd("importBuildButton", "click", importBuildHandler);
+  initUserSettingsModal();
   
   // User menu actions: mirror index.html behavior
   safeAdd("mapVetoBtn", "click", () => {
@@ -55,12 +57,6 @@ export function initializeViewBuildPage() {
     window.location.href = "/index.html";
   });
 
-  safeAdd("settingsBtn", "click", () => {
-    const userMenu = document.getElementById("userMenu");
-    if (userMenu) userMenu.style.display = "none";
-    try { localStorage.setItem("openSettingsOnLoad", "true"); } catch {}
-    window.location.href = "/index.html";
-  });
   initializeSectionToggles();
 }
 

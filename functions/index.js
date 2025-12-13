@@ -530,9 +530,67 @@ function collectRaceRatings(obj, acc = []) {
   return acc;
 }
 
+function extractPulseNameFromTeamEntry(entry) {
+  if (!entry) return "";
+
+  const membersArray = Array.isArray(entry.members)
+    ? entry.members
+    : Array.isArray(entry.members?.members)
+    ? entry.members.members
+    : null;
+
+  const firstMember =
+    membersArray && membersArray.length ? membersArray[0] : null;
+
+  const candidateNames = [
+    firstMember?.character?.tag,
+    firstMember?.character?.name,
+    firstMember?.account?.tag,
+    firstMember?.account?.battleTag,
+    entry?.members?.character?.tag,
+    entry?.members?.character?.name,
+    entry?.members?.account?.tag,
+    entry?.members?.account?.battleTag,
+  ]
+    .filter(Boolean)
+    .map((name) => name.toString().trim());
+
+  const cleaned = candidateNames
+    .map((name) => name.split("#")[0] || name)
+    .find(Boolean);
+
+  return cleaned || "";
+}
+
+function extractPulseNameFromCharacterEntry(entry) {
+  if (!entry) return "";
+  const candidateNames = [
+    entry?.members?.character?.tag,
+    entry?.members?.character?.name,
+    entry?.members?.account?.tag,
+    entry?.members?.account?.battleTag,
+  ]
+    .filter(Boolean)
+    .map((name) => name.toString().trim());
+
+  const cleaned = candidateNames
+    .map((name) => name.split("#")[0] || name)
+    .find(Boolean);
+
+  return cleaned || "";
+}
+
+function cleanPulseName(name) {
+  if (!name || typeof name !== "string") return "";
+  const trimmed = name.trim();
+  if (!trimmed) return "";
+  return trimmed.split("#")[0] || trimmed;
+}
+
 async function fetchRaceRatingsFromTeamsApi(details) {
   const raceDetails = {};
   let lastStatus = null;
+  let pulseName = "";
 
   const ids = [];
   if (details?.id) {
@@ -552,6 +610,10 @@ async function fetchRaceRatingsFromTeamsApi(details) {
       lastStatus = resp.status;
       if (!resp.ok) continue;
       const json = await resp.json();
+      if (!pulseName) {
+        const first = Array.isArray(json) ? json[0] : null;
+        pulseName = extractPulseNameFromTeamEntry(first);
+      }
       const { byRaceDetailed } = extractRaceRatingsFromTeams(json);
       Object.assign(
         raceDetails,
@@ -565,7 +627,7 @@ async function fetchRaceRatingsFromTeamsApi(details) {
   const byRace = collapseRaceDetails(raceDetails);
   const mmr = Object.values(byRace).filter(mmrInRange).reduce((a, b) => Math.max(a, b), 0) || null;
 
-  return { byRace, mmr, lastStatus };
+  return { byRace, mmr, lastStatus, pulseName };
 }
 
 function extractRaceRatingsFromCharactersPayload(json) {
@@ -609,6 +671,28 @@ async function fetchRaceRatingsFromCharacters(details) {
   let lastStatus = null;
   const raceDetails = {};
   const urls = [];
+  let pulseName = "";
+
+  // Try the direct character endpoint to get a reliable display name
+  if (details?.id) {
+    const profileUrl = `${PULSE_API_BASE}/characters/${details.id}`;
+    try {
+      const resp = await fetch(profileUrl, {
+        headers: { Accept: "application/json" },
+      });
+      lastStatus = resp.status;
+      if (resp.ok) {
+        const json = await resp.json();
+        const candidate = json?.name || json?.battleTag || json?.tag;
+        pulseName = cleanPulseName(candidate);
+      }
+    } catch (e) {
+      functions.logger.warn(
+        `Failed to fetch character profile from ${profileUrl}`,
+        e
+      );
+    }
+  }
 
   if (details?.id) {
     urls.push(`${PULSE_API_BASE}/characters?characterId=${details.id}`);
@@ -625,6 +709,10 @@ async function fetchRaceRatingsFromCharacters(details) {
       lastStatus = resp.status;
       if (!resp.ok) continue;
       const json = await resp.json();
+      if (!pulseName) {
+        const first = Array.isArray(json) ? json[0] : null;
+        pulseName = extractPulseNameFromCharacterEntry(first);
+      }
       const { byRaceDetailed } = extractRaceRatingsFromCharactersPayload(json);
       Object.assign(
         raceDetails,
@@ -638,7 +726,7 @@ async function fetchRaceRatingsFromCharacters(details) {
   const byRace = collapseRaceDetails(raceDetails);
   const mmr = Object.values(byRace).filter(mmrInRange).reduce((a, b) => Math.max(a, b), 0) || null;
 
-  return { byRace, mmr, lastStatus };
+  return { byRace, mmr, lastStatus, pulseName };
 }
 
 async function fetchPulseMmrViaBrowser(url) {
@@ -1463,18 +1551,21 @@ exports.fetchPulseMmr = onRequest({ region: "us-central1" }, async (req, res) =>
     let byRace = {};
     let mmr = null;
     let lastStatus = null;
+    let pulseName = "";
 
     const teamResult = await fetchRaceRatingsFromTeamsApi(details);
     byRace = { ...byRace, ...teamResult.byRace };
     mmr = teamResult.mmr;
     lastStatus = teamResult.lastStatus;
+    pulseName = teamResult.pulseName || pulseName;
 
-    if (!mmr) {
+    if (!mmr || !pulseName) {
       const charResult = await fetchRaceRatingsFromCharacters(details);
       if (!Object.keys(byRace).length) {
         byRace = { ...byRace, ...charResult.byRace };
       }
       mmr = mmr || charResult.mmr;
+      pulseName = charResult.pulseName || pulseName;
       if (!mmr && Object.values(byRace).length) {
         const valid = Object.values(byRace).filter(mmrInRange);
         if (valid.length) {
@@ -1508,7 +1599,7 @@ exports.fetchPulseMmr = onRequest({ region: "us-central1" }, async (req, res) =>
 
     functions.logger.info(`MMR for uid=${uid} updated to ${mmr}`, { byRace });
 
-    return res.status(200).json({ mmr, byRace });
+    return res.status(200).json({ mmr, byRace, pulseName: pulseName || null });
   } catch (err) {
     functions.logger.error("fetchPulseMmr crashed:", err);
     return res.status(500).json({ error: "Internal server error." });

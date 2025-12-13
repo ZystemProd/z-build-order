@@ -1,6 +1,7 @@
 import { getDoc, getDocs, doc, collection, updateDoc, setDoc, query, where } from "firebase/firestore";
 import { auth, db } from "../../../app.js";
 import DOMPurify from "dompurify";
+import { initUserSettingsModal } from "../settingsModalInit.js";
 
 let koFiOverlayInitialized = false;
 let koFiOverlayInitStarted = false;
@@ -68,7 +69,6 @@ import {
   renderCreateClanUI,
   renderChooseManageClanUI,
   renderFindClanUI,
-  getUserClans,
 } from "../clan.js";
 // Static imports to avoid dynamic + static duplication warnings
 import {
@@ -218,12 +218,8 @@ import {
 } from "../helpers/sharedEventUtils.js";
 import {
   isBracketInputEnabled,
-  setBracketInputEnabled,
   isBuildInputShown,
-  setBuildInputShown,
   loadUserSettings,
-  getMainClanId,
-  setMainClanId,
 } from "../settings.js";
 import { checkForJoinRequestNotifications } from "../utils/notificationHelpers.js";
 import { logAnalyticsEvent } from "../analyticsHelper.js";
@@ -282,26 +278,6 @@ function showSupportModal() {
   if (modal) modal.style.display = "block";
 }
 
-async function populateMainClanDropdown() {
-  const select = document.getElementById("mainClanSelect");
-  if (!select) return;
-  const user = auth.currentUser;
-  if (!user) return;
-  select.innerHTML = "";
-  const clans = await getUserClans(user.uid);
-  const noneOpt = document.createElement("option");
-  noneOpt.value = "";
-  noneOpt.textContent = "None";
-  select.appendChild(noneOpt);
-  clans.forEach((c) => {
-    const opt = document.createElement("option");
-    opt.value = c.id;
-    opt.textContent = c.name;
-    select.appendChild(opt);
-  });
-  select.value = getMainClanId();
-}
-
 // Templates modal will be set up lazily when first opened
 
 // — replay meta, filled by populateReplayOptions —
@@ -319,6 +295,15 @@ let currentBuildFilter = "all";
 export async function initializeIndexPage() {
   console.log("🛠 Initializing Index Page");
   initKoFiOverlay();
+  initUserSettingsModal({
+    onBracketToggleChange: () => {
+      updateSupplyColumnVisibility();
+      updateBuildInputPlaceholder();
+    },
+    onBuildToggleChange: () => {
+      updateBuildInputVisibility();
+    },
+  });
   const supportLink = document.getElementById("supportersLink");
   if (supportLink) supportLink.textContent = "support";
 
@@ -589,7 +574,6 @@ export async function initializeIndexPage() {
       await checkForJoinRequestNotifications();
       initializeUserData(user);
       await loadUserSettings();
-      await populateMainClanDropdown();
       const builds = await fetchUserBuilds();
       setSavedBuilds(builds);
       saveSavedBuildsToLocalStorage();
@@ -1125,44 +1109,6 @@ export async function initializeIndexPage() {
     }
   });
 
-  safeAdd("closeSettingsModal", "click", () => {
-    const modal = document.getElementById("settingsModal");
-    if (modal) modal.style.display = "none";
-  });
-
-  const settingsModal = document.getElementById("settingsModal");
-  window.addEventListener("mousedown", (event) => {
-    if (settingsModal && event.target === settingsModal) {
-      settingsModal.style.display = "none";
-    }
-  });
-
-  const bracketToggle = document.getElementById("bracketInputToggle");
-  if (bracketToggle) {
-    bracketToggle.checked = isBracketInputEnabled();
-    bracketToggle.addEventListener("change", () => {
-      setBracketInputEnabled(bracketToggle.checked);
-      updateSupplyColumnVisibility();
-      updateBuildInputPlaceholder();
-    });
-  }
-
-  const inputToggle = document.getElementById("buildInputToggle");
-  if (inputToggle) {
-    inputToggle.checked = isBuildInputShown();
-    inputToggle.addEventListener("change", () => {
-      setBuildInputShown(inputToggle.checked);
-      updateBuildInputVisibility();
-    });
-  }
-
-  const mainClanSelect = document.getElementById("mainClanSelect");
-  if (mainClanSelect) {
-    mainClanSelect.addEventListener("change", () => {
-      setMainClanId(mainClanSelect.value);
-    });
-  }
-
   safeAdd("closePrivacyModal", "click", () => {
     const modal = document.getElementById("privacyModal");
     if (modal) modal.style.display = "none";
@@ -1501,9 +1447,6 @@ export async function initializeIndexPage() {
     const modal = document.getElementById("settingsModal");
     if (modal) {
       modal.style.display = "block";
-      const toggle = document.getElementById("bracketInputToggle");
-      if (toggle) toggle.checked = isBracketInputEnabled();
-      populateMainClanDropdown();
     }
   });
 
@@ -1597,20 +1540,8 @@ export async function initializeIndexPage() {
 
   // Open modals from flags set on other pages (e.g., viewBuild)
   try {
-    const openSettings = localStorage.getItem("openSettingsOnLoad") === "true";
     const openStats = localStorage.getItem("openStatsOnLoad") === "true";
     const openClans = localStorage.getItem("openClanModalOnLoad") === "true";
-
-    if (openSettings) {
-      localStorage.removeItem("openSettingsOnLoad");
-      const modal = document.getElementById("settingsModal");
-      if (modal) {
-        modal.style.display = "block";
-        const toggle = document.getElementById("bracketInputToggle");
-        if (toggle) toggle.checked = isBracketInputEnabled();
-        await populateMainClanDropdown();
-      }
-    }
 
     if (openStats) {
       localStorage.removeItem("openStatsOnLoad");
