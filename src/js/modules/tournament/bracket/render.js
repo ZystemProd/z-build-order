@@ -268,7 +268,7 @@ export function layoutBracketSection(
 
   const CARD_HEIGHT = 90;
   const CARD_WIDTH = 240;
-  const V_GAP = 8;
+  const V_GAP = 2;
   const H_GAP = 90;
 
   const clonedRounds = rounds.map((round) => round.slice());
@@ -335,7 +335,7 @@ export function layoutBracketSection(
   let maxX = 0;
   const matchCenters = new Map();
 
-  const baseStep = CARD_HEIGHT + V_GAP;
+  const baseStep = CARD_HEIGHT + 1;
 
   // Build seed slot map so player sources can align like a full seeded bracket
   const playerList = Array.from(playersById.values() || []);
