@@ -417,6 +417,26 @@ export function layoutBracketSection(
     maxY = Math.max(maxY, y + CARD_HEIGHT);
   });
 
+  // Align single-parent children horizontally with their parent to keep straight connectors
+  orderedRounds.forEach((round, rIdx) => {
+    if (rIdx === 0) return;
+    round.forEach((match) => {
+      const pos = positions.get(match.id);
+      if (!pos) return;
+      const parents = (match.sources || []).filter(
+        (src) => src && src.type === "match" && src.matchId
+      );
+      if (parents.length !== 1) return;
+      const parentPos = positions.get(parents[0].matchId);
+      if (!parentPos) return;
+      const parentMid = parentPos.y + CARD_HEIGHT / 2;
+      const y = parentMid - CARD_HEIGHT / 2;
+      positions.set(match.id, { x: pos.x, y });
+      matchCenters.set(match.id, parentMid);
+      maxY = Math.max(maxY, y + CARD_HEIGHT);
+    });
+  });
+
   const matchCards = [];
   orderedRounds.forEach((round) => {
     round.forEach((match) => {
