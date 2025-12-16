@@ -222,8 +222,7 @@ export function buildRoundRobinBracket(players, rrSettings) {
     Math.max(1, settings.groups),
     Math.max(1, playerCount)
   );
-  const bestOfGroup =
-    currentTournamentMeta?.bestOf?.upper ?? defaultBestOf.upper ?? 1;
+  const bestOfGroup = settings.bestOf ?? defaultRoundRobinSettings.bestOf ?? 1;
 
   const groups = createRoundRobinGroups(players, groupCount).map(
     (group, idx) => {
@@ -469,21 +468,36 @@ export function normalizeRoundRobinSettings(raw = {}) {
   const playoffs = normalizePlayoffMode(
     raw.playoffs || raw.playoffMode || defaultRoundRobinSettings.playoffs
   );
-  return { groups, advancePerGroup, playoffs };
+  const bestOf =
+    Number(raw.bestOf || raw.groupBestOf || defaultRoundRobinSettings.bestOf) || 1;
+  return { groups, advancePerGroup, playoffs, bestOf };
 }
 
 export function generateSeedPositions(size) {
-  let positions = [1, 2];
-  while (positions.length < size) {
-    const nextSize = positions.length * 2;
-    const next = new Array(nextSize);
-    for (let i = 0; i < positions.length; i++) {
-      next[i] = positions[i];
-      next[nextSize - 1 - i] = positions[i] + positions.length;
-    }
-    positions = next;
+  if (!Number.isFinite(size) || size < 1) return [];
+  if (size === 1) return [1];
+  if (size === 2) return [1, 2];
+
+  function buildSeeds(n) {
+    if (n === 1) return [1];
+    if (n === 2) return [1, 2];
+    const half = buildSeeds(n / 2);
+    const result = [];
+    half.forEach((seed) => {
+      result.push(seed);
+      result.push(n + 1 - seed);
+    });
+    return result;
   }
-  return positions.slice(0, size);
+
+  if ((size & (size - 1)) !== 0) {
+    // Fallback: fill up to next power of two and then slice
+    const nextPow = pow2(size);
+    const seeds = buildSeeds(nextPow);
+    return seeds.slice(0, size);
+  }
+
+  return buildSeeds(size);
 }
 
 export function pow2(n) {

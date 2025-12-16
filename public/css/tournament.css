@@ -406,6 +406,16 @@ a {
   text-align: right;
 }
 
+.players-table .player-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.players-table .player-name {
+  font-weight: 600;
+}
+
 .seed-actions {
   display: flex;
   align-items: center;

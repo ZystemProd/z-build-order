@@ -313,7 +313,7 @@
             <label>Custom URL slug
               <div class="inline-row">
                 <span class="muted">https://zbuildorder.com/tournament/</span>
-                <input type="text" id="settingsSlugInput" placeholder="my-weekly-cup" disabled />
+              <input type="text" id="settingsSlugInput" placeholder="my-weekly-cup" />
               </div>
               <p class="helper">Slug changes are locked for existing tournaments.</p>
             </label>
@@ -395,7 +395,7 @@
               <div class="picker-header" style="margin-top:12px;">
                 <div>
                   <h4>All 1v1 maps</h4>
-                  <p class="helper">Click to add/remove</p>
+                  <p class="helper">Click to add/remove. Includes current + archive.</p>
                 </div>
               </div>
               <div id="settingsMapPoolPicker" class="map-pool-grid selectable"></div>
@@ -422,6 +422,13 @@
                   <option value="Double Elimination">Double Elimination</option>
                   <option value="Single Elimination">Single Elimination</option>
                   <option value="None">None</option>
+                </select>
+              </label>
+              <label style="flex:1;">Group best of
+                <select id="settingsRoundRobinBestOf">
+                  <option value="1">Bo1</option>
+                  <option value="3">Bo3</option>
+                  <option value="5">Bo5</option>
                 </select>
               </label>
             </div>
@@ -665,7 +672,7 @@
           <div class="picker-header" style="margin-top:12px;">
             <div>
               <h4>All 1v1 maps</h4>
-              <p class="helper">Click to add/remove</p>
+              <p class="helper">Click to add/remove. Includes current + archive.</p>
             </div>
           </div>
           <div id="mapPoolPicker" class="map-pool-grid selectable"></div>
@@ -692,6 +699,13 @@
               <option value="Double Elimination">Double Elimination</option>
               <option value="Single Elimination">Single Elimination</option>
               <option value="None">None</option>
+            </select>
+          </label>
+          <label style="flex:1;">Group best of
+            <select id="roundRobinBestOfInput">
+              <option value="1">Bo1</option>
+              <option value="3">Bo3</option>
+              <option value="5">Bo5</option>
             </select>
           </label>
         </div>

@@ -11,6 +11,7 @@ import {
 } from "../state.js";
 import { getMatchLookup, resolveParticipants } from "../bracket/lookup.js";
 import { getBestOfForMatch } from "../bracket/renderUtils.js";
+import { renderBracketView } from "../bracket/render.js";
 
 export function openVetoModal(matchId, { getPlayersMap, getDefaultMapPoolNames, getMapByName }) {
   setCurrentVetoMatchIdState(matchId);
@@ -241,4 +242,22 @@ export function renderVetoStatus() {
       turnLabel.textContent = `Veto phase - ${turnName} to veto`;
     }
   }
+}
+
+// Dependencies for veto module that need to be set from index.js
+let vetoDeps = null;
+export function attachMatchActionHandlers() {
+  if (!vetoDeps) return;
+  document.querySelectorAll(".veto-btn").forEach((btn) => {
+    btn.addEventListener("click", () =>
+      openVetoModal(btn.dataset.matchId, vetoDeps)
+    );
+  });
+  document.querySelectorAll(".info-btn").forEach((btn) => {
+    btn.addEventListener("click", () => showVetoInfo(btn.dataset.matchId));
+  });
+}
+
+export function setVetoDependencies(deps) {
+  vetoDeps = deps;
 }

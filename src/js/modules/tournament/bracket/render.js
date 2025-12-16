@@ -1,6 +1,7 @@
 import DOMPurify from "dompurify";
 import { state, currentTournamentMeta, defaultBestOf } from "../state.js";
 import { getMatchLookup, resolveParticipants } from "./lookup.js";
+import { generateSeedPositions } from "./build.js";
 import {
   escapeHtml,
   getBestOfForMatch,
@@ -332,78 +333,88 @@ export function layoutBracketSection(
   const positions = new Map();
   let maxY = 0;
   let maxX = 0;
+  const matchCenters = new Map();
 
-  const maxMatchesPerRound = orderedRounds.reduce(
-    (max, round) => Math.max(max, round.length || 0),
-    0
+  const baseStep = CARD_HEIGHT + V_GAP;
+
+  // Build seed slot map so player sources can align like a full seeded bracket
+  const playerList = Array.from(playersById.values() || []);
+  const maxSeeds = Math.max(
+    playerList.reduce((max, p) => Math.max(max, p?.seed || 0), 0),
+    playerList.length
   );
-  const SECTION_HEIGHT =
-    maxMatchesPerRound > 0
-      ? maxMatchesPerRound * (CARD_HEIGHT + V_GAP) - V_GAP
-      : 0;
+  // try to approximate base size from round 2 pairings if available
+  const inferredBaseSize =
+    (orderedRounds[1]?.length || orderedRounds[0]?.length || 1) * 2;
+  const seedSlotsSize = Math.max(
+    inferredBaseSize || 2,
+    1 << Math.ceil(Math.log2(Math.max(2, maxSeeds)))
+  );
+  const seedPositions = generateSeedPositions(seedSlotsSize);
+  const seedToSlot = new Map();
+  seedPositions.forEach((seed, idx) => seedToSlot.set(seed, idx));
+
+  const slotMap = new Map();
 
   orderedRounds.forEach((round, rIdx) => {
     const x = offsetX + rIdx * (CARD_WIDTH + H_GAP);
     if (!round.length) return;
 
-    const roundHeight = round.length * (CARD_HEIGHT + V_GAP) - V_GAP;
-    const baseStartY = (SECTION_HEIGHT - roundHeight) / 2;
+    round.forEach((match, mIdx) => {
+      const sourceSlots = (match.sources || [])
+        .map((src) => {
+          if (!src) return null;
+          if (src.type === "match") {
+            return slotMap.get(src.matchId) ?? null;
+          }
+          if (src.type === "player") {
+            const player = playersById.get(src.playerId);
+            const seed = player?.seed || null;
+            if (seed && seedToSlot.has(seed)) return seedToSlot.get(seed);
+            return null;
+          }
+          return null;
+        })
+        .filter((v) => Number.isFinite(v));
 
-    if (rIdx === 0) {
-      round.forEach((match, mIdx) => {
-        const y = baseStartY + mIdx * (CARD_HEIGHT + V_GAP);
-        positions.set(match.id, { x, y });
-        maxY = Math.max(maxY, y + CARD_HEIGHT);
-        maxX = Math.max(maxX, x + CARD_WIDTH);
-      });
-      return;
-    }
-
-    const desired = round.map((match, mIdx) => {
-      const parents = (match.sources || [])
-        .map((src) =>
-          src && src.type === "match" ? positions.get(src.matchId) : null
-        )
-        .filter(Boolean);
-
-      const parentCenters = parents.map((p) => p.y + CARD_HEIGHT / 2);
-
-      const fallbackCenter =
-        baseStartY + mIdx * (CARD_HEIGHT + V_GAP) + CARD_HEIGHT / 2;
-
-      let center;
-      if (parentCenters.length === 2) {
-        center = (parentCenters[0] + parentCenters[1]) / 2;
-      } else if (parentCenters.length === 1) {
-        center = parentCenters[0];
+      let slot;
+      if (sourceSlots.length === 1) {
+        slot = sourceSlots[0];
+      } else if (sourceSlots.length >= 2) {
+        slot =
+          sourceSlots.reduce((sum, v) => sum + v, 0) / sourceSlots.length;
       } else {
-        center = fallbackCenter;
+        // fallback to sequential placement within the round if no source info
+        slot = mIdx;
       }
 
-      return { match, center };
-    });
+      slotMap.set(match.id, slot);
 
-    desired.sort((a, b) => a.center - b.center);
-
-    let minCenter = desired[0].center;
-    let maxCenter = desired[0].center;
-    for (let i = 1; i < desired.length; i++) {
-      const c = desired[i].center;
-      if (c < minCenter) minCenter = c;
-      if (c > maxCenter) maxCenter = c;
-    }
-
-    const bandMid = SECTION_HEIGHT / 2;
-    const spanMid = (minCenter + maxCenter) / 2;
-    const delta = bandMid - spanMid;
-
-    desired.forEach((item) => {
-      const shiftedCenter = item.center + delta;
-      const y = shiftedCenter - CARD_HEIGHT / 2;
-      positions.set(item.match.id, { x, y });
+      const y = slot * baseStep;
+      positions.set(match.id, { x, y });
+      matchCenters.set(match.id, y + CARD_HEIGHT / 2);
       maxY = Math.max(maxY, y + CARD_HEIGHT);
       maxX = Math.max(maxX, x + CARD_WIDTH);
     });
+  });
+
+  // Compress slots to remove large gaps (e.g., unused seeds)
+  const usedSlots = Array.from(
+    new Set(
+      Array.from(slotMap.values()).filter((v) => Number.isFinite(v))
+    )
+  ).sort((a, b) => a - b);
+  const remap = new Map();
+  usedSlots.forEach((slot, idx) => remap.set(slot, idx));
+
+  maxY = 0;
+  positions.forEach((pos, id) => {
+    const origSlot = slotMap.get(id);
+    const compressed = remap.has(origSlot) ? remap.get(origSlot) : 0;
+    const y = compressed * baseStep;
+    positions.set(id, { x: pos.x, y });
+    matchCenters.set(id, y + CARD_HEIGHT / 2);
+    maxY = Math.max(maxY, y + CARD_HEIGHT);
   });
 
   const matchCards = [];

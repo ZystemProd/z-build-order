@@ -63,6 +63,7 @@ export const defaultRoundRobinSettings = {
   groups: 2,
   advancePerGroup: 2,
   playoffs: "Double Elimination", // Single Elimination | Double Elimination | None
+  bestOf: 3,
 };
 export let currentVetoMatchId = null;
 export let vetoState = null;

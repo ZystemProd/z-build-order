@@ -3,6 +3,7 @@ import {
   TOURNAMENT_COLLECTION,
   TOURNAMENT_REGISTRY_KEY,
   TOURNAMENT_STATE_COLLECTION,
+  STORAGE_KEY,
   defaultState,
 } from "../state.js";
 import { db } from "../../../../app.js";
@@ -60,12 +61,10 @@ export async function loadTournamentRegistry(force = false) {
   if (!force && loadTournamentRegistry.cached) return loadTournamentRegistry.cached;
   const fallback = loadTournamentRegistryCache();
   try {
-    const snap = await getDocs(TOURNAMENT_COLLECTION);
+    const snap = await getDocs(collection(db, TOURNAMENT_COLLECTION));
     const list = snap.docs.map((d) => {
       const data = d.data() || {};
-      const startTime = data.startTime?.toMillis
-        ? data.startTime.toMillis()
-        : data.startTime;
+      const startTime = data.startTime?.toMillis ? data.startTime.toMillis() : data.startTime;
       return {
         id: d.id,
         slug: data.slug || d.id,
@@ -111,12 +110,10 @@ export function loadState(currentSlug, applySeedingFn, deserializeBracketFn) {
 export async function loadTournamentStateRemote(slug) {
   if (!slug) return null;
   try {
-    const snap = await getDoc(doc(TOURNAMENT_STATE_COLLECTION, slug));
+    const snap = await getDoc(doc(collection(db, TOURNAMENT_STATE_COLLECTION), slug));
     if (!snap.exists()) return null;
     const data = snap.data() || {};
-    const lastUpdated = data.lastUpdated?.toMillis
-      ? data.lastUpdated.toMillis()
-      : data.lastUpdated;
+    const lastUpdated = data.lastUpdated?.toMillis ? data.lastUpdated.toMillis() : data.lastUpdated;
     return { ...data, lastUpdated: lastUpdated || Date.now() };
   } catch (_) {
     return null;
@@ -152,7 +149,7 @@ export async function persistTournamentStateRemote(
 ) {
   if (!currentSlug) return;
   try {
-    const ref = doc(TOURNAMENT_STATE_COLLECTION, currentSlug);
+    const ref = doc(collection(db, TOURNAMENT_STATE_COLLECTION), currentSlug);
     const bracket = snapshot.bracket
       ? serializeBracketFn(snapshot.bracket)
       : null;
@@ -203,11 +200,11 @@ export function getStorageKey(currentSlug) {
   return `${currentSlug || "tournament"}:${STORAGE_KEY}`;
 }
 
-export function stripUndefinedDeep(value) {
+// Local helper to strip undefined values deeply
+function stripUndefinedDeep(value) {
   if (Array.isArray(value)) {
     return value.map(stripUndefinedDeep).filter((v) => v !== undefined);
   }
-
   if (value && typeof value === "object") {
     const out = {};
     for (const [k, v] of Object.entries(value)) {
@@ -218,6 +215,5 @@ export function stripUndefinedDeep(value) {
     }
     return out;
   }
-
   return value;
 }
