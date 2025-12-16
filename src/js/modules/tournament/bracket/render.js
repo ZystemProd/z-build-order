@@ -268,7 +268,7 @@ export function layoutBracketSection(
 
   const CARD_HEIGHT = 90;
   const CARD_WIDTH = 240;
-  const V_GAP = 2;
+  const V_GAP = 8;
   const H_GAP = 90;
 
   const clonedRounds = rounds.map((round) => round.slice());
@@ -335,26 +335,14 @@ export function layoutBracketSection(
   let maxX = 0;
   const matchCenters = new Map();
 
-  const baseStep = CARD_HEIGHT + 1;
+  const baseStep = CARD_HEIGHT + V_GAP;
 
-  // Build seed slot map so player sources can align like a full seeded bracket
-  const playerList = Array.from(playersById.values() || []);
-  const maxSeeds = Math.max(
-    playerList.reduce((max, p) => Math.max(max, p?.seed || 0), 0),
-    playerList.length
-  );
-  // try to approximate base size from round 2 pairings if available
-  const inferredBaseSize =
-    (orderedRounds[1]?.length || orderedRounds[0]?.length || 1) * 2;
-  const seedSlotsSize = Math.max(
-    inferredBaseSize || 2,
-    1 << Math.ceil(Math.log2(Math.max(2, maxSeeds)))
-  );
-  const seedPositions = generateSeedPositions(seedSlotsSize);
-  const seedToSlot = new Map();
-  seedPositions.forEach((seed, idx) => seedToSlot.set(seed, idx));
-
+  // Parent-aware slot assignment
   const slotMap = new Map();
+  // Determine used slot range for centering
+  const usedSlots = Array.from(new Set(Array.from(slotMap.values()).filter((v) => Number.isFinite(v))));
+  const maxSlot = usedSlots.length ? Math.max(...usedSlots) : 0;
+  const sectionHeight = (maxSlot + 1) * baseStep;
 
   orderedRounds.forEach((round, rIdx) => {
     const x = offsetX + rIdx * (CARD_WIDTH + H_GAP);
@@ -367,12 +355,6 @@ export function layoutBracketSection(
           if (src.type === "match") {
             return slotMap.get(src.matchId) ?? null;
           }
-          if (src.type === "player") {
-            const player = playersById.get(src.playerId);
-            const seed = player?.seed || null;
-            if (seed && seedToSlot.has(seed)) return seedToSlot.get(seed);
-            return null;
-          }
           return null;
         })
         .filter((v) => Number.isFinite(v));
@@ -384,56 +366,16 @@ export function layoutBracketSection(
         slot =
           sourceSlots.reduce((sum, v) => sum + v, 0) / sourceSlots.length;
       } else {
-        // fallback to sequential placement within the round if no source info
         slot = mIdx;
       }
 
       slotMap.set(match.id, slot);
 
-      const y = slot * baseStep;
+      const y = slot * baseStep + (sectionHeight - (maxSlot + 1) * baseStep) / 2;
       positions.set(match.id, { x, y });
       matchCenters.set(match.id, y + CARD_HEIGHT / 2);
       maxY = Math.max(maxY, y + CARD_HEIGHT);
       maxX = Math.max(maxX, x + CARD_WIDTH);
-    });
-  });
-
-  // Compress slots to remove large gaps (e.g., unused seeds)
-  const usedSlots = Array.from(
-    new Set(
-      Array.from(slotMap.values()).filter((v) => Number.isFinite(v))
-    )
-  ).sort((a, b) => a - b);
-  const remap = new Map();
-  usedSlots.forEach((slot, idx) => remap.set(slot, idx));
-
-  maxY = 0;
-  positions.forEach((pos, id) => {
-    const origSlot = slotMap.get(id);
-    const compressed = remap.has(origSlot) ? remap.get(origSlot) : 0;
-    const y = compressed * baseStep;
-    positions.set(id, { x: pos.x, y });
-    matchCenters.set(id, y + CARD_HEIGHT / 2);
-    maxY = Math.max(maxY, y + CARD_HEIGHT);
-  });
-
-  // Align single-parent children horizontally with their parent to keep straight connectors
-  orderedRounds.forEach((round, rIdx) => {
-    if (rIdx === 0) return;
-    round.forEach((match) => {
-      const pos = positions.get(match.id);
-      if (!pos) return;
-      const parents = (match.sources || []).filter(
-        (src) => src && src.type === "match" && src.matchId
-      );
-      if (parents.length !== 1) return;
-      const parentPos = positions.get(parents[0].matchId);
-      if (!parentPos) return;
-      const parentMid = parentPos.y + CARD_HEIGHT / 2;
-      const y = parentMid - CARD_HEIGHT / 2;
-      positions.set(match.id, { x: pos.x, y });
-      matchCenters.set(match.id, parentMid);
-      maxY = Math.max(maxY, y + CARD_HEIGHT);
     });
   });
 
