@@ -29,34 +29,54 @@ export function updateMatchScore(matchId, scoreA, scoreB, { saveState, renderAll
   const match = lookup.get(matchId);
   if (!match) return;
 
-  const a = Number(scoreA);
-  const b = Number(scoreB);
-  const valA = Number.isFinite(a) ? a : 0;
-  const valB = Number.isFinite(b) ? b : 0;
   const bestOf = getBestOfForMatch(match) || 1;
   const needed = Math.max(1, Math.ceil(bestOf / 2));
+  const isWalkoverA = String(scoreA).toUpperCase() === "W";
+  const isWalkoverB = String(scoreB).toUpperCase() === "W";
   const srcA = match.sources?.[0] || null;
   const srcB = match.sources?.[1] || null;
   const idA = getParticipantIdFromSource(srcA, lookup);
   const idB = getParticipantIdFromSource(srcB, lookup);
 
+  let walkover = null;
+  let valA = 0;
+  let valB = 0;
   let winnerId = null;
   let loserId = null;
-  if (valA !== valB && Math.max(valA, valB) >= needed) {
-    if (valA > valB) {
-      winnerId = idA;
-      loserId = idB;
-    } else {
-      winnerId = idB;
-      loserId = idA;
+
+  if (isWalkoverA && !isWalkoverB) {
+    walkover = "a";
+    valA = 0;
+    valB = needed;
+    winnerId = idB;
+    loserId = idA;
+  } else if (isWalkoverB && !isWalkoverA) {
+    walkover = "b";
+    valA = needed;
+    valB = 0;
+    winnerId = idA;
+    loserId = idB;
+  } else {
+    const a = Number(scoreA);
+    const b = Number(scoreB);
+    valA = Number.isFinite(a) ? a : 0;
+    valB = Number.isFinite(b) ? b : 0;
+    if (valA !== valB && Math.max(valA, valB) >= needed) {
+      if (valA > valB) {
+        winnerId = idA;
+        loserId = idB;
+      } else {
+        winnerId = idB;
+        loserId = idA;
+      }
     }
   }
 
   match.scores = [valA, valB];
-  match.walkover = null;
+  match.walkover = walkover;
   match.winnerId = winnerId || null;
   match.loserId = loserId || null;
-  match.status = winnerId ? "complete" : "pending";
+  match.status = winnerId || walkover ? "complete" : "pending";
 
   saveState?.({ bracket: state.bracket });
   renderAll?.();
