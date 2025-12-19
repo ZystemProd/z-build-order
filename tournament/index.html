@@ -150,13 +150,18 @@
 
     <main class="page-stack">
       <div class="tab-bar" id="tabBar">
-        <button class="tab-btn active" data-tab="bracketTab">Bracket</button>
-        <button class="tab-btn" data-tab="descriptionTab">Description &amp; Rules</button>
-        <button class="tab-btn" data-tab="mapsTab">Maps</button>
-        <button class="tab-btn" data-tab="registrationTab" id="adminTabBtn">Registration</button>
-        <button class="tab-btn" data-tab="seedingTab" id="seedingTabBtn" style="display:none;">Seeding</button>
-        <button class="tab-btn" data-tab="settingsTab" id="settingsTabBtn" data-admin-only="true"
-          style="display:none;">Settings</button>
+        <div class="tab-group public-tabs">
+          <button class="tab-btn active" data-tab="bracketTab">Bracket</button>
+          <button class="tab-btn" data-tab="descriptionTab">Description &amp; Rules</button>
+          <button class="tab-btn" data-tab="mapsTab">Maps</button>
+          <button class="tab-btn" data-tab="registrationTab" id="adminTabBtn">Registration</button>
+        </div>
+        <div class="tab-divider" data-admin-only="true" aria-hidden="true"></div>
+        <div class="tab-group admin-tabs" data-admin-only="true">
+          <button class="tab-btn" data-tab="seedingTab" id="seedingTabBtn" style="display:none;">Seeding</button>
+          <button class="tab-btn" data-tab="settingsTab" id="settingsTabBtn" data-admin-only="true"
+            style="display:none;">Settings</button>
+        </div>
       </div>
 
       <section id="descriptionTab" class="tab-panel">
@@ -932,7 +937,21 @@
         <h3 id="matchInfoTitle">Match</h3>
         <button class="icon-btn" id="closeMatchInfoModal" aria-label="Close match info modal">x</button>
       </div>
-      <p class="helper" id="matchInfoBestOf"></p>
+      <div class="match-info-toprow">
+        <p class="helper" id="matchInfoBestOf"></p>
+        <button class="icon-btn match-info-help-btn" id="matchInfoHelpBtn" aria-label="Match help"
+          title="How scoring and map veto works">?</button>
+        <div class="match-info-help-popover" id="matchInfoHelpPopover" aria-live="polite">
+          <div class="match-info-help-title">Scoring</div>
+          <div class="match-info-help-body">
+            Click the left or right pill for each map to mark the winner. Click again to clear.
+          </div>
+          <div class="match-info-help-title">Map veto</div>
+          <div class="match-info-help-body">
+            Use the “Map veto” button to open the veto flow (only match players can change it).
+          </div>
+        </div>
+      </div>
       <div class="match-info-scoreboard">
         <table class="match-info-table">
           <thead>
@@ -940,14 +959,20 @@
               <th class="match-info-player-col">
                 <div class="match-info-player-head">
                   <div id="matchInfoLeftScore" class="match-info-score">0</div>
-                  <div id="matchInfoLeftName" class="match-info-player-name"></div>
+                  <div class="match-info-player-name">
+                    <span id="matchInfoLeftName"></span>
+                    <span id="matchInfoLeftPresence" class="match-info-presence offline" aria-label="Player offline"></span>
+                  </div>
                 </div>
               </th>
-              <th class="match-info-map-col">Map</th>
+              <th class="match-info-map-col">VS</th>
               <th class="match-info-player-col">
                 <div class="match-info-player-head">
                   <div id="matchInfoRightScore" class="match-info-score">0</div>
-                  <div id="matchInfoRightName" class="match-info-player-name"></div>
+                  <div class="match-info-player-name">
+                    <span id="matchInfoRightName"></span>
+                    <span id="matchInfoRightPresence" class="match-info-presence offline" aria-label="Player offline"></span>
+                  </div>
                 </div>
               </th>
             </tr>

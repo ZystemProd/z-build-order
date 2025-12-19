@@ -61,7 +61,7 @@ export const defaultBestOf = {
   lowerFinal: 5,
 };
 export const defaultRoundRobinSettings = {
-  groups: 2,
+  groups: 4,
   advancePerGroup: 2,
   playoffs: "Double Elimination", // Single Elimination | Double Elimination | None
   bestOf: 3,

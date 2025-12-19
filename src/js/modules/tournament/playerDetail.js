@@ -87,6 +87,20 @@ export function attachPlayerDetailHandlers({ getPlayersMap }) {
   const playersTable = document.getElementById("playersTableBody");
 
   const handler = (e) => {
+    const inRoundRobinGroupStage = Boolean(e.target.closest(".group-stage"));
+    if (inRoundRobinGroupStage) {
+      const nameTarget = e.target.closest(".name-text");
+      if (!nameTarget) return;
+      const trigger =
+        nameTarget.closest("[data-player-id]") ||
+        nameTarget.closest(".row[data-player-id]");
+      const pid = trigger?.dataset?.playerId;
+      if (!pid) return;
+      const player = getPlayersMap().get(pid);
+      if (player) openPlayerDetailModal(player);
+      return;
+    }
+
     if (
       e.target.closest("select") ||
       e.target.closest(".remove-player") ||

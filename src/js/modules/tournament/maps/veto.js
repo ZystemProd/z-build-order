@@ -1,6 +1,14 @@
 import DOMPurify from "dompurify";
 import { showToast } from "../../toastHandler.js";
-import { auth } from "../../../../app.js";
+import { auth, db, getCurrentUsername } from "../../../../app.js";
+import {
+  collection,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  serverTimestamp,
+  setDoc,
+} from "firebase/firestore";
 import {
   currentTournamentMeta,
   vetoState,
@@ -10,10 +18,24 @@ import {
   state,
   defaultBestOf,
   isAdmin,
+  currentSlug,
+  TOURNAMENT_STATE_COLLECTION,
+  pulseProfile,
 } from "../state.js";
 import { getMatchLookup, resolveParticipants } from "../bracket/lookup.js";
 import { escapeHtml, getBestOfForMatch } from "../bracket/renderUtils.js";
 import { renderBracketView } from "../bracket/render.js";
+
+const PRESENCE_COLLECTION = "tournamentPresence";
+const PRESENCE_TTL_MS = 45_000;
+const PRESENCE_HEARTBEAT_MS = 20_000;
+let presenceUnsub = null;
+let presenceHeartbeat = null;
+let presenceUiTimer = null;
+let presenceLatest = new Map(); // uid -> { matchId, updatedAtMs, playerId }
+let presenceContext = { matchId: null, leftPlayerId: null, rightPlayerId: null };
+let presenceSlug = null;
+let presenceWriteDenied = false;
 
 export function openVetoModal(matchId, { getPlayersMap, getDefaultMapPoolNames, getMapByName }) {
   setCurrentVetoMatchIdState(matchId);
@@ -35,6 +57,23 @@ export function openVetoModal(matchId, { getPlayersMap, getDefaultMapPoolNames, 
 
   const playersById = getPlayersMap();
   const [pA, pB] = resolveParticipants(match, lookup, playersById);
+
+  if (!isAdmin) {
+    const uid = auth?.currentUser?.uid || null;
+    if (!uid) {
+      showToast?.("Sign in to veto/pick maps.", "warning");
+      return;
+    }
+    const me = resolveCurrentPlayerForPresence();
+    const isParticipant =
+      (me?.id && (me.id === pA?.id || me.id === pB?.id)) ||
+      (uid && (uid === pA?.uid || uid === pB?.uid));
+    if (!isParticipant) {
+      showToast?.("Only match players can veto/pick maps.", "warning");
+      return;
+    }
+  }
+
   const ordered = [pA, pB]
     .filter(Boolean)
     .sort((a, b) => (b.seed || 999) - (a.seed || 999));
@@ -124,8 +163,12 @@ export function openMatchInfoModal(
   const rowsEl = document.getElementById("matchInfoMapRows");
   const leftVetoesEl = document.getElementById("matchInfoLeftVetoes");
   const rightVetoesEl = document.getElementById("matchInfoRightVetoes");
+  const leftPresenceEl = document.getElementById("matchInfoLeftPresence");
+  const rightPresenceEl = document.getElementById("matchInfoRightPresence");
   const openVetoBtn = document.getElementById("openMapVetoBtn");
   const closeBtn = document.getElementById("closeMatchInfoModal");
+  const helpBtn = document.getElementById("matchInfoHelpBtn");
+  const helpPopover = document.getElementById("matchInfoHelpPopover");
   if (!modal) return;
   modal.dataset.matchId = matchId || "";
 
@@ -140,6 +183,16 @@ export function openMatchInfoModal(
   const [pA, pB] = resolveParticipants(match, lookup, playersById);
   const aName = pA?.name || "TBD";
   const bName = pB?.name || "TBD";
+  const leftPlayerId = pA?.id || null;
+  const rightPlayerId = pB?.id || null;
+  const uid = auth?.currentUser?.uid || null;
+  const me = resolveCurrentPlayerForPresence();
+  const canEditResults =
+    isAdmin ||
+    (me?.id && (me.id === leftPlayerId || me.id === rightPlayerId)) ||
+    (uid && (uid === pA?.uid || uid === pB?.uid));
+
+  modal.dataset.canEditResults = canEditResults ? "true" : "false";
 
   if (title) {
     const bracketLabel =
@@ -164,6 +217,7 @@ export function openMatchInfoModal(
   if (leftNameEl) leftNameEl.textContent = aName;
   if (rightNameEl) rightNameEl.textContent = bName;
   renderMatchInfoVetoes({ leftVetoesEl, rightVetoesEl, vetoedMaps, aName, bName });
+  setPresenceContext({ matchId, leftPlayerId, rightPlayerId });
 
   if (rowsEl) {
     const record = ensureMatchVetoRecord(matchId, bestOf);
@@ -176,53 +230,75 @@ export function openMatchInfoModal(
       winners,
     });
 
-    rowsEl.onmouseover = (e) => {
-      const cell = e.target.closest?.(".match-info-pick-cell");
-      if (!cell) return;
-      if (cell.classList.contains("is-disabled")) return;
-      const row = cell.closest("tr");
-      const idx = Number(row?.dataset?.mapIdx || "-1");
-      if (!row || !Number.isFinite(idx) || idx < 0 || idx >= bestOf) return;
-      if (winners[idx]) return;
-      row.dataset.previewWinner = cell.dataset.side || "";
-    };
-
-    rowsEl.onmouseout = (e) => {
-      const row = e.target.closest?.("tr");
-      if (!row) return;
-      if (!row.contains(e.relatedTarget)) {
+    if (!canEditResults) {
+      rowsEl.querySelectorAll(".match-info-pick-cell").forEach((cell) => {
+        cell.classList.add("is-disabled");
+      });
+      rowsEl.querySelectorAll(".match-info-row").forEach((row) => {
         delete row.dataset.previewWinner;
-      }
-    };
+      });
+      rowsEl.onmouseover = null;
+      rowsEl.onmouseout = null;
+      rowsEl.onclick = null;
+    } else {
+      rowsEl.onmouseover = (e) => {
+        const cell = e.target.closest?.(".match-info-pick-cell");
+        if (!cell) return;
+        if (cell.classList.contains("is-disabled")) return;
+        const row = cell.closest("tr");
+        const idx = Number(row?.dataset?.mapIdx || "-1");
+        if (!row || !Number.isFinite(idx) || idx < 0 || idx >= bestOf) return;
+        if (winners[idx]) return;
+        row.dataset.previewWinner = cell.dataset.side || "";
+      };
 
-    rowsEl.onclick = (e) => {
-      const cell = e.target.closest?.(".match-info-pick-cell");
-      if (!cell) return;
-      if (cell.classList.contains("is-disabled")) return;
-      const row = cell.closest("tr");
-      const idx = Number(row?.dataset?.mapIdx || "-1");
-      const side = cell.dataset.side === "B" ? "B" : "A";
-      if (!row || !Number.isFinite(idx) || idx < 0 || idx >= bestOf) return;
+      rowsEl.onmouseout = (e) => {
+        const row = e.target.closest?.("tr");
+        if (!row) return;
+        if (!row.contains(e.relatedTarget)) {
+          delete row.dataset.previewWinner;
+        }
+      };
 
-      winners[idx] = winners[idx] === side ? null : side;
-      record.mapResults = winners;
+      rowsEl.onclick = (e) => {
+        const cell = e.target.closest?.(".match-info-pick-cell");
+        if (!cell) return;
+        if (cell.classList.contains("is-disabled")) return;
+        const row = cell.closest("tr");
+        const idx = Number(row?.dataset?.mapIdx || "-1");
+        const side = cell.dataset.side === "B" ? "B" : "A";
+        if (!row || !Number.isFinite(idx) || idx < 0 || idx >= bestOf) return;
 
-      const winsA = winners.filter((w) => w === "A").length;
-      const winsB = winners.filter((w) => w === "B").length;
-      if (typeof vetoDeps?.updateMatchScore === "function") {
-        vetoDeps.updateMatchScore(matchId, winsA, winsB);
-      }
-      vetoDeps?.saveState?.({ matchVetoes: state.matchVetoes });
-      updateMatchInfoHeaderScores({ leftScoreEl, rightScoreEl, winners });
-      renderMatchInfoRows(rowsEl, { bestOf, pickedMaps, winners });
-    };
+        winners[idx] = winners[idx] === side ? null : side;
+        record.mapResults = winners;
+
+        const winsA = winners.filter((w) => w === "A").length;
+        const winsB = winners.filter((w) => w === "B").length;
+        if (typeof vetoDeps?.updateMatchScore === "function") {
+          vetoDeps.updateMatchScore(matchId, winsA, winsB);
+        }
+        vetoDeps?.saveState?.({ matchVetoes: state.matchVetoes });
+        updateMatchInfoHeaderScores({ leftScoreEl, rightScoreEl, winners });
+        renderMatchInfoRows(rowsEl, { bestOf, pickedMaps, winners });
+      };
+    }
   }
 
   if (openVetoBtn) {
-    openVetoBtn.onclick = () => {
-      hideMatchInfoModal();
-      openVetoModal(matchId, { getPlayersMap, getDefaultMapPoolNames, getMapByName });
-    };
+    const isParticipant =
+      isAdmin ||
+      (me?.id && (me.id === leftPlayerId || me.id === rightPlayerId));
+    openVetoBtn.style.display = isParticipant ? "" : "none";
+    openVetoBtn.onclick = isParticipant
+      ? () => {
+          hideMatchInfoModal();
+          openVetoModal(matchId, {
+            getPlayersMap,
+            getDefaultMapPoolNames,
+            getMapByName,
+          });
+        }
+      : null;
   }
 
   if (closeBtn) closeBtn.onclick = () => hideMatchInfoModal();
@@ -231,6 +307,33 @@ export function openMatchInfoModal(
   modal.onclick = (e) => {
     if (e.target === modal) hideMatchInfoModal();
   };
+
+  if (!modal.dataset.helpBound && helpBtn && helpPopover) {
+    modal.dataset.helpBound = "true";
+
+    helpBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      helpPopover.classList.toggle("is-open");
+    });
+
+    modal.addEventListener(
+      "click",
+      (e) => {
+        if (!helpPopover.classList.contains("is-open")) return;
+        if (e.target.closest("#matchInfoHelpPopover")) return;
+        if (e.target.closest("#matchInfoHelpBtn")) return;
+        helpPopover.classList.remove("is-open");
+      },
+      true
+    );
+  }
+
+  startPresenceTracking(matchId, { leftPlayerId, rightPlayerId, aName, bName });
+  applyPresenceIndicators({ leftPresenceEl, rightPresenceEl });
+  if (!presenceUiTimer) {
+    presenceUiTimer = setInterval(() => applyPresenceIndicators(), 5_000);
+  }
 }
 
 function updateMatchInfoHeaderScores({ leftScoreEl, rightScoreEl, winners }) {
@@ -352,6 +455,9 @@ export function hideMatchInfoModal() {
     modal.style.display = "none";
     delete modal.dataset.matchId;
   }
+  stopPresenceTracking();
+  if (presenceUiTimer) clearInterval(presenceUiTimer);
+  presenceUiTimer = null;
 }
 
 export function refreshMatchInfoModalIfOpen() {
@@ -363,6 +469,245 @@ export function refreshMatchInfoModalIfOpen() {
   const matchId = modal.dataset.matchId;
   if (!matchId) return;
   openMatchInfoModal(matchId, vetoDeps);
+}
+
+export function refreshMatchInfoPresenceIfOpen() {
+  const modal = document.getElementById("matchInfoModal");
+  if (!modal) return;
+  const visible = modal.style.display && modal.style.display !== "none";
+  if (!visible) return;
+  applyPresenceIndicators();
+}
+
+function presenceDocRef(uid) {
+  if (!uid || !currentSlug) return null;
+  return doc(db, PRESENCE_COLLECTION, currentSlug, "matchInfo", uid);
+}
+
+function tournamentStateDocRef() {
+  if (!currentSlug) return null;
+  return doc(collection(db, TOURNAMENT_STATE_COLLECTION), currentSlug);
+}
+
+function startPresenceTracking(matchId, hint = null) {
+  if (presenceSlug && presenceSlug !== currentSlug) {
+    try {
+      presenceUnsub?.();
+    } catch (_) {
+      // ignore
+    }
+    presenceUnsub = null;
+    presenceLatest = new Map();
+    presenceSlug = null;
+  }
+
+  if (!presenceUnsub && currentSlug) {
+    const colRef = collection(db, PRESENCE_COLLECTION, currentSlug, "matchInfo");
+    presenceUnsub = onSnapshot(
+      colRef,
+      (snap) => {
+        const next = new Map();
+        for (const d of snap.docs) {
+          const data = d.data() || {};
+          const updatedAtMs = data.updatedAt?.toMillis
+            ? data.updatedAt.toMillis()
+            : Number(data.clientUpdatedAt) || Number(data.updatedAt) || 0;
+          next.set(d.id, {
+            matchId: data.matchId || null,
+            updatedAtMs,
+            playerId: data.playerId || null,
+          });
+        }
+        presenceLatest = next;
+        applyPresenceIndicators();
+      },
+      () => {}
+    );
+    presenceSlug = currentSlug;
+  }
+
+  const uid = auth?.currentUser?.uid || null;
+  const ref = presenceDocRef(uid);
+  if (!ref) return;
+
+  const player = resolveCurrentPlayerForPresence();
+  let playerId = player?.id || null;
+
+  if (!playerId) {
+    const username = (getCurrentUsername?.() || "").trim();
+    if (username && hint?.aName && username === hint.aName) playerId = hint.leftPlayerId || null;
+    if (username && hint?.bName && username === hint.bName) playerId = hint.rightPlayerId || null;
+  }
+
+  if (playerId && uid && !player?.uid) {
+    tryBackfillPlayerUid(playerId, uid);
+  }
+
+  const write = async () => {
+    const now = Date.now();
+
+    const stateRef = tournamentStateDocRef();
+    if (stateRef && playerId) {
+      try {
+        await setDoc(
+          stateRef,
+          {
+            presence: {
+              matchInfo: {
+                [playerId]: {
+                  matchId: matchId || null,
+                  clientUpdatedAt: now,
+                },
+              },
+            },
+          },
+          { merge: true }
+        );
+      } catch (err) {
+        console.warn("Presence (state doc) write failed", err);
+      }
+    }
+
+    if (presenceWriteDenied) return;
+    try {
+      await setDoc(
+        ref,
+        {
+          matchId: matchId || null,
+          playerId: playerId || null,
+          updatedAt: serverTimestamp(),
+          clientUpdatedAt: now,
+        },
+        { merge: true }
+      );
+    } catch (err) {
+      if (err?.code === "permission-denied") {
+        presenceWriteDenied = true;
+        return;
+      }
+      console.warn("Presence write failed", err);
+    }
+  };
+
+  write();
+  if (presenceHeartbeat) clearInterval(presenceHeartbeat);
+  presenceHeartbeat = setInterval(write, PRESENCE_HEARTBEAT_MS);
+}
+
+function stopPresenceTracking() {
+  const uid = auth?.currentUser?.uid || null;
+  const ref = presenceDocRef(uid);
+  if (presenceHeartbeat) clearInterval(presenceHeartbeat);
+  presenceHeartbeat = null;
+  if (ref) {
+    deleteDoc(ref).catch(() => {});
+  }
+
+  const player = resolveCurrentPlayerForPresence();
+  const playerId = player?.id || null;
+  const stateRef = tournamentStateDocRef();
+  if (stateRef && playerId) {
+    setDoc(
+      stateRef,
+      {
+        presence: {
+          matchInfo: {
+            [playerId]: {
+              matchId: null,
+              clientUpdatedAt: Date.now(),
+            },
+          },
+        },
+      },
+      { merge: true }
+    ).catch(() => {});
+  }
+}
+
+function setPresenceContext({ matchId, leftPlayerId, rightPlayerId }) {
+  presenceContext = {
+    matchId: matchId || null,
+    leftPlayerId: leftPlayerId || null,
+    rightPlayerId: rightPlayerId || null,
+  };
+}
+
+function isPlayerOnlineForMatch(playerId, matchId) {
+  if (!playerId || !matchId) return false;
+  for (const entry of presenceLatest.values()) {
+    if (!entry) continue;
+    if (entry.playerId !== playerId) continue;
+    if (entry.matchId !== matchId) continue;
+    if (Date.now() - (entry.updatedAtMs || 0) <= PRESENCE_TTL_MS) return true;
+  }
+
+  const stateEntry = state?.presence?.matchInfo?.[playerId] || null;
+  if (stateEntry && stateEntry.matchId === matchId) {
+    const ts = Number(stateEntry.clientUpdatedAt) || 0;
+    if (Date.now() - ts <= PRESENCE_TTL_MS) return true;
+  }
+  return false;
+}
+
+function applyPresenceIndicators(override = null) {
+  const modal = document.getElementById("matchInfoModal");
+  if (!modal) return;
+  const visible = modal.style.display && modal.style.display !== "none";
+  if (!visible) return;
+
+  const leftPresenceEl =
+    override?.leftPresenceEl || document.getElementById("matchInfoLeftPresence");
+  const rightPresenceEl =
+    override?.rightPresenceEl || document.getElementById("matchInfoRightPresence");
+
+  const matchId = modal.dataset.matchId || presenceContext.matchId;
+  const leftOnline = isPlayerOnlineForMatch(presenceContext.leftPlayerId, matchId);
+  const rightOnline = isPlayerOnlineForMatch(presenceContext.rightPlayerId, matchId);
+
+  if (leftPresenceEl) {
+    leftPresenceEl.classList.toggle("online", leftOnline);
+    leftPresenceEl.classList.toggle("offline", !leftOnline);
+    leftPresenceEl.setAttribute("aria-label", leftOnline ? "Player online" : "Player offline");
+  }
+  if (rightPresenceEl) {
+    rightPresenceEl.classList.toggle("online", rightOnline);
+    rightPresenceEl.classList.toggle("offline", !rightOnline);
+    rightPresenceEl.setAttribute("aria-label", rightOnline ? "Player online" : "Player offline");
+  }
+}
+
+function resolveCurrentPlayerForPresence() {
+  const uid = auth?.currentUser?.uid || null;
+  const username = (getCurrentUsername?.() || "").trim();
+  const pulseUrl = pulseProfile?.url || "";
+  const normalizedPulseUrl = pulseUrl ? pulseUrl.toString().trim() : "";
+
+  const players = state.players || [];
+  if (uid) {
+    const byUid = players.find((p) => p && p.uid === uid);
+    if (byUid) return byUid;
+  }
+  if (normalizedPulseUrl) {
+    const byLink = players.find((p) => p && p.sc2Link === normalizedPulseUrl);
+    if (byLink) return byLink;
+  }
+  if (username) {
+    const byName = players.find((p) => p && p.name === username);
+    if (byName) return byName;
+  }
+  return null;
+}
+
+function tryBackfillPlayerUid(playerId, uid) {
+  if (!playerId || !uid) return;
+  const players = Array.isArray(state.players) ? state.players : [];
+  const idx = players.findIndex((p) => p && p.id === playerId);
+  if (idx === -1) return;
+  const existing = players[idx];
+  if (existing?.uid) return;
+  const nextPlayers = players.map((p, i) => (i === idx ? { ...p, uid } : p));
+  state.players = nextPlayers;
+  vetoDeps?.saveState?.({ players: nextPlayers });
 }
 
 export function handleVetoPoolClick(e) {
@@ -479,6 +824,7 @@ export function hideVetoModal() {
   if (modal) modal.style.display = "none";
   if (modal) delete modal.dataset.matchId;
   if (poolEl) poolEl.onclick = null;
+  // keep global presence subscription alive for match info; veto modal itself doesn't affect presence
   setCurrentVetoMatchIdState(null);
   setVetoStateState(null);
 }
@@ -625,6 +971,7 @@ export function attachMatchActionHandlers() {
 
 export function setVetoDependencies(deps) {
   vetoDeps = deps;
+  attachMatchActionHandlers();
 }
 
 export function refreshVetoModalIfOpen() {

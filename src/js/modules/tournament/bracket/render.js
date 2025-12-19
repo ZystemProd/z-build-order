@@ -16,6 +16,19 @@ const INFO_ICON_SVG = `<svg class="info-icon" viewBox="0 0 24 24" aria-hidden="t
   <circle cx="12" cy="7.5" r="1.25" fill="currentColor"></circle>
 </svg>`;
 
+let currentUsernameHint = "";
+
+function setCurrentUsernameHint(username) {
+  currentUsernameHint = (username || "").trim().toLowerCase();
+}
+
+function isCurrentUserPlayer(player) {
+  if (!currentUsernameHint) return false;
+  const name = (player?.name || "").trim().toLowerCase();
+  const pulseName = (player?.pulseName || "").trim().toLowerCase();
+  return Boolean(currentUsernameHint && (name === currentUsernameHint || pulseName === currentUsernameHint));
+}
+
 function displayValueFor(match, idx) {
   if (match.walkover === "a") {
     return idx === 0 ? "w/o" : match.scores?.[1] ?? 0;
@@ -64,6 +77,20 @@ function getMatchLabel(match) {
   return matchLetterMap.get(match.id) || match.id;
 }
 
+function displayPlaceholderForSource(match, participantIdx, lookup) {
+  const src = match?.sources?.[participantIdx];
+  if (!src) return "Awaiting player";
+
+  if (src.type === "match" && src.matchId) {
+    const sourceMatch = lookup?.get(src.matchId);
+    const fromLabel = sourceMatch ? getMatchLabel(sourceMatch) : src.matchId;
+    const prefix = src.outcome === "loser" ? "loser of" : "winner of";
+    return `(${prefix} ${fromLabel})`;
+  }
+
+  return "Awaiting player";
+}
+
 export function renderMatchCard(match, lookup, playersById) {
   const participants = resolveParticipants(match, lookup, playersById);
   const [pA, pB] = participants;
@@ -79,6 +106,9 @@ export function renderMatchCard(match, lookup, playersById) {
   const cls = ["match-card"];
   if (match.status === "complete") cls.push("complete");
   if (match.walkover) cls.push("walkover");
+  const isReady = Boolean(pA && pB && match.status !== "complete");
+  const isUserMatch = Boolean(isCurrentUserPlayer(pA) || isCurrentUserPlayer(pB));
+  if (isReady && isUserMatch) cls.push("ready");
 
   const valA = displayValueFor(match, 0);
   const valB = displayValueFor(match, 1);
@@ -96,8 +126,8 @@ export function renderMatchCard(match, lookup, playersById) {
         <span class="badge muted">Bo${bestOf}</span>
       </div>
     </div>
-    ${renderPlayerRow(pA, selectValA, "A", bestOf)}
-    ${renderPlayerRow(pB, selectValB, "B", bestOf)}
+    ${renderPlayerRow(pA, selectValA, "A", bestOf, match, 0, lookup)}
+    ${renderPlayerRow(pB, selectValB, "B", bestOf, match, 1, lookup)}
     <div class="match-footer">
       ${
         canVeto
@@ -117,10 +147,11 @@ export function renderMatchCard(match, lookup, playersById) {
   return DOMPurify.sanitize(html);
 }
 
-export function renderPlayerRow(player, score, label, bestOf) {
+export function renderPlayerRow(player, score, label, bestOf, match, participantIdx, lookup) {
   if (!player) {
+    const placeholderText = displayPlaceholderForSource(match, participantIdx, lookup);
     return `<div class="player-row">
-      <div class="player-name placeholder-tag">TBD</div>
+      <div class="player-name placeholder-tag">${escapeHtml(placeholderText)}</div>
       <select class="result-select" disabled>
         <option value="0">0</option>
       </select>
@@ -194,12 +225,20 @@ export function renderSimpleMatch(
   w,
   prefix = "",
   extraStyle = "",
-  layout = "tree"
+  layout = "tree",
+  lookup = null
 ) {
   const isTreeLayout = layout === "tree";
-  const cardClass = isTreeLayout ? "match-card tree" : "match-card group";
-  const aName = pA ? pA.name : "TBD";
-  const bName = pB ? pB.name : "TBD";
+  const isReady = Boolean(pA && pB && match?.status !== "complete");
+  const isUserMatch = Boolean(isCurrentUserPlayer(pA) || isCurrentUserPlayer(pB));
+  const shouldHighlightReady = isReady && isUserMatch;
+  const cardClass = isTreeLayout
+    ? `match-card tree${shouldHighlightReady ? " ready" : ""}`
+    : `match-card group${shouldHighlightReady ? " ready" : ""}`;
+  const aIsPlaceholder = !pA;
+  const bIsPlaceholder = !pB;
+  const aName = pA ? pA.name : displayPlaceholderForSource(match, 0, lookup);
+  const bName = pB ? pB.name : displayPlaceholderForSource(match, 1, lookup);
   const raceClassA = raceClassName(pA?.race);
   const raceClassB = raceClassName(pB?.race);
   const showScores = !!(pA && pB);
@@ -215,7 +254,12 @@ export function renderSimpleMatch(
     ? `top:${y}px; left:${x}px; width:${w}px; height:${h}px; ${extraStyle}`
     : extraStyle;
 
-  const matchNumberLabel = escapeHtml(getMatchLabel(match));
+  const parsedGroupNumber =
+    layout === "group" ? parseMatchNumber(match?.id || "") : null;
+  const matchNumberLabel =
+    layout === "group" && parsedGroupNumber
+      ? `M${parsedGroupNumber}`
+      : escapeHtml(getMatchLabel(match));
 
   const html = `<div class="${cardClass}" data-match-id="${
     match.id
@@ -225,10 +269,12 @@ export function renderSimpleMatch(
       match.winnerId === pA?.id ? "winner" : ""
     }" data-player-id="${pA?.id || ""}">
       <span class="name">${
-        pA ? `<span class="seed-chip">#${pA.seed || "?"}</span>` : ""
-      }<span class="race-strip ${raceClassA}"></span><span class="name-text">${escapeHtml(
-    aName
-  )}</span></span>
+         pA ? `<span class="seed-chip">#${pA.seed || "?"}</span>` : ""
+      }<span class="race-strip ${raceClassA}"></span><span class="name-text ${
+    aIsPlaceholder ? "is-placeholder" : ""
+  }">${escapeHtml(
+     aName
+   )}</span></span>
       <div class="row-actions">
         <div class="score-select score-display ${
           match.winnerId === pA?.id ? "winner" : ""
@@ -241,10 +287,12 @@ export function renderSimpleMatch(
       match.winnerId === pB?.id ? "winner" : ""
     }" data-player-id="${pB?.id || ""}">
       <span class="name">${
-        pB ? `<span class="seed-chip">#${pB.seed || "?"}</span>` : ""
-      }<span class="race-strip ${raceClassB}"></span><span class="name-text">${escapeHtml(
-    bName
-  )}</span></span>
+         pB ? `<span class="seed-chip">#${pB.seed || "?"}</span>` : ""
+      }<span class="race-strip ${raceClassB}"></span><span class="name-text ${
+    bIsPlaceholder ? "is-placeholder" : ""
+  }">${escapeHtml(
+     bName
+   )}</span></span>
       <div class="row-actions">
         <div class="score-select score-display ${
           match.winnerId === pB?.id ? "winner" : ""
@@ -508,7 +556,9 @@ export function layoutBracketSection(
           CARD_HEIGHT,
           CARD_WIDTH,
           "",
-          ""
+          "",
+          "tree",
+          lookup
         )
       );
     });
@@ -681,6 +731,12 @@ export function makeVConnector(x, y1, y2, meta = {}) {
 
 function getRoundLabel(titlePrefix, idx, totalRounds) {
   const fromEnd = totalRounds - idx;
+
+  if (titlePrefix === "Playoffs") {
+    if (fromEnd === 1) return "Finals";
+    if (fromEnd === 2) return "Semi-Finals";
+    return `Round ${idx + 1}`;
+  }
 
   if (titlePrefix === "Upper") {
     if (fromEnd === 1) return "Final";
@@ -874,7 +930,7 @@ export function renderGroupBlock(group, bracket, lookup, playersById) {
           row.mapDiff > 0 ? `+${row.mapDiff}` : String(row.mapDiff || 0);
         const pid = player?.id || "";
         const nameCell = player
-          ? `<span class="player-detail-trigger" data-player-id="${pid}">${escapeHtml(
+          ? `<span class="player-detail-trigger name-text" data-player-id="${pid}">${escapeHtml(
               player.name
             )}</span>`
           : "TBD";
@@ -903,7 +959,8 @@ export function renderGroupBlock(group, bracket, lookup, playersById) {
           240,
           "",
           "",
-          "group"
+          "group",
+          lookup
         );
       })
       .join("") || `<div class="helper">No matches yet.</div>`;
@@ -943,6 +1000,7 @@ export function renderRoundRobinView(
       `<div class="placeholder">Add players to generate the bracket.</div>`
     );
   }
+  buildMatchLetters(bracket);
   const lookup = getMatchLookup(bracket);
   const groups = bracket.groups || [];
   const groupHtml = groups
@@ -967,9 +1025,12 @@ export function renderBracketView({
   getPlayersMap,
   attachMatchActionHandlers,
   computeGroupStandings,
+  currentUsername,
 }) {
   const grid = document.getElementById("bracketGrid");
   if (!grid) return;
+
+  setCurrentUsernameHint(currentUsername);
 
   if (!bracket || !players.length) {
     grid.innerHTML = DOMPurify.sanitize(

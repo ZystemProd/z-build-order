@@ -145,6 +145,7 @@ import {
   attachMatchActionHandlers,
   setVetoDependencies,
   refreshMatchInfoModalIfOpen,
+  refreshMatchInfoPresenceIfOpen,
   refreshVetoModalIfOpen,
 } from "./maps/veto.js";
 import { loadTournamentRegistry } from "./sync/persistence.js";
@@ -183,7 +184,19 @@ async function loadMapCatalog() {
 
 function syncFromRemote(incoming) {
   if (!incoming || typeof incoming !== "object") return;
-  if (incoming.lastUpdated && incoming.lastUpdated <= state.lastUpdated) return;
+  const incomingPresence = incoming.presence?.matchInfo || null;
+  const currentPresence = state?.presence?.matchInfo || null;
+  const presenceChanged =
+    incomingPresence &&
+    JSON.stringify(incomingPresence) !== JSON.stringify(currentPresence || {});
+
+  if (incoming.lastUpdated && incoming.lastUpdated <= state.lastUpdated) {
+    if (presenceChanged) {
+      setStateObj({ ...state, presence: { matchInfo: incomingPresence } });
+      refreshMatchInfoPresenceIfOpen?.();
+    }
+    return;
+  }
   setStateObj({
     ...defaultState,
     ...incoming,
@@ -275,6 +288,17 @@ function renderAll() {
   // Update seeding table
   renderSeedingTable(applySeeding(state.players || []));
 
+  if (currentTournamentMeta) {
+    populateSettingsPanelUI({
+      tournament: currentTournamentMeta,
+      setMapPoolSelection,
+      getDefaultMapPoolNames,
+      updateSettingsDescriptionPreview,
+      updateSettingsRulesPreview,
+      syncFormatFieldVisibility,
+    });
+  }
+
   // Render maps tab from current meta or default pool
   renderMapsTabUI(currentTournamentMeta, {
     mapPoolSelection,
@@ -310,6 +334,7 @@ function renderAll() {
         computeGroupStandings
       );
       bracketContainer.innerHTML = DOMPurify.sanitize(html);
+      attachMatchActionHandlers?.();
     } else {
       renderBracketView({
         bracket,
@@ -319,6 +344,7 @@ function renderAll() {
         getPlayersMap,
         attachMatchActionHandlers,
         computeGroupStandings,
+        currentUsername: getCurrentUsername?.() || "",
       });
     }
     attachMatchHoverHandlers();

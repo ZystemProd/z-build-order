@@ -16,6 +16,7 @@ import { renderChosenMaps as renderChosenMapsUI, updateMapButtons as updateMapBu
 import { renderMapPoolPicker as renderMapPoolPickerUI } from "./maps/pool.js";
 import { attachPlayerDetailHandlers } from "./playerDetail.js";
 import { ensureTestHarnessPanel } from "./ui/testHarness.js";
+import { enableDragScroll } from "./ui/dragScroll.js";
 import { initUserSettingsModal } from "../settingsModalInit.js";
 
 export function initTournamentPage({
@@ -232,6 +233,11 @@ export function initTournamentPage({
   jumpToBracket?.addEventListener("click", () => {
     switchTab("bracketTab");
     document.getElementById("bracketGrid")?.scrollIntoView({ behavior: "smooth" });
+  });
+
+  enableDragScroll(bracketGrid, {
+    ignoreSelector:
+      'a, button, input, select, textarea, label, summary, details, [contenteditable="true"], [data-no-drag], .name-text, .hover-info-container, .score-select, .row-actions',
   });
 
   playersTable?.addEventListener("change", (e) => {

@@ -32,6 +32,10 @@ export function populateSettingsPanel({
   syncFormatFieldVisibility,
 }) {
   if (!tournament) return;
+  const storedFormat =
+    (typeof localStorage !== "undefined" &&
+      localStorage.getItem("zboSettingsFormat")) ||
+    "";
   const nameInput = document.getElementById("settingsNameInput");
   const slugInput = document.getElementById("settingsSlugInput");
   const descInput = document.getElementById("settingsDescriptionInput");
@@ -59,7 +63,8 @@ export function populateSettingsPanel({
   if (descInput) descInput.value = tournament.description || "";
   if (rulesInput) rulesInput.value = tournament.rules || "";
   if (formatSelect)
-    formatSelect.value = tournament.format || "Double Elimination";
+    formatSelect.value =
+      tournament.format || storedFormat || "Double Elimination";
   if (maxInput) maxInput.value = tournament.maxPlayers || "";
   if (startInput) {
     startInput.value = tournament.startTime

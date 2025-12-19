@@ -42,9 +42,14 @@ export function bindSettingsEvents({
   );
   settingsRulesInput?.addEventListener("input", updateSettingsRulesPreview);
 
-  settingsFormatSelect?.addEventListener("change", () =>
-    syncFormatFieldVisibility("settings")
-  );
+  settingsFormatSelect?.addEventListener("change", () => {
+    try {
+      localStorage.setItem("zboSettingsFormat", settingsFormatSelect.value || "");
+    } catch (_) {
+      // ignore storage errors
+    }
+    syncFormatFieldVisibility("settings");
+  });
 
   saveSettingsBtn?.addEventListener("click", handleSaveSettings);
 }
