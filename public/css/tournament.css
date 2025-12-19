@@ -5,7 +5,7 @@
   --panel: #0f1421;
   --panel-2: #11182b;
   --stroke: #1f2737;
-  --line: rgba(255, 255, 255, 0.35);
+  --line: rgb(87 87 87);
   --glow: rgba(78, 213, 255, 0.35);
   --accent: #f5c542;
   --accent-2: #4ed5ff;
@@ -505,7 +505,6 @@ a {
 
 .match-card {
   border: 1px solid var(--stroke);
-  border-radius: 12px;
   padding: 8px;
   background: var(--panel-2);
   box-shadow: 0 6px 22px rgba(0, 0, 0, 0.25);
@@ -664,14 +663,13 @@ a {
 
 .match-card.tree {
   position: absolute;
-  border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
   background: var(--panel);
-  padding: 6px 8px;
+  padding: 6px 8px 6px 8px;
   overflow: visible;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr;
   grid-template-rows: auto auto;
   column-gap: 8px;
   row-gap: 4px;
@@ -686,10 +684,10 @@ a {
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
   background: var(--panel);
-  padding: 8px 10px;
-  overflow: hidden;
+  padding: 8px 34px 8px 10px;
+  overflow: visible;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr;
   grid-template-rows: auto auto;
   column-gap: 8px;
   row-gap: 4px;
@@ -721,16 +719,6 @@ a {
   font-weight: 700;
   color: var(--muted);
   font-size: 12px;
-}
-
-.match-card.group .match-info-col {
-  grid-row: 1 / span 2;
-  grid-column: 3;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  gap: 6px;
 }
 
 .match-card.group .row-actions {
@@ -821,10 +809,14 @@ a {
   min-width: 44px;
   width: 48px;
   padding: 3px;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.12);
   color: var(--text);
-  border: 1px solid var(--stroke);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-variant-numeric: tabular-nums;
 }
 
 .match-card.tree .row-actions,
@@ -849,16 +841,6 @@ a {
   font-weight: 700;
   color: var(--muted);
   font-size: 12px;
-}
-
-.match-card.tree .match-info-col {
-  grid-row: 1 / span 2;
-  grid-column: 3;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  gap: 6px;
 }
 
 .result-select,
@@ -892,18 +874,28 @@ a {
   gap: 6px;
 }
 
-.veto-summary {
-  padding: 4px 8px;
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
-}
-
 .match-card.tree .name,
 .match-card.group .name {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
+}
+
+.match-card.tree .row,
+.match-card.group .row {
+  min-width: 0;
+}
+
+.match-card.tree .name-text,
+.match-card.group .name-text {
+  display: inline-block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
 }
 
 .match-card.tree .seed-badge {
@@ -923,6 +915,46 @@ a {
 .row.highlight-player .name-text {
   color: var(--accent);
   font-weight: 700;
+}
+
+.hover-info-container {
+  position: absolute;
+  right: -38px;
+  top: 0;
+  height: 100%;
+  width: 38px;
+  border-radius: 0 10px 10px 0;
+  z-index: 2;
+  background: #1c7f9c;
+  border: 1px solid var(--stroke);
+  border-left-color: rgba(255, 255, 255, 0.12);
+  opacity: 0;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-left: 6px;
+  transition: opacity 140ms ease, background 140ms ease, border-color 140ms ease,
+    box-shadow 140ms ease;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  outline: none;
+}
+
+.match-card:hover .hover-info-container {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.hover-info-container:hover {
+  border-color: var(--accent-2);
+}
+
+.hover-info-container .info-icon {
+  width: 18px;
+  height: 18px;
+  opacity: 0.95;
 }
 
 .race-strip {
@@ -1570,6 +1602,219 @@ textarea:focus {
   width: 90%;
 }
 
+.match-info-modal {
+  max-width: 520px;
+  width: 90%;
+}
+
+.match-info-modal .modal-header {
+  position: relative;
+}
+
+.match-info-modal #closeMatchInfoModal {
+  position: absolute;
+  right: 0;
+  top: 0;
+  margin-top: 0;
+}
+
+.match-info-modal .form-actions {
+  justify-content: center;
+}
+
+.match-info-player-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.match-info-score {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.match-info-player-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.match-info-scoreboard {
+  margin-top: 10px;
+  border: 1px solid var(--stroke);
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.match-info-vetoes {
+  display: grid;
+  grid-template-columns: 34% 32% 34%;
+  gap: 10px;
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--stroke);
+}
+
+.match-info-veto-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.match-info-veto-spacer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.match-info-veto-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.match-info-veto-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+}
+
+.match-info-veto-list li {
+  padding: 0;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.match-info-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.match-info-table thead {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.match-info-table th,
+.match-info-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--stroke);
+}
+
+.match-info-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.match-info-player-col {
+  width: 34%;
+  color: var(--muted);
+  font-weight: 600;
+  text-align: center;
+}
+
+.match-info-map-col {
+  width: 32%;
+  color: var(--muted);
+  font-weight: 600;
+  text-align: center;
+}
+
+.match-info-result-col {
+  text-align: center;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: rgba(231, 233, 243, 0.9);
+}
+
+.match-info-map-cell {
+  text-align: center;
+  font-weight: 600;
+}
+
+.match-info-map-cell.is-eliminated {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.match-info-pick-cell {
+  text-align: center;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  user-select: none;
+  cursor: pointer;
+  border-radius: 10px;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+  position: relative;
+}
+
+.match-info-pick-cell.is-disabled {
+  cursor: default;
+  pointer-events: none;
+  opacity: 0.45;
+}
+
+.match-info-pick-cell.is-winner {
+  background: rgba(74, 222, 128, 0.14);
+  color: rgba(74, 222, 128, 0.95);
+}
+
+.match-info-pick-cell.is-loser {
+  background: rgba(255, 107, 107, 0.12);
+  color: rgba(255, 107, 107, 0.95);
+}
+
+.match-info-row[data-preview-winner="A"] .match-info-pick-cell[data-side="A"],
+.match-info-pick-cell[data-side="A"]:not(.is-winner):not(.is-loser):hover {
+  background: rgba(74, 222, 128, 0.12);
+}
+
+.match-info-row[data-preview-winner="A"] .match-info-pick-cell[data-side="B"] {
+  background: rgba(255, 107, 107, 0.1);
+}
+
+.match-info-row[data-preview-winner="B"] .match-info-pick-cell[data-side="B"],
+.match-info-pick-cell[data-side="B"]:not(.is-winner):not(.is-loser):hover {
+  background: rgba(74, 222, 128, 0.12);
+}
+
+.match-info-row[data-preview-winner="B"] .match-info-pick-cell[data-side="A"] {
+  background: rgba(255, 107, 107, 0.1);
+}
+
+.match-info-row[data-preview-winner="A"]
+  .match-info-pick-cell[data-side="A"]::after {
+  content: "W";
+  color: rgba(74, 222, 128, 0.92);
+}
+
+.match-info-row[data-preview-winner="A"]
+  .match-info-pick-cell[data-side="B"]::after {
+  content: "L";
+  color: rgba(255, 107, 107, 0.92);
+}
+
+.match-info-row[data-preview-winner="B"]
+  .match-info-pick-cell[data-side="B"]::after {
+  content: "W";
+  color: rgba(74, 222, 128, 0.92);
+}
+
+.match-info-row[data-preview-winner="B"]
+  .match-info-pick-cell[data-side="A"]::after {
+  content: "L";
+  color: rgba(255, 107, 107, 0.92);
+}
+
 .veto-modal .modal-header {
   display: flex;
   justify-content: space-between;
@@ -1590,6 +1835,12 @@ textarea:focus {
   border-radius: 999px;
   color: var(--text);
   font-size: 13px;
+}
+
+.selected-maps .pill.muted {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--muted);
 }
 
 .tournament-map-card.vetoed {

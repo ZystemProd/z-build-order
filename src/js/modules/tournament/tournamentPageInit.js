@@ -50,6 +50,7 @@ export function initTournamentPage({
   updatePlayerPoints,
   removePlayer,
   updateMatchScore,
+  saveState,
   setTestBracketCount,
   cycleTestBracketCount,
   resetTournament,
@@ -302,6 +303,8 @@ export function initTournamentPage({
     getPlayersMap,
     getDefaultMapPoolNames,
     getMapByName,
+    updateMatchScore,
+    saveState,
   });
 
   // Wire test harness buttons if callbacks provided

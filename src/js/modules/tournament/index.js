@@ -7,11 +7,19 @@ import {
   initializeAuthUI,
 } from "../../../app.js";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, setDoc, getDoc, collection, serverTimestamp } from "firebase/firestore";
+import {
+  doc,
+  setDoc,
+  getDoc,
+  collection,
+  serverTimestamp,
+  onSnapshot,
+} from "firebase/firestore";
 import { showToast } from "../toastHandler.js";
 import DOMPurify from "dompurify";
 import {
   TOURNAMENT_COLLECTION,
+  TOURNAMENT_STATE_COLLECTION,
   MAPS_JSON_URL,
   FALLBACK_LADDER_MAPS,
   defaultState,
@@ -136,6 +144,8 @@ import {
   showVetoInfo,
   attachMatchActionHandlers,
   setVetoDependencies,
+  refreshMatchInfoModalIfOpen,
+  refreshVetoModalIfOpen,
 } from "./maps/veto.js";
 import { loadTournamentRegistry } from "./sync/persistence.js";
 import { initTournamentPage } from "./tournamentPageInit.js";
@@ -180,8 +190,38 @@ function syncFromRemote(incoming) {
     players: applySeeding(incoming.players || []),
     pointsLedger: incoming.pointsLedger || {},
     activity: incoming.activity || [],
+    bracket: deserializeBracket(incoming.bracket),
   });
   renderAll();
+  refreshMatchInfoModalIfOpen?.();
+  refreshVetoModalIfOpen?.();
+}
+
+let unsubscribeRemoteState = null;
+function subscribeTournamentStateRemote(slug) {
+  try {
+    unsubscribeRemoteState?.();
+  } catch (_) {
+    // ignore
+  }
+  unsubscribeRemoteState = null;
+  if (!slug) return;
+
+  const ref = doc(collection(db, TOURNAMENT_STATE_COLLECTION), slug);
+  unsubscribeRemoteState = onSnapshot(
+    ref,
+    (snap) => {
+      if (!snap.exists()) return;
+      const data = snap.data() || {};
+      syncFromRemote({
+        ...data,
+        lastUpdated: data.lastUpdated?.toMillis ? data.lastUpdated.toMillis() : data.lastUpdated,
+      });
+    },
+    (err) => {
+      console.warn("Remote tournament state listener error", err);
+    }
+  );
 }
 
 const syncFormatFieldVisibility = syncFormatFieldVisibilityUI;
@@ -561,6 +601,7 @@ async function enterTournament(slug) {
     saveState,
     renderAll
   );
+  subscribeTournamentStateRemote(slug);
   const landingView = document.getElementById("landingView");
   const tournamentView = document.getElementById("tournamentView");
   if (landingView) landingView.style.display = "none";
@@ -569,6 +610,12 @@ async function enterTournament(slug) {
 }
 
 async function showLanding() {
+  try {
+    unsubscribeRemoteState?.();
+  } catch (_) {
+    // ignore
+  }
+  unsubscribeRemoteState = null;
   setIsAdminState(false);
   updateAdminVisibility();
   const landingView = document.getElementById("landingView");
@@ -824,6 +871,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     updatePlayerPoints,
     removePlayer,
     updateMatchScore,
+    saveState,
     // test harness hooks
     setTestBracketCount,
     cycleTestBracketCount,
@@ -1290,6 +1338,7 @@ async function handleRegistration(event) {
     clan: clanName === "None" ? "" : clanName,
     clanAbbreviation: clanAbbreviation || "",
     pulseName: pulseProfile?.accountName || "",
+    uid: auth.currentUser?.uid || null,
   });
 
   const hasCompletedMatches = bracketHasResults();

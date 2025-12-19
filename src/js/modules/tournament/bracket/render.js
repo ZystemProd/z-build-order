@@ -10,6 +10,12 @@ import {
   raceClassName,
 } from "./renderUtils.js";
 
+const INFO_ICON_SVG = `<svg class="info-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+  <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"></circle>
+  <path d="M12 10.5v6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+  <circle cx="12" cy="7.5" r="1.25" fill="currentColor"></circle>
+</svg>`;
+
 function displayValueFor(match, idx) {
   if (match.walkover === "a") {
     return idx === 0 ? "w/o" : match.scores?.[1] ?? 0;
@@ -78,17 +84,6 @@ export function renderMatchCard(match, lookup, playersById) {
   const valB = displayValueFor(match, 1);
   const canVeto = Boolean(pA && pB && match.status !== "complete");
   const bestOf = getBestOfForMatch(match);
-  const vetoData = state.matchVetoes?.[match.id] || null;
-  const vetoSummary = vetoData?.maps?.length
-    ? `<div class="veto-summary">${vetoData.maps
-        .map(
-          (m, idx) =>
-            `<span class="pill">${idx + 1}. ${escapeHtml(m.map)} (${escapeHtml(
-              m.picker || "Player"
-            )})</span>`
-        )
-        .join("")}</div>`
-    : "";
   const selectValA = getSelectValue(match, 0, bestOf);
   const selectValB = getSelectValue(match, 1, bestOf);
   const hasPlayers = Boolean(pA && pB);
@@ -99,9 +94,6 @@ export function renderMatchCard(match, lookup, playersById) {
       <span>${statusTag}</span>
       <div class="match-actions">
         <span class="badge muted">Bo${bestOf}</span>
-        <button class="icon-btn info-btn" data-match-id="${
-          match.id
-        }" aria-label="View map picks">i</button>
       </div>
     </div>
     ${renderPlayerRow(pA, selectValA, "A", bestOf)}
@@ -117,7 +109,9 @@ export function renderMatchCard(match, lookup, playersById) {
           : `<span class="helper">Waiting for players</span>`
       }
     </div>
-    ${vetoSummary}
+    <button class="hover-info-container info-btn" data-match-id="${
+      match.id
+    }" aria-label="Open map veto">${INFO_ICON_SVG}</button>
   </div>`;
 
   return DOMPurify.sanitize(html);
@@ -166,7 +160,7 @@ export function renderScoreOptions(current, bestOf = 3) {
 export function clampScoreSelectOptions() {
   if (!state?.bracket) return;
   const lookup = getMatchLookup(state.bracket);
-  document.querySelectorAll(".score-select").forEach((sel) => {
+  document.querySelectorAll("select.score-select").forEach((sel) => {
     const matchId = sel.dataset.matchId;
     const match = lookup.get(matchId);
     const bestOf = getBestOfForMatch(match || { bracket: "winners", round: 1 });
@@ -212,19 +206,11 @@ export function renderSimpleMatch(
   const bestOf = getBestOfForMatch(match);
   const selectValA = getSelectValue(match, 0, bestOf);
   const selectValB = getSelectValue(match, 1, bestOf);
+  const scoreLabelA =
+    String(selectValA).toUpperCase() === "W" ? "w/o" : String(selectValA ?? 0);
+  const scoreLabelB =
+    String(selectValB).toUpperCase() === "W" ? "w/o" : String(selectValB ?? 0);
   const canVeto = Boolean(pA && pB && match.status !== "complete");
-  const vetoData = state.matchVetoes?.[match.id] || null;
-  const summary =
-    vetoData?.maps?.length && showScores
-      ? `<div class="veto-summary">${vetoData.maps
-          .map(
-            (m, idx) =>
-              `<span class="pill">${idx + 1}. ${escapeHtml(
-                m.map
-              )} (${escapeHtml(m.picker || "Player")})</span>`
-          )
-          .join("")}</div>`
-      : "";
   const baseStyle = isTreeLayout
     ? `top:${y}px; left:${x}px; width:${w}px; height:${h}px; ${extraStyle}`
     : extraStyle;
@@ -244,13 +230,11 @@ export function renderSimpleMatch(
     aName
   )}</span></span>
       <div class="row-actions">
-        <select class="score-select ${
+        <div class="score-select score-display ${
           match.winnerId === pA?.id ? "winner" : ""
-        }" name="score-${match.id}-A" data-match-id="${
-    match.id
-  }" data-player-idx="0" ${showScores ? "" : 'style="display:none;"'}>
-          ${renderScoreOptions(selectValA, bestOf)}
-        </select>
+        }" data-match-id="${match.id}" data-player-idx="0" ${
+    showScores ? "" : 'style="display:none;"'
+  }>${escapeHtml(scoreLabelA)}</div>
       </div>
     </div>
     <div class="row ${
@@ -262,21 +246,16 @@ export function renderSimpleMatch(
     bName
   )}</span></span>
       <div class="row-actions">
-        <select class="score-select ${
+        <div class="score-select score-display ${
           match.winnerId === pB?.id ? "winner" : ""
-        }" name="score-${match.id}-B" data-match-id="${
-    match.id
-  }" data-player-idx="1" ${showScores ? "" : 'style="display:none;"'}>
-          ${renderScoreOptions(selectValB, bestOf)}
-        </select>
+        }" data-match-id="${match.id}" data-player-idx="1" ${
+    showScores ? "" : 'style="display:none;"'
+  }>${escapeHtml(scoreLabelB)}</div>
       </div>
     </div>
-    <div class="match-info-col">
-      <button class="icon-btn info-btn" data-match-id="${
-        match.id
-      }" aria-label="View map picks">i</button>
-    </div>
-    ${summary}
+    <button class="hover-info-container info-btn" data-match-id="${
+      match.id
+    }" aria-label="Open map veto">${INFO_ICON_SVG}</button>
   </div>`;
 
   return DOMPurify.sanitize(html);

@@ -925,6 +925,53 @@
       </div>
     </div>
   </div>
+  <!-- Match Info Modal -->
+  <div id="matchInfoModal" class="modal" style="display:none;">
+    <div class="modal-content match-info-modal">
+      <div class="modal-header">
+        <h3 id="matchInfoTitle">Match</h3>
+        <button class="icon-btn" id="closeMatchInfoModal" aria-label="Close match info modal">x</button>
+      </div>
+      <p class="helper" id="matchInfoBestOf"></p>
+      <div class="match-info-scoreboard">
+        <table class="match-info-table">
+          <thead>
+            <tr>
+              <th class="match-info-player-col">
+                <div class="match-info-player-head">
+                  <div id="matchInfoLeftScore" class="match-info-score">0</div>
+                  <div id="matchInfoLeftName" class="match-info-player-name"></div>
+                </div>
+              </th>
+              <th class="match-info-map-col">Map</th>
+              <th class="match-info-player-col">
+                <div class="match-info-player-head">
+                  <div id="matchInfoRightScore" class="match-info-score">0</div>
+                  <div id="matchInfoRightName" class="match-info-player-name"></div>
+                </div>
+              </th>
+            </tr>
+          </thead>
+          <tbody id="matchInfoMapRows"></tbody>
+        </table>
+        <div class="match-info-vetoes">
+          <div class="match-info-veto-col">
+            <div class="match-info-veto-title">Vetoes</div>
+            <ul id="matchInfoLeftVetoes" class="match-info-veto-list"></ul>
+          </div>
+          <div class="match-info-veto-spacer" aria-hidden="true"></div>
+          <div class="match-info-veto-col">
+            <div class="match-info-veto-title">Vetoes</div>
+            <ul id="matchInfoRightVetoes" class="match-info-veto-list"></ul>
+          </div>
+        </div>
+      </div>
+      <div class="form-actions" style="margin-top:12px;">
+        <button class="cta primary" id="openMapVetoBtn">Map veto</button>
+      </div>
+    </div>
+  </div>
+
   <div id="playerDetailModal" class="modal" style="display:none;">
     <div class="modal-content player-detail-card">
       <button class="modal-close-button" id="closePlayerDetailModal" aria-label="Close player details">&times;</button>

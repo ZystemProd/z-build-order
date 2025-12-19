@@ -81,6 +81,8 @@ const db = initializeFirestore(app, {
         }),
 });
 const provider = new GoogleAuthProvider();
+const switchAccountProvider = new GoogleAuthProvider();
+switchAccountProvider.setCustomParameters({ prompt: "select_account" });
 
 const appCheck = initializeAppCheck(app, {
   provider: new ReCaptchaV3Provider("6LcBBWsrAAAAALLmBNIhl-zKPa8KRj8mXMldoKbN"),
@@ -1804,13 +1806,23 @@ function closeUserMenu() {
   }
 }
 
+let authPopupInProgress = false;
+
 export function handleSignIn() {
+  if (authPopupInProgress) return;
+  authPopupInProgress = true;
   signInWithPopup(auth, provider)
     .then(() => {
       initializeAuthUI();
     })
     .catch((error) => {
+      if (error?.code === "auth/cancelled-popup-request") return;
+      if (error?.code === "auth/popup-closed-by-user") return;
       console.error("❌ Sign in error:", error);
+      showToast("Sign-in failed. Please try again.", "error");
+    })
+    .finally(() => {
+      authPopupInProgress = false;
     });
 }
 
@@ -1829,13 +1841,20 @@ export function handleSignOut() {
 
 export async function handleSwitchAccount() {
   try {
+    if (authPopupInProgress) return;
+    authPopupInProgress = true;
     await signOut(auth);
-    const result = await signInWithPopup(auth, provider);
+    const result = await signInWithPopup(auth, switchAccountProvider);
     initializeAuthUI();
     closeUserMenu();
     window.location.reload();
   } catch (err) {
+    if (err?.code === "auth/cancelled-popup-request") return;
+    if (err?.code === "auth/popup-closed-by-user") return;
     console.error("❌ Error switching accounts:", err);
+    showToast("Failed to switch account. Please try again.", "error");
+  } finally {
+    authPopupInProgress = false;
   }
 }
 
