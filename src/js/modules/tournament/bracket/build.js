@@ -10,7 +10,7 @@ import {
   safeWinnerSource,
   safeLoserSource,
 } from "./lookup.js";
-import { LOSERS_TEMPLATES } from "../../bracketLosersTemplates.js";
+import { WINNERS_TEMPLATES, LOSERS_TEMPLATES } from "../../bracketTemplates.js";
 
 export function applySeeding(players) {
   const seeded = [...players].sort((a, b) => {
@@ -43,9 +43,28 @@ export function buildEliminationBracket(players, { includeLosers = true } = {}) 
   }
 
   const seedMap = new Map(players.map((p) => [p.seed, p]));
+  const baseSize = computeBaseSize(total);
+  const numPlayIns = Math.max(0, total - baseSize);
+  const winnersTemplate = WINNERS_TEMPLATES[total];
+  if (winnersTemplate) {
+    const winners = buildWinnersFromTemplate(winnersTemplate, seedMap);
+    const losers = includeLosers
+      ? buildLosersBracket(winners, baseSize, total, numPlayIns)
+      : [];
+    const finals =
+      includeLosers && losers.length
+        ? createMatch(
+            "finals",
+            1,
+            1,
+            winnerSource(winners[winners.length - 1][0]),
+            winnerSource(losers[losers.length - 1][0])
+          )
+        : null;
+    return { winners, losers, finals, seedOrder };
+  }
 
   if (total <= 4) {
-    const baseSize = Math.max(2, pow2(total));
     const seedPositions = generateSeedPositions(baseSize);
     const placedPlayers = seedPositions.map(
       (seed) => seedMap.get(seed) || null
@@ -91,7 +110,7 @@ export function buildEliminationBracket(players, { includeLosers = true } = {}) 
     }
 
     const losers = includeLosers
-      ? buildLosersBracket(winners, baseSize, total, 0)
+      ? buildLosersBracket(winners, baseSize, total, numPlayIns)
       : [];
     const finals =
       includeLosers && losers.length
@@ -106,18 +125,6 @@ export function buildEliminationBracket(players, { includeLosers = true } = {}) 
 
     return { winners, losers, finals, seedOrder };
   }
-
-  const lowerPow = 1 << Math.floor(Math.log2(total));
-  const upperPow = lowerPow * 2;
-  let baseSize;
-  const lowerGap = total - lowerPow;
-  const upperGap = upperPow - total;
-  if (total === 12 || total === 13 || total === 14 || total === 15) {
-    baseSize = lowerPow;
-  } else {
-    baseSize = lowerGap < upperGap ? lowerPow : upperPow;
-  }
-  const numPlayIns = Math.max(0, total - baseSize);
 
   const seedPositions = generateSeedPositions(baseSize);
 
@@ -381,6 +388,13 @@ function buildLosersFromTemplate(winners, template) {
       const srcA = resolveRef(mtpl.a);
       const srcB = resolveRef(mtpl.b);
       const match = createMatch("losers", rIndex + 1, mIndex + 1, srcA, srcB);
+      // Ensure lower bracket matches are tightly packed vertically.
+      // Use explicit template slot when provided; otherwise default to dense ordering by index.
+      if (Number.isFinite(mtpl.slot)) {
+        match.displaySlot = mtpl.slot;
+      } else {
+        match.displaySlot = mIndex;
+      }
       round.push(match);
       lbMatches[rIndex][mIndex] = match;
     });
@@ -503,6 +517,72 @@ export function generateSeedPositions(size) {
 export function pow2(n) {
   if (n <= 1) return 1;
   return 1 << Math.ceil(Math.log2(n));
+}
+
+export function computeBaseSize(total) {
+  if (!Number.isFinite(total) || total <= 0) return 0;
+  if (total <= 4) {
+    return Math.max(2, pow2(total));
+  }
+  // start.gg-style: 31 entrants uses a 32-slot core (single bye), not 16-slot core with 15 play-ins.
+  if (total === 31) {
+    return 32;
+  }
+  // For 17-31 entrants we use a 16-slot core with play-ins (start.gg-style),
+  // not a 32-slot core with many byes.
+  if (total > 16 && total < 32) {
+    return 16;
+  }
+  const lowerPow = 1 << Math.floor(Math.log2(total));
+  const upperPow = lowerPow * 2;
+  const lowerGap = total - lowerPow;
+  const upperGap = upperPow - total;
+  if ([12, 13, 14, 15].includes(total)) {
+    return lowerPow;
+  }
+  // When exactly between two powers of two, prefer the smaller base size
+  // so brackets like 24 players use a 16-slot core with play-ins instead of 32 with many byes.
+  return lowerGap <= upperGap ? lowerPow : upperPow;
+}
+
+export function buildWinnersFromTemplate(template, seedMap) {
+  const rounds = [];
+  template.forEach((roundTpl, rIdx) => {
+    const matches = [];
+    roundTpl.forEach((mtpl, mIdx) => {
+      const srcA = resolveTemplateSource(mtpl.a, rounds, seedMap);
+      const srcB = resolveTemplateSource(mtpl.b, rounds, seedMap);
+      const match = createMatch(
+        "winners",
+        rIdx + 1,
+        matches.length + 1,
+        srcA,
+        srcB
+      );
+      if (Number.isFinite(mtpl.slot)) {
+        match.displaySlot = mtpl.slot;
+      }
+      matches.push(match);
+    });
+    rounds.push(matches);
+  });
+  return rounds;
+}
+
+function resolveTemplateSource(source, rounds, seedMap) {
+  if (!source) return null;
+  if (source.type === "player") {
+    const player = seedMap.get(source.seed);
+    return playerSource(player);
+  }
+  if (source.type === "match") {
+    const match = rounds[source.round]?.[source.match];
+    if (!match) return null;
+    return source.outcome === "loser"
+      ? loserSource(match)
+      : winnerSource(match);
+  }
+  return null;
 }
 
 export function createMatch(bracket, round, index, sourceA, sourceB, bestOf = null) {

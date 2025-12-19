@@ -1,6 +1,6 @@
 import DOMPurify from "dompurify";
 import { state, currentTournamentMeta, defaultBestOf } from "../state.js";
-import { getMatchLookup, resolveParticipants } from "./lookup.js";
+import { getAllMatches, getMatchLookup, resolveParticipants } from "./lookup.js";
 import { generateSeedPositions } from "./build.js";
 import {
   escapeHtml,
@@ -18,6 +18,44 @@ function displayValueFor(match, idx) {
     return idx === 1 ? "w/o" : match.scores?.[0] ?? 0;
   }
   return match.scores?.[idx] ?? 0;
+}
+
+let matchLetterMap = new Map();
+
+function indexToLetters(idx) {
+  const alphabet = 26;
+  let n = idx;
+  let out = "";
+  do {
+    out = String.fromCharCode(65 + (n % alphabet)) + out;
+    n = Math.floor(n / alphabet) - 1;
+  } while (n >= 0);
+  return out;
+}
+
+function buildMatchLetters(bracket) {
+  matchLetterMap = new Map();
+  if (!bracket) return;
+  const priority = { winners: 0, losers: 1, finals: 2, group: 3 };
+  const all = getAllMatches(bracket) || [];
+  all
+    .slice()
+    .sort((a, b) => {
+      const pa = priority[a.bracket] ?? 99;
+      const pb = priority[b.bracket] ?? 99;
+      if (pa !== pb) return pa - pb;
+      const ra = a.round || 0;
+      const rb = b.round || 0;
+      if (ra !== rb) return ra - rb;
+      const ia = a.index || 0;
+      const ib = b.index || 0;
+      return ia - ib;
+    })
+    .forEach((m, idx) => matchLetterMap.set(m.id, indexToLetters(idx)));
+}
+
+function getMatchLabel(match) {
+  return matchLetterMap.get(match.id) || match.id;
 }
 
 export function renderMatchCard(match, lookup, playersById) {
@@ -57,7 +95,7 @@ export function renderMatchCard(match, lookup, playersById) {
 
   const html = `<div class="${cls.join(" ")}" data-match-id="${match.id}">
     <div class="match-meta">
-      <span>${match.id}</span>
+      <span>${getMatchLabel(match)}</span>
       <span>${statusTag}</span>
       <div class="match-actions">
         <span class="badge muted">Bo${bestOf}</span>
@@ -187,15 +225,11 @@ export function renderSimpleMatch(
           )
           .join("")}</div>`
       : "";
-  const matchNumber = parseMatchNumber(match.id);
   const baseStyle = isTreeLayout
     ? `top:${y}px; left:${x}px; width:${w}px; height:${h}px; ${extraStyle}`
     : extraStyle;
 
-  const matchNumberLabel =
-    matchNumber !== null
-      ? matchNumber
-      : escapeHtml(prefix ? `${prefix}${match.id}` : match.id);
+  const matchNumberLabel = escapeHtml(getMatchLabel(match));
 
   const html = `<div class="${cardClass}" data-match-id="${
     match.id
@@ -337,41 +371,141 @@ export function layoutBracketSection(
 
   const baseStep = CARD_HEIGHT + V_GAP;
 
-  // Parent-aware slot assignment
+  const matchById = new Map();
+  orderedRounds.forEach((round) => round.forEach((m) => matchById.set(m.id, m)));
+
+  const maxMatches = orderedRounds.reduce(
+    (acc, round) => Math.max(acc, round.length || 0),
+    0
+  );
+  const baseSize = Math.max(2, maxMatches * 2);
+  const seedOrder = generateSeedPositions(baseSize);
+  const seedToLeafIdx = new Map();
+  seedOrder.forEach((seed, idx) => seedToLeafIdx.set(seed, idx));
+
+  const spanMemo = new Map();
+  let fallbackLeaf = baseSize;
+
+  const spanForSource = (src) => {
+    if (!src) return null;
+    if (src.type === "match" && src.matchId) {
+      return spanForMatch(src.matchId);
+    }
+    if (src.type === "player") {
+      const player = playersById.get(src.playerId || "");
+      const seed = player?.seed;
+      const leaf = Number.isFinite(seed) && seedToLeafIdx.has(seed)
+        ? seedToLeafIdx.get(seed)
+        : fallbackLeaf++;
+      return { min: leaf, max: leaf };
+    }
+    return null;
+  };
+
+  const spanForMatch = (matchId) => {
+    if (spanMemo.has(matchId)) return spanMemo.get(matchId);
+    const match = matchById.get(matchId);
+    if (!match) {
+      const leaf = fallbackLeaf++;
+      const span = { min: leaf, max: leaf };
+      spanMemo.set(matchId, span);
+      return span;
+    }
+    if (Number.isFinite(match.displaySlot)) {
+      const slot = match.displaySlot;
+      const span = { min: slot, max: slot };
+      spanMemo.set(matchId, span);
+      return span;
+    }
+    const spans = (match.sources || [])
+      .map((src) => spanForSource(src))
+      .filter(Boolean);
+    const span =
+      spans.length === 0
+        ? (() => {
+            const leaf = fallbackLeaf++;
+            return { min: leaf, max: leaf };
+          })()
+        : {
+            min: Math.min(...spans.map((s) => s.min)),
+            max: Math.max(...spans.map((s) => s.max)),
+          };
+    spanMemo.set(matchId, span);
+    return span;
+  };
+
   const slotMap = new Map();
-  // Determine used slot range for centering
-  const usedSlots = Array.from(new Set(Array.from(slotMap.values()).filter((v) => Number.isFinite(v))));
-  const maxSlot = usedSlots.length ? Math.max(...usedSlots) : 0;
-  const sectionHeight = (maxSlot + 1) * baseStep;
+  orderedRounds.forEach((round) => {
+    round.forEach((match) => {
+      const span = spanForMatch(match.id) || { min: 0, max: 0 };
+      const slot = (span.min + span.max) / 2;
+      slotMap.set(match.id, slot);
+    });
+  });
+
+  // For lower bracket layouts, remap slots densely to remove large vertical gaps.
+  if (titlePrefix === "Lower" && slotMap.size) {
+    const uniqueSlots = Array.from(new Set(slotMap.values())).sort((a, b) => a - b);
+    const remap = new Map(uniqueSlots.map((s, idx) => [s, idx]));
+    slotMap.forEach((slot, id) => {
+      slotMap.set(id, remap.get(slot) ?? slot);
+    });
+  }
+
+  const allSlots = Array.from(slotMap.values());
+  const minSlot =
+    allSlots.length && Number.isFinite(Math.min(...allSlots))
+      ? Math.min(...allSlots)
+      : 0;
 
   orderedRounds.forEach((round, rIdx) => {
     const x = offsetX + rIdx * (CARD_WIDTH + H_GAP);
-    if (!round.length) return;
+    const sorted = [...round].sort((a, b) => {
+      const sa = slotMap.get(a.id) ?? 0;
+      const sb = slotMap.get(b.id) ?? 0;
+      if (sa !== sb) return sa - sb;
+      return a.index - b.index;
+    });
 
-    round.forEach((match, mIdx) => {
-      const sourceSlots = (match.sources || [])
-        .map((src) => {
-          if (!src) return null;
-          if (src.type === "match") {
-            return slotMap.get(src.matchId) ?? null;
-          }
-          return null;
-        })
-        .filter((v) => Number.isFinite(v));
+    const perRoundUsed = new Map();
 
-      let slot;
-      if (sourceSlots.length === 1) {
-        slot = sourceSlots[0];
-      } else if (sourceSlots.length >= 2) {
-        slot =
-          sourceSlots.reduce((sum, v) => sum + v, 0) / sourceSlots.length;
-      } else {
-        slot = mIdx;
+    sorted.forEach((match) => {
+      // Finals: lock to the first parent’s vertical position for a straight connector
+      if (match.bracket === "finals") {
+        const parentId =
+          (match.sources || [])
+            .find((src) => src && src.type === "match" && src.matchId)?.matchId ||
+          null;
+        const parentPos = parentId ? positions.get(parentId) : null;
+        const y = parentPos ? parentPos.y : 0;
+        positions.set(match.id, { x, y });
+        matchCenters.set(match.id, y + CARD_HEIGHT / 2);
+        maxY = Math.max(maxY, y + CARD_HEIGHT);
+        maxX = Math.max(maxX, x + CARD_WIDTH);
+        return;
       }
 
-      slotMap.set(match.id, slot);
+      const parentSlots = (match.sources || [])
+        .filter((src) => src && src.type === "match" && src.matchId)
+        .map((src) => slotMap.get(src.matchId))
+        .filter((v) => Number.isFinite(v));
+      const origSlot = slotMap.get(match.id) ?? 0;
+      let baseSlot = origSlot;
+      if (parentSlots.length === 1) {
+        baseSlot = parentSlots[0];
+        slotMap.set(match.id, baseSlot);
+      }
+      if (parentSlots.length === 2) {
+        const avg = (parentSlots[0] + parentSlots[1]) / 2;
+        baseSlot = avg;
+        slotMap.set(match.id, baseSlot);
+      }
 
-      const y = slot * baseStep + (sectionHeight - (maxSlot + 1) * baseStep) / 2;
+      const usedCount = perRoundUsed.get(baseSlot) || 0;
+      perRoundUsed.set(baseSlot, usedCount + 1);
+      const slot = baseSlot + usedCount * 0.5;
+      slotMap.set(match.id, slot);
+      const y = (slot - minSlot) * baseStep;
       positions.set(match.id, { x, y });
       matchCenters.set(match.id, y + CARD_HEIGHT / 2);
       maxY = Math.max(maxY, y + CARD_HEIGHT);
@@ -864,6 +998,8 @@ export function renderBracketView({
     );
     return;
   }
+
+  buildMatchLetters(bracket);
 
   const isSingleElimination = format.toLowerCase().startsWith("single");
   const isRoundRobin = format.toLowerCase().includes("round robin");

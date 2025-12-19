@@ -24,6 +24,7 @@ export const defaultState = {
   needsReseed: false,
   activity: [],
   lastUpdated: Date.now(),
+  bracketLayoutVersion: 1,
   matchVetoes: {},
 };
 

@@ -309,6 +309,9 @@ export function initTournamentPage({
     .getElementById("testBracketStart")
     ?.addEventListener("click", () => setTestBracketCount?.(16));
   document
+    .getElementById("testBracketStart32")
+    ?.addEventListener("click", () => setTestBracketCount?.(32));
+  document
     .getElementById("testBracketPrev")
     ?.addEventListener("click", () => cycleTestBracketCount?.(-1));
   document

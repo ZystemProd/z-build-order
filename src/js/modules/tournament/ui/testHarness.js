@@ -20,8 +20,33 @@ function buildTestPlayers(count) {
     "NeonViper",
     "Astra",
     "GrimNova",
-    "StormRider",
     "LunarEdge",
+    "Pulsefire",
+    "VoidReaper",
+    "IronWarden",
+    "Frostbyte",
+    "WarpDrive",
+    "StormBreaker",
+    "Obsidian",
+    "Blazeheart",
+    "RiftWalker",
+    "Ironclad",
+    "Starforge",
+    "CryoCoreX",
+    "Tempest",
+    "Halcyon",
+    "Wraith",
+    "Aurora",
+    "Thunderstrike",
+    "Falconer",
+    "Glacier",
+    "Pyre",
+    "Volt",
+    "Spectre",
+    "Onyx",
+    "Nimbus",
+    "DriftKing",
+    "Arclight",
   ];
   const races = ["Zerg", "Protoss", "Terran", "Random"];
   const createdAt = Date.now();
@@ -50,7 +75,7 @@ function updateTestHarnessLabel() {
 }
 
 function setTestBracketCount(count) {
-  const clamped = Math.max(1, Math.min(16, count));
+  const clamped = Math.max(1, Math.min(32, count));
   bracketTestHarness.active = true;
   bracketTestHarness.count = clamped;
   const testPlayers = buildTestPlayers(clamped);
@@ -99,6 +124,7 @@ export function ensureTestHarnessPanel() {
   panel.innerHTML = `
     <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
       <button class="cta small ghost" id="testBracketStart">Start 1-16 Test</button>
+      <button class="cta small ghost" id="testBracketStart32">Start 17-32 Test</button>
       <button class="cta small ghost" id="testBracketPrev">Prev</button>
       <button class="cta small ghost" id="testBracketNext">Next</button>
       <span class="helper" id="testBracketLabel">Test harness not started</span>
@@ -116,6 +142,9 @@ export function bindTestHarnessButtons() {
   document
     .getElementById("testBracketStart")
     ?.addEventListener("click", () => setTestBracketCount(16));
+  document
+    .getElementById("testBracketStart32")
+    ?.addEventListener("click", () => setTestBracketCount(32));
   document
     .getElementById("testBracketPrev")
     ?.addEventListener("click", () => cycleTestBracketCount(-1));

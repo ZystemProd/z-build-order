@@ -149,6 +149,7 @@ import {
   setRegisteredTournament,
 } from "./sync/persistence.js";
 const renderMapPoolPicker = renderMapPoolPickerUI;
+const CURRENT_BRACKET_LAYOUT_VERSION = 54;
 function renderMarkdown(text = "") {
   return DOMPurify.sanitize(text || "").replace(/\n/g, "<br>");
 }
@@ -244,6 +245,15 @@ function renderAll() {
   const bracketContainer = document.getElementById("bracketGrid");
   const bracket = state.bracket;
   const playersArr = state.players || [];
+  const layoutVersion = state.bracketLayoutVersion || 1;
+  const needsLayoutUpgrade =
+    bracket &&
+    layoutVersion < CURRENT_BRACKET_LAYOUT_VERSION &&
+    !bracketHasRecordedResults(bracket);
+  if (needsLayoutUpgrade) {
+    rebuildBracket(true, "Updated bracket layout");
+    return;
+  }
   if (bracketContainer && bracket) {
     const format = currentTournamentMeta?.format || "Tournament";
     let lookup = getMatchLookup(bracket);
@@ -301,6 +311,23 @@ function bracketHasResults() {
   } catch (_) {
     return false;
   }
+}
+
+function bracketHasRecordedResults(bracket) {
+  if (!bracket) return false;
+  try {
+    const lookup = getMatchLookup(bracket);
+    for (const match of lookup.values()) {
+      if (!match) continue;
+      if (match.status === "complete") return true;
+      if (match.winnerId || match.walkover) return true;
+      const scores = match.scores || [];
+      if ((scores[0] || 0) + (scores[1] || 0) > 0) return true;
+    }
+  } catch (_) {
+    return false;
+  }
+  return false;
 }
 
 function createOrUpdatePlayer(data) {
@@ -375,7 +402,12 @@ function rebuildBracket(force = false, reason = "") {
     currentTournamentMeta || {},
     isRoundRobin
   );
-  saveState({ players: seededPlayers, bracket, needsReseed: false });
+    saveState({
+      players: seededPlayers,
+      bracket,
+      needsReseed: false,
+      bracketLayoutVersion: CURRENT_BRACKET_LAYOUT_VERSION,
+    });
   if (reason) addActivity(reason);
   renderAll();
 }
@@ -1105,7 +1137,7 @@ function updateTestHarnessLabel() {
 }
 
 function setTestBracketCount(count) {
-  const clamped = Math.max(1, Math.min(16, count));
+  const clamped = Math.max(1, Math.min(32, count));
   bracketTestHarness.active = true;
   bracketTestHarness.count = clamped;
   const testPlayers = buildTestPlayers(clamped);
