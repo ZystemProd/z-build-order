@@ -1807,10 +1807,31 @@ function closeUserMenu() {
 }
 
 let authPopupInProgress = false;
+function scheduleAuthPopupReset() {
+  const resetIfIdle = () => {
+    if (authPopupInProgress && !auth.currentUser) {
+      authPopupInProgress = false;
+    }
+  };
+  const onFocus = () => {
+    window.removeEventListener("focus", onFocus);
+    setTimeout(resetIfIdle, 150);
+  };
+  const onVisibility = () => {
+    if (document.hidden) return;
+    document.removeEventListener("visibilitychange", onVisibility);
+    setTimeout(resetIfIdle, 150);
+  };
+  window.addEventListener("focus", onFocus);
+  document.addEventListener("visibilitychange", onVisibility);
+
+  setTimeout(resetIfIdle, 4000);
+}
 
 export function handleSignIn() {
   if (authPopupInProgress) return;
   authPopupInProgress = true;
+  scheduleAuthPopupReset();
   signInWithPopup(auth, provider)
     .then(() => {
       initializeAuthUI();
@@ -1843,6 +1864,7 @@ export async function handleSwitchAccount() {
   try {
     if (authPopupInProgress) return;
     authPopupInProgress = true;
+    scheduleAuthPopupReset();
     await signOut(auth);
     const result = await signInWithPopup(auth, switchAccountProvider);
     initializeAuthUI();

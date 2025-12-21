@@ -23,7 +23,7 @@ import {
   getDownloadURL,
   ref as storageRef,
 } from "firebase/storage";
-import { createNotificationDot } from "./uiHandlers.js";
+import { createNotificationDot } from "./notificationDot.js";
 import { showToast } from "./toastHandler.js";
 import { app, db } from "../../app.js";
 import { checkForJoinRequestNotifications } from "./utils/notificationHelpers.js";

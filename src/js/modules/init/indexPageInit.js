@@ -56,8 +56,8 @@ import {
   initializeSectionToggles,
   initializeTextareaClickHandler,
   showBuildOrderHelpModal,
-  createNotificationDot,
 } from "../uiHandlers.js";
+import { createNotificationDot } from "../notificationDot.js";
 import {
   initializeTooltips,
   updateTooltips,

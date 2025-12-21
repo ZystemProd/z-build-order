@@ -922,6 +922,83 @@ export function renderGroupBlock(group, bracket, lookup, playersById) {
   const standings = computeGroupStandings
     ? computeGroupStandings(bracket, group, playersById, lookup)
     : [];
+  const advanceCount = Math.max(
+    0,
+    Number(bracket?.roundRobin?.advancePerGroup || 0)
+  );
+  const winsByPlayer = new Map(
+    standings.map((row) => [row.playerId, row.wins || 0])
+  );
+  const remainingByPlayer = new Map();
+  const countRemaining = (pid) => {
+    if (!pid) return;
+    remainingByPlayer.set(pid, (remainingByPlayer.get(pid) || 0) + 1);
+  };
+  const isMatchComplete = (match) => {
+    if (!match) return false;
+    if (match.status === "complete" || match.winnerId || match.walkover)
+      return true;
+    const a = Number(match?.scores?.[0]);
+    const b = Number(match?.scores?.[1]);
+    const validA = Number.isFinite(a) ? a : 0;
+    const validB = Number.isFinite(b) ? b : 0;
+    if (!Number.isFinite(a) && !Number.isFinite(b)) return false;
+    const bestOf = getBestOfForMatch(match) || 1;
+    const needed = Math.max(1, Math.ceil(bestOf / 2));
+    return Math.max(validA, validB) >= needed;
+  };
+  (group.matches || []).forEach((gm) => {
+    const match = lookup?.get(gm.id) || gm;
+    const srcA = match?.sources?.[0] || {};
+    const srcB = match?.sources?.[1] || {};
+    const pA = srcA.playerId || null;
+    const pB = srcB.playerId || null;
+    if (!pA || !pB) return;
+    if (isMatchComplete(match)) return;
+    countRemaining(pA);
+    countRemaining(pB);
+  });
+  const maxWinsByPlayer = new Map();
+  standings.forEach((row) => {
+    const remaining = remainingByPlayer.get(row.playerId) || 0;
+    maxWinsByPlayer.set(row.playerId, (row.wins || 0) + remaining);
+  });
+  const isGuaranteed = (playerId) => {
+    if (!advanceCount) return false;
+    const minWins = winsByPlayer.get(playerId) || 0;
+    let ahead = 0;
+    let ties = 0;
+    standings.forEach((row) => {
+      if (row.playerId === playerId) return;
+      const otherMax =
+        maxWinsByPlayer.get(row.playerId) ?? (row.wins || 0);
+      if (otherMax > minWins) {
+        ahead += 1;
+      } else if (otherMax === minWins) {
+        ties += 1;
+      }
+    });
+    const worstRank = 1 + ahead + ties;
+    return worstRank <= advanceCount;
+  };
+  const qualifiedSet = new Set();
+  standings.forEach((row) => {
+    if (isGuaranteed(row.playerId)) qualifiedSet.add(row.playerId);
+  });
+  const remainingSlots = Math.max(0, advanceCount - qualifiedSet.size);
+  const tieCandidates = new Set();
+  if (remainingSlots === 1 && standings.length) {
+    const cutoffIndex = Math.min(qualifiedSet.size, standings.length - 1);
+    const cutoffRow = standings[cutoffIndex];
+    const cutoffKey = `${cutoffRow.wins || 0}|${cutoffRow.mapDiff || 0}`;
+    const tiedRows = standings.filter(
+      (row) => `${row.wins || 0}|${row.mapDiff || 0}` === cutoffKey
+    );
+    if (tiedRows.length > 1) {
+      tiedRows.forEach((row) => tieCandidates.add(row.playerId));
+    }
+  }
+  const isTied = (playerId) => tieCandidates.has(playerId);
   const standingsRows =
     standings
       .map((row, idx) => {
@@ -929,12 +1006,19 @@ export function renderGroupBlock(group, bracket, lookup, playersById) {
         const diff =
           row.mapDiff > 0 ? `+${row.mapDiff}` : String(row.mapDiff || 0);
         const pid = player?.id || "";
+        const qualified = qualifiedSet.has(row.playerId);
+        const tied = !qualified && isTied(row.playerId);
+        const rowClass = qualified
+          ? "is-qualified"
+          : tied
+          ? "is-tied"
+          : "";
         const nameCell = player
           ? `<span class="player-detail-trigger name-text" data-player-id="${pid}">${escapeHtml(
               player.name
             )}</span>`
           : "TBD";
-        return `<tr>
+        return `<tr class="${rowClass}">
           <td>${idx + 1}</td>
           <td>${nameCell}</td>
           <td>${row.wins}-${row.losses}</td>

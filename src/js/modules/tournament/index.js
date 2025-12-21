@@ -864,6 +864,19 @@ onAuthStateChanged?.(auth, () => {
 });
 
 document.addEventListener("DOMContentLoaded", async () => {
+  window.addEventListener("popstate", async () => {
+    const slugFromUrl = getSlugFromPath();
+    try {
+      if (slugFromUrl) {
+        await enterTournament(slugFromUrl);
+      } else {
+        await showLanding();
+      }
+    } catch (err) {
+      console.error("Failed to handle history navigation", err);
+    }
+  });
+
   // Attach all UI handlers first so buttons work even if async setup below fails/awaits.
   initTournamentPage({
     handleRegistration,

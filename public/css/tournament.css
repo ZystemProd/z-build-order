@@ -851,6 +851,14 @@ a {
   font-weight: 600;
 }
 
+.group-standings tbody tr.is-qualified {
+  background: rgba(92, 201, 120, 0.18);
+}
+
+.group-standings tbody tr.is-tied {
+  background: rgba(240, 165, 60, 0.18);
+}
+
 .group-match-list {
   display: flex;
   flex-direction: column;
