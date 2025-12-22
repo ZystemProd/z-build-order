@@ -78,75 +78,67 @@
     </div>
   </div>
 
-  <!-- Landing: list & create -->
-  <section id="landingView" class="landing" style="display:none;">
-    <div class="hero landing-hero">
-      <div class="hero-main">
-        <a class="ghost-link" href="/index.html">Back to Z-Build Order</a>
-        <p class="eyebrow">Tournament Center</p>
-        <h1>Find or host your SC2 tournament.</h1>
-        <p class="lede">Browse tournaments or spin up a new one with custom links and formats.</p>
-        <div class="hero-actions">
-          <button id="openCreateTournament" class="cta primary">Create a tournament</button>
+  <div class="tournament-shell">
+    <!-- Landing: list & create -->
+    <section id="landingView" class="landing" style="display:none;">
+      <div class="hero landing-hero">
+        <div class="hero-main">
+          <a class="ghost-link" href="/index.html">Back to Z-Build Order</a>
+          <p class="eyebrow">Tournament Center</p>
+          <h1>Find or host your SC2 tournament.</h1>
+          <p class="lede">Browse tournaments or spin up a new one with custom links and formats.</p>
+          <div class="hero-actions">
+            <button id="openCreateTournament" class="cta primary">Create a tournament</button>
+          </div>
         </div>
-      </div>
       <div class="hero-stats">
-        <div class="stat-card">
-          <p>Active tournaments</p>
-          <h2 id="statTournaments">0</h2>
-        </div>
         <div class="stat-card accent">
           <p>Next start</p>
           <h2 id="statNextStart">TBD</h2>
         </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-header">
-        <div>
-          <p class="eyebrow">Browse</p>
-          <h3>Open tournaments</h3>
-        </div>
-        <button id="refreshTournaments" class="cta ghost small">Refresh</button>
-      </div>
-      <div class="list-tabs" id="tournamentListTabs">
-        <button class="list-tab active" data-list-filter="open">Open tournaments</button>
-        <button class="list-tab" data-list-filter="mine">My tournaments</button>
-        <button class="list-tab" data-list-filter="hosted">Hosted tournaments</button>
-      </div>
-      <ul id="tournamentList" class="tournament-list"></ul>
-    </div>
-  </section>
-
-  <!-- Tournament detail -->
-  <section id="tournamentView" style="display:none;">
-    <header class="hero">
-      <div class="hero-main">
-        <a class="ghost-link" href="/tournament">All tournaments</a>
-        <p class="eyebrow" id="tournamentFormat">Tournament</p>
-        <h1 id="tournamentTitle">Tournament</h1>
-        <div class="hero-actions">
-          <button id="jumpToRegistration" class="cta primary">Add a player</button>
-          <button id="openRegisterBtn" class="cta ghost" style="display:none;">Register</button>
-          <button id="jumpToBracket" class="cta ghost">View bracket</button>
+        <div class="stat-card">
+          <p>Active tournaments</p>
+          <h2 id="statTournaments">0</h2>
         </div>
       </div>
-      <div class="hero-stats">
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <p class="eyebrow">Browse</p>
+            <h3>Open tournaments</h3>
+          </div>
+          <button id="refreshTournaments" class="cta ghost small">Refresh</button>
+        </div>
+        <div class="list-tabs" id="tournamentListTabs">
+          <button class="list-tab active" data-list-filter="open">Open tournaments</button>
+          <button class="list-tab" data-list-filter="mine">My tournaments</button>
+          <button class="list-tab" data-list-filter="hosted">Hosted tournaments</button>
+        </div>
+        <ul id="tournamentList" class="tournament-list"></ul>
+      </div>
+    </section>
+
+    <!-- Tournament detail -->
+    <section id="tournamentView" style="display:none;">
+      <header class="hero">
+        <div class="hero-main">
+          <a class="ghost-link" href="/tournament">All tournaments</a>
+          <p class="eyebrow" id="tournamentFormat">Tournament</p>
+          <h1 id="tournamentTitle">Tournament</h1>
+        </div>
+        <div class="hero-stats">
         <div class="stat-card">
           <p>Registered</p>
           <h2 id="statPlayers">0</h2>
-        </div>
-        <div class="stat-card">
-          <p>Bracket Size</p>
-          <h2 id="statBracket">0</h2>
         </div>
         <div class="stat-card accent">
           <p>Start</p>
           <h2 id="tournamentStart">TBD</h2>
         </div>
-      </div>
-    </header>
+        </div>
+      </header>
 
     <main class="page-stack">
       <div class="tab-bar" id="tabBar">
@@ -327,6 +319,15 @@
             </label>
             <label>Max players
               <input type="number" id="settingsMaxPlayersInput" min="2" max="512" placeholder="32" />
+            </label>
+            <label>Cover image
+              <div class="image-upload">
+                <input type="file" id="settingsImageInput" accept="image/*" />
+                <div class="image-preview">
+                  <img id="settingsImagePreview" alt="Tournament cover preview" />
+                </div>
+                <p class="helper">Recommended 1200x630. JPG/PNG/WebP.</p>
+              </div>
             </label>
             <div class="publish-checkbox-row">
               <span>Require SC2Pulse link for registration</span>
@@ -579,6 +580,7 @@
       </section>
     </main>
   </section>
+  </div>
 
   <!-- Create tournament modal -->
   <div id="createTournamentModal" class="modal create-modal" style="display:none;">
@@ -615,6 +617,15 @@
         </label>
         <label>Max players
           <input type="number" id="tournamentMaxPlayersInput" min="2" max="512" placeholder="32" />
+        </label>
+        <label>Cover image
+          <div class="image-upload">
+            <input type="file" id="tournamentImageInput" accept="image/*" />
+            <div class="image-preview">
+              <img id="tournamentImagePreview" alt="Tournament cover preview" />
+            </div>
+            <p class="helper">Recommended 1200x630. JPG/PNG/WebP.</p>
+          </div>
         </label>
       </div>
       <div class="settings-panel" id="createDesc">

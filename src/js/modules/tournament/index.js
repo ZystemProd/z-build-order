@@ -1,5 +1,6 @@
 import {
   auth,
+  app,
   db,
   getCurrentUsername,
   getCurrentUserAvatarUrl,
@@ -15,8 +16,10 @@ import {
   serverTimestamp,
   onSnapshot,
 } from "firebase/firestore";
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { showToast } from "../toastHandler.js";
 import DOMPurify from "dompurify";
+import { prepareImageForUpload, validateImageFile } from "../imageUtils.js";
 import {
   TOURNAMENT_COLLECTION,
   TOURNAMENT_STATE_COLLECTION,
@@ -155,12 +158,18 @@ import {
   hydrateStateFromRemote,
   saveState as persistState,
   persistTournamentStateRemote,
+  loadTournamentStateRemote,
   getStorageKey as getPersistStorageKey,
   getRegisteredTournaments,
   setRegisteredTournament,
 } from "./sync/persistence.js";
 const renderMapPoolPicker = renderMapPoolPickerUI;
 const CURRENT_BRACKET_LAYOUT_VERSION = 54;
+const MAX_TOURNAMENT_IMAGE_SIZE = 12 * 1024 * 1024;
+const COVER_TARGET_WIDTH = 1200;
+const COVER_TARGET_HEIGHT = 675;
+const COVER_QUALITY = 0.82;
+const storage = getStorage(app);
 function renderMarkdown(text = "") {
   return DOMPurify.sanitize(text || "").replace(/\n/g, "<br>");
 }
@@ -289,6 +298,37 @@ function renderAll() {
   renderSeedingTable(applySeeding(state.players || []));
 
   if (currentTournamentMeta) {
+    const tournamentTitle = document.getElementById("tournamentTitle");
+    const tournamentFormat = document.getElementById("tournamentFormat");
+    const tournamentStart = document.getElementById("tournamentStart");
+    const statPlayers = document.getElementById("statPlayers");
+    const startTimeRaw = currentTournamentMeta.startTime;
+    const startMs = startTimeRaw?.toMillis
+      ? startTimeRaw.toMillis()
+      : typeof startTimeRaw === "number"
+      ? startTimeRaw
+      : startTimeRaw
+      ? new Date(startTimeRaw).getTime()
+      : null;
+
+    if (tournamentTitle) {
+      tournamentTitle.textContent = currentTournamentMeta.name || "Tournament";
+    }
+    if (tournamentFormat) {
+      tournamentFormat.textContent = currentTournamentMeta.format || "Tournament";
+    }
+    if (tournamentStart) {
+      tournamentStart.textContent = startMs
+        ? new Date(startMs).toLocaleString([], {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : "TBD";
+    }
+    if (statPlayers) statPlayers.textContent = String(state.players?.length || 0);
     populateSettingsPanelUI({
       tournament: currentTournamentMeta,
       setMapPoolSelection,
@@ -491,6 +531,7 @@ function renderTournamentList() {
   listEl.innerHTML = `<li class="muted">Loading tournaments...</li>`;
   loadTournamentRegistry(true)
     .then((items) => {
+      const progressTargets = [];
       const filtered = (items || []).filter((item) => {
         if (activeFilter === "hosted") {
           return userId && item.createdBy === userId;
@@ -518,43 +559,127 @@ function renderTournamentList() {
               ? new Date(item.startTime).toLocaleString()
               : "TBD";
             const playerLabel = item.maxPlayers
-              ? `${item.maxPlayers} players`
-              : "players TBD";
+              ? `Up to ${item.maxPlayers} players`
+              : "Players TBD";
+            const coverUrl = sanitizeUrl(item.coverImageUrl || "");
+            const now = Date.now();
+            const isStarted = Boolean(item.startTime && item.startTime <= now);
+            let statusLabel = "TBD";
+            let statusClass = "status-tbd";
+            if (item.startTime) {
+              if (item.startTime <= now) {
+                statusLabel = "Started";
+                statusClass = "status-started";
+              } else {
+                statusLabel = "Upcoming";
+                statusClass = "status-upcoming";
+              }
+            }
             li.innerHTML = DOMPurify.sanitize(`
-              <div>
-                <p class="eyebrow">${escapeHtml(item.format)}</p>
-                <h4>${escapeHtml(item.name)}</h4>
-                <div class="meta">
-                  <span>${escapeHtml(playerLabel)}</span>
-                  <span>${escapeHtml(startLabel)}</span>
-                  <span>Host: ${escapeHtml(item.createdByName || "Unknown")}</span>
+              <div class="card-cover${coverUrl ? " has-image" : ""}"${
+                coverUrl ? ` style="background-image:url('${escapeHtml(coverUrl)}')"` : ""
+              }></div>
+              <div class="card-top">
+                <div class="time-block">
+                  <span class="time-label">Start</span>
+                  <span class="time-value">${escapeHtml(startLabel)}</span>
                 </div>
-              </div>
-              <button class="cta ghost small" data-slug="${escapeHtml(
-                item.slug
-              )}">View</button>
+              <span class="status-chip ${statusClass}">${statusLabel}</span>
+            </div>
+            <h4>${escapeHtml(item.name)}</h4>
+            <p class="tournament-format">${escapeHtml(item.format)}</p>
+            <div class="meta">
+              <span>${escapeHtml(playerLabel)}</span>
+              <span>Host: ${escapeHtml(item.createdByName || "Unknown")}</span>
+            </div>
+            ${
+              isStarted
+                ? `<div class="tournament-progress" data-slug="${escapeHtml(
+                    item.slug
+                  )}">
+                    <span class="progress-label">Progress</span>
+                    <div class="progress-track">
+                      <div class="progress-fill" style="width:0%"></div>
+                    </div>
+                    <div class="progress-meta">Loading progress…</div>
+                  </div>`
+                : ""
+            }
             `);
             const open = () => enterTournament(item.slug);
             li.addEventListener("click", open);
-            li.querySelector("button")?.addEventListener("click", (e) => {
-              e.stopPropagation();
-              open();
-            });
             listEl.appendChild(li);
+            if (isStarted) {
+              progressTargets.push({ slug: item.slug, el: li });
+            }
           });
       }
       if (statTournaments) statTournaments.textContent = String(filtered.length);
       if (statNextStart) {
         const next = filtered.find((i) => i.startTime);
         statNextStart.textContent = next
-          ? new Date(next.startTime).toLocaleString()
+          ? new Date(next.startTime).toLocaleString([], {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            })
           : "TBD";
       }
+      updateTournamentProgress(progressTargets);
     })
     .catch((err) => {
       console.error("Failed to load tournaments", err);
       listEl.innerHTML = `<li class="muted error">Failed to load tournaments.</li>`;
     });
+}
+
+function computeTournamentProgress(bracket) {
+  if (!bracket) return null;
+  const matches = getAllMatches(bracket);
+  if (!matches.length) return null;
+  let completed = 0;
+  matches.forEach((match) => {
+    if (
+      match?.status === "complete" ||
+      match?.winnerId ||
+      match?.walkover
+    ) {
+      completed += 1;
+    }
+  });
+  const percent = Math.round((completed / matches.length) * 100);
+  return { completed, total: matches.length, percent };
+}
+
+function updateTournamentProgress(targets = []) {
+  if (!targets.length) return;
+  Promise.all(
+    targets.map(async ({ slug, el }) => {
+      if (!slug || !el) return;
+      const progressEl = el.querySelector(".tournament-progress");
+      if (!progressEl) return;
+      try {
+        const remote = await loadTournamentStateRemote(slug);
+        const bracket = deserializeBracket(remote?.bracket);
+        const progress = computeTournamentProgress(bracket);
+        const fill = progressEl.querySelector(".progress-fill");
+        const meta = progressEl.querySelector(".progress-meta");
+        if (!fill || !meta) return;
+        if (!progress) {
+          fill.style.width = "0%";
+          meta.textContent = "No matches yet";
+          return;
+        }
+        const percent = Math.max(0, Math.min(100, progress.percent));
+        fill.style.width = `${percent}%`;
+        meta.textContent = `${progress.completed}/${progress.total} matches`;
+      } catch (err) {
+        console.warn("Failed to load progress", err);
+      }
+    })
+  );
 }
 
 function markRegisteredTournament(slug) {
@@ -588,6 +713,14 @@ async function populateCreateForm() {
   if (slugInput && !slugInput.value) {
     slugInput.value = await generateUniqueSlug();
     updateSlugPreview();
+  }
+  const imageInput = document.getElementById("tournamentImageInput");
+  const imagePreview = document.getElementById("tournamentImagePreview");
+  if (imageInput) imageInput.value = "";
+  if (imagePreview) {
+    imagePreview.removeAttribute("src");
+    imagePreview.style.display = "none";
+    delete imagePreview.dataset.tempPreview;
   }
 }
 
@@ -683,12 +816,37 @@ function setMapPoolSelection(names) {
   });
 }
 
+function validateTournamentImage(file) {
+  return validateImageFile(file, { maxBytes: MAX_TOURNAMENT_IMAGE_SIZE });
+}
+
+async function uploadTournamentCover(file, slug) {
+  const error = validateTournamentImage(file);
+  if (error) throw new Error(error);
+  if (!slug) throw new Error("Missing tournament slug.");
+  const processed = await prepareImageForUpload(file, {
+    targetWidth: COVER_TARGET_WIDTH,
+    targetHeight: COVER_TARGET_HEIGHT,
+    quality: COVER_QUALITY,
+    outputType: "image/webp",
+    fallbackType: "image/jpeg",
+  });
+  const path = `tournamentCovers/${slug}/cover-${Date.now()}.webp`;
+  const ref = storageRef(storage, path);
+  await uploadBytes(ref, processed.blob, { contentType: processed.contentType });
+  return getDownloadURL(ref);
+}
+
 async function handleSaveSettings(event) {
   event?.preventDefault?.();
   const formatSelect = document.getElementById("settingsFormatSelect");
   const descInput = document.getElementById("settingsDescriptionInput");
   const rulesInput = document.getElementById("settingsRulesInput");
   const slugInput = document.getElementById("settingsSlugInput");
+  const startInput = document.getElementById("settingsStartInput");
+  const maxPlayersInput = document.getElementById("settingsMaxPlayersInput");
+  const imageInput = document.getElementById("settingsImageInput");
+  const imageFile = imageInput?.files?.[0] || null;
   const newSlugRaw = (slugInput?.value || "").trim();
   const newSlug = newSlugRaw || currentSlug || "";
   const slugChanged = newSlug && newSlug !== currentSlug;
@@ -704,8 +862,21 @@ async function handleSaveSettings(event) {
   const format = (formatSelect?.value || currentTournamentMeta?.format || "Tournament").trim();
   const description = descInput?.value || "";
   const rules = rulesInput?.value || "";
+  const startTime = startInput?.value ? new Date(startInput.value) : null;
+  const maxPlayers = maxPlayersInput?.value
+    ? Number(maxPlayersInput.value)
+    : null;
   const mapPool = Array.from(mapPoolSelection || []);
   const rrSettings = extractRoundRobinSettingsUI("settings", defaultRoundRobinSettings);
+  let coverImageUrl = currentTournamentMeta?.coverImageUrl || "";
+  if (imageFile) {
+    try {
+      coverImageUrl = await uploadTournamentCover(imageFile, newSlug);
+    } catch (err) {
+      showToast?.(err?.message || "Failed to upload cover image.", "error");
+      return;
+    }
+  }
 
   const meta = {
     ...(currentTournamentMeta || {}),
@@ -713,6 +884,9 @@ async function handleSaveSettings(event) {
     format,
     description,
     rules,
+    coverImageUrl,
+    maxPlayers: Number.isFinite(maxPlayers) ? maxPlayers : null,
+    startTime: startTime ? startTime.getTime() : null,
     bestOf,
     mapPool,
     roundRobin: rrSettings,
@@ -764,6 +938,8 @@ async function handleCreateTournament(event) {
   const maxPlayersInput = document.getElementById("tournamentMaxPlayersInput");
   const descriptionInput = document.getElementById("tournamentDescriptionInput");
   const rulesInput = document.getElementById("tournamentRulesInput");
+  const imageInput = document.getElementById("tournamentImageInput");
+  const imageFile = imageInput?.files?.[0] || null;
   const modal = document.getElementById("createTournamentModal");
   const name = (nameInput?.value || "").trim();
   const slug = (slugInput?.value || "").trim() || (await generateUniqueSlug());
@@ -787,7 +963,7 @@ async function handleCreateTournament(event) {
       rules,
       format,
       maxPlayers: Number.isFinite(maxPlayers) ? maxPlayers : null,
-      startTime: startTime ? serverTimestamp() : null,
+      startTime: startTime ? startTime.getTime() : null,
       mapPool: Array.from(mapPoolSelection || []),
       createdBy: auth.currentUser?.uid || null,
       createdByName: getCurrentUsername() || "Unknown host",
@@ -815,6 +991,19 @@ async function handleCreateTournament(event) {
     await setDoc(doc(collection(db, TOURNAMENT_COLLECTION), slug), payload, {
       merge: true,
     });
+    if (imageFile) {
+      try {
+        const coverImageUrl = await uploadTournamentCover(imageFile, slug);
+        payload.coverImageUrl = coverImageUrl;
+        await setDoc(
+          doc(collection(db, TOURNAMENT_COLLECTION), slug),
+          { coverImageUrl },
+          { merge: true }
+        );
+      } catch (err) {
+        showToast?.(err?.message || "Failed to upload cover image.", "error");
+      }
+    }
     setCurrentSlugState(slug);
     setCurrentTournamentMetaState(payload);
     showToast?.("Tournament saved.", "success");
@@ -823,7 +1012,7 @@ async function handleCreateTournament(event) {
     await renderTournamentList();
   } catch (err) {
     console.error("Failed to save tournament", err);
-    showToast?.("Failed to save tournament.", "error");
+    showToast?.(err?.message || "Failed to save tournament.", "error");
   }
 }
 

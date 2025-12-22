@@ -29,8 +29,12 @@ import { app, db } from "../../app.js";
 import { checkForJoinRequestNotifications } from "./utils/notificationHelpers.js";
 import DOMPurify from "dompurify";
 import { logAnalyticsEvent } from "./analyticsHelper.js";
+import { prepareImageForUpload, validateImageFile } from "./imageUtils.js";
 
 const storage = getStorage(app);
+const CLAN_LOGO_SIZE = 512;
+const CLAN_LOGO_MAX_BYTES = 2 * 1024 * 1024;
+const CLAN_LOGO_QUALITY = 0.85;
 
 let currentClanView = null;
 
@@ -52,11 +56,16 @@ export async function getUsernameFromUid(uid) {
 }
 
 export async function uploadClanLogo(file, clanId) {
-  const storage = getStorage(app);
   const filePath = `clanLogos/${clanId}/logo.webp`;
   const storageRef = ref(storage, filePath);
-
-  await uploadBytes(storageRef, file, { contentType: "image/webp" });
+  const processed = await prepareImageForUpload(file, {
+    targetWidth: CLAN_LOGO_SIZE,
+    targetHeight: CLAN_LOGO_SIZE,
+    quality: CLAN_LOGO_QUALITY,
+    outputType: "image/webp",
+    fallbackType: "image/jpeg",
+  });
+  await uploadBytes(storageRef, processed.blob, { contentType: processed.contentType });
 
   // ✅ Get real download URL
   const url = await getDownloadURL(storageRef);
@@ -91,14 +100,12 @@ export async function createClan({
 
   // Step 2: Optional logo upload with validation
   if (logoFile) {
-    const validTypes = ["image/png", "image/jpeg", "image/webp"];
-    const maxSize = 2 * 1024 * 1024;
-
-    if (!validTypes.includes(logoFile.type)) {
-      throw new Error("Only PNG, JPG, or WEBP files are allowed.");
-    }
-    if (logoFile.size > maxSize) {
-      throw new Error("Image is too large. Max 2MB.");
+    const error = validateImageFile(logoFile, {
+      maxBytes: CLAN_LOGO_MAX_BYTES,
+      allowedTypes: ["image/png", "image/jpeg", "image/webp"],
+    });
+    if (error) {
+      throw new Error(error);
     }
 
     // Upload and update the logoUrl
@@ -1113,15 +1120,12 @@ async function renderManageTab(tab, clan) {
         const file = logoInput.files[0]; // ✅ corrected here
 
         if (file) {
-          const validTypes = ["image/png", "image/jpeg", "image/webp"];
-          const maxSize = 2 * 1024 * 1024; // 2MB
-
-          if (!validTypes.includes(file.type)) {
-            throw new Error("Only PNG, JPG, or WEBP files are allowed.");
-          }
-
-          if (file.size > maxSize) {
-            throw new Error("Image is too large. Max 2MB.");
+          const error = validateImageFile(file, {
+            maxBytes: CLAN_LOGO_MAX_BYTES,
+            allowedTypes: ["image/png", "image/jpeg", "image/webp"],
+          });
+          if (error) {
+            throw new Error(error);
           }
 
           const logoUrl = await uploadClanLogo(file, clan.id);

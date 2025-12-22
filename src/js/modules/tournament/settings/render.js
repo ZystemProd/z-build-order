@@ -43,6 +43,8 @@ export function populateSettingsPanel({
   const formatSelect = document.getElementById("settingsFormatSelect");
   const maxInput = document.getElementById("settingsMaxPlayersInput");
   const startInput = document.getElementById("settingsStartInput");
+  const imageInput = document.getElementById("settingsImageInput");
+  const imagePreview = document.getElementById("settingsImagePreview");
   const rrBestOf = document.getElementById("settingsRoundRobinBestOf");
   const bestOf = {
     ...defaultBestOf,
@@ -70,6 +72,18 @@ export function populateSettingsPanel({
     startInput.value = tournament.startTime
       ? new Date(tournament.startTime).toISOString().slice(0, 16)
       : "";
+  }
+  if (imageInput) imageInput.value = "";
+  if (imagePreview) {
+    if (tournament.coverImageUrl) {
+      imagePreview.src = tournament.coverImageUrl;
+      imagePreview.style.display = "block";
+      delete imagePreview.dataset.tempPreview;
+    } else {
+      imagePreview.removeAttribute("src");
+      imagePreview.style.display = "none";
+      delete imagePreview.dataset.tempPreview;
+    }
   }
   const requirePulseInput = document.getElementById("settingsRequirePulseLink");
   if (requirePulseInput)

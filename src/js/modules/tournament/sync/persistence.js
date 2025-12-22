@@ -73,6 +73,7 @@ export async function loadTournamentRegistry(force = false) {
         rules: data.rules || "",
         mapPool: data.mapPool?.length ? data.mapPool : [],
         format: data.format || "Tournament",
+        coverImageUrl: data.coverImageUrl || "",
         maxPlayers: data.maxPlayers || null,
         startTime: startTime || null,
         createdBy: data.createdBy || null,

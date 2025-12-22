@@ -95,6 +95,10 @@ export function initTournamentPage({
   const saveSettingsBtn = document.getElementById("saveSettingsBtn");
   const settingsDescToolbarBtns = document.querySelectorAll("[data-settings-desc-action]");
   const settingsRulesToolbarBtns = document.querySelectorAll("[data-settings-rules-action]");
+  const createImageInput = document.getElementById("tournamentImageInput");
+  const createImagePreview = document.getElementById("tournamentImagePreview");
+  const settingsImageInput = document.getElementById("settingsImageInput");
+  const settingsImagePreview = document.getElementById("settingsImagePreview");
   const slugInput = document.getElementById("tournamentSlugInput");
   const bestOfUpperInput = document.getElementById("bestOfUpperInput");
   const bestOfLowerInput = document.getElementById("bestOfLowerInput");
@@ -111,6 +115,33 @@ export function initTournamentPage({
   const vetoModal = document.getElementById("vetoModal");
   const closeVetoModal = document.getElementById("closeVetoModal");
   const saveVetoBtn = document.getElementById("saveVetoBtn");
+
+  const bindImagePreview = (inputEl, previewEl) => {
+    if (!inputEl || !previewEl) return;
+    inputEl.addEventListener("change", () => {
+      const file = inputEl.files?.[0] || null;
+      if (!file) {
+        if (previewEl.dataset.tempPreview) {
+          try {
+            URL.revokeObjectURL(previewEl.dataset.tempPreview);
+          } catch (_) {}
+          previewEl.removeAttribute("src");
+          previewEl.style.display = "none";
+          delete previewEl.dataset.tempPreview;
+        }
+        return;
+      }
+      const url = URL.createObjectURL(file);
+      if (previewEl.dataset.tempPreview) {
+        try {
+          URL.revokeObjectURL(previewEl.dataset.tempPreview);
+        } catch (_) {}
+      }
+      previewEl.src = url;
+      previewEl.style.display = "block";
+      previewEl.dataset.tempPreview = url;
+    });
+  };
 
   registrationForm?.addEventListener("submit", handleRegistration);
   rebuildBtn?.addEventListener("click", () => rebuildBracket(true, "Manual reseed"));
@@ -191,6 +222,8 @@ export function initTournamentPage({
       applyFormattingInline(btn.dataset.rulesAction, "tournamentRulesInput")
     );
   });
+  bindImagePreview(createImageInput, createImagePreview);
+  bindImagePreview(settingsImageInput, settingsImagePreview);
 
   bindMapSelectionEvents({
     setMapPoolSelection,
