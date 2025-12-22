@@ -43,6 +43,8 @@ export function populateSettingsPanel({
   const formatSelect = document.getElementById("settingsFormatSelect");
   const maxInput = document.getElementById("settingsMaxPlayersInput");
   const startInput = document.getElementById("settingsStartInput");
+  const checkInHoursInput = document.getElementById("settingsCheckInHoursInput");
+  const checkInMinutesInput = document.getElementById("settingsCheckInMinutesInput");
   const imageInput = document.getElementById("settingsImageInput");
   const imagePreview = document.getElementById("settingsImagePreview");
   const rrBestOf = document.getElementById("settingsRoundRobinBestOf");
@@ -72,6 +74,13 @@ export function populateSettingsPanel({
     startInput.value = tournament.startTime
       ? new Date(tournament.startTime).toISOString().slice(0, 16)
       : "";
+  }
+  if (checkInHoursInput || checkInMinutesInput) {
+    const total = Number(tournament.checkInWindowMinutes || 0);
+    const hours = Math.floor(total / 60);
+    const minutes = total % 60;
+    if (checkInHoursInput) checkInHoursInput.value = total ? String(hours) : "";
+    if (checkInMinutesInput) checkInMinutesInput.value = total ? String(minutes) : "";
   }
   if (imageInput) imageInput.value = "";
   if (imagePreview) {

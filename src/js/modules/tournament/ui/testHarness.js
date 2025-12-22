@@ -107,6 +107,9 @@ function cycleTestBracketCount(delta) {
 }
 
 export function ensureTestHarnessPanel() {
+  if (typeof window !== "undefined" && window.__tournamentIsAdmin === false) {
+    return;
+  }
   const host =
     document.getElementById("bracketTab") ||
     document.getElementById("seedingCard") ||

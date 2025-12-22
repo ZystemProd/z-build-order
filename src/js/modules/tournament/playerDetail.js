@@ -85,6 +85,7 @@ export function attachPlayerDetailHandlers({ getPlayersMap }) {
   setupPlayerDetailModal();
   const bracketGrid = document.getElementById("bracketGrid");
   const playersTable = document.getElementById("playersTableBody");
+  const registeredPlayersList = document.getElementById("registeredPlayersList");
 
   const handler = (e) => {
     const inRoundRobinGroupStage = Boolean(e.target.closest(".group-stage"));
@@ -120,6 +121,7 @@ export function attachPlayerDetailHandlers({ getPlayersMap }) {
 
   bracketGrid?.addEventListener("click", handler);
   playersTable?.addEventListener("click", handler);
+  registeredPlayersList?.addEventListener("click", handler);
 }
 
 export function openPlayerDetailModal(player) {

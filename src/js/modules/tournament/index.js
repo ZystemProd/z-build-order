@@ -295,20 +295,25 @@ function getPlayersMap() {
 
 function renderAll() {
   // Update seeding table
-  renderSeedingTable(applySeeding(state.players || []));
+  renderSeedingTable(applySeeding(state.players || []), { isLive: state.isLive });
 
   if (currentTournamentMeta) {
     const tournamentTitle = document.getElementById("tournamentTitle");
     const tournamentFormat = document.getElementById("tournamentFormat");
     const tournamentStart = document.getElementById("tournamentStart");
     const statPlayers = document.getElementById("statPlayers");
-    const startTimeRaw = currentTournamentMeta.startTime;
-    const startMs = startTimeRaw?.toMillis
-      ? startTimeRaw.toMillis()
-      : typeof startTimeRaw === "number"
-      ? startTimeRaw
-      : startTimeRaw
-      ? new Date(startTimeRaw).getTime()
+    const registerBtn = document.getElementById("registerBtn");
+    const goLiveBtn = document.getElementById("rebuildBracketBtn");
+    const removeNotCheckedInBtn = document.getElementById("removeNotCheckedInBtn");
+    const startMs = getStartTimeMs(currentTournamentMeta);
+    const liveDot = document.getElementById("liveDot");
+    const bracketGrid = document.getElementById("bracketGrid");
+    const bracketNotLive = document.getElementById("bracketNotLive");
+    const registeredPlayersList = document.getElementById("registeredPlayersList");
+    const activityCard = document.getElementById("activityCard");
+    const currentUid = auth.currentUser?.uid || null;
+    const currentPlayer = currentUid
+      ? (state.players || []).find((p) => p.uid === currentUid)
       : null;
 
     if (tournamentTitle) {
@@ -329,6 +334,63 @@ function renderAll() {
         : "TBD";
     }
     if (statPlayers) statPlayers.textContent = String(state.players?.length || 0);
+
+    if (registerBtn) {
+      if (state.isLive) {
+        registerBtn.textContent = "Registration closed";
+        registerBtn.disabled = true;
+      } else if (currentPlayer) {
+        registerBtn.textContent = "Unregister";
+        registerBtn.disabled = false;
+      } else {
+        registerBtn.textContent = "Register";
+        registerBtn.disabled = false;
+      }
+    }
+
+    if (goLiveBtn) {
+      goLiveBtn.disabled = state.isLive;
+      goLiveBtn.textContent = state.isLive ? "Live" : "Go Live";
+    }
+    if (removeNotCheckedInBtn) {
+      removeNotCheckedInBtn.disabled = state.isLive;
+    }
+
+    updateCheckInUI();
+
+    if (liveDot) {
+      liveDot.textContent = state.isLive ? "Live" : "Not Live";
+      liveDot.classList.toggle("not-live", !state.isLive);
+    }
+
+    if (bracketGrid && bracketNotLive) {
+      if (!state.isLive && !isAdmin) {
+        bracketGrid.style.display = "none";
+        bracketNotLive.style.display = "block";
+        if (registeredPlayersList) {
+          const items = (state.players || []).map((p) => {
+            const name = escapeHtml(p.name || "Unknown");
+            const race = (p.race || "").trim();
+            const raceClass = raceClassName(race);
+            const raceLabel = race ? escapeHtml(race) : "Race TBD";
+            const mmr = Number.isFinite(p.mmr) ? `${Math.round(p.mmr)} MMR` : "MMR TBD";
+            return `<li data-player-id="${escapeHtml(p.id || "")}">
+              <span class="race-strip ${raceClass}"></span>
+              <span class="name-text">${name}</span>
+              <span class="registered-meta">${raceLabel} · ${mmr}</span>
+            </li>`;
+          });
+          registeredPlayersList.innerHTML = items.join("");
+        }
+      } else {
+        bracketGrid.style.display = "flex";
+        bracketNotLive.style.display = "none";
+      }
+    }
+
+    if (activityCard) {
+      activityCard.style.display = state.isLive ? "" : "none";
+    }
     populateSettingsPanelUI({
       tournament: currentTournamentMeta,
       setMapPoolSelection,
@@ -393,6 +455,80 @@ function renderAll() {
   }
 }
 
+function checkInCurrentPlayer() {
+  const meta = currentTournamentMeta || {};
+  const { isOpen } = getCheckInWindowState(meta);
+  if (!isOpen) {
+    showToast?.("Check-in is not open yet.", "error");
+    return;
+  }
+  const uid = auth.currentUser?.uid || null;
+  if (!uid) {
+    showToast?.("You must be signed in to check in.", "error");
+    return;
+  }
+  const players = state.players || [];
+  const idx = players.findIndex((p) => p.uid === uid);
+  if (idx === -1) {
+    showToast?.("Register before checking in.", "error");
+    return;
+  }
+  if (players[idx].checkedInAt) {
+    showToast?.("You are already checked in.", "success");
+    return;
+  }
+  const updated = players.map((p, i) =>
+    i === idx ? { ...p, checkedInAt: Date.now() } : p
+  );
+  saveState({ players: updated });
+  addActivity(`${players[idx].name || "Player"} checked in.`);
+  renderAll();
+}
+
+function removeNotCheckedInPlayers() {
+  if (state.isLive) {
+    showToast?.("Tournament is live. Seeding is locked.", "error");
+    return;
+  }
+  const players = state.players || [];
+  const remaining = players.filter((p) => p.checkedInAt);
+  const removedCount = players.length - remaining.length;
+  if (!removedCount) {
+    showToast?.("No players to remove.", "success");
+    return;
+  }
+  saveState({ players: remaining, needsReseed: true });
+  rebuildBracket(true, "Removed unchecked-in players");
+  addActivity(`Removed ${removedCount} unchecked-in player(s).`);
+}
+
+function goLiveTournament() {
+  if (state.isLive) {
+    showToast?.("Tournament is already live.", "success");
+    return;
+  }
+  const checkedInPlayers = (state.players || []).filter((p) => p.checkedInAt);
+  if (!checkedInPlayers.length) {
+    showToast?.("No checked-in players to go live.", "error");
+    return;
+  }
+  const seededPlayers = applySeeding(checkedInPlayers);
+  const bracket = buildBracket(
+    seededPlayers,
+    currentTournamentMeta || {},
+    (fmt) => (fmt || "").toLowerCase().includes("round robin")
+  );
+  saveState({
+    players: seededPlayers,
+    bracket,
+    needsReseed: false,
+    bracketLayoutVersion: CURRENT_BRACKET_LAYOUT_VERSION,
+    isLive: true,
+  });
+  addActivity("Tournament went live.");
+  renderAll();
+}
+
 function addActivity(message) {
   if (!message) return;
   const entry = { message, time: Date.now() };
@@ -453,6 +589,7 @@ function createOrUpdatePlayer(data) {
 }
 
 function removePlayer(id) {
+  if (state.isLive) return;
   if (!id) return;
   const players = (state.players || []).filter((p) => p.id !== id);
   saveState({ players, needsReseed: true });
@@ -460,6 +597,7 @@ function removePlayer(id) {
 }
 
 function updatePlayerPoints(id, points) {
+  if (state.isLive) return;
   if (!id) return;
   const players = (state.players || []).map((p) =>
     p.id === id ? { ...p, points } : p
@@ -716,12 +854,16 @@ async function populateCreateForm() {
   }
   const imageInput = document.getElementById("tournamentImageInput");
   const imagePreview = document.getElementById("tournamentImagePreview");
+  const checkInHoursInput = document.getElementById("checkInHoursInput");
+  const checkInMinutesInput = document.getElementById("checkInMinutesInput");
   if (imageInput) imageInput.value = "";
   if (imagePreview) {
     imagePreview.removeAttribute("src");
     imagePreview.style.display = "none";
     delete imagePreview.dataset.tempPreview;
   }
+  if (checkInHoursInput) checkInHoursInput.value = "";
+  if (checkInMinutesInput) checkInMinutesInput.value = "";
 }
 
 function getSlugFromPath() {
@@ -820,6 +962,100 @@ function validateTournamentImage(file) {
   return validateImageFile(file, { maxBytes: MAX_TOURNAMENT_IMAGE_SIZE });
 }
 
+function getStartTimeMs(meta) {
+  const raw = meta?.startTime;
+  if (!raw) return null;
+  if (raw?.toMillis) return raw.toMillis();
+  if (typeof raw === "number") return raw;
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.getTime();
+}
+
+function getCheckInWindowMinutesFromMeta(meta) {
+  const minutes = Number(meta?.checkInWindowMinutes || 0);
+  return Number.isFinite(minutes) && minutes > 0 ? minutes : 0;
+}
+
+function getCheckInWindowState(meta) {
+  const startMs = getStartTimeMs(meta);
+  const windowMinutes = getCheckInWindowMinutesFromMeta(meta);
+  if (!startMs || !windowMinutes) {
+    return { isOpen: false, opensAt: null, closesAt: null };
+  }
+  const now = Date.now();
+  const opensAt = startMs - windowMinutes * 60 * 1000;
+  const closesAt = startMs;
+  return { isOpen: now >= opensAt && now < closesAt, opensAt, closesAt };
+}
+
+function formatCountdown(ms) {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  return `${minutes}m`;
+}
+
+function updateCheckInUI() {
+  if (!currentTournamentMeta) return;
+  const checkInBtn = document.getElementById("checkInBtn");
+  const checkInStatus = document.getElementById("checkInStatus");
+  if (!checkInBtn || !checkInStatus) return;
+
+  checkInStatus.classList.remove("is-open", "is-checked", "is-closed");
+  const startMs = getStartTimeMs(currentTournamentMeta);
+  const checkInState = getCheckInWindowState(currentTournamentMeta);
+  const currentUid = auth.currentUser?.uid || null;
+  const currentPlayer = currentUid
+    ? (state.players || []).find((p) => p.uid === currentUid)
+    : null;
+
+  if (state.isLive || !getCheckInWindowMinutesFromMeta(currentTournamentMeta) || !startMs) {
+    checkInBtn.style.display = "none";
+    checkInStatus.textContent = "";
+    return;
+  }
+
+  if (!checkInState.isOpen) {
+    checkInBtn.style.display = "none";
+    const timeUntil = checkInState.opensAt ? checkInState.opensAt - Date.now() : 0;
+    checkInStatus.textContent = checkInState.opensAt
+      ? `Check-in opens in ${formatCountdown(timeUntil)}`
+      : "Check-in is not open yet.";
+    checkInStatus.classList.add("is-closed");
+    return;
+  }
+
+  if (!currentPlayer) {
+    checkInBtn.style.display = "none";
+    checkInStatus.textContent = "Register to check in.";
+    checkInStatus.classList.add("is-open");
+    return;
+  }
+
+  if (currentPlayer.checkedInAt) {
+    checkInBtn.style.display = "none";
+    checkInStatus.textContent = "You are checked in.";
+    checkInStatus.classList.add("is-checked");
+    return;
+  }
+
+  const closesIn = checkInState.closesAt ? checkInState.closesAt - Date.now() : 0;
+  checkInBtn.style.display = "inline-flex";
+  checkInStatus.textContent = `Check-in open · closes in ${formatCountdown(closesIn)}`;
+  checkInStatus.classList.add("is-open");
+}
+
+function getCheckInWindowMinutes(hoursInput, minutesInput) {
+  const hours = Number(hoursInput?.value || 0);
+  const minutes = Number(minutesInput?.value || 0);
+  const safeHours = Number.isFinite(hours) && hours > 0 ? hours : 0;
+  const safeMinutes = Number.isFinite(minutes) && minutes > 0 ? minutes : 0;
+  return safeHours * 60 + safeMinutes;
+}
+
 async function uploadTournamentCover(file, slug) {
   const error = validateTournamentImage(file);
   if (error) throw new Error(error);
@@ -845,6 +1081,8 @@ async function handleSaveSettings(event) {
   const slugInput = document.getElementById("settingsSlugInput");
   const startInput = document.getElementById("settingsStartInput");
   const maxPlayersInput = document.getElementById("settingsMaxPlayersInput");
+  const checkInHoursInput = document.getElementById("settingsCheckInHoursInput");
+  const checkInMinutesInput = document.getElementById("settingsCheckInMinutesInput");
   const imageInput = document.getElementById("settingsImageInput");
   const imageFile = imageInput?.files?.[0] || null;
   const newSlugRaw = (slugInput?.value || "").trim();
@@ -866,6 +1104,10 @@ async function handleSaveSettings(event) {
   const maxPlayers = maxPlayersInput?.value
     ? Number(maxPlayersInput.value)
     : null;
+  const checkInWindowMinutes = getCheckInWindowMinutes(
+    checkInHoursInput,
+    checkInMinutesInput
+  );
   const mapPool = Array.from(mapPoolSelection || []);
   const rrSettings = extractRoundRobinSettingsUI("settings", defaultRoundRobinSettings);
   let coverImageUrl = currentTournamentMeta?.coverImageUrl || "";
@@ -887,6 +1129,7 @@ async function handleSaveSettings(event) {
     coverImageUrl,
     maxPlayers: Number.isFinite(maxPlayers) ? maxPlayers : null,
     startTime: startTime ? startTime.getTime() : null,
+    checkInWindowMinutes,
     bestOf,
     mapPool,
     roundRobin: rrSettings,
@@ -936,6 +1179,8 @@ async function handleCreateTournament(event) {
   const formatSelect = document.getElementById("tournamentFormatSelect");
   const startInput = document.getElementById("tournamentStartInput");
   const maxPlayersInput = document.getElementById("tournamentMaxPlayersInput");
+  const checkInHoursInput = document.getElementById("checkInHoursInput");
+  const checkInMinutesInput = document.getElementById("checkInMinutesInput");
   const descriptionInput = document.getElementById("tournamentDescriptionInput");
   const rulesInput = document.getElementById("tournamentRulesInput");
   const imageInput = document.getElementById("tournamentImageInput");
@@ -948,6 +1193,10 @@ async function handleCreateTournament(event) {
   const maxPlayers = maxPlayersInput?.value
     ? Number(maxPlayersInput.value)
     : null;
+  const checkInWindowMinutes = getCheckInWindowMinutes(
+    checkInHoursInput,
+    checkInMinutesInput
+  );
   const description = descriptionInput?.value || "";
   const rules = rulesInput?.value || "";
   const rrSettings = extractRoundRobinSettingsUI("create", defaultRoundRobinSettings);
@@ -964,6 +1213,7 @@ async function handleCreateTournament(event) {
       format,
       maxPlayers: Number.isFinite(maxPlayers) ? maxPlayers : null,
       startTime: startTime ? startTime.getTime() : null,
+      checkInWindowMinutes,
       mapPool: Array.from(mapPoolSelection || []),
       createdBy: auth.currentUser?.uid || null,
       createdByName: getCurrentUsername() || "Unknown host",
@@ -1104,7 +1354,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     setTestBracketCount,
     cycleTestBracketCount,
     resetTournament,
+    checkInCurrentPlayer,
+    removeNotCheckedInPlayers,
+    goLiveTournament,
   });
+
+  if (typeof window !== "undefined") {
+    setInterval(() => {
+      if (currentTournamentMeta) {
+        updateCheckInUI();
+      }
+    }, 30000);
+  }
 
   try {
     await loadMapCatalog();
@@ -1148,12 +1409,20 @@ function updateAdminVisibility() {
   const settingsBtn = document.getElementById("settingsTabBtn");
   if (seedingBtn) seedingBtn.style.display = isAdmin ? "" : "none";
   if (settingsBtn) settingsBtn.style.display = isAdmin ? "" : "none";
+  const testHarness = document.getElementById("testBracketPanel");
+  if (testHarness) testHarness.style.display = isAdmin ? "" : "none";
+  if (typeof window !== "undefined") {
+    window.__tournamentIsAdmin = isAdmin;
+  }
 }
 
 function recomputeAdminFromMeta() {
   const uid = auth?.currentUser?.uid || null;
   const owns = Boolean(uid && currentTournamentMeta?.createdBy === uid);
   setIsAdminState(owns);
+  if (typeof window !== "undefined") {
+    window.__tournamentIsAdmin = owns;
+  }
   updateAdminVisibility();
 }
 
@@ -1439,6 +1708,10 @@ function cycleTestBracketCount(delta) {
 
 async function handleRegistration(event) {
   event.preventDefault();
+  if (state.isLive) {
+    showToast?.("Tournament is live. Registration is closed.", "error");
+    return;
+  }
   const name = document.getElementById("playerNameInput")?.value.trim();
   const statusEl = document.getElementById("mmrStatus");
   const raceSelect = document.getElementById("raceSelect");
@@ -1464,6 +1737,23 @@ async function handleRegistration(event) {
       "Sign in and add your SC2Pulse link in Settings first.",
       true
     );
+    return;
+  }
+
+  const existingPlayer = (state.players || []).find(
+    (p) => p.uid === auth.currentUser?.uid
+  );
+  if (existingPlayer) {
+    const remaining = (state.players || []).filter(
+      (p) => p.uid !== auth.currentUser?.uid
+    );
+    saveState({ players: remaining, needsReseed: true });
+    rebuildBracket(true, "Player removed");
+    addActivity(`${existingPlayer.name} unregistered.`);
+    showToast?.("You have been unregistered.", "success");
+    event.target.reset();
+    hydratePulseFromState(pulseProfile);
+    renderAll();
     return;
   }
 

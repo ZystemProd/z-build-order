@@ -55,6 +55,9 @@ export function initTournamentPage({
   setTestBracketCount,
   cycleTestBracketCount,
   resetTournament,
+  checkInCurrentPlayer,
+  removeNotCheckedInPlayers,
+  goLiveTournament,
 }) {
   ensureTestHarnessPanel();
   initUserSettingsModal();
@@ -62,11 +65,13 @@ export function initTournamentPage({
   const registrationForm = document.getElementById("registrationForm");
   const rebuildBtn = document.getElementById("rebuildBracketBtn");
   const resetBtn = document.getElementById("resetTournamentBtn");
+  const removeNotCheckedInBtn = document.getElementById("removeNotCheckedInBtn");
   const jumpToRegistration = document.getElementById("jumpToRegistration");
   const jumpToBracket = document.getElementById("jumpToBracket");
   const bracketGrid = document.getElementById("bracketGrid");
   const playersTable = document.getElementById("playersTableBody");
   const autoFillBtn = document.getElementById("autoFillBtn");
+  const checkInBtn = document.getElementById("checkInBtn");
   const signInBtn = document.getElementById("signInBtn");
   const signOutBtn = document.getElementById("signOutBtn");
   const switchAccountBtn = document.getElementById("switchAccountBtn");
@@ -144,11 +149,13 @@ export function initTournamentPage({
   };
 
   registrationForm?.addEventListener("submit", handleRegistration);
-  rebuildBtn?.addEventListener("click", () => rebuildBracket(true, "Manual reseed"));
+  rebuildBtn?.addEventListener("click", () => goLiveTournament?.());
+  removeNotCheckedInBtn?.addEventListener("click", () => removeNotCheckedInPlayers?.());
   resetBtn?.addEventListener("click", () => {
     resetTournament?.();
   });
   autoFillBtn?.addEventListener("click", autoFillPlayers);
+  checkInBtn?.addEventListener("click", () => checkInCurrentPlayer?.());
 
   signInBtn?.addEventListener("click", () => window.handleSignIn?.());
   signOutBtn?.addEventListener("click", () => window.handleSignOut?.());

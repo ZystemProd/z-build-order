@@ -193,13 +193,17 @@
               <p class="eyebrow">Bracket</p>
               <h3 id="bracketTitle">Double elimination</h3>
             </div>
-            <div class="live-dot">Live</div>
+            <div class="live-dot not-live" id="liveDot">Not Live</div>
+          </div>
+          <div id="bracketNotLive" class="not-live-panel" style="display:none;">
+            <p class="helper">Bracket will appear when the tournament goes live.</p>
+            <ul id="registeredPlayersList" class="registered-list"></ul>
           </div>
           <div id="bracketGrid" class="bracket-grid">
             <div class="placeholder">No players yet. Add players to generate the bracket.</div>
           </div>
         </div>
-        <div class="card activity-card">
+        <div class="card activity-card" id="activityCard">
           <div class="card-header">
             <div>
               <p class="eyebrow">Stream View</p>
@@ -217,7 +221,10 @@
               <p class="eyebrow">Registration</p>
               <h3>Add or update players</h3>
             </div>
-            <span class="badge muted">SC2Pulse × MMR</span>
+            <div class="checkin-row">
+              <p id="checkInStatus" class="checkin-status"></p>
+              <button type="button" id="checkInBtn" class="cta ghost" style="display:none;">Check in</button>
+            </div>
           </div>
           <form id="registrationForm" class="form-grid">
             <label>
@@ -241,15 +248,11 @@
               MMR (auto)
               <input id="mmrDisplay" type="text" placeholder="MMR will load from SC2Pulse" readonly />
             </label>
-            <label>
-              Starting points (optional)
-              <input id="pointsInput" type="number" inputmode="numeric" min="0" placeholder="0" />
-            </label>
             <div class="form-actions">
-              <button type="submit" class="cta primary">Register</button>
-              <button type="button" id="autoFillBtn" class="cta small ghost">Dev: Auto-fill 12 players</button>
+              <button type="submit" class="cta primary" id="registerBtn">Register</button>
+              <button type="button" id="autoFillBtn" class="cta small ghost" data-admin-only="true">Dev: Auto-fill 12 players</button>
             </div>
-            <p id="mmrStatus" class="helper">Race and MMR load from your SC2Pulse profile in Settings.</p>
+            <p id="mmrStatus" class="helper" style="display:none;"></p>
           </form>
         </div>
 
@@ -265,7 +268,8 @@
             <div class="seed-actions">
               <span id="seedingNotice" class="badge warning" style="display:none;">Seeding changed - rebuild
                 needed</span>
-              <button id="rebuildBracketBtn" class="cta small ghost">Apply to bracket</button>
+              <button id="rebuildBracketBtn" class="cta small ghost">Go Live</button>
+              <button id="removeNotCheckedInBtn" class="cta small ghost">Remove not checked-in</button>
               <button id="resetTournamentBtn" class="cta small subtle">Reset tournament</button>
             </div>
           </div>
@@ -278,6 +282,7 @@
                   <th>Points</th>
                   <th>MMR</th>
                   <th>SC2Pulse</th>
+                  <th>Check-in</th>
                   <th></th>
                 </tr>
               </thead>
@@ -317,6 +322,14 @@
             </label>
             <label>Max players
               <input type="number" id="settingsMaxPlayersInput" min="2" max="512" placeholder="32" />
+            </label>
+            <label>Check-in opens (before start)
+              <div class="inline-row">
+                <input type="number" id="settingsCheckInHoursInput" min="0" placeholder="0" />
+                <span class="muted">hours</span>
+                <input type="number" id="settingsCheckInMinutesInput" min="0" max="59" placeholder="0" />
+                <span class="muted">min</span>
+              </div>
             </label>
             <label>Cover image
               <div class="image-upload">
@@ -615,6 +628,14 @@
         </label>
         <label>Max players
           <input type="number" id="tournamentMaxPlayersInput" min="2" max="512" placeholder="32" />
+        </label>
+        <label>Check-in opens (before start)
+          <div class="inline-row">
+            <input type="number" id="checkInHoursInput" min="0" placeholder="0" />
+            <span class="muted">hours</span>
+            <input type="number" id="checkInMinutesInput" min="0" max="59" placeholder="0" />
+            <span class="muted">min</span>
+          </div>
         </label>
         <label>Cover image
           <div class="image-upload">

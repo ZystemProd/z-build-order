@@ -1,6 +1,6 @@
 import { escapeHtml } from "../bracket/renderUtils.js";
 
-export function renderSeedingTable(players = []) {
+export function renderSeedingTable(players = [], { isLive = false } = {}) {
   const body = document.getElementById("playersTableBody");
   if (!body) return;
 
@@ -15,6 +15,9 @@ export function renderSeedingTable(players = []) {
     const pulseHtml = pulseLink
       ? `<a href="${escapeHtml(pulseLink)}" target="_blank" rel="noopener">Link</a>`
       : "-";
+    const checkedIn = p.checkedInAt
+      ? `<span class="checkin-pill is-checked">Checked in</span>`
+      : `<span class="checkin-pill is-missing">Not checked in</span>`;
 
     return `
       <tr>
@@ -32,17 +35,23 @@ export function renderSeedingTable(players = []) {
             data-player-id="${escapeHtml(p.id || "")}"
             value="${points}"
             min="0"
+            ${isLive ? "disabled" : ""}
           />
         </td>
         <td>${mmr ?? "-"}</td>
         <td>${pulseHtml}</td>
+        <td>${checkedIn}</td>
         <td>
-          <button
-            class="cta small subtle remove-player"
-            data-player-id="${escapeHtml(p.id || "")}"
-          >
-            Remove
-          </button>
+          ${
+            isLive
+              ? `<span class="helper">Locked</span>`
+              : `<button
+                  class="cta small subtle remove-player"
+                  data-player-id="${escapeHtml(p.id || "")}"
+                >
+                  Remove
+                </button>`
+          }
         </td>
       </tr>
     `;

@@ -26,6 +26,7 @@ export const defaultState = {
   lastUpdated: Date.now(),
   bracketLayoutVersion: 1,
   matchVetoes: {},
+  isLive: false,
 };
 
 export let currentSlug = null;

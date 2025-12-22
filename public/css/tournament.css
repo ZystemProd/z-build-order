@@ -356,6 +356,15 @@ a {
   box-shadow: 0 0 0 8px rgba(74, 222, 128, 0.12);
 }
 
+.live-dot.not-live {
+  color: var(--danger);
+}
+
+.live-dot.not-live::before {
+  background: var(--danger);
+  box-shadow: 0 0 0 8px rgba(255, 107, 107, 0.12);
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -425,15 +434,158 @@ a {
 .players-table td {
   padding: 10px 12px;
   border-bottom: 1px solid var(--stroke);
+  text-align: left;
 }
 
 .players-table tbody tr:last-child td {
   border-bottom: none;
 }
 
+.not-live-panel {
+  border: 1px dashed var(--stroke);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.registered-list {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 0 0;
+  display: grid;
+  gap: 6px;
+}
+
+.registered-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.registered-list .name-text {
+  color: var(--text);
+  font-weight: 600;
+  outline: 1px solid transparent;
+  outline-offset: 2px;
+  border-radius: 6px;
+  padding: 2px 4px;
+  cursor: pointer;
+}
+
+.registered-list .name-text:hover {
+  outline-color: rgba(78, 213, 255, 0.55);
+  background: rgba(78, 213, 255, 0.08);
+}
+
+.registered-meta {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.checkin-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+.checkin-status::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--muted);
+  box-shadow: 0 0 0 6px rgba(154, 163, 182, 0.12);
+}
+
+.checkin-status.is-open {
+  color: var(--accent-2);
+}
+
+.checkin-status.is-open::before {
+  background: var(--accent-2);
+  box-shadow: 0 0 0 6px rgba(78, 213, 255, 0.18);
+}
+
+.checkin-status.is-checked {
+  color: var(--success);
+}
+
+.checkin-status.is-checked::before {
+  background: var(--success);
+  box-shadow: 0 0 0 6px rgba(74, 222, 128, 0.18);
+}
+
+.checkin-status.is-closed {
+  color: var(--danger);
+}
+
+.checkin-status.is-closed::before {
+  background: var(--danger);
+  box-shadow: 0 0 0 6px rgba(255, 107, 107, 0.16);
+}
+
+.checkin-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 0;
+  justify-content: flex-end;
+  width: 100%;
+}
+
+.card-header .checkin-row {
+  width: auto;
+}
+
+.checkin-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  letter-spacing: 0.01em;
+}
+
+.checkin-pill.is-checked {
+  color: #d6ffe7;
+  background: rgba(22, 163, 74, 0.38);
+  border-color: rgba(34, 197, 94, 0.75);
+}
+
+.checkin-pill.is-missing {
+  color: #ffe0e0;
+  background: rgba(239, 68, 68, 0.3);
+  border-color: rgba(248, 113, 113, 0.75);
+}
+
 .players-table input {
   width: 80px;
   text-align: right;
+}
+
+.points-input {
+  width: 90px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--stroke);
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 13px;
+  text-align: right;
+}
+
+.points-input:focus {
+  outline: 2px solid var(--accent-2);
+  border-color: var(--accent-2);
 }
 
 .players-table .player-line {
@@ -702,7 +854,7 @@ a {
 .tree-bracket {
   position: relative;
   min-height: 200px;
-  --card-width: 260px;
+  --card-width: 240px;
 }
 
 .tree-bracket .row-title {
