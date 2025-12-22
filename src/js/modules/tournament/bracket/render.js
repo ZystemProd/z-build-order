@@ -341,7 +341,7 @@ export function layoutBracketSection(
   const CARD_HEIGHT = 70;
   const CARD_WIDTH = 240;
   const V_GAP = 8;
-  const H_GAP = 90;
+  const H_GAP = 50;
 
   const clonedRounds = rounds.map((round) => round.slice());
 
