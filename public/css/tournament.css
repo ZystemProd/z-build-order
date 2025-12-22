@@ -450,6 +450,7 @@ a {
   flex-direction: column;
   gap: 20px;
   max-width: 100%;
+  padding-left: 15px;
   overflow: auto;
   -webkit-overflow-scrolling: touch;
   cursor: grab;
@@ -656,6 +657,19 @@ a {
   font-size: 12px;
 }
 
+.match-card.tree .seed-chip,
+.match-card.group .seed-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+}
+
+.match-card.tree .seed-chip.is-placeholder,
+.match-card.group .seed-chip.is-placeholder {
+  visibility: hidden;
+}
+
 .result-select,
 .score-select {
   width: 100%;
@@ -691,7 +705,7 @@ a {
   color: var(--muted);
   font-weight: 600;
   user-select: none;
-  z-index: 3;
+  z-index: 0;
   pointer-events: none;
 }
 
@@ -723,12 +737,13 @@ a {
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
   background: var(--panel);
-  padding: 6px 8px 6px 8px;
+  height: 70px;
+  padding: 3px 3px 3px;
   overflow: visible;
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: 1fr;
   grid-template-rows: auto auto;
-  column-gap: 5px;
+  column-gap: 0;
   row-gap: 0px;
   align-items: center;
   z-index: 1;
@@ -799,6 +814,7 @@ a {
   font-weight: 700;
   color: var(--muted);
   font-size: 12px;
+  z-index: 10;
 }
 
 .match-card.group .row-actions {
@@ -895,7 +911,7 @@ a {
   align-items: center;
   gap: 6px;
   font-size: 13px;
-  grid-column: 2;
+  grid-column: 1;
 }
 
 .match-card.tree .row.winner .name-text,
@@ -929,20 +945,24 @@ a {
 }
 
 .match-card.tree .match-number {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  transform: translate(-50%, -50%);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  grid-row: 1 / span 2;
-  grid-column: 1;
-  min-width: 28px;
-  height: 100%;
-  padding: 2px 6px;
-  border-radius: 8px;
-  border: 1px solid var(--stroke);
-  background: rgba(255, 255, 255, 0.05);
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(78, 213, 255, 0.4);
+  background: #030608;
   font-weight: 700;
-  color: var(--muted);
+  color: var(--accent-2);
   font-size: 12px;
+  letter-spacing: 0.04em;
+  z-index: 10;
 }
 
 .result-select,
@@ -1009,7 +1029,22 @@ a {
   outline: 1px solid transparent;
   outline-offset: 2px;
   border-radius: 8px;
-  padding: 2px;
+  padding-right: 1px;
+  padding-left: 1px;
+}
+
+.clan-logo-inline {
+  width: 1.5em;
+  height: 1.5em;
+  border-radius: 4px;
+  object-fit: cover;
+  vertical-align: middle;
+  display: inline-block;
+}
+
+.clan-logo-inline.is-placeholder {
+  opacity: 0.35;
+  filter: grayscale(0.25);
 }
 
 .match-card.tree .name-text:not(.is-placeholder),
@@ -1061,7 +1096,7 @@ a {
   height: 100%;
   width: 38px;
   border-radius: 0 10px 10px 0;
-  z-index: 2;
+  z-index: 12;
   background: #1c7f9c;
   border: 1px solid var(--stroke);
   border-left-color: rgba(255, 255, 255, 0.12);
@@ -1085,7 +1120,7 @@ a {
   bottom: calc(100% + 8px);
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(15, 20, 33, 0.95);
+  background: #0f1421;
   color: var(--text);
   border: 1px solid var(--stroke);
   border-radius: 8px;
@@ -1094,9 +1129,12 @@ a {
   font-weight: 600;
   letter-spacing: 0.02em;
   white-space: nowrap;
+  z-index: 20;
   opacity: 0;
   pointer-events: none;
   transition: opacity 140ms ease, transform 140ms ease;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  mix-blend-mode: normal;
 }
 
 .hover-info-container:hover::after {
@@ -1152,18 +1190,20 @@ a {
   position: absolute;
   height: 2px;
   background: var(--line);
+  z-index: 0;
 }
 
 .connector.v {
   position: absolute;
   width: 2px;
   background: var(--line);
+  z-index: 0;
 }
 
 .connector.highlight {
   background: var(--accent-2);
   box-shadow: 0 0 6px rgba(78, 213, 255, 0.6);
-  z-index: 2;
+  z-index: 0;
 }
 
 .placeholder {

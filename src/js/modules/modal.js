@@ -836,7 +836,9 @@ export async function populateBuildList(
       const mainId = getMainClanId();
       if (pubImg && mainId) {
         getClanInfo(mainId).then((info) => {
-          if (info?.logoUrl) pubImg.src = info.logoUrl;
+          if (info?.logoUrlSmall || info?.logoUrl) {
+            pubImg.src = info.logoUrlSmall || info.logoUrl;
+          }
         });
       }
 
@@ -1704,4 +1706,3 @@ async function loadBuildIntoEditor(build) {
 }
 
 export { closeBuildsModal };
-

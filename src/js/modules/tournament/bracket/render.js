@@ -4,6 +4,7 @@ import { getAllMatches, getMatchLookup, resolveParticipants } from "./lookup.js"
 import { generateSeedPositions } from "./build.js";
 import {
   escapeHtml,
+  sanitizeUrl,
   getBestOfForMatch,
   getSelectValue,
   parseMatchNumber,
@@ -241,6 +242,8 @@ export function renderSimpleMatch(
   const bName = pB ? pB.name : displayPlaceholderForSource(match, 1, lookup);
   const raceClassA = raceClassName(pA?.race);
   const raceClassB = raceClassName(pB?.race);
+  const clanLogoA = pA?.clanLogoUrl ? sanitizeUrl(pA.clanLogoUrl) : "";
+  const clanLogoB = pB?.clanLogoUrl ? sanitizeUrl(pB.clanLogoUrl) : "";
   const showScores = !!(pA && pB);
   const bestOf = getBestOfForMatch(match);
   const selectValA = getSelectValue(match, 0, bestOf);
@@ -268,9 +271,13 @@ export function renderSimpleMatch(
     <div class="row ${
       match.winnerId === pA?.id ? "winner" : ""
     }" data-player-id="${pA?.id || ""}">
-      <span class="name">${
-         pA ? `<span class="seed-chip">#${pA.seed || "?"}</span>` : ""
-      }<span class="race-strip ${raceClassA}"></span><span class="name-text ${
+      <span class="name"><span class="seed-chip ${
+        pA ? "" : "is-placeholder"
+      }">${pA ? `#${pA.seed || "?"}` : ""}</span><span class="race-strip ${raceClassA}"></span>${
+        clanLogoA
+          ? `<img class="clan-logo-inline" src="${escapeHtml(clanLogoA)}" alt="Clan logo" />`
+          : `<img class="clan-logo-inline is-placeholder" src="img/clan/logo.webp" alt="No clan logo" />`
+      }<span class="name-text ${
     aIsPlaceholder ? "is-placeholder" : ""
   }">${escapeHtml(
      aName
@@ -286,9 +293,13 @@ export function renderSimpleMatch(
     <div class="row ${
       match.winnerId === pB?.id ? "winner" : ""
     }" data-player-id="${pB?.id || ""}">
-      <span class="name">${
-         pB ? `<span class="seed-chip">#${pB.seed || "?"}</span>` : ""
-      }<span class="race-strip ${raceClassB}"></span><span class="name-text ${
+      <span class="name"><span class="seed-chip ${
+        pB ? "" : "is-placeholder"
+      }">${pB ? `#${pB.seed || "?"}` : ""}</span><span class="race-strip ${raceClassB}"></span>${
+        clanLogoB
+          ? `<img class="clan-logo-inline" src="${escapeHtml(clanLogoB)}" alt="Clan logo" />`
+          : `<img class="clan-logo-inline is-placeholder" src="img/clan/logo.webp" alt="No clan logo" />`
+      }<span class="name-text ${
     bIsPlaceholder ? "is-placeholder" : ""
   }">${escapeHtml(
      bName
@@ -327,7 +338,7 @@ export function layoutBracketSection(
     return { html: "", height: 0 };
   }
 
-  const CARD_HEIGHT = 90;
+  const CARD_HEIGHT = 70;
   const CARD_WIDTH = 240;
   const V_GAP = 8;
   const H_GAP = 90;

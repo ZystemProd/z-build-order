@@ -1539,6 +1539,7 @@ async function handleRegistration(event) {
   const selectedClanId = mainClanSelect?.value || "";
   let clanName = selectedClanOption?.textContent || "";
   let clanAbbreviation = selectedClanOption?.dataset?.abbr || "";
+  let clanLogoUrl = selectedClanOption?.dataset?.logoUrl || "";
   if (selectedClanId) {
     try {
       const clanDoc = await getDoc(doc(db, "clans", selectedClanId));
@@ -1546,6 +1547,7 @@ async function handleRegistration(event) {
         const clanData = clanDoc.data();
         clanName = clanData?.name || clanName;
         clanAbbreviation = clanData?.abbreviation || clanAbbreviation;
+        clanLogoUrl = clanData?.logoUrlSmall || clanData?.logoUrl || clanLogoUrl;
       }
     } catch (err) {
       console.warn("Could not fetch clan abbreviation", err);
@@ -1565,6 +1567,7 @@ async function handleRegistration(event) {
     mmrByRace,
     clan: clanName === "None" ? "" : clanName,
     clanAbbreviation: clanAbbreviation || "",
+    clanLogoUrl: clanLogoUrl || "",
     pulseName: pulseProfile?.accountName || "",
     uid: auth.currentUser?.uid || null,
   });

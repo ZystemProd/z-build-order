@@ -270,7 +270,7 @@ export function initTournamentPage({
 
   enableDragScroll(bracketGrid, {
     ignoreSelector:
-      'a, button, input, select, textarea, label, summary, details, [contenteditable="true"], [data-no-drag], .name-text, .hover-info-container, .score-select, .row-actions',
+      'a, button, input, select, textarea, label, summary, details, [contenteditable="true"], [data-no-drag], .name-text:not(.is-placeholder), .hover-info-container, .score-select, .row-actions',
   });
 
   playersTable?.addEventListener("change", (e) => {

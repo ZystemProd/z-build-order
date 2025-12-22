@@ -32,7 +32,8 @@ import { logAnalyticsEvent } from "./analyticsHelper.js";
 import { prepareImageForUpload, validateImageFile } from "./imageUtils.js";
 
 const storage = getStorage(app);
-const CLAN_LOGO_SIZE = 512;
+const CLAN_LOGO_SIZE = 256;
+const CLAN_LOGO_SMALL_SIZE = 96;
 const CLAN_LOGO_MAX_BYTES = 2 * 1024 * 1024;
 const CLAN_LOGO_QUALITY = 0.85;
 
@@ -72,6 +73,20 @@ export async function uploadClanLogo(file, clanId) {
   return url;
 }
 
+export async function uploadClanLogoSmall(file, clanId) {
+  const filePath = `clanLogos/${clanId}/logo-small.webp`;
+  const storageRef = ref(storage, filePath);
+  const processed = await prepareImageForUpload(file, {
+    targetWidth: CLAN_LOGO_SMALL_SIZE,
+    targetHeight: CLAN_LOGO_SMALL_SIZE,
+    quality: CLAN_LOGO_QUALITY,
+    outputType: "image/webp",
+    fallbackType: "image/jpeg",
+  });
+  await uploadBytes(storageRef, processed.blob, { contentType: processed.contentType });
+  return getDownloadURL(storageRef);
+}
+
 export async function createClan({
   name,
   logoFile,
@@ -108,9 +123,12 @@ export async function createClan({
       throw new Error(error);
     }
 
-    // Upload and update the logoUrl
-    const logoUrl = await uploadClanLogo(logoFile, clanDoc.id);
-    await updateDoc(clanDoc, { logoUrl });
+    // Upload and update the logo URLs
+    const [logoUrl, logoUrlSmall] = await Promise.all([
+      uploadClanLogo(logoFile, clanDoc.id),
+      uploadClanLogoSmall(logoFile, clanDoc.id),
+    ]);
+    await updateDoc(clanDoc, { logoUrl, logoUrlSmall });
   }
 
   logAnalyticsEvent("clan_created", { name });
@@ -155,7 +173,12 @@ export async function getUserClans(uid) {
   snap.forEach((d) => {
     const data = d.data();
     if (data.members?.includes(uid)) {
-      clans.push({ id: d.id, name: data.name, logoUrl: data.logoUrl });
+      clans.push({
+        id: d.id,
+        name: data.name,
+        logoUrl: data.logoUrl,
+        logoUrlSmall: data.logoUrlSmall,
+      });
     }
   });
   return clans;
@@ -1128,8 +1151,12 @@ async function renderManageTab(tab, clan) {
             throw new Error(error);
           }
 
-          const logoUrl = await uploadClanLogo(file, clan.id);
+          const [logoUrl, logoUrlSmall] = await Promise.all([
+            uploadClanLogo(file, clan.id),
+            uploadClanLogoSmall(file, clan.id),
+          ]);
           updates.logoUrl = logoUrl;
+          updates.logoUrlSmall = logoUrlSmall;
         }
 
         await updateDoc(doc(db, "clans", clan.id), updates);

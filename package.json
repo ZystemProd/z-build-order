@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "deploy": "npm run build && firebase deploy",
-    "preview-deploy": "rm -rf dist/img && npm run build && firebase hosting:channel:deploy dev",
+    "preview-deploy": "npm run clean-dist && npm run build && firebase hosting:channel:deploy dev",
+    "clean-dist": "npx rimraf dist/* dist/.[!.]* dist/..?*",
     "clean": "rimraf node_modules/.vite dist",
     "minify-firebase": "node scripts/minify-firebase.js"
   },

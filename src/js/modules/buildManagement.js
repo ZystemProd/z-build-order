@@ -727,6 +727,7 @@ export async function syncToPublishedBuild(buildId, buildData) {
           name: clan.name,
           tag: clan.abbreviation || clan.tag || "",
           logoUrl: clan.logoUrl || null,
+          logoUrlSmall: clan.logoUrlSmall || null,
         };
       }
     } catch (e) {
