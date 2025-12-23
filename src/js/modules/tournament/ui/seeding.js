@@ -18,28 +18,20 @@ export function renderSeedingTable(
     const pulseHtml = pulseLink
       ? `<a href="${escapeHtml(pulseLink)}" target="_blank" rel="noopener">Link</a>`
       : "-";
-    const checkedIn = p.checkedInAt
-      ? `<span class="checkin-pill is-checked">Checked in</span>`
-      : `<span class="checkin-pill is-missing">Not checked in</span>`;
+    const checkinPill = `<span class="checkin-pill ${p.checkedInAt ? "is-checked" : "is-missing"}">
+        ${p.checkedInAt ? "Checked in" : "Not checked in"}
+      </span>`;
     const checkInAction = isAdmin
       ? `<div class="checkin-editor">
-          <button
-            class="cta small ghost toggle-checkin"
-            data-player-id="${escapeHtml(p.id || "")}"
-            type="button"
-          >
-            Edit
-          </button>
           <select
-            class="checkin-select"
+            class="checkin-select checkin-select-pill ${p.checkedInAt ? "is-checked" : "is-missing"}"
             data-player-id="${escapeHtml(p.id || "")}"
-            style="display:none;"
           >
             <option value="checked" ${p.checkedInAt ? "selected" : ""}>Checked in</option>
             <option value="not" ${p.checkedInAt ? "" : "selected"}>Not checked in</option>
           </select>
         </div>`
-      : "";
+      : checkinPill;
 
     return `
       <tr>
@@ -64,7 +56,6 @@ export function renderSeedingTable(
         <td>${pulseHtml}</td>
         <td>
           <div class="checkin-cell">
-            ${checkedIn}
             ${checkInAction}
           </div>
         </td>

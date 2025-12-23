@@ -99,6 +99,14 @@ import {
   raceClassName,
 } from "./bracket/renderUtils.js";
 import { playerKey } from "./playerKey.js";
+import {
+  readCircuitPointsTable,
+  renderCircuitPointsSettings,
+  handleAddCircuitPointsRow,
+  handleRemoveCircuitPointsRow,
+  handleApplyCircuitPoints as handleApplyCircuitPointsCore,
+  getCircuitSeedPoints,
+} from "./circuitPoints.js";
 import { updateTooltips } from "../tooltip.js";
 import {
   fetchCircuitMeta,
@@ -309,6 +317,21 @@ function getPlayersMap() {
   return new Map((state.players || []).map((p) => [p.id, p]));
 }
 
+function handleApplyCircuitPoints(event) {
+  const result = handleApplyCircuitPointsCore(event, { saveState, renderAll });
+  if (!result?.applied || !currentTournamentMeta?.slug) return;
+  const updatedMeta = { ...(currentTournamentMeta || {}), circuitPointsApplied: true };
+  setCurrentTournamentMetaState(updatedMeta);
+  renderCircuitPointsSettings();
+  setDoc(
+    doc(collection(db, TOURNAMENT_COLLECTION), currentTournamentMeta.slug),
+    { circuitPointsApplied: true },
+    { merge: true }
+  ).catch((err) => {
+    console.error("Failed to store circuit points applied flag", err);
+  });
+}
+
 function renderAll() {
   // Update seeding table
   renderSeedingTable(applySeeding(state.players || []), {
@@ -418,6 +441,7 @@ function renderAll() {
       updateSettingsRulesPreview,
       syncFormatFieldVisibility,
     });
+    renderCircuitPointsSettings();
   }
 
   // Render maps tab from current meta or default pool
@@ -656,10 +680,11 @@ function resetTournament() {
   setSeedingNotice(false);
 }
 
-function updateMatchScore(matchId, scoreA, scoreB) {
+function updateMatchScore(matchId, scoreA, scoreB, options = {}) {
   updateMatchScoreCore(matchId, scoreA, scoreB, {
     saveState,
     renderAll,
+    ...options,
   });
 }
 
@@ -1154,6 +1179,7 @@ async function enterCircuit(slug, options = {}) {
           circuitSlug: currentCircuitMeta?.slug || "",
         }),
       showDelete: isCircuitAdmin,
+      showEdit: isCircuitAdmin,
     });
     updateCircuitAdminVisibility();
   } catch (err) {
@@ -1352,6 +1378,9 @@ async function handleSaveSettings(event) {
   );
   const mapPool = Array.from(mapPoolSelection || []);
   const rrSettings = extractRoundRobinSettingsUI("settings", defaultRoundRobinSettings);
+  const circuitPoints = currentTournamentMeta?.circuitSlug
+    ? readCircuitPointsTable()
+    : null;
   let coverImageUrl = currentTournamentMeta?.coverImageUrl || "";
   if (imageFile) {
     try {
@@ -1377,6 +1406,9 @@ async function handleSaveSettings(event) {
     roundRobin: rrSettings,
     lastUpdated: Date.now(),
   };
+  if (currentTournamentMeta?.circuitSlug) {
+    meta.circuitPoints = circuitPoints || [];
+  }
 
   const previousSlug = currentSlug;
   if (slugChanged) {
@@ -1522,6 +1554,14 @@ async function handleCreateTournament(event) {
         ),
         lower: Number(
           document.getElementById("bestOfLowerInput")?.value || defaultBestOf.lower
+        ),
+        lowerSemi: Number(
+          document.getElementById("bestOfLowerSemiInput")?.value ||
+            defaultBestOf.lowerSemi
+        ),
+        lowerFinal: Number(
+          document.getElementById("bestOfLowerFinalInput")?.value ||
+            defaultBestOf.lowerFinal
         ),
         quarter: Number(
           document.getElementById("bestOfQuarterInput")?.value ||
@@ -1674,6 +1714,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     removePlayer,
     updateMatchScore,
     saveState,
+    handleAddCircuitPointsRow,
+    handleRemoveCircuitPointsRow,
+    handleApplyCircuitPoints,
     // test harness hooks
     setTestBracketCount,
     cycleTestBracketCount,
@@ -1719,6 +1762,10 @@ function switchTab(targetId) {
   });
 }
 
+if (typeof window !== "undefined") {
+  window.__switchTournamentTab = switchTab;
+}
+
 function updateAdminVisibility() {
   const adminEls = document.querySelectorAll("[data-admin-only='true']");
   adminEls.forEach((el) => {
@@ -1726,8 +1773,13 @@ function updateAdminVisibility() {
   });
   const seedingBtn = document.getElementById("seedingTabBtn");
   const settingsBtn = document.getElementById("settingsTabBtn");
+  const circuitPointsBtn = document.getElementById("circuitPointsTabBtn");
   if (seedingBtn) seedingBtn.style.display = isAdmin ? "" : "none";
   if (settingsBtn) settingsBtn.style.display = isAdmin ? "" : "none";
+  if (circuitPointsBtn) {
+    circuitPointsBtn.style.display =
+      isAdmin && currentTournamentMeta?.circuitSlug ? "" : "none";
+  }
   const testHarness = document.getElementById("testBracketPanel");
   if (testHarness) testHarness.style.display = isAdmin ? "" : "none";
   if (typeof window !== "undefined") {
@@ -2099,7 +2151,7 @@ async function handleRegistration(event) {
     rawPoints === "" || rawPoints === null || rawPoints === undefined
       ? null
       : Number(rawPoints);
-  const startingPoints =
+  let startingPoints =
     requestedPoints === null
       ? null
       : Number.isFinite(requestedPoints)
@@ -2122,6 +2174,19 @@ async function handleRegistration(event) {
       true
     );
     return;
+  }
+
+  if (
+    startingPoints === null &&
+    currentTournamentMeta?.circuitSlug &&
+    name
+  ) {
+    startingPoints = await getCircuitSeedPoints({
+      name,
+      sc2Link: sc2LinkInput,
+      circuitSlug: currentTournamentMeta.circuitSlug,
+      tournamentSlug: currentSlug,
+    });
   }
 
   if (raceSelect) {

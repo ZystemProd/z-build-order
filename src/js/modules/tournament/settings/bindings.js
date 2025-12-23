@@ -7,6 +7,9 @@ export function bindSettingsEvents({
   updateSettingsRulesPreview,
   syncFormatFieldVisibility,
   handleSaveSettings,
+  handleAddCircuitPointsRow,
+  handleRemoveCircuitPointsRow,
+  handleApplyCircuitPoints,
 }) {
   const settingsDescToolbarBtns = document.querySelectorAll(
     "[data-settings-desc-action]"
@@ -21,6 +24,9 @@ export function bindSettingsEvents({
   );
   const settingsFormatSelect = document.getElementById("settingsFormatSelect");
   const saveSettingsBtn = document.getElementById("saveSettingsBtn");
+  const addCircuitPointsRowBtn = document.getElementById("addCircuitPointsRow");
+  const applyCircuitPointsBtn = document.getElementById("applyCircuitPointsBtn");
+  const circuitPointsBody = document.getElementById("circuitPointsBody");
 
   settingsDescToolbarBtns.forEach((btn) => {
     btn.addEventListener("click", () =>
@@ -52,4 +58,11 @@ export function bindSettingsEvents({
   });
 
   saveSettingsBtn?.addEventListener("click", handleSaveSettings);
+  addCircuitPointsRowBtn?.addEventListener("click", handleAddCircuitPointsRow);
+  applyCircuitPointsBtn?.addEventListener("click", handleApplyCircuitPoints);
+  circuitPointsBody?.addEventListener("click", (event) => {
+    const target = event.target.closest("[data-circuit-remove='true']");
+    if (!target) return;
+    handleRemoveCircuitPointsRow?.(event);
+  });
 }

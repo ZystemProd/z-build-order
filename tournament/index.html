@@ -99,7 +99,7 @@
   </div>
 
   <div id="usernameModal" class="modal" style="display: none">
-    <div class="modal-content">
+    <div class="modal-content scrollable-modal">
       <h3>Choose a Username</h3>
       <input type="text" id="usernameInput" placeholder="Enter your username" />
       <br /><br />
@@ -197,8 +197,11 @@
                 <p class="eyebrow">Leaderboard</p>
                 <h3>Points standings</h3>
               </div>
+              <button id="openCircuitPointsEditBtn" class="cta ghost small" style="display:none;">
+                Edit points
+              </button>
             </div>
-            <div class="table-wrapper">
+            <div class="table-wrapper leaderboard-scroll custom-scroll">
               <table class="players-table leaderboard-table">
                 <thead>
                   <tr>
@@ -249,6 +252,8 @@
           <button class="tab-btn" data-tab="seedingTab" id="seedingTabBtn" style="display:none;">Seeding</button>
           <button class="tab-btn" data-tab="settingsTab" id="settingsTabBtn" data-admin-only="true"
             style="display:none;">Settings</button>
+          <button class="tab-btn" data-tab="circuitPointsTab" id="circuitPointsTabBtn" data-admin-only="true"
+            style="display:none;">Circuit points</button>
         </div>
       </div>
 
@@ -678,14 +683,43 @@
 
             </div>
           </div>
-
-
-
           <div class="form-actions" style="margin-top:16px;">
             <button class="cta primary" id="saveSettingsBtn">Save settings</button>
           </div>
           <div class="form-actions danger-actions">
             <button class="cta danger" id="deleteTournamentBtn">Delete tournament</button>
+          </div>
+        </div>
+      </section>
+      <section id="circuitPointsTab" class="tab-panel" data-admin-only="true">
+        <div class="card">
+          <div id="circuitPointsPanel" class="circuit-points-panel" style="display:none;">
+            <div>
+              <p class="eyebrow">Circuit</p>
+              <h4>Circuit points</h4>
+            </div>
+            <p class="helper">Assign points for placements in this tournament. Ties share the same points.</p>
+            <div class="table-wrapper">
+              <table class="players-table circuit-points-table">
+                <thead>
+                  <tr>
+                    <th>Place</th>
+                    <th>Points</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="circuitPointsBody"></tbody>
+              </table>
+            </div>
+            <div class="circuit-points-actions">
+              <button class="cta small ghost" id="addCircuitPointsRow" type="button">
+                Add placement
+              </button>
+              <button class="cta small primary" id="applyCircuitPointsBtn" type="button">
+                Apply points to players
+              </button>
+            </div>
+            <p class="helper" id="circuitPointsStatus"></p>
           </div>
         </div>
       </section>
@@ -852,28 +886,151 @@
             </select>
           </label>
         </div>
-        <div class="inline-row">
-          <label style="flex:1;">Upper bracket best of
-            <input type="number" id="bestOfUpperInput" min="1" max="9" placeholder="3" />
-          </label>
-          <label style="flex:1;">Lower bracket best of
-            <input type="number" id="bestOfLowerInput" min="1" max="9" placeholder="3" />
-          </label>
-        </div>
-        <div class="inline-row">
-          <label style="flex:1;">Quarterfinals best of
-            <input type="number" id="bestOfQuarterInput" min="1" max="9" placeholder="5" />
-          </label>
-          <label style="flex:1;">Semifinals best of
-            <input type="number" id="bestOfSemiInput" min="1" max="9" placeholder="5" />
-          </label>
-          <label style="flex:1;">Finals best of
-            <input type="number" id="bestOfFinalInput" min="1" max="9" placeholder="7" />
-          </label>
+        <div class="format-diagram">
+          <div class="format-row format-row--upper">
+            <div class="format-col format-col--upper-main">
+              <div class="format-title">Upper bracket</div>
+              <div class="format-box format-box--big format-box--upper"></div>
+              <label class="format-input">
+                Best of
+                <select id="bestOfUpperInput">
+                  <option value="1">Bo1</option>
+                  <option value="3">Bo3</option>
+                  <option value="5">Bo5</option>
+                  <option value="7">Bo7</option>
+                  <option value="9">Bo9</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="format-col format-col--quarter">
+              <div class="format-title">Quarterfinals</div>
+              <div class="format-box format-box--big format-box--qf"></div>
+              <label class="format-input">
+                Best of
+                <select id="bestOfQuarterInput">
+                  <option value="1">Bo1</option>
+                  <option value="3">Bo3</option>
+                  <option value="5">Bo5</option>
+                  <option value="7">Bo7</option>
+                  <option value="9">Bo9</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="format-col format-col--semi">
+              <div class="format-title">Semi-finals</div>
+              <div class="format-box format-box--medium format-box--semi"></div>
+              <label class="format-input">
+                Best of
+                <select id="bestOfSemiInput">
+                  <option value="1">Bo1</option>
+                  <option value="3">Bo3</option>
+                  <option value="5">Bo5</option>
+                  <option value="7">Bo7</option>
+                  <option value="9">Bo9</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="format-col format-col--final">
+              <div class="format-title">Finals</div>
+              <div class="format-box format-box--medium format-box--final"></div>
+              <label class="format-input">
+                Best of
+                <select id="bestOfFinalInput">
+                  <option value="1">Bo1</option>
+                  <option value="3">Bo3</option>
+                  <option value="5">Bo5</option>
+                  <option value="7">Bo7</option>
+                  <option value="9">Bo9</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <div class="format-row format-row--lower">
+            <div class="format-col format-col--lower-main">
+              <div class="format-title">Lower bracket</div>
+              <div class="format-box format-box--big format-box--lower"></div>
+              <label class="format-input">
+                Best of
+                <select id="bestOfLowerInput">
+                  <option value="1">Bo1</option>
+                  <option value="3">Bo3</option>
+                  <option value="5">Bo5</option>
+                  <option value="7">Bo7</option>
+                  <option value="9">Bo9</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="format-col format-col--lb-extra">
+              <div class="format-title">LB Semi-finals</div>
+              <div class="format-box format-box--medium format-box--lb-semi"></div>
+              <label class="format-input">
+                Best of
+                <select id="bestOfLowerSemiInput">
+                  <option value="1">Bo1</option>
+                  <option value="3">Bo3</option>
+                  <option value="5">Bo5</option>
+                  <option value="7">Bo7</option>
+                  <option value="9">Bo9</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="format-col format-col--lb-extra">
+              <div class="format-title">LB Finals</div>
+              <div class="format-box format-box--medium format-box--lb-final"></div>
+              <label class="format-input">
+                Best of
+                <select id="bestOfLowerFinalInput">
+                  <option value="1">Bo1</option>
+                  <option value="3">Bo3</option>
+                  <option value="5">Bo5</option>
+                  <option value="7">Bo7</option>
+                  <option value="9">Bo9</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="format-col format-col--spacer"></div>
+          </div>
         </div>
       </div>
       <div class="form-actions create-modal-footer">
         <button class="cta subtle" id="closeCreateTournament">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="circuitPointsModal" class="modal create-modal" style="display:none;">
+    <div class="modal-content scrollable-modal">
+      <div class="modal-title-row">
+        <h3>Edit circuit points</h3>
+        <div class="form-actions inline-actions">
+          <button class="cta primary" id="saveCircuitPointsBtn">Save</button>
+        </div>
+      </div>
+      <label class="inline-filter">
+        <span class="muted">Search</span>
+        <input type="text" id="circuitPointsSearch" placeholder="Filter players..." />
+      </label>
+      <p class="helper">Update points for this circuit leaderboard.</p>
+      <div class="table-wrapper custom-scroll">
+        <table class="players-table">
+          <thead>
+            <tr>
+              <th>Player</th>
+              <th>Points</th>
+            </tr>
+          </thead>
+          <tbody id="circuitPointsEditBody"></tbody>
+        </table>
+      </div>
+      <div class="form-actions">
+        <button class="cta subtle" id="closeCircuitPointsModal">Close</button>
       </div>
     </div>
   </div>
@@ -1098,6 +1255,38 @@
     </div>
   </div>
 
+  <!-- Clan Modal -->
+  <div id="clanModal" class="modal">
+    <div class="modal-content-template">
+      <div class="template-header">
+        <span class="close-modal" id="closeClanModal">&times;</span>
+        <h3>Clans</h3>
+        <div class="clan-main-tabs">
+          <button id="createClanBtn" class="clan-main-tab-button" data-view="create">Create Clan</button>
+          <button id="manageClanBtn" class="clan-main-tab-button" data-view="manage">Manage Clan</button>
+          <button id="findClanBtn" class="clan-main-tab-button" data-view="find">Find a Clan</button>
+        </div>
+      </div>
+
+      <div class="clan-views">
+        <div id="createClanView" class="clan-subview"></div>
+        <div id="manageClanView" class="clan-subview">
+          <div class="clan-tabs">
+            <button class="clan-tab-button" data-tab="members">Members</button>
+            <button class="clan-tab-button" data-tab="requests">Requests</button>
+            <button class="clan-tab-button" data-tab="settings">Settings</button>
+          </div>
+          <div id="chooseManageClanView" class="clan-subview"></div>
+          <div class="clan-tab-content" id="clan-members-tab"></div>
+          <div class="clan-tab-content" id="clan-requests-tab"></div>
+          <div class="clan-tab-content" id="clan-settings-tab"></div>
+        </div>
+        <div id="findClanView" class="clan-subview"></div>
+        <div id="viewClanPage" class="clan-subview"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Match Veto Modal -->
   <div id="vetoModal" class="modal" style="display:none;">
     <div class="modal-content veto-modal">
@@ -1105,12 +1294,26 @@
         <h3>Map veto</h3>
         <button class="icon-btn" id="closeVetoModal" aria-label="Close veto modal">×</button>
       </div>
-      <p class="helper" id="vetoMatchLabel"></p>
-      <p class="helper" id="vetoBestOfLabel"></p>
+      <div class="veto-status">
+        <p class="helper" id="vetoMatchLabel"></p>
+        <p class="helper" id="vetoBestOfLabel"></p>
+      </div>
       <div id="vetoMapPool" class="map-pool-grid selectable"></div>
-      <div id="vetoSelections" class="selected-maps"></div>
       <div class="form-actions" style="margin-top:12px;">
-        <button class="cta primary" id="saveVetoBtn">Save veto</button>
+        <button class="cta primary" id="saveVetoBtn">Done</button>
+        <button class="cta danger" id="resetVetoBtn">Reset veto</button>
+      </div>
+    </div>
+  </div>
+  <div id="confirmResetVetoModal" class="modal">
+    <div class="modal-content small-modal">
+      <h3>Reset veto</h3>
+      <p class="helper">
+        This clears all current vetoes and picks for this match.
+      </p>
+      <div class="form-actions">
+        <button class="cta danger" id="confirmResetVetoBtn">Yes, reset</button>
+        <button class="cta ghost" id="cancelResetVetoBtn">Cancel</button>
       </div>
     </div>
   </div>
@@ -1119,10 +1322,6 @@
     <div class="modal-content match-info-modal">
       <div class="modal-header">
         <h3 id="matchInfoTitle">Match</h3>
-        <button class="icon-btn" id="closeMatchInfoModal" aria-label="Close match info modal">x</button>
-      </div>
-      <div class="match-info-toprow">
-        <p class="helper" id="matchInfoBestOf"></p>
         <button class="icon-btn match-info-help-btn" id="matchInfoHelpBtn" aria-label="Match help"
           title="How scoring and map veto works">?</button>
         <div class="match-info-help-popover" id="matchInfoHelpPopover" aria-live="polite">
@@ -1134,6 +1333,18 @@
           <div class="match-info-help-body">
             Use the “Map veto” button to open the veto flow (only match players can change it).
           </div>
+        </div>
+        <button class="icon-btn" id="closeMatchInfoModal" aria-label="Close match info modal">x</button>
+      </div>
+      <div class="match-info-toprow">
+        <p class="helper" id="matchInfoBestOf"></p>
+        <div class="match-info-walkover">
+          <label class="helper" for="matchInfoWalkoverSelect">Walkover</label>
+          <select id="matchInfoWalkoverSelect" class="match-info-walkover-select">
+            <option value="">None</option>
+            <option value="A">Left forfeits</option>
+            <option value="B">Right forfeits</option>
+          </select>
         </div>
       </div>
       <div class="match-info-scoreboard">
@@ -1176,6 +1387,9 @@
         </div>
       </div>
       <div class="form-actions" style="margin-top:12px;">
+        <button class="cta primary" id="confirmMatchScoreBtn" style="display:none;">
+          Confirm score
+        </button>
         <button class="cta primary" id="openMapVetoBtn">Map veto</button>
       </div>
     </div>

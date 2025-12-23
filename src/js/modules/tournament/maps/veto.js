@@ -42,6 +42,8 @@ export function openVetoModal(matchId, { getPlayersMap, getDefaultMapPoolNames, 
   const modal = document.getElementById("vetoModal");
   const label = document.getElementById("vetoMatchLabel");
   const bestOfLabel = document.getElementById("vetoBestOfLabel");
+  const resetBtn = document.getElementById("resetVetoBtn");
+  const doneBtn = document.getElementById("saveVetoBtn");
   if (modal) modal.dataset.matchId = matchId || "";
   const lookup = getMatchLookup(state.bracket || {});
   const match = lookup.get(matchId);
@@ -137,14 +139,15 @@ export function openVetoModal(matchId, { getPlayersMap, getDefaultMapPoolNames, 
   }
   if (bestOfLabel) bestOfLabel.textContent = "";
 
+  if (doneBtn) doneBtn.style.display = vetoState?.stage === "done" ? "" : "none";
   renderVetoPoolGrid(pool);
-  renderVetoSelectionList();
   renderVetoStatus();
   modal.style.display = "flex";
   modal.dataset.bestOf = vetoState.bestOf;
   modal.onclick = (e) => {
     if (e.target === modal) hideVetoModal();
   };
+  if (resetBtn) resetBtn.onclick = () => showResetVetoModal();
   const poolEl = document.getElementById("vetoMapPool");
   if (poolEl) poolEl.onclick = handleVetoPoolClick;
 }
@@ -166,6 +169,8 @@ export function openMatchInfoModal(
   const leftPresenceEl = document.getElementById("matchInfoLeftPresence");
   const rightPresenceEl = document.getElementById("matchInfoRightPresence");
   const openVetoBtn = document.getElementById("openMapVetoBtn");
+  const confirmScoreBtn = document.getElementById("confirmMatchScoreBtn");
+  const walkoverSelect = document.getElementById("matchInfoWalkoverSelect");
   const closeBtn = document.getElementById("closeMatchInfoModal");
   const helpBtn = document.getElementById("matchInfoHelpBtn");
   const helpPopover = document.getElementById("matchInfoHelpPopover");
@@ -187,10 +192,11 @@ export function openMatchInfoModal(
   const rightPlayerId = pB?.id || null;
   const uid = auth?.currentUser?.uid || null;
   const me = resolveCurrentPlayerForPresence();
-  const canEditResults =
-    isAdmin ||
+  const isParticipant =
     (me?.id && (me.id === leftPlayerId || me.id === rightPlayerId)) ||
     (uid && (uid === pA?.uid || uid === pB?.uid));
+  const canEditResults =
+    (isAdmin || isParticipant) && match?.status !== "complete";
 
   modal.dataset.canEditResults = canEditResults ? "true" : "false";
 
@@ -219,11 +225,53 @@ export function openMatchInfoModal(
   renderMatchInfoVetoes({ leftVetoesEl, rightVetoesEl, vetoedMaps, aName, bName });
   setPresenceContext({ matchId, leftPlayerId, rightPlayerId });
 
+  let winners = [];
+  const setWalkoverSelection = () => {
+    if (!walkoverSelect) return;
+    if (walkoverSelect.options.length >= 3) {
+      walkoverSelect.options[1].textContent = `${aName} forfeits`;
+      walkoverSelect.options[2].textContent = `${bName} forfeits`;
+    }
+    if (match?.walkover === "a") walkoverSelect.value = "A";
+    else if (match?.walkover === "b") walkoverSelect.value = "B";
+    else walkoverSelect.value = "";
+    walkoverSelect.disabled = !canEditResults;
+  };
+  const updateConfirmScoreButton = () => {
+    if (!confirmScoreBtn) return;
+    if (!canEditResults) {
+      confirmScoreBtn.style.display = "none";
+      confirmScoreBtn.onclick = null;
+      return;
+    }
+    const walkoverValue = walkoverSelect?.value || "";
+    const winsA = winners.filter((w) => w === "A").length;
+    const winsB = winners.filter((w) => w === "B").length;
+    const needed = Math.max(1, Math.ceil(bestOf / 2));
+    const canConfirm =
+      walkoverValue !== "" || (winsA !== winsB && Math.max(winsA, winsB) >= needed);
+    confirmScoreBtn.style.display = "";
+    confirmScoreBtn.disabled = !canConfirm;
+    confirmScoreBtn.textContent = "Confirm score";
+    confirmScoreBtn.onclick = canConfirm
+      ? () => {
+          if (walkoverValue === "A") {
+            vetoDeps?.updateMatchScore?.(matchId, "W", 0, { finalize: true });
+          } else if (walkoverValue === "B") {
+            vetoDeps?.updateMatchScore?.(matchId, 0, "W", { finalize: true });
+          } else {
+            vetoDeps?.updateMatchScore?.(matchId, winsA, winsB, { finalize: true });
+          }
+          refreshMatchInfoModalIfOpen();
+        }
+      : null;
+  };
+
   if (rowsEl) {
     const record = ensureMatchVetoRecord(matchId, bestOf);
-    const winners = normalizeMapResults(record.mapResults, bestOf);
+    winners = normalizeMapResults(record.mapResults, bestOf);
     record.mapResults = winners;
-    updateMatchInfoHeaderScores({ leftScoreEl, rightScoreEl, winners });
+    updateMatchInfoHeaderScores({ leftScoreEl, rightScoreEl, winners, match });
     renderMatchInfoRows(rowsEl, {
       bestOf,
       pickedMaps,
@@ -245,6 +293,7 @@ export function openMatchInfoModal(
         const cell = e.target.closest?.(".match-info-pick-cell");
         if (!cell) return;
         if (cell.classList.contains("is-disabled")) return;
+        if (walkoverSelect?.value) return;
         const row = cell.closest("tr");
         const idx = Number(row?.dataset?.mapIdx || "-1");
         if (!row || !Number.isFinite(idx) || idx < 0 || idx >= bestOf) return;
@@ -264,6 +313,7 @@ export function openMatchInfoModal(
         const cell = e.target.closest?.(".match-info-pick-cell");
         if (!cell) return;
         if (cell.classList.contains("is-disabled")) return;
+        if (walkoverSelect?.value) return;
         const row = cell.closest("tr");
         const idx = Number(row?.dataset?.mapIdx || "-1");
         const side = cell.dataset.side === "B" ? "B" : "A";
@@ -275,21 +325,45 @@ export function openMatchInfoModal(
         const winsA = winners.filter((w) => w === "A").length;
         const winsB = winners.filter((w) => w === "B").length;
         if (typeof vetoDeps?.updateMatchScore === "function") {
-          vetoDeps.updateMatchScore(matchId, winsA, winsB);
+          vetoDeps.updateMatchScore(matchId, winsA, winsB, { finalize: false });
         }
         vetoDeps?.saveState?.({ matchVetoes: state.matchVetoes });
-        updateMatchInfoHeaderScores({ leftScoreEl, rightScoreEl, winners });
+        updateMatchInfoHeaderScores({ leftScoreEl, rightScoreEl, winners, match });
         renderMatchInfoRows(rowsEl, { bestOf, pickedMaps, winners });
+        updateConfirmScoreButton();
       };
     }
   }
+  setWalkoverSelection();
+  if (walkoverSelect) {
+    walkoverSelect.onchange = () => {
+      const value = walkoverSelect.value;
+      if (value) {
+        winners = normalizeMapResults([], bestOf);
+        const record = ensureMatchVetoRecord(matchId, bestOf);
+        record.mapResults = winners;
+        vetoDeps?.saveState?.({ matchVetoes: state.matchVetoes });
+      }
+      if (value === "A") {
+        vetoDeps?.updateMatchScore?.(matchId, "W", 0, { finalize: false });
+      } else if (value === "B") {
+        vetoDeps?.updateMatchScore?.(matchId, 0, "W", { finalize: false });
+      } else {
+        const winsA = winners.filter((w) => w === "A").length;
+        const winsB = winners.filter((w) => w === "B").length;
+        vetoDeps?.updateMatchScore?.(matchId, winsA, winsB, { finalize: false });
+      }
+      updateMatchInfoHeaderScores({ leftScoreEl, rightScoreEl, winners, match });
+      renderMatchInfoRows(rowsEl, { bestOf, pickedMaps, winners });
+      updateConfirmScoreButton();
+    };
+  }
+  updateConfirmScoreButton();
 
   if (openVetoBtn) {
-    const isParticipant =
-      isAdmin ||
-      (me?.id && (me.id === leftPlayerId || me.id === rightPlayerId));
-    openVetoBtn.style.display = isParticipant ? "" : "none";
-    openVetoBtn.onclick = isParticipant
+    const canOpenVeto = isAdmin || isParticipant;
+    openVetoBtn.style.display = canOpenVeto ? "" : "none";
+    openVetoBtn.onclick = canOpenVeto
       ? () => {
           hideMatchInfoModal();
           openVetoModal(matchId, {
@@ -336,9 +410,14 @@ export function openMatchInfoModal(
   }
 }
 
-function updateMatchInfoHeaderScores({ leftScoreEl, rightScoreEl, winners }) {
-  const winsA = winners.filter((w) => w === "A").length;
-  const winsB = winners.filter((w) => w === "B").length;
+function updateMatchInfoHeaderScores({ leftScoreEl, rightScoreEl, winners, match }) {
+  const hasWalkover = Boolean(match?.walkover);
+  const winsA = hasWalkover
+    ? Number(match?.scores?.[0] ?? 0)
+    : winners.filter((w) => w === "A").length;
+  const winsB = hasWalkover
+    ? Number(match?.scores?.[1] ?? 0)
+    : winners.filter((w) => w === "B").length;
   if (leftScoreEl) leftScoreEl.textContent = String(winsA);
   if (rightScoreEl) rightScoreEl.textContent = String(winsB);
 }
@@ -779,43 +858,7 @@ export function handleVetoPoolClick(e) {
 
   persistLiveVetoState();
   renderVetoPoolGrid();
-  renderVetoSelectionList();
   renderVetoStatus();
-}
-
-export function renderVetoSelectionList() {
-  const container = document.getElementById("vetoSelections");
-  if (!container) return;
-  const picks = vetoState?.picks || [];
-  const vetoed = vetoState?.vetoed || [];
-  const bestOf = Math.max(1, Number(vetoState?.bestOf) || 1);
-
-  const pickHtml = picks.length
-    ? picks
-        .slice(0, bestOf)
-        .map(
-          (m, idx) =>
-            `<span class="pill">Pick ${idx + 1}: ${escapeHtml(m.map)} (${escapeHtml(
-              m.picker || "Player"
-            )})</span>`
-        )
-        .join("")
-    : "";
-
-  const vetoHtml = vetoed.length
-    ? vetoed
-        .map(
-          (m) =>
-            `<span class="pill muted">Veto: ${escapeHtml(m.map)} (${escapeHtml(
-              m.picker || "Player"
-            )})</span>`
-        )
-        .join("")
-    : "";
-
-  container.innerHTML =
-    DOMPurify.sanitize(pickHtml + vetoHtml) ||
-    `<span class="helper">No picks yet.</span>`;
 }
 
 export function hideVetoModal() {
@@ -827,6 +870,55 @@ export function hideVetoModal() {
   // keep global presence subscription alive for match info; veto modal itself doesn't affect presence
   setCurrentVetoMatchIdState(null);
   setVetoStateState(null);
+}
+
+function showResetVetoModal() {
+  const modal = document.getElementById("confirmResetVetoModal");
+  if (!modal) return;
+  if (!modal.dataset.bound) {
+    modal.dataset.bound = "true";
+    const confirmBtn = document.getElementById("confirmResetVetoBtn");
+    const cancelBtn = document.getElementById("cancelResetVetoBtn");
+    if (confirmBtn) confirmBtn.onclick = () => resetVetoSelection();
+    if (cancelBtn) cancelBtn.onclick = () => hideResetVetoModal();
+    modal.onclick = (e) => {
+      if (e.target === modal) hideResetVetoModal();
+    };
+  }
+  modal.style.display = "flex";
+}
+
+function hideResetVetoModal() {
+  const modal = document.getElementById("confirmResetVetoModal");
+  if (modal) modal.style.display = "none";
+}
+
+function resetVetoSelection() {
+  if (!currentVetoMatchId || !vetoState) {
+    hideResetVetoModal();
+    return;
+  }
+  const bestOf = Math.max(1, Number(vetoState.bestOf) || 1);
+  const pool = vetoState.pool || vetoState.remaining || [];
+  vetoState.picks = [];
+  vetoState.vetoed = [];
+  vetoState.remaining = [...pool];
+  vetoState.stage = pool.length <= bestOf ? "pick" : "veto";
+  vetoState.turn = "low";
+
+  state.matchVetoes = state.matchVetoes || {};
+  const existing = state.matchVetoes[currentVetoMatchId] || {};
+  state.matchVetoes[currentVetoMatchId] = {
+    ...existing,
+    maps: [],
+    vetoed: [],
+    mapResults: [],
+    bestOf,
+  };
+  vetoDeps?.saveState?.({ matchVetoes: state.matchVetoes });
+  renderVetoPoolGrid();
+  renderVetoStatus();
+  hideResetVetoModal();
 }
 
 function persistLiveVetoState() {
@@ -872,7 +964,6 @@ export function saveVetoSelection() {
   if (match) match.bestOf = vetoState.bestOf || match.bestOf || defaultBestOf.upper;
   vetoDeps?.saveState?.({ matchVetoes: state.matchVetoes, bracket: state.bracket });
   renderVetoStatus();
-  renderVetoSelectionList();
   renderVetoPoolGrid();
   hideVetoModal();
   openMatchInfoModal(matchId, vetoDeps);
@@ -885,18 +976,22 @@ export function renderVetoPoolGrid(poolOverride = null) {
   const remainingNames = vetoState?.remaining?.map((m) => m.name) || [];
   const html = pool
     .map((map) => {
-      const pickedIdx =
-        vetoState?.picks?.findIndex((m) => m.map === map.name) ?? -1;
-      const vetoIdx =
-        vetoState?.vetoed?.findIndex((m) => m.map === map.name) ?? -1;
+      const pickEntry = vetoState?.picks?.find((m) => m.map === map.name) || null;
+      const vetoEntry = vetoState?.vetoed?.find((m) => m.map === map.name) || null;
+      const pickedIdx = pickEntry
+        ? vetoState?.picks?.findIndex((m) => m.map === map.name) ?? -1
+        : -1;
+      const vetoIdx = vetoEntry
+        ? vetoState?.vetoed?.findIndex((m) => m.map === map.name) ?? -1
+        : -1;
       const imgPath = map.folder ? `img/maps/${map.folder}/${map.file}` : "";
       const stateClass =
         pickedIdx !== -1 ? "selected" : vetoIdx !== -1 ? "vetoed" : "";
       const helper =
         pickedIdx !== -1
-          ? `Pick ${pickedIdx + 1}`
+          ? `Pick ${pickedIdx + 1} · ${escapeHtml(pickEntry?.picker || "Player")}`
           : vetoIdx !== -1
-          ? `Veto`
+          ? `Veto · ${escapeHtml(vetoEntry?.picker || "Player")}`
           : remainingNames.includes(map.name)
           ? ""
           : "Unavailable";
@@ -908,14 +1003,12 @@ export function renderVetoPoolGrid(poolOverride = null) {
         }></div>
         <div class="map-meta">
           <div class="map-name">${escapeHtml(map.name)}</div>
-          <span class="map-mode">${escapeHtml(map.mode || "1v1")}</span>
         </div>
         <div class="helper">${helper}</div>
       </div>`;
     })
     .join("");
   poolEl.innerHTML = DOMPurify.sanitize(html);
-  renderVetoSelectionList();
   renderVetoStatus();
 }
 
@@ -936,23 +1029,30 @@ export function showVetoInfo(matchId) {
 export function renderVetoStatus() {
   const status = document.getElementById("vetoBestOfLabel");
   const turnLabel = document.getElementById("vetoMatchLabel");
+  const doneBtn = document.getElementById("saveVetoBtn");
   if (!vetoState) {
     if (status) status.textContent = "";
     if (turnLabel) turnLabel.textContent = "";
+    if (doneBtn) doneBtn.style.display = "none";
     return;
   }
   const { stage, turn, bestOf, lowerName, higherName, remaining } = vetoState;
   const turnName =
     turn === "low" ? lowerName || "Lower seed" : higherName || "Higher seed";
-  if (status)
-    status.textContent = `Best of ${bestOf}. ${remaining.length} maps remaining. Stage: ${stage}.`;
+  if (doneBtn) doneBtn.style.display = stage === "done" ? "" : "none";
+  if (status) {
+    const remainingLabel =
+      stage === "done"
+        ? "Complete"
+        : `${remaining.length} left · ${stage === "pick" ? "Picking" : "Vetoing"}`;
+    status.textContent = `Best of ${bestOf} · ${remainingLabel}`;
+  }
   if (turnLabel) {
     if (stage === "done") {
-      turnLabel.textContent = `Map order locked.`;
-    } else if (stage === "pick") {
-      turnLabel.textContent = `Pick phase - ${turnName} to pick`;
+      turnLabel.textContent = "Map veto complete.";
     } else {
-      turnLabel.textContent = `Veto phase - ${turnName} to veto`;
+      const actionLabel = stage === "pick" ? "Pick" : "Veto";
+      turnLabel.textContent = `${actionLabel} turn: ${turnName}`;
     }
   }
 }

@@ -62,6 +62,9 @@ export function initTournamentPage({
   removePlayer,
   updateMatchScore,
   saveState,
+  handleAddCircuitPointsRow,
+  handleRemoveCircuitPointsRow,
+  handleApplyCircuitPoints,
   setTestBracketCount,
   cycleTestBracketCount,
   resetTournament,
@@ -128,6 +131,8 @@ export function initTournamentPage({
   const circuitSlugInput = document.getElementById("circuitSlugInput");
   const bestOfUpperInput = document.getElementById("bestOfUpperInput");
   const bestOfLowerInput = document.getElementById("bestOfLowerInput");
+  const bestOfLowerSemiInput = document.getElementById("bestOfLowerSemiInput");
+  const bestOfLowerFinalInput = document.getElementById("bestOfLowerFinalInput");
   const bestOfQuarterInput = document.getElementById("bestOfQuarterInput");
   const bestOfSemiInput = document.getElementById("bestOfSemiInput");
   const bestOfFinalInput = document.getElementById("bestOfFinalInput");
@@ -138,6 +143,7 @@ export function initTournamentPage({
   const settingsBestOfSemi = document.getElementById("settingsBestOfSemi");
   const settingsBestOfFinal = document.getElementById("settingsBestOfFinal");
   const settingsFormatSelect = document.getElementById("settingsFormatSelect");
+  const showClanModalButton = document.getElementById("showClanModalButton");
   const vetoModal = document.getElementById("vetoModal");
   const closeVetoModal = document.getElementById("closeVetoModal");
   const saveVetoBtn = document.getElementById("saveVetoBtn");
@@ -267,14 +273,19 @@ export function initTournamentPage({
       createPanels.forEach((panel) => panel.classList.toggle("active", panel.id === target));
     });
   });
+  const switchSettingsTab = (targetId) => {
+    if (!targetId) return;
+    settingsTabBtns.forEach((b) => b.classList.toggle("active", b.dataset.settingsTab === targetId));
+    settingsPanels.forEach((panel) => panel.classList.toggle("active", panel.id === targetId));
+  };
   settingsTabBtns.forEach((btn) => {
     btn.addEventListener("click", () => {
-      const target = btn.dataset.settingsTab;
-      if (!target) return;
-      settingsTabBtns.forEach((b) => b.classList.toggle("active", b === btn));
-      settingsPanels.forEach((panel) => panel.classList.toggle("active", panel.id === target));
+      switchSettingsTab(btn.dataset.settingsTab);
     });
   });
+  if (typeof window !== "undefined") {
+    window.__switchSettingsTab = switchSettingsTab;
+  }
 
   descriptionInput?.addEventListener("input", () => {
     const preview = document.getElementById("tournamentDescriptionPreview");
@@ -313,11 +324,16 @@ export function initTournamentPage({
     updateSettingsRulesPreview,
     syncFormatFieldVisibility,
     handleSaveSettings,
+    handleAddCircuitPointsRow,
+    handleRemoveCircuitPointsRow,
+    handleApplyCircuitPoints,
   });
 
   [
     bestOfUpperInput,
     bestOfLowerInput,
+    bestOfLowerSemiInput,
+    bestOfLowerFinalInput,
     bestOfQuarterInput,
     bestOfSemiInput,
     bestOfFinalInput,
@@ -332,6 +348,49 @@ export function initTournamentPage({
   settingsFormatSelect?.addEventListener("change", () => syncFormatFieldVisibility("settings"));
   closeVetoModal?.addEventListener("click", () => hideVetoModal());
   saveVetoBtn?.addEventListener("click", () => saveVetoSelection());
+
+  let clanModulePromise = null;
+  const ensureClanStyles = () => {
+    if (document.getElementById("clanStylesheet")) return;
+    const link = document.createElement("link");
+    link.id = "clanStylesheet";
+    link.rel = "stylesheet";
+    link.href = "/public/css/clan.css";
+    document.head.appendChild(link);
+  };
+  const ensureClanModule = async () => {
+    if (!clanModulePromise) {
+      clanModulePromise = import("../clan.js");
+    }
+    return clanModulePromise;
+  };
+  const ensureClanModalReady = async () => {
+    ensureClanStyles();
+    const clanModule = await ensureClanModule();
+    if (!document.body.dataset.clanModalBound) {
+      clanModule.setupClanViewSwitching?.();
+      const closeClanModal = document.getElementById("closeClanModal");
+      const clanModal = document.getElementById("clanModal");
+      closeClanModal?.addEventListener("click", () => {
+        if (clanModal) clanModal.style.display = "none";
+      });
+      window.addEventListener("mousedown", (event) => {
+        if (!clanModal || clanModal.style.display === "none") return;
+        if (event.target === clanModal) clanModal.style.display = "none";
+      });
+      document.body.dataset.clanModalBound = "true";
+    }
+    return clanModule;
+  };
+
+  showClanModalButton?.addEventListener("click", async () => {
+    const userMenu = document.getElementById("userMenu");
+    if (userMenu) userMenu.style.display = "none";
+    await ensureClanModalReady();
+    const clanModal = document.getElementById("clanModal");
+    if (clanModal) clanModal.style.display = "flex";
+    document.getElementById("findClanBtn")?.click();
+  });
 
   jumpToRegistration?.addEventListener("click", () => {
     switchTab("registrationTab");
@@ -361,22 +420,12 @@ export function initTournamentPage({
       const id = e.target.dataset.playerId;
       removePlayer?.(id);
     }
-    if (e.target.matches(".toggle-checkin")) {
-      const toggleBtn = e.target;
-      const row = toggleBtn.closest("tr");
-      const select = row?.querySelector(".checkin-select");
-      if (select) {
-        select.style.display = select.style.display === "none" ? "inline-flex" : "none";
-        select.focus?.();
-      }
-    }
   });
   playersTable?.addEventListener("change", (e) => {
     if (e.target.matches(".checkin-select")) {
       const id = e.target.dataset.playerId;
       const value = e.target.value;
       setPlayerCheckIn?.(id, value === "checked");
-      e.target.style.display = "none";
     }
   });
 

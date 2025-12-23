@@ -21,9 +21,14 @@ function getParticipantIdFromSource(source, lookup) {
  * @param {string} matchId
  * @param {number|string} scoreA
  * @param {number|string} scoreB
- * @param {{ saveState: Function, renderAll: Function }} deps
+ * @param {{ saveState: Function, renderAll: Function, finalize?: boolean }} deps
  */
-export function updateMatchScore(matchId, scoreA, scoreB, { saveState, renderAll }) {
+export function updateMatchScore(
+  matchId,
+  scoreA,
+  scoreB,
+  { saveState, renderAll, finalize = true } = {}
+) {
   if (!state?.bracket || !matchId) return;
   const lookup = getMatchLookup(state.bracket);
   const match = lookup.get(matchId);
@@ -74,9 +79,15 @@ export function updateMatchScore(matchId, scoreA, scoreB, { saveState, renderAll
 
   match.scores = [valA, valB];
   match.walkover = walkover;
-  match.winnerId = winnerId || null;
-  match.loserId = loserId || null;
-  match.status = winnerId || walkover ? "complete" : "pending";
+  if (finalize) {
+    match.winnerId = winnerId || null;
+    match.loserId = loserId || null;
+    match.status = winnerId || walkover ? "complete" : "pending";
+  } else {
+    match.winnerId = null;
+    match.loserId = null;
+    match.status = "pending";
+  }
 
   saveState?.({ bracket: state.bracket });
   renderAll?.();

@@ -1,4 +1,4 @@
-import { doc, getDoc, collection } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection } from "firebase/firestore";
 import DOMPurify from "dompurify";
 import { db } from "../../../app.js";
 import { CIRCUIT_COLLECTION } from "./state.js";
@@ -23,6 +23,10 @@ export function normalizeCircuitData(data = {}, fallbackSlug = "") {
     description: data.description || "",
     tournaments: Array.from(new Set(slugs)),
     finalTournamentSlug: data.finalTournamentSlug || "",
+    pointsOverrides:
+      data.pointsOverrides && typeof data.pointsOverrides === "object"
+        ? { ...data.pointsOverrides }
+        : {},
     createdBy: data.createdBy || null,
     createdByName: data.createdByName || data.hostName || null,
     createdAt: createdAt || null,
@@ -114,7 +118,7 @@ export async function renderCircuitList({ onEnterCircuit } = {}) {
 
 export async function renderCircuitView(
   meta,
-  { onEnterTournament, onDeleteTournament, showDelete = false } = {}
+  { onEnterTournament, onDeleteTournament, showDelete = false, showEdit = false } = {}
 ) {
   const titleEl = document.getElementById("circuitTitle");
   const descEl = document.getElementById("circuitDescription");
@@ -144,7 +148,7 @@ export async function renderCircuitView(
       onDeleteTournament,
       showDelete,
     }),
-    renderCircuitLeaderboard(meta, slugs),
+    renderCircuitLeaderboard(meta, slugs, { showEdit }),
   ]);
 }
 
@@ -245,16 +249,104 @@ export async function renderCircuitTournamentList(
   }
 }
 
-export async function renderCircuitLeaderboard(meta, slugs = []) {
+let circuitPointsModalBound = false;
+let circuitPointsEditEntries = [];
+let circuitPointsEditMeta = null;
+
+function bindCircuitPointsModal() {
+  if (circuitPointsModalBound) return;
+  circuitPointsModalBound = true;
+  const modal = document.getElementById("circuitPointsModal");
+  const closeBtn = document.getElementById("closeCircuitPointsModal");
+  const saveBtn = document.getElementById("saveCircuitPointsBtn");
+  closeBtn?.addEventListener("click", () => {
+    if (modal) modal.style.display = "none";
+  });
+  window.addEventListener("mousedown", (e) => {
+    if (modal && modal.style.display === "flex" && e.target === modal) {
+      modal.style.display = "none";
+    }
+  });
+  saveBtn?.addEventListener("click", async () => {
+    if (!circuitPointsEditMeta?.slug) return;
+    const body = document.getElementById("circuitPointsEditBody");
+    if (!body) return;
+    const rows = Array.from(body.querySelectorAll("[data-points-edit-row]"));
+    const overrides = {};
+    rows.forEach((row) => {
+      const key = row.dataset.playerKey || "";
+      const input = row.querySelector("input");
+      const value = Number(input?.value);
+      if (!key || !Number.isFinite(value) || value < 0) return;
+      overrides[key] = value;
+    });
+    try {
+      await setDoc(
+        doc(collection(db, CIRCUIT_COLLECTION), circuitPointsEditMeta.slug),
+        { pointsOverrides: overrides },
+        { merge: true }
+      );
+      circuitPointsEditMeta.pointsOverrides = overrides;
+      await renderCircuitLeaderboard(
+        circuitPointsEditMeta,
+        normalizeCircuitTournamentSlugs(circuitPointsEditMeta),
+        { showEdit: true }
+      );
+      if (modal) modal.style.display = "none";
+    } catch (err) {
+      console.error("Failed to save circuit points", err);
+    }
+  });
+}
+
+function openCircuitPointsModal(entries, meta) {
+  const modal = document.getElementById("circuitPointsModal");
+  const body = document.getElementById("circuitPointsEditBody");
+  const search = document.getElementById("circuitPointsSearch");
+  if (!modal || !body) return;
+  bindCircuitPointsModal();
+  circuitPointsEditEntries = entries || [];
+  circuitPointsEditMeta = meta || null;
+  const renderRows = (filterText) => {
+    const query = (filterText || "").trim().toLowerCase();
+    const rows = circuitPointsEditEntries.filter((entry) => {
+      if (!query) return true;
+      return String(entry.name || "").toLowerCase().includes(query);
+    });
+    body.innerHTML = rows
+      .map(
+        (entry) => `
+          <tr data-points-edit-row data-player-key="${escapeHtml(entry.key)}">
+            <td>${escapeHtml(entry.name || "Unknown")}</td>
+            <td>
+              <input type="number" min="0" class="points-input" value="${Number(entry.points) || 0}" />
+            </td>
+          </tr>
+        `
+      )
+      .join("");
+  };
+  if (search) {
+    search.value = "";
+    search.oninput = () => renderRows(search.value);
+  }
+  renderRows("");
+  modal.style.display = "flex";
+}
+
+export async function renderCircuitLeaderboard(meta, slugs = [], { showEdit = false } = {}) {
   const body = document.getElementById("circuitLeaderboardBody");
   const note = document.getElementById("circuitLeaderboardNote");
   const statPlayers = document.getElementById("circuitStatPlayers");
+  const editBtn = document.getElementById("openCircuitPointsEditBtn");
   if (!body) return;
+  if (editBtn) editBtn.style.display = showEdit ? "inline-flex" : "none";
   body.innerHTML = `<tr><td colspan="4" class="helper">Loading leaderboard...</td></tr>`;
   if (!slugs.length) {
     body.innerHTML = `<tr><td colspan="4" class="helper">No tournaments yet.</td></tr>`;
     if (note) note.textContent = "Add tournaments to build the leaderboard.";
     if (statPlayers) statPlayers.textContent = "0";
+    if (editBtn) editBtn.disabled = true;
     return;
   }
   try {
@@ -271,7 +363,8 @@ export async function renderCircuitLeaderboard(meta, slugs = []) {
         if (!key) return;
         const playerPoints = Number(player.points);
         const ledgerPoints = Number(snapshot.pointsLedger?.[key]);
-        const rawPoints = Number.isFinite(playerPoints) ? playerPoints : ledgerPoints;
+        const useLedger = Number.isFinite(ledgerPoints);
+        const rawPoints = useLedger ? ledgerPoints : playerPoints;
         const points = Number.isFinite(rawPoints) ? rawPoints : 0;
         const entry = totals.get(key) || {
           name: player.name || "Unknown",
@@ -284,33 +377,51 @@ export async function renderCircuitLeaderboard(meta, slugs = []) {
         totals.set(key, entry);
       });
     });
-    const leaderboard = Array.from(totals.values())
-      .map((entry) => ({
-        name: entry.name,
-        points: entry.points,
-        tournaments: entry.tournaments.size,
-      }))
+    const leaderboard = Array.from(totals.entries())
+      .map(([key, entry]) => {
+        const override = Number(meta?.pointsOverrides?.[key]);
+        return {
+          key,
+          name: entry.name,
+          points: Number.isFinite(override) ? override : entry.points,
+          tournaments: entry.tournaments.size,
+        };
+      })
       .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
     if (!leaderboard.length) {
       body.innerHTML = `<tr><td colspan="4" class="helper">No players yet.</td></tr>`;
       if (note) note.textContent = "Points will appear after tournaments log players.";
       if (statPlayers) statPlayers.textContent = "0";
+      if (editBtn) editBtn.disabled = true;
       return;
     }
-    body.innerHTML = DOMPurify.sanitize(
-      leaderboard
-        .map(
-          (entry, idx) => `
-            <tr>
-              <td>${idx + 1}</td>
-              <td>${escapeHtml(entry.name)}</td>
-              <td class="points-cell">${entry.points}</td>
-              <td class="events-cell">${entry.tournaments}</td>
-            </tr>
-          `
-        )
-        .join("")
-    );
+    body.innerHTML = "";
+    const editEntries = [];
+    leaderboard.forEach((entry, idx) => {
+      const row = document.createElement("tr");
+
+      const rankCell = document.createElement("td");
+      rankCell.textContent = String(idx + 1);
+
+      const nameCell = document.createElement("td");
+      nameCell.textContent = entry.name || "Unknown";
+
+      const pointsCell = document.createElement("td");
+      pointsCell.className = "points-cell";
+      pointsCell.textContent = String(entry.points || 0);
+
+      const eventsCell = document.createElement("td");
+      eventsCell.className = "events-cell";
+      eventsCell.textContent = String(entry.tournaments || 0);
+
+      row.append(rankCell, nameCell, pointsCell, eventsCell);
+      body.appendChild(row);
+      editEntries.push({ key: entry.key, name: entry.name, points: entry.points });
+    });
+    if (editBtn) {
+      editBtn.disabled = false;
+      editBtn.onclick = () => openCircuitPointsModal(editEntries, meta);
+    }
     if (statPlayers) statPlayers.textContent = String(leaderboard.length);
     if (note) note.textContent = `Totals across ${slugs.length} tournaments.`;
   } catch (err) {
@@ -318,6 +429,7 @@ export async function renderCircuitLeaderboard(meta, slugs = []) {
     body.innerHTML = `<tr><td colspan="4" class="helper">Failed to load leaderboard.</td></tr>`;
     if (note) note.textContent = "Try refreshing in a moment.";
     if (statPlayers) statPlayers.textContent = "0";
+    if (editBtn) editBtn.disabled = true;
   }
 }
 

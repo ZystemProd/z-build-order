@@ -105,7 +105,9 @@ export function attachPlayerDetailHandlers({ getPlayersMap }) {
     if (
       e.target.closest("select") ||
       e.target.closest(".remove-player") ||
-      e.target.closest(".points-input")
+      e.target.closest(".points-input") ||
+      e.target.closest(".checkin-editor") ||
+      e.target.closest(".checkin-select")
     ) {
       return;
     }
