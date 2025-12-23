@@ -14,9 +14,7 @@
   <link rel="stylesheet" type="text/css" href="public/css/style.css" />
   <link rel="stylesheet" type="text/css" href="public/css/viewBuild.css" />
   <link rel="stylesheet" type="text/css" href="public/css/showToast.css">
-  <script type="module" src="./src/app.js"></script>
   <script type="module" src="./src/js/modules/viewBuild.js"></script>
-  <script type="module" src="./src/js/modules/init/viewBuildPageInit.js"></script>
 
 
 </head>
@@ -424,17 +422,6 @@
       <div id="focusContent" class="focus-content"></div>
     </div>
   </div>
-
-  <script type="module">
-    import { initializeAuthUI } from './src/app.js';
-    import { initializeViewBuildPage } from './src/js/modules/init/viewBuildPageInit.js';
-
-    document.addEventListener("DOMContentLoaded", () => {
-      initializeAuthUI();  // Make sure Firebase Auth is ready first
-      initializeViewBuildPage();  // Then initialize the page
-    });
-  </script>
-
 
 </body>
 

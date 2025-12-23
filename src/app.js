@@ -84,10 +84,24 @@ const provider = new GoogleAuthProvider();
 const switchAccountProvider = new GoogleAuthProvider();
 switchAccountProvider.setCustomParameters({ prompt: "select_account" });
 
-const appCheck = initializeAppCheck(app, {
-  provider: new ReCaptchaV3Provider("6LcBBWsrAAAAALLmBNIhl-zKPa8KRj8mXMldoKbN"),
-  isTokenAutoRefreshEnabled: true, // auto refresh recommended
-});
+let appCheck;
+if (typeof window !== "undefined") {
+  appCheck = window.__appCheckInstance;
+  if (!appCheck) {
+    appCheck = initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider(
+        "6LcBBWsrAAAAALLmBNIhl-zKPa8KRj8mXMldoKbN"
+      ),
+      isTokenAutoRefreshEnabled: true,
+    });
+    window.__appCheckInstance = appCheck;
+  }
+} else {
+  appCheck = initializeAppCheck(app, {
+    provider: new ReCaptchaV3Provider("6LcBBWsrAAAAALLmBNIhl-zKPa8KRj8mXMldoKbN"),
+    isTokenAutoRefreshEnabled: true,
+  });
+}
 
 function updateFloatingTilePositions() {
   const authEl = document.getElementById("auth-container");

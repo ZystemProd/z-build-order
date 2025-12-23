@@ -14,8 +14,37 @@
   <meta property="og:type" content="website" />
   <meta property="og:image" content="https://zbuildorder.com/img/og-image.webp" />
   <link rel="icon" type="image/x-icon" href="/img/favicon.ico" />
-  <link rel="stylesheet" href="/public/css/showToast.css" />
+  <link rel="preload" href="/public/css/tournament.css" as="style" />
+  <link rel="preload" href="/public/css/showToast.css" as="style" />
+  <link rel="modulepreload" href="/tournament.js" />
+  <style>
+    body.tournament-body {
+      margin: 0;
+      background: #080a12;
+      color: #e7e9f3;
+      min-height: 100vh;
+      padding: 24px 6vw;
+    }
+
+    .tournament-shell {
+      max-width: 1180px;
+      margin: 0 auto;
+    }
+
+    .auth-floating {
+      position: fixed;
+      top: 16px;
+      right: 24px;
+      z-index: 50;
+    }
+
+    .hero {
+      display: grid;
+      gap: 24px;
+    }
+  </style>
   <link rel="stylesheet" href="/public/css/tournament.css" />
+  <link rel="stylesheet" href="/public/css/showToast.css" />
 </head>
 
 <body class="tournament-body">
@@ -78,7 +107,8 @@
     </div>
   </div>
 
-  <div class="tournament-shell">
+  <main id="mainContent">
+    <div class="tournament-shell">
     <!-- Landing: list & create -->
     <section id="landingView" class="landing" style="display:none;">
       <div class="hero landing-hero">
@@ -661,7 +691,8 @@
       </section>
     </main>
   </section>
-  </div>
+    </div>
+  </main>
 
   <!-- Create tournament modal -->
   <div id="createTournamentModal" class="modal create-modal" style="display:none;">
@@ -894,7 +925,6 @@
     </div>
   </div>
 
-  <script type="module" src="/src/app.js"></script>
   <script type="module" src="/src/js/modules/tournament.js"></script>
 
   <div id="settingsModal" class="modal">

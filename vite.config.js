@@ -34,6 +34,11 @@ export default defineConfig({
           }
 
           // App-Level Modules
+          if (id.includes("src/js/modules/uiHandlers.js")) return "ui";
+          if (id.includes("src/js/modules/init/indexPageInit.js"))
+            return "indexInit";
+          if (id.includes("src/js/modules/init/viewBuildPageInit.js"))
+            return "viewBuildInit";
           if (id.includes("src/js/modules/utils/notificationHelpers.js"))
             return "notificationHelpers";
 
