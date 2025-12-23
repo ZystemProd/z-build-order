@@ -3,6 +3,8 @@ import {
   TOURNAMENT_COLLECTION,
   TOURNAMENT_REGISTRY_KEY,
   TOURNAMENT_STATE_COLLECTION,
+  CIRCUIT_COLLECTION,
+  CIRCUIT_REGISTRY_KEY,
   STORAGE_KEY,
   defaultState,
 } from "../state.js";
@@ -86,6 +88,62 @@ export async function loadTournamentRegistry(force = false) {
     return list;
   } catch (_) {
     loadTournamentRegistry.cached = fallback;
+    return fallback || [];
+  }
+}
+
+export function cacheCircuitRegistry(registry) {
+  try {
+    if (!registry) {
+      localStorage.removeItem(CIRCUIT_REGISTRY_KEY);
+    } else {
+      localStorage.setItem(CIRCUIT_REGISTRY_KEY, JSON.stringify(registry));
+    }
+  } catch (_) {
+    // ignore
+  }
+}
+
+export function loadCircuitRegistryCache() {
+  try {
+    const raw = localStorage.getItem(CIRCUIT_REGISTRY_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+export async function loadCircuitRegistry(force = false) {
+  if (!force && loadCircuitRegistry.cached) return loadCircuitRegistry.cached;
+  const fallback = loadCircuitRegistryCache();
+  try {
+    const snap = await getDocs(collection(db, CIRCUIT_COLLECTION));
+    const list = snap.docs.map((d) => {
+      const data = d.data() || {};
+      const createdAt = data.createdAt?.toMillis ? data.createdAt.toMillis() : data.createdAt;
+      const tournaments = Array.isArray(data.tournaments) ? data.tournaments : [];
+      const slugs = tournaments
+        .map((entry) => (typeof entry === "string" ? entry : entry?.slug))
+        .filter(Boolean);
+      return {
+        id: d.id,
+        slug: data.slug || d.id,
+        name: data.name || d.id,
+        description: data.description || "",
+        tournaments: Array.from(new Set(slugs)),
+        finalTournamentSlug: data.finalTournamentSlug || "",
+        createdBy: data.createdBy || null,
+        createdByName: data.createdByName || data.hostName || null,
+        createdAt: createdAt || null,
+      };
+    });
+    loadCircuitRegistry.cached = list;
+    cacheCircuitRegistry(list);
+    return list;
+  } catch (_) {
+    loadCircuitRegistry.cached = fallback;
     return fallback || [];
   }
 }

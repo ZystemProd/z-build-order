@@ -12,8 +12,11 @@ import {
   doc,
   setDoc,
   getDoc,
+  deleteDoc,
   collection,
   serverTimestamp,
+  arrayUnion,
+  arrayRemove,
   onSnapshot,
 } from "firebase/firestore";
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -23,6 +26,7 @@ import { prepareImageForUpload, validateImageFile } from "../imageUtils.js";
 import {
   TOURNAMENT_COLLECTION,
   TOURNAMENT_STATE_COLLECTION,
+  CIRCUIT_COLLECTION,
   MAPS_JSON_URL,
   FALLBACK_LADDER_MAPS,
   defaultState,
@@ -94,6 +98,16 @@ import {
   parseMatchNumber,
   raceClassName,
 } from "./bracket/renderUtils.js";
+import { playerKey } from "./playerKey.js";
+import { updateTooltips } from "../tooltip.js";
+import {
+  fetchCircuitMeta,
+  renderCircuitList,
+  renderCircuitView,
+  generateCircuitSlug,
+  updateCircuitSlugPreview,
+  populateCreateCircuitForm,
+} from "./circuit.js";
 import {
   renderPlayerRow,
   renderScoreOptions,
@@ -170,6 +184,8 @@ const COVER_TARGET_WIDTH = 1200;
 const COVER_TARGET_HEIGHT = 675;
 const COVER_QUALITY = 0.82;
 const storage = getStorage(app);
+let currentCircuitMeta = null;
+let isCircuitAdmin = false;
 function renderMarkdown(text = "") {
   return DOMPurify.sanitize(text || "").replace(/\n/g, "<br>");
 }
@@ -295,7 +311,10 @@ function getPlayersMap() {
 
 function renderAll() {
   // Update seeding table
-  renderSeedingTable(applySeeding(state.players || []), { isLive: state.isLive });
+  renderSeedingTable(applySeeding(state.players || []), {
+    isLive: state.isLive,
+    isAdmin,
+  });
 
   if (currentTournamentMeta) {
     const tournamentTitle = document.getElementById("tournamentTitle");
@@ -453,6 +472,7 @@ function renderAll() {
     annotateConnectorPlayers(lookup, playersById);
     clampScoreSelectOptions();
   }
+  updateTooltips?.();
 }
 
 function checkInCurrentPlayer() {
@@ -606,6 +626,27 @@ function updatePlayerPoints(id, points) {
   rebuildBracket(true, "Points updated");
 }
 
+function setPlayerCheckIn(id, shouldCheckIn) {
+  if (!id) return;
+  const players = (state.players || []).map((p) => {
+    if (p.id !== id) return p;
+    if (shouldCheckIn) {
+      return { ...p, checkedInAt: p.checkedInAt || Date.now() };
+    }
+    return { ...p, checkedInAt: null };
+  });
+  saveState({ players });
+  const changed = players.find((p) => p.id === id);
+  if (changed) {
+    addActivity(
+      `${changed.name || "Player"} marked ${
+        changed.checkedInAt ? "checked in" : "not checked in"
+      }.`
+    );
+  }
+  renderAll();
+}
+
 function resetTournament() {
   const empty = { ...defaultState, lastUpdated: Date.now() };
   setStateObj(empty);
@@ -660,9 +701,16 @@ function renderTournamentList() {
   const listEl = document.getElementById("tournamentList");
   const statTournaments = document.getElementById("statTournaments");
   const statNextStart = document.getElementById("statNextStart");
+  const listTitle = document.getElementById("tournamentListTitle");
   const activeFilter =
     document.querySelector("#tournamentListTabs .list-tab.active")
       ?.dataset.listFilter || "open";
+  if (activeFilter === "circuits") {
+    if (listTitle) listTitle.textContent = "Circuits";
+    renderCircuitList({ onEnterCircuit: enterCircuit });
+    return;
+  }
+  if (listTitle) listTitle.textContent = "Open tournaments";
   const userId = auth?.currentUser?.uid || null;
   const registered = new Set(getRegisteredTournaments());
   if (!listEl) return;
@@ -837,7 +885,9 @@ function updateSlugPreview() {
   const slugInput = document.getElementById("tournamentSlugInput");
   const preview = document.getElementById("slugPreview");
   if (slugInput && preview) {
-    preview.textContent = slugInput.value || "";
+    const next = (slugInput.value || "").toLowerCase();
+    if (slugInput.value !== next) slugInput.value = next;
+    preview.textContent = next;
   }
 }
 
@@ -864,14 +914,144 @@ async function populateCreateForm() {
   }
   if (checkInHoursInput) checkInHoursInput.value = "";
   if (checkInMinutesInput) checkInMinutesInput.value = "";
+  setCreateTournamentCircuitContext("");
 }
 
-function getSlugFromPath() {
-  const parts = (window.location.pathname || "").split("/").filter(Boolean);
-  if (parts.length === 1 && parts[0].toLowerCase() === "tournament") {
-    return "";
+function setCreateTournamentCircuitContext(circuitSlug) {
+  const modal = document.getElementById("createTournamentModal");
+  const options = document.getElementById("circuitTournamentOptions");
+  const label = document.getElementById("circuitSlugLabel");
+  const toggle = document.getElementById("circuitFinalToggle");
+  if (options) options.style.display = circuitSlug ? "block" : "none";
+  if (label) label.textContent = circuitSlug || "";
+  if (toggle) toggle.checked = false;
+  if (modal) {
+    if (circuitSlug) {
+      modal.dataset.circuitSlug = circuitSlug;
+    } else {
+      delete modal.dataset.circuitSlug;
+    }
   }
-  return parts.length ? parts[parts.length - 1] : "";
+}
+
+async function openCircuitTournamentModal() {
+  if (!currentCircuitMeta?.slug || !isCircuitAdmin) return;
+  await populateCreateForm();
+  setCreateTournamentCircuitContext(currentCircuitMeta.slug);
+  const modal = document.getElementById("createTournamentModal");
+  if (modal) modal.style.display = "flex";
+}
+
+function openDeleteTournamentModal({ slug, circuitSlug } = {}) {
+  const targetSlug = slug || currentSlug || "";
+  if (!targetSlug) return;
+  const modal = document.getElementById("confirmDeleteTournamentModal");
+  const message = document.getElementById("confirmDeleteTournamentMessage");
+  if (modal) {
+    modal.dataset.slug = targetSlug;
+    if (circuitSlug) {
+      modal.dataset.circuitSlug = circuitSlug;
+    } else {
+      delete modal.dataset.circuitSlug;
+    }
+    if (message) {
+      message.textContent = `Are you sure you want to delete "${targetSlug}"? This cannot be undone.`;
+    }
+    modal.style.display = "flex";
+  }
+}
+
+function closeDeleteTournamentModal() {
+  const modal = document.getElementById("confirmDeleteTournamentModal");
+  if (!modal) return;
+  delete modal.dataset.slug;
+  delete modal.dataset.circuitSlug;
+  modal.style.display = "none";
+}
+
+async function confirmDeleteTournament() {
+  const modal = document.getElementById("confirmDeleteTournamentModal");
+  if (!modal?.dataset.slug) return;
+  const slug = modal.dataset.slug;
+  const circuitSlug = modal.dataset.circuitSlug || currentTournamentMeta?.circuitSlug || "";
+  try {
+    await deleteDoc(doc(collection(db, TOURNAMENT_COLLECTION), slug));
+    await deleteDoc(doc(collection(db, TOURNAMENT_STATE_COLLECTION), slug));
+    try {
+      localStorage.removeItem(getPersistStorageKey(slug));
+    } catch (_) {
+      // ignore
+    }
+    if (circuitSlug) {
+      const updates = { tournaments: arrayRemove(slug) };
+      if (currentCircuitMeta?.finalTournamentSlug === slug) {
+        updates.finalTournamentSlug = "";
+      }
+      await setDoc(doc(collection(db, CIRCUIT_COLLECTION), circuitSlug), updates, {
+        merge: true,
+      });
+      if (currentCircuitMeta?.slug === circuitSlug) {
+        currentCircuitMeta = {
+          ...currentCircuitMeta,
+          tournaments: (currentCircuitMeta.tournaments || []).filter(
+            (t) => t !== slug
+          ),
+          finalTournamentSlug:
+            currentCircuitMeta.finalTournamentSlug === slug
+              ? ""
+              : currentCircuitMeta.finalTournamentSlug,
+        };
+      }
+    }
+    showToast?.("Tournament deleted.", "success");
+    closeDeleteTournamentModal();
+    const redirectTarget = circuitSlug ? `/tournament/${circuitSlug}` : "/tournament/";
+    if (typeof window !== "undefined") {
+      window.location.href = redirectTarget;
+    }
+  } catch (err) {
+    console.error("Failed to delete tournament", err);
+    showToast?.("Failed to delete tournament.", "error");
+  }
+}
+
+function getRouteFromPath() {
+  const parts = (window.location.pathname || "").split("/").filter(Boolean);
+  if (!parts.length) {
+    return { view: "landing", slug: "" };
+  }
+  if (parts.length === 1 && parts[0].toLowerCase() === "tournament") {
+    return { view: "landing", slug: "" };
+  }
+  if (
+    parts[0].toLowerCase() === "tournament" &&
+    parts[1]?.toLowerCase() === "circuit" &&
+    parts[2]
+  ) {
+    return { view: "circuit", slug: parts[2] };
+  }
+  if (parts[0].toLowerCase() === "tournament" && parts.length >= 2) {
+    return { view: "slug", slug: parts[1] };
+  }
+  return { view: "landing", slug: "" };
+}
+
+async function handleRouteChange() {
+  const route = getRouteFromPath();
+  if (route.view === "circuit" && route.slug) {
+    await enterCircuit(route.slug);
+    return;
+  }
+  if (route.view === "slug" && route.slug) {
+    const meta = await fetchCircuitMeta(route.slug);
+    if (meta) {
+      await enterCircuit(route.slug, { meta });
+      return;
+    }
+    await enterTournament(route.slug);
+    return;
+  }
+  await showLanding();
 }
 
 async function enterTournament(slug) {
@@ -905,8 +1085,13 @@ async function enterTournament(slug) {
   subscribeTournamentStateRemote(slug);
   const landingView = document.getElementById("landingView");
   const tournamentView = document.getElementById("tournamentView");
+  const circuitView = document.getElementById("circuitView");
   if (landingView) landingView.style.display = "none";
   if (tournamentView) tournamentView.style.display = "block";
+  if (circuitView) circuitView.style.display = "none";
+  currentCircuitMeta = null;
+  isCircuitAdmin = false;
+  updateCircuitAdminVisibility();
   renderAll();
 }
 
@@ -921,9 +1106,66 @@ async function showLanding() {
   updateAdminVisibility();
   const landingView = document.getElementById("landingView");
   const tournamentView = document.getElementById("tournamentView");
+  const circuitView = document.getElementById("circuitView");
   if (landingView) landingView.style.display = "block";
   if (tournamentView) tournamentView.style.display = "none";
+  if (circuitView) circuitView.style.display = "none";
+  currentCircuitMeta = null;
+  isCircuitAdmin = false;
+  updateCircuitAdminVisibility();
   switchTab("registrationTab");
+}
+
+async function enterCircuit(slug, options = {}) {
+  if (!slug) return;
+  const { skipPush = false, meta = null } = options;
+  try {
+    unsubscribeRemoteState?.();
+  } catch (_) {
+    // ignore
+  }
+  unsubscribeRemoteState = null;
+  setIsAdminState(false);
+  updateAdminVisibility();
+  const target = `/tournament/${slug}`;
+  if (!skipPush && window.location.pathname !== target) {
+    window.history.pushState({}, "", target);
+  }
+  const landingView = document.getElementById("landingView");
+  const tournamentView = document.getElementById("tournamentView");
+  const circuitView = document.getElementById("circuitView");
+  if (landingView) landingView.style.display = "none";
+  if (tournamentView) tournamentView.style.display = "none";
+  if (circuitView) circuitView.style.display = "block";
+  try {
+    const fetched = meta || (await fetchCircuitMeta(slug));
+    if (!fetched) {
+      showToast?.("Circuit not found.", "error");
+      await showLanding();
+      return;
+    }
+    currentCircuitMeta = fetched;
+    recomputeCircuitAdminFromMeta();
+    await renderCircuitView(currentCircuitMeta, {
+      onEnterTournament: enterTournament,
+      onDeleteTournament: (tournamentSlug) =>
+        openDeleteTournamentModal({
+          slug: tournamentSlug,
+          circuitSlug: currentCircuitMeta?.slug || "",
+        }),
+      showDelete: isCircuitAdmin,
+    });
+    updateCircuitAdminVisibility();
+  } catch (err) {
+    console.error("Failed to load circuit", err);
+    showToast?.("Failed to load circuit.", "error");
+    await showLanding();
+  }
+}
+
+async function refreshCircuitView() {
+  if (!currentCircuitMeta?.slug) return;
+  await enterCircuit(currentCircuitMeta.slug, { skipPush: true });
 }
 
 function setStatus(el, message, isError = false) {
@@ -1172,6 +1414,56 @@ async function handleSaveSettings(event) {
   rebuildBracket(true, "Settings updated");
 }
 
+async function handleCreateCircuit(event) {
+  event?.preventDefault?.();
+  const nameInput = document.getElementById("circuitNameInput");
+  const slugInput = document.getElementById("circuitSlugInput");
+  const descriptionInput = document.getElementById("circuitDescriptionInput");
+  const modal = document.getElementById("createCircuitModal");
+  const name = (nameInput?.value || "").trim();
+  const slug =
+    (slugInput?.value || "").trim().toLowerCase() ||
+    (await generateCircuitSlug());
+  const description = descriptionInput?.value || "";
+  if (!name) {
+    showToast?.("Circuit name is required.", "error");
+    return;
+  }
+  if (!slug) {
+    showToast?.("Circuit slug is required.", "error");
+    return;
+  }
+  if (!auth?.currentUser) {
+    showToast?.("Sign in to create a circuit.", "error");
+    return;
+  }
+  const payload = {
+    name,
+    slug,
+    description,
+    tournaments: [],
+    finalTournamentSlug: "",
+    createdBy: auth.currentUser.uid,
+    createdByName:
+      getCurrentUsername?.() || auth.currentUser.displayName || "Unknown",
+    createdAt: serverTimestamp(),
+  };
+  try {
+    await setDoc(
+      doc(collection(db, CIRCUIT_COLLECTION), slug),
+      payload,
+      { merge: true }
+    );
+    showToast?.("Circuit saved.", "success");
+    if (modal) modal.style.display = "none";
+    await renderCircuitList({ onEnterCircuit: enterCircuit });
+    await enterCircuit(slug);
+  } catch (err) {
+    console.error("Failed to save circuit", err);
+    showToast?.("Failed to save circuit.", "error");
+  }
+}
+
 async function handleCreateTournament(event) {
   event?.preventDefault?.();
   const nameInput = document.getElementById("tournamentNameInput");
@@ -1186,8 +1478,14 @@ async function handleCreateTournament(event) {
   const imageInput = document.getElementById("tournamentImageInput");
   const imageFile = imageInput?.files?.[0] || null;
   const modal = document.getElementById("createTournamentModal");
+  const circuitSlug = (modal?.dataset.circuitSlug || "").trim();
+  const isCircuitFinal = circuitSlug
+    ? Boolean(document.getElementById("circuitFinalToggle")?.checked)
+    : false;
   const name = (nameInput?.value || "").trim();
-  const slug = (slugInput?.value || "").trim() || (await generateUniqueSlug());
+  const slug =
+    (slugInput?.value || "").trim().toLowerCase() ||
+    (await generateUniqueSlug());
   const format = (formatSelect?.value || "Double Elimination").trim();
   const startTime = startInput?.value ? new Date(startInput.value) : null;
   const maxPlayers = maxPlayersInput?.value
@@ -1237,6 +1535,8 @@ async function handleCreateTournament(event) {
             defaultBestOf.final
         ),
       },
+      circuitSlug: circuitSlug || null,
+      isCircuitFinal: circuitSlug ? isCircuitFinal : false,
     };
     await setDoc(doc(collection(db, TOURNAMENT_COLLECTION), slug), payload, {
       merge: true,
@@ -1252,6 +1552,24 @@ async function handleCreateTournament(event) {
         );
       } catch (err) {
         showToast?.(err?.message || "Failed to upload cover image.", "error");
+      }
+    }
+    if (circuitSlug) {
+      const circuitPayload = {
+        tournaments: arrayUnion(slug),
+      };
+      if (isCircuitFinal) {
+        circuitPayload.finalTournamentSlug = slug;
+      }
+      try {
+        await setDoc(
+          doc(collection(db, CIRCUIT_COLLECTION), circuitSlug),
+          circuitPayload,
+          { merge: true }
+        );
+      } catch (err) {
+        console.error("Failed to link tournament to circuit", err);
+        showToast?.("Tournament saved, but circuit update failed.", "error");
       }
     }
     setCurrentSlugState(slug);
@@ -1300,17 +1618,13 @@ if (typeof window !== "undefined") {
 
 onAuthStateChanged?.(auth, () => {
   recomputeAdminFromMeta();
+  recomputeCircuitAdminFromMeta();
 });
 
 document.addEventListener("DOMContentLoaded", async () => {
   window.addEventListener("popstate", async () => {
-    const slugFromUrl = getSlugFromPath();
     try {
-      if (slugFromUrl) {
-        await enterTournament(slugFromUrl);
-      } else {
-        await showLanding();
-      }
+      await handleRouteChange();
     } catch (err) {
       console.error("Failed to handle history navigation", err);
     }
@@ -1320,6 +1634,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   initTournamentPage({
     handleRegistration,
     handleCreateTournament,
+    handleCreateCircuit,
+    openCircuitTournamentModal,
+    openDeleteTournamentModal,
+    confirmDeleteTournament,
+    closeDeleteTournamentModal,
     handleSaveSettings,
     rebuildBracket,
     setSeedingNotice,
@@ -1329,10 +1648,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     updateMmrDisplay,
     switchTab,
     populateCreateForm,
+    populateCreateCircuitForm,
     generateUniqueSlug,
+    generateCircuitSlug,
     validateSlug,
     updateSlugPreview,
+    updateCircuitSlugPreview,
     renderTournamentList,
+    refreshCircuitView,
     syncFormatFieldVisibility,
     applyFormattingInline,
     setMapPoolSelection,
@@ -1347,6 +1670,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     getAll1v1Maps,
     currentMapPoolMode,
     updatePlayerPoints,
+    setPlayerCheckIn,
     removePlayer,
     updateMatchScore,
     saveState,
@@ -1372,12 +1696,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     setMapPoolSelection(getDefaultMapPoolNames());
     initializeAuthUI();
     hydratePulseFromState(getPulseState());
-    const slugFromUrl = getSlugFromPath();
-    if (slugFromUrl) {
-      await enterTournament(slugFromUrl);
-    } else {
-      await showLanding();
-    }
+    await handleRouteChange();
   } catch (err) {
     console.error("Tournament page init failed", err);
   }
@@ -1414,6 +1733,19 @@ function updateAdminVisibility() {
   if (typeof window !== "undefined") {
     window.__tournamentIsAdmin = isAdmin;
   }
+}
+
+function updateCircuitAdminVisibility() {
+  const createBtn = document.getElementById("openCreateCircuitTournament");
+  if (createBtn) {
+    createBtn.style.display = isCircuitAdmin ? "inline-flex" : "none";
+  }
+}
+
+function recomputeCircuitAdminFromMeta() {
+  const uid = auth?.currentUser?.uid || null;
+  isCircuitAdmin = Boolean(uid && currentCircuitMeta?.createdBy === uid);
+  updateCircuitAdminVisibility();
 }
 
 function recomputeAdminFromMeta() {
@@ -2011,14 +2343,6 @@ function deserializeBracket(bracket) {
     losers: toArr(bracket.losers),
     groups: toArr(bracket.groups),
   };
-}
-
-function playerKey(name, link) {
-  const base = (name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-");
-  if (link) {
-    return `${base}-${link.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
-  }
-  return base;
 }
 
 function formatTime(ts) {

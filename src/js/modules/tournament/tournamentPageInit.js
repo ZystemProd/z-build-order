@@ -22,6 +22,11 @@ import { initUserSettingsModal } from "../settingsModalInit.js";
 export function initTournamentPage({
   handleRegistration,
   handleCreateTournament,
+  handleCreateCircuit,
+  openCircuitTournamentModal,
+  openDeleteTournamentModal,
+  confirmDeleteTournament,
+  closeDeleteTournamentModal,
   handleSaveSettings,
   rebuildBracket,
   setSeedingNotice,
@@ -31,10 +36,14 @@ export function initTournamentPage({
   updateMmrDisplay,
   switchTab,
   populateCreateForm,
+  populateCreateCircuitForm,
   generateUniqueSlug,
+  generateCircuitSlug,
   validateSlug,
   updateSlugPreview,
+  updateCircuitSlugPreview,
   renderTournamentList,
+  refreshCircuitView,
   syncFormatFieldVisibility,
   applyFormattingInline,
   setMapPoolSelection,
@@ -49,6 +58,7 @@ export function initTournamentPage({
   getAll1v1Maps,
   currentMapPoolMode,
   updatePlayerPoints,
+  setPlayerCheckIn,
   removePlayer,
   updateMatchScore,
   saveState,
@@ -81,8 +91,18 @@ export function initTournamentPage({
   const createModal = document.getElementById("createTournamentModal");
   const closeCreateTournament = document.getElementById("closeCreateTournament");
   const saveTournamentBtn = document.getElementById("saveTournamentBtn");
+  const openCreateCircuitTournament = document.getElementById("openCreateCircuitTournament");
+  const deleteTournamentBtn = document.getElementById("deleteTournamentBtn");
+  const confirmDeleteTournamentBtn = document.getElementById("confirmDeleteTournamentBtn");
+  const cancelDeleteTournamentBtn = document.getElementById("cancelDeleteTournamentBtn");
+  const deleteTournamentModal = document.getElementById("confirmDeleteTournamentModal");
+  const openCreateCircuit = document.getElementById("openCreateCircuit");
+  const createCircuitModal = document.getElementById("createCircuitModal");
+  const closeCreateCircuit = document.getElementById("closeCreateCircuit");
+  const saveCircuitBtn = document.getElementById("saveCircuitBtn");
   const refreshTournaments = document.getElementById("refreshTournaments");
   const generateSlugBtn = document.getElementById("generateSlugBtn");
+  const generateCircuitSlugBtn = document.getElementById("generateCircuitSlugBtn");
   const testBracketStartBtn = document.getElementById("testBracketStart");
   const testBracketPrevBtn = document.getElementById("testBracketPrev");
   const testBracketNextBtn = document.getElementById("testBracketNext");
@@ -105,6 +125,7 @@ export function initTournamentPage({
   const settingsImageInput = document.getElementById("settingsImageInput");
   const settingsImagePreview = document.getElementById("settingsImagePreview");
   const slugInput = document.getElementById("tournamentSlugInput");
+  const circuitSlugInput = document.getElementById("circuitSlugInput");
   const bestOfUpperInput = document.getElementById("bestOfUpperInput");
   const bestOfLowerInput = document.getElementById("bestOfLowerInput");
   const bestOfQuarterInput = document.getElementById("bestOfQuarterInput");
@@ -120,6 +141,7 @@ export function initTournamentPage({
   const vetoModal = document.getElementById("vetoModal");
   const closeVetoModal = document.getElementById("closeVetoModal");
   const saveVetoBtn = document.getElementById("saveVetoBtn");
+  const refreshCircuitBtn = document.getElementById("refreshCircuitBtn");
 
   const bindImagePreview = (inputEl, previewEl) => {
     if (!inputEl || !previewEl) return;
@@ -186,11 +208,56 @@ export function initTournamentPage({
   refreshTournaments?.addEventListener("click", () => renderTournamentList());
   generateSlugBtn?.addEventListener("click", async () => {
     const input = document.getElementById("tournamentSlugInput");
-    if (input) input.value = await generateUniqueSlug();
+    if (input) input.value = (await generateUniqueSlug()).toLowerCase();
     await validateSlug();
     updateSlugPreview();
   });
   slugInput?.addEventListener("input", () => updateSlugPreview());
+  openCreateCircuitTournament?.addEventListener("click", () => {
+    openCircuitTournamentModal?.();
+  });
+  deleteTournamentBtn?.addEventListener("click", () => {
+    openDeleteTournamentModal?.();
+  });
+  confirmDeleteTournamentBtn?.addEventListener("click", () => {
+    confirmDeleteTournament?.();
+  });
+  cancelDeleteTournamentBtn?.addEventListener("click", () => {
+    closeDeleteTournamentModal?.();
+  });
+  window.addEventListener("mousedown", (e) => {
+    if (
+      deleteTournamentModal &&
+      deleteTournamentModal.style.display === "flex" &&
+      e.target === deleteTournamentModal
+    ) {
+      closeDeleteTournamentModal?.();
+    }
+  });
+  openCreateCircuit?.addEventListener("click", async () => {
+    await populateCreateCircuitForm?.();
+    if (createCircuitModal) createCircuitModal.style.display = "flex";
+  });
+  closeCreateCircuit?.addEventListener("click", () => {
+    if (createCircuitModal) createCircuitModal.style.display = "none";
+  });
+  window.addEventListener("mousedown", (e) => {
+    if (
+      createCircuitModal &&
+      createCircuitModal.style.display === "flex" &&
+      e.target === createCircuitModal
+    ) {
+      createCircuitModal.style.display = "none";
+    }
+  });
+  saveCircuitBtn?.addEventListener("click", handleCreateCircuit);
+  generateCircuitSlugBtn?.addEventListener("click", async () => {
+    if (!circuitSlugInput || !generateCircuitSlug) return;
+    circuitSlugInput.value = (await generateCircuitSlug()).toLowerCase();
+    updateCircuitSlugPreview?.();
+  });
+  circuitSlugInput?.addEventListener("input", () => updateCircuitSlugPreview?.());
+  refreshCircuitBtn?.addEventListener("click", () => refreshCircuitView?.());
 
   createTabBtns.forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -293,6 +360,23 @@ export function initTournamentPage({
     if (e.target.matches(".remove-player")) {
       const id = e.target.dataset.playerId;
       removePlayer?.(id);
+    }
+    if (e.target.matches(".toggle-checkin")) {
+      const toggleBtn = e.target;
+      const row = toggleBtn.closest("tr");
+      const select = row?.querySelector(".checkin-select");
+      if (select) {
+        select.style.display = select.style.display === "none" ? "inline-flex" : "none";
+        select.focus?.();
+      }
+    }
+  });
+  playersTable?.addEventListener("change", (e) => {
+    if (e.target.matches(".checkin-select")) {
+      const id = e.target.dataset.playerId;
+      const value = e.target.value;
+      setPlayerCheckIn?.(id, value === "checked");
+      e.target.style.display = "none";
     }
   });
 

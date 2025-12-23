@@ -1,0 +1,348 @@
+import { doc, getDoc, collection } from "firebase/firestore";
+import DOMPurify from "dompurify";
+import { db } from "../../../app.js";
+import { CIRCUIT_COLLECTION } from "./state.js";
+import {
+  loadTournamentRegistry,
+  loadCircuitRegistry,
+  loadTournamentStateRemote,
+} from "./sync/persistence.js";
+import { sanitizeUrl, escapeHtml } from "./bracket/renderUtils.js";
+import { playerKey } from "./playerKey.js";
+
+export function normalizeCircuitData(data = {}, fallbackSlug = "") {
+  const tournaments = Array.isArray(data.tournaments) ? data.tournaments : [];
+  const slugs = tournaments
+    .map((entry) => (typeof entry === "string" ? entry : entry?.slug))
+    .filter(Boolean);
+  const createdAt = data.createdAt?.toMillis ? data.createdAt.toMillis() : data.createdAt;
+  return {
+    id: data.id || fallbackSlug,
+    slug: data.slug || fallbackSlug,
+    name: data.name || fallbackSlug,
+    description: data.description || "",
+    tournaments: Array.from(new Set(slugs)),
+    finalTournamentSlug: data.finalTournamentSlug || "",
+    createdBy: data.createdBy || null,
+    createdByName: data.createdByName || data.hostName || null,
+    createdAt: createdAt || null,
+  };
+}
+
+export function normalizeCircuitTournamentSlugs(meta) {
+  const base = Array.isArray(meta?.tournaments) ? meta.tournaments : [];
+  const slugs = base
+    .map((entry) => (typeof entry === "string" ? entry : entry?.slug))
+    .map((entry) => String(entry || "").trim())
+    .filter(Boolean);
+  const finalSlug = String(meta?.finalTournamentSlug || "").trim();
+  if (finalSlug && !slugs.includes(finalSlug)) {
+    slugs.push(finalSlug);
+  }
+  return Array.from(new Set(slugs));
+}
+
+export async function fetchCircuitMeta(slug) {
+  if (!slug) return null;
+  try {
+    const snap = await getDoc(doc(collection(db, CIRCUIT_COLLECTION), slug));
+    if (!snap.exists()) return null;
+    return normalizeCircuitData(snap.data() || {}, slug);
+  } catch (_) {
+    return null;
+  }
+}
+
+export async function renderCircuitList({ onEnterCircuit } = {}) {
+  const listEl = document.getElementById("tournamentList");
+  const statTournaments = document.getElementById("statTournaments");
+  const statNextStart = document.getElementById("statNextStart");
+  const listTitle = document.getElementById("tournamentListTitle");
+  if (listTitle) listTitle.textContent = "Circuits";
+  if (!listEl) return;
+  listEl.innerHTML = `<li class="muted">Loading circuits...</li>`;
+  try {
+    const items = await loadCircuitRegistry(true);
+    const normalized = (items || []).map((item) =>
+      normalizeCircuitData(item, item.slug || item.id || "")
+    );
+    normalized.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+    listEl.innerHTML = "";
+    if (!normalized.length) {
+      listEl.innerHTML = `<li class="muted">No circuits found.</li>`;
+    } else {
+      normalized.forEach((item) => {
+        const li = document.createElement("li");
+        li.className = "tournament-card circuit-card";
+        const tournamentCount = item.tournaments.length;
+        const description = item.description || "Circuit points race.";
+        const metaBits = [
+          `${tournamentCount} tournaments`,
+          `Host: ${item.createdByName || "Unknown"}`,
+        ];
+        if (item.finalTournamentSlug) {
+          metaBits.unshift(`Finals: ${item.finalTournamentSlug}`);
+        }
+        li.innerHTML = DOMPurify.sanitize(`
+          <div class="card-cover"></div>
+          <div class="card-top">
+            <div class="time-block">
+              <span class="time-label">Tournaments</span>
+              <span class="time-value">${tournamentCount}</span>
+            </div>
+            <span class="status-chip status-circuit">Circuit</span>
+          </div>
+          <h4>${escapeHtml(item.name)}</h4>
+          <p class="tournament-format">${escapeHtml(description)}</p>
+          <div class="meta">
+            ${metaBits.map((text) => `<span>${escapeHtml(text)}</span>`).join("")}
+          </div>
+        `);
+        if (onEnterCircuit) {
+          li.addEventListener("click", () => onEnterCircuit(item.slug));
+        }
+        listEl.appendChild(li);
+      });
+    }
+    if (statTournaments) statTournaments.textContent = String(normalized.length);
+    if (statNextStart) statNextStart.textContent = "TBD";
+  } catch (err) {
+    console.error("Failed to load circuits", err);
+    listEl.innerHTML = `<li class="muted error">Failed to load circuits.</li>`;
+  }
+}
+
+export async function renderCircuitView(
+  meta,
+  { onEnterTournament, onDeleteTournament, showDelete = false } = {}
+) {
+  const titleEl = document.getElementById("circuitTitle");
+  const descEl = document.getElementById("circuitDescription");
+  const statTournaments = document.getElementById("circuitStatTournaments");
+  const statPlayers = document.getElementById("circuitStatPlayers");
+  const finalLink = document.getElementById("circuitFinalLink");
+  if (titleEl) titleEl.textContent = meta?.name || "Circuit";
+  if (descEl) {
+    descEl.textContent = meta?.description || "Circuit overview.";
+  }
+  const finalSlug = String(meta?.finalTournamentSlug || "").trim();
+  if (finalLink) {
+    if (finalSlug) {
+      finalLink.href = `/tournament/${finalSlug}`;
+      finalLink.textContent = `Final tournament: ${finalSlug}`;
+      finalLink.style.display = "inline-flex";
+    } else {
+      finalLink.style.display = "none";
+    }
+  }
+  const slugs = normalizeCircuitTournamentSlugs(meta);
+  if (statTournaments) statTournaments.textContent = String(slugs.length);
+  if (statPlayers) statPlayers.textContent = "0";
+  await Promise.all([
+    renderCircuitTournamentList(meta, slugs, {
+      onEnterTournament,
+      onDeleteTournament,
+      showDelete,
+    }),
+    renderCircuitLeaderboard(meta, slugs),
+  ]);
+}
+
+export async function renderCircuitTournamentList(
+  meta,
+  slugs = [],
+  { onEnterTournament, onDeleteTournament, showDelete = false } = {}
+) {
+  const listEl = document.getElementById("circuitTournamentList");
+  if (!listEl) return;
+  listEl.innerHTML = `<li class="muted">Loading tournaments...</li>`;
+  if (!slugs.length) {
+    listEl.innerHTML = `<li class="muted">No tournaments added yet.</li>`;
+    return;
+  }
+  try {
+    const registry = await loadTournamentRegistry(true);
+    const bySlug = new Map((registry || []).map((item) => [item.slug, item]));
+    listEl.innerHTML = "";
+    slugs.forEach((slug) => {
+      const item = bySlug.get(slug) || {
+        slug,
+        name: slug,
+        format: "Tournament",
+        startTime: null,
+        maxPlayers: null,
+        coverImageUrl: "",
+        createdByName: null,
+      };
+      const li = document.createElement("li");
+      li.className = "tournament-card";
+      const coverUrl = sanitizeUrl(item.coverImageUrl || "");
+      const startLabel = item.startTime
+        ? new Date(item.startTime).toLocaleString()
+        : "TBD";
+      const playerLabel = item.maxPlayers
+        ? `Up to ${item.maxPlayers} players`
+        : "Players TBD";
+      const now = Date.now();
+      let statusLabel = "TBD";
+      let statusClass = "status-tbd";
+      if (item.startTime) {
+        if (item.startTime <= now) {
+          statusLabel = "Started";
+          statusClass = "status-started";
+        } else {
+          statusLabel = "Upcoming";
+          statusClass = "status-upcoming";
+        }
+      }
+      const metaBits = [
+        playerLabel,
+        `Host: ${item.createdByName || "Unknown"}`,
+      ];
+      if (meta?.finalTournamentSlug && slug === meta.finalTournamentSlug) {
+        metaBits.unshift("Finals event");
+      }
+      const actionSlot = showDelete
+        ? `<div class="card-actions">
+            <button class="cta small danger circuit-delete-btn" data-slug="${escapeHtml(
+              item.slug
+            )}">Delete</button>
+          </div>`
+        : "";
+      li.innerHTML = DOMPurify.sanitize(`
+        <div class="card-cover${coverUrl ? " has-image" : ""}"${
+          coverUrl ? ` style="background-image:url('${escapeHtml(coverUrl)}')"` : ""
+        }></div>
+        <div class="card-top">
+          <div class="time-block">
+            <span class="time-label">Start</span>
+            <span class="time-value">${escapeHtml(startLabel)}</span>
+          </div>
+          <span class="status-chip ${statusClass}">${statusLabel}</span>
+        </div>
+        <h4>${escapeHtml(item.name)}</h4>
+        <p class="tournament-format">${escapeHtml(item.format || "Tournament")}</p>
+        <div class="meta">
+          ${metaBits.map((text) => `<span>${escapeHtml(text)}</span>`).join("")}
+        </div>
+        ${actionSlot}
+      `);
+      const deleteBtn = li.querySelector(".circuit-delete-btn");
+      if (deleteBtn && onDeleteTournament) {
+        deleteBtn.addEventListener("click", (event) => {
+          event.stopPropagation();
+          onDeleteTournament(item.slug);
+        });
+      }
+      if (onEnterTournament) {
+        li.addEventListener("click", () => onEnterTournament(item.slug));
+      }
+      listEl.appendChild(li);
+    });
+  } catch (err) {
+    console.error("Failed to load circuit tournaments", err);
+    listEl.innerHTML = `<li class="muted error">Failed to load tournaments.</li>`;
+  }
+}
+
+export async function renderCircuitLeaderboard(meta, slugs = []) {
+  const body = document.getElementById("circuitLeaderboardBody");
+  const note = document.getElementById("circuitLeaderboardNote");
+  const statPlayers = document.getElementById("circuitStatPlayers");
+  if (!body) return;
+  body.innerHTML = `<tr><td colspan="4" class="helper">Loading leaderboard...</td></tr>`;
+  if (!slugs.length) {
+    body.innerHTML = `<tr><td colspan="4" class="helper">No tournaments yet.</td></tr>`;
+    if (note) note.textContent = "Add tournaments to build the leaderboard.";
+    if (statPlayers) statPlayers.textContent = "0";
+    return;
+  }
+  try {
+    const states = await Promise.all(
+      slugs.map((slug) => loadTournamentStateRemote(slug))
+    );
+    const totals = new Map();
+    states.forEach((snapshot, idx) => {
+      if (!snapshot) return;
+      const tournamentSlug = slugs[idx];
+      const players = Array.isArray(snapshot.players) ? snapshot.players : [];
+      players.forEach((player) => {
+        const key = playerKey(player.name, player.sc2Link);
+        if (!key) return;
+        const playerPoints = Number(player.points);
+        const ledgerPoints = Number(snapshot.pointsLedger?.[key]);
+        const rawPoints = Number.isFinite(playerPoints) ? playerPoints : ledgerPoints;
+        const points = Number.isFinite(rawPoints) ? rawPoints : 0;
+        const entry = totals.get(key) || {
+          name: player.name || "Unknown",
+          points: 0,
+          tournaments: new Set(),
+        };
+        entry.points += points;
+        if (tournamentSlug) entry.tournaments.add(tournamentSlug);
+        if (!entry.name && player.name) entry.name = player.name;
+        totals.set(key, entry);
+      });
+    });
+    const leaderboard = Array.from(totals.values())
+      .map((entry) => ({
+        name: entry.name,
+        points: entry.points,
+        tournaments: entry.tournaments.size,
+      }))
+      .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
+    if (!leaderboard.length) {
+      body.innerHTML = `<tr><td colspan="4" class="helper">No players yet.</td></tr>`;
+      if (note) note.textContent = "Points will appear after tournaments log players.";
+      if (statPlayers) statPlayers.textContent = "0";
+      return;
+    }
+    body.innerHTML = DOMPurify.sanitize(
+      leaderboard
+        .map(
+          (entry, idx) => `
+            <tr>
+              <td>${idx + 1}</td>
+              <td>${escapeHtml(entry.name)}</td>
+              <td class="points-cell">${entry.points}</td>
+              <td class="events-cell">${entry.tournaments}</td>
+            </tr>
+          `
+        )
+        .join("")
+    );
+    if (statPlayers) statPlayers.textContent = String(leaderboard.length);
+    if (note) note.textContent = `Totals across ${slugs.length} tournaments.`;
+  } catch (err) {
+    console.error("Failed to load circuit leaderboard", err);
+    body.innerHTML = `<tr><td colspan="4" class="helper">Failed to load leaderboard.</td></tr>`;
+    if (note) note.textContent = "Try refreshing in a moment.";
+    if (statPlayers) statPlayers.textContent = "0";
+  }
+}
+
+export async function generateCircuitSlug() {
+  return `c-${Date.now().toString(36)}`;
+}
+
+export function updateCircuitSlugPreview() {
+  const slugInput = document.getElementById("circuitSlugInput");
+  const preview = document.getElementById("circuitSlugPreview");
+  if (slugInput && preview) {
+    const next = (slugInput.value || "").toLowerCase();
+    if (slugInput.value !== next) slugInput.value = next;
+    preview.textContent = next;
+  }
+}
+
+export async function populateCreateCircuitForm() {
+  const nameInput = document.getElementById("circuitNameInput");
+  const slugInput = document.getElementById("circuitSlugInput");
+  const descInput = document.getElementById("circuitDescriptionInput");
+  if (nameInput) nameInput.value = "";
+  if (descInput) descInput.value = "";
+  if (slugInput && !slugInput.value) {
+    slugInput.value = await generateCircuitSlug();
+  }
+  updateCircuitSlugPreview();
+}

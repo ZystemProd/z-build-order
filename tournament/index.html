@@ -89,6 +89,7 @@
           <p class="lede">Browse tournaments or spin up a new one with custom links and formats.</p>
           <div class="hero-actions">
             <button id="openCreateTournament" class="cta primary">Create a tournament</button>
+            <button id="openCreateCircuit" class="cta ghost">Create a circuit</button>
           </div>
         </div>
       <div class="hero-stats">
@@ -107,17 +108,83 @@
         <div class="card-header">
           <div>
             <p class="eyebrow">Browse</p>
-            <h3>Open tournaments</h3>
+            <h3 id="tournamentListTitle">Open tournaments</h3>
           </div>
           <button id="refreshTournaments" class="cta ghost small">Refresh</button>
         </div>
         <div class="list-tabs" id="tournamentListTabs">
           <button class="list-tab active" data-list-filter="open">Open tournaments</button>
+          <button class="list-tab" data-list-filter="circuits">Circuits</button>
           <button class="list-tab" data-list-filter="mine">My tournaments</button>
           <button class="list-tab" data-list-filter="hosted">Hosted tournaments</button>
         </div>
         <ul id="tournamentList" class="tournament-list"></ul>
       </div>
+    </section>
+
+    <!-- Circuit detail -->
+    <section id="circuitView" style="display:none;">
+      <header class="hero">
+        <div class="hero-main">
+          <a class="ghost-link" href="/tournament"><span class="ghost-link-icon">←</span>All tournaments</a>
+          <p class="eyebrow">Circuit</p>
+          <h1 id="circuitTitle">Circuit</h1>
+          <p class="lede" id="circuitDescription">Circuit overview.</p>
+          <div class="hero-actions">
+            <a id="circuitFinalLink" class="cta ghost small" href="#" style="display:none;">Final tournament</a>
+            <button id="openCreateCircuitTournament" class="cta primary small" style="display:none;">
+              Create tournament
+            </button>
+          </div>
+        </div>
+        <div class="hero-stats">
+          <div class="stat-card">
+            <p>Tournaments</p>
+            <h2 id="circuitStatTournaments">0</h2>
+          </div>
+          <div class="stat-card accent">
+            <p>Players ranked</p>
+            <h2 id="circuitStatPlayers">0</h2>
+          </div>
+        </div>
+      </header>
+
+      <main class="page-stack">
+        <div class="circuit-grid">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <p class="eyebrow">Circuit tournaments</p>
+                <h3>Included tournaments</h3>
+              </div>
+              <button id="refreshCircuitBtn" class="cta ghost small">Refresh</button>
+            </div>
+            <ul id="circuitTournamentList" class="tournament-list circuit-tournament-list"></ul>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <p class="eyebrow">Leaderboard</p>
+                <h3>Points standings</h3>
+              </div>
+            </div>
+            <div class="table-wrapper">
+              <table class="players-table leaderboard-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Player</th>
+                    <th class="points-cell">Points</th>
+                    <th class="events-cell">Events</th>
+                  </tr>
+                </thead>
+                <tbody id="circuitLeaderboardBody"></tbody>
+              </table>
+            </div>
+            <p id="circuitLeaderboardNote" class="helper"></p>
+          </div>
+        </div>
+      </main>
     </section>
 
     <!-- Tournament detail -->
@@ -587,6 +654,9 @@
           <div class="form-actions" style="margin-top:16px;">
             <button class="cta primary" id="saveSettingsBtn">Save settings</button>
           </div>
+          <div class="form-actions danger-actions">
+            <button class="cta danger" id="deleteTournamentBtn">Delete tournament</button>
+          </div>
         </div>
       </section>
     </main>
@@ -646,6 +716,13 @@
             <p class="helper">Recommended 1200x630. JPG/PNG/WebP.</p>
           </div>
         </label>
+        <div id="circuitTournamentOptions" style="display:none;">
+          <p class="helper">Circuit: <span id="circuitSlugLabel"></span></p>
+          <label class="checkbox-row">
+            <input type="checkbox" id="circuitFinalToggle" />
+            Mark as the final circuit event
+          </label>
+        </div>
       </div>
       <div class="settings-panel" id="createDesc">
         <label>Description
@@ -764,8 +841,55 @@
           </label>
         </div>
       </div>
-      <div class="form-actions">
+      <div class="form-actions create-modal-footer">
         <button class="cta subtle" id="closeCreateTournament">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create circuit modal -->
+  <div id="createCircuitModal" class="modal create-modal" style="display:none;">
+    <div class="modal-content">
+      <div class="modal-title-row">
+        <h3>Create circuit</h3>
+        <div class="form-actions inline-actions">
+          <button class="cta primary" id="saveCircuitBtn">Create</button>
+        </div>
+      </div>
+      <label>Circuit name
+        <input type="text" id="circuitNameInput" placeholder="Monthly Challenger Circuit" />
+      </label>
+      <label>Custom URL slug
+        <div class="inline-row">
+          <span class="muted">https://zbuildorder.com/tournament/</span>
+          <div class="slug-input-wrapper">
+            <input type="text" id="circuitSlugInput" placeholder="challenger-circuit" />
+            <button type="button" class="icon-btn slug-generate-btn" id="generateCircuitSlugBtn"
+              aria-label="Generate random slug">↻</button>
+          </div>
+        </div>
+        <p class="helper" id="circuitSlugPreview"></p>
+      </label>
+      <label>Description
+        <textarea id="circuitDescriptionInput" class="markdown-input" rows="6"
+          placeholder="What makes this circuit special?"></textarea>
+      </label>
+      <div class="form-actions">
+        <button class="cta subtle" id="closeCreateCircuit">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete tournament modal -->
+  <div id="confirmDeleteTournamentModal" class="modal">
+    <div class="modal-content small-modal">
+      <h3>Delete tournament</h3>
+      <p id="confirmDeleteTournamentMessage" class="helper">
+        This will permanently delete the tournament and its bracket data.
+      </p>
+      <div class="form-actions">
+        <button class="cta danger" id="confirmDeleteTournamentBtn">Yes, delete</button>
+        <button class="cta ghost" id="cancelDeleteTournamentBtn">Cancel</button>
       </div>
     </div>
   </div>

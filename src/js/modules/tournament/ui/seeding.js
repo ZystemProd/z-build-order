@@ -1,6 +1,9 @@
 import { escapeHtml } from "../bracket/renderUtils.js";
 
-export function renderSeedingTable(players = [], { isLive = false } = {}) {
+export function renderSeedingTable(
+  players = [],
+  { isLive = false, isAdmin = false } = {}
+) {
   const body = document.getElementById("playersTableBody");
   if (!body) return;
 
@@ -18,6 +21,25 @@ export function renderSeedingTable(players = [], { isLive = false } = {}) {
     const checkedIn = p.checkedInAt
       ? `<span class="checkin-pill is-checked">Checked in</span>`
       : `<span class="checkin-pill is-missing">Not checked in</span>`;
+    const checkInAction = isAdmin
+      ? `<div class="checkin-editor">
+          <button
+            class="cta small ghost toggle-checkin"
+            data-player-id="${escapeHtml(p.id || "")}"
+            type="button"
+          >
+            Edit
+          </button>
+          <select
+            class="checkin-select"
+            data-player-id="${escapeHtml(p.id || "")}"
+            style="display:none;"
+          >
+            <option value="checked" ${p.checkedInAt ? "selected" : ""}>Checked in</option>
+            <option value="not" ${p.checkedInAt ? "" : "selected"}>Not checked in</option>
+          </select>
+        </div>`
+      : "";
 
     return `
       <tr>
@@ -40,7 +62,12 @@ export function renderSeedingTable(players = [], { isLive = false } = {}) {
         </td>
         <td>${mmr ?? "-"}</td>
         <td>${pulseHtml}</td>
-        <td>${checkedIn}</td>
+        <td>
+          <div class="checkin-cell">
+            ${checkedIn}
+            ${checkInAction}
+          </div>
+        </td>
         <td>
           ${
             isLive

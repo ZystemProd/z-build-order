@@ -244,6 +244,8 @@ export function renderSimpleMatch(
   const raceClassB = raceClassName(pB?.race);
   const clanLogoA = pA?.clanLogoUrl ? sanitizeUrl(pA.clanLogoUrl) : "";
   const clanLogoB = pB?.clanLogoUrl ? sanitizeUrl(pB.clanLogoUrl) : "";
+  const clanNameA = (pA?.clan || "").trim();
+  const clanNameB = (pB?.clan || "").trim();
   const showScores = !!(pA && pB);
   const bestOf = getBestOfForMatch(match);
   const selectValA = getSelectValue(match, 0, bestOf);
@@ -275,7 +277,9 @@ export function renderSimpleMatch(
         pA ? "" : "is-placeholder"
       }">${pA ? `#${pA.seed || "?"}` : ""}</span><span class="race-strip ${raceClassA}"></span>${
         clanLogoA
-          ? `<img class="clan-logo-inline" src="${escapeHtml(clanLogoA)}" alt="Clan logo" />`
+          ? `<img class="clan-logo-inline" src="${escapeHtml(clanLogoA)}" alt="Clan logo" ${
+              clanNameA ? `data-tooltip="${escapeHtml(clanNameA)}"` : ""
+            } />`
           : `<img class="clan-logo-inline is-placeholder" src="img/clan/logo.webp" alt="No clan logo" />`
       }<span class="name-text ${
     aIsPlaceholder ? "is-placeholder" : ""
@@ -297,7 +301,9 @@ export function renderSimpleMatch(
         pB ? "" : "is-placeholder"
       }">${pB ? `#${pB.seed || "?"}` : ""}</span><span class="race-strip ${raceClassB}"></span>${
         clanLogoB
-          ? `<img class="clan-logo-inline" src="${escapeHtml(clanLogoB)}" alt="Clan logo" />`
+          ? `<img class="clan-logo-inline" src="${escapeHtml(clanLogoB)}" alt="Clan logo" ${
+              clanNameB ? `data-tooltip="${escapeHtml(clanNameB)}"` : ""
+            } />`
           : `<img class="clan-logo-inline is-placeholder" src="img/clan/logo.webp" alt="No clan logo" />`
       }<span class="name-text ${
     bIsPlaceholder ? "is-placeholder" : ""
