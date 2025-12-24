@@ -845,7 +845,7 @@ a {
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.2s ease, visibility 0.2s ease;
-  z-index: 1200;
+  z-index: 1400;
 }
 
 .tooltip::after {
@@ -2532,7 +2532,17 @@ textarea:focus {
   position: relative;
 }
 
+.match-info-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .match-info-toprow #matchInfoBestOf {
+  margin: 0;
+}
+
+.match-info-toprow #matchInfoServer {
   margin: 0;
 }
 
@@ -2571,6 +2581,12 @@ textarea:focus {
   font-size: 12px;
   font-weight: 600;
   color: var(--muted);
+}
+
+.match-info-flag {
+  font-size: 14px;
+  line-height: 1;
+  cursor: default;
 }
 
 .match-info-presence {
@@ -3359,6 +3375,17 @@ label {
 
 .player-detail-meta h3 {
   margin: 0 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.player-detail-flag {
+  margin-left: auto;
+  font-size: 20px;
+  line-height: 1;
+  cursor: default;
 }
 
 .player-detail-tags {

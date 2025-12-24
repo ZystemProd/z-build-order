@@ -738,98 +738,140 @@
       <div class="modal-content small-modal">
         <span class="close-modal" id="closeSettingsModal">&times;</span>
         <h3>Settings</h3>
-        <div class="settings-avatar-section">
-          <div class="settings-avatar-preview">
-            <img id="settingsCurrentAvatar" src="img/avatar/marine_avatar_1.webp" alt="Current avatar" />
-          </div>
-        <button type="button" class="settings-avatar-button" id="changeAvatarBtn">
-          <img id="settingsAvatarButtonImage" src="img/SVG/user-svgrepo-com.svg" class="menu-icon" alt="" aria-hidden="true" />
-            Change Avatar
+        <div class="settings-tabs" id="userSettingsTabs">
+          <button class="settings-tab-btn active" data-user-settings-tab="settingsGeneral">
+            General
+          </button>
+          <button class="settings-tab-btn" data-user-settings-tab="settingsTournament">
+            Tournament
           </button>
         </div>
-        <hr class="settings-divider" />
-        <div class="settings-username-section">
-          <label for="settingsUsernameInput" class="settings-label">Username</label>
-          <div class="settings-username-row">
-            <input
-              id="settingsUsernameInput"
-              class="settings-input"
-              type="text"
-              maxlength="20"
-              placeholder="New username"
-              autocomplete="off"
-              spellcheck="false"
-            />
-            <button type="button" class="settings-username-button" id="saveUsernameButton">
-              <img src="img/SVG/pencil.svg" class="menu-icon" alt="" aria-hidden="true" />
-              Update
+        <div class="settings-panel active" id="settingsGeneral">
+          <div class="settings-avatar-section">
+            <div class="settings-avatar-preview">
+              <img id="settingsCurrentAvatar" src="img/avatar/marine_avatar_1.webp" alt="Current avatar" />
+            </div>
+            <button type="button" class="settings-avatar-button" id="changeAvatarBtn">
+              <img id="settingsAvatarButtonImage" src="img/SVG/user-svgrepo-com.svg" class="menu-icon" alt="" aria-hidden="true" />
+              Change Avatar
             </button>
           </div>
-          <p id="settingsUsernameStatus" class="settings-helper-text">
-            Use 3-20 letters, numbers, or underscores.
-          </p>
+          <hr class="settings-divider" />
+          <div class="settings-username-section">
+            <label for="settingsUsernameInput" class="settings-label">Username</label>
+            <div class="settings-username-row">
+              <input
+                id="settingsUsernameInput"
+                class="settings-input"
+                type="text"
+                maxlength="20"
+                placeholder="New username"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <button type="button" class="settings-username-button" id="saveUsernameButton">
+                <img src="img/SVG/pencil.svg" class="menu-icon" alt="" aria-hidden="true" />
+                Update
+              </button>
+            </div>
+            <p id="settingsUsernameStatus" class="settings-helper-text">
+              Use 3-20 letters, numbers, or underscores.
+            </p>
+          </div>
+          <hr class="settings-divider" />
+          <div class="publish-checkbox-row">
+            <span>Enable Bracket Input</span>
+            <div class="checkbox-wrapper-59">
+              <label class="switch">
+                <input type="checkbox" id="bracketInputToggle" checked />
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+          <div class="publish-checkbox-row">
+            <span>Show Build Input</span>
+            <div class="checkbox-wrapper-59">
+              <label class="switch">
+                <input type="checkbox" id="buildInputToggle" checked />
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+          <div class="publish-checkbox-row">
+            <span>Main Clan</span>
+            <select id="mainClanSelect" class="styled-dropdown"></select>
+          </div>
+          <hr class="settings-divider" />
+          <div class="settings-danger-zone">
+            <button type="button" class="settings-danger-button" id="deleteAccountBtn">
+              <img src="img/SVG/trash.svg" class="menu-icon" alt="" aria-hidden="true" />
+              Delete Account
+            </button>
+            <p class="settings-danger-note">This action will permanently remove your account.</p>
+          </div>
         </div>
-        <hr class="settings-divider" />
+        <div class="settings-panel" id="settingsTournament">
           <div class="settings-username-section">
             <div class="settings-label-row">
               <label for="sc2PulseInput" class="settings-label">SC2Pulse Link</label>
               <button
-              type="button"
-              class="help-circle animated-help"
-              id="pulseHelpBtn"
-              aria-label="How to find your SC2Pulse link"
-              title="How to find your SC2Pulse link"
-            >
-              ?
-            </button>
+                type="button"
+                class="help-circle animated-help"
+                id="pulseHelpBtn"
+                aria-label="How to find your SC2Pulse link"
+                title="How to find your SC2Pulse link"
+              >
+                ?
+              </button>
+            </div>
+            <div class="settings-username-row">
+              <input
+                id="sc2PulseInput"
+                class="settings-input"
+                type="url"
+                placeholder="https://sc2pulse.nephest.com/sc2/?type=character&id=..."
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <button type="button" class="settings-username-button" id="connectPulseBtn">
+                <img src="img/SVG/stats.svg" class="menu-icon" alt="" aria-hidden="true" />
+                Update
+              </button>
+            </div>
+            <p id="pulseStatusText" class="settings-helper-text">
+              Paste your SC2Pulse profile link to sync your latest MMR.
+            </p>
+            <div class="settings-secondary-pulse">
+              <button type="button" class="secondary-pulse-button" id="openSecondaryPulseModalBtn">
+                Manage secondary SC2Pulse links
+              </button>
+            </div>
           </div>
-        <div class="settings-username-row">
-          <input
-            id="sc2PulseInput"
-            class="settings-input"
-            type="url"
-            placeholder="https://sc2pulse.nephest.com/sc2/?type=character&id=..."
-            autocomplete="off"
-            spellcheck="false"
-          />
-          <button type="button" class="settings-username-button" id="connectPulseBtn">
-            <img src="img/SVG/stats.svg" class="menu-icon" alt="" aria-hidden="true" />
-            Update
-          </button>
-        </div>
-        <p id="pulseStatusText" class="settings-helper-text">
-          Paste your SC2Pulse profile link to sync your latest MMR.
-        </p>
-        <div class="settings-secondary-pulse">
-          <button type="button" class="secondary-pulse-button" id="openSecondaryPulseModalBtn">
-            Manage secondary SC2Pulse links
-          </button>
-        </div>
-        <div class="settings-username-section">
-          <label for="settingsTwitchInput" class="settings-label">Twitch Channel</label>
-              <div class="settings-username-row">
-                <input
-                  id="settingsTwitchInput"
-                  class="settings-input"
-                  type="text"
-                  placeholder="https://www.twitch.tv/username"
-                />
-                <button type="button" class="settings-username-button" id="saveTwitchButton">
-                  <img src="img/SVG/twitch.svg" class="menu-icon" alt="" aria-hidden="true" />
-                  Save
-                </button>
-              </div>
-              <p id="settingsTwitchStatus" class="settings-helper-text">
-                Add your Twitch channel to link your stream.
-              </p>
+          <div class="settings-username-section">
+            <label for="settingsTwitchInput" class="settings-label">Twitch Channel</label>
+            <div class="settings-username-row">
+              <input
+                id="settingsTwitchInput"
+                class="settings-input"
+                type="text"
+                placeholder="https://www.twitch.tv/username"
+              />
+              <button type="button" class="settings-username-button" id="saveTwitchButton">
+                Save
+              </button>
             </div>
-            <div class="settings-username-section">
-              <label for="settingsCountrySelect" class="settings-label">Country</label>
-              <select id="settingsCountrySelect" class="settings-input styled-dropdown"></select>
-              <p id="settingsCountryStatus" class="settings-helper-text">
-                Select where you are from.
-              </p>
-            </div>
+            <p id="settingsTwitchStatus" class="settings-helper-text">
+              Add your Twitch channel to link your stream.
+            </p>
+          </div>
+          <div class="settings-username-section">
+            <label for="settingsCountrySelect" class="settings-label">Country</label>
+            <select id="settingsCountrySelect" class="settings-input styled-dropdown"></select>
+            <p id="settingsCountryStatus" class="settings-helper-text">
+              Select where you are from.
+            </p>
+          </div>
+        </div>
       <div id="pulseHelpModal" class="modal">
         <div class="modal-content">
           <span class="close" id="closePulseHelp">&times;</span>
@@ -860,37 +902,6 @@
           </p>
         </div>
       </div>
-        </div>
-        <hr class="settings-divider" />
-        <div class="publish-checkbox-row">
-          <span>Enable Bracket Input</span>
-          <div class="checkbox-wrapper-59">
-            <label class="switch">
-              <input type="checkbox" id="bracketInputToggle" checked />
-              <span class="slider"></span>
-            </label>
-          </div>
-        </div>
-        <div class="publish-checkbox-row">
-          <span>Show Build Input</span>
-          <div class="checkbox-wrapper-59">
-            <label class="switch">
-              <input type="checkbox" id="buildInputToggle" checked />
-              <span class="slider"></span>
-            </label>
-          </div>
-        </div>
-        <div class="publish-checkbox-row">
-          <span>Main Clan</span>
-          <select id="mainClanSelect" class="styled-dropdown"></select>
-        </div>
-        <hr class="settings-divider" />
-        <div class="settings-danger-zone">
-          <button type="button" class="settings-danger-button" id="deleteAccountBtn">
-            <img src="img/SVG/trash.svg" class="menu-icon" alt="" aria-hidden="true" />
-            Delete Account
-          </button>
-          <p class="settings-danger-note">This action will permanently remove your account.</p>
         </div>
       </div>
     </div>

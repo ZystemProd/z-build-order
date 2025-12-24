@@ -3,7 +3,6 @@ import { bindSettingsEvents } from "./settings/bindings.js";
 import {
   openVetoModal,
   renderVetoPoolGrid,
-  renderVetoSelectionList,
   renderVetoStatus,
   handleVetoPoolClick,
   hideVetoModal,

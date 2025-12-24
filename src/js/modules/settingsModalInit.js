@@ -29,6 +29,21 @@ export function initUserSettingsModal(options = {}) {
   const bracketToggle = document.getElementById("bracketInputToggle");
   const buildToggle = document.getElementById("buildInputToggle");
   const mainClanSelect = document.getElementById("mainClanSelect");
+  const tabButtons = modal.querySelectorAll("[data-user-settings-tab]");
+  const tabPanels = modal.querySelectorAll(".settings-panel");
+
+  const setActiveTab = (targetId) => {
+    if (!targetId) return;
+    tabButtons.forEach((btn) => {
+      btn.classList.toggle(
+        "active",
+        btn.dataset.userSettingsTab === targetId
+      );
+    });
+    tabPanels.forEach((panel) => {
+      panel.classList.toggle("active", panel.id === targetId);
+    });
+  };
 
   const syncToggles = () => {
     if (bracketToggle) {
@@ -94,14 +109,19 @@ export function initUserSettingsModal(options = {}) {
 
   const hideModal = () => {
     modal.style.display = "none";
+    document.body.classList.remove("modal-open");
   };
 
   const showModal = async () => {
     modal.style.display = "block";
+    document.body.classList.add("modal-open");
     await loadUserSettings();
     await populateMainClanDropdown();
     syncToggles();
     syncAvatarPreview();
+    if (tabButtons.length) {
+      setActiveTab(tabButtons[0].dataset.userSettingsTab);
+    }
   };
 
   if (settingsBtn) {
@@ -148,6 +168,14 @@ export function initUserSettingsModal(options = {}) {
   if (mainClanSelect) {
     mainClanSelect.addEventListener("change", () => {
       setMainClanId(mainClanSelect.value);
+    });
+  }
+
+  if (tabButtons.length) {
+    tabButtons.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        setActiveTab(btn.dataset.userSettingsTab);
+      });
     });
   }
 

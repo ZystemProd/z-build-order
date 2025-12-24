@@ -1,11 +1,11 @@
 [
   {
-    "code": "AF",
-    "name": "Afghanistan"
-  },
-  {
     "code": "AX",
     "name": "A.land Islands"
+  },
+  {
+    "code": "AF",
+    "name": "Afghanistan"
   },
   {
     "code": "AL",
@@ -144,6 +144,10 @@
     "name": "Burundi"
   },
   {
+    "code": "CI",
+    "name": "CA'te d'Ivoire"
+  },
+  {
     "code": "CV",
     "name": "Cabo Verde"
   },
@@ -212,10 +216,6 @@
     "name": "Costa Rica"
   },
   {
-    "code": "CI",
-    "name": "CA'te d'Ivoire"
-  },
-  {
     "code": "HR",
     "name": "Croatia"
   },
@@ -262,6 +262,10 @@
   {
     "code": "SV",
     "name": "El Salvador"
+  },
+  {
+    "code": "ENG",
+    "name": "England"
   },
   {
     "code": "GQ",
@@ -470,10 +474,6 @@
   {
     "code": "KP",
     "name": "Korea (Democratic People's Republic of)"
-  },
-  {
-    "code": "KR",
-    "name": "Korea, Republic of"
   },
   {
     "code": "KW",
@@ -729,7 +729,7 @@
   },
   {
     "code": "RU",
-    "name": "Russian Federation"
+    "name": "Russia"
   },
   {
     "code": "RW",
@@ -780,6 +780,10 @@
     "name": "Saudi Arabia"
   },
   {
+    "code": "SCT",
+    "name": "Scotland"
+  },
+  {
     "code": "SN",
     "name": "Senegal"
   },
@@ -828,6 +832,10 @@
     "name": "South Georgia and the South Sandwich Islands"
   },
   {
+    "code": "KR",
+    "name": "South Korea"
+  },
+  {
     "code": "SS",
     "name": "South Sudan"
   },
@@ -862,6 +870,10 @@
   {
     "code": "SY",
     "name": "Syrian Arab Republic"
+  },
+  {
+    "code": "TR",
+    "name": "TA¬rkiye"
   },
   {
     "code": "TW",
@@ -904,10 +916,6 @@
     "name": "Tunisia"
   },
   {
-    "code": "TR",
-    "name": "TA¬rkiye"
-  },
-  {
     "code": "TM",
     "name": "Turkmenistan"
   },
@@ -936,12 +944,12 @@
     "name": "United Kingdom of Great Britain and Northern Ireland"
   },
   {
-    "code": "US",
-    "name": "United States of America"
-  },
-  {
     "code": "UM",
     "name": "United States Minor Outlying Islands"
+  },
+  {
+    "code": "US",
+    "name": "United States of America"
   },
   {
     "code": "UY",
@@ -970,6 +978,10 @@
   {
     "code": "VI",
     "name": "Virgin Islands (U.S.)"
+  },
+  {
+    "code": "WLS",
+    "name": "Wales"
   },
   {
     "code": "WF",

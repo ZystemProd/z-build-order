@@ -1,4 +1,6 @@
 import DOMPurify from "dompurify";
+import { db } from "../../../app.js";
+import { doc, getDoc } from "firebase/firestore";
 import {
   MAX_SECONDARY_PULSE_LINKS,
   DEFAULT_PLAYER_AVATAR,
@@ -6,6 +8,31 @@ import {
   setPlayerDetailModalInitializedState,
 } from "./state.js";
 import { escapeHtml } from "./bracket/renderUtils.js";
+import countries from "../../data/countries.json" assert { type: "json" };
+import { updateTooltips } from "../tooltip.js";
+
+const countryFlagCache = new Map();
+const COUNTRY_NAME_BY_CODE = new Map(
+  (Array.isArray(countries) ? countries : []).map((entry) => [
+    String(entry?.code || "").toUpperCase(),
+    String(entry?.name || ""),
+  ])
+);
+
+function setFlagTitle(flagEl, code) {
+  if (!flagEl) return;
+  const normalized = String(code || "").trim().toUpperCase();
+  const name = COUNTRY_NAME_BY_CODE.get(normalized) || "";
+  if (name) {
+    flagEl.setAttribute("aria-label", name);
+    flagEl.setAttribute("data-tooltip", name);
+    flagEl.removeAttribute("title");
+  } else {
+    flagEl.removeAttribute("aria-label");
+    flagEl.removeAttribute("data-tooltip");
+    flagEl.removeAttribute("title");
+  }
+}
 
 function formatPulseLinks(list = [], linkClass = "secondary-pulse-link") {
   if (!Array.isArray(list) || !list.length) {
@@ -131,6 +158,8 @@ export function openPlayerDetailModal(player) {
   if (!modal) return;
   const avatar = document.getElementById("playerDetailAvatar");
   const nameEl = document.getElementById("playerDetailName");
+  const nameTextEl = document.getElementById("playerDetailNameText");
+  const flagEl = document.getElementById("playerDetailCountryFlag");
   const clanEl = document.getElementById("playerDetailClan");
   const raceEl = document.getElementById("playerDetailRace");
   const pointsEl = document.getElementById("playerDetailPoints");
@@ -145,7 +174,22 @@ export function openPlayerDetailModal(player) {
     const abbr = player?.clanAbbreviation;
     const displayName = player?.pulseName || player?.name;
     const safeName = displayName || "Player";
-    nameEl.textContent = abbr ? `[${abbr}] ${safeName}` : safeName;
+    const composedName = abbr ? `[${abbr}] ${safeName}` : safeName;
+    if (nameTextEl) {
+      nameTextEl.textContent = composedName;
+    } else {
+      nameEl.textContent = composedName;
+    }
+    if (flagEl) {
+      const flag = countryCodeToFlag(player?.country || "");
+      flagEl.textContent = flag;
+      flagEl.style.display = flag ? "inline-flex" : "none";
+      setFlagTitle(flagEl, player?.country || "");
+      updateTooltips();
+      if (!flag && player?.uid) {
+        void hydrateCountryFlag(player, flagEl);
+      }
+    }
   }
   if (clanEl) {
     const clan = player?.clan || "";
@@ -199,4 +243,57 @@ export function openPlayerDetailModal(player) {
   formatMmrByRace(player);
   modal.dataset.ready = "true";
   modal.showModal?.();
+}
+
+async function hydrateCountryFlag(player, flagEl) {
+  const uid = String(player?.uid || "").trim();
+  if (!uid || !flagEl) return;
+  if (countryFlagCache.has(uid)) {
+    const cached = countryFlagCache.get(uid) || "";
+    flagEl.textContent = cached;
+    flagEl.style.display = cached ? "inline-flex" : "none";
+    if (cached && player?.country) {
+      setFlagTitle(flagEl, player.country);
+    } else {
+      setFlagTitle(flagEl, "");
+    }
+    updateTooltips();
+    return;
+  }
+  try {
+    const snap = await getDoc(doc(db, "users", uid));
+    const code = snap.exists() ? String(snap.data()?.country || "") : "";
+    const flag = countryCodeToFlag(code);
+    countryFlagCache.set(uid, flag);
+    if (flag) {
+      flagEl.textContent = flag;
+      flagEl.style.display = "inline-flex";
+      player.country = code.toUpperCase();
+      setFlagTitle(flagEl, player.country);
+    } else {
+      setFlagTitle(flagEl, "");
+    }
+    updateTooltips();
+  } catch (_) {
+    countryFlagCache.set(uid, "");
+  }
+}
+
+function countryCodeToFlag(raw) {
+  const code = String(raw || "").trim().toUpperCase();
+  if (code === "ENG") {
+    return "\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}";
+  }
+  if (code === "SCT") {
+    return "\u{1F3F4}\u{E0067}\u{E0062}\u{E0073}\u{E0063}\u{E0074}\u{E007F}";
+  }
+  if (code === "WLS") {
+    return "\u{1F3F4}\u{E0067}\u{E0062}\u{E0077}\u{E006C}\u{E0073}\u{E007F}";
+  }
+  if (code.length !== 2) return "";
+  const A = 0x1f1e6;
+  const first = code.charCodeAt(0) - 65;
+  const second = code.charCodeAt(1) - 65;
+  if (first < 0 || first > 25 || second < 0 || second > 25) return "";
+  return String.fromCodePoint(A + first, A + second);
 }

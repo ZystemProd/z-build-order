@@ -9,6 +9,9 @@ import {
   serverTimestamp,
   setDoc,
 } from "firebase/firestore";
+import { getPreferredServerLabel } from "../../../data/countryRegions.js";
+import countries from "../../../data/countries.json" assert { type: "json" };
+import { updateTooltips } from "../../tooltip.js";
 import {
   currentTournamentMeta,
   vetoState,
@@ -36,6 +39,28 @@ let presenceLatest = new Map(); // uid -> { matchId, updatedAtMs, playerId }
 let presenceContext = { matchId: null, leftPlayerId: null, rightPlayerId: null };
 let presenceSlug = null;
 let presenceWriteDenied = false;
+const countryFlagCache = new Map();
+const COUNTRY_NAME_BY_CODE = new Map(
+  (Array.isArray(countries) ? countries : []).map((entry) => [
+    String(entry?.code || "").toUpperCase(),
+    String(entry?.name || ""),
+  ])
+);
+
+function setFlagTitle(flagEl, code) {
+  if (!flagEl) return;
+  const normalized = String(code || "").trim().toUpperCase();
+  const name = COUNTRY_NAME_BY_CODE.get(normalized) || "";
+  if (name) {
+    flagEl.setAttribute("aria-label", name);
+    flagEl.setAttribute("data-tooltip", name);
+    flagEl.removeAttribute("title");
+  } else {
+    flagEl.removeAttribute("aria-label");
+    flagEl.removeAttribute("data-tooltip");
+    flagEl.removeAttribute("title");
+  }
+}
 
 export function openVetoModal(matchId, { getPlayersMap, getDefaultMapPoolNames, getMapByName }) {
   setCurrentVetoMatchIdState(matchId);
@@ -161,6 +186,8 @@ export function openMatchInfoModal(
   const bestOfEl = document.getElementById("matchInfoBestOf");
   const leftNameEl = document.getElementById("matchInfoLeftName");
   const rightNameEl = document.getElementById("matchInfoRightName");
+  const leftFlagEl = document.getElementById("matchInfoLeftFlag");
+  const rightFlagEl = document.getElementById("matchInfoRightFlag");
   const leftScoreEl = document.getElementById("matchInfoLeftScore");
   const rightScoreEl = document.getElementById("matchInfoRightScore");
   const rowsEl = document.getElementById("matchInfoMapRows");
@@ -168,6 +195,7 @@ export function openMatchInfoModal(
   const rightVetoesEl = document.getElementById("matchInfoRightVetoes");
   const leftPresenceEl = document.getElementById("matchInfoLeftPresence");
   const rightPresenceEl = document.getElementById("matchInfoRightPresence");
+  const serverEl = document.getElementById("matchInfoServer");
   const openVetoBtn = document.getElementById("openMapVetoBtn");
   const confirmScoreBtn = document.getElementById("confirmMatchScoreBtn");
   const walkoverSelect = document.getElementById("matchInfoWalkoverSelect");
@@ -222,6 +250,35 @@ export function openMatchInfoModal(
   if (bestOfEl) bestOfEl.textContent = `Best of ${bestOf}`;
   if (leftNameEl) leftNameEl.textContent = aName;
   if (rightNameEl) rightNameEl.textContent = bName;
+  if (leftFlagEl) {
+    const flag = countryCodeToFlag(pA?.country || "");
+    leftFlagEl.textContent = flag;
+    leftFlagEl.style.display = flag ? "inline-flex" : "none";
+    setFlagTitle(leftFlagEl, pA?.country || "");
+    if (!flag && pA?.uid) {
+      void hydrateCountryFlag(pA, leftFlagEl);
+    }
+  }
+  if (rightFlagEl) {
+    const flag = countryCodeToFlag(pB?.country || "");
+    rightFlagEl.textContent = flag;
+    rightFlagEl.style.display = flag ? "inline-flex" : "none";
+    setFlagTitle(rightFlagEl, pB?.country || "");
+    if (!flag && pB?.uid) {
+      void hydrateCountryFlag(pB, rightFlagEl);
+    }
+  }
+  updateTooltips();
+  if (serverEl) {
+    const { label, note } = getPreferredServerLabel([pA?.country, pB?.country]);
+    if (label) {
+      serverEl.textContent = `Preferred server: ${label}${
+        note ? ` (${note})` : ""
+      }`;
+    } else {
+      serverEl.textContent = "Preferred server: N/A";
+    }
+  }
   renderMatchInfoVetoes({ leftVetoesEl, rightVetoesEl, vetoedMaps, aName, bName });
   setPresenceContext({ matchId, leftPlayerId, rightPlayerId });
 
@@ -465,6 +522,59 @@ function normalizeMapResults(mapResults, bestOf) {
   if (out.length > n) return out.slice(0, n);
   while (out.length < n) out.push(null);
   return out;
+}
+
+async function hydrateCountryFlag(player, flagEl) {
+  const uid = String(player?.uid || "").trim();
+  if (!uid || !flagEl) return;
+  if (countryFlagCache.has(uid)) {
+    const cached = countryFlagCache.get(uid) || "";
+    flagEl.textContent = cached;
+    flagEl.style.display = cached ? "inline-flex" : "none";
+    if (cached && player?.country) {
+      setFlagTitle(flagEl, player.country);
+    } else {
+      setFlagTitle(flagEl, "");
+    }
+    updateTooltips();
+    return;
+  }
+  try {
+    const snap = await getDoc(doc(db, "users", uid));
+    const code = snap.exists() ? String(snap.data()?.country || "") : "";
+    const flag = countryCodeToFlag(code);
+    countryFlagCache.set(uid, flag);
+    if (flag) {
+      flagEl.textContent = flag;
+      flagEl.style.display = "inline-flex";
+      player.country = code.toUpperCase();
+      setFlagTitle(flagEl, player.country);
+    } else {
+      setFlagTitle(flagEl, "");
+    }
+    updateTooltips();
+  } catch (_) {
+    countryFlagCache.set(uid, "");
+  }
+}
+
+function countryCodeToFlag(raw) {
+  const code = String(raw || "").trim().toUpperCase();
+  if (code === "ENG") {
+    return "\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}";
+  }
+  if (code === "SCT") {
+    return "\u{1F3F4}\u{E0067}\u{E0062}\u{E0073}\u{E0063}\u{E0074}\u{E007F}";
+  }
+  if (code === "WLS") {
+    return "\u{1F3F4}\u{E0067}\u{E0062}\u{E0077}\u{E006C}\u{E0073}\u{E007F}";
+  }
+  if (code.length !== 2) return "";
+  const A = 0x1f1e6;
+  const first = code.charCodeAt(0) - 65;
+  const second = code.charCodeAt(1) - 65;
+  if (first < 0 || first > 25 || second < 0 || second > 25) return "";
+  return String.fromCodePoint(A + first, A + second);
 }
 
 function renderMatchInfoRows(rowsEl, { bestOf, pickedMaps, winners }) {

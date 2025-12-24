@@ -691,9 +691,14 @@ function setCountrySelectValue(value) {
 function populateCountrySelectOptions() {
   const select = document.getElementById("settingsCountrySelect");
   if (!select || select.dataset.filled === "true") return;
+  const sortedCountries = [...ISO_COUNTRIES].sort((a, b) =>
+    String(a?.name || "").localeCompare(String(b?.name || ""), "en", {
+      sensitivity: "base",
+    })
+  );
   const options = ['<option value="">Prefer not to say</option>']
     .concat(
-      ISO_COUNTRIES.map(
+      sortedCountries.map(
         (country) => `<option value="${country.code}">${country.name}</option>`
       )
     )

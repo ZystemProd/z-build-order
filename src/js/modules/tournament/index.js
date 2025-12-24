@@ -161,7 +161,6 @@ import { bindSettingsEvents } from "./settings/bindings.js";
 import {
   openVetoModal,
   renderVetoPoolGrid,
-  renderVetoSelectionList,
   renderVetoStatus,
   handleVetoPoolClick,
   hideVetoModal,
@@ -1154,6 +1153,7 @@ async function enterTournament(slug, options = {}) {
   isCircuitAdmin = false;
   updateCircuitAdminVisibility();
   renderAll();
+  switchTab("bracketTab");
 }
 
 async function showLanding() {
@@ -2263,6 +2263,7 @@ async function handleRegistration(event) {
   const mainClanSelect = document.getElementById("mainClanSelect");
   const selectedClanOption = mainClanSelect?.selectedOptions?.[0];
   const selectedClanId = mainClanSelect?.value || "";
+  const countryCode = document.getElementById("settingsCountrySelect")?.value?.trim().toUpperCase() || "";
   let clanName = selectedClanOption?.textContent || "";
   let clanAbbreviation = selectedClanOption?.dataset?.abbr || "";
   let clanLogoUrl = selectedClanOption?.dataset?.logoUrl || "";
@@ -2291,6 +2292,7 @@ async function handleRegistration(event) {
     secondaryPulseLinks,
     secondaryPulseProfiles,
     mmrByRace,
+    country: countryCode || "",
     clan: clanName === "None" ? "" : clanName,
     clanAbbreviation: clanAbbreviation || "",
     clanLogoUrl: clanLogoUrl || "",
