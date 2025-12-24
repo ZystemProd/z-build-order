@@ -132,7 +132,10 @@ export async function renderCircuitView(
   const finalSlug = String(meta?.finalTournamentSlug || "").trim();
   if (finalLink) {
     if (finalSlug) {
-      finalLink.href = `/tournament/${finalSlug}`;
+      const circuitSlug = String(meta?.slug || "").trim();
+      finalLink.href = circuitSlug
+        ? `/tournament/${circuitSlug}/${finalSlug}`
+        : `/tournament/${finalSlug}`;
       finalLink.textContent = `Final tournament: ${finalSlug}`;
       finalLink.style.display = "inline-flex";
     } else {
@@ -239,7 +242,7 @@ export async function renderCircuitTournamentList(
         });
       }
       if (onEnterTournament) {
-        li.addEventListener("click", () => onEnterTournament(item.slug));
+        li.addEventListener("click", () => onEnterTournament(item.slug, meta?.slug || ""));
       }
       listEl.appendChild(li);
     });

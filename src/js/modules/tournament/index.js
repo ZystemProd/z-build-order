@@ -817,7 +817,8 @@ function renderTournamentList() {
                 : ""
             }
             `);
-            const open = () => enterTournament(item.slug);
+            const open = () =>
+              enterTournament(item.slug, { circuitSlug: item.circuitSlug || "" });
             li.addEventListener("click", open);
             listEl.appendChild(li);
             if (isStarted) {
@@ -1053,9 +1054,12 @@ function getRouteFromPath() {
     parts[1]?.toLowerCase() === "circuit" &&
     parts[2]
   ) {
-    return { view: "circuit", slug: parts[2] };
+    return { view: "circuitLegacy", slug: parts[2] };
   }
-  if (parts[0].toLowerCase() === "tournament" && parts.length >= 2) {
+  if (parts[0].toLowerCase() === "tournament" && parts.length >= 3) {
+    return { view: "circuitTournament", circuitSlug: parts[1], slug: parts[2] };
+  }
+  if (parts[0].toLowerCase() === "tournament" && parts.length === 2) {
     return { view: "slug", slug: parts[1] };
   }
   return { view: "landing", slug: "" };
@@ -1063,6 +1067,14 @@ function getRouteFromPath() {
 
 async function handleRouteChange() {
   const route = getRouteFromPath();
+  if (route.view === "circuitLegacy" && route.slug) {
+    await enterCircuit(route.slug);
+    return;
+  }
+  if (route.view === "circuitTournament" && route.slug && route.circuitSlug) {
+    await enterTournament(route.slug, { circuitSlug: route.circuitSlug });
+    return;
+  }
   if (route.view === "circuit" && route.slug) {
     await enterCircuit(route.slug);
     return;
@@ -1073,16 +1085,30 @@ async function handleRouteChange() {
       await enterCircuit(route.slug, { meta });
       return;
     }
+    try {
+      const snap = await getDoc(doc(collection(db, TOURNAMENT_COLLECTION), route.slug));
+      if (snap.exists()) {
+        const tournamentMeta = snap.data() || {};
+        const circuitSlug = String(tournamentMeta?.circuitSlug || "").trim();
+        if (circuitSlug) {
+          await enterTournament(route.slug, { circuitSlug });
+          return;
+        }
+      }
+    } catch (_) {
+      // ignore lookup errors
+    }
     await enterTournament(route.slug);
     return;
   }
   await showLanding();
 }
 
-async function enterTournament(slug) {
+async function enterTournament(slug, options = {}) {
+  const { circuitSlug = "" } = options;
   setCurrentSlugState(slug || null);
   if (slug) {
-    const target = `/tournament/${slug}`;
+    const target = circuitSlug ? `/tournament/${circuitSlug}/${slug}` : `/tournament/${slug}`;
     if (window.location.pathname !== target) {
       window.history.pushState({}, "", target);
     }
@@ -1093,7 +1119,17 @@ async function enterTournament(slug) {
   // Try remote meta first
   try {
     const snap = await getDoc(doc(collection(db, TOURNAMENT_COLLECTION), slug));
-    if (snap.exists()) setCurrentTournamentMetaState(snap.data() || null);
+    if (snap.exists()) {
+      const meta = snap.data() || null;
+      setCurrentTournamentMetaState(meta);
+      const metaCircuitSlug = meta?.circuitSlug || "";
+      if (slug && metaCircuitSlug && !circuitSlug) {
+        const target = `/tournament/${metaCircuitSlug}/${slug}`;
+        if (window.location.pathname !== target) {
+          window.history.pushState({}, "", target);
+        }
+      }
+    }
   } catch (_) {
     // ignore
   }
@@ -1172,7 +1208,8 @@ async function enterCircuit(slug, options = {}) {
     currentCircuitMeta = fetched;
     recomputeCircuitAdminFromMeta();
     await renderCircuitView(currentCircuitMeta, {
-      onEnterTournament: enterTournament,
+      onEnterTournament: (tournamentSlug) =>
+        enterTournament(tournamentSlug, { circuitSlug: currentCircuitMeta?.slug || "" }),
       onDeleteTournament: (tournamentSlug) =>
         openDeleteTournamentModal({
           slug: tournamentSlug,
@@ -1418,7 +1455,9 @@ async function handleSaveSettings(event) {
     } catch (_) {
       // ignore storage removal errors
     }
-    window.history.pushState({}, "", `/tournament/${newSlug}`);
+    const circuitSlug = meta?.circuitSlug || "";
+    const target = circuitSlug ? `/tournament/${circuitSlug}/${newSlug}` : `/tournament/${newSlug}`;
+    window.history.pushState({}, "", target);
   }
 
   setCurrentTournamentMetaState(meta);
