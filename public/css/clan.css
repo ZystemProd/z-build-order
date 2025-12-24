@@ -1,173 +1,320 @@
-:root {
-  --active-color: var(--accent-2);
-}
+/* Clan modal styles (copied from style.css/template.css for tournament use) */
 
 #clanModal {
   backdrop-filter: none;
 }
 
 #clanModal .modal-content-template {
-  background: var(--panel-2);
-  border: 1px solid var(--stroke);
-  border-radius: 12px;
-  padding: 18px;
-  color: var(--text);
-  width: min(900px, 94vw);
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
-}
-
-.template-header {
-  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding-right: 32px;
+  background-color: rgba(30, 30, 30, 1);
+  backdrop-filter: blur(10px);
+  color: white;
+  margin: 3% auto;
+  border: 1px solid #3a3a3a;
+  width: min(1200px, 94vw);
+  height: min(90vh, 840px);
+  max-width: 1200px;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
 }
 
-.template-header h3 {
+#clanModal input {
+  width: 90%;
+  padding: 10px;
+  margin: 10px 0;
+}
+
+#clanModal textarea {
+  width: 100%;
+  height: 100px;
+  background-color: #2c2c2c;
+  color: #e0e0e0;
+  border: 2px solid #444;
+  border-radius: 5px;
+  padding: 10px;
+  resize: vertical;
+  font-size: 1.1em;
+  line-height: 1.6;
+}
+
+#clanModal textarea:focus {
+  outline: none;
+  border: 2px solid #cfcfcf;
+}
+
+#clanModal textarea::placeholder,
+#clanModal input::placeholder {
+  color: #a0a0a0;
+  font-style: italic;
+}
+
+#clanModal button {
+  background-color: #444;
+  color: #e0e0e0;
+  padding: 10px 20px;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 10px 0;
+  border: none;
+  cursor: pointer;
+  border-radius: 5px;
+  text-align: center;
+  display: inline-block;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  user-select: none;
+}
+
+#clanModal button:hover {
+  background-color: #555;
+  transform: scale(1.05);
+}
+
+.meta-chip.clan-chip {
+  background-color: #355454;
+  color: #a8e6e6;
+}
+
+.label-clans,
+.label-clan {
+  color: #50c878;
+  font-weight: 600;
+}
+
+.clan-card {
+  width: 180px;
+  border: 1px solid #444;
+  border-radius: 8px;
+  background-color: #1a1a1a;
+  overflow: hidden;
+  margin: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 0.9rem;
+}
+
+.clan-card-banner {
+  width: 100%;
+  height: 100px;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-color: #111;
+  border-bottom: 1px solid #333;
+}
+
+.clan-card-content {
+  padding: 10px;
+  text-align: center;
+  width: 100%;
+}
+
+.clan-card-content button {
+  margin-top: 6px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+}
+
+#clanModal .template-header {
+  position: sticky;
+  top: 0;
+  background-color: #2a2a2a;
+  z-index: 10;
+  padding: 10px 35px 10px 35px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+#clanModal .template-header h3 {
   margin: 0;
+}
+
+#clanModal .clan-views {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .clan-main-tabs {
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.clan-main-tab-button {
-  padding: 6px 16px;
-  background: var(--panel);
-  border: 1px solid var(--stroke);
-  color: var(--muted);
-  font-weight: 600;
-  cursor: pointer;
-  border-radius: 10px;
-  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
-}
-
-.modal .clan-main-tab-button.active {
-  background: rgba(78, 213, 255, 0.12);
-  color: var(--text);
-  border-color: var(--accent-2);
-}
-
-.clan-main-tab-button:hover {
-  color: var(--text);
-  border-color: rgba(78, 213, 255, 0.35);
-}
-
-.clan-views {
-  display: flex;
-  flex-direction: column;
+  justify-content: flex-start;
   gap: 12px;
-}
-
-.clan-subview {
-  display: none;
+  margin-bottom: 16px;
+  padding-top: 4px;
 }
 
 .clan-tabs {
   display: flex;
-  gap: 8px;
-  border-bottom: 1px solid var(--stroke);
+  border-bottom: 1px solid #444;
   margin-bottom: 12px;
 }
 
-.modal .clan-tab-button {
-  all: unset;
-  padding: 8px 12px;
+#clan-requests-tab {
+  padding: 12px 16px;
+}
+
+.clan-settings-form {
+  max-width: 500px;
+  margin: 0 auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: #111;
+  border-radius: 8px;
+  max-width: 600px;
+}
+
+.clan-settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.clan-settings-field label {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 6px;
+  color: #ccc;
+}
+
+.clan-settings-field input,
+.clan-settings-field textarea {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #444;
+  background: #1a1a1a;
+  color: #eee;
+  border-radius: 4px;
+}
+
+.clan-settings-form textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.clan-settings-form button {
+  align-self: flex-end;
+  margin-top: 8px;
+  padding: 8px 16px;
+  background-color: var(--active-color);
+  border: none;
+  border-radius: 4px;
+  color: white;
+  font-weight: bold;
   cursor: pointer;
-  color: var(--muted);
-  font-weight: 600;
-  transition: color 0.2s ease;
 }
 
-.modal .clan-tab-button:hover {
-  color: var(--text);
+#clanModal .clan-tab-button {
+  all: unset;
+  padding: 10px 16px;
+  cursor: pointer;
+  color: #ccc;
+  font-weight: bold;
+  transition: color 0.2s;
 }
 
-.modal .clan-tab-button.active {
-  color: var(--text);
-  border-bottom: 2px solid var(--accent-2);
+#clanModal .clan-tab-button:hover {
+  color: #fff;
 }
 
-.clan-tab-content {
-  display: none;
+#clanModal .clan-tab-button.active {
+  background-color: #1a1a1a;
+  border-color: transparent;
+  color: #fff;
+  border-bottom: 3px solid var(--active-color);
+  box-shadow: none;
+}
+
+.clan-main-tab-button {
+  padding: 6px 16px;
+  background: none;
+  border: none;
+  color: #ccc;
+  font-weight: bold;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
+#clanModal .clan-main-tab-button.active {
+  background-color: var(--active-color);
+  color: #fff;
+  border: 1px solid var(--active-color);
+}
+
+.clan-main-tab-button:hover {
+  color: #fff;
+}
+
+.clan-banner h3 {
+  font-size: 1.5em;
+  font-weight: bold;
+  color: white;
+}
+
+.clan-content-card {
+  background-color: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 16px;
+  max-width: 700px;
+  margin: 16px auto;
+}
+
+.clan-info-card {
+  background: #2c2c2c;
+  border-radius: 10px;
+  margin: 16px 10px;
+}
+
+.clan-info-card p {
+  padding-left: 10px;
+}
+
+.clan-info-card h3 {
+  padding-left: 10px;
 }
 
 .clan-search-input {
   padding: 8px 12px;
-  font-size: 0.9rem;
-  border-radius: 10px;
-  border: 1px solid var(--stroke);
-  background: var(--panel);
-  color: var(--text);
+  font-size: 1rem;
+  border-radius: 6px;
+  border: 1px solid #444;
+  background-color: #222;
+  color: #eee;
   margin-left: auto;
-  width: 240px;
-}
-
-.clan-grid-manage {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 12px;
-  max-height: 70vh;
-  overflow-y: auto;
-}
-
-.clan-card-manage {
-  background: var(--panel);
-  border: 1px solid var(--stroke);
-  border-radius: 10px;
-  padding: 12px;
-  text-align: center;
-  cursor: pointer;
-  transition: border-color 0.2s ease, transform 0.2s ease;
-}
-
-.clan-card-manage:hover {
-  border-color: rgba(78, 213, 255, 0.45);
-  transform: translateY(-1px);
-}
-
-.clan-card-logo {
-  width: 64px;
-  height: 64px;
-  object-fit: cover;
-  border-radius: 10px;
-  margin-bottom: 8px;
-}
-
-.clan-card-title {
-  font-weight: 600;
-}
-
-.clan-info-card {
-  background: rgba(15, 20, 33, 0.7);
-  border: 1px solid var(--stroke);
-  border-radius: 12px;
-  margin: 16px 0;
+  width: 220px;
 }
 
 .clan-banner-wrapper {
   display: flex;
-  gap: 16px;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  justify-content: start;
+  gap: 20px;
   flex-wrap: wrap;
-  padding: 16px;
-  border-bottom: 1px solid var(--stroke);
-  background: var(--panel);
+  padding: 20px;
+  position: relative;
+  background-color: #1e1e1e;
+  border-bottom: solid #353535;
 }
 
 .clan-banner-logo {
-  width: 160px;
-  height: 160px;
+  width: 200px;
+  height: 200px;
   object-fit: cover;
-  border-radius: 10px;
+  border-radius: 8px;
 }
 
 .clan-banner-text {
-  max-width: 420px;
+  max-width: 400px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -175,22 +322,37 @@
 
 .clan-banner-title {
   margin: 0;
-  font-size: 1.4rem;
-  font-weight: 700;
-  color: var(--text);
+  font-size: 1.6rem;
+  font-weight: bold;
+  color: #fff;
 }
 
 .clan-banner-description {
-  color: var(--muted);
+  color: #aaa;
   font-size: 0.95rem;
 }
 
 .clan-banner-info {
-  color: var(--muted);
+  color: #ccc;
   font-size: 0.9rem;
+  text-align: right;
   display: flex;
   flex-direction: column;
   gap: 4px;
+  text-align: initial;
+}
+
+.clan-banner-wrapper img {
+  width: 200px;
+  height: 200px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.clan-banner-wrapper h3 {
+  margin: 0;
+  font-size: 1.6rem;
+  color: #fff;
 }
 
 .clan-member-table {
@@ -202,11 +364,342 @@
 .clan-member-table th,
 .clan-member-table td {
   padding: 10px 12px;
-  border: 1px solid var(--stroke);
-  color: var(--text);
+  border: 1px solid #444;
+  color: #eee;
 }
 
 .clan-member-table th {
-  background: rgba(255, 255, 255, 0.04);
+  background-color: #2a2a2a;
   text-align: left;
+}
+
+button.btn-small {
+  padding: 4px 10px;
+  background-color: var(--active-color);
+  border: none;
+  color: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85em;
+}
+
+.clan-member-table button.btn-small {
+  padding: 4px 10px;
+  background-color: var(--active-color);
+  border: none;
+  color: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85em;
+}
+
+.clan-member-table td:first-child,
+.clan-member-table th:first-child {
+  border-left: none;
+}
+
+.clan-member-table td:last-child,
+.clan-member-table th:last-child {
+  border-right: none;
+}
+
+.clan-select-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.clan-select-card {
+  background-color: #1a1a1a;
+  border: 1px solid #333;
+  color: #eee;
+  padding: 16px;
+  margin: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.2s;
+}
+
+.clan-select-card:hover {
+  background-color: #2a2a2a;
+}
+
+.clan-grid-manage {
+  max-height: 70vh;
+  overflow-y: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  padding: 10px 0;
+  justify-content: center;
+}
+
+.clan-grid-manage::-webkit-scrollbar {
+  width: 10px;
+}
+
+.clan-grid-manage::-webkit-scrollbar-thumb {
+  background: #666;
+  border-radius: 5px;
+}
+
+.clan-grid-manage::-webkit-scrollbar-thumb:hover {
+  background: #333;
+}
+
+#clanModal .clan-tab-content .btn-accept {
+  background-color: #28a745;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+#clanModal .clan-tab-content .btn-deny {
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.clan-breadcrumb {
+  font-size: 1.2rem;
+  color: #999;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 16px;
+  margin-top: 16px;
+  padding-left: 8px;
+}
+
+.breadcrumb-link {
+  color: #ccc;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.breadcrumb-link:hover {
+  color: #fff;
+}
+
+.breadcrumb-divider::before {
+  content: ">";
+  color: #888;
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin: 0 4px;
+}
+
+.breadcrumb-current {
+  color: #fff;
+  font-weight: bold;
+}
+
+#showClanModalButton .notification-dot {
+  top: 0px;
+  right: 4px;
+}
+
+.clan-card-manage {
+  background-color: #1d1d1d;
+  border: 1px solid #333;
+  border-radius: 12px;
+  padding: 15px;
+  width: 180px;
+  height: 160px;
+  position: relative;
+  cursor: pointer;
+  text-align: center;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.clan-card-manage:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+}
+
+.clan-card-logo {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  margin-bottom: 10px;
+}
+
+.clan-card-title {
+  font-weight: bold;
+  color: #ddd;
+  font-size: 16px;
+}
+
+.tag.clan {
+  background-color: #3949ab;
+}
+
+#createClanView,
+#manageClanView,
+#chooseManageClanView,
+#clan-requests-tab,
+#clan-settings-tab,
+#findClanView,
+#viewClanPage {
+  display: none;
+}
+
+@media screen and (max-width: 768px) {
+  #clanModal .modal-content-template {
+    margin: 5% auto;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  #clanModal .template-header {
+    position: relative;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 5px;
+    gap: 5px;
+  }
+
+  #clanModal .template-header h3 {
+    margin-bottom: 0;
+  }
+}
+
+@media screen and (max-width: 500px) {
+  .tag.clan {
+    font-size: 0;
+    position: relative;
+  }
+
+  .tag.clan::after {
+    content: "C";
+    font-size: 0.7rem;
+  }
+}
+
+@media screen and (max-width: 640px) {
+  .clan-banner-wrapper {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 16px;
+    padding: 16px 12px;
+  }
+
+  .clan-banner-logo,
+  .clan-banner-wrapper img {
+    width: 140px;
+    height: 140px;
+  }
+
+  .clan-banner-text {
+    max-width: none;
+    width: 100%;
+    align-items: center;
+  }
+
+  .clan-banner-title {
+    font-size: 1.4rem;
+    text-align: center;
+  }
+
+  .clan-banner-info {
+    text-align: center;
+    align-items: center;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .role-gear-icon {
+    visibility: hidden;
+  }
+
+  .clan-member-table tr:hover .role-gear-icon {
+    visibility: visible;
+  }
+}
+
+.role-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.role-gear-icon {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  filter: invert(1) brightness(0.8);
+}
+
+.role-gear-icon.disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.role-select {
+  background-color: #1a1a1a;
+  color: #eee;
+  border: 1px solid #444;
+  border-radius: 4px;
+  padding: 4px 6px;
+}
+
+.small-modal {
+  max-width: 420px;
+  min-height: 220px;
+  height: auto;
+  background: #2b2b2b;
+  padding: 24px;
+  border-radius: 14px;
+  color: #e0e0e0;
+  text-align: left;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid #444;
+  animation: fadeInUp 0.3s ease-out;
+}
+
+.small-modal > * + * {
+  margin-top: 16px;
+}
+
+.modal-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.confirm-button,
+.cancel-button {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background 0.3s, color 0.3s;
+}
+
+.confirm-button {
+  background-color: #00c853;
+  color: white;
+}
+
+.confirm-button:hover {
+  background-color: #00e676;
+}
+
+.cancel-button {
+  background-color: #555;
+  color: white;
+}
+
+.cancel-button:hover {
+  background-color: #777;
 }

@@ -4849,6 +4849,16 @@ td {
   padding-top: 4px;
 }
 
+.clan-views {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
 /* Subview tabs inside Manage */
 .clan-tabs {
   display: flex;

@@ -813,6 +813,14 @@ async function renderManageTab(tab, clan) {
       const roleWrapper = document.createElement("div");
       roleWrapper.className = "role-wrapper";
 
+      const isSelf = member.uid === auth.currentUser?.uid;
+      const isTargetCaptain =
+        member.role === "Captain" || member.uid === clan.adminUid;
+
+      const canChangeRole =
+        (myRole === "Captain" && !isSelf) ||
+        (myRole === "Co-Captain" && !isSelf && !isTargetCaptain);
+
       const roleText = document.createElement("span");
       roleText.textContent = member.role;
       roleText.className = "role-text";
@@ -834,13 +842,12 @@ async function renderManageTab(tab, clan) {
         roleSelect.appendChild(option);
       });
 
-      const isSelf = member.uid === auth.currentUser?.uid;
-      const isTargetCaptain =
-        member.role === "Captain" || member.uid === clan.adminUid;
-
-      const canChangeRole =
-        (myRole === "Captain" && !isSelf) ||
-        (myRole === "Co-Captain" && !isSelf && !isTargetCaptain);
+      if (canChangeRole && !isTargetCaptain) {
+        const removeOption = document.createElement("option");
+        removeOption.value = "Remove";
+        removeOption.textContent = "Remove";
+        roleSelect.appendChild(removeOption);
+      }
 
       if (!canChangeRole) {
         roleWrapper.appendChild(roleText);
@@ -849,6 +856,26 @@ async function renderManageTab(tab, clan) {
 
         roleSelect.onchange = async () => {
           const newRole = roleSelect.value;
+
+          if (newRole === "Remove") {
+            if (isTargetCaptain) {
+              showToast("You cannot remove the Captain.", "error");
+              roleSelect.value = member.role;
+              return;
+            }
+            const confirmed = await confirmClanMemberRemoval(member.username);
+            if (!confirmed) {
+              roleSelect.value = member.role;
+              return;
+            }
+            await updateDoc(doc(db, "clans", clan.id), {
+              members: arrayRemove(member.uid),
+              [`memberInfo.${member.uid}`]: deleteField(),
+            });
+            showToast(`${member.username} removed from clan`, "success");
+            await renderManageClanUI(clan.id);
+            return;
+          }
 
           if (newRole === "Captain" && auth.currentUser?.uid !== clan.adminUid) {
             showToast("Only the admin can assign Captain role.", "error");
@@ -1299,6 +1326,82 @@ async function renderManageTab(tab, clan) {
     scrollWrapper.appendChild(form);
     settingsTab.appendChild(scrollWrapper);
   }
+}
+
+function ensureClanMemberRemovalModal() {
+  let modal = document.getElementById("confirmClanMemberRemovalModal");
+  if (modal) return modal;
+
+  modal = document.createElement("div");
+  modal.id = "confirmClanMemberRemovalModal";
+  modal.className = "modal";
+  modal.style.display = "none";
+
+  const content = document.createElement("div");
+  content.className = "small-modal clan-confirm-modal";
+
+  const title = document.createElement("h3");
+  title.textContent = "Remove member";
+
+  const message = document.createElement("p");
+  message.id = "confirmClanMemberRemovalText";
+
+  const buttons = document.createElement("div");
+  buttons.className = "modal-buttons";
+
+  const confirmBtn = document.createElement("button");
+  confirmBtn.className = "confirm-button";
+  confirmBtn.id = "confirmClanMemberRemovalYes";
+  confirmBtn.textContent = "Remove";
+
+  const cancelBtn = document.createElement("button");
+  cancelBtn.className = "cancel-button";
+  cancelBtn.id = "confirmClanMemberRemovalNo";
+  cancelBtn.textContent = "Cancel";
+
+  buttons.append(confirmBtn, cancelBtn);
+  content.append(title, message, buttons);
+  modal.appendChild(content);
+  document.body.appendChild(modal);
+
+  return modal;
+}
+
+function confirmClanMemberRemoval(memberName) {
+  const modal = ensureClanMemberRemovalModal();
+  const message = modal.querySelector("#confirmClanMemberRemovalText");
+  const confirmBtn = modal.querySelector("#confirmClanMemberRemovalYes");
+  const cancelBtn = modal.querySelector("#confirmClanMemberRemovalNo");
+
+  if (message) {
+    message.textContent = `Remove ${memberName} from the clan?`;
+  }
+
+  modal.style.display = "block";
+
+  return new Promise((resolve) => {
+    const cleanup = () => {
+      confirmBtn?.removeEventListener("click", onConfirm);
+      cancelBtn?.removeEventListener("click", onCancel);
+      modal.removeEventListener("mousedown", onBackdrop);
+    };
+
+    const close = (result) => {
+      modal.style.display = "none";
+      cleanup();
+      resolve(result);
+    };
+
+    const onConfirm = () => close(true);
+    const onCancel = () => close(false);
+    const onBackdrop = (event) => {
+      if (event.target === modal) close(false);
+    };
+
+    confirmBtn?.addEventListener("click", onConfirm);
+    cancelBtn?.addEventListener("click", onCancel);
+    modal.addEventListener("mousedown", onBackdrop);
+  });
 }
 
 function createClanBanner(clan) {
