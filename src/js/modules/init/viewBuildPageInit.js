@@ -4,7 +4,6 @@ import { initializeSectionToggles } from "../uiHandlers.js";
 import { doc, getDoc, setDoc, getDocs, collection, query, where } from "firebase/firestore";
 import { logAnalyticsEvent } from "../analyticsHelper.js";
 import { showToast } from "../toastHandler.js";
-import { initUserSettingsModal } from "../settingsModalInit.js";
 
 function getBuildId() {
   const path = window.location.pathname;
@@ -28,7 +27,18 @@ export function initializeViewBuildPage() {
   safeAdd("signOutBtn", "click", window.handleSignOut);
   safeAdd("switchAccountBtn", "click", window.handleSwitchAccount);
   safeAdd("importBuildButton", "click", importBuildHandler);
-  initUserSettingsModal();
+  safeAdd("settingsBtn", "click", async () => {
+    const userMenu = document.getElementById("userMenu");
+    if (userMenu) userMenu.style.display = "none";
+    const mod = await import("../settingsModalInit.js");
+    if (typeof mod.openSettingsModal === "function") {
+      await mod.openSettingsModal();
+    } else if (typeof mod.initUserSettingsModal === "function") {
+      mod.initUserSettingsModal();
+      const modal = document.getElementById("settingsModal");
+      if (modal) modal.style.display = "block";
+    }
+  });
   
   // User menu actions: mirror index.html behavior
   safeAdd("mapVetoBtn", "click", () => {

@@ -16,7 +16,6 @@ import { renderMapPoolPicker as renderMapPoolPickerUI } from "./maps/pool.js";
 import { attachPlayerDetailHandlers } from "./playerDetail.js";
 import { ensureTestHarnessPanel } from "./ui/testHarness.js";
 import { enableDragScroll } from "./ui/dragScroll.js";
-import { initUserSettingsModal } from "../settingsModalInit.js";
 
 export function initTournamentPage({
   handleRegistration,
@@ -72,7 +71,6 @@ export function initTournamentPage({
   goLiveTournament,
 }) {
   ensureTestHarnessPanel();
-  initUserSettingsModal();
 
   const registrationForm = document.getElementById("registrationForm");
   const rebuildBtn = document.getElementById("rebuildBracketBtn");
@@ -87,6 +85,7 @@ export function initTournamentPage({
   const signInBtn = document.getElementById("signInBtn");
   const signOutBtn = document.getElementById("signOutBtn");
   const switchAccountBtn = document.getElementById("switchAccountBtn");
+  const settingsBtn = document.getElementById("settingsBtn");
   const raceSelect = document.getElementById("raceSelect");
   const openRegisterBtn = document.getElementById("openRegisterBtn");
   const openCreateTournament = document.getElementById("openCreateTournament");
@@ -187,6 +186,18 @@ export function initTournamentPage({
   signInBtn?.addEventListener("click", () => window.handleSignIn?.());
   signOutBtn?.addEventListener("click", () => window.handleSignOut?.());
   switchAccountBtn?.addEventListener("click", () => window.handleSwitchAccount?.());
+  settingsBtn?.addEventListener("click", async () => {
+    const userMenu = document.getElementById("userMenu");
+    if (userMenu) userMenu.style.display = "none";
+    const mod = await import("../settingsModalInit.js");
+    if (typeof mod.openSettingsModal === "function") {
+      await mod.openSettingsModal();
+    } else if (typeof mod.initUserSettingsModal === "function") {
+      mod.initUserSettingsModal();
+      const modal = document.getElementById("settingsModal");
+      if (modal) modal.style.display = "block";
+    }
+  });
   raceSelect?.addEventListener("change", () => {
     const statusEl = document.getElementById("mmrStatus");
     const normalizedRace = normalizeRaceLabel(raceSelect.value);

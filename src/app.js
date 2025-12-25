@@ -68,12 +68,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   setupModalImageLazyLoading();
 
-  setupUsernameSettingsSection();
-  setupPulseSettingsSection();
-  setupTwitchSettingsSection();
-  setupCountrySelector();
-  setupSecondaryPulseModal();
-
   // Position the floating utility tiles relative to auth-container
   try {
     updateFloatingTilePositions();
@@ -109,7 +103,9 @@ if (typeof window !== "undefined") {
   }
 } else {
   appCheck = initializeAppCheck(app, {
-    provider: new ReCaptchaV3Provider("6LcBBWsrAAAAALLmBNIhl-zKPa8KRj8mXMldoKbN"),
+    provider: new ReCaptchaV3Provider(
+      "6LcBBWsrAAAAALLmBNIhl-zKPa8KRj8mXMldoKbN"
+    ),
     isTokenAutoRefreshEnabled: true,
   });
 }
@@ -218,6 +214,8 @@ let avatarModalInitialized = false;
 let lastFocusedBeforeAvatarModal = null;
 let currentUsername = null;
 let usernameFormInitialized = false;
+let currentUserProfile = null;
+let settingsUiReady = false;
 const normalizedBannedWords = bannedWords.map((word) =>
   (word || "").toLowerCase()
 );
@@ -227,6 +225,11 @@ const ISO_COUNTRIES = Array.isArray(countries) ? countries : [];
 const MAX_SECONDARY_PULSE_LINKS = 5;
 const MIN_SECONDARY_PULSE_LINKS = 2;
 let secondaryPulseModalInitialized = false;
+const SETTINGS_STORAGE_KEYS = {
+  bracket: "enableBracketInput",
+  buildInput: "showBuildInput",
+  mainClan: "mainClanId",
+};
 
 const RACE_UI = {
   zerg: { label: "Zerg", icon: "img/race/zerg2.webp", color: "#d16ba5" },
@@ -692,7 +695,12 @@ function setCountrySelectValue(value) {
   const select = document.getElementById("settingsCountrySelect");
   if (!select) return;
   if (!select.querySelector(`option[value="${value}"]`)) {
-    // No matching option; leave blank
+    // Options not loaded yet; store for later.
+    if (value) {
+      select.dataset.pendingValue = value;
+    } else {
+      delete select.dataset.pendingValue;
+    }
     select.value = "";
     return;
   }
@@ -716,6 +724,34 @@ function populateCountrySelectOptions() {
     .join("");
   select.innerHTML = options;
   select.dataset.filled = "true";
+  const pending = select.dataset.pendingValue;
+  if (pending) {
+    delete select.dataset.pendingValue;
+    setCountrySelectValue(pending);
+  }
+}
+
+function applySettingsToLocalStorage(settings = {}) {
+  if (!settings || typeof settings !== "object") return;
+  if (settings.enableBracketInput !== undefined) {
+    localStorage.setItem(
+      SETTINGS_STORAGE_KEYS.bracket,
+      settings.enableBracketInput ? "true" : "false"
+    );
+  }
+  if (settings.showBuildInput !== undefined) {
+    localStorage.setItem(
+      SETTINGS_STORAGE_KEYS.buildInput,
+      settings.showBuildInput ? "true" : "false"
+    );
+  }
+  if (settings.mainClanId !== undefined) {
+    if (settings.mainClanId) {
+      localStorage.setItem(SETTINGS_STORAGE_KEYS.mainClan, settings.mainClanId);
+    } else {
+      localStorage.removeItem(SETTINGS_STORAGE_KEYS.mainClan);
+    }
+  }
 }
 
 function normalizeTwitchUrl(raw) {
@@ -899,6 +935,36 @@ function buildMmrBadges(byRace, overall, updatedAt) {
 
   return hasBadges ? frag : null;
 }
+
+function updateUserMenuMmrFromProfile(userData) {
+  const mmrEl = document.getElementById("userMmrMenu");
+  if (!mmrEl) return;
+  const byRace =
+    userData?.pulse?.lastMmrByRace || userData?.lastKnownMMRByRace || null;
+  const overall = (() => {
+    if (byRace && typeof byRace === "object") {
+      const vals = Object.values(byRace).filter((v) => Number.isFinite(v));
+      if (vals.length) return Math.max(...vals);
+    }
+    const n = Number(
+      userData?.pulse?.lastMmr ??
+        userData?.pulse?.mmr ??
+        userData?.lastKnownMMR
+    );
+    return Number.isFinite(n) ? n : null;
+  })();
+  const updatedAt = userData?.lastMmrUpdated?.toMillis?.();
+  const badges = buildMmrBadges(byRace, overall, updatedAt);
+  mmrEl.innerHTML = "";
+  if (badges) {
+    mmrEl.appendChild(badges);
+    mmrEl.style.display = "block";
+  } else {
+    mmrEl.style.display = "none";
+    mmrEl.textContent = "";
+  }
+}
+
 
 function hydrateLazyImages(root = document) {
   if (!root || typeof root.querySelectorAll !== "function") return;
@@ -1345,6 +1411,17 @@ function setupSecondaryPulseModal() {
   secondaryPulseModalInitialized = true;
 }
 
+export function ensureSettingsUiReady() {
+  if (settingsUiReady) return;
+  setupUsernameSettingsSection();
+  setupPulseSettingsSection();
+  setupTwitchSettingsSection();
+  setupCountrySelector();
+  setupSecondaryPulseModal();
+  setupAvatarModal();
+  settingsUiReady = true;
+}
+
 async function fetchPulseMmrFromBackend(url) {
   const user = auth.currentUser;
   if (!user) {
@@ -1774,11 +1851,6 @@ export function initializeAuthUI() {
   const menuDividers = document.querySelectorAll("#userMenu .menu-divider");
   const settingsAvatarImg = document.getElementById("settingsCurrentAvatar");
 
-  setupUsernameSettingsSection();
-  setupAvatarModal();
-  setupTwitchSettingsSection();
-  setupCountrySelector();
-
   // ✅ IMMEDIATE HIDE to prevent any flashing before Firebase loads
   if (userMenu) userMenu.style.display = "none";
   menuDividers.forEach((d) => (d.style.display = "none"));
@@ -1804,7 +1876,16 @@ export function initializeAuthUI() {
         username = userData?.username ?? "Guest";
       }
 
+      currentUserProfile = userData;
       currentUsername = username || "Guest";
+      applySettingsToLocalStorage(userData?.settings || {});
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("user-profile-updated", {
+            detail: { userData },
+          })
+        );
+      }
       setSettingsUsernameDisabled(false);
       setSettingsUsernameValue(currentUsername);
       setSettingsUsernameStatus(
@@ -1818,6 +1899,7 @@ export function initializeAuthUI() {
         lastMmrUpdated: userData?.lastMmrUpdated,
       };
       applyPulseStateFromProfile(pulseMerged);
+      updateUserMenuMmrFromProfile(userData);
       setPulseControlsDisabled(false);
 
       if (userName) userName.innerText = username || "Guest";
@@ -1852,6 +1934,7 @@ export function initializeAuthUI() {
       const authContainerEl = document.getElementById("auth-container");
       if (authContainerEl) authContainerEl.classList.remove("is-auth");
       currentUserAvatarUrl = DEFAULT_AVATAR_URL;
+      currentUserProfile = null;
       currentUsername = null;
       updateAvatarSelectionHighlight(DEFAULT_AVATAR_URL);
       emitAvatarUpdate(DEFAULT_AVATAR_URL);
@@ -1860,6 +1943,11 @@ export function initializeAuthUI() {
       if (userNameMenu) userNameMenu.innerText = "Guest";
       if (userPhoto) userPhoto.src = DEFAULT_AVATAR_URL;
       if (settingsAvatarImg) settingsAvatarImg.src = DEFAULT_AVATAR_URL;
+      const mmrEl = document.getElementById("userMmrMenu");
+      if (mmrEl) {
+        mmrEl.style.display = "none";
+        mmrEl.textContent = "";
+      }
       setTwitchInputValue("");
       setTwitchStatus("Sign in to add your Twitch channel.", "muted");
       setCountrySelectValue("");
@@ -2154,6 +2242,10 @@ function getPulseState() {
   return { ...pulseState };
 }
 
+function getCurrentUserProfile() {
+  return currentUserProfile ? { ...currentUserProfile } : null;
+}
+
 function getCurrentUsername() {
   return currentUsername || auth.currentUser?.displayName || "";
 }
@@ -2167,6 +2259,7 @@ export {
   auth,
   db,
   getPulseState,
+  getCurrentUserProfile,
   getCurrentUsername,
   getCurrentUserAvatarUrl,
 };

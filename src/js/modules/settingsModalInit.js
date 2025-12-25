@@ -1,4 +1,4 @@
-import { auth } from "../../app.js";
+import { auth, ensureSettingsUiReady } from "../../app.js";
 import {
   isBracketInputEnabled,
   setBracketInputEnabled,
@@ -11,6 +11,7 @@ import {
 import { getUserClans } from "./clan.js";
 
 let settingsModalInitialized = false;
+let showSettingsModal = null;
 
 export function initUserSettingsModal(options = {}) {
   if (settingsModalInitialized) return;
@@ -24,7 +25,6 @@ export function initUserSettingsModal(options = {}) {
   const modal = document.getElementById("settingsModal");
   if (!modal) return;
 
-  const settingsBtn = document.getElementById("settingsBtn");
   const closeBtn = document.getElementById("closeSettingsModal");
   const bracketToggle = document.getElementById("bracketInputToggle");
   const buildToggle = document.getElementById("buildInputToggle");
@@ -115,6 +115,7 @@ export function initUserSettingsModal(options = {}) {
   const showModal = async () => {
     modal.style.display = "block";
     document.body.classList.add("modal-open");
+    ensureSettingsUiReady();
     if (window.hydrateLazyImages) {
       window.hydrateLazyImages(modal);
     }
@@ -126,14 +127,7 @@ export function initUserSettingsModal(options = {}) {
       setActiveTab(tabButtons[0].dataset.userSettingsTab);
     }
   };
-
-  if (settingsBtn) {
-    settingsBtn.addEventListener("click", () => {
-      const userMenu = document.getElementById("userMenu");
-      if (userMenu) userMenu.style.display = "none";
-      void showModal();
-    });
-  }
+  showSettingsModal = showModal;
 
   if (closeBtn) {
     closeBtn.addEventListener("click", hideModal);
@@ -182,12 +176,6 @@ export function initUserSettingsModal(options = {}) {
     });
   }
 
-  auth.onAuthStateChanged(async () => {
-    await loadUserSettings();
-    await populateMainClanDropdown();
-    syncToggles();
-  });
-
   // Optional auto-open flag used by other pages to open settings on arrival
   try {
     const shouldOpen = localStorage.getItem(autoOpenFlag) === "true";
@@ -200,4 +188,19 @@ export function initUserSettingsModal(options = {}) {
   }
 
   settingsModalInitialized = true;
+}
+
+export async function openSettingsModal(options = {}) {
+  if (!settingsModalInitialized) {
+    initUserSettingsModal(options);
+  }
+  if (typeof showSettingsModal === "function") {
+    await showSettingsModal();
+  } else {
+    const modal = document.getElementById("settingsModal");
+    if (modal) {
+      modal.style.display = "block";
+      document.body.classList.add("modal-open");
+    }
+  }
 }

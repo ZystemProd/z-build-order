@@ -695,7 +695,6 @@ export async function syncToPublishedBuild(buildId, buildData) {
   const db = getFirestore();
   const user = getAuth().currentUser;
   if (!user) return;
-
   const publishedRef = doc(db, "publishedBuilds", buildId);
   const existingSnap = await getDoc(publishedRef);
 

@@ -1,7 +1,6 @@
 import { getDoc, getDocs, doc, collection, updateDoc, setDoc, query, where } from "firebase/firestore";
 import { auth, db } from "../../../app.js";
 import DOMPurify from "dompurify";
-import { initUserSettingsModal } from "../settingsModalInit.js";
 
 let koFiOverlayInitialized = false;
 let koFiOverlayInitStarted = false;
@@ -258,7 +257,6 @@ import {
 import {
   isBracketInputEnabled,
   isBuildInputShown,
-  loadUserSettings,
 } from "../settings.js";
 import { checkForJoinRequestNotifications } from "../utils/notificationHelpers.js";
 import { logAnalyticsEvent } from "../analyticsHelper.js";
@@ -328,6 +326,31 @@ function preloadBuildModalRaceImages() {
   });
 }
 
+const settingsInitOptions = {
+  onBracketToggleChange: () => {
+    updateSupplyColumnVisibility();
+    updateBuildInputPlaceholder();
+  },
+  onBuildToggleChange: () => {
+    updateBuildInputVisibility();
+  },
+};
+
+async function openSettingsModal() {
+  const mod = await import("../settingsModalInit.js");
+  if (typeof mod.openSettingsModal === "function") {
+    await mod.openSettingsModal(settingsInitOptions);
+    return;
+  }
+  if (typeof mod.initUserSettingsModal === "function") {
+    mod.initUserSettingsModal(settingsInitOptions);
+  }
+  const modal = document.getElementById("settingsModal");
+  if (modal) {
+    modal.style.display = "block";
+  }
+}
+
 // Templates modal will be set up lazily when first opened
 
 // — replay meta, filled by populateReplayOptions —
@@ -344,17 +367,14 @@ let currentBuildFilter = "all";
  ----------------- */
 export async function initializeIndexPage() {
   console.log("🛠 Initializing Index Page");
-  initUserSettingsModal({
-    onBracketToggleChange: () => {
-      updateSupplyColumnVisibility();
-      updateBuildInputPlaceholder();
-    },
-    onBuildToggleChange: () => {
-      updateBuildInputVisibility();
-    },
-  });
   const supportLink = document.getElementById("supportersLink");
   if (supportLink) supportLink.textContent = "support";
+
+  window.addEventListener("user-profile-updated", () => {
+    updateSupplyColumnVisibility();
+    updateBuildInputVisibility();
+    updateBuildInputPlaceholder();
+  });
 
   const restoreCommunity = localStorage.getItem("restoreCommunityModal");
   const filterType = localStorage.getItem("communityFilterType");
@@ -645,8 +665,6 @@ export async function initializeIndexPage() {
     // ✅ If logged in, do user setup
     if (user) {
       await checkForJoinRequestNotifications();
-      initializeUserData(user);
-      await loadUserSettings();
       const builds = await fetchUserBuilds();
       setSavedBuilds(builds);
       saveSavedBuildsToLocalStorage();
@@ -1412,50 +1430,6 @@ export async function initializeIndexPage() {
 
   // Community builds load lazily when the modal is opened
 
-  // This will load the necessary user data after successful authentication
-  async function initializeUserData(user) {
-    const userRef = doc(db, "users", user.uid);
-    const userSnapshot = await getDoc(userRef);
-
-    if (userSnapshot.exists()) {
-      const data = userSnapshot.data() || {};
-      const username = data.username || "Guest";
-      document.getElementById("userName").innerText = username;
-      const avatarUrl =
-        data?.profile?.avatarUrl ||
-        data?.avatarUrl ||
-        "img/avatar/marine_avatar_1.webp";
-      document.getElementById("userPhoto").src = avatarUrl;
-      document.getElementById("userNameMenu").innerText = username;
-      const mmrEl = document.getElementById("userMmrMenu");
-      const byRace = data?.pulse?.lastMmrByRace || data?.lastKnownMMRByRace || null;
-      const overall = (() => {
-        if (byRace && typeof byRace === "object") {
-          const vals = Object.values(byRace).filter((v) => Number.isFinite(v));
-          if (vals.length) return Math.max(...vals);
-        }
-        const n = Number(data?.pulse?.lastMmr ?? data?.pulse?.mmr ?? data?.lastKnownMMR);
-        return Number.isFinite(n) ? n : null;
-      })();
-      if (mmrEl) {
-        const badges = window.buildMmrBadges
-          ? window.buildMmrBadges(byRace, overall, data?.lastMmrUpdated?.toMillis?.())
-          : null;
-        mmrEl.innerHTML = "";
-        if (badges) {
-          mmrEl.appendChild(badges);
-          mmrEl.style.display = "block";
-        } else {
-          mmrEl.style.display = "none";
-          mmrEl.textContent = "";
-        }
-      }
-    } else {
-      // Handle case when user data doesn't exist
-      console.log("No user data found!");
-    }
-  }
-
   document.getElementById("mapVetoBtn")?.addEventListener("click", () => {
     window.location.href = "/veto.html";
   });
@@ -1496,13 +1470,10 @@ export async function initializeIndexPage() {
     });
   }
 
-  document.getElementById("settingsBtn")?.addEventListener("click", () => {
+  safeAdd("settingsBtn", "click", async () => {
     const userMenu = document.getElementById("userMenu");
     if (userMenu) userMenu.style.display = "none";
-    const modal = document.getElementById("settingsModal");
-    if (modal) {
-      modal.style.display = "block";
-    }
+    await openSettingsModal();
   });
 
   const clanModal = document.getElementById("clanModal");
@@ -1595,8 +1566,15 @@ export async function initializeIndexPage() {
 
   // Open modals from flags set on other pages (e.g., viewBuild)
   try {
+    const openSettings =
+      localStorage.getItem("openSettingsOnLoad") === "true";
     const openStats = localStorage.getItem("openStatsOnLoad") === "true";
     const openClans = localStorage.getItem("openClanModalOnLoad") === "true";
+
+    if (openSettings) {
+      localStorage.removeItem("openSettingsOnLoad");
+      await openSettingsModal();
+    }
 
     if (openStats) {
       localStorage.removeItem("openStatsOnLoad");
