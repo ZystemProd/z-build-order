@@ -115,6 +115,9 @@ export function initUserSettingsModal(options = {}) {
   const showModal = async () => {
     modal.style.display = "block";
     document.body.classList.add("modal-open");
+    if (window.hydrateLazyImages) {
+      window.hydrateLazyImages(modal);
+    }
     await loadUserSettings();
     await populateMainClanDropdown();
     syncToggles();

@@ -361,87 +361,12 @@ body.dark .transpose-group {
   border: 0;
 }
 
-/* Game Selector */
-#game-select {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  padding: 10px;
-  height: 70px;
-  width: 70px;
-  background-color: #37373780;
-  border-radius: 12px;
-  display: none !important;
-  flex-direction: column;
-  align-items: center;
-  z-index: 999;
-}
-
-#game-select .selected-game img {
-  width: 50px;
-  height: 50px;
-  object-fit: cover;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-#game-select .game-dropdown {
-  display: none;
-  position: absolute;
-  top: 60px;
-  left: 0;
-  background-color: #373737;
-  padding: 5px;
-  border-radius: 8px;
-  min-width: 210px;
-  white-space: nowrap;
-}
-
-#game-select .game-dropdown {
-  display: none;
-}
-
-#game-select .game-dropdown {
-  display: none;
-}
-
-#game-select .game-dropdown.open {
-  display: block;
-}
-
-#game-select .game-option {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px;
-}
-
-#game-select .game-option img {
-  width: 30px;
-  height: 30px;
-  border-radius: 4px;
-}
-
-#game-select .game-option.disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-#game-select:hover {
-  background-color: #6b6b6b80;
-}
-
+/* Dropdown button */
 .dropdown {
   position: relative;
   display: inline-block;
 }
 
-#game-select .game-dropdown .game-option:hover {
-  background-color: #f0f0f02b; /* or your highlight color */
-  cursor: pointer;
-}
-
-/* Dropdown button */
 .dropdown-btn {
   background-color: #444;
   color: white;
@@ -6346,23 +6271,6 @@ optgroup[label="Terran"] {
     padding: 0;
     border: none;
     margin-left: auto;
-  }
-  #main-header #game-select {
-    position: relative;
-    top: 0;
-    right: 0;
-    background-color: transparent;
-    padding: 0;
-    height: 40px;
-    flex-direction: row;
-  }
-  #main-header #game-select .selected-game img {
-    width: 32px;
-    height: 32px;
-  }
-  #main-header #game-select .game-dropdown {
-    top: calc(100% + 5px);
-    right: 0;
   }
   #main-header button {
     border: none;

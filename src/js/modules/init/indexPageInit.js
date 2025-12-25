@@ -5,31 +5,59 @@ import { initUserSettingsModal } from "../settingsModalInit.js";
 
 let koFiOverlayInitialized = false;
 let koFiOverlayInitStarted = false;
+let koFiOverlayScriptPromise = null;
+
+const buildModalRaceImages = [
+  "img/race/terran2.webp",
+  "img/race/zerg2.webp",
+  "img/race/protoss2.webp",
+];
+let buildModalRaceImagesPreloaded = false;
+
+function loadKoFiOverlayScript() {
+  if (window.kofiWidgetOverlay) return Promise.resolve();
+  if (koFiOverlayScriptPromise) return koFiOverlayScriptPromise;
+  koFiOverlayScriptPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://storage.ko-fi.com/cdn/scripts/overlay-widget.js";
+    script.defer = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Ko-fi overlay failed to load"));
+    document.head.appendChild(script);
+  });
+  return koFiOverlayScriptPromise;
+}
 
 function initKoFiOverlay() {
   if (koFiOverlayInitialized || koFiOverlayInitStarted) return;
   koFiOverlayInitStarted = true;
-  const attempt = () => {
-    if (
-      window.kofiWidgetOverlay &&
-      typeof window.kofiWidgetOverlay.draw === "function"
-    ) {
-      window.kofiWidgetOverlay.draw("zystem", {
-        type: "floating-chat",
-        "floating-chat.donateButton.text": "Donate",
-        "floating-chat.donateButton.background-color": "#d9534f",
-        "floating-chat.donateButton.text-color": "#fff",
-      });
-      const overlay = document.querySelector('[id^="kofi-widget-overlay"]');
-      if (overlay) {
-        overlay.style.display = "none";
-        koFiOverlayInitialized = true;
-      }
-    } else {
-      setTimeout(attempt, 300);
-    }
-  };
-  attempt();
+  loadKoFiOverlayScript()
+    .then(() => {
+      const attempt = () => {
+        if (
+          window.kofiWidgetOverlay &&
+          typeof window.kofiWidgetOverlay.draw === "function"
+        ) {
+          window.kofiWidgetOverlay.draw("zystem", {
+            type: "floating-chat",
+            "floating-chat.donateButton.text": "Donate",
+            "floating-chat.donateButton.background-color": "#d9534f",
+            "floating-chat.donateButton.text-color": "#fff",
+          });
+          const overlay = document.querySelector('[id^="kofi-widget-overlay"]');
+          if (overlay) {
+            overlay.style.display = "none";
+            koFiOverlayInitialized = true;
+          }
+        } else {
+          setTimeout(attempt, 300);
+        }
+      };
+      attempt();
+    })
+    .catch(() => {
+      koFiOverlayInitStarted = false;
+    });
 }
 import {
   saveCurrentBuild,
@@ -146,6 +174,7 @@ function debounce(fn, delay = 50) {
 function adjustCatPosition() {
   try {
     const box = document.getElementById("box");
+    const input = document.getElementById("buildOrderInput");
     if (!box) return;
 
     // If the cat is hidden by CSS (mobile), reset any shift and skip
@@ -153,6 +182,16 @@ function adjustCatPosition() {
     if (cs.display === "none") {
       box.style.removeProperty("--cat-shift");
       return;
+    }
+
+    if (input) {
+      const inputRect = input.getBoundingClientRect();
+      const catEl = document.querySelector("#box .cat") || box;
+      const catRect = catEl.getBoundingClientRect();
+      const boxRect = box.getBoundingClientRect();
+      const delta = inputRect.top - catRect.top;
+      const newTop = window.scrollY + boxRect.top + delta;
+      box.style.top = `${Math.max(0, Math.round(newTop))}px`;
     }
 
     // Helper: compute how much we need to move left to clear buttons
@@ -278,6 +317,17 @@ function showSupportModal() {
   if (modal) modal.style.display = "block";
 }
 
+function preloadBuildModalRaceImages() {
+  if (buildModalRaceImagesPreloaded) return;
+  buildModalRaceImagesPreloaded = true;
+  buildModalRaceImages.forEach((src) => {
+    const img = new Image();
+    img.decoding = "async";
+    img.loading = "eager";
+    img.src = src;
+  });
+}
+
 // Templates modal will be set up lazily when first opened
 
 // — replay meta, filled by populateReplayOptions —
@@ -294,7 +344,6 @@ let currentBuildFilter = "all";
  ----------------- */
 export async function initializeIndexPage() {
   console.log("🛠 Initializing Index Page");
-  initKoFiOverlay();
   initUserSettingsModal({
     onBracketToggleChange: () => {
       updateSupplyColumnVisibility();
@@ -383,6 +432,30 @@ export async function initializeIndexPage() {
   safeAdd("signInBtn", "click", window.handleSignIn);
   safeAdd("signOutBtn", "click", window.handleSignOut);
   safeAdd("switchAccountBtn", "click", window.handleSwitchAccount);
+
+  const buildsBtn = document.getElementById("showBuildsButton");
+  if (buildsBtn) {
+    const preload = () => preloadBuildModalRaceImages();
+    buildsBtn.addEventListener("mouseenter", preload, { once: true });
+    buildsBtn.addEventListener("focus", preload, { once: true });
+    buildsBtn.addEventListener("touchstart", preload, {
+      once: true,
+      passive: true,
+    });
+    buildsBtn.addEventListener("click", preload, { once: true });
+  }
+
+  const communityBtn = document.getElementById("showCommunityModalButton");
+  if (communityBtn) {
+    const preload = () => preloadBuildModalRaceImages();
+    communityBtn.addEventListener("mouseenter", preload, { once: true });
+    communityBtn.addEventListener("focus", preload, { once: true });
+    communityBtn.addEventListener("touchstart", preload, {
+      once: true,
+      passive: true,
+    });
+    communityBtn.addEventListener("click", preload, { once: true });
+  }
 
   // --- Main Build Buttons
   const saveBuildButton = document.getElementById("saveBuildButton");
@@ -1212,24 +1285,6 @@ export async function initializeIndexPage() {
       modal.style.display = "none";
     }
   });
-
-  const gameSelect = document.getElementById("game-select");
-  if (gameSelect) {
-    const selectedGame = gameSelect.querySelector(".selected-game");
-    const dropdown = gameSelect.querySelector(".game-dropdown");
-
-    selectedGame.addEventListener("click", (e) => {
-      e.stopPropagation(); // Prevent click from bubbling
-      dropdown.classList.toggle("open");
-    });
-
-    // Optional: close when clicking outside
-    document.addEventListener("click", (e) => {
-      if (!gameSelect.contains(e.target)) {
-        dropdown.classList.remove("open");
-      }
-    });
-  }
 
   // 🆕 Share button trigger
   safeAdd("shareBuildButton", "click", async () => {

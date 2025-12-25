@@ -86,7 +86,12 @@ async function loadUserTemplates() {
 
 export async function showTemplatesModal() {
   const templateModal = document.getElementById("templateModal");
-  if (templateModal) templateModal.style.display = "block";
+  if (templateModal) {
+    templateModal.style.display = "block";
+    if (window.hydrateLazyImages) {
+      window.hydrateLazyImages(templateModal);
+    }
+  }
   // Load user templates (if signed in) and then populate
   await loadUserTemplates();
   populateTemplateList(templates);
@@ -163,6 +168,9 @@ function updateTemplatePreview(templateData) {
 export function showSaveTemplateModal() {
   const modal = document.getElementById("saveTemplateModal");
   modal.style.display = "block";
+  if (window.hydrateLazyImages) {
+    window.hydrateLazyImages(modal);
+  }
 
   const closeButton = document.getElementById("closeSaveTemplateModal");
   closeButton.onclick = () => {

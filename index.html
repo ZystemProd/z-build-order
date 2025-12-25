@@ -67,23 +67,6 @@
     </div>
   </div>
 
-  <!-- Game Selector -->
-  <div id="game-select">
-    <div class="selected-game">
-      <img src="img/game-icons/sc2.png" alt="StarCraft 2" />
-    </div>
-    <div class="game-dropdown">
-      <div class="game-option active">
-        <img src="img/game-icons/sc2.png" alt="StarCraft 2" />
-        <span>StarCraft 2</span>
-      </div>
-      <div class="game-option disabled">
-        <img src="img/game-icons/sg.png" alt="Stormgate" />
-        <span>Stormgate (Coming Soon)</span>
-      </div>
-    </div>
-  </div>
-
   <header id="main-header">
     <nav id="main-nav"></nav>
   </header>
@@ -494,15 +477,15 @@
           <div class="race-selection">
             <label>
               <input type="radio" name="templateRace" value="zerg" />
-              <img src="img/race/zerg.webp" alt="Zerg" />
+              <img data-src="img/race/zerg.webp" alt="Zerg" />
             </label>
             <label>
               <input type="radio" name="templateRace" value="terran" />
-              <img src="img/race/terran.webp" alt="Terran" />
+              <img data-src="img/race/terran.webp" alt="Terran" />
             </label>
             <label>
               <input type="radio" name="templateRace" value="protoss" />
-              <img src="img/race/protoss.webp" alt="Protoss" />
+              <img data-src="img/race/protoss.webp" alt="Protoss" />
             </label>
           </div>
         </div>
@@ -749,7 +732,7 @@
         <div class="settings-panel active" id="settingsGeneral">
           <div class="settings-avatar-section">
             <div class="settings-avatar-preview">
-              <img id="settingsCurrentAvatar" src="img/avatar/marine_avatar_1.webp" alt="Current avatar" />
+              <img id="settingsCurrentAvatar" data-src="img/avatar/marine_avatar_1.webp" alt="Current avatar" />
             </div>
             <button type="button" class="settings-avatar-button" id="changeAvatarBtn">
               Change Avatar
@@ -1190,7 +1173,6 @@
       <div id="focusContent" class="focus-content"></div>
     </div>
   </div>
-  <script defer src="https://storage.ko-fi.com/cdn/scripts/overlay-widget.js"></script>
   <script type="module" src="./src/initMain.js"></script>
 
 

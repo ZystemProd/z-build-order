@@ -55,7 +55,18 @@ document.addEventListener("DOMContentLoaded", () => {
   if (userPhoto) userPhoto.style.display = "none";
   if (userName) userName.style.display = "none";
   if (userNameMenu) userNameMenu.style.display = "none";
-  if (userMenu) userMenu.style.display = "none";
+  if (userMenu) {
+    userMenu.style.display = "none";
+    deferWebpImagesIn(userMenu);
+    deferSvgImagesIn(userMenu);
+    observeVisibilityForLazyImages(userMenu);
+  }
+  const replayOverlay = document.getElementById("replayDropOverlay");
+  if (replayOverlay) {
+    deferSvgImagesIn(replayOverlay);
+    observeVisibilityForLazyImages(replayOverlay);
+  }
+  setupModalImageLazyLoading();
 
   setupUsernameSettingsSection();
   setupPulseSettingsSection();
@@ -848,7 +859,9 @@ function buildMmrBadges(byRace, overall, updatedAt) {
     if (meta.icon) {
       const img = document.createElement("img");
       img.className = "mmr-badge-icon";
-      img.src = meta.icon;
+      img.dataset.src = meta.icon;
+      img.loading = "lazy";
+      img.decoding = "async";
       img.alt = `${meta.label} icon`;
       badge.appendChild(img);
     }
@@ -886,9 +899,79 @@ function buildMmrBadges(byRace, overall, updatedAt) {
 
   return hasBadges ? frag : null;
 }
+
+function hydrateLazyImages(root = document) {
+  if (!root || typeof root.querySelectorAll !== "function") return;
+  root.querySelectorAll("img[data-src]:not([data-loaded])").forEach((img) => {
+    const src = img.dataset.src;
+    if (!src) return;
+    img.src = src;
+    img.dataset.loaded = "true";
+  });
+}
+
+function deferWebpImagesIn(root) {
+  if (!root || typeof root.querySelectorAll !== "function") return;
+  root.querySelectorAll("img[src$='.webp']").forEach((img) => {
+    if (img.dataset.src) return;
+    img.dataset.src = img.getAttribute("src");
+    img.removeAttribute("src");
+    img.loading = "lazy";
+    img.decoding = "async";
+  });
+}
+
+function deferSvgImagesIn(root) {
+  if (!root || typeof root.querySelectorAll !== "function") return;
+  root.querySelectorAll("img[src$='.svg']").forEach((img) => {
+    if (img.dataset.src) return;
+    img.dataset.src = img.getAttribute("src");
+    img.removeAttribute("src");
+    img.loading = "lazy";
+    img.decoding = "async";
+  });
+}
+
+function observeVisibilityForLazyImages(el) {
+  if (!el || !(el instanceof HTMLElement)) return;
+  const observer = new MutationObserver(() => {
+    const style = window.getComputedStyle(el);
+    if (style.display !== "none" && style.visibility !== "hidden") {
+      hydrateLazyImages(el);
+    }
+  });
+  observer.observe(el, { attributes: true, attributeFilter: ["style", "class"] });
+}
+
+function setupModalImageLazyLoading() {
+  const modals = document.querySelectorAll(".modal");
+  modals.forEach((modal) => {
+    deferWebpImagesIn(modal);
+    deferSvgImagesIn(modal);
+  });
+
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((m) => {
+      const el = m.target;
+      if (!(el instanceof HTMLElement)) return;
+      if (!el.classList.contains("modal")) return;
+      const style = window.getComputedStyle(el);
+      if (style.display !== "none" && style.visibility !== "hidden") {
+        hydrateLazyImages(el);
+      }
+    });
+  });
+
+  observer.observe(document.body, {
+    attributes: true,
+    attributeFilter: ["style", "class"],
+    subtree: true,
+  });
+}
 // Expose for other modules that run before module bundling combines scope
 if (typeof window !== "undefined") {
   window.buildMmrBadges = buildMmrBadges;
+  window.hydrateLazyImages = hydrateLazyImages;
 }
 
 function updateUserMmrBadge(mmr, byRace = null, updatedAt = null) {
@@ -2001,11 +2084,11 @@ const userMenu = document.getElementById("userMenu");
 const authContainer = document.getElementById("auth-container");
 const userPhoto = document.getElementById("userPhoto");
 
-if (authContainer && userMenu) {
-  // Toggle menu on auth container click
-  authContainer.addEventListener("click", (event) => {
-    // Only allow toggling when user is signed in
-    if (!auth.currentUser) return;
+  if (authContainer && userMenu) {
+    // Toggle menu on auth container click
+    authContainer.addEventListener("click", (event) => {
+      // Only allow toggling when user is signed in
+      if (!auth.currentUser) return;
     // Do not toggle if clicking the sign-in button
     const signInBtn = document.getElementById("signInBtn");
     if (
@@ -2017,8 +2100,11 @@ if (authContainer && userMenu) {
     // Prevent toggling when clicking inside the open menu itself
     if (userMenu.contains(event.target)) return;
     event.stopPropagation();
-    userMenu.style.display =
-      userMenu.style.display === "block" ? "none" : "block";
+    const isOpen = userMenu.style.display === "block";
+    userMenu.style.display = isOpen ? "none" : "block";
+    if (!isOpen) {
+      hydrateLazyImages(userMenu);
+    }
   });
 
   // Close menu if clicking outside of both auth container and the menu
