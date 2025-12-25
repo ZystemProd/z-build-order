@@ -1,9 +1,23 @@
-import { initializeApp } from "firebase/app";
-import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
-import { initAnalytics } from "./js/modules/analyticsHelper.js";
 import {
-  getAuth,
-  GoogleAuthProvider,
+  app,
+  auth,
+  db,
+  provider,
+  switchAccountProvider,
+} from "./js/modules/firebase.js";
+import { initCookieConsent } from "./js/modules/cookieConsent.js";
+import {
+  deferSvgImagesIn,
+  deferWebpImagesIn,
+  hydrateLazyImages,
+  observeVisibilityForLazyImages,
+  setupModalImageLazyLoading,
+} from "./js/modules/ui/lazyImages.js";
+import {
+  initFloatingTilePositioning,
+  updateFloatingTilePositions,
+} from "./js/modules/ui/floatingTiles.js";
+import {
   signInWithPopup,
   signOut,
   deleteUser,
@@ -12,7 +26,6 @@ import {
   browserLocalPersistence,
 } from "firebase/auth";
 import {
-  initializeFirestore,
   getDocs,
   collection,
   doc,
@@ -25,25 +38,21 @@ import {
   query,
   where,
   collectionGroup,
-  persistentLocalCache,
-  persistentMultipleTabManager,
-  memoryLocalCache,
 } from "firebase/firestore";
 import { bannedWords } from "./js/data/bannedWords.js";
 import countries from "./js/data/countries.json" assert { type: "json" };
 import { showToast } from "./js/modules/toastHandler.js";
 import { resetBuildInputs } from "./js/modules/utils.js";
-
-// Firebase config
-const firebaseConfig = {
-  apiKey: "AIzaSyBBLnneYwLDfIp-Oep2MvExGnVk_EvDQoo",
-  authDomain: "z-build-order.firebaseapp.com",
-  projectId: "z-build-order",
-  storageBucket: "z-build-order.firebasestorage.app",
-  messagingSenderId: "22023941178",
-  appId: "1:22023941178:web:ba417e9a52332a8e055903",
-  measurementId: "G-LBDMKMG1W9",
-};
+import {
+  DEFAULT_AVATAR_URL,
+  closeAvatarModal,
+  emitAvatarUpdate,
+  getCurrentUserAvatarUrl,
+  resolveUserAvatar,
+  setCurrentUserAvatarUrl,
+  setupAvatarModal,
+  updateAvatarSelectionHighlight,
+} from "./js/modules/settings/avatar.js";
 
 // --- DOM Reset --- //
 document.addEventListener("DOMContentLoaded", () => {
@@ -74,144 +83,9 @@ document.addEventListener("DOMContentLoaded", () => {
   } catch (_) {}
 });
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = initializeFirestore(app, {
-  localCache:
-    typeof window === "undefined"
-      ? memoryLocalCache()
-      : persistentLocalCache({
-          tabManager: persistentMultipleTabManager(),
-        }),
-});
-const provider = new GoogleAuthProvider();
-const switchAccountProvider = new GoogleAuthProvider();
-switchAccountProvider.setCustomParameters({ prompt: "select_account" });
+initFloatingTilePositioning();
+initCookieConsent(app);
 
-let appCheck;
-if (typeof window !== "undefined") {
-  appCheck = window.__appCheckInstance;
-  if (!appCheck) {
-    appCheck = initializeAppCheck(app, {
-      provider: new ReCaptchaV3Provider(
-        "6LcBBWsrAAAAALLmBNIhl-zKPa8KRj8mXMldoKbN"
-      ),
-      isTokenAutoRefreshEnabled: true,
-    });
-    window.__appCheckInstance = appCheck;
-  }
-} else {
-  appCheck = initializeAppCheck(app, {
-    provider: new ReCaptchaV3Provider(
-      "6LcBBWsrAAAAALLmBNIhl-zKPa8KRj8mXMldoKbN"
-    ),
-    isTokenAutoRefreshEnabled: true,
-  });
-}
-
-function updateFloatingTilePositions() {
-  const authEl = document.getElementById("auth-container");
-  const vetoEl = document.getElementById("mapVetoTile");
-  const tournamentEl = document.getElementById("tournamentTile");
-  if (!authEl) return;
-
-  // Skip on mobile (tiles are hidden there)
-  if (window.matchMedia && window.matchMedia("(max-width: 768px)").matches) {
-    return;
-  }
-
-  // Preferred horizontal gap between elements
-  const gap = 16; // px
-
-  const rect = authEl.getBoundingClientRect();
-  if (!rect || rect.width === 0) {
-    if (vetoEl) vetoEl.style.right = "10px";
-    if (tournamentEl) tournamentEl.style.right = "10px";
-    return;
-  }
-
-  // Place tiles to the left of auth container with a fixed gap
-  let currentRight = Math.max(10, window.innerWidth - rect.left + gap);
-  if (vetoEl) {
-    vetoEl.style.right = `${currentRight}px`;
-    currentRight += (vetoEl.offsetWidth || 150) + gap;
-  }
-  if (tournamentEl) {
-    tournamentEl.style.right = `${currentRight}px`;
-  }
-}
-
-window.addEventListener("resize", () => {
-  try {
-    updateFloatingTilePositions();
-  } catch (_) {}
-});
-window.addEventListener("load", () => {
-  try {
-    updateFloatingTilePositions();
-  } catch (_) {}
-});
-
-function initCookieConsent() {
-  const banner = document.getElementById("cookieBanner");
-  const acceptBtn = document.getElementById("cookieAccept");
-  const declineBtn = document.getElementById("cookieDecline");
-
-  const consent = localStorage.getItem("analyticsConsent");
-
-  if (consent === "accepted") {
-    import("firebase/analytics").then(({ getAnalytics }) => {
-      getAnalytics(app);
-      initAnalytics(app);
-    });
-    if (banner) banner.style.display = "none";
-    return;
-  }
-
-  if (consent === "declined") {
-    if (banner) banner.style.display = "none";
-    return;
-  }
-
-  if (!banner) return;
-
-  banner.style.display = "block";
-  if (acceptBtn) {
-    acceptBtn.addEventListener("click", async () => {
-      localStorage.setItem("analyticsConsent", "accepted");
-      banner.style.display = "none";
-      try {
-        const { getAnalytics } = await import("firebase/analytics");
-        getAnalytics(app);
-        initAnalytics(app);
-      } catch (_) {
-        // ignore analytics load errors
-      }
-    });
-  }
-  if (declineBtn) {
-    declineBtn.addEventListener("click", () => {
-      localStorage.setItem("analyticsConsent", "declined");
-      banner.style.display = "none";
-    });
-  }
-}
-
-initCookieConsent();
-
-const DEFAULT_AVATAR_URL = "img/avatar/marine_avatar_1.webp";
-const AVATAR_MANIFEST_URL = "img/avatar/avatars.json";
-const FALLBACK_AVATAR_OPTIONS = [
-  "img/avatar/marine_avatar_1.webp",
-  "img/avatar/protoss_avatar_1.webp",
-  "img/avatar/zergling_avatar_1.webp",
-];
-
-let currentUserAvatarUrl = DEFAULT_AVATAR_URL;
-let avatarOptionsCache = null;
-let avatarModalInitialized = false;
-let lastFocusedBeforeAvatarModal = null;
 let currentUsername = null;
 let usernameFormInitialized = false;
 let currentUserProfile = null;
@@ -267,255 +141,6 @@ const PULSE_ENDPOINTS = (() => {
   );
   return endpoints;
 })();
-
-const avatarModalElements = {
-  changeBtn: null,
-  modal: null,
-  grid: null,
-  closeBtn: null,
-};
-
-function sanitizeAvatarUrl(url) {
-  if (typeof url !== "string") return DEFAULT_AVATAR_URL;
-  const trimmed = url.trim();
-  if (!trimmed) return DEFAULT_AVATAR_URL;
-  const lower = trimmed.toLowerCase();
-  const allowedStarts = [
-    "http://",
-    "https://",
-    "data:image",
-    "img/",
-    "/img/",
-    "./img/",
-  ];
-  if (allowedStarts.some((prefix) => lower.startsWith(prefix))) {
-    return trimmed.replace(/^\.\//, "");
-  }
-  return trimmed.endsWith(".webp")
-    ? `img/avatar/${trimmed}`
-    : DEFAULT_AVATAR_URL;
-}
-
-function emitAvatarUpdate(avatarUrl) {
-  const sanitized = sanitizeAvatarUrl(avatarUrl);
-  const settingsPreview = document.getElementById("settingsCurrentAvatar");
-  if (settingsPreview) {
-    settingsPreview.src = sanitized;
-  }
-  const buttonPreview = document.getElementById("settingsAvatarButtonImage");
-  if (buttonPreview) {
-    buttonPreview.src = sanitized;
-  }
-
-  window.dispatchEvent(
-    new CustomEvent("user-avatar-updated", { detail: { avatarUrl: sanitized } })
-  );
-}
-
-async function loadAvatarOptions() {
-  if (Array.isArray(avatarOptionsCache) && avatarOptionsCache.length) {
-    return avatarOptionsCache;
-  }
-
-  const options = new Set([DEFAULT_AVATAR_URL]);
-
-  try {
-    const response = await fetch(AVATAR_MANIFEST_URL, { cache: "no-store" });
-    if (response.ok) {
-      const payload = await response.json();
-      if (Array.isArray(payload)) {
-        payload.forEach((entry) => {
-          if (typeof entry !== "string") return;
-          const sanitized = sanitizeAvatarUrl(entry);
-          if (sanitized) options.add(sanitized);
-        });
-      }
-    }
-  } catch (error) {
-    console.warn(
-      "Failed to load avatar manifest, using fallback avatars.",
-      error
-    );
-  }
-
-  FALLBACK_AVATAR_OPTIONS.forEach((fallback) => {
-    const sanitized = sanitizeAvatarUrl(fallback);
-    if (sanitized) options.add(sanitized);
-  });
-
-  avatarOptionsCache = Array.from(options);
-  return avatarOptionsCache;
-}
-
-function updateAvatarSelectionHighlight(selectedUrl) {
-  const grid = avatarModalElements.grid;
-  if (!grid) return;
-
-  const sanitizedSelected = sanitizeAvatarUrl(selectedUrl);
-
-  grid.querySelectorAll(".avatar-option").forEach((button) => {
-    const isSelected = button.dataset.avatar === sanitizedSelected;
-    button.classList.toggle("is-selected", isSelected);
-    button.setAttribute("aria-pressed", isSelected ? "true" : "false");
-  });
-}
-
-async function populateAvatarGrid() {
-  const grid = avatarModalElements.grid;
-  if (!grid) return;
-
-  const avatars = await loadAvatarOptions();
-  grid.innerHTML = "";
-
-  avatars.forEach((avatarUrl) => {
-    const sanitized = sanitizeAvatarUrl(avatarUrl);
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "avatar-option";
-    button.dataset.avatar = sanitized;
-    button.setAttribute("aria-pressed", "false");
-    button.setAttribute("aria-label", "Select avatar");
-
-    const img = document.createElement("img");
-    img.src = sanitized;
-    img.alt = "Avatar option";
-    img.loading = "lazy";
-
-    button.appendChild(img);
-    button.addEventListener("click", () => handleAvatarSelection(sanitized));
-    grid.appendChild(button);
-  });
-
-  updateAvatarSelectionHighlight(currentUserAvatarUrl);
-}
-
-async function openAvatarModal() {
-  if (!avatarModalInitialized) return;
-  if (!auth.currentUser) {
-    showToast("Sign in to change your avatar.", "info");
-    return;
-  }
-
-  closeUserMenu();
-  await populateAvatarGrid();
-
-  const modal = avatarModalElements.modal;
-  if (!modal) return;
-
-  lastFocusedBeforeAvatarModal = document.activeElement;
-  modal.style.display = "block";
-  modal.setAttribute("aria-hidden", "false");
-
-  const focusTarget =
-    avatarModalElements.closeBtn ||
-    modal.querySelector(".avatar-option") ||
-    modal;
-  if (focusTarget && typeof focusTarget.focus === "function") {
-    focusTarget.focus();
-  }
-}
-
-function closeAvatarModal() {
-  const modal = avatarModalElements.modal;
-  if (!modal) return;
-
-  modal.style.display = "none";
-  modal.setAttribute("aria-hidden", "true");
-  if (
-    lastFocusedBeforeAvatarModal &&
-    typeof lastFocusedBeforeAvatarModal.focus === "function"
-  ) {
-    lastFocusedBeforeAvatarModal.focus();
-  }
-  lastFocusedBeforeAvatarModal = null;
-}
-
-async function handleAvatarSelection(avatarUrl) {
-  const user = auth.currentUser;
-  if (!user) {
-    showToast("Sign in to change your avatar.", "info");
-    return;
-  }
-
-  const sanitized = sanitizeAvatarUrl(avatarUrl);
-  if (!sanitized) return;
-
-  try {
-    const userRef = doc(db, "users", user.uid);
-    await setDoc(
-      userRef,
-      { profile: { avatarUrl: sanitized } },
-      { merge: true }
-    );
-
-    currentUserAvatarUrl = sanitized;
-    updateAvatarSelectionHighlight(sanitized);
-
-    if (auth.currentUser) {
-      auth.currentUser.photoURL = sanitized;
-    }
-
-    const userPhotoEl = document.getElementById("userPhoto");
-    if (userPhotoEl) {
-      userPhotoEl.src = sanitized;
-    }
-
-    emitAvatarUpdate(sanitized);
-    showToast("Avatar updated!", "success");
-    closeAvatarModal();
-  } catch (error) {
-    console.error("Failed to update avatar:", error);
-    showToast("Failed to update avatar. Please try again.", "error");
-  }
-}
-
-function resolveUserAvatar(userData) {
-  const profileAvatar = userData?.profile?.avatarUrl;
-  if (profileAvatar) return profileAvatar;
-  return "img/default-avatar.webp";
-}
-
-function setupAvatarModal() {
-  if (avatarModalInitialized) {
-    updateAvatarSelectionHighlight(currentUserAvatarUrl);
-    return;
-  }
-
-  const changeBtn = document.getElementById("changeAvatarBtn");
-  const modal = document.getElementById("avatarModal");
-  const grid = document.getElementById("avatarGrid");
-  const closeBtn = document.getElementById("closeAvatarModal");
-
-  if (!changeBtn || !modal || !grid || !closeBtn) {
-    return;
-  }
-
-  avatarModalElements.changeBtn = changeBtn;
-  avatarModalElements.modal = modal;
-  avatarModalElements.grid = grid;
-  avatarModalElements.closeBtn = closeBtn;
-
-  changeBtn.addEventListener("click", async (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    await openAvatarModal();
-  });
-
-  closeBtn.addEventListener("click", closeAvatarModal);
-  modal.addEventListener("click", (event) => {
-    if (event.target === modal) {
-      closeAvatarModal();
-    }
-  });
-
-  window.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && modal.style.display === "block") {
-      closeAvatarModal();
-    }
-  });
-
-  avatarModalInitialized = true;
-}
 
 /*
 // If testing locally, you can enable Firebase emulators by importing
@@ -966,74 +591,6 @@ function updateUserMenuMmrFromProfile(userData) {
 }
 
 
-function hydrateLazyImages(root = document) {
-  if (!root || typeof root.querySelectorAll !== "function") return;
-  root.querySelectorAll("img[data-src]:not([data-loaded])").forEach((img) => {
-    const src = img.dataset.src;
-    if (!src) return;
-    img.src = src;
-    img.dataset.loaded = "true";
-  });
-}
-
-function deferWebpImagesIn(root) {
-  if (!root || typeof root.querySelectorAll !== "function") return;
-  root.querySelectorAll("img[src$='.webp']").forEach((img) => {
-    if (img.dataset.src) return;
-    img.dataset.src = img.getAttribute("src");
-    img.removeAttribute("src");
-    img.loading = "lazy";
-    img.decoding = "async";
-  });
-}
-
-function deferSvgImagesIn(root) {
-  if (!root || typeof root.querySelectorAll !== "function") return;
-  root.querySelectorAll("img[src$='.svg']").forEach((img) => {
-    if (img.dataset.src) return;
-    img.dataset.src = img.getAttribute("src");
-    img.removeAttribute("src");
-    img.loading = "lazy";
-    img.decoding = "async";
-  });
-}
-
-function observeVisibilityForLazyImages(el) {
-  if (!el || !(el instanceof HTMLElement)) return;
-  const observer = new MutationObserver(() => {
-    const style = window.getComputedStyle(el);
-    if (style.display !== "none" && style.visibility !== "hidden") {
-      hydrateLazyImages(el);
-    }
-  });
-  observer.observe(el, { attributes: true, attributeFilter: ["style", "class"] });
-}
-
-function setupModalImageLazyLoading() {
-  const modals = document.querySelectorAll(".modal");
-  modals.forEach((modal) => {
-    deferWebpImagesIn(modal);
-    deferSvgImagesIn(modal);
-  });
-
-  const observer = new MutationObserver((mutations) => {
-    mutations.forEach((m) => {
-      const el = m.target;
-      if (!(el instanceof HTMLElement)) return;
-      if (!el.classList.contains("modal")) return;
-      const style = window.getComputedStyle(el);
-      if (style.display !== "none" && style.visibility !== "hidden") {
-        hydrateLazyImages(el);
-      }
-    });
-  });
-
-  observer.observe(document.body, {
-    attributes: true,
-    attributeFilter: ["style", "class"],
-    subtree: true,
-  });
-}
 // Expose for other modules that run before module bundling combines scope
 if (typeof window !== "undefined") {
   window.buildMmrBadges = buildMmrBadges;
@@ -1418,7 +975,7 @@ export function ensureSettingsUiReady() {
   setupTwitchSettingsSection();
   setupCountrySelector();
   setupSecondaryPulseModal();
-  setupAvatarModal();
+  setupAvatarModal({ closeUserMenu });
   settingsUiReady = true;
 }
 
@@ -1893,7 +1450,8 @@ export function initializeAuthUI() {
         "muted"
       );
 
-      currentUserAvatarUrl = resolveUserAvatar(userData);
+      setCurrentUserAvatarUrl(resolveUserAvatar(userData));
+      const currentAvatarUrl = getCurrentUserAvatarUrl();
       const pulseMerged = {
         ...(userData?.pulse || {}),
         lastMmrUpdated: userData?.lastMmrUpdated,
@@ -1904,10 +1462,10 @@ export function initializeAuthUI() {
 
       if (userName) userName.innerText = username || "Guest";
       if (userNameMenu) userNameMenu.innerText = username || "Guest";
-      if (userPhoto) userPhoto.src = currentUserAvatarUrl;
-      if (settingsAvatarImg) settingsAvatarImg.src = currentUserAvatarUrl;
-      updateAvatarSelectionHighlight(currentUserAvatarUrl);
-      emitAvatarUpdate(currentUserAvatarUrl);
+      if (userPhoto) userPhoto.src = currentAvatarUrl;
+      if (settingsAvatarImg) settingsAvatarImg.src = currentAvatarUrl;
+      updateAvatarSelectionHighlight(currentAvatarUrl);
+      emitAvatarUpdate(currentAvatarUrl);
       setTwitchInputValue(userData?.twitchUrl || "");
       setTwitchStatus(
         userData?.twitchUrl
@@ -1933,7 +1491,7 @@ export function initializeAuthUI() {
     } else {
       const authContainerEl = document.getElementById("auth-container");
       if (authContainerEl) authContainerEl.classList.remove("is-auth");
-      currentUserAvatarUrl = DEFAULT_AVATAR_URL;
+      setCurrentUserAvatarUrl(DEFAULT_AVATAR_URL);
       currentUserProfile = null;
       currentUsername = null;
       updateAvatarSelectionHighlight(DEFAULT_AVATAR_URL);
@@ -2248,10 +1806,6 @@ function getCurrentUserProfile() {
 
 function getCurrentUsername() {
   return currentUsername || auth.currentUser?.displayName || "";
-}
-
-function getCurrentUserAvatarUrl() {
-  return currentUserAvatarUrl;
 }
 
 export {
