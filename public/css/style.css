@@ -1636,7 +1636,10 @@ textarea::-webkit-scrollbar-thumb:hover {
   display: flex;
   flex-direction: column;
   width: 610px;
-  padding-top: 16px;
+  padding: 14px 20px 20px;
+  position: relative;
+  background: #1f1f1f;
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 #settingsModal .settings-panel {
@@ -6531,35 +6534,52 @@ optgroup[label="Terran"] {
   margin: 18px 0;
 }
 
+.settings-modal-title {
+  margin: 0 0 10px;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+#settingsModal .close-modal {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  font-size: 22px;
+  line-height: 1;
+}
+
 .settings-tabs {
   display: flex;
   gap: 0;
   margin: 0;
   flex-wrap: wrap;
   padding: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .settings-tab-btn {
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-bottom: none;
-  background: #3a3a3a;
-  color: #f0f0f0;
-  border-radius: 12px 12px 0 0;
-  padding: 9px 20px;
+  background: #2f2f2f;
+  background: rgba(255, 255, 255, 0.04);
+  color: #e6e6e6;
+  border-radius: 10px 10px 0 0;
+  padding: 8px 18px;
   cursor: pointer;
-  transition: border-color 120ms ease, background 120ms ease;
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
   user-select: none;
-  font-weight: 700;
+  font-weight: 600;
   position: relative;
-  top: 0; 
-  margin: 0px;
+  top: 0;
+  margin: 0;
 }
 
 .settings-tab-btn.active {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.18);
-  box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.08) inset;
+  background: linear-gradient(135deg, #4cc9f0, #4895ef);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  box-shadow: none;
   z-index: 1;
 }
 
@@ -6567,9 +6587,9 @@ optgroup[label="Terran"] {
   display: none;
   gap: 12px;
   flex-direction: column;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
-  padding-top: 12px;
-  margin-top: 0px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 14px;
+  margin-top: 0;
 }
 
 .settings-panel.active {
