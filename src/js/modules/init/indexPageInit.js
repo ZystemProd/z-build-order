@@ -189,7 +189,8 @@ function adjustCatPosition() {
       const catRect = catEl.getBoundingClientRect();
       const boxRect = box.getBoundingClientRect();
       const delta = inputRect.top - catRect.top;
-      const newTop = window.scrollY + boxRect.top + delta;
+      const alignOffset = 46; // move cat up to align with input top border
+      const newTop = window.scrollY + boxRect.top + delta - alignOffset;
       box.style.top = `${Math.max(0, Math.round(newTop))}px`;
     }
 
