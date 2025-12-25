@@ -62,6 +62,8 @@ export function populateSettingsPanel({
   const rrGroups = document.getElementById("settingsRoundRobinGroups");
   const rrAdvance = document.getElementById("settingsRoundRobinAdvance");
   const rrPlayoffs = document.getElementById("settingsRoundRobinPlayoffs");
+  const qualifyRow = document.getElementById("settingsCircuitQualifyRow");
+  const qualifyInput = document.getElementById("settingsCircuitQualifyCount");
   if (nameInput) nameInput.value = tournament.name || "";
   if (slugInput) slugInput.value = tournament.slug || "";
   if (descInput) descInput.value = tournament.description || "";
@@ -117,6 +119,14 @@ export function populateSettingsPanel({
   if (rrAdvance) rrAdvance.value = rrSettings.advancePerGroup;
   if (rrPlayoffs) rrPlayoffs.value = rrSettings.playoffs;
   if (rrBestOf) rrBestOf.value = rrSettings.bestOf ?? defaultRoundRobinSettings.bestOf;
+
+  const qualifyCount = Number(tournament.circuitQualifyCount);
+  if (qualifyInput) {
+    qualifyInput.value = Number.isFinite(qualifyCount) ? qualifyCount : "";
+  }
+  if (qualifyRow) {
+    qualifyRow.style.display = tournament.isCircuitFinal ? "" : "none";
+  }
 
   applyBestOfToSettings({
     ...defaultBestOf,

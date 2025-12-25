@@ -40,6 +40,7 @@ export function initTournamentPage({
   validateSlug,
   updateSlugPreview,
   updateCircuitSlugPreview,
+  updateFinalSlugPreview,
   renderTournamentList,
   refreshCircuitView,
   syncFormatFieldVisibility,
@@ -47,6 +48,9 @@ export function initTournamentPage({
   setMapPoolSelection,
   getDefaultMapPoolNames,
   toggleMapSelection,
+  setFinalMapPoolSelection,
+  toggleFinalMapSelection,
+  resetFinalMapPoolSelection,
   updateSettingsDescriptionPreview,
   updateSettingsRulesPreview,
   getPlayersMap,
@@ -111,22 +115,35 @@ export function initTournamentPage({
   const descToolbarBtns = document.querySelectorAll("[data-desc-action]");
   const rulesInput = document.getElementById("tournamentRulesInput");
   const rulesToolbarBtns = document.querySelectorAll("[data-rules-action]");
+  const finalDescriptionInput = document.getElementById("finalTournamentDescriptionInput");
+  const finalDescToolbarBtns = document.querySelectorAll("[data-final-desc-action]");
+  const finalRulesInput = document.getElementById("finalTournamentRulesInput");
+  const finalRulesToolbarBtns = document.querySelectorAll("[data-final-rules-action]");
   const mapPoolPicker = document.getElementById("mapPoolPicker");
   const useLadderMapsBtn = document.getElementById("useLadderMapsBtn");
   const clearMapPoolBtn = document.getElementById("clearMapPoolBtn");
+  const finalMapPoolPicker = document.getElementById("finalMapPoolPicker");
+  const finalUseLadderMapsBtn = document.getElementById("finalUseLadderMapsBtn");
+  const finalClearMapPoolBtn = document.getElementById("finalClearMapPoolBtn");
   const settingsTabBtns = document.querySelectorAll("[data-settings-tab]");
   const settingsPanels = document.querySelectorAll("#settingsTab .settings-panel");
   const createTabBtns = document.querySelectorAll("[data-create-tab]");
   const createPanels = document.querySelectorAll("#createTournamentModal .settings-panel");
+  const createCircuitTabBtns = document.querySelectorAll("[data-create-circuit-tab]");
+  const createCircuitPanels = document.querySelectorAll("#createCircuitModal .settings-panel");
   const saveSettingsBtn = document.getElementById("saveSettingsBtn");
   const settingsDescToolbarBtns = document.querySelectorAll("[data-settings-desc-action]");
   const settingsRulesToolbarBtns = document.querySelectorAll("[data-settings-rules-action]");
   const createImageInput = document.getElementById("tournamentImageInput");
   const createImagePreview = document.getElementById("tournamentImagePreview");
+  const finalImageInput = document.getElementById("finalTournamentImageInput");
+  const finalImagePreview = document.getElementById("finalTournamentImagePreview");
   const settingsImageInput = document.getElementById("settingsImageInput");
   const settingsImagePreview = document.getElementById("settingsImagePreview");
   const slugInput = document.getElementById("tournamentSlugInput");
   const circuitSlugInput = document.getElementById("circuitSlugInput");
+  const finalSlugInput = document.getElementById("finalTournamentSlugInput");
+  const generateFinalSlugBtn = document.getElementById("generateFinalSlugBtn");
   const bestOfUpperInput = document.getElementById("bestOfUpperInput");
   const bestOfLowerInput = document.getElementById("bestOfLowerInput");
   const bestOfLowerSemiInput = document.getElementById("bestOfLowerSemiInput");
@@ -135,6 +152,7 @@ export function initTournamentPage({
   const bestOfSemiInput = document.getElementById("bestOfSemiInput");
   const bestOfFinalInput = document.getElementById("bestOfFinalInput");
   const createFormatSelect = document.getElementById("tournamentFormatSelect");
+  const finalFormatSelect = document.getElementById("finalFormatSelect");
   const settingsBestOfUpper = document.getElementById("settingsBestOfUpper");
   const settingsBestOfLower = document.getElementById("settingsBestOfLower");
   const settingsBestOfQuarter = document.getElementById("settingsBestOfQuarter");
@@ -252,6 +270,8 @@ export function initTournamentPage({
   });
   openCreateCircuit?.addEventListener("click", async () => {
     await populateCreateCircuitForm?.();
+    resetFinalMapPoolSelection?.();
+    updateFinalSlugPreview?.();
     if (createCircuitModal) createCircuitModal.style.display = "flex";
   });
   closeCreateCircuit?.addEventListener("click", () => {
@@ -271,8 +291,18 @@ export function initTournamentPage({
     if (!circuitSlugInput || !generateCircuitSlug) return;
     circuitSlugInput.value = (await generateCircuitSlug()).toLowerCase();
     updateCircuitSlugPreview?.();
+    updateFinalSlugPreview?.();
   });
-  circuitSlugInput?.addEventListener("input", () => updateCircuitSlugPreview?.());
+  circuitSlugInput?.addEventListener("input", () => {
+    updateCircuitSlugPreview?.();
+    updateFinalSlugPreview?.();
+  });
+  generateFinalSlugBtn?.addEventListener("click", async () => {
+    if (!finalSlugInput || !generateUniqueSlug) return;
+    finalSlugInput.value = (await generateUniqueSlug()).toLowerCase();
+    updateFinalSlugPreview?.();
+  });
+  finalSlugInput?.addEventListener("input", () => updateFinalSlugPreview?.());
   refreshCircuitBtn?.addEventListener("click", () => refreshCircuitView?.());
 
   createTabBtns.forEach((btn) => {
@@ -281,6 +311,16 @@ export function initTournamentPage({
       if (!target) return;
       createTabBtns.forEach((b) => b.classList.toggle("active", b === btn));
       createPanels.forEach((panel) => panel.classList.toggle("active", panel.id === target));
+    });
+  });
+  createCircuitTabBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const target = btn.dataset.createCircuitTab;
+      if (!target) return;
+      createCircuitTabBtns.forEach((b) => b.classList.toggle("active", b === btn));
+      createCircuitPanels.forEach((panel) =>
+        panel.classList.toggle("active", panel.id === target)
+      );
     });
   });
   const switchSettingsTab = (targetId) => {
@@ -307,6 +347,16 @@ export function initTournamentPage({
     if (!preview) return;
     preview.innerHTML = renderMarkdown(rulesInput.value || "");
   });
+  finalDescriptionInput?.addEventListener("input", () => {
+    const preview = document.getElementById("finalTournamentDescriptionPreview");
+    if (!preview) return;
+    preview.innerHTML = renderMarkdown(finalDescriptionInput.value || "");
+  });
+  finalRulesInput?.addEventListener("input", () => {
+    const preview = document.getElementById("finalTournamentRulesPreview");
+    if (!preview) return;
+    preview.innerHTML = renderMarkdown(finalRulesInput.value || "");
+  });
   descToolbarBtns.forEach((btn) => {
     btn.addEventListener("click", () =>
       applyFormattingInline(btn.dataset.descAction, "tournamentDescriptionInput")
@@ -317,13 +367,33 @@ export function initTournamentPage({
       applyFormattingInline(btn.dataset.rulesAction, "tournamentRulesInput")
     );
   });
+  finalDescToolbarBtns.forEach((btn) => {
+    btn.addEventListener("click", () =>
+      applyFormattingInline(btn.dataset.finalDescAction, "finalTournamentDescriptionInput")
+    );
+  });
+  finalRulesToolbarBtns.forEach((btn) => {
+    btn.addEventListener("click", () =>
+      applyFormattingInline(btn.dataset.finalRulesAction, "finalTournamentRulesInput")
+    );
+  });
   bindImagePreview(createImageInput, createImagePreview);
+  bindImagePreview(finalImageInput, finalImagePreview);
   bindImagePreview(settingsImageInput, settingsImagePreview);
 
   bindMapSelectionEvents({
     setMapPoolSelection,
     getDefaultMapPoolNames,
     toggleMapSelection,
+  });
+  finalUseLadderMapsBtn?.addEventListener("click", () =>
+    setFinalMapPoolSelection?.(getDefaultMapPoolNames())
+  );
+  finalClearMapPoolBtn?.addEventListener("click", () => setFinalMapPoolSelection?.([]));
+  finalMapPoolPicker?.addEventListener("click", (e) => {
+    const card = e.target.closest(".tournament-map-card");
+    if (!card) return;
+    toggleFinalMapSelection?.(card.dataset.mapName);
   });
   bindSettingsEvents({
     applyFormatting: applyFormattingInline,
@@ -356,6 +426,7 @@ export function initTournamentPage({
 
   createFormatSelect?.addEventListener("change", () => syncFormatFieldVisibility("create"));
   settingsFormatSelect?.addEventListener("change", () => syncFormatFieldVisibility("settings"));
+  finalFormatSelect?.addEventListener("change", () => syncFormatFieldVisibility("final"));
   closeVetoModal?.addEventListener("click", () => hideVetoModal());
   saveVetoBtn?.addEventListener("click", () => saveVetoSelection());
 
@@ -512,4 +583,5 @@ export function initTournamentPage({
 
   syncFormatFieldVisibility("create");
   syncFormatFieldVisibility("settings");
+  syncFormatFieldVisibility("final");
 }

@@ -110,6 +110,7 @@ import {
 import { updateTooltips } from "../tooltip.js";
 import {
   fetchCircuitMeta,
+  buildCircuitLeaderboard,
   renderCircuitList,
   renderCircuitView,
   generateCircuitSlug,
@@ -141,6 +142,7 @@ import { renderMapPoolPicker as renderMapPoolPickerUI } from "./maps/pool.js";
 import {
   setMapPoolSelection as setMapPoolSelectionUI,
   toggleMapSelection as toggleMapSelectionUI,
+  isDefaultLadderSelection,
 } from "./maps/selection.js";
 import {
   setupPlayerDetailModal,
@@ -184,6 +186,7 @@ import {
   getRegisteredTournaments,
   setRegisteredTournament,
 } from "./sync/persistence.js";
+import { createFinalTournamentForCircuit } from "./finalsCreate.js";
 const renderMapPoolPicker = renderMapPoolPickerUI;
 const CURRENT_BRACKET_LAYOUT_VERSION = 54;
 const MAX_TOURNAMENT_IMAGE_SIZE = 12 * 1024 * 1024;
@@ -193,6 +196,8 @@ const COVER_QUALITY = 0.82;
 const storage = getStorage(app);
 let currentCircuitMeta = null;
 let isCircuitAdmin = false;
+let finalMapPoolSelection = new Set();
+let finalMapPoolMode = "ladder";
 function renderMarkdown(text = "") {
   return DOMPurify.sanitize(text || "").replace(/\n/g, "<br>");
 }
@@ -916,6 +921,19 @@ function updateSlugPreview() {
   }
 }
 
+function updateFinalSlugPreview() {
+  const slugInput = document.getElementById("finalTournamentSlugInput");
+  const preview = document.getElementById("finalSlugPreview");
+  if (slugInput && preview) {
+    const next = (slugInput.value || "").toLowerCase();
+    if (slugInput.value !== next) slugInput.value = next;
+    const circuitSlug = (document.getElementById("circuitSlugInput")?.value || "")
+      .trim()
+      .toLowerCase();
+    preview.textContent = circuitSlug && next ? `${circuitSlug}/${next}` : next;
+  }
+}
+
 async function populateCreateForm() {
   renderMapPoolPicker("mapPoolPicker", {
     mapPoolSelection,
@@ -1263,6 +1281,51 @@ function setMapPoolSelection(names) {
   });
 }
 
+function updateFinalMapButtons() {
+  const ladderBtn = document.getElementById("finalUseLadderMapsBtn");
+  const customBtn = document.getElementById("finalClearMapPoolBtn");
+  const isLadder = finalMapPoolMode === "ladder";
+  ladderBtn?.classList.toggle("active", isLadder);
+  customBtn?.classList.toggle("active", !isLadder);
+}
+
+function renderFinalMapPoolSelection() {
+  renderMapPoolPickerUI("finalMapPoolPicker", {
+    mapPoolSelection: finalMapPoolSelection,
+    getAll1v1Maps,
+  });
+  renderChosenMapsUI("finalChosenMapList", {
+    mapPoolSelection: finalMapPoolSelection,
+    getMapByName,
+  });
+  updateFinalMapButtons();
+}
+
+function setFinalMapPoolSelection(names) {
+  finalMapPoolSelection = new Set((names || []).filter(Boolean));
+  finalMapPoolMode = isDefaultLadderSelection(finalMapPoolSelection, getDefaultMapPoolNames)
+    ? "ladder"
+    : "custom";
+  renderFinalMapPoolSelection();
+}
+
+function toggleFinalMapSelection(name) {
+  if (!name) return;
+  if (finalMapPoolSelection.has(name)) {
+    finalMapPoolSelection.delete(name);
+  } else {
+    finalMapPoolSelection.add(name);
+  }
+  finalMapPoolMode = isDefaultLadderSelection(finalMapPoolSelection, getDefaultMapPoolNames)
+    ? "ladder"
+    : "custom";
+  renderFinalMapPoolSelection();
+}
+
+function resetFinalMapPoolSelection() {
+  setFinalMapPoolSelection(getDefaultMapPoolNames());
+}
+
 function validateTournamentImage(file) {
   return validateImageFile(file, { maxBytes: MAX_TOURNAMENT_IMAGE_SIZE });
 }
@@ -1388,6 +1451,7 @@ async function handleSaveSettings(event) {
   const maxPlayersInput = document.getElementById("settingsMaxPlayersInput");
   const checkInHoursInput = document.getElementById("settingsCheckInHoursInput");
   const checkInMinutesInput = document.getElementById("settingsCheckInMinutesInput");
+  const qualifyInput = document.getElementById("settingsCircuitQualifyCount");
   const imageInput = document.getElementById("settingsImageInput");
   const imageFile = imageInput?.files?.[0] || null;
   const newSlugRaw = (slugInput?.value || "").trim();
@@ -1409,6 +1473,11 @@ async function handleSaveSettings(event) {
   const maxPlayers = maxPlayersInput?.value
     ? Number(maxPlayersInput.value)
     : null;
+  const qualifyRaw = qualifyInput?.value ?? "";
+  const qualifyCount =
+    qualifyRaw === "" || qualifyRaw === null || qualifyRaw === undefined
+      ? null
+      : Number(qualifyRaw);
   const checkInWindowMinutes = getCheckInWindowMinutes(
     checkInHoursInput,
     checkInMinutesInput
@@ -1438,6 +1507,12 @@ async function handleSaveSettings(event) {
     maxPlayers: Number.isFinite(maxPlayers) ? maxPlayers : null,
     startTime: startTime ? startTime.getTime() : null,
     checkInWindowMinutes,
+    circuitQualifyCount:
+      currentTournamentMeta?.isCircuitFinal &&
+      Number.isFinite(qualifyCount) &&
+      qualifyCount >= 0
+        ? qualifyCount
+        : null,
     bestOf,
     mapPool,
     roundRobin: rrSettings,
@@ -1490,12 +1565,47 @@ async function handleCreateCircuit(event) {
   const nameInput = document.getElementById("circuitNameInput");
   const slugInput = document.getElementById("circuitSlugInput");
   const descriptionInput = document.getElementById("circuitDescriptionInput");
+  const finalNameInput = document.getElementById("finalTournamentNameInput");
+  const finalSlugInput = document.getElementById("finalTournamentSlugInput");
+  const finalFormatSelect = document.getElementById("finalFormatSelect");
+  const finalStartInput = document.getElementById("finalTournamentStartInput");
+  const finalMaxPlayersInput = document.getElementById("finalTournamentMaxPlayersInput");
+  const finalCheckInHoursInput = document.getElementById("finalCheckInHoursInput");
+  const finalCheckInMinutesInput = document.getElementById("finalCheckInMinutesInput");
+  const finalDescriptionInput = document.getElementById("finalTournamentDescriptionInput");
+  const finalRulesInput = document.getElementById("finalTournamentRulesInput");
+  const finalImageInput = document.getElementById("finalTournamentImageInput");
+  const finalQualifyInput = document.getElementById("finalQualifyCountInput");
   const modal = document.getElementById("createCircuitModal");
   const name = (nameInput?.value || "").trim();
   const slug =
     (slugInput?.value || "").trim().toLowerCase() ||
     (await generateCircuitSlug());
   const description = descriptionInput?.value || "";
+  const finalName =
+    (finalNameInput?.value || "").trim() || (name ? `${name} Finals` : "");
+  let finalSlug = (finalSlugInput?.value || "").trim().toLowerCase();
+  if (!finalSlug) {
+    finalSlug = slug ? `${slug}-final` : await generateUniqueSlug();
+  }
+  const finalFormat = (finalFormatSelect?.value || "Double Elimination").trim();
+  const finalStartTime = finalStartInput?.value ? new Date(finalStartInput.value) : null;
+  const finalMaxPlayers = finalMaxPlayersInput?.value
+    ? Number(finalMaxPlayersInput.value)
+    : null;
+  const finalCheckInWindowMinutes = getCheckInWindowMinutes(
+    finalCheckInHoursInput,
+    finalCheckInMinutesInput
+  );
+  const finalDescription = finalDescriptionInput?.value || "";
+  const finalRules = finalRulesInput?.value || "";
+  const finalImageFile = finalImageInput?.files?.[0] || null;
+  const finalQualifyRaw = finalQualifyInput?.value ?? "";
+  const finalQualifyCount =
+    finalQualifyRaw === "" || finalQualifyRaw === null || finalQualifyRaw === undefined
+      ? null
+      : Number(finalQualifyRaw);
+  const rrSettings = extractRoundRobinSettingsUI("final", defaultRoundRobinSettings);
   if (!name) {
     showToast?.("Circuit name is required.", "error");
     return;
@@ -1506,6 +1616,14 @@ async function handleCreateCircuit(event) {
   }
   if (!auth?.currentUser) {
     showToast?.("Sign in to create a circuit.", "error");
+    return;
+  }
+  if (!finalName) {
+    showToast?.("Final tournament name is required.", "error");
+    return;
+  }
+  if (!finalSlug) {
+    showToast?.("Final tournament slug is required.", "error");
     return;
   }
   const payload = {
@@ -1519,16 +1637,89 @@ async function handleCreateCircuit(event) {
       getCurrentUsername?.() || auth.currentUser.displayName || "Unknown",
     createdAt: serverTimestamp(),
   };
+  const finalPayload = {
+    slug: finalSlug,
+    name: finalName,
+    description: finalDescription,
+    rules: finalRules,
+    format: finalFormat,
+    maxPlayers: Number.isFinite(finalMaxPlayers) ? finalMaxPlayers : null,
+    startTime: finalStartTime ? finalStartTime.getTime() : null,
+    checkInWindowMinutes: finalCheckInWindowMinutes,
+    mapPool: Array.from(finalMapPoolSelection || []),
+    createdBy: auth.currentUser?.uid || null,
+    createdByName: getCurrentUsername() || "Unknown host",
+    roundRobin: rrSettings,
+    bestOf: {
+      upper: Number(
+        document.getElementById("finalBestOfUpperInput")?.value || defaultBestOf.upper
+      ),
+      lower: Number(
+        document.getElementById("finalBestOfLowerInput")?.value || defaultBestOf.lower
+      ),
+      lowerSemi: Number(
+        document.getElementById("finalBestOfLowerSemiInput")?.value ||
+          defaultBestOf.lowerSemi
+      ),
+      lowerFinal: Number(
+        document.getElementById("finalBestOfLowerFinalInput")?.value ||
+          defaultBestOf.lowerFinal
+      ),
+      quarter: Number(
+        document.getElementById("finalBestOfQuarterInput")?.value ||
+          defaultBestOf.quarter
+      ),
+      semi: Number(
+        document.getElementById("finalBestOfSemiInput")?.value || defaultBestOf.semi
+      ),
+      final: Number(
+        document.getElementById("finalBestOfFinalInput")?.value || defaultBestOf.final
+      ),
+    },
+    circuitSlug: slug,
+    isCircuitFinal: true,
+    circuitQualifyCount:
+      Number.isFinite(finalQualifyCount) && finalQualifyCount >= 0
+        ? finalQualifyCount
+        : null,
+  };
   try {
     await setDoc(
       doc(collection(db, CIRCUIT_COLLECTION), slug),
       payload,
       { merge: true }
     );
-    showToast?.("Circuit saved.", "success");
+    let finalCreated = false;
+    try {
+      await createFinalTournamentForCircuit({
+        db,
+        doc,
+        collection,
+        setDoc,
+        arrayUnion,
+        uploadTournamentCover,
+        showToast,
+        tournamentCollection: TOURNAMENT_COLLECTION,
+        circuitCollection: CIRCUIT_COLLECTION,
+        circuitSlug: slug,
+        finalSlug,
+        finalPayload,
+        finalImageFile,
+      });
+      finalCreated = true;
+    } catch (err) {
+      console.error("Failed to create final tournament", err);
+      showToast?.("Circuit saved, but final tournament failed.", "error");
+    }
+    if (finalCreated) {
+      showToast?.("Circuit saved.", "success");
+    }
     if (modal) modal.style.display = "none";
     await renderCircuitList({ onEnterCircuit: enterCircuit });
     await enterCircuit(slug);
+    if (finalCreated) {
+      await renderTournamentList();
+    }
   } catch (err) {
     console.error("Failed to save circuit", err);
     showToast?.("Failed to save circuit.", "error");
@@ -1733,6 +1924,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     validateSlug,
     updateSlugPreview,
     updateCircuitSlugPreview,
+    updateFinalSlugPreview,
     renderTournamentList,
     refreshCircuitView,
     syncFormatFieldVisibility,
@@ -1740,6 +1932,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     setMapPoolSelection,
     getDefaultMapPoolNames,
     toggleMapSelection,
+    setFinalMapPoolSelection,
+    toggleFinalMapSelection,
+    resetFinalMapPoolSelection,
     updateSettingsDescriptionPreview,
     updateSettingsRulesPreview,
     getPlayersMap,
@@ -1776,6 +1971,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   try {
     await loadMapCatalog();
     setMapPoolSelection(getDefaultMapPoolNames());
+    resetFinalMapPoolSelection();
     initializeAuthUI();
     hydratePulseFromState(getPulseState());
     await handleRouteChange();
@@ -2204,6 +2400,58 @@ async function handleRegistration(event) {
       true
     );
     return;
+  }
+
+  const qualifyCount = Number(currentTournamentMeta?.circuitQualifyCount);
+  if (
+    currentTournamentMeta?.isCircuitFinal &&
+    Number.isFinite(qualifyCount) &&
+    qualifyCount > 0
+  ) {
+    const circuitSlug = currentTournamentMeta?.circuitSlug || "";
+    if (!circuitSlug) {
+      setStatus(
+        statusEl,
+        "Circuit leaderboard is unavailable for this finals event.",
+        true
+      );
+      return;
+    }
+    const circuitMeta = await fetchCircuitMeta(circuitSlug);
+    if (!circuitMeta) {
+      setStatus(
+        statusEl,
+        "Circuit leaderboard is unavailable for this finals event.",
+        true
+      );
+      return;
+    }
+    let leaderboard = null;
+    try {
+      ({ leaderboard } = await buildCircuitLeaderboard(circuitMeta, [], { excludeSlug: currentSlug }));
+    } catch (err) {
+      console.error("Failed to load circuit leaderboard", err);
+    }
+    if (!leaderboard) {
+      setStatus(statusEl, "Circuit leaderboard is unavailable.", true);
+      return;
+    }
+    if (!leaderboard.length) {
+      setStatus(statusEl, "Circuit leaderboard is empty.", true);
+      return;
+    }
+    const key = playerKey(name, sc2LinkInput);
+    const qualified = leaderboard
+      .slice(0, qualifyCount)
+      .some((entry) => entry.key === key);
+    if (!qualified) {
+      setStatus(
+        statusEl,
+        `You must be in the top ${qualifyCount} of the circuit leaderboard to register.`,
+        true
+      );
+      return;
+    }
   }
 
   if (!race) {

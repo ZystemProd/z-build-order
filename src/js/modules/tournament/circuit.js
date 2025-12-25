@@ -337,6 +337,54 @@ function openCircuitPointsModal(entries, meta) {
   modal.style.display = "flex";
 }
 
+export async function buildCircuitLeaderboard(meta, slugs = [], { excludeSlug } = {}) {
+  const base = Array.isArray(slugs) && slugs.length ? slugs : normalizeCircuitTournamentSlugs(meta);
+  const filtered = base
+    .map((slug) => String(slug || "").trim())
+    .filter(Boolean)
+    .filter((slug) => (excludeSlug ? slug !== excludeSlug : true));
+  if (!filtered.length) {
+    return { leaderboard: [], slugs: [] };
+  }
+  const states = await Promise.all(filtered.map((slug) => loadTournamentStateRemote(slug)));
+  const totals = new Map();
+  states.forEach((snapshot, idx) => {
+    if (!snapshot) return;
+    const tournamentSlug = filtered[idx];
+    const players = Array.isArray(snapshot.players) ? snapshot.players : [];
+    players.forEach((player) => {
+      const key = playerKey(player.name, player.sc2Link);
+      if (!key) return;
+      const playerPoints = Number(player.points);
+      const ledgerPoints = Number(snapshot.pointsLedger?.[key]);
+      const useLedger = Number.isFinite(ledgerPoints);
+      const rawPoints = useLedger ? ledgerPoints : playerPoints;
+      const points = Number.isFinite(rawPoints) ? rawPoints : 0;
+      const entry = totals.get(key) || {
+        name: player.name || "Unknown",
+        points: 0,
+        tournaments: new Set(),
+      };
+      entry.points += points;
+      if (tournamentSlug) entry.tournaments.add(tournamentSlug);
+      if (!entry.name && player.name) entry.name = player.name;
+      totals.set(key, entry);
+    });
+  });
+  const leaderboard = Array.from(totals.entries())
+    .map(([key, entry]) => {
+      const override = Number(meta?.pointsOverrides?.[key]);
+      return {
+        key,
+        name: entry.name,
+        points: Number.isFinite(override) ? override : entry.points,
+        tournaments: entry.tournaments.size,
+      };
+    })
+    .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
+  return { leaderboard, slugs: filtered };
+}
+
 export async function renderCircuitLeaderboard(meta, slugs = [], { showEdit = false } = {}) {
   const body = document.getElementById("circuitLeaderboardBody");
   const note = document.getElementById("circuitLeaderboardNote");
@@ -353,44 +401,14 @@ export async function renderCircuitLeaderboard(meta, slugs = [], { showEdit = fa
     return;
   }
   try {
-    const states = await Promise.all(
-      slugs.map((slug) => loadTournamentStateRemote(slug))
-    );
-    const totals = new Map();
-    states.forEach((snapshot, idx) => {
-      if (!snapshot) return;
-      const tournamentSlug = slugs[idx];
-      const players = Array.isArray(snapshot.players) ? snapshot.players : [];
-      players.forEach((player) => {
-        const key = playerKey(player.name, player.sc2Link);
-        if (!key) return;
-        const playerPoints = Number(player.points);
-        const ledgerPoints = Number(snapshot.pointsLedger?.[key]);
-        const useLedger = Number.isFinite(ledgerPoints);
-        const rawPoints = useLedger ? ledgerPoints : playerPoints;
-        const points = Number.isFinite(rawPoints) ? rawPoints : 0;
-        const entry = totals.get(key) || {
-          name: player.name || "Unknown",
-          points: 0,
-          tournaments: new Set(),
-        };
-        entry.points += points;
-        if (tournamentSlug) entry.tournaments.add(tournamentSlug);
-        if (!entry.name && player.name) entry.name = player.name;
-        totals.set(key, entry);
-      });
-    });
-    const leaderboard = Array.from(totals.entries())
-      .map(([key, entry]) => {
-        const override = Number(meta?.pointsOverrides?.[key]);
-        return {
-          key,
-          name: entry.name,
-          points: Number.isFinite(override) ? override : entry.points,
-          tournaments: entry.tournaments.size,
-        };
-      })
-      .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
+    const { leaderboard, slugs: usedSlugs } = await buildCircuitLeaderboard(meta, slugs);
+    if (!usedSlugs.length) {
+      body.innerHTML = `<tr><td colspan="4" class="helper">No tournaments yet.</td></tr>`;
+      if (note) note.textContent = "Add tournaments to build the leaderboard.";
+      if (statPlayers) statPlayers.textContent = "0";
+      if (editBtn) editBtn.disabled = true;
+      return;
+    }
     if (!leaderboard.length) {
       body.innerHTML = `<tr><td colspan="4" class="helper">No players yet.</td></tr>`;
       if (note) note.textContent = "Points will appear after tournaments log players.";
@@ -426,7 +444,7 @@ export async function renderCircuitLeaderboard(meta, slugs = [], { showEdit = fa
       editBtn.onclick = () => openCircuitPointsModal(editEntries, meta);
     }
     if (statPlayers) statPlayers.textContent = String(leaderboard.length);
-    if (note) note.textContent = `Totals across ${slugs.length} tournaments.`;
+    if (note) note.textContent = `Totals across ${usedSlugs.length} tournaments.`;
   } catch (err) {
     console.error("Failed to load circuit leaderboard", err);
     body.innerHTML = `<tr><td colspan="4" class="helper">Failed to load leaderboard.</td></tr>`;
@@ -454,10 +472,44 @@ export async function populateCreateCircuitForm() {
   const nameInput = document.getElementById("circuitNameInput");
   const slugInput = document.getElementById("circuitSlugInput");
   const descInput = document.getElementById("circuitDescriptionInput");
+  const finalNameInput = document.getElementById("finalTournamentNameInput");
+  const finalSlugInput = document.getElementById("finalTournamentSlugInput");
+  const finalDescInput = document.getElementById("finalTournamentDescriptionInput");
+  const finalRulesInput = document.getElementById("finalTournamentRulesInput");
+  const finalStartInput = document.getElementById("finalTournamentStartInput");
+  const finalMaxPlayersInput = document.getElementById("finalTournamentMaxPlayersInput");
+  const finalCheckInHoursInput = document.getElementById("finalCheckInHoursInput");
+  const finalCheckInMinutesInput = document.getElementById("finalCheckInMinutesInput");
+  const finalImageInput = document.getElementById("finalTournamentImageInput");
+  const finalImagePreview = document.getElementById("finalTournamentImagePreview");
+  const finalQualifyInput = document.getElementById("finalQualifyCountInput");
   if (nameInput) nameInput.value = "";
   if (descInput) descInput.value = "";
   if (slugInput && !slugInput.value) {
     slugInput.value = await generateCircuitSlug();
+  }
+  if (finalNameInput) finalNameInput.value = "";
+  if (finalDescInput) finalDescInput.value = "";
+  if (finalRulesInput) finalRulesInput.value = "";
+  if (finalStartInput) finalStartInput.value = "";
+  if (finalMaxPlayersInput) finalMaxPlayersInput.value = "";
+  if (finalCheckInHoursInput) finalCheckInHoursInput.value = "";
+  if (finalCheckInMinutesInput) finalCheckInMinutesInput.value = "";
+  if (finalQualifyInput) finalQualifyInput.value = "";
+  if (finalImageInput) finalImageInput.value = "";
+  if (finalImagePreview) {
+    if (finalImagePreview.dataset.tempPreview) {
+      try {
+        URL.revokeObjectURL(finalImagePreview.dataset.tempPreview);
+      } catch (_) {}
+    }
+    finalImagePreview.removeAttribute("src");
+    finalImagePreview.style.display = "none";
+    delete finalImagePreview.dataset.tempPreview;
+  }
+  if (finalSlugInput && slugInput) {
+    const baseSlug = (slugInput.value || "").trim().toLowerCase();
+    finalSlugInput.value = baseSlug ? `${baseSlug}-final` : "";
   }
   updateCircuitSlugPreview();
 }

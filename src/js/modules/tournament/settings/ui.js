@@ -3,7 +3,11 @@ import { normalizeRoundRobinSettings } from "../bracket/build.js";
 
 export function syncFormatFieldVisibility(scope) {
   const selectId =
-    scope === "settings" ? "settingsFormatSelect" : "tournamentFormatSelect";
+    scope === "settings"
+      ? "settingsFormatSelect"
+      : scope === "final"
+      ? "finalFormatSelect"
+      : "tournamentFormatSelect";
   const value = document.getElementById(selectId)?.value || "";
   const isRR = (value || "").toLowerCase().startsWith("round robin");
   const rrBlocks = document.querySelectorAll(
@@ -38,6 +42,13 @@ export function extractRoundRobinSettings(scope, defaultRoundRobinSettings) {
           advance: "settingsRoundRobinAdvance",
           playoffs: "settingsRoundRobinPlayoffs",
           bestOf: "settingsRoundRobinBestOf",
+        }
+      : scope === "final"
+      ? {
+          groups: "finalRoundRobinGroupsInput",
+          advance: "finalRoundRobinAdvanceInput",
+          playoffs: "finalRoundRobinPlayoffsSelect",
+          bestOf: "finalRoundRobinBestOfInput",
         }
       : {
           groups: "roundRobinGroupsInput",

@@ -426,6 +426,12 @@
             <label>Max players
               <input type="number" id="settingsMaxPlayersInput" min="2" max="512" placeholder="32" />
             </label>
+            <div id="settingsCircuitQualifyRow" style="display:none;">
+              <label>Final qualifiers from circuit leaderboard
+                <input type="number" id="settingsCircuitQualifyCount" min="0" placeholder="8" />
+              </label>
+              <p class="helper">Only the top N on the circuit leaderboard can register for finals.</p>
+            </div>
             <label>Check-in opens (before start)
               <div class="inline-row">
                 <input type="number" id="settingsCheckInHoursInput" min="0" placeholder="0" />
@@ -1045,24 +1051,286 @@
           <button class="cta primary" id="saveCircuitBtn">Create</button>
         </div>
       </div>
-      <label>Circuit name
-        <input type="text" id="circuitNameInput" placeholder="Monthly Challenger Circuit" />
-      </label>
-      <label>Custom URL slug
-        <div class="inline-row">
-          <span class="muted">https://zbuildorder.com/tournament/</span>
-          <div class="slug-input-wrapper">
-            <input type="text" id="circuitSlugInput" placeholder="challenger-circuit" />
-            <button type="button" class="icon-btn slug-generate-btn" id="generateCircuitSlugBtn"
-              aria-label="Generate random slug">↻</button>
+      <div class="settings-tabs" id="createCircuitTabs">
+        <button class="settings-tab-btn active" data-create-circuit-tab="createCircuitGeneral">Circuit</button>
+        <button class="settings-tab-btn" data-create-circuit-tab="createFinalGeneral">Final General</button>
+        <button class="settings-tab-btn" data-create-circuit-tab="createFinalDesc">Final Description &amp; Rules</button>
+        <button class="settings-tab-btn" data-create-circuit-tab="createFinalMaps">Final Maps</button>
+        <button class="settings-tab-btn" data-create-circuit-tab="createFinalFormat">Final Format</button>
+      </div>
+      <div class="settings-panel active" id="createCircuitGeneral">
+        <label>Circuit name
+          <input type="text" id="circuitNameInput" placeholder="Monthly Challenger Circuit" />
+        </label>
+        <label>Custom URL slug
+          <div class="inline-row">
+            <span class="muted">https://zbuildorder.com/tournament/</span>
+            <div class="slug-input-wrapper">
+              <input type="text" id="circuitSlugInput" placeholder="challenger-circuit" />
+              <button type="button" class="icon-btn slug-generate-btn" id="generateCircuitSlugBtn"
+                aria-label="Generate random slug">↻</button>
+            </div>
+          </div>
+          <p class="helper" id="circuitSlugPreview"></p>
+        </label>
+        <label>Description
+          <textarea id="circuitDescriptionInput" class="markdown-input" rows="6"
+            placeholder="What makes this circuit special?"></textarea>
+        </label>
+      </div>
+      <div class="settings-panel" id="createFinalGeneral">
+        <label>Final tournament name
+          <input type="text" id="finalTournamentNameInput" placeholder="Circuit Finals" />
+        </label>
+        <label>Custom URL slug
+          <div class="inline-row">
+            <span class="muted">https://zbuildorder.com/tournament/</span>
+            <div class="slug-input-wrapper">
+              <input type="text" id="finalTournamentSlugInput" placeholder="circuit-finals" />
+              <button type="button" class="icon-btn slug-generate-btn" id="generateFinalSlugBtn"
+                aria-label="Generate random slug">↻</button>
+            </div>
+          </div>
+          <p class="helper" id="finalSlugPreview"></p>
+        </label>
+        <label>Start time
+          <input type="datetime-local" id="finalTournamentStartInput" class="datetime-input" />
+        </label>
+        <label>Max players
+          <input type="number" id="finalTournamentMaxPlayersInput" min="2" max="512" placeholder="16" />
+        </label>
+        <label>Qualify from leaderboard
+          <input type="number" id="finalQualifyCountInput" min="0" placeholder="8" />
+        </label>
+        <p class="helper">Only the top N on the circuit leaderboard can register for finals.</p>
+        <label>Check-in opens (before start)
+          <div class="inline-row">
+            <input type="number" id="finalCheckInHoursInput" min="0" placeholder="0" />
+            <span class="muted">hours</span>
+            <input type="number" id="finalCheckInMinutesInput" min="0" max="59" placeholder="0" />
+            <span class="muted">min</span>
+          </div>
+        </label>
+        <label>Cover image
+          <div class="image-upload">
+            <input type="file" id="finalTournamentImageInput" accept="image/*" />
+            <div class="image-preview">
+              <img id="finalTournamentImagePreview" alt="Finals cover preview" />
+            </div>
+            <p class="helper">Recommended 1200x630. JPG/PNG/WebP.</p>
+          </div>
+        </label>
+      </div>
+      <div class="settings-panel" id="createFinalDesc">
+        <label>Description
+          <div class="markdown-editor">
+            <div class="markdown-toolbar">
+              <button type="button" class="toolbar-btn" data-final-desc-action="heading">H2</button>
+              <button type="button" class="toolbar-btn" data-final-desc-action="bold"><strong>B</strong></button>
+              <button type="button" class="toolbar-btn" data-final-desc-action="italic"><em>I</em></button>
+              <button type="button" class="toolbar-btn" data-final-desc-action="bullet">- List</button>
+              <button type="button" class="toolbar-btn" data-final-desc-action="numbered">1. List</button>
+              <button type="button" class="toolbar-btn" data-final-desc-action="quote">" "</button>
+              <button type="button" class="toolbar-btn" data-final-desc-action="link">Link</button>
+              <button type="button" class="toolbar-btn" data-final-desc-action="image">Image</button>
+              <button type="button" class="toolbar-btn" data-final-desc-action="code">&lt;/&gt;</button>
+            </div>
+            <textarea id="finalTournamentDescriptionInput" class="markdown-input" rows="10"
+              placeholder="Write rules, schedule, map pool..."></textarea>
+          </div>
+        </label>
+        <label>Rules
+          <div class="markdown-editor">
+            <div class="markdown-toolbar">
+              <button type="button" class="toolbar-btn" data-final-rules-action="heading">H2</button>
+              <button type="button" class="toolbar-btn" data-final-rules-action="bold"><strong>B</strong></button>
+              <button type="button" class="toolbar-btn" data-final-rules-action="italic"><em>I</em></button>
+              <button type="button" class="toolbar-btn" data-final-rules-action="bullet">- List</button>
+              <button type="button" class="toolbar-btn" data-final-rules-action="numbered">1. List</button>
+              <button type="button" class="toolbar-btn" data-final-rules-action="quote">" "</button>
+              <button type="button" class="toolbar-btn" data-final-rules-action="link">Link</button>
+              <button type="button" class="toolbar-btn" data-final-rules-action="image">Image</button>
+              <button type="button" class="toolbar-btn" data-final-rules-action="code">&lt;/&gt;</button>
+            </div>
+            <textarea id="finalTournamentRulesInput" class="markdown-input" rows="10"
+              placeholder="Add eligibility, format, communication, and fair play rules..."></textarea>
+          </div>
+        </label>
+        <div class="markdown-preview">
+          <p class="eyebrow">Description Preview</p>
+          <div id="finalTournamentDescriptionPreview" class="helper"></div>
+        </div>
+        <div class="markdown-preview">
+          <p class="eyebrow">Rules Preview</p>
+          <div id="finalTournamentRulesPreview" class="helper"></div>
+        </div>
+      </div>
+      <div class="settings-panel" id="createFinalMaps">
+        <div class="map-pool-picker">
+          <div class="picker-header">
+            <div>
+              <p class="eyebrow">Maps</p>
+              <h4>Chosen map pool</h4>
+            </div>
+            <div class="picker-actions">
+              <button type="button" class="cta small ghost" id="finalUseLadderMapsBtn">All ladder maps</button>
+              <button type="button" class="cta small subtle" id="finalClearMapPoolBtn">Custom</button>
+            </div>
+          </div>
+          <div id="finalChosenMapList" class="map-pool-grid chosen-grid"></div>
+          <div class="picker-header" style="margin-top:12px;">
+            <div>
+              <h4>All 1v1 maps</h4>
+              <p class="helper">Click to add/remove. Includes current + archive.</p>
+            </div>
+          </div>
+          <div id="finalMapPoolPicker" class="map-pool-grid selectable"></div>
+        </div>
+      </div>
+      <div class="settings-panel" id="createFinalFormat">
+        <label>Format
+          <select id="finalFormatSelect">
+            <option value="Double Elimination">Double Elimination</option>
+            <option value="Single Elimination">Single Elimination</option>
+            <option value="Round Robin">Round Robin</option>
+            <option value="Swiss">Swiss</option>
+          </select>
+        </label>
+        <div class="inline-row" data-format-scope="final-roundrobin">
+          <label style="flex:1;">Number of groups
+            <input type="number" id="finalRoundRobinGroupsInput" min="1" />
+          </label>
+          <label style="flex:1;">Advance per group
+            <input type="number" id="finalRoundRobinAdvanceInput" min="0" />
+          </label>
+          <label style="flex:1;">Playoffs
+            <select id="finalRoundRobinPlayoffsSelect">
+              <option value="Double Elimination">Double Elimination</option>
+              <option value="Single Elimination">Single Elimination</option>
+              <option value="None">None</option>
+            </select>
+          </label>
+          <label style="flex:1;">Group best of
+            <select id="finalRoundRobinBestOfInput">
+              <option value="1">Bo1</option>
+              <option value="3">Bo3</option>
+              <option value="5">Bo5</option>
+            </select>
+          </label>
+        </div>
+        <div class="format-diagram">
+          <div class="format-row format-row--upper">
+            <div class="format-col format-col--upper-main">
+              <div class="format-title">Upper bracket</div>
+              <div class="format-box format-box--big format-box--upper"></div>
+              <label class="format-input">
+                Best of
+                <select id="finalBestOfUpperInput">
+                  <option value="1">Bo1</option>
+                  <option value="3">Bo3</option>
+                  <option value="5">Bo5</option>
+                  <option value="7">Bo7</option>
+                  <option value="9">Bo9</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="format-col format-col--quarter">
+              <div class="format-title">Quarterfinals</div>
+              <div class="format-box format-box--big format-box--qf"></div>
+              <label class="format-input">
+                Best of
+                <select id="finalBestOfQuarterInput">
+                  <option value="1">Bo1</option>
+                  <option value="3">Bo3</option>
+                  <option value="5">Bo5</option>
+                  <option value="7">Bo7</option>
+                  <option value="9">Bo9</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="format-col format-col--semi">
+              <div class="format-title">Semi-finals</div>
+              <div class="format-box format-box--medium format-box--semi"></div>
+              <label class="format-input">
+                Best of
+                <select id="finalBestOfSemiInput">
+                  <option value="1">Bo1</option>
+                  <option value="3">Bo3</option>
+                  <option value="5">Bo5</option>
+                  <option value="7">Bo7</option>
+                  <option value="9">Bo9</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="format-col format-col--final">
+              <div class="format-title">Finals</div>
+              <div class="format-box format-box--medium format-box--final"></div>
+              <label class="format-input">
+                Best of
+                <select id="finalBestOfFinalInput">
+                  <option value="1">Bo1</option>
+                  <option value="3">Bo3</option>
+                  <option value="5">Bo5</option>
+                  <option value="7">Bo7</option>
+                  <option value="9">Bo9</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <div class="format-row format-row--lower">
+            <div class="format-col format-col--lower-main">
+              <div class="format-title">Lower bracket</div>
+              <div class="format-box format-box--big format-box--lower"></div>
+              <label class="format-input">
+                Best of
+                <select id="finalBestOfLowerInput">
+                  <option value="1">Bo1</option>
+                  <option value="3">Bo3</option>
+                  <option value="5">Bo5</option>
+                  <option value="7">Bo7</option>
+                  <option value="9">Bo9</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="format-col format-col--lb-extra">
+              <div class="format-title">LB Semi-finals</div>
+              <div class="format-box format-box--medium format-box--lb-semi"></div>
+              <label class="format-input">
+                Best of
+                <select id="finalBestOfLowerSemiInput">
+                  <option value="1">Bo1</option>
+                  <option value="3">Bo3</option>
+                  <option value="5">Bo5</option>
+                  <option value="7">Bo7</option>
+                  <option value="9">Bo9</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="format-col format-col--lb-extra">
+              <div class="format-title">LB Finals</div>
+              <div class="format-box format-box--medium format-box--lb-final"></div>
+              <label class="format-input">
+                Best of
+                <select id="finalBestOfLowerFinalInput">
+                  <option value="1">Bo1</option>
+                  <option value="3">Bo3</option>
+                  <option value="5">Bo5</option>
+                  <option value="7">Bo7</option>
+                  <option value="9">Bo9</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="format-col format-col--spacer"></div>
           </div>
         </div>
-        <p class="helper" id="circuitSlugPreview"></p>
-      </label>
-      <label>Description
-        <textarea id="circuitDescriptionInput" class="markdown-input" rows="6"
-          placeholder="What makes this circuit special?"></textarea>
-      </label>
+      </div>
       <div class="form-actions">
         <button class="cta subtle" id="closeCreateCircuit">Cancel</button>
       </div>
