@@ -7,10 +7,25 @@ export function renderSeedingTable(
   const body = document.getElementById("playersTableBody");
   if (!body) return;
 
+  const normalizeInviteStatus = (status) => {
+    const normalized = (status || "").toLowerCase();
+    if (normalized === "pending" || normalized === "denied" || normalized === "accepted") {
+      return normalized;
+    }
+    return "accepted";
+  };
+
   const rows = (players || []).map((p, idx) => {
     const seed = idx + 1;
     const name = escapeHtml(p.name || "Unknown");
     const race = (p.race || "").trim();
+    const inviteStatus = normalizeInviteStatus(p.inviteStatus);
+    const statusLabel =
+      inviteStatus === "pending"
+        ? "Pending"
+        : inviteStatus === "denied"
+        ? "Denied"
+        : "Accepted";
     const points = Number.isFinite(p.points) ? p.points : 0;
     const mmr = Number.isFinite(p.mmr) ? Math.round(p.mmr) : null;
     const pulseLink = p.sc2Link || "";
@@ -18,11 +33,14 @@ export function renderSeedingTable(
     const pulseHtml = pulseLink
       ? `<a href="${escapeHtml(pulseLink)}" target="_blank" rel="noopener">Link</a>`
       : "-";
+    const isInviteLocked = inviteStatus !== "accepted";
     const checkinPill = `<span class="checkin-pill ${p.checkedInAt ? "is-checked" : "is-missing"}">
         ${p.checkedInAt ? "Checked in" : "Not checked in"}
       </span>`;
     const checkInAction = isAdmin
-      ? `<div class="checkin-editor">
+      ? isInviteLocked
+        ? `<span class="helper">-</span>`
+        : `<div class="checkin-editor">
           <select
             class="checkin-select checkin-select-pill ${p.checkedInAt ? "is-checked" : "is-missing"}"
             data-player-id="${escapeHtml(p.id || "")}"
@@ -31,6 +49,8 @@ export function renderSeedingTable(
             <option value="not" ${p.checkedInAt ? "" : "selected"}>Not checked in</option>
           </select>
         </div>`
+      : isInviteLocked
+      ? `<span class="helper">-</span>`
       : checkinPill;
 
     return `
@@ -43,13 +63,16 @@ export function renderSeedingTable(
           </div>
         </td>
         <td>
+          <span class="seed-status ${inviteStatus}">${statusLabel}</span>
+        </td>
+        <td>
           <input
             type="number"
             class="points-input"
             data-player-id="${escapeHtml(p.id || "")}"
             value="${points}"
             min="0"
-            ${isLive ? "disabled" : ""}
+            ${isLive || isInviteLocked ? "disabled" : ""}
           />
         </td>
         <td>${mmr ?? "-"}</td>

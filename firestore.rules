@@ -216,6 +216,16 @@ service cloud.firestore {
       allow create, update, delete: if request.auth != null && request.auth.uid == uid;
     }
 
+    // ? USER NOTIFICATIONS
+    match /users/{userId}/notifications/{notificationId} {
+      allow get: if request.auth != null && request.auth.uid == userId;
+      allow list: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null
+        && request.resource.data.userId is string
+        && request.resource.data.userId == userId
+        && request.resource.data.senderUid == request.auth.uid;
+      allow update, delete: if request.auth != null && request.auth.uid == userId;
+    }
 
   }
 }

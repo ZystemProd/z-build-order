@@ -47,6 +47,20 @@
   <header class="tournament-header">
     <div class="tournament-shell tournament-header-inner">
       <div class="tournament-header-spacer"></div>
+      <div id="tournamentNotifications" class="tournament-notifications">
+        <button id="notificationTrigger" class="notification-trigger" type="button" aria-haspopup="true"
+          aria-expanded="false" aria-controls="notificationDropdown" aria-label="Open notifications">
+          <img src="img/SVG/bell.svg" alt="" class="notification-icon" />
+          <span id="notificationCount" class="notification-count" aria-hidden="true"></span>
+        </button>
+        <div id="notificationDropdown" class="notification-dropdown" style="display: none;">
+          <div class="notification-dropdown-header">
+            <span class="notification-dropdown-title">Notifications</span>
+            <button id="notificationViewAll" class="notification-view-all" type="button">View all</button>
+          </div>
+          <ul id="notificationList" class="notification-dropdown-list"></ul>
+        </div>
+      </div>
       <div id="auth-container" class="auth-inline">
         <div class="auth-info">
           <div id="authLoadingWrapper" class="auth-loading">
@@ -96,6 +110,28 @@
       </div>
     </div>
   </header>
+
+  <div id="notificationModal" class="modal" style="display: none;">
+    <div class="modal-content notification-modal">
+      <button id="closeNotificationModal" class="modal-close-button" type="button" aria-label="Close notifications">
+        ×
+      </button>
+      <div class="notification-modal-header">
+        <h3>Notifications</h3>
+      </div>
+      <div class="notification-modal-body">
+        <div class="notification-sidebar">
+          <div id="notificationSidebarList" class="notification-sidebar-list"></div>
+        </div>
+        <div class="notification-detail">
+          <p id="notificationDetailTitle" class="notification-detail-title"></p>
+          <p id="notificationDetailMeta" class="notification-detail-meta"></p>
+          <div id="notificationDetailBody" class="notification-detail-body"></div>
+          <div id="notificationDetailActions" class="notification-detail-actions"></div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <div id="usernameModal" class="modal" style="display: none">
     <div class="modal-content scrollable-modal">
@@ -376,7 +412,7 @@
               <span id="seedingNotice" class="badge warning" style="display:none;">Seeding changed - rebuild
                 needed</span>
               <button id="rebuildBracketBtn" class="cta small ghost">Go Live</button>
-              <button id="removeNotCheckedInBtn" class="cta small ghost">Remove not checked-in</button>
+              <button id="notifyCheckInBtn" class="cta small ghost">Notify check-in</button>
               <button id="resetTournamentBtn" class="cta small subtle">Reset tournament</button>
             </div>
           </div>
@@ -396,6 +432,7 @@
                 <tr>
                   <th>Seed</th>
                   <th>Player</th>
+                  <th>Status</th>
                   <th>Points</th>
                   <th>MMR</th>
                   <th>SC2Pulse</th>
@@ -770,7 +807,17 @@
       <div class="modal-title-row">
         <h3>Create tournament</h3>
         <div class="form-actions inline-actions">
-          <button class="cta primary" id="saveTournamentBtn">Create</button>
+          <div class="template-select cta primary">
+            <select id="tournamentTemplateSelect" aria-label="Tournament template">
+              <option value="" selected>Template</option>
+              <option value="__manager__">Template manager...</option>
+            </select>
+            <span class="template-select-caret">v</span>
+          </div>
+          <button class="cta primary template-manager-hide" id="saveTournamentBtn">Create</button>
+          <button class="cta primary template-manager-only" id="saveTournamentTemplateBtn" type="button">
+            Save template
+          </button>
         </div>
       </div>
       <div class="settings-tabs" id="createTabs">
@@ -780,10 +827,13 @@
         <button class="settings-tab-btn" data-create-tab="createFormat">Format</button>
       </div>
       <div class="settings-panel active" id="createGeneral">
+        <label class="template-manager-only">Template name <span class="required">*</span>
+          <input type="text" id="tournamentTemplateNameInput" placeholder="Weekly cup settings" />
+        </label>
         <label>Tournament name <span class="required">*</span>
           <input type="text" id="tournamentNameInput" placeholder="My Weekly Cup" required />
         </label>
-        <label>Custom URL slug
+        <label class="template-manager-hide">Custom URL slug
           <div class="inline-row">
             <span class="muted">https://zbuildorder.com/tournament/</span>
             <div class="slug-input-wrapper">
@@ -794,7 +844,7 @@
           </div>
           <p class="helper" id="slugStatus"></p>
         </label>
-        <label>Start time
+        <label class="template-manager-hide">Start time
           <div class="datetime-row">
             <input type="text" id="tournamentStartInput" class="datetime-input" placeholder="YYYY-MM-DD HH:MM" />
             <button type="button" class="icon-btn datepicker-btn" data-datepicker-for="tournamentStartInput"
@@ -832,13 +882,6 @@
             <p class="helper">Recommended 1200x630. JPG/PNG/WebP.</p>
           </div>
         </label>
-        <div id="circuitTournamentOptions" style="display:none;">
-          <p class="helper">Circuit: <span id="circuitSlugLabel"></span></p>
-          <label class="checkbox-row">
-            <input type="checkbox" id="circuitFinalToggle" />
-            Mark as the final circuit event
-          </label>
-        </div>
       </div>
       <div class="settings-panel" id="createDesc">
         <label>Description
@@ -1053,6 +1096,30 @@
       <div class="form-actions create-modal-footer">
         <button class="cta subtle" id="closeCreateTournament">Cancel</button>
       </div>
+    </div>
+  </div>
+
+  <div id="tournamentTemplateModal" class="modal create-modal" style="display:none;">
+    <div class="template-manager-layout">
+      <aside class="template-manager-sidebar">
+        <div class="template-manager-sidebar-header">
+          <h3>Template manager</h3>
+          <button class="icon-btn" id="closeTournamentTemplateModal" aria-label="Close template manager">×</button>
+        </div>
+        <button class="cta small ghost" id="newTournamentTemplateBtn" type="button">
+          New template
+        </button>
+        <div class="template-manager-list" id="tournamentTemplateList"></div>
+        <p class="helper template-manager-empty" id="tournamentTemplateEmpty">
+          No templates saved yet.
+        </p>
+        <div class="template-manager-actions">
+          <button class="cta small danger" id="deleteTournamentTemplateBtn" type="button">
+            Delete template
+          </button>
+        </div>
+      </aside>
+      <div class="template-manager-main" id="tournamentTemplateMain"></div>
     </div>
   </div>
 

@@ -1220,20 +1220,6 @@ async function renderManageTab(tab, clan) {
         // Delete Firestore document
         await deleteDoc(doc(db, "clans", clan.id));
 
-        // Clean up any related notifications
-        const notifQuery = query(
-          collection(db, "notifications"),
-          where("clanId", "==", clan.id)
-        );
-        try {
-          const notifSnap = await getDocs(notifQuery);
-          notifSnap.forEach(async (docSnap) => {
-            await deleteDoc(docSnap.ref).catch(() => {});
-          });
-        } catch (err) {
-          console.warn("Skipping notification cleanup:", err.message);
-        }
-
         // Clean up storage if a logo was uploaded
         if (clan.logoUrl && clan.logoUrl.includes("clanLogos")) {
           const logoPath = `clanLogos/${clan.id}/logo.webp`;

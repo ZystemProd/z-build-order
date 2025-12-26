@@ -209,6 +209,20 @@ import {
   readBestOf,
 } from "./tournamentPayloads.js";
 import { createAdminPlayerSearch } from "./admin/addSearchPlayer.js";
+import {
+  INVITE_STATUS,
+  normalizeInviteStatus,
+  isInviteAccepted,
+  getEligiblePlayers,
+  seedEligiblePlayers,
+  applyRosterSeeding,
+} from "./rosterSeeding.js";
+import {
+  handleTournamentInviteAction,
+  handleTournamentCheckInAction,
+  sendTournamentCheckInNotifications,
+  sendTournamentInviteNotification,
+} from "./invites.js";
 const renderMapPoolPicker = renderMapPoolPickerUI;
 const CURRENT_BRACKET_LAYOUT_VERSION = 54;
 const MAX_TOURNAMENT_IMAGE_SIZE = 12 * 1024 * 1024;
@@ -258,7 +272,7 @@ function syncFromRemote(incoming) {
   setStateObj({
     ...defaultState,
     ...incoming,
-    players: applySeeding(incoming.players || []),
+    players: applyRosterSeeding(incoming.players || []),
     pointsLedger: incoming.pointsLedger || {},
     activity: incoming.activity || [],
     bracket: deserializeBracket(incoming.bracket),
@@ -359,7 +373,10 @@ function handleApplyCircuitPoints(event) {
 
 function renderAll() {
   // Update seeding table
-  renderSeedingTable(applySeeding(state.players || []), {
+  const seedingSnapshot = applySeeding(
+    (state.players || []).map((player) => ({ ...player }))
+  );
+  renderSeedingTable(seedingSnapshot, {
     isLive: state.isLive,
     isAdmin,
   });
@@ -371,7 +388,7 @@ function renderAll() {
     const statPlayers = document.getElementById("statPlayers");
     const registerBtn = document.getElementById("registerBtn");
     const goLiveBtn = document.getElementById("rebuildBracketBtn");
-    const removeNotCheckedInBtn = document.getElementById("removeNotCheckedInBtn");
+    const notifyCheckInBtn = document.getElementById("notifyCheckInBtn");
     const startMs = getStartTimeMs(currentTournamentMeta);
     const liveDot = document.getElementById("liveDot");
     const bracketGrid = document.getElementById("bracketGrid");
@@ -382,6 +399,8 @@ function renderAll() {
     const currentPlayer = currentUid
       ? (state.players || []).find((p) => p.uid === currentUid)
       : null;
+    const currentInviteStatus = normalizeInviteStatus(currentPlayer?.inviteStatus);
+    const eligiblePlayers = getEligiblePlayers(state.players || []);
 
     if (tournamentTitle) {
       tournamentTitle.textContent = currentTournamentMeta.name || "Tournament";
@@ -400,11 +419,17 @@ function renderAll() {
           })
         : "TBD";
     }
-    if (statPlayers) statPlayers.textContent = String(state.players?.length || 0);
+    if (statPlayers) statPlayers.textContent = String(eligiblePlayers.length || 0);
 
     if (registerBtn) {
       if (state.isLive) {
         registerBtn.textContent = "Registration closed";
+        registerBtn.disabled = true;
+      } else if (currentPlayer && currentInviteStatus === INVITE_STATUS.pending) {
+        registerBtn.textContent = "Invitation pending";
+        registerBtn.disabled = true;
+      } else if (currentPlayer && currentInviteStatus === INVITE_STATUS.denied) {
+        registerBtn.textContent = "Invite declined";
         registerBtn.disabled = true;
       } else if (currentPlayer) {
         registerBtn.textContent = "Unregister";
@@ -419,8 +444,11 @@ function renderAll() {
       goLiveBtn.disabled = state.isLive;
       goLiveBtn.textContent = state.isLive ? "Live" : "Go Live";
     }
-    if (removeNotCheckedInBtn) {
-      removeNotCheckedInBtn.disabled = state.isLive;
+    if (notifyCheckInBtn) {
+      const checkInState = getCheckInWindowState(currentTournamentMeta);
+      const eligibleNotCheckedIn = eligiblePlayers.filter((p) => !p.checkedInAt);
+      notifyCheckInBtn.disabled =
+        state.isLive || !checkInState.isOpen || eligibleNotCheckedIn.length === 0;
     }
 
     updateCheckInUI();
@@ -435,7 +463,7 @@ function renderAll() {
         bracketGrid.style.display = "none";
         bracketNotLive.style.display = "block";
         if (registeredPlayersList) {
-          const items = (state.players || []).map((p) => {
+          const items = eligiblePlayers.map((p) => {
             const name = escapeHtml(p.name || "Unknown");
             const race = (p.race || "").trim();
             const raceClass = raceClassName(race);
@@ -542,6 +570,10 @@ function checkInCurrentPlayer() {
     showToast?.("Register before checking in.", "error");
     return;
   }
+  if (!isInviteAccepted(players[idx])) {
+    showToast?.("Respond to your invite before checking in.", "error");
+    return;
+  }
   if (players[idx].checkedInAt) {
     showToast?.("You are already checked in.", "success");
     return;
@@ -554,21 +586,50 @@ function checkInCurrentPlayer() {
   renderAll();
 }
 
-function removeNotCheckedInPlayers() {
+async function notifyCheckInPlayers() {
+  if (!isAdmin) {
+    showToast?.("Only admins can send check-in reminders.", "error");
+    return;
+  }
+  if (!currentTournamentMeta) {
+    showToast?.("Tournament data not loaded yet.", "error");
+    return;
+  }
+  const checkInState = getCheckInWindowState(currentTournamentMeta);
+  if (!checkInState.isOpen) {
+    showToast?.("Check-in is not open yet.", "error");
+    return;
+  }
   if (state.isLive) {
-    showToast?.("Tournament is live. Seeding is locked.", "error");
+    showToast?.("Tournament is live. Check-in is closed.", "error");
     return;
   }
-  const players = state.players || [];
-  const remaining = players.filter((p) => p.checkedInAt);
-  const removedCount = players.length - remaining.length;
-  if (!removedCount) {
-    showToast?.("No players to remove.", "success");
+  const targetSlug = currentSlug || currentTournamentMeta.slug || currentTournamentMeta.id || "";
+  if (!targetSlug) {
+    showToast?.("Missing tournament slug.", "error");
     return;
   }
-  saveState({ players: remaining, needsReseed: true });
-  rebuildBracket(true, "Removed unchecked-in players");
-  addActivity(`Removed ${removedCount} unchecked-in player(s).`);
+  const eligiblePlayers = getEligiblePlayers(state.players || []).filter(
+    (player) => player?.uid && !player.checkedInAt
+  );
+  if (!eligiblePlayers.length) {
+    showToast?.("All eligible players are checked in.", "success");
+    return;
+  }
+  try {
+    await sendTournamentCheckInNotifications({
+      db,
+      auth,
+      getCurrentUsername,
+      players: eligiblePlayers,
+      tournamentMeta: currentTournamentMeta,
+      slug: targetSlug,
+    });
+    showToast?.("Check-in notifications sent.", "success");
+  } catch (err) {
+    console.error("Failed to send check-in notifications", err);
+    showToast?.("Failed to send check-in notifications.", "error");
+  }
 }
 
 function goLiveTournament() {
@@ -576,7 +637,9 @@ function goLiveTournament() {
     showToast?.("Tournament is already live.", "success");
     return;
   }
-  const checkedInPlayers = (state.players || []).filter((p) => p.checkedInAt);
+  const checkedInPlayers = getEligiblePlayers(state.players || []).filter(
+    (p) => p.checkedInAt
+  );
   if (!checkedInPlayers.length) {
     showToast?.("No checked-in players to go live.", "error");
     return;
@@ -641,6 +704,7 @@ function bracketHasRecordedResults(bracket) {
   return false;
 }
 
+
 function createOrUpdatePlayer(data) {
   if (!data) return null;
   const id =
@@ -679,6 +743,7 @@ function setPlayerCheckIn(id, shouldCheckIn) {
   if (!id) return;
   const players = (state.players || []).map((p) => {
     if (p.id !== id) return p;
+    if (!isInviteAccepted(p)) return p;
     if (shouldCheckIn) {
       return { ...p, checkedInAt: p.checkedInAt || Date.now() };
     }
@@ -728,17 +793,17 @@ function saveState(next = {}, options = {}) {
 }
 
 function rebuildBracket(force = false, reason = "") {
-  const seededPlayers = applySeeding(state.players || []);
-  setStateObj({ ...state, players: seededPlayers, needsReseed: false });
+  const { seededEligible, mergedPlayers } = seedEligiblePlayers(state.players || []);
+  setStateObj({ ...state, players: mergedPlayers, needsReseed: false });
   const isRoundRobin = (fmt) =>
     (fmt || "").toLowerCase().includes("round robin");
   const bracket = buildBracket(
-    seededPlayers,
+    seededEligible,
     currentTournamentMeta || {},
     isRoundRobin
   );
     saveState({
-      players: seededPlayers,
+      players: mergedPlayers,
       bracket,
       needsReseed: false,
       bracketLayoutVersion: CURRENT_BRACKET_LAYOUT_VERSION,
@@ -942,6 +1007,8 @@ async function populateCreateForm() {
   const imageInput = document.getElementById("tournamentImageInput");
   const imagePreview = document.getElementById("tournamentImagePreview");
   const checkInSelect = document.getElementById("checkInSelect");
+  const templateSelect = document.getElementById("tournamentTemplateSelect");
+  const templateNameInput = document.getElementById("tournamentTemplateNameInput");
   if (imageInput) imageInput.value = "";
   if (imagePreview) {
     imagePreview.removeAttribute("src");
@@ -949,8 +1016,14 @@ async function populateCreateForm() {
     delete imagePreview.dataset.tempPreview;
   }
   if (checkInSelect) checkInSelect.value = "0";
+  if (templateSelect) templateSelect.value = "";
+  if (templateNameInput) {
+    templateNameInput.value = "";
+    delete templateNameInput.dataset.templateId;
+  }
   setCreateTournamentCircuitContext("");
 }
+
 
 function setCreateTournamentCircuitContext(circuitSlug) {
   const modal = document.getElementById("createTournamentModal");
@@ -1132,7 +1205,7 @@ async function enterTournament(slug, options = {}) {
     backLink.href = circuitSlug ? `/tournament/${circuitSlug}` : "/tournament";
   }
   // Load local state for this slug
-  const local = loadLocalState(slug, applySeeding, deserializeBracket);
+  const local = loadLocalState(slug, applyRosterSeeding, deserializeBracket);
   setStateObj(local);
   // Try remote meta first
   try {
@@ -1163,7 +1236,7 @@ async function enterTournament(slug, options = {}) {
   // Hydrate remote state (merge) and render
   await hydrateStateFromRemote(
     slug,
-    applySeeding,
+    applyRosterSeeding,
     deserializeBracket,
     saveState,
     renderAll
@@ -1318,6 +1391,7 @@ function updateCheckInUI() {
   const currentPlayer = currentUid
     ? (state.players || []).find((p) => p.uid === currentUid)
     : null;
+  const inviteStatus = normalizeInviteStatus(currentPlayer?.inviteStatus);
 
   if (state.isLive || !getCheckInWindowMinutesFromMeta(currentTournamentMeta) || !startMs) {
     checkInBtn.style.display = "none";
@@ -1339,6 +1413,15 @@ function updateCheckInUI() {
     checkInBtn.style.display = "none";
     checkInStatus.textContent = "Register to check in.";
     checkInStatus.classList.add("is-open");
+    return;
+  }
+  if (inviteStatus !== INVITE_STATUS.accepted) {
+    checkInBtn.style.display = "none";
+    checkInStatus.textContent =
+      inviteStatus === INVITE_STATUS.pending
+        ? "Invite pending."
+        : "Invite declined.";
+    checkInStatus.classList.add("is-closed");
     return;
   }
 
@@ -1757,6 +1840,38 @@ onAuthStateChanged?.(auth, () => {
   recomputeCircuitAdminFromMeta();
 });
 
+document.addEventListener("tournament:notification-action", (event) => {
+  const detail = event.detail || {};
+  if (detail.notification?.type === "tournament-checkin") {
+    handleTournamentCheckInAction({
+      notification: detail.notification,
+      auth,
+      db,
+      currentSlug,
+      checkInLocal: checkInCurrentPlayer,
+      showToast,
+    });
+    return;
+  }
+  handleTournamentInviteAction({
+    notification: detail.notification,
+    action: detail.action,
+    race: detail.race,
+    auth,
+    db,
+    currentSlug,
+    state,
+    isLive: state.isLive,
+    setSeedingNotice,
+    saveState,
+    renderAll,
+    rebuildBracket,
+    seedEligiblePlayers,
+    bracketHasResults,
+    showToast,
+  });
+});
+
 document.addEventListener("DOMContentLoaded", async () => {
   window.addEventListener("popstate", async () => {
     try {
@@ -1830,7 +1945,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     cycleTestBracketCount,
     resetTournament,
     checkInCurrentPlayer,
-    removeNotCheckedInPlayers,
+    notifyCheckInPlayers,
     goLiveTournament,
   });
   initFinalAdminSearch();
@@ -2426,6 +2541,15 @@ async function handleRegistration(event) {
     (p) => p.uid === auth.currentUser?.uid
   );
   if (existingPlayer) {
+    const inviteStatus = normalizeInviteStatus(existingPlayer.inviteStatus);
+    if (inviteStatus === INVITE_STATUS.pending) {
+      setStatus(statusEl, "Your invite is still pending.", true);
+      return;
+    }
+    if (inviteStatus === INVITE_STATUS.denied) {
+      setStatus(statusEl, "Your invite was declined.", true);
+      return;
+    }
     const remaining = (state.players || []).filter(
       (p) => p.uid !== auth.currentUser?.uid
     );
@@ -2560,6 +2684,7 @@ async function handleRegistration(event) {
     sc2Link: sc2LinkInput,
     mmr: Number.isFinite(mmr) ? mmr : 0,
     points: startingPoints,
+    inviteStatus: INVITE_STATUS.accepted,
     avatarUrl,
     twitchUrl,
     secondaryPulseLinks,
@@ -2574,9 +2699,9 @@ async function handleRegistration(event) {
   });
 
   const hasCompletedMatches = bracketHasResults();
-  const seededPlayers = applySeeding(state.players);
+  const { mergedPlayers } = seedEligiblePlayers(state.players);
   const nextState = {
-    players: seededPlayers,
+    players: mergedPlayers,
     needsReseed: hasCompletedMatches,
   };
 
@@ -2623,7 +2748,7 @@ function renderFinalAdminSearchResults(results = []) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "cta small primary";
-    button.textContent = "Add";
+    button.textContent = "Invite";
     button.dataset.adminAddUsername = entry.username;
     if (entry.userId) {
       button.dataset.adminUserId = entry.userId;
@@ -2635,7 +2760,7 @@ function renderFinalAdminSearchResults(results = []) {
     );
     if (alreadyAdded) {
       button.disabled = true;
-      button.textContent = "Added";
+      button.textContent = "Invited";
     }
     row.append(label, button);
     resultsEl.append(row);
@@ -2705,12 +2830,17 @@ function initFinalAdminSearch() {
           console.warn("Could not fetch clan data", err);
         }
       }
+      const inviterName = getCurrentUsername?.() || "Tournament admin";
       const newPlayer = createOrUpdatePlayer({
         name: displayName,
         race,
         sc2Link,
         mmr,
         points: Number.isFinite(startingPoints) ? startingPoints : 0,
+        inviteStatus: INVITE_STATUS.pending,
+        invitedAt: Date.now(),
+        invitedByUid: auth.currentUser?.uid || "",
+        invitedByName: inviterName,
         avatarUrl,
         twitchUrl: userData?.twitchUrl || "",
         secondaryPulseLinks,
@@ -2723,20 +2853,25 @@ function initFinalAdminSearch() {
         pulseName: pulse.name || pulse.accountName || "",
         uid: userId,
       });
-      const hasCompletedMatches = bracketHasResults();
-      const seededPlayers = applySeeding(state.players);
-      saveState({
-        players: seededPlayers,
-        needsReseed: hasCompletedMatches,
-      });
-      addActivity(`Admin added ${newPlayer.name}.`);
-      if (!hasCompletedMatches) {
-        rebuildBracket(true, "Roster updated");
-      } else {
-        setSeedingNotice(true);
-        renderAll();
+      const { mergedPlayers } = seedEligiblePlayers(state.players);
+      saveState({ players: mergedPlayers });
+      addActivity(`Admin invited ${newPlayer.name}.`);
+      try {
+        await sendTournamentInviteNotification({
+          db,
+          auth,
+          getCurrentUsername,
+          userId,
+          playerName: newPlayer.name,
+          tournamentMeta: currentTournamentMeta,
+          slug: currentSlug,
+        });
+      } catch (err) {
+        console.error("Failed to send invite notification", err);
+        showToast?.("Invite created, but notification failed to send.", "error");
       }
-      showToast?.(`${newPlayer.name} added.`, "success");
+      renderAll();
+      showToast?.(`Invite sent to ${newPlayer.name}.`, "success");
     },
   });
 

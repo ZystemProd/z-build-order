@@ -21,6 +21,8 @@ const DOMPurify = createDOMPurify(window);
 
 const SITE_URL =
   process.env.SITE_URL || "https://zbuildorder.com/viewBuild.html";
+const TOURNAMENT_BASE_URL =
+  process.env.TOURNAMENT_BASE_URL || "https://zbuildorder.com";
 
 const BOT_USER_AGENTS = [
   /googlebot/i,
@@ -78,6 +80,43 @@ function sanitizeUrl(value, fallback) {
     return sanitized;
   }
   return sanitizeText(fallback, fallback);
+}
+
+function getStartTimeMs(meta) {
+  const raw = meta?.startTime;
+  if (!raw) return null;
+  if (raw?.toMillis) return raw.toMillis();
+  if (typeof raw === "number") return raw;
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.getTime();
+}
+
+function getCheckInWindowMinutes(meta) {
+  const minutes = Number(meta?.checkInWindowMinutes || 0);
+  return Number.isFinite(minutes) && minutes > 0 ? minutes : 0;
+}
+
+function isInviteAccepted(player) {
+  const normalized = String(player?.inviteStatus || "").toLowerCase();
+  if (normalized === "pending" || normalized === "denied") return false;
+  return true;
+}
+
+function buildTournamentUrl(meta, slug) {
+  if (!slug) return "";
+  const circuitSlug = meta?.circuitSlug || "";
+  const path = circuitSlug
+    ? `/tournament/${circuitSlug}/${slug}`
+    : `/tournament/${slug}`;
+  return `${TOURNAMENT_BASE_URL}${path}`;
+}
+
+function safeTaskId(value) {
+  const base = sanitizeText(value, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
+  return base || "tournament";
 }
 
 // Create a simple, stable slug for titles

@@ -1,5 +1,5 @@
 import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, getDocs, query, where, limit, collection } from "firebase/firestore";
 import { auth, db, provider, switchAccountProvider } from "../firebase.js";
 import { showToast } from "../toastHandler.js";
 import { resetBuildInputs } from "../utils.js";
@@ -99,16 +99,34 @@ function initializeAuthUI() {
       const authContainerEl = document.getElementById("auth-container");
       if (authContainerEl) authContainerEl.classList.add("is-auth");
       const userRef = doc(db, "users", user.uid);
-      const userSnapshot = await getDoc(userRef);
-
-      let userData = userSnapshot.exists() ? userSnapshot.data() : {};
-      let username = userData?.username ?? null;
-
-      if (!username) {
-        await checkAndSetUsername(user);
-        const updatedSnapshot = await getDoc(userRef);
-        userData = updatedSnapshot.exists() ? updatedSnapshot.data() : userData;
-        username = userData?.username ?? "Guest";
+      let userSnapshot = null;
+      let userData = {};
+      let username = null;
+      const fetchUsernameByUid = async (uid) => {
+        const q = query(
+          collection(db, "usernames"),
+          where("userId", "==", uid),
+          limit(1)
+        );
+        const snap = await getDocs(q);
+        if (snap.empty) return null;
+        return snap.docs[0]?.id || null;
+      };
+      try {
+        userSnapshot = await getDoc(userRef);
+        userData = userSnapshot.exists() ? userSnapshot.data() : {};
+        username = userData?.username ?? null;
+        if (!username) {
+          await checkAndSetUsername(user);
+          const updatedSnapshot = await getDoc(userRef);
+          userData = updatedSnapshot.exists() ? updatedSnapshot.data() : userData;
+          username = userData?.username ?? "Guest";
+        }
+      } catch (err) {
+        if (err?.code !== "permission-denied") {
+          console.error("Failed to load user profile", err);
+        }
+        username = (await fetchUsernameByUid(user.uid)) || "Guest";
       }
 
       setCurrentUserProfile(userData);

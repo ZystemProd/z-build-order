@@ -17,6 +17,8 @@ import { attachPlayerDetailHandlers } from "./playerDetail.js";
 import { ensureTestHarnessPanel } from "./ui/testHarness.js";
 import { enableDragScroll } from "./ui/dragScroll.js";
 import { lockBodyScroll, unlockBodyScroll } from "./modalLock.js";
+import { initTournamentNotifications } from "./notifications.js";
+import { initTournamentTemplateManager } from "./templateManager.js";
 
 export function initTournamentPage({
   handleRegistration,
@@ -72,15 +74,16 @@ export function initTournamentPage({
   cycleTestBracketCount,
   resetTournament,
   checkInCurrentPlayer,
-  removeNotCheckedInPlayers,
+  notifyCheckInPlayers,
   goLiveTournament,
 }) {
   ensureTestHarnessPanel();
+  initTournamentNotifications();
 
   const registrationForm = document.getElementById("registrationForm");
   const rebuildBtn = document.getElementById("rebuildBracketBtn");
   const resetBtn = document.getElementById("resetTournamentBtn");
-  const removeNotCheckedInBtn = document.getElementById("removeNotCheckedInBtn");
+  const notifyCheckInBtn = document.getElementById("notifyCheckInBtn");
   const jumpToRegistration = document.getElementById("jumpToRegistration");
   const jumpToBracket = document.getElementById("jumpToBracket");
   const bracketGrid = document.getElementById("bracketGrid");
@@ -178,6 +181,7 @@ export function initTournamentPage({
     }
   };
 
+
   const initDatePickers = () => {
     if (typeof window.flatpickr !== "function") return;
     const options = {
@@ -241,16 +245,22 @@ export function initTournamentPage({
     });
   };
 
+  const templateManager = initTournamentTemplateManager({
+    mapPoolSelection,
+    setMapPoolSelection,
+    setModalVisible,
+  });
+
   registrationForm?.addEventListener("submit", handleRegistration);
 
   initDatePickers();
   rebuildBtn?.addEventListener("click", () => goLiveTournament?.());
-  removeNotCheckedInBtn?.addEventListener("click", () => removeNotCheckedInPlayers?.());
   resetBtn?.addEventListener("click", () => {
     resetTournament?.();
   });
   autoFillBtn?.addEventListener("click", autoFillPlayers);
   checkInBtn?.addEventListener("click", () => checkInCurrentPlayer?.());
+  notifyCheckInBtn?.addEventListener("click", () => notifyCheckInPlayers?.());
 
   signInBtn?.addEventListener("click", () => window.handleSignIn?.());
   signOutBtn?.addEventListener("click", () => window.handleSignOut?.());
@@ -279,9 +289,16 @@ export function initTournamentPage({
 
   openCreateTournament?.addEventListener("click", async () => {
     await populateCreateForm();
+    templateManager?.ensureCreateModalHome();
+    templateManager?.setTemplateManagerMode(false);
+    templateManager?.refreshTemplateUI();
     setModalVisible(createModal, true);
   });
   closeCreateTournament?.addEventListener("click", () => {
+    if (templateManager?.isTemplateManagerOpen?.()) {
+      templateManager.closeTemplateManager(false);
+      return;
+    }
     setModalVisible(createModal, false);
   });
   window.addEventListener("mousedown", (e) => {
