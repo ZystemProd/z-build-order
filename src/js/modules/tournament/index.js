@@ -1211,6 +1211,7 @@ async function enterTournament(slug, options = {}) {
   const backLink = document.getElementById("tournamentBackLink");
   if (backLink) {
     backLink.href = circuitSlug ? `/tournament/${circuitSlug}` : "/tournament";
+    backLink.lastChild.textContent = circuitSlug ? "Circuit page" : "All tournaments";
   }
   // Load local state for this slug
   const local = loadLocalState(slug, applyRosterSeeding, deserializeBracket);
@@ -1234,6 +1235,7 @@ async function enterTournament(slug, options = {}) {
       const backLink = document.getElementById("tournamentBackLink");
       if (backLink) {
         backLink.href = metaCircuitSlug ? `/tournament/${metaCircuitSlug}` : "/tournament";
+        backLink.lastChild.textContent = metaCircuitSlug ? "Circuit page" : "All tournaments";
       }
     }
   } catch (_) {
