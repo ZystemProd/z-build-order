@@ -364,10 +364,12 @@ export async function buildCircuitLeaderboard(meta, slugs = [], { excludeSlug } 
         name: player.name || "Unknown",
         points: 0,
         tournaments: new Set(),
+        sc2Link: player.sc2Link || "",
       };
       entry.points += points;
       if (tournamentSlug) entry.tournaments.add(tournamentSlug);
       if (!entry.name && player.name) entry.name = player.name;
+      if (!entry.sc2Link && player.sc2Link) entry.sc2Link = player.sc2Link;
       totals.set(key, entry);
     });
   });
@@ -379,6 +381,7 @@ export async function buildCircuitLeaderboard(meta, slugs = [], { excludeSlug } 
         name: entry.name,
         points: Number.isFinite(override) ? override : entry.points,
         tournaments: entry.tournaments.size,
+        sc2Link: entry.sc2Link || "",
       };
     })
     .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
@@ -478,8 +481,7 @@ export async function populateCreateCircuitForm() {
   const finalRulesInput = document.getElementById("finalTournamentRulesInput");
   const finalStartInput = document.getElementById("finalTournamentStartInput");
   const finalMaxPlayersInput = document.getElementById("finalTournamentMaxPlayersInput");
-  const finalCheckInHoursInput = document.getElementById("finalCheckInHoursInput");
-  const finalCheckInMinutesInput = document.getElementById("finalCheckInMinutesInput");
+  const finalCheckInSelect = document.getElementById("finalCheckInSelect");
   const finalImageInput = document.getElementById("finalTournamentImageInput");
   const finalImagePreview = document.getElementById("finalTournamentImagePreview");
   const finalQualifyInput = document.getElementById("finalQualifyCountInput");
@@ -491,10 +493,14 @@ export async function populateCreateCircuitForm() {
   if (finalNameInput) finalNameInput.value = "";
   if (finalDescInput) finalDescInput.value = "";
   if (finalRulesInput) finalRulesInput.value = "";
-  if (finalStartInput) finalStartInput.value = "";
+  if (finalStartInput) {
+    finalStartInput.value = "";
+    if (finalStartInput._flatpickr) {
+      finalStartInput._flatpickr.clear();
+    }
+  }
   if (finalMaxPlayersInput) finalMaxPlayersInput.value = "";
-  if (finalCheckInHoursInput) finalCheckInHoursInput.value = "";
-  if (finalCheckInMinutesInput) finalCheckInMinutesInput.value = "";
+  if (finalCheckInSelect) finalCheckInSelect.value = "0";
   if (finalQualifyInput) finalQualifyInput.value = "";
   if (finalImageInput) finalImageInput.value = "";
   if (finalImagePreview) {

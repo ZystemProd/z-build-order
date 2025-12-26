@@ -187,6 +187,28 @@ import {
   setRegisteredTournament,
 } from "./sync/persistence.js";
 import { createFinalTournamentForCircuit } from "./finalsCreate.js";
+import { lockBodyScroll, unlockBodyScroll } from "./modalLock.js";
+import {
+  configureFinalMapPool,
+  getFinalMapPoolSelection,
+  resetFinalMapPoolSelection,
+  setFinalMapPoolSelection,
+  toggleFinalMapSelection,
+} from "./finalMapPool.js";
+import { createCircuitPageHandlers } from "./circuitPage.js";
+import { enforceCircuitFinalQualification } from "./registrationGates.js";
+import {
+  generateUniqueSlug,
+  updateFinalSlugPreview,
+  updateSlugPreview,
+} from "./slugs.js";
+import {
+  buildCreateTournamentPayload,
+  buildFinalTournamentPayload,
+  buildSettingsPayload,
+  readBestOf,
+} from "./tournamentPayloads.js";
+import { createAdminPlayerSearch } from "./admin/addSearchPlayer.js";
 const renderMapPoolPicker = renderMapPoolPickerUI;
 const CURRENT_BRACKET_LAYOUT_VERSION = 54;
 const MAX_TOURNAMENT_IMAGE_SIZE = 12 * 1024 * 1024;
@@ -196,8 +218,7 @@ const COVER_QUALITY = 0.82;
 const storage = getStorage(app);
 let currentCircuitMeta = null;
 let isCircuitAdmin = false;
-let finalMapPoolSelection = new Set();
-let finalMapPoolMode = "ladder";
+let circuitPointsBtnTemplate = null;
 function renderMarkdown(text = "") {
   return DOMPurify.sanitize(text || "").replace(/\n/g, "<br>");
 }
@@ -903,35 +924,8 @@ function markRegisteredTournament(slug) {
   setRegisteredTournament(slug);
 }
 
-async function generateUniqueSlug() {
-  return `t-${Date.now().toString(36)}`;
-}
-
 async function validateSlug() {
   return true;
-}
-
-function updateSlugPreview() {
-  const slugInput = document.getElementById("tournamentSlugInput");
-  const preview = document.getElementById("slugPreview");
-  if (slugInput && preview) {
-    const next = (slugInput.value || "").toLowerCase();
-    if (slugInput.value !== next) slugInput.value = next;
-    preview.textContent = next;
-  }
-}
-
-function updateFinalSlugPreview() {
-  const slugInput = document.getElementById("finalTournamentSlugInput");
-  const preview = document.getElementById("finalSlugPreview");
-  if (slugInput && preview) {
-    const next = (slugInput.value || "").toLowerCase();
-    if (slugInput.value !== next) slugInput.value = next;
-    const circuitSlug = (document.getElementById("circuitSlugInput")?.value || "")
-      .trim()
-      .toLowerCase();
-    preview.textContent = circuitSlug && next ? `${circuitSlug}/${next}` : next;
-  }
 }
 
 async function populateCreateForm() {
@@ -947,16 +941,14 @@ async function populateCreateForm() {
   }
   const imageInput = document.getElementById("tournamentImageInput");
   const imagePreview = document.getElementById("tournamentImagePreview");
-  const checkInHoursInput = document.getElementById("checkInHoursInput");
-  const checkInMinutesInput = document.getElementById("checkInMinutesInput");
+  const checkInSelect = document.getElementById("checkInSelect");
   if (imageInput) imageInput.value = "";
   if (imagePreview) {
     imagePreview.removeAttribute("src");
     imagePreview.style.display = "none";
     delete imagePreview.dataset.tempPreview;
   }
-  if (checkInHoursInput) checkInHoursInput.value = "";
-  if (checkInMinutesInput) checkInMinutesInput.value = "";
+  if (checkInSelect) checkInSelect.value = "0";
   setCreateTournamentCircuitContext("");
 }
 
@@ -982,7 +974,10 @@ async function openCircuitTournamentModal() {
   await populateCreateForm();
   setCreateTournamentCircuitContext(currentCircuitMeta.slug);
   const modal = document.getElementById("createTournamentModal");
-  if (modal) modal.style.display = "flex";
+  if (modal) {
+    modal.style.display = "flex";
+    lockBodyScroll();
+  }
 }
 
 function openDeleteTournamentModal({ slug, circuitSlug } = {}) {
@@ -1001,6 +996,7 @@ function openDeleteTournamentModal({ slug, circuitSlug } = {}) {
       message.textContent = `Are you sure you want to delete "${targetSlug}"? This cannot be undone.`;
     }
     modal.style.display = "flex";
+    lockBodyScroll();
   }
 }
 
@@ -1010,6 +1006,7 @@ function closeDeleteTournamentModal() {
   delete modal.dataset.slug;
   delete modal.dataset.circuitSlug;
   modal.style.display = "none";
+  unlockBodyScroll();
 }
 
 async function confirmDeleteTournament() {
@@ -1130,6 +1127,10 @@ async function enterTournament(slug, options = {}) {
       window.history.pushState({}, "", target);
     }
   }
+  const backLink = document.getElementById("tournamentBackLink");
+  if (backLink) {
+    backLink.href = circuitSlug ? `/tournament/${circuitSlug}` : "/tournament";
+  }
   // Load local state for this slug
   const local = loadLocalState(slug, applySeeding, deserializeBracket);
   setStateObj(local);
@@ -1138,6 +1139,9 @@ async function enterTournament(slug, options = {}) {
     const snap = await getDoc(doc(collection(db, TOURNAMENT_COLLECTION), slug));
     if (snap.exists()) {
       const meta = snap.data() || null;
+      if (meta && circuitSlug && !meta.circuitSlug) {
+        meta.circuitSlug = circuitSlug;
+      }
       setCurrentTournamentMetaState(meta);
       const metaCircuitSlug = meta?.circuitSlug || "";
       if (slug && metaCircuitSlug && !circuitSlug) {
@@ -1145,6 +1149,10 @@ async function enterTournament(slug, options = {}) {
         if (window.location.pathname !== target) {
           window.history.pushState({}, "", target);
         }
+      }
+      const backLink = document.getElementById("tournamentBackLink");
+      if (backLink) {
+        backLink.href = metaCircuitSlug ? `/tournament/${metaCircuitSlug}` : "/tournament";
       }
     }
   } catch (_) {
@@ -1160,6 +1168,7 @@ async function enterTournament(slug, options = {}) {
     saveState,
     renderAll
   );
+  await maybeAutoAddFinalPlayers();
   subscribeTournamentStateRemote(slug);
   const landingView = document.getElementById("landingView");
   const tournamentView = document.getElementById("tournamentView");
@@ -1195,59 +1204,34 @@ async function showLanding() {
   switchTab("registrationTab");
 }
 
-async function enterCircuit(slug, options = {}) {
-  if (!slug) return;
-  const { skipPush = false, meta = null } = options;
-  try {
-    unsubscribeRemoteState?.();
-  } catch (_) {
-    // ignore
-  }
-  unsubscribeRemoteState = null;
-  setIsAdminState(false);
-  updateAdminVisibility();
-  const target = `/tournament/${slug}`;
-  if (!skipPush && window.location.pathname !== target) {
-    window.history.pushState({}, "", target);
-  }
-  const landingView = document.getElementById("landingView");
-  const tournamentView = document.getElementById("tournamentView");
-  const circuitView = document.getElementById("circuitView");
-  if (landingView) landingView.style.display = "none";
-  if (tournamentView) tournamentView.style.display = "none";
-  if (circuitView) circuitView.style.display = "block";
-  try {
-    const fetched = meta || (await fetchCircuitMeta(slug));
-    if (!fetched) {
-      showToast?.("Circuit not found.", "error");
-      await showLanding();
-      return;
-    }
-    currentCircuitMeta = fetched;
-    recomputeCircuitAdminFromMeta();
-    await renderCircuitView(currentCircuitMeta, {
-      onEnterTournament: (tournamentSlug) =>
-        enterTournament(tournamentSlug, { circuitSlug: currentCircuitMeta?.slug || "" }),
-      onDeleteTournament: (tournamentSlug) =>
-        openDeleteTournamentModal({
-          slug: tournamentSlug,
-          circuitSlug: currentCircuitMeta?.slug || "",
-        }),
-      showDelete: isCircuitAdmin,
-      showEdit: isCircuitAdmin,
-    });
-    updateCircuitAdminVisibility();
-  } catch (err) {
-    console.error("Failed to load circuit", err);
-    showToast?.("Failed to load circuit.", "error");
-    await showLanding();
-  }
-}
-
-async function refreshCircuitView() {
-  if (!currentCircuitMeta?.slug) return;
-  await enterCircuit(currentCircuitMeta.slug, { skipPush: true });
-}
+const {
+  enterCircuit,
+  refreshCircuitView,
+  updateCircuitAdminVisibility,
+  recomputeCircuitAdminFromMeta,
+} = createCircuitPageHandlers({
+  fetchCircuitMeta,
+  renderCircuitView,
+  enterTournament,
+  openDeleteTournamentModal,
+  showToast,
+  showLanding,
+  setIsAdminState,
+  updateAdminVisibility,
+  getUnsubscribeRemoteState: () => unsubscribeRemoteState,
+  setUnsubscribeRemoteState: (next) => {
+    unsubscribeRemoteState = next;
+  },
+  getCurrentCircuitMeta: () => currentCircuitMeta,
+  setCurrentCircuitMeta: (next) => {
+    currentCircuitMeta = next;
+  },
+  getAuthUid: () => auth?.currentUser?.uid || null,
+  getIsCircuitAdmin: () => isCircuitAdmin,
+  setIsCircuitAdmin: (next) => {
+    isCircuitAdmin = next;
+  },
+});
 
 function setStatus(el, message, isError = false) {
   if (!el) return;
@@ -1279,51 +1263,6 @@ function setMapPoolSelection(names) {
     getAll1v1Maps,
     updateMapButtonsUI,
   });
-}
-
-function updateFinalMapButtons() {
-  const ladderBtn = document.getElementById("finalUseLadderMapsBtn");
-  const customBtn = document.getElementById("finalClearMapPoolBtn");
-  const isLadder = finalMapPoolMode === "ladder";
-  ladderBtn?.classList.toggle("active", isLadder);
-  customBtn?.classList.toggle("active", !isLadder);
-}
-
-function renderFinalMapPoolSelection() {
-  renderMapPoolPickerUI("finalMapPoolPicker", {
-    mapPoolSelection: finalMapPoolSelection,
-    getAll1v1Maps,
-  });
-  renderChosenMapsUI("finalChosenMapList", {
-    mapPoolSelection: finalMapPoolSelection,
-    getMapByName,
-  });
-  updateFinalMapButtons();
-}
-
-function setFinalMapPoolSelection(names) {
-  finalMapPoolSelection = new Set((names || []).filter(Boolean));
-  finalMapPoolMode = isDefaultLadderSelection(finalMapPoolSelection, getDefaultMapPoolNames)
-    ? "ladder"
-    : "custom";
-  renderFinalMapPoolSelection();
-}
-
-function toggleFinalMapSelection(name) {
-  if (!name) return;
-  if (finalMapPoolSelection.has(name)) {
-    finalMapPoolSelection.delete(name);
-  } else {
-    finalMapPoolSelection.add(name);
-  }
-  finalMapPoolMode = isDefaultLadderSelection(finalMapPoolSelection, getDefaultMapPoolNames)
-    ? "ladder"
-    : "custom";
-  renderFinalMapPoolSelection();
-}
-
-function resetFinalMapPoolSelection() {
-  setFinalMapPoolSelection(getDefaultMapPoolNames());
 }
 
 function validateTournamentImage(file) {
@@ -1416,12 +1355,9 @@ function updateCheckInUI() {
   checkInStatus.classList.add("is-open");
 }
 
-function getCheckInWindowMinutes(hoursInput, minutesInput) {
-  const hours = Number(hoursInput?.value || 0);
-  const minutes = Number(minutesInput?.value || 0);
-  const safeHours = Number.isFinite(hours) && hours > 0 ? hours : 0;
-  const safeMinutes = Number.isFinite(minutes) && minutes > 0 ? minutes : 0;
-  return safeHours * 60 + safeMinutes;
+function getCheckInWindowMinutes(selectInput) {
+  const minutes = Number(selectInput?.value || 0);
+  return Number.isFinite(minutes) && minutes > 0 ? minutes : 0;
 }
 
 async function uploadTournamentCover(file, slug) {
@@ -1449,23 +1385,14 @@ async function handleSaveSettings(event) {
   const slugInput = document.getElementById("settingsSlugInput");
   const startInput = document.getElementById("settingsStartInput");
   const maxPlayersInput = document.getElementById("settingsMaxPlayersInput");
-  const checkInHoursInput = document.getElementById("settingsCheckInHoursInput");
-  const checkInMinutesInput = document.getElementById("settingsCheckInMinutesInput");
+  const checkInSelect = document.getElementById("settingsCheckInSelect");
   const qualifyInput = document.getElementById("settingsCircuitQualifyCount");
   const imageInput = document.getElementById("settingsImageInput");
   const imageFile = imageInput?.files?.[0] || null;
   const newSlugRaw = (slugInput?.value || "").trim();
   const newSlug = newSlugRaw || currentSlug || "";
   const slugChanged = newSlug && newSlug !== currentSlug;
-  const bestOf = {
-    upper: Number(document.getElementById("settingsBestOfUpper")?.value || defaultBestOf.upper),
-    lower: Number(document.getElementById("settingsBestOfLower")?.value || defaultBestOf.lower),
-    quarter: Number(
-      document.getElementById("settingsBestOfQuarter")?.value || defaultBestOf.quarter
-    ),
-    semi: Number(document.getElementById("settingsBestOfSemi")?.value || defaultBestOf.semi),
-    final: Number(document.getElementById("settingsBestOfFinal")?.value || defaultBestOf.final),
-  };
+  const bestOf = readBestOf("settings", defaultBestOf);
   const format = (formatSelect?.value || currentTournamentMeta?.format || "Tournament").trim();
   const description = descInput?.value || "";
   const rules = rulesInput?.value || "";
@@ -1478,10 +1405,7 @@ async function handleSaveSettings(event) {
     qualifyRaw === "" || qualifyRaw === null || qualifyRaw === undefined
       ? null
       : Number(qualifyRaw);
-  const checkInWindowMinutes = getCheckInWindowMinutes(
-    checkInHoursInput,
-    checkInMinutesInput
-  );
+  const checkInWindowMinutes = getCheckInWindowMinutes(checkInSelect);
   const mapPool = Array.from(mapPoolSelection || []);
   const rrSettings = extractRoundRobinSettingsUI("settings", defaultRoundRobinSettings);
   const circuitPoints = currentTournamentMeta?.circuitSlug
@@ -1497,27 +1421,26 @@ async function handleSaveSettings(event) {
     }
   }
 
-  const meta = {
-    ...(currentTournamentMeta || {}),
-    slug: newSlug,
+  const meta = buildSettingsPayload({
+    currentTournamentMeta,
+    newSlug,
     format,
     description,
     rules,
     coverImageUrl,
-    maxPlayers: Number.isFinite(maxPlayers) ? maxPlayers : null,
-    startTime: startTime ? startTime.getTime() : null,
+    maxPlayers,
+    startTime,
     checkInWindowMinutes,
+    bestOf,
+    mapPool,
+    roundRobin: rrSettings,
     circuitQualifyCount:
       currentTournamentMeta?.isCircuitFinal &&
       Number.isFinite(qualifyCount) &&
       qualifyCount >= 0
         ? qualifyCount
         : null,
-    bestOf,
-    mapPool,
-    roundRobin: rrSettings,
-    lastUpdated: Date.now(),
-  };
+  });
   if (currentTournamentMeta?.circuitSlug) {
     meta.circuitPoints = circuitPoints || [];
   }
@@ -1570,8 +1493,7 @@ async function handleCreateCircuit(event) {
   const finalFormatSelect = document.getElementById("finalFormatSelect");
   const finalStartInput = document.getElementById("finalTournamentStartInput");
   const finalMaxPlayersInput = document.getElementById("finalTournamentMaxPlayersInput");
-  const finalCheckInHoursInput = document.getElementById("finalCheckInHoursInput");
-  const finalCheckInMinutesInput = document.getElementById("finalCheckInMinutesInput");
+  const finalCheckInSelect = document.getElementById("finalCheckInSelect");
   const finalDescriptionInput = document.getElementById("finalTournamentDescriptionInput");
   const finalRulesInput = document.getElementById("finalTournamentRulesInput");
   const finalImageInput = document.getElementById("finalTournamentImageInput");
@@ -1593,10 +1515,7 @@ async function handleCreateCircuit(event) {
   const finalMaxPlayers = finalMaxPlayersInput?.value
     ? Number(finalMaxPlayersInput.value)
     : null;
-  const finalCheckInWindowMinutes = getCheckInWindowMinutes(
-    finalCheckInHoursInput,
-    finalCheckInMinutesInput
-  );
+  const finalCheckInWindowMinutes = getCheckInWindowMinutes(finalCheckInSelect);
   const finalDescription = finalDescriptionInput?.value || "";
   const finalRules = finalRulesInput?.value || "";
   const finalImageFile = finalImageInput?.files?.[0] || null;
@@ -1637,52 +1556,23 @@ async function handleCreateCircuit(event) {
       getCurrentUsername?.() || auth.currentUser.displayName || "Unknown",
     createdAt: serverTimestamp(),
   };
-  const finalPayload = {
+  const finalPayload = buildFinalTournamentPayload({
     slug: finalSlug,
     name: finalName,
     description: finalDescription,
     rules: finalRules,
     format: finalFormat,
-    maxPlayers: Number.isFinite(finalMaxPlayers) ? finalMaxPlayers : null,
-    startTime: finalStartTime ? finalStartTime.getTime() : null,
+    maxPlayers: finalMaxPlayers,
+    startTime: finalStartTime,
     checkInWindowMinutes: finalCheckInWindowMinutes,
-    mapPool: Array.from(finalMapPoolSelection || []),
+    mapPool: getFinalMapPoolSelection(),
     createdBy: auth.currentUser?.uid || null,
     createdByName: getCurrentUsername() || "Unknown host",
     roundRobin: rrSettings,
-    bestOf: {
-      upper: Number(
-        document.getElementById("finalBestOfUpperInput")?.value || defaultBestOf.upper
-      ),
-      lower: Number(
-        document.getElementById("finalBestOfLowerInput")?.value || defaultBestOf.lower
-      ),
-      lowerSemi: Number(
-        document.getElementById("finalBestOfLowerSemiInput")?.value ||
-          defaultBestOf.lowerSemi
-      ),
-      lowerFinal: Number(
-        document.getElementById("finalBestOfLowerFinalInput")?.value ||
-          defaultBestOf.lowerFinal
-      ),
-      quarter: Number(
-        document.getElementById("finalBestOfQuarterInput")?.value ||
-          defaultBestOf.quarter
-      ),
-      semi: Number(
-        document.getElementById("finalBestOfSemiInput")?.value || defaultBestOf.semi
-      ),
-      final: Number(
-        document.getElementById("finalBestOfFinalInput")?.value || defaultBestOf.final
-      ),
-    },
+    bestOf: readBestOf("final", defaultBestOf),
     circuitSlug: slug,
-    isCircuitFinal: true,
-    circuitQualifyCount:
-      Number.isFinite(finalQualifyCount) && finalQualifyCount >= 0
-        ? finalQualifyCount
-        : null,
-  };
+    circuitQualifyCount: finalQualifyCount,
+  });
   try {
     await setDoc(
       doc(collection(db, CIRCUIT_COLLECTION), slug),
@@ -1714,7 +1604,10 @@ async function handleCreateCircuit(event) {
     if (finalCreated) {
       showToast?.("Circuit saved.", "success");
     }
-    if (modal) modal.style.display = "none";
+    if (modal) {
+      modal.style.display = "none";
+      unlockBodyScroll();
+    }
     await renderCircuitList({ onEnterCircuit: enterCircuit });
     await enterCircuit(slug);
     if (finalCreated) {
@@ -1733,8 +1626,7 @@ async function handleCreateTournament(event) {
   const formatSelect = document.getElementById("tournamentFormatSelect");
   const startInput = document.getElementById("tournamentStartInput");
   const maxPlayersInput = document.getElementById("tournamentMaxPlayersInput");
-  const checkInHoursInput = document.getElementById("checkInHoursInput");
-  const checkInMinutesInput = document.getElementById("checkInMinutesInput");
+  const checkInSelect = document.getElementById("checkInSelect");
   const descriptionInput = document.getElementById("tournamentDescriptionInput");
   const rulesInput = document.getElementById("tournamentRulesInput");
   const imageInput = document.getElementById("tournamentImageInput");
@@ -1753,10 +1645,7 @@ async function handleCreateTournament(event) {
   const maxPlayers = maxPlayersInput?.value
     ? Number(maxPlayersInput.value)
     : null;
-  const checkInWindowMinutes = getCheckInWindowMinutes(
-    checkInHoursInput,
-    checkInMinutesInput
-  );
+  const checkInWindowMinutes = getCheckInWindowMinutes(checkInSelect);
   const description = descriptionInput?.value || "";
   const rules = rulesInput?.value || "";
   const rrSettings = extractRoundRobinSettingsUI("create", defaultRoundRobinSettings);
@@ -1765,49 +1654,23 @@ async function handleCreateTournament(event) {
     return;
   }
   try {
-    const payload = {
+    const payload = buildCreateTournamentPayload({
       slug,
       name,
       description,
       rules,
       format,
-      maxPlayers: Number.isFinite(maxPlayers) ? maxPlayers : null,
-      startTime: startTime ? startTime.getTime() : null,
+      maxPlayers,
+      startTime,
       checkInWindowMinutes,
       mapPool: Array.from(mapPoolSelection || []),
       createdBy: auth.currentUser?.uid || null,
       createdByName: getCurrentUsername() || "Unknown host",
       roundRobin: rrSettings,
-      bestOf: {
-        upper: Number(
-          document.getElementById("bestOfUpperInput")?.value || defaultBestOf.upper
-        ),
-        lower: Number(
-          document.getElementById("bestOfLowerInput")?.value || defaultBestOf.lower
-        ),
-        lowerSemi: Number(
-          document.getElementById("bestOfLowerSemiInput")?.value ||
-            defaultBestOf.lowerSemi
-        ),
-        lowerFinal: Number(
-          document.getElementById("bestOfLowerFinalInput")?.value ||
-            defaultBestOf.lowerFinal
-        ),
-        quarter: Number(
-          document.getElementById("bestOfQuarterInput")?.value ||
-            defaultBestOf.quarter
-        ),
-        semi: Number(
-          document.getElementById("bestOfSemiInput")?.value || defaultBestOf.semi
-        ),
-        final: Number(
-          document.getElementById("bestOfFinalInput")?.value ||
-            defaultBestOf.final
-        ),
-      },
+      bestOf: readBestOf("create", defaultBestOf),
       circuitSlug: circuitSlug || null,
       isCircuitFinal: circuitSlug ? isCircuitFinal : false,
-    };
+    });
     await setDoc(doc(collection(db, TOURNAMENT_COLLECTION), slug), payload, {
       merge: true,
     });
@@ -1845,7 +1708,10 @@ async function handleCreateTournament(event) {
     setCurrentSlugState(slug);
     setCurrentTournamentMetaState(payload);
     showToast?.("Tournament saved.", "success");
-    if (modal) modal.style.display = "none";
+    if (modal) {
+      modal.style.display = "none";
+      unlockBodyScroll();
+    }
     await enterTournament(slug);
     await renderTournamentList();
   } catch (err) {
@@ -1901,6 +1767,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   // Attach all UI handlers first so buttons work even if async setup below fails/awaits.
+  configureFinalMapPool({
+    getDefaultMapPoolNames,
+    getAll1v1Maps,
+    getMapByName,
+    renderMapPoolPickerUI,
+    renderChosenMapsUI,
+    isDefaultLadderSelection,
+  });
   initTournamentPage({
     handleRegistration,
     handleCreateTournament,
@@ -1959,6 +1833,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     removeNotCheckedInPlayers,
     goLiveTournament,
   });
+  initFinalAdminSearch();
+  initFinalAutoAddToggle();
 
   if (typeof window !== "undefined") {
     setInterval(() => {
@@ -2009,30 +1885,61 @@ function updateAdminVisibility() {
   const seedingBtn = document.getElementById("seedingTabBtn");
   const settingsBtn = document.getElementById("settingsTabBtn");
   const circuitPointsBtn = document.getElementById("circuitPointsTabBtn");
+  const adminTabs = document.querySelector(".tab-group.admin-tabs");
   if (seedingBtn) seedingBtn.style.display = isAdmin ? "" : "none";
   if (settingsBtn) settingsBtn.style.display = isAdmin ? "" : "none";
-  if (circuitPointsBtn) {
-    circuitPointsBtn.style.display =
+  if (currentTournamentMeta?.isCircuitFinal) {
+    if (circuitPointsBtn) {
+      if (!circuitPointsBtnTemplate) {
+        circuitPointsBtnTemplate = circuitPointsBtn.cloneNode(true);
+      }
+      if (
+        document.querySelector(".tab-btn.active")?.dataset.tab ===
+        "circuitPointsTab"
+      ) {
+        switchTab("bracketTab");
+      }
+      circuitPointsBtn.remove();
+    }
+  } else if (!circuitPointsBtn && circuitPointsBtnTemplate && adminTabs) {
+    const restored = circuitPointsBtnTemplate.cloneNode(true);
+    restored.addEventListener("click", () =>
+      switchTab(restored.dataset.tab)
+    );
+    adminTabs.append(restored);
+  }
+  const liveCircuitPointsBtn = document.getElementById("circuitPointsTabBtn");
+  if (liveCircuitPointsBtn) {
+    liveCircuitPointsBtn.style.display =
       isAdmin && currentTournamentMeta?.circuitSlug ? "" : "none";
   }
   const testHarness = document.getElementById("testBracketPanel");
   if (testHarness) testHarness.style.display = isAdmin ? "" : "none";
+  updateFinalAdminAddVisibility();
+  updateFinalAutoAddRow();
   if (typeof window !== "undefined") {
     window.__tournamentIsAdmin = isAdmin;
   }
 }
 
-function updateCircuitAdminVisibility() {
-  const createBtn = document.getElementById("openCreateCircuitTournament");
-  if (createBtn) {
-    createBtn.style.display = isCircuitAdmin ? "inline-flex" : "none";
-  }
+function updateFinalAutoAddRow() {
+  const row = document.getElementById("finalAutoAddRow");
+  const toggle = document.getElementById("finalAutoAddToggle");
+  if (!row || !toggle) return;
+  const show = isAdmin && currentTournamentMeta?.isCircuitFinal;
+  row.style.display = show ? "flex" : "none";
+  toggle.checked = !state.disableFinalAutoAdd;
 }
 
-function recomputeCircuitAdminFromMeta() {
-  const uid = auth?.currentUser?.uid || null;
-  isCircuitAdmin = Boolean(uid && currentCircuitMeta?.createdBy === uid);
-  updateCircuitAdminVisibility();
+function setFinalAutoAddStatus(message) {
+  const statusEl = document.getElementById("finalAutoAddStatus");
+  if (statusEl) statusEl.textContent = message || "";
+}
+
+function updateFinalAdminAddVisibility() {
+  const panel = document.getElementById("finalAdminAddPanel");
+  if (!panel) return;
+  panel.style.display = isAdmin ? "block" : "none";
 }
 
 function recomputeAdminFromMeta() {
@@ -2043,6 +1950,162 @@ function recomputeAdminFromMeta() {
     window.__tournamentIsAdmin = owns;
   }
   updateAdminVisibility();
+}
+
+function initFinalAutoAddToggle() {
+  const toggle = document.getElementById("finalAutoAddToggle");
+  if (!toggle) return;
+  toggle.addEventListener("change", () => {
+    const enabled = Boolean(toggle.checked);
+    saveState({ disableFinalAutoAdd: !enabled });
+    if (enabled) {
+      maybeAutoAddFinalPlayers({ force: true });
+    } else {
+      showToast?.("Auto add from leaderboard disabled.", "info");
+    }
+  });
+}
+
+async function maybeAutoAddFinalPlayers({ force = false } = {}) {
+  if (!currentTournamentMeta?.isCircuitFinal) return;
+  if (!isAdmin) return;
+  if (state.disableFinalAutoAdd && !force) {
+    setFinalAutoAddStatus("Auto add is disabled.");
+    return;
+  }
+  const circuitSlug = currentTournamentMeta?.circuitSlug || "";
+  const qualifyCount = Number(currentTournamentMeta?.circuitQualifyCount);
+  if (!circuitSlug) {
+    setFinalAutoAddStatus("Circuit link is missing.");
+    return;
+  }
+  if (!Number.isFinite(qualifyCount) || qualifyCount <= 0) {
+    setFinalAutoAddStatus("Set a qualify count to auto add players.");
+    return;
+  }
+  if (!force && (state.players || []).length >= qualifyCount) {
+    setFinalAutoAddStatus("Auto add already applied.");
+    return;
+  }
+  const circuitMeta = await fetchCircuitMeta(circuitSlug);
+  if (!circuitMeta) {
+    setFinalAutoAddStatus("Circuit not found.");
+    return;
+  }
+  const { leaderboard } = await buildCircuitLeaderboard(circuitMeta, [], {
+    excludeSlug: currentSlug,
+  });
+  if (!leaderboard?.length) {
+    setFinalAutoAddStatus("Circuit leaderboard has no players yet.");
+    return;
+  }
+  const finalists = leaderboard.slice(0, qualifyCount);
+  let added = 0;
+  for (const entry of finalists) {
+    const name = (entry?.name || "").trim();
+    if (!name) continue;
+    const existing = (state.players || []).some(
+      (player) =>
+        (player.name || "").toLowerCase() === name.toLowerCase()
+    );
+    if (existing) continue;
+    let userId = "";
+    try {
+      const lowerName = name.toLowerCase();
+      let usernameSnap = await getDoc(doc(db, "usernames", name));
+      if (!usernameSnap.exists() && lowerName !== name) {
+        usernameSnap = await getDoc(doc(db, "usernames", lowerName));
+      }
+      if (usernameSnap.exists()) {
+        userId = usernameSnap.data()?.userId || usernameSnap.data()?.uid || "";
+      }
+    } catch (err) {
+      console.warn("Failed to resolve username", err);
+    }
+    let userData = {};
+    if (userId) {
+      try {
+        const userSnap = await getDoc(doc(db, "users", userId));
+        userData = userSnap.exists() ? userSnap.data() || {} : {};
+      } catch (err) {
+        console.warn("Failed to load user profile", err);
+      }
+    }
+    const displayName = userData.username || name;
+    const pulse = userData?.pulse || {};
+    const byRace = pulse.lastMmrByRace || pulse.byRace || null;
+    const fallbackMmr = Number(pulse.lastMmr ?? pulse.mmr);
+    const pick = pickBestRace(byRace, fallbackMmr);
+    const race = pick.race || "Random";
+    const mmr = Number.isFinite(pick.mmr) ? pick.mmr : 0;
+    const sc2Link = sanitizeUrl(
+      userData.sc2PulseUrl || pulse.url || entry.sc2Link || ""
+    );
+    const avatarUrl =
+      userData?.profile?.avatarUrl ||
+      userData?.avatarUrl ||
+      DEFAULT_PLAYER_AVATAR;
+    const secondaryPulseProfiles = Array.isArray(pulse.secondary)
+      ? pulse.secondary
+      : [];
+    const secondaryPulseLinks = secondaryPulseProfiles
+      .map((entry) => (entry && typeof entry === "object" ? entry.url : ""))
+      .filter(Boolean);
+    let clanName = "";
+    let clanAbbreviation = "";
+    let clanLogoUrl = "";
+    const mainClanId = userData?.settings?.mainClanId || "";
+    if (mainClanId) {
+      try {
+        const clanDoc = await getDoc(doc(db, "clans", mainClanId));
+        if (clanDoc.exists()) {
+          const clanData = clanDoc.data() || {};
+          clanName = clanData?.name || "";
+          clanAbbreviation = clanData?.abbreviation || "";
+          clanLogoUrl = clanData?.logoUrlSmall || clanData?.logoUrl || "";
+        }
+      } catch (err) {
+        console.warn("Could not fetch clan data", err);
+      }
+    }
+    createOrUpdatePlayer({
+      name: displayName,
+      race,
+      sc2Link,
+      mmr,
+      points: Number.isFinite(entry.points) ? entry.points : 0,
+      avatarUrl,
+      twitchUrl: userData?.twitchUrl || "",
+      secondaryPulseLinks,
+      secondaryPulseProfiles,
+      mmrByRace: byRace || null,
+      country: (userData?.country || "").toUpperCase(),
+      clan: clanName,
+      clanAbbreviation,
+      clanLogoUrl,
+      pulseName: pulse.name || pulse.accountName || "",
+      uid: userId || null,
+    });
+    added += 1;
+  }
+  if (!added) {
+    setFinalAutoAddStatus("All qualifying players are already added.");
+    return;
+  }
+  const hasCompletedMatches = bracketHasResults();
+  const seededPlayers = applySeeding(state.players);
+  saveState({
+    players: seededPlayers,
+    needsReseed: hasCompletedMatches,
+  });
+  if (!hasCompletedMatches) {
+    rebuildBracket(true, "Auto-added leaderboard finalists");
+  } else {
+    setSeedingNotice(true);
+    renderAll();
+  }
+  setFinalAutoAddStatus(`Auto-added ${added} player(s).`);
+  showToast?.(`Auto-added ${added} finalist(s).`, "success");
 }
 
 function hydratePulseFromState(pulseState) {
@@ -2402,56 +2465,18 @@ async function handleRegistration(event) {
     return;
   }
 
-  const qualifyCount = Number(currentTournamentMeta?.circuitQualifyCount);
-  if (
-    currentTournamentMeta?.isCircuitFinal &&
-    Number.isFinite(qualifyCount) &&
-    qualifyCount > 0
-  ) {
-    const circuitSlug = currentTournamentMeta?.circuitSlug || "";
-    if (!circuitSlug) {
-      setStatus(
-        statusEl,
-        "Circuit leaderboard is unavailable for this finals event.",
-        true
-      );
-      return;
-    }
-    const circuitMeta = await fetchCircuitMeta(circuitSlug);
-    if (!circuitMeta) {
-      setStatus(
-        statusEl,
-        "Circuit leaderboard is unavailable for this finals event.",
-        true
-      );
-      return;
-    }
-    let leaderboard = null;
-    try {
-      ({ leaderboard } = await buildCircuitLeaderboard(circuitMeta, [], { excludeSlug: currentSlug }));
-    } catch (err) {
-      console.error("Failed to load circuit leaderboard", err);
-    }
-    if (!leaderboard) {
-      setStatus(statusEl, "Circuit leaderboard is unavailable.", true);
-      return;
-    }
-    if (!leaderboard.length) {
-      setStatus(statusEl, "Circuit leaderboard is empty.", true);
-      return;
-    }
-    const key = playerKey(name, sc2LinkInput);
-    const qualified = leaderboard
-      .slice(0, qualifyCount)
-      .some((entry) => entry.key === key);
-    if (!qualified) {
-      setStatus(
-        statusEl,
-        `You must be in the top ${qualifyCount} of the circuit leaderboard to register.`,
-        true
-      );
-      return;
-    }
+  const qualification = await enforceCircuitFinalQualification({
+    name,
+    sc2Link: sc2LinkInput,
+    currentTournamentMeta,
+    currentSlug,
+    fetchCircuitMeta,
+    buildCircuitLeaderboard,
+    playerKey,
+  });
+  if (!qualification.ok) {
+    setStatus(statusEl, qualification.message || "Registration is restricted.", true);
+    return;
   }
 
   if (!race) {
@@ -2579,6 +2604,152 @@ async function handleRegistration(event) {
 
   event.target.reset();
   hydratePulseFromState(pulseProfile);
+}
+
+function setFinalAdminSearchStatus(message) {
+  const statusEl = document.getElementById("finalAdminSearchStatus");
+  if (statusEl) statusEl.textContent = message || "";
+}
+
+function renderFinalAdminSearchResults(results = []) {
+  const resultsEl = document.getElementById("finalAdminSearchResults");
+  if (!resultsEl) return;
+  resultsEl.replaceChildren();
+  results.forEach((entry) => {
+    const row = document.createElement("div");
+    row.className = "admin-search-item";
+    const label = document.createElement("span");
+    label.textContent = entry.username;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "cta small primary";
+    button.textContent = "Add";
+    button.dataset.adminAddUsername = entry.username;
+    if (entry.userId) {
+      button.dataset.adminUserId = entry.userId;
+    }
+    const alreadyAdded = (state.players || []).some(
+      (player) =>
+        (entry.userId && player.uid === entry.userId) ||
+        (player.name || "").toLowerCase() === entry.username.toLowerCase()
+    );
+    if (alreadyAdded) {
+      button.disabled = true;
+      button.textContent = "Added";
+    }
+    row.append(label, button);
+    resultsEl.append(row);
+  });
+}
+
+function initFinalAdminSearch() {
+  const input = document.getElementById("finalAdminSearchInput");
+  const resultsEl = document.getElementById("finalAdminSearchResults");
+  if (!input || !resultsEl) return;
+  const search = createAdminPlayerSearch({
+    db,
+    getIsEnabled: () => isAdmin,
+    getPlayers: () => state.players || [],
+    onStatus: setFinalAdminSearchStatus,
+    onResults: renderFinalAdminSearchResults,
+    onError: (err) => {
+      if (err?.message) showToast?.(err.message, "error");
+    },
+    onSuccess: () => {
+      input.value = "";
+      renderFinalAdminSearchResults([]);
+      setFinalAdminSearchStatus("");
+    },
+    addPlayer: async ({ userId, username, userData }) => {
+      const displayName = userData.username || username;
+      const pulse = userData?.pulse || {};
+      const byRace = pulse.lastMmrByRace || pulse.byRace || null;
+      const fallbackMmr = Number(pulse.lastMmr ?? pulse.mmr);
+      const pick = pickBestRace(byRace, fallbackMmr);
+      const race = pick.race || "Random";
+      const mmr = Number.isFinite(pick.mmr) ? pick.mmr : 0;
+      const sc2Link = sanitizeUrl(userData.sc2PulseUrl || pulse.url || "");
+      let startingPoints = null;
+      if (currentTournamentMeta?.circuitSlug && displayName) {
+        startingPoints = await getCircuitSeedPoints({
+          name: displayName,
+          sc2Link,
+          circuitSlug: currentTournamentMeta.circuitSlug,
+          tournamentSlug: currentSlug,
+        });
+      }
+      const avatarUrl =
+        userData?.profile?.avatarUrl ||
+        userData?.avatarUrl ||
+        DEFAULT_PLAYER_AVATAR;
+      const secondaryPulseProfiles = Array.isArray(pulse.secondary)
+        ? pulse.secondary
+        : [];
+      const secondaryPulseLinks = secondaryPulseProfiles
+        .map((entry) => (entry && typeof entry === "object" ? entry.url : ""))
+        .filter(Boolean);
+      let clanName = "";
+      let clanAbbreviation = "";
+      let clanLogoUrl = "";
+      const mainClanId = userData?.settings?.mainClanId || "";
+      if (mainClanId) {
+        try {
+          const clanDoc = await getDoc(doc(db, "clans", mainClanId));
+          if (clanDoc.exists()) {
+            const clanData = clanDoc.data() || {};
+            clanName = clanData?.name || "";
+            clanAbbreviation = clanData?.abbreviation || "";
+            clanLogoUrl = clanData?.logoUrlSmall || clanData?.logoUrl || "";
+          }
+        } catch (err) {
+          console.warn("Could not fetch clan data", err);
+        }
+      }
+      const newPlayer = createOrUpdatePlayer({
+        name: displayName,
+        race,
+        sc2Link,
+        mmr,
+        points: Number.isFinite(startingPoints) ? startingPoints : 0,
+        avatarUrl,
+        twitchUrl: userData?.twitchUrl || "",
+        secondaryPulseLinks,
+        secondaryPulseProfiles,
+        mmrByRace: byRace || null,
+        country: (userData?.country || "").toUpperCase(),
+        clan: clanName,
+        clanAbbreviation,
+        clanLogoUrl,
+        pulseName: pulse.name || pulse.accountName || "",
+        uid: userId,
+      });
+      const hasCompletedMatches = bracketHasResults();
+      const seededPlayers = applySeeding(state.players);
+      saveState({
+        players: seededPlayers,
+        needsReseed: hasCompletedMatches,
+      });
+      addActivity(`Admin added ${newPlayer.name}.`);
+      if (!hasCompletedMatches) {
+        rebuildBracket(true, "Roster updated");
+      } else {
+        setSeedingNotice(true);
+        renderAll();
+      }
+      showToast?.(`${newPlayer.name} added.`, "success");
+    },
+  });
+
+  input.addEventListener("input", () => {
+    search.debouncedSearch(input.value);
+  });
+  resultsEl.addEventListener("click", (event) => {
+    const target = event.target.closest("[data-admin-add-username]");
+    if (!target) return;
+    const username = target.dataset.adminAddUsername || "";
+    const userId = target.dataset.adminUserId || "";
+    search.addByUsername(username, userId);
+  });
 }
 
 function mmrForRace(raceLabel) {

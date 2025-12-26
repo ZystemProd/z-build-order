@@ -319,7 +319,7 @@ export function openMatchInfoModal(
           } else {
             vetoDeps?.updateMatchScore?.(matchId, winsA, winsB, { finalize: true });
           }
-          refreshMatchInfoModalIfOpen();
+          hideMatchInfoModal();
         }
       : null;
   };

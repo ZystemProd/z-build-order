@@ -29,6 +29,7 @@ export const defaultState = {
   bracketLayoutVersion: 1,
   matchVetoes: {},
   isLive: false,
+  disableFinalAutoAdd: false,
 };
 
 export let currentSlug = null;

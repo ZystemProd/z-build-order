@@ -43,8 +43,7 @@ export function populateSettingsPanel({
   const formatSelect = document.getElementById("settingsFormatSelect");
   const maxInput = document.getElementById("settingsMaxPlayersInput");
   const startInput = document.getElementById("settingsStartInput");
-  const checkInHoursInput = document.getElementById("settingsCheckInHoursInput");
-  const checkInMinutesInput = document.getElementById("settingsCheckInMinutesInput");
+  const checkInSelect = document.getElementById("settingsCheckInSelect");
   const imageInput = document.getElementById("settingsImageInput");
   const imagePreview = document.getElementById("settingsImagePreview");
   const rrBestOf = document.getElementById("settingsRoundRobinBestOf");
@@ -76,13 +75,18 @@ export function populateSettingsPanel({
     startInput.value = tournament.startTime
       ? new Date(tournament.startTime).toISOString().slice(0, 16)
       : "";
+    if (startInput._flatpickr) {
+      if (startInput.value) {
+        startInput._flatpickr.setDate(startInput.value, false);
+      } else {
+        startInput._flatpickr.clear();
+      }
+    }
   }
-  if (checkInHoursInput || checkInMinutesInput) {
+  if (checkInSelect) {
     const total = Number(tournament.checkInWindowMinutes || 0);
-    const hours = Math.floor(total / 60);
-    const minutes = total % 60;
-    if (checkInHoursInput) checkInHoursInput.value = total ? String(hours) : "";
-    if (checkInMinutesInput) checkInMinutesInput.value = total ? String(minutes) : "";
+    const normalized = Math.max(0, Math.min(180, Math.round(total / 15) * 15));
+    checkInSelect.value = String(normalized);
   }
   if (imageInput) imageInput.value = "";
   if (imagePreview) {

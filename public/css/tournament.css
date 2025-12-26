@@ -2442,6 +2442,64 @@ a {
   color: var(--text);
 }
 
+.datetime-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.datetime-row .datetime-input {
+  flex: 1;
+}
+
+.admin-add-player {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--stroke);
+}
+
+.admin-search-results {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.admin-search-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--stroke);
+  background: var(--panel-2);
+}
+
+.admin-search-item span {
+  font-size: 14px;
+}
+
+.required {
+  color: var(--accent-2);
+  font-weight: 600;
+}
+
+.datepicker-btn {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.datepicker-btn:hover {
+  border-color: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.18);
+}
+
+.datepicker-btn img {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
 .datetime-input:focus {
   outline: none;
   border-color: var(--accent-2);
@@ -2468,14 +2526,27 @@ a {
   box-shadow: 0 0 0 2px rgba(78, 213, 255, 0.25);
 }
 
-/* Date picker icon visibility */
-input[type="datetime-local"]::-webkit-calendar-picker-indicator {
-  filter: invert(100%) brightness(1.1);
-  opacity: 1;
+#createCircuitModal .form-actions {
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
 }
 
-input[type="datetime-local"] {
-  color-scheme: dark;
+#createCircuitModal #saveCircuitBtn {
+  padding: 6px 18px;
+  font-size: 0.9rem;
+  min-height: 36px;
+  width: auto;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+#createCircuitModal .final-settings-title {
+  margin-bottom: 10px;
 }
 
 /* Global input focus accent */
@@ -2978,6 +3049,14 @@ textarea:focus {
 label {
   display: block;
   margin-bottom: 14px;
+}
+
+.checkbox-wrapper-59 .switch {
+  margin: 0 12px;
+}
+
+.publish-checkbox-row label {
+  margin-bottom: 0;
 }
 
 .checkbox-row {
@@ -3572,6 +3651,15 @@ label {
   line-height: 1.5;
 }
 
+.publish-checkbox-row .checkbox-wrapper-59 {
+  justify-self: end;
+}
+
+.publish-checkbox-row .switch {
+  display: inline-flex;
+  align-items: center;
+}
+
 .checkbox-wrapper-59 {
   display: flex;
   align-items: center;
@@ -3629,6 +3717,22 @@ label {
 
 .checkbox-wrapper-59 input:checked + .slider {
   box-shadow: 0 0 0 2px limegreen, 0 0 8px limegreen;
+}
+
+.checkbox-wrapper-59--blue .slider {
+  box-shadow: 0 0 0 2px rgba(255, 128, 128, 0.6), 0 0 4px rgba(255, 128, 128, 0.5);
+}
+
+.checkbox-wrapper-59--blue .slider:before {
+  background-color: #ff9aa0;
+}
+
+.checkbox-wrapper-59--blue input:checked + .slider:before {
+  background-color: #4ed5ff;
+}
+
+.checkbox-wrapper-59--blue input:checked + .slider {
+  box-shadow: 0 0 0 2px rgba(78, 213, 255, 0.9), 0 0 8px rgba(78, 213, 255, 0.8);
 }
 
 .help-circle.animated-help {

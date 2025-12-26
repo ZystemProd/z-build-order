@@ -16,6 +16,7 @@ import { renderMapPoolPicker as renderMapPoolPickerUI } from "./maps/pool.js";
 import { attachPlayerDetailHandlers } from "./playerDetail.js";
 import { ensureTestHarnessPanel } from "./ui/testHarness.js";
 import { enableDragScroll } from "./ui/dragScroll.js";
+import { lockBodyScroll, unlockBodyScroll } from "./modalLock.js";
 
 export function initTournamentPage({
   handleRegistration,
@@ -105,6 +106,8 @@ export function initTournamentPage({
   const createCircuitModal = document.getElementById("createCircuitModal");
   const closeCreateCircuit = document.getElementById("closeCreateCircuit");
   const saveCircuitBtn = document.getElementById("saveCircuitBtn");
+  const nextCreateCircuitStep = document.getElementById("nextCreateCircuitStep");
+  const backCreateCircuitStep = document.getElementById("backCreateCircuitStep");
   const refreshTournaments = document.getElementById("refreshTournaments");
   const generateSlugBtn = document.getElementById("generateSlugBtn");
   const generateCircuitSlugBtn = document.getElementById("generateCircuitSlugBtn");
@@ -129,8 +132,8 @@ export function initTournamentPage({
   const settingsPanels = document.querySelectorAll("#settingsTab .settings-panel");
   const createTabBtns = document.querySelectorAll("[data-create-tab]");
   const createPanels = document.querySelectorAll("#createTournamentModal .settings-panel");
-  const createCircuitTabBtns = document.querySelectorAll("[data-create-circuit-tab]");
-  const createCircuitPanels = document.querySelectorAll("#createCircuitModal .settings-panel");
+  const createFinalTabBtns = document.querySelectorAll("[data-final-create-tab]");
+  const createFinalPanels = document.querySelectorAll("#createFinalPanel .create-final-panel");
   const saveSettingsBtn = document.getElementById("saveSettingsBtn");
   const settingsDescToolbarBtns = document.querySelectorAll("[data-settings-desc-action]");
   const settingsRulesToolbarBtns = document.querySelectorAll("[data-settings-rules-action]");
@@ -165,6 +168,52 @@ export function initTournamentPage({
   const saveVetoBtn = document.getElementById("saveVetoBtn");
   const refreshCircuitBtn = document.getElementById("refreshCircuitBtn");
 
+  const setModalVisible = (modal, visible, display = "flex") => {
+    if (!modal) return;
+    modal.style.display = visible ? display : "none";
+    if (visible) {
+      lockBodyScroll();
+    } else {
+      unlockBodyScroll();
+    }
+  };
+
+  const initDatePickers = () => {
+    if (typeof window.flatpickr !== "function") return;
+    const options = {
+      enableTime: true,
+      time_24hr: true,
+      allowInput: true,
+      dateFormat: "Y-m-d\\TH:i",
+      disableMobile: true,
+    };
+    const ensurePicker = (input) => {
+      if (!input || input._flatpickr) return input?._flatpickr || null;
+      if (typeof window.flatpickr !== "function") return null;
+      return window.flatpickr(input, options);
+    };
+    const inputs = [
+      document.getElementById("tournamentStartInput"),
+      document.getElementById("finalTournamentStartInput"),
+      document.getElementById("settingsStartInput"),
+    ];
+    inputs.forEach((input) => {
+      ensurePicker(input);
+    });
+
+    document.querySelectorAll("[data-datepicker-for]").forEach((button) => {
+      const targetId = button.dataset.datepickerFor;
+      if (!targetId) return;
+      const target = document.getElementById(targetId);
+      if (!target) return;
+      button.addEventListener("click", () => {
+        const picker = ensurePicker(target);
+        if (picker) picker.open();
+        else target.focus();
+      });
+    });
+  };
+
   const bindImagePreview = (inputEl, previewEl) => {
     if (!inputEl || !previewEl) return;
     inputEl.addEventListener("change", () => {
@@ -193,6 +242,8 @@ export function initTournamentPage({
   };
 
   registrationForm?.addEventListener("submit", handleRegistration);
+
+  initDatePickers();
   rebuildBtn?.addEventListener("click", () => goLiveTournament?.());
   removeNotCheckedInBtn?.addEventListener("click", () => removeNotCheckedInPlayers?.());
   resetBtn?.addEventListener("click", () => {
@@ -228,14 +279,14 @@ export function initTournamentPage({
 
   openCreateTournament?.addEventListener("click", async () => {
     await populateCreateForm();
-    if (createModal) createModal.style.display = "flex";
+    setModalVisible(createModal, true);
   });
   closeCreateTournament?.addEventListener("click", () => {
-    if (createModal) createModal.style.display = "none";
+    setModalVisible(createModal, false);
   });
   window.addEventListener("mousedown", (e) => {
     if (createModal && createModal.style.display === "flex" && e.target === createModal) {
-      createModal.style.display = "none";
+      setModalVisible(createModal, false);
     }
   });
   saveTournamentBtn?.addEventListener("click", handleCreateTournament || handleRegistration);
@@ -268,14 +319,36 @@ export function initTournamentPage({
       closeDeleteTournamentModal?.();
     }
   });
+  const setCreateCircuitStep = (step) => {
+    const circuitPanel = document.getElementById("createCircuitGeneral");
+    const finalPanel = document.getElementById("createFinalPanel");
+    const isFinal = step === "final";
+    if (circuitPanel) circuitPanel.classList.toggle("active", !isFinal);
+    if (finalPanel) finalPanel.classList.toggle("active", isFinal);
+    if (nextCreateCircuitStep)
+      nextCreateCircuitStep.style.display = isFinal ? "none" : "inline-flex";
+    if (backCreateCircuitStep)
+      backCreateCircuitStep.style.display = isFinal ? "inline-flex" : "none";
+    if (saveCircuitBtn) saveCircuitBtn.style.display = isFinal ? "inline-flex" : "none";
+    if (isFinal && createFinalTabBtns.length) {
+      createFinalTabBtns.forEach((b) =>
+        b.classList.toggle("active", b.dataset.finalCreateTab === "createFinalGeneral")
+      );
+      createFinalPanels.forEach((panel) =>
+        panel.classList.toggle("active", panel.id === "createFinalGeneral")
+      );
+    }
+  };
+
   openCreateCircuit?.addEventListener("click", async () => {
     await populateCreateCircuitForm?.();
     resetFinalMapPoolSelection?.();
     updateFinalSlugPreview?.();
-    if (createCircuitModal) createCircuitModal.style.display = "flex";
+    setCreateCircuitStep("circuit");
+    setModalVisible(createCircuitModal, true);
   });
   closeCreateCircuit?.addEventListener("click", () => {
-    if (createCircuitModal) createCircuitModal.style.display = "none";
+    setModalVisible(createCircuitModal, false);
   });
   window.addEventListener("mousedown", (e) => {
     if (
@@ -283,7 +356,7 @@ export function initTournamentPage({
       createCircuitModal.style.display === "flex" &&
       e.target === createCircuitModal
     ) {
-      createCircuitModal.style.display = "none";
+      setModalVisible(createCircuitModal, false);
     }
   });
   saveCircuitBtn?.addEventListener("click", handleCreateCircuit);
@@ -304,6 +377,7 @@ export function initTournamentPage({
   });
   finalSlugInput?.addEventListener("input", () => updateFinalSlugPreview?.());
   refreshCircuitBtn?.addEventListener("click", () => refreshCircuitView?.());
+  setCreateCircuitStep("circuit");
 
   createTabBtns.forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -313,12 +387,14 @@ export function initTournamentPage({
       createPanels.forEach((panel) => panel.classList.toggle("active", panel.id === target));
     });
   });
-  createCircuitTabBtns.forEach((btn) => {
+  nextCreateCircuitStep?.addEventListener("click", () => setCreateCircuitStep("final"));
+  backCreateCircuitStep?.addEventListener("click", () => setCreateCircuitStep("circuit"));
+  createFinalTabBtns.forEach((btn) => {
     btn.addEventListener("click", () => {
-      const target = btn.dataset.createCircuitTab;
+      const target = btn.dataset.finalCreateTab;
       if (!target) return;
-      createCircuitTabBtns.forEach((b) => b.classList.toggle("active", b === btn));
-      createCircuitPanels.forEach((panel) =>
+      createFinalTabBtns.forEach((b) => b.classList.toggle("active", b === btn));
+      createFinalPanels.forEach((panel) =>
         panel.classList.toggle("active", panel.id === target)
       );
     });
