@@ -1000,8 +1000,16 @@ async function populateCreateForm() {
   });
   renderChosenMapsUI("chosenMapList", { mapPoolSelection, getMapByName });
   const slugInput = document.getElementById("tournamentSlugInput");
+  const nameInput = document.getElementById("tournamentNameInput");
   if (slugInput && !slugInput.value) {
-    slugInput.value = await generateUniqueSlug();
+    const baseName = (nameInput?.value || "").trim();
+    if (baseName) {
+      slugInput.value = await generateUniqueSlug(baseName);
+      slugInput.dataset.auto = "true";
+    } else {
+      slugInput.value = "";
+      slugInput.dataset.auto = "true";
+    }
     updateSlugPreview();
   }
   const imageInput = document.getElementById("tournamentImageInput");
@@ -1720,9 +1728,18 @@ async function handleCreateTournament(event) {
     ? Boolean(document.getElementById("circuitFinalToggle")?.checked)
     : false;
   const name = (nameInput?.value || "").trim();
-  const slug =
-    (slugInput?.value || "").trim().toLowerCase() ||
-    (await generateUniqueSlug());
+  if (!name) {
+    showToast?.("Tournament name is required.", "error");
+    return;
+  }
+  const rawSlug = (slugInput?.value || "").trim();
+  const slugBase = rawSlug || name;
+  const slug = await generateUniqueSlug(slugBase);
+  if (slugInput && slug && slugInput.value !== slug) {
+    slugInput.value = slug;
+    slugInput.dataset.auto = "true";
+    updateSlugPreview();
+  }
   const format = (formatSelect?.value || "Double Elimination").trim();
   const startTime = startInput?.value ? new Date(startInput.value) : null;
   const maxPlayers = maxPlayersInput?.value
@@ -1732,10 +1749,6 @@ async function handleCreateTournament(event) {
   const description = descriptionInput?.value || "";
   const rules = rulesInput?.value || "";
   const rrSettings = extractRoundRobinSettingsUI("create", defaultRoundRobinSettings);
-  if (!name) {
-    showToast?.("Tournament name is required.", "error");
-    return;
-  }
   try {
     const payload = buildCreateTournamentPayload({
       slug,

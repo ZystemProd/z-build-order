@@ -146,9 +146,11 @@ export function initTournamentPage({
   const finalImagePreview = document.getElementById("finalTournamentImagePreview");
   const settingsImageInput = document.getElementById("settingsImageInput");
   const settingsImagePreview = document.getElementById("settingsImagePreview");
+  const nameInput = document.getElementById("tournamentNameInput");
   const slugInput = document.getElementById("tournamentSlugInput");
   const circuitSlugInput = document.getElementById("circuitSlugInput");
   const finalSlugInput = document.getElementById("finalTournamentSlugInput");
+  const finalNameInput = document.getElementById("finalTournamentNameInput");
   const generateFinalSlugBtn = document.getElementById("generateFinalSlugBtn");
   const bestOfUpperInput = document.getElementById("bestOfUpperInput");
   const bestOfLowerInput = document.getElementById("bestOfLowerInput");
@@ -308,13 +310,41 @@ export function initTournamentPage({
   });
   saveTournamentBtn?.addEventListener("click", handleCreateTournament || handleRegistration);
   refreshTournaments?.addEventListener("click", () => renderTournamentList());
+  let slugAutoTimer = null;
+  const queueSlugFromName = () => {
+    if (!nameInput || !slugInput || !generateUniqueSlug) return;
+    const shouldAuto =
+      !slugInput.value || slugInput.dataset.auto === "true";
+    if (!shouldAuto) return;
+    const nameValue = nameInput.value || "";
+    if (!nameValue.trim()) {
+      slugInput.value = "";
+      slugInput.dataset.auto = "true";
+      updateSlugPreview();
+      return;
+    }
+    if (slugAutoTimer) window.clearTimeout(slugAutoTimer);
+    slugAutoTimer = window.setTimeout(async () => {
+      const nextSlug = await generateUniqueSlug(nameValue);
+      if (!nextSlug) return;
+      slugInput.value = nextSlug;
+      slugInput.dataset.auto = "true";
+      updateSlugPreview();
+    }, 250);
+  };
   generateSlugBtn?.addEventListener("click", async () => {
-    const input = document.getElementById("tournamentSlugInput");
-    if (input) input.value = (await generateUniqueSlug()).toLowerCase();
+    if (!slugInput) return;
+    const nextSlug = await generateUniqueSlug(nameInput?.value || "");
+    slugInput.value = nextSlug.toLowerCase();
+    slugInput.dataset.auto = "true";
     await validateSlug();
     updateSlugPreview();
   });
-  slugInput?.addEventListener("input", () => updateSlugPreview());
+  nameInput?.addEventListener("input", () => queueSlugFromName());
+  slugInput?.addEventListener("input", () => {
+    if (slugInput) slugInput.dataset.auto = "false";
+    updateSlugPreview();
+  });
   openCreateCircuitTournament?.addEventListener("click", () => {
     openCircuitTournamentModal?.();
   });
@@ -389,7 +419,7 @@ export function initTournamentPage({
   });
   generateFinalSlugBtn?.addEventListener("click", async () => {
     if (!finalSlugInput || !generateUniqueSlug) return;
-    finalSlugInput.value = (await generateUniqueSlug()).toLowerCase();
+    finalSlugInput.value = (await generateUniqueSlug(finalNameInput?.value || "")).toLowerCase();
     updateFinalSlugPreview?.();
   });
   finalSlugInput?.addEventListener("input", () => updateFinalSlugPreview?.());

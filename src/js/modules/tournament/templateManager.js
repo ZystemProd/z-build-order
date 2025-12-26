@@ -2,6 +2,7 @@ import { showToast } from "../toastHandler.js";
 import { defaultBestOf, defaultRoundRobinSettings } from "./state.js";
 import { readBestOf } from "./tournamentPayloads.js";
 import { extractRoundRobinSettings, syncFormatFieldVisibility } from "./settings/ui.js";
+import { slugify } from "./slugs.js";
 
 const TOURNAMENT_TEMPLATE_STORAGE_KEY = "zbo:tournamentTemplates:v1";
 let tournamentTemplates = loadTournamentTemplates();
@@ -42,11 +43,11 @@ function saveTournamentTemplate(template) {
   );
   const existing =
     existingIndex >= 0 ? tournamentTemplates[existingIndex] : null;
+  const existingIds = new Set(tournamentTemplates.map((item) => item.id).filter(Boolean));
+  const nextId = template.id || buildUniqueTemplateId(template.name, existingIds, now);
   const savedTemplate = {
     ...template,
-    id:
-      template.id ||
-      `tpl_${now}_${Math.random().toString(36).slice(2, 7)}`,
+    id: nextId,
     createdAt: existing?.createdAt || now,
     updatedAt: now,
   };
@@ -57,6 +58,17 @@ function saveTournamentTemplate(template) {
   }
   persistTournamentTemplates(tournamentTemplates);
   return savedTemplate;
+}
+
+function buildUniqueTemplateId(name, existingIds, now) {
+  const baseSlug = slugify(name) || `tpl-${now.toString(36)}`;
+  let candidate = baseSlug;
+  let counter = 2;
+  while (existingIds.has(candidate)) {
+    candidate = `${baseSlug}-${counter}`;
+    counter += 1;
+  }
+  return candidate;
 }
 
 function deleteTournamentTemplate(templateId) {
