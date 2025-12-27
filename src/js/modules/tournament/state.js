@@ -28,6 +28,9 @@ export const defaultState = {
   lastUpdated: Date.now(),
   bracketLayoutVersion: 1,
   matchVetoes: {},
+  casters: [],
+  casterRequests: [],
+  matchCasts: {},
   isLive: false,
   disableFinalAutoAdd: false,
 };

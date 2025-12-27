@@ -66,6 +66,7 @@ export function initTournamentPage({
   setPlayerCheckIn,
   removePlayer,
   updateMatchScore,
+  renderAll,
   saveState,
   handleAddCircuitPointsRow,
   handleRemoveCircuitPointsRow,
@@ -688,6 +689,7 @@ export function initTournamentPage({
     getMapByName,
     updateMatchScore,
     saveState,
+    renderAll,
   });
 
   // Wire test harness buttons if callbacks provided

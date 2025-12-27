@@ -27,6 +27,7 @@ export function normalizeCircuitData(data = {}, fallbackSlug = "") {
       data.pointsOverrides && typeof data.pointsOverrides === "object"
         ? { ...data.pointsOverrides }
         : {},
+    admins: Array.isArray(data.admins) ? data.admins : [],
     createdBy: data.createdBy || null,
     createdByName: data.createdByName || data.hostName || null,
     createdAt: createdAt || null,

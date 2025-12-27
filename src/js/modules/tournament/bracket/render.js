@@ -17,6 +17,12 @@ const INFO_ICON_SVG = `<svg class="info-icon" viewBox="0 0 24 24" aria-hidden="t
   <circle cx="12" cy="7.5" r="1.25" fill="currentColor"></circle>
 </svg>`;
 
+const CAST_ICON_SVG = `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+  <circle cx="12" cy="12" r="3" fill="currentColor"></circle>
+  <path d="M6.5 7.5a8 8 0 0 1 11 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+  <path d="M4 5a12 12 0 0 1 16 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+</svg>`;
+
 let currentUsernameHint = "";
 
 function setCurrentUsernameHint(username) {
@@ -90,6 +96,17 @@ function displayPlaceholderForSource(match, participantIdx, lookup) {
   }
 
   return "Awaiting player";
+}
+
+function renderCastIndicator(match) {
+  const cast = state.matchCasts?.[match.id] || null;
+  if (!cast) return "";
+  const casterName = escapeHtml(cast.name || "Caster");
+  return `<button class="cast-indicator cast-indicator-btn" type="button" data-match-id="${escapeHtml(
+    match.id || ""
+  )}" title="Casting: ${casterName}" aria-label="Casting">
+    ${CAST_ICON_SVG}
+  </button>`;
 }
 
 export function renderMatchCard(match, lookup, playersById) {
@@ -258,6 +275,7 @@ export function renderSimpleMatch(
   const baseStyle = isTreeLayout
     ? `top:${y}px; left:${x}px; width:${w}px; height:${h}px; ${extraStyle}`
     : extraStyle;
+  const castIndicator = renderCastIndicator(match);
 
   const parsedGroupNumber =
     layout === "group" ? parseMatchNumber(match?.id || "") : null;
@@ -269,6 +287,7 @@ export function renderSimpleMatch(
   const html = `<div class="${cardClass}" data-match-id="${
     match.id
   }" style="${baseStyle}">
+    ${castIndicator}
     <span class="match-number">${matchNumberLabel}</span>
     <div class="row ${
       match.winnerId === pA?.id ? "winner" : ""

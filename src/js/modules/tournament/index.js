@@ -209,6 +209,8 @@ import {
   readBestOf,
 } from "./tournamentPayloads.js";
 import { createAdminPlayerSearch } from "./admin/addSearchPlayer.js";
+import { createAdminManager } from "./admin/manageAdmins.js";
+import { initCasterControls, renderCasterSection } from "./caster.js";
 import {
   INVITE_STATUS,
   normalizeInviteStatus,
@@ -233,6 +235,32 @@ const storage = getStorage(app);
 let currentCircuitMeta = null;
 let isCircuitAdmin = false;
 let circuitPointsBtnTemplate = null;
+const adminManager = createAdminManager({
+  auth,
+  db,
+  doc,
+  collection,
+  setDoc,
+  CIRCUIT_COLLECTION,
+  TOURNAMENT_COLLECTION,
+  lockBodyScroll,
+  unlockBodyScroll,
+  showToast,
+  getCurrentTournamentMeta: () => currentTournamentMeta,
+  setCurrentTournamentMeta: (next) => setCurrentTournamentMetaState(next),
+  getCurrentCircuitMeta: () => currentCircuitMeta,
+  setCurrentCircuitMeta: (next) => {
+    currentCircuitMeta = next;
+  },
+});
+const {
+  isAdminForMeta,
+  renderTournamentAdmins,
+  renderCircuitAdmins,
+  updateTournamentAdminInviteVisibility,
+  updateCircuitAdminInviteVisibility,
+  initAdminInviteModal,
+} = adminManager;
 function renderMarkdown(text = "") {
   return DOMPurify.sanitize(text || "").replace(/\n/g, "<br>");
 }
@@ -261,8 +289,17 @@ function syncFromRemote(incoming) {
   const presenceChanged =
     incomingPresence &&
     JSON.stringify(incomingPresence) !== JSON.stringify(currentPresence || {});
+  const casterChanged =
+    JSON.stringify(incoming.casterRequests || []) !==
+      JSON.stringify(state.casterRequests || []) ||
+    JSON.stringify(incoming.casters || []) !== JSON.stringify(state.casters || []) ||
+    JSON.stringify(incoming.matchCasts || {}) !== JSON.stringify(state.matchCasts || {});
 
-  if (incoming.lastUpdated && incoming.lastUpdated <= state.lastUpdated) {
+  if (
+    incoming.lastUpdated &&
+    incoming.lastUpdated <= state.lastUpdated &&
+    !casterChanged
+  ) {
     if (presenceChanged) {
       setStateObj({ ...state, presence: { matchInfo: incomingPresence } });
       refreshMatchInfoPresenceIfOpen?.();
@@ -452,6 +489,7 @@ function renderAll() {
     }
 
     updateCheckInUI();
+    renderCasterSection();
 
     if (liveDot) {
       liveDot.textContent = state.isLive ? "Live" : "Not Live";
@@ -1314,6 +1352,8 @@ const {
   setIsCircuitAdmin: (next) => {
     isCircuitAdmin = next;
   },
+  isAdminForMeta,
+  renderAdmins: renderCircuitAdmins,
 });
 
 function setStatus(el, message, isError = false) {
@@ -1644,6 +1684,7 @@ async function handleCreateCircuit(event) {
     description,
     tournaments: [],
     finalTournamentSlug: "",
+    admins: [],
     createdBy: auth.currentUser.uid,
     createdByName:
       getCurrentUsername?.() || auth.currentUser.displayName || "Unknown",
@@ -1951,6 +1992,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     setPlayerCheckIn,
     removePlayer,
     updateMatchScore,
+    renderAll,
     saveState,
     handleAddCircuitPointsRow,
     handleRemoveCircuitPointsRow,
@@ -1963,7 +2005,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     notifyCheckInPlayers,
     goLiveTournament,
   });
+  initCasterControls({ saveState });
   initFinalAdminSearch();
+  initAdminInviteModal();
   initFinalAutoAddToggle();
 
   if (typeof window !== "undefined") {
@@ -2052,6 +2096,7 @@ function updateAdminVisibility() {
   }
 }
 
+
 function updateFinalAutoAddRow() {
   const row = document.getElementById("finalAutoAddRow");
   const toggle = document.getElementById("finalAutoAddToggle");
@@ -2074,12 +2119,13 @@ function updateFinalAdminAddVisibility() {
 
 function recomputeAdminFromMeta() {
   const uid = auth?.currentUser?.uid || null;
-  const owns = Boolean(uid && currentTournamentMeta?.createdBy === uid);
+  const owns = Boolean(uid && isAdminForMeta(currentTournamentMeta, uid));
   setIsAdminState(owns);
   if (typeof window !== "undefined") {
     window.__tournamentIsAdmin = owns;
   }
   updateAdminVisibility();
+  renderTournamentAdmins(currentTournamentMeta);
 }
 
 function initFinalAutoAddToggle() {
@@ -2901,6 +2947,7 @@ function initFinalAdminSearch() {
     search.addByUsername(username, userId);
   });
 }
+
 
 function mmrForRace(raceLabel) {
   const key = normalizeRaceKey(raceLabel);

@@ -89,6 +89,13 @@ export function updateMatchScore(
     match.status = "pending";
   }
 
-  saveState?.({ bracket: state.bracket });
+  const shouldClearCast = finalize && match.status === "complete";
+  if (shouldClearCast && state.matchCasts?.[matchId]) {
+    const nextMatchCasts = { ...(state.matchCasts || {}) };
+    delete nextMatchCasts[matchId];
+    saveState?.({ bracket: state.bracket, matchCasts: nextMatchCasts });
+  } else {
+    saveState?.({ bracket: state.bracket });
+  }
   renderAll?.();
 }

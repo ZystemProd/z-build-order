@@ -35,6 +35,44 @@
       display: grid;
       gap: 24px;
     }
+
+    .hero-admins {
+      display: grid;
+      gap: 12px;
+    }
+
+    .hero-admins-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .hero-admins-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .hero-admin-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      font-size: 0.9rem;
+    }
+
+    .hero-admin-role {
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.16);
+      font-size: 0.7rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
   </style>
   <link rel="stylesheet" href="/public/css/tournament.css" />
   <link id="clanStylesheet" rel="stylesheet" href="/public/css/clan.css" />
@@ -133,6 +171,31 @@
     </div>
   </div>
 
+  <div id="adminInviteModal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <button id="closeAdminInviteModal" class="modal-close-button" type="button" aria-label="Close admin invite">
+        ×
+      </button>
+      <div class="modal-title-row">
+        <h3 id="adminInviteTitle">Manage admins</h3>
+      </div>
+      <div class="admin-invite-grid">
+        <div class="admin-invite-current">
+          <p class="eyebrow">Current admins</p>
+          <div class="admin-invite-list" id="adminInviteCurrentList"></div>
+        </div>
+        <div class="admin-invite-search">
+          <label>Find user by username
+            <input id="adminInviteSearchInput" type="text" placeholder="Search username..." autocomplete="off"
+              spellcheck="false" />
+          </label>
+          <div class="admin-search-results" id="adminInviteSearchResults"></div>
+          <p class="helper" id="adminInviteStatus"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="usernameModal" class="modal" style="display: none">
     <div class="modal-content scrollable-modal">
       <h3>Choose a Username</h3>
@@ -189,7 +252,7 @@
 
     <!-- Circuit detail -->
     <section id="circuitView" style="display:none;">
-      <header class="hero">
+      <header class="hero hero-with-admins">
         <div class="hero-main">
           <a class="ghost-link" href="/tournament"><span class="ghost-link-icon">←</span>All tournaments</a>
           <p class="eyebrow">Circuit</p>
@@ -209,6 +272,17 @@
           <div class="stat-card accent">
             <p>Players ranked</p>
             <h2 id="circuitStatPlayers">0</h2>
+          </div>
+        </div>
+        <div class="hero-admin-panel">
+          <div class="hero-admins" id="circuitAdminSection">
+            <div class="hero-admins-header">
+              <span class="eyebrow">Admins</span>
+              <button id="inviteCircuitAdminBtn" class="cta ghost small" type="button" style="display:none;">
+                Manage admins
+              </button>
+            </div>
+            <div class="hero-admins-list" id="circuitAdminList"></div>
           </div>
         </div>
       </header>
@@ -256,7 +330,7 @@
 
     <!-- Tournament detail -->
     <section id="tournamentView" style="display:none;">
-      <header class="hero">
+      <header class="hero hero-with-admins">
         <div class="hero-main">
           <a class="ghost-link" href="/tournament" id="tournamentBackLink"><span class="ghost-link-icon">←</span>All tournaments</a>
           <h1 id="tournamentTitle">Tournament</h1>
@@ -270,6 +344,17 @@
           <p>Start</p>
           <h2 id="tournamentStart">TBD</h2>
         </div>
+        </div>
+        <div class="hero-admin-panel">
+          <div class="hero-admins" id="tournamentAdminSection">
+            <div class="hero-admins-header">
+              <span class="eyebrow">Admins</span>
+              <button id="inviteTournamentAdminBtn" class="cta ghost small" type="button" style="display:none;">
+                Invite admin
+              </button>
+            </div>
+            <div class="hero-admins-list" id="tournamentAdminList"></div>
+          </div>
         </div>
       </header>
 
@@ -389,6 +474,23 @@
             </div>
             <p id="mmrStatus" class="helper" style="display:none;"></p>
           </form>
+          <div class="caster-section" id="casterSection">
+            <p class="helper">
+              Register as a caster to stream the game on Twitch. A host or admin must accept your request.
+            </p>
+            <div class="caster-actions">
+              <button type="button" class="cta ghost" id="requestCasterBtn">Request caster access</button>
+              <p class="helper" id="casterRequestStatus"></p>
+            </div>
+            <div class="caster-requests" id="casterRequestPanel" data-admin-only="true" style="display:none;">
+              <div class="section-title">
+                <p class="eyebrow">Caster requests</p>
+                <h4>Awaiting approval</h4>
+              </div>
+              <div class="caster-request-list" id="casterRequestList"></div>
+              <p class="helper" id="casterRequestAdminStatus"></p>
+            </div>
+          </div>
           <div class="admin-add-player" data-admin-only="true" id="finalAdminAddPanel" style="display:none;">
             <label>Find player by username
               <input id="finalAdminSearchInput" type="text" placeholder="Search username..."
@@ -1805,8 +1907,10 @@
         <button class="cta primary" id="confirmMatchScoreBtn" style="display:none;">
           Confirm score
         </button>
+        <button class="cta ghost" id="castMatchBtn" style="display:none;">Cast</button>
         <button class="cta primary" id="openMapVetoBtn">Map veto</button>
       </div>
+      <p class="helper match-cast-status" id="castMatchStatus" style="display:none;"></p>
     </div>
   </div>
 

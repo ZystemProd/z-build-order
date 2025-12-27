@@ -14,6 +14,8 @@ export function createCircuitPageHandlers({
   getAuthUid,
   getIsCircuitAdmin,
   setIsCircuitAdmin,
+  isAdminForMeta,
+  renderAdmins,
 } = {}) {
   if (!fetchCircuitMeta || !renderCircuitView) {
     throw new Error("Missing dependencies for circuit page handlers.");
@@ -28,9 +30,12 @@ export function createCircuitPageHandlers({
   function recomputeCircuitAdminFromMeta() {
     const uid = getAuthUid();
     const meta = getCurrentCircuitMeta();
-    const isAdmin = Boolean(uid && meta?.createdBy === uid);
+    const isAdmin = typeof isAdminForMeta === "function"
+      ? isAdminForMeta(meta, uid)
+      : Boolean(uid && meta?.createdBy === uid);
     setIsCircuitAdmin(isAdmin);
     updateCircuitAdminVisibility();
+    renderAdmins?.(meta);
   }
 
   async function enterCircuit(slug, options = {}) {

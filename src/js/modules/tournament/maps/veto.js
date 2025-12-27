@@ -25,6 +25,7 @@ import {
   TOURNAMENT_STATE_COLLECTION,
   pulseProfile,
 } from "../state.js";
+import { getCasterEntryByUid } from "../caster.js";
 import { getMatchLookup, resolveParticipants } from "../bracket/lookup.js";
 import { escapeHtml, getBestOfForMatch } from "../bracket/renderUtils.js";
 import { renderBracketView } from "../bracket/render.js";
@@ -198,6 +199,8 @@ export function openMatchInfoModal(
   const serverEl = document.getElementById("matchInfoServer");
   const openVetoBtn = document.getElementById("openMapVetoBtn");
   const confirmScoreBtn = document.getElementById("confirmMatchScoreBtn");
+  const castBtn = document.getElementById("castMatchBtn");
+  const castStatus = document.getElementById("castMatchStatus");
   const walkoverSelect = document.getElementById("matchInfoWalkoverSelect");
   const closeBtn = document.getElementById("closeMatchInfoModal");
   const helpBtn = document.getElementById("matchInfoHelpBtn");
@@ -220,6 +223,8 @@ export function openMatchInfoModal(
   const rightPlayerId = pB?.id || null;
   const uid = auth?.currentUser?.uid || null;
   const me = resolveCurrentPlayerForPresence();
+  const casterEntry = getCasterEntryByUid(uid);
+  const isCaster = Boolean(casterEntry || isAdmin);
   const isParticipant =
     (me?.id && (me.id === leftPlayerId || me.id === rightPlayerId)) ||
     (uid && (uid === pA?.uid || uid === pB?.uid));
@@ -250,6 +255,55 @@ export function openMatchInfoModal(
   if (bestOfEl) bestOfEl.textContent = `Best of ${bestOf}`;
   if (leftNameEl) leftNameEl.textContent = aName;
   if (rightNameEl) rightNameEl.textContent = bName;
+  if (castBtn) {
+    const currentCast = state.matchCasts?.[matchId] || null;
+    const isCasting = Boolean(currentCast?.uid && currentCast.uid === uid);
+    const isTaken = Boolean(currentCast?.uid && currentCast.uid !== uid);
+    if (!isCaster) {
+      castBtn.style.display = "none";
+      castBtn.onclick = null;
+    } else {
+      castBtn.style.display = "inline-flex";
+      castBtn.textContent = isCasting ? "Stop Casting" : "Cast";
+      castBtn.disabled = isTaken;
+      castBtn.onclick = () => {
+        if (!uid) {
+          showToast?.("Sign in to cast a match.", "error");
+          return;
+        }
+        const nextMatchCasts = { ...(state.matchCasts || {}) };
+        if (isCasting) {
+          delete nextMatchCasts[matchId];
+        } else if (isTaken) {
+          showToast?.("This match already has a caster.", "error");
+          return;
+        } else {
+          nextMatchCasts[matchId] = {
+            uid,
+            name: casterEntry?.name || getCurrentUsername?.() || "Caster",
+            twitchUrl: casterEntry?.twitchUrl || "",
+            startedAt: Date.now(),
+          };
+        }
+        vetoDeps?.saveState?.({ matchCasts: nextMatchCasts });
+        vetoDeps?.renderAll?.();
+        openMatchInfoModal(matchId, vetoDeps);
+      };
+    }
+  }
+  if (castStatus) {
+    const currentCast = state.matchCasts?.[matchId] || null;
+    let message = "";
+    if (currentCast?.uid && currentCast.uid === uid) {
+      message = "You are casting this match.";
+    } else if (currentCast?.uid) {
+      message = `Casting: ${currentCast.name || "Caster"}.`;
+    } else if (isCaster) {
+      message = "Mark this match as casting to show the stream icon.";
+    }
+    castStatus.textContent = message;
+    castStatus.style.display = message ? "block" : "none";
+  }
   if (leftFlagEl) {
     const flag = countryCodeToFlag(pA?.country || "");
     leftFlagEl.textContent = flag;
