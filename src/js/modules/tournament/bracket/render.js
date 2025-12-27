@@ -357,7 +357,8 @@ export function layoutBracketSection(
   lookup,
   playersById,
   offsetX,
-  matchLayerOffset = 0
+  matchLayerOffset = 0,
+  roundLabelOptions = {}
 ) {
   if (!rounds?.length) {
     return { html: "", height: 0 };
@@ -720,7 +721,7 @@ export function layoutBracketSection(
         ? `<span class="round-bo">Bo${bestOfLabel}</span>`
         : "";
 
-      const label = getRoundLabel(titlePrefix, idx, totalRounds);
+      const label = getRoundLabel(titlePrefix, idx, totalRounds, roundLabelOptions);
 
       return `<div class="round-title row-title" style="left:${
         offsetX + idx * (CARD_WIDTH + H_GAP)
@@ -765,7 +766,7 @@ export function makeVConnector(x, y1, y2, meta = {}) {
   )}px; height:${Math.abs(y2 - y1)}px;"></div>`;
 }
 
-function getRoundLabel(titlePrefix, idx, totalRounds) {
+function getRoundLabel(titlePrefix, idx, totalRounds, { hasGrandFinal = false } = {}) {
   const fromEnd = totalRounds - idx;
 
   if (titlePrefix === "Playoffs") {
@@ -775,8 +776,10 @@ function getRoundLabel(titlePrefix, idx, totalRounds) {
   }
 
   if (titlePrefix === "Upper") {
-    if (fromEnd === 1) return "Final";
-    if (fromEnd === 2) return "Semi-final";
+    if (fromEnd === 1) return hasGrandFinal ? "Grand Final" : "Final";
+    if (fromEnd === 2) return hasGrandFinal ? "Upper Final" : "Semi-final";
+    if (fromEnd === 3) return hasGrandFinal ? "Semi-final" : "Quarterfinal";
+    if (fromEnd === 4) return hasGrandFinal ? "Quarterfinal" : `Upper Round ${idx + 1}`;
     return `Upper Round ${idx + 1}`;
   }
 
@@ -1197,7 +1200,8 @@ export function renderBracketView({
     lookup,
     playersById,
     0,
-    ROUND_TITLE_BAND
+    ROUND_TITLE_BAND,
+    { hasGrandFinal: Boolean(bracket.finals) }
   );
 
   let lower = { html: "", height: 0 };

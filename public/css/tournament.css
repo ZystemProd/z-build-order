@@ -3969,7 +3969,7 @@ label {
   flex-direction: column;
   gap: 24px;
   margin-top: 10px;
-  max-width: 30%;
+  max-width: 44%;
   margin-inline: auto; /* center inside the panel */
 }
 
@@ -4058,6 +4058,11 @@ label {
 
 .format-box--semi {
   background: rgba(78, 213, 255, 0.16);
+}
+
+.format-box--upper-final {
+  background: rgba(78, 213, 255, 0.22);
+  border-color: rgba(78, 213, 255, 0.4);
 }
 
 .format-box--final,

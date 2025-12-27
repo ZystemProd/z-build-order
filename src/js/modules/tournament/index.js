@@ -3301,13 +3301,15 @@ function sortRoundsByParents(rounds) {
 }
 
 // Helper: pretty round titles (Final / Semi-final / Lower Final, etc.)
-function getRoundLabel(titlePrefix, idx, totalRounds) {
+function getRoundLabel(titlePrefix, idx, totalRounds, { hasGrandFinal = false } = {}) {
   // idx is 0-based, totalRounds is the number of columns in this section
   const fromEnd = totalRounds - idx; // 1 = last round, 2 = second last, ...
 
   if (titlePrefix === "Upper") {
-    if (fromEnd === 1) return "Final";
-    if (fromEnd === 2) return "Semi-final";
+    if (fromEnd === 1) return hasGrandFinal ? "Grand Final" : "Final";
+    if (fromEnd === 2) return hasGrandFinal ? "Upper Final" : "Semi-final";
+    if (fromEnd === 3) return hasGrandFinal ? "Semi-final" : "Quarterfinal";
+    if (fromEnd === 4) return hasGrandFinal ? "Quarterfinal" : `Upper Round ${idx + 1}`;
     return `Upper Round ${idx + 1}`;
   }
 

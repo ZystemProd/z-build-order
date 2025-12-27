@@ -7,6 +7,7 @@ export function applyBestOfToSettings(bestOf) {
   const lowerInput = document.getElementById("settingsBestOfLower");
   const quarterInput = document.getElementById("settingsBestOfQuarter");
   const semiInput = document.getElementById("settingsBestOfSemi");
+  const upperFinalInput = document.getElementById("settingsBestOfUpperFinal");
   const finalInput = document.getElementById("settingsBestOfFinal");
   const lbSemiInput = document.getElementById("settingsBestOfLowerSemi");
   const lbFinalInput = document.getElementById("settingsBestOfLowerFinal");
@@ -16,6 +17,8 @@ export function applyBestOfToSettings(bestOf) {
   if (quarterInput)
     quarterInput.value = bestOf.quarter ?? defaultBestOf.quarter;
   if (semiInput) semiInput.value = bestOf.semi ?? defaultBestOf.semi;
+  if (upperFinalInput)
+    upperFinalInput.value = bestOf.upperFinal ?? defaultBestOf.upperFinal;
   if (finalInput) finalInput.value = bestOf.final ?? defaultBestOf.final;
   if (lbSemiInput)
     lbSemiInput.value = bestOf.lowerSemi ?? defaultBestOf.lowerSemi;
@@ -55,6 +58,7 @@ export function populateSettingsPanel({
   const lowerInput = document.getElementById("settingsBestOfLower");
   const quarterInput = document.getElementById("settingsBestOfQuarter");
   const semiInput = document.getElementById("settingsBestOfSemi");
+  const upperFinalInput = document.getElementById("settingsBestOfUpperFinal");
   const finalInput = document.getElementById("settingsBestOfFinal");
   const lbSemiInput = document.getElementById("settingsBestOfLowerSemi");
   const lbFinalInput = document.getElementById("settingsBestOfLowerFinal");
@@ -113,6 +117,8 @@ export function populateSettingsPanel({
   if (quarterInput)
     quarterInput.value = bestOf.quarter ?? defaultBestOf.quarter;
   if (semiInput) semiInput.value = bestOf.semi ?? defaultBestOf.semi;
+  if (upperFinalInput)
+    upperFinalInput.value = bestOf.upperFinal ?? defaultBestOf.upperFinal;
   if (finalInput) finalInput.value = bestOf.final ?? defaultBestOf.final;
   if (lbSemiInput)
     lbSemiInput.value = bestOf.lowerSemi ?? defaultBestOf.lowerSemi;

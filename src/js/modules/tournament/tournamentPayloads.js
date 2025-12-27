@@ -6,6 +6,7 @@ const BEST_OF_INPUT_IDS = {
     lowerFinal: "bestOfLowerFinalInput",
     quarter: "bestOfQuarterInput",
     semi: "bestOfSemiInput",
+    upperFinal: "bestOfUpperFinalInput",
     final: "bestOfFinalInput",
   },
   settings: {
@@ -13,6 +14,7 @@ const BEST_OF_INPUT_IDS = {
     lower: "settingsBestOfLower",
     quarter: "settingsBestOfQuarter",
     semi: "settingsBestOfSemi",
+    upperFinal: "settingsBestOfUpperFinal",
     final: "settingsBestOfFinal",
     lowerSemi: "settingsBestOfLowerSemi",
     lowerFinal: "settingsBestOfLowerFinal",
@@ -24,6 +26,7 @@ const BEST_OF_INPUT_IDS = {
     lowerFinal: "finalBestOfLowerFinalInput",
     quarter: "finalBestOfQuarterInput",
     semi: "finalBestOfSemiInput",
+    upperFinal: "finalBestOfUpperFinalInput",
     final: "finalBestOfFinalInput",
   },
 };
@@ -38,6 +41,9 @@ export function readBestOf(scope, defaultBestOf) {
     lowerFinal: Number(document.getElementById(ids.lowerFinal)?.value || defaultBestOf.lowerFinal),
     quarter: Number(document.getElementById(ids.quarter)?.value || defaultBestOf.quarter),
     semi: Number(document.getElementById(ids.semi)?.value || defaultBestOf.semi),
+    upperFinal: Number(
+      document.getElementById(ids.upperFinal)?.value || defaultBestOf.upperFinal
+    ),
     final: Number(document.getElementById(ids.final)?.value || defaultBestOf.final),
   };
 }

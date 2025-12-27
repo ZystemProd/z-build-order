@@ -58,8 +58,17 @@ export function getBestOfForMatch(match) {
   const winnersRounds = state.bracket?.winners?.length || 0;
 
   if (match.bracket === "winners") {
-    if (match.round === winnersRounds)
+    if (match.round === winnersRounds) {
+      if (state.bracket?.finals) {
+        return (
+          bestOf.upperFinal ??
+          bestOf.final ??
+          defaultBestOf.upperFinal ??
+          defaultBestOf.final
+        );
+      }
       return bestOf.final ?? defaultBestOf.final;
+    }
     if (match.round === winnersRounds - 1)
       return bestOf.semi ?? defaultBestOf.semi;
     if (match.round === winnersRounds - 2)

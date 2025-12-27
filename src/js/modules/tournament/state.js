@@ -61,6 +61,7 @@ export const defaultBestOf = {
   upper: 3,
   quarter: 3,
   semi: 3,
+  upperFinal: 5,
   final: 5,
   // lower bracket
   lower: 1,

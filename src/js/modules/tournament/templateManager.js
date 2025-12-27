@@ -178,6 +178,7 @@ function applyTournamentTemplate(template, setMapPoolSelection) {
   setBestOf("bestOfLowerFinalInput", bestOf.lowerFinal);
   setBestOf("bestOfQuarterInput", bestOf.quarter);
   setBestOf("bestOfSemiInput", bestOf.semi);
+  setBestOf("bestOfUpperFinalInput", bestOf.upperFinal);
   setBestOf("bestOfFinalInput", bestOf.final);
 
   if (Array.isArray(settings.mapPool)) {

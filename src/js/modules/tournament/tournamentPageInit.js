@@ -221,6 +221,82 @@ export function initTournamentPage({
     });
   };
 
+  const resolveMaxPlayers = (input) => {
+    const raw = input?.value;
+    const fallback = Number(input?.placeholder || 0);
+    const parsed = Number(raw);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+    if (Number.isFinite(fallback) && fallback > 0) return fallback;
+    return 8;
+  };
+
+  const nextPowerOfTwo = (value) => {
+    const v = Math.max(2, Math.floor(value || 2));
+    return 2 ** Math.ceil(Math.log2(v));
+  };
+
+  const getUpperLabelForSettings = (roundNumber, totalRounds, isDoubleElim) => {
+    const idx = Math.max(1, roundNumber);
+    const fromEnd = totalRounds - idx + 1;
+    if (fromEnd === 1) return isDoubleElim ? "Upper Final" : "Final";
+    if (fromEnd === 2) return "Semi-final";
+    if (fromEnd === 3) return "Quarterfinal";
+    return `Upper Round ${idx}`;
+  };
+
+  const updateFormatDiagramTitles = ({ root, maxPlayersInput, formatSelect }) => {
+    if (!root) return;
+    const format = (formatSelect?.value || "").toLowerCase();
+    const isDoubleElim = format.includes("double");
+    const maxPlayers = resolveMaxPlayers(maxPlayersInput);
+    const totalRounds = Math.max(1, Math.log2(nextPowerOfTwo(maxPlayers)));
+    const earlyRounds = Math.max(0, totalRounds - (isDoubleElim ? 3 : 2));
+    const upperTitle = root.querySelector(".format-col--upper-main .format-title");
+    const quarterTitle = root.querySelector(".format-col--quarter .format-title");
+    const semiTitle = root.querySelector(".format-col--semi .format-title");
+    const upperFinalTitle = root.querySelector(".format-col--upper-final .format-title");
+    const finalTitle = root.querySelector(".format-col--final .format-title");
+    const upperFinalCol = root.querySelector(".format-col--upper-final");
+
+    if (upperTitle) {
+      if (earlyRounds <= 0) {
+        upperTitle.textContent = "Upper bracket";
+      } else if (earlyRounds === 1) {
+        upperTitle.textContent = "Upper Round 1";
+      } else {
+        upperTitle.textContent = `Upper Rounds 1-${earlyRounds}`;
+      }
+    }
+
+    if (quarterTitle) {
+      quarterTitle.textContent = getUpperLabelForSettings(
+        Math.max(1, totalRounds - 2),
+        totalRounds,
+        isDoubleElim
+      );
+    }
+    if (semiTitle) {
+      semiTitle.textContent = getUpperLabelForSettings(
+        Math.max(1, totalRounds - 1),
+        totalRounds,
+        isDoubleElim
+      );
+    }
+    if (upperFinalTitle) {
+      upperFinalTitle.textContent = isDoubleElim
+        ? getUpperLabelForSettings(totalRounds, totalRounds, isDoubleElim)
+        : getUpperLabelForSettings(totalRounds, totalRounds, isDoubleElim);
+    }
+    if (upperFinalCol) {
+      upperFinalCol.style.display = isDoubleElim ? "" : "none";
+    }
+    if (finalTitle) {
+      finalTitle.textContent = isDoubleElim
+        ? "Grand Final"
+        : getUpperLabelForSettings(totalRounds, totalRounds, isDoubleElim);
+    }
+  };
+
   const bindImagePreview = (inputEl, previewEl) => {
     if (!inputEl || !previewEl) return;
     inputEl.addEventListener("change", () => {
@@ -690,6 +766,30 @@ export function initTournamentPage({
     updateMatchScore,
     saveState,
     renderAll,
+  });
+
+  const formatDiagrams = [
+    {
+      root: document.querySelector("#settingsTab .format-diagram"),
+      maxPlayersInput: document.getElementById("settingsMaxPlayersInput"),
+      formatSelect: document.getElementById("settingsFormatSelect"),
+    },
+    {
+      root: document.querySelector("#createTournamentModal .format-diagram"),
+      maxPlayersInput: document.getElementById("tournamentMaxPlayersInput"),
+      formatSelect: document.getElementById("tournamentFormatSelect"),
+    },
+    {
+      root: document.querySelector("#createFinalPanel .format-diagram"),
+      maxPlayersInput: document.getElementById("finalTournamentMaxPlayersInput"),
+      formatSelect: document.getElementById("finalFormatSelect"),
+    },
+  ];
+
+  formatDiagrams.forEach((entry) => {
+    updateFormatDiagramTitles(entry);
+    entry.maxPlayersInput?.addEventListener("input", () => updateFormatDiagramTitles(entry));
+    entry.formatSelect?.addEventListener("change", () => updateFormatDiagramTitles(entry));
   });
 
   // Wire test harness buttons if callbacks provided
