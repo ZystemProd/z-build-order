@@ -12,6 +12,7 @@ import {
   doc,
   setDoc,
   getDoc,
+  getDocs,
   deleteDoc,
   collection,
   serverTimestamp,
@@ -19,7 +20,14 @@ import {
   arrayRemove,
   onSnapshot,
 } from "firebase/firestore";
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
+import {
+  getStorage,
+  ref as storageRef,
+  uploadBytes,
+  getDownloadURL,
+  deleteObject,
+  listAll,
+} from "firebase/storage";
 import { showToast } from "../toastHandler.js";
 import DOMPurify from "dompurify";
 import { prepareImageForUpload, validateImageFile } from "../imageUtils.js";
@@ -1134,8 +1142,22 @@ async function confirmDeleteTournament() {
   const slug = modal.dataset.slug;
   const circuitSlug = modal.dataset.circuitSlug || currentTournamentMeta?.circuitSlug || "";
   try {
+    let coverImageUrl = "";
+    if (currentTournamentMeta?.slug === slug) {
+      coverImageUrl = currentTournamentMeta?.coverImageUrl || "";
+    } else {
+      try {
+        const tournamentSnap = await getDoc(doc(collection(db, TOURNAMENT_COLLECTION), slug));
+        coverImageUrl = tournamentSnap.exists() ? tournamentSnap.data()?.coverImageUrl || "" : "";
+      } catch (err) {
+        console.warn("Failed to load tournament cover image", err);
+      }
+    }
     await deleteDoc(doc(collection(db, TOURNAMENT_COLLECTION), slug));
     await deleteDoc(doc(collection(db, TOURNAMENT_STATE_COLLECTION), slug));
+    await deleteTournamentCoverByUrl(coverImageUrl);
+    await deleteTournamentCoverFolder(slug);
+    await deleteTournamentPresence(slug);
     try {
       localStorage.removeItem(getPersistStorageKey(slug));
     } catch (_) {
@@ -1275,6 +1297,11 @@ async function enterTournament(slug, options = {}) {
         backLink.href = metaCircuitSlug ? `/tournament/${metaCircuitSlug}` : "/tournament";
         backLink.lastChild.textContent = metaCircuitSlug ? "Circuit page" : "All tournaments";
       }
+    } else {
+      if (typeof window !== "undefined") {
+        window.location.href = "/404.html";
+      }
+      return;
     }
   } catch (_) {
     // ignore
@@ -1491,6 +1518,43 @@ function updateCheckInUI() {
 function getCheckInWindowMinutes(selectInput) {
   const minutes = Number(selectInput?.value || 0);
   return Number.isFinite(minutes) && minutes > 0 ? minutes : 0;
+}
+
+async function deleteTournamentPresence(slug) {
+  if (!slug) return;
+  try {
+    const colRef = collection(db, "tournamentPresence", slug, "matchInfo");
+    const snap = await getDocs(colRef);
+    await Promise.all(snap.docs.map((docSnap) => deleteDoc(docSnap.ref)));
+  } catch (err) {
+    console.warn("Failed to delete tournament presence data", err);
+  }
+}
+
+function isFirebaseStorageUrl(url) {
+  return /^gs:\/\//.test(url) || url.includes("firebasestorage.googleapis.com");
+}
+
+async function deleteTournamentCoverByUrl(coverImageUrl) {
+  const trimmed = String(coverImageUrl || "").trim();
+  if (!trimmed || !isFirebaseStorageUrl(trimmed)) return;
+  try {
+    const coverRef = storageRef(storage, trimmed);
+    await deleteObject(coverRef);
+  } catch (err) {
+    console.warn("Failed to delete tournament cover image", err);
+  }
+}
+
+async function deleteTournamentCoverFolder(slug) {
+  if (!slug) return;
+  try {
+    const folderRef = storageRef(storage, `tournamentCovers/${slug}`);
+    const list = await listAll(folderRef);
+    await Promise.all(list.items.map((item) => deleteObject(item)));
+  } catch (err) {
+    console.warn("Failed to delete tournament cover folder", err);
+  }
 }
 
 async function uploadTournamentCover(file, slug) {
