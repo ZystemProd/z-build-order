@@ -10,6 +10,134 @@ import {
 import { sanitizeUrl, escapeHtml } from "./bracket/renderUtils.js";
 import { playerKey } from "./playerKey.js";
 
+function normalizeRaceLabel(raw) {
+  const val = (raw || "").toString().toLowerCase();
+  if (val.startsWith("z")) return "Zerg";
+  if (val.startsWith("p")) return "Protoss";
+  if (val.startsWith("t")) return "Terran";
+  if (val.startsWith("r")) return "Random";
+  return "";
+}
+
+function normalizeRaceKey(raw) {
+  const val = (raw || "").toString().toLowerCase();
+  if (val.startsWith("z")) return "zerg";
+  if (val.startsWith("p")) return "protoss";
+  if (val.startsWith("t")) return "terran";
+  if (val.startsWith("r")) return "random";
+  return "";
+}
+
+function pickBestRace(byRace = null, fallbackMmr = null) {
+  const entries = Object.entries(byRace || {}).map(([race, value]) => ({
+    race: normalizeRaceLabel(race),
+    key: normalizeRaceKey(race),
+    mmr: Number(value),
+  }));
+  const valid = entries
+    .filter((entry) => entry.key && Number.isFinite(entry.mmr) && entry.mmr > 0)
+    .sort((a, b) => b.mmr - a.mmr);
+
+  if (valid.length) {
+    return { race: valid[0].race, mmr: Math.round(valid[0].mmr) };
+  }
+
+  const mmr = Number.isFinite(fallbackMmr)
+    ? Math.round(Math.max(0, fallbackMmr))
+    : null;
+  return { race: null, mmr };
+}
+
+function resolveSecondaryPulseEntry(entry) {
+  const profiles = Array.isArray(entry?.secondaryPulseProfiles)
+    ? entry.secondaryPulseProfiles
+    : [];
+  const links = Array.isArray(entry?.secondaryPulseLinks)
+    ? entry.secondaryPulseLinks
+    : [];
+  const profile = profiles.find(
+    (profileEntry) =>
+      profileEntry &&
+      (profileEntry.url ||
+        profileEntry.lastMmrByRace ||
+        profileEntry.byRace ||
+        Number.isFinite(profileEntry.lastMmr) ||
+        Number.isFinite(profileEntry.mmr))
+  );
+  if (profile) return profile;
+  if (links.length) return { url: links[0] };
+  return null;
+}
+
+function buildCircuitLeaderboardCsv(leaderboard = []) {
+  const headers = [
+    "Placement",
+    "Player Name",
+    "Points",
+    "Main SC2Pulse Name",
+    "Main SC2Pulse URL",
+    "Main Race",
+    "Main MMR",
+    "Secondary SC2Pulse Name",
+    "Secondary SC2Pulse URL",
+    "Secondary Race",
+    "Secondary MMR",
+  ];
+  const rows = [headers];
+  (leaderboard || []).forEach((entry, idx) => {
+    const mainRace = normalizeRaceLabel(entry?.race || "") || entry?.race || "";
+    const mainMmr = Number.isFinite(entry?.mmr) ? Math.round(entry.mmr) : "";
+    const secondaryProfile = resolveSecondaryPulseEntry(entry);
+    const mainPulseName = entry?.pulseName || "";
+    const secondaryName = secondaryProfile?.name || "";
+    const secondaryUrl = secondaryProfile?.url || "";
+    const { race: secondaryRaceRaw, mmr: secondaryMmrRaw } = pickBestRace(
+      secondaryProfile?.lastMmrByRace || secondaryProfile?.byRace || null,
+      secondaryProfile?.lastMmr ?? secondaryProfile?.mmr ?? null
+    );
+    const secondaryRace = secondaryRaceRaw || "";
+    const secondaryMmr = Number.isFinite(secondaryMmrRaw) ? secondaryMmrRaw : "";
+    rows.push([
+      idx + 1,
+      entry?.name || "",
+      Number.isFinite(entry?.points) ? entry.points : "",
+      mainPulseName,
+      entry?.sc2Link || "",
+      mainRace,
+      mainMmr,
+      secondaryName,
+      secondaryUrl,
+      secondaryRace,
+      secondaryMmr,
+    ]);
+  });
+
+  const escapeCsv = (value) => {
+    const str = value == null ? "" : String(value);
+    if (/[",\n]/.test(str)) {
+      return `"${str.replace(/"/g, "\"\"")}"`;
+    }
+    return str;
+  };
+
+  return rows.map((row) => row.map(escapeCsv).join(",")).join("\n");
+}
+
+function downloadCircuitLeaderboardCsv(leaderboard, meta) {
+  const slug = String(meta?.slug || "leaderboard").trim() || "leaderboard";
+  const safeSlug = slug.replace(/[^a-z0-9_-]+/gi, "-");
+  const csv = buildCircuitLeaderboardCsv(leaderboard);
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `circuit-${safeSlug}-leaderboard.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 export function normalizeCircuitData(data = {}, fallbackSlug = "") {
   const tournaments = Array.isArray(data.tournaments) ? data.tournaments : [];
   const slugs = tournaments
@@ -366,11 +494,39 @@ export async function buildCircuitLeaderboard(meta, slugs = [], { excludeSlug } 
         points: 0,
         tournaments: new Set(),
         sc2Link: player.sc2Link || "",
+        pulseName: "",
+        race: "",
+        mmr: null,
+        secondaryPulseLinks: [],
+        secondaryPulseProfiles: [],
       };
       entry.points += points;
       if (tournamentSlug) entry.tournaments.add(tournamentSlug);
       if (!entry.name && player.name) entry.name = player.name;
       if (!entry.sc2Link && player.sc2Link) entry.sc2Link = player.sc2Link;
+      if (!entry.pulseName && player.pulseName) entry.pulseName = player.pulseName;
+      const race = normalizeRaceLabel(player.race || "") || player.race || "";
+      if (!entry.race && race) entry.race = race;
+      if (
+        (!Number.isFinite(entry.mmr) || entry.mmr <= 0) &&
+        Number.isFinite(player.mmr)
+      ) {
+        entry.mmr = player.mmr;
+      }
+      if (
+        !entry.secondaryPulseProfiles.length &&
+        Array.isArray(player.secondaryPulseProfiles) &&
+        player.secondaryPulseProfiles.length
+      ) {
+        entry.secondaryPulseProfiles = player.secondaryPulseProfiles;
+      }
+      if (
+        !entry.secondaryPulseLinks.length &&
+        Array.isArray(player.secondaryPulseLinks) &&
+        player.secondaryPulseLinks.length
+      ) {
+        entry.secondaryPulseLinks = player.secondaryPulseLinks;
+      }
       totals.set(key, entry);
     });
   });
@@ -383,6 +539,11 @@ export async function buildCircuitLeaderboard(meta, slugs = [], { excludeSlug } 
         points: Number.isFinite(override) ? override : entry.points,
         tournaments: entry.tournaments.size,
         sc2Link: entry.sc2Link || "",
+        pulseName: entry.pulseName || "",
+        race: entry.race || "",
+        mmr: entry.mmr,
+        secondaryPulseLinks: entry.secondaryPulseLinks || [],
+        secondaryPulseProfiles: entry.secondaryPulseProfiles || [],
       };
     })
     .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
@@ -394,14 +555,17 @@ export async function renderCircuitLeaderboard(meta, slugs = [], { showEdit = fa
   const note = document.getElementById("circuitLeaderboardNote");
   const statPlayers = document.getElementById("circuitStatPlayers");
   const editBtn = document.getElementById("openCircuitPointsEditBtn");
+  const downloadBtn = document.getElementById("downloadCircuitLeaderboardBtn");
   if (!body) return;
   if (editBtn) editBtn.style.display = showEdit ? "inline-flex" : "none";
+  if (downloadBtn) downloadBtn.style.display = showEdit ? "inline-flex" : "none";
   body.innerHTML = `<tr><td colspan="4" class="helper">Loading leaderboard...</td></tr>`;
   if (!slugs.length) {
     body.innerHTML = `<tr><td colspan="4" class="helper">No tournaments yet.</td></tr>`;
     if (note) note.textContent = "Add tournaments to build the leaderboard.";
     if (statPlayers) statPlayers.textContent = "0";
     if (editBtn) editBtn.disabled = true;
+    if (downloadBtn) downloadBtn.disabled = true;
     return;
   }
   try {
@@ -411,6 +575,7 @@ export async function renderCircuitLeaderboard(meta, slugs = [], { showEdit = fa
       if (note) note.textContent = "Add tournaments to build the leaderboard.";
       if (statPlayers) statPlayers.textContent = "0";
       if (editBtn) editBtn.disabled = true;
+      if (downloadBtn) downloadBtn.disabled = true;
       return;
     }
     if (!leaderboard.length) {
@@ -418,6 +583,7 @@ export async function renderCircuitLeaderboard(meta, slugs = [], { showEdit = fa
       if (note) note.textContent = "Points will appear after tournaments log players.";
       if (statPlayers) statPlayers.textContent = "0";
       if (editBtn) editBtn.disabled = true;
+      if (downloadBtn) downloadBtn.disabled = true;
       return;
     }
     body.innerHTML = "";
@@ -447,6 +613,10 @@ export async function renderCircuitLeaderboard(meta, slugs = [], { showEdit = fa
       editBtn.disabled = false;
       editBtn.onclick = () => openCircuitPointsModal(editEntries, meta);
     }
+    if (downloadBtn) {
+      downloadBtn.disabled = false;
+      downloadBtn.onclick = () => downloadCircuitLeaderboardCsv(leaderboard, meta);
+    }
     if (statPlayers) statPlayers.textContent = String(leaderboard.length);
     if (note) note.textContent = `Totals across ${usedSlugs.length} tournaments.`;
   } catch (err) {
@@ -455,6 +625,7 @@ export async function renderCircuitLeaderboard(meta, slugs = [], { showEdit = fa
     if (note) note.textContent = "Try refreshing in a moment.";
     if (statPlayers) statPlayers.textContent = "0";
     if (editBtn) editBtn.disabled = true;
+    if (downloadBtn) downloadBtn.disabled = true;
   }
 }
 
