@@ -253,19 +253,36 @@
       </div>
       </div>
 
-      <div class="card">
-        <div class="card-header">
+      <div class="card tournament-list-card is-tournaments">
+        <div class="card-header tournament-filter-header">
           <div>
-            <p class="eyebrow">Browse</p>
-            <h3 id="tournamentListTitle">Open tournaments</h3>
+            <div class="list-tabs" id="tournamentTypeTabs">
+              <button class="list-tab active" data-type-filter="tournaments">Tournaments</button>
+              <button class="list-tab" data-type-filter="circuits">Circuits</button>
+            </div>
+            <h3 id="tournamentListTitle">Tournaments</h3>
+          </div>
+          <div class="tournament-filter-controls" id="tournamentFilterControls">
+            <label class="tournament-filter">
+              <span class="tournament-filter-label">Filter by status</span>
+              <select id="tournamentStatusSelect" class="tournament-filter-select">
+                <option value="all">All</option>
+                <option value="live">Live</option>
+                <option value="upcoming">Upcoming</option>
+                <option value="finished">Finished</option>
+              </select>
+            </label>
+            <label class="tournament-filter">
+              <span class="tournament-filter-label">Filter by role</span>
+              <select id="tournamentRoleSelect" class="tournament-filter-select">
+                <option value="all">All</option>
+                <option value="registered">Registered</option>
+                <option value="casting">Casting</option>
+                <option value="hosting">Hosting</option>
+              </select>
+            </label>
           </div>
           <button id="refreshTournaments" class="cta ghost small">Refresh</button>
-        </div>
-        <div class="list-tabs" id="tournamentListTabs">
-          <button class="list-tab active" data-list-filter="open">Open tournaments</button>
-          <button class="list-tab" data-list-filter="circuits">Circuits</button>
-          <button class="list-tab" data-list-filter="mine">My tournaments</button>
-          <button class="list-tab" data-list-filter="hosted">Hosted tournaments</button>
         </div>
         <div class="tournament-list-slider">
           <button id="tournamentListPrev" class="slider-btn" type="button" aria-label="Previous tournaments">

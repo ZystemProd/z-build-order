@@ -785,25 +785,19 @@ export function initTournamentPage({
       refreshTournamentListLayout();
     }, 150);
   });
-  document.querySelectorAll("#tournamentListTabs .list-tab").forEach((btn) => {
+  const statusSelect = document.getElementById("tournamentStatusSelect");
+  const roleSelect = document.getElementById("tournamentRoleSelect");
+  document.querySelectorAll("#tournamentTypeTabs .list-tab").forEach((btn) => {
     btn.addEventListener("click", () => {
       document
-        .querySelectorAll("#tournamentListTabs .list-tab")
+        .querySelectorAll("#tournamentTypeTabs .list-tab")
         .forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
       renderTournamentList();
     });
   });
-  // Ensure "Open tournaments" is active on load and render list once
-  const defaultTab = document.querySelector(
-    '#tournamentListTabs .list-tab[data-list-filter="open"]'
-  );
-  if (defaultTab) {
-    document
-      .querySelectorAll("#tournamentListTabs .list-tab")
-      .forEach((b) => b.classList.remove("active"));
-    defaultTab.classList.add("active");
-  }
+  statusSelect?.addEventListener("change", () => renderTournamentList());
+  roleSelect?.addEventListener("change", () => renderTournamentList());
   renderTournamentList();
 
   attachPlayerDetailHandlers({ getPlayersMap });

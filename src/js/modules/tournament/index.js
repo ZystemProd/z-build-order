@@ -194,6 +194,7 @@ import {
   getRegisteredTournaments,
   setRegisteredTournament,
   loadTournamentRegistry,
+  loadCircuitRegistry,
 } from "./sync/persistence.js";
 import { createFinalTournamentForCircuit } from "./finalsCreate.js";
 import { lockBodyScroll, unlockBodyScroll } from "./modalLock.js";
@@ -887,102 +888,185 @@ function rebuildBracket(force = false, reason = "") {
   renderAll();
 }
 
-function renderTournamentList() {
+async function renderTournamentList() {
   const listEl = document.getElementById("tournamentList");
   const statTournaments = document.getElementById("statTournaments");
   const statNextStart = document.getElementById("statNextStart");
   const listTitle = document.getElementById("tournamentListTitle");
-  const activeFilter =
-    document.querySelector("#tournamentListTabs .list-tab.active")
-      ?.dataset.listFilter || "open";
-  if (activeFilter === "circuits") {
-    if (listTitle) listTitle.textContent = "Circuits";
-    renderCircuitList({ onEnterCircuit: enterCircuit });
-    return;
+  const typeFilter =
+    document.querySelector("#tournamentTypeTabs .list-tab.active")
+      ?.dataset.typeFilter || "tournaments";
+  const statusFilter =
+    document.getElementById("tournamentStatusSelect")?.value || "all";
+  const roleFilter =
+    document.getElementById("tournamentRoleSelect")?.value || "all";
+  const filterControls = document.getElementById("tournamentFilterControls");
+  if (listTitle) {
+    listTitle.textContent = typeFilter === "circuits" ? "Circuits" : "Tournaments";
   }
-  if (listTitle) listTitle.textContent = "Open tournaments";
+  const listCard = listEl?.closest(".tournament-list-card");
+  if (listCard) {
+    listCard.classList.toggle("is-tournaments", typeFilter !== "circuits");
+    listCard.classList.toggle("is-circuits", typeFilter === "circuits");
+  }
+  if (filterControls) {
+    filterControls.style.display = typeFilter === "circuits" ? "none" : "flex";
+  }
   const userId = auth?.currentUser?.uid || null;
   const registered = new Set(getRegisteredTournaments());
   if (!listEl) return;
   listEl.innerHTML = `<li class="muted">Loading tournaments...</li>`;
-  loadTournamentRegistry(true)
-    .then((items) => {
-      const progressTargets = [];
-      const filtered = (items || []).filter((item) => {
-        if (activeFilter === "hosted") {
-          return userId && item.createdBy === userId;
-        }
-        if (activeFilter === "mine") {
-          return (
-            (userId && item.createdBy === userId) ||
-            registered.has(item.slug || item.id)
-          );
-        }
-        return true; // open = all
-      });
-      const sorted = filtered.sort((a, b) => (a.startTime || 0) - (b.startTime || 0));
-      if (!sorted.length) {
-        listEl.innerHTML = `<li class="muted">No tournaments found.</li>`;
-        setTournamentListItems([], { mode: activeFilter });
+  try {
+    if (typeFilter === "circuits") {
+      const circuits = await loadCircuitRegistry(true);
+      const circuitItems = (circuits || []).map((item) => ({
+        ...item,
+        type: "circuit",
+      }));
+      if (!circuitItems.length) {
+        listEl.innerHTML = `<li class="muted">No circuits found.</li>`;
+        setTournamentListItems([], { mode: "circuits" });
       } else {
-        setTournamentListItems(sorted, {
-          mode: activeFilter,
-          onPageRender: (targetList) => {
-            const targets = Array.from(
-              targetList.querySelectorAll(".tournament-progress")
-            ).map((progressEl) => {
-              const card = progressEl.closest(".tournament-card");
-              return {
-                slug: progressEl.dataset.slug,
-                el: card,
-              };
-            });
-            updateTournamentProgress(targets);
-          },
+        setTournamentListItems(circuitItems, {
+          mode: "circuits",
           renderItem: (item, targetList) => {
             const li = document.createElement("li");
-            li.className = "tournament-card";
-            li.dataset.slug = item.slug;
-            const startLabel = item.startTime
-              ? new Intl.DateTimeFormat("en-GB", {
-                  day: "2-digit",
-                  month: "short",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                }).format(new Date(item.startTime))
-              : "TBD";
-            const playerLabel = item.maxPlayers
-              ? `Up to ${item.maxPlayers} players`
-              : "Players TBD";
-            const coverUrl = sanitizeUrl(item.coverImageUrl || "");
-            const now = Date.now();
-            const isStarted = Boolean(item.startTime && item.startTime <= now);
-            let statusLabel = "TBD";
-            let statusClass = "status-tbd";
-            if (item.startTime) {
-              if (item.startTime <= now) {
-                statusLabel = "Started";
-                statusClass = "status-started";
-              } else {
-                statusLabel = "Upcoming";
-                statusClass = "status-upcoming";
-              }
+            li.className = "tournament-card circuit-card";
+            const tournamentCount = item.tournaments?.length || 0;
+            const description = item.description || "Circuit points race.";
+            const metaBits = [
+              `${tournamentCount} tournaments`,
+              `Host: ${item.createdByName || "Unknown"}`,
+            ];
+            if (item.finalTournamentSlug) {
+              metaBits.unshift(`Finals: ${item.finalTournamentSlug}`);
             }
-            const overlayChip = `<span class="status-chip ${statusClass} status-chip-overlay">${statusLabel}</span>`;
             li.innerHTML = DOMPurify.sanitize(`
-              <div class="card-cover${coverUrl ? " has-image" : ""}"${
-                coverUrl ? ` style="background-image:url('${escapeHtml(coverUrl)}')"` : ""
-              }>
-                ${overlayChip}
+              <div class="card-cover">
+                <span class="status-chip status-circuit status-chip-overlay">Circuit</span>
               </div>
               <div class="card-top">
                 <h4>${escapeHtml(item.name)}</h4>
                 <div class="time-block">
-                  <span class="time-label">Start</span>
-                  <span class="time-value">${escapeHtml(startLabel)}</span>
+                  <span class="time-label">Tournaments</span>
+                  <span class="time-value">${tournamentCount}</span>
                 </div>
               </div>
               <div class="meta">
+                ${metaBits.map((text) => `<span>${escapeHtml(text)}</span>`).join("")}
+              </div>
+            `);
+            li.addEventListener("click", () => enterCircuit(item.slug));
+            targetList.appendChild(li);
+          },
+        });
+      }
+      if (statTournaments) statTournaments.textContent = String(circuitItems.length);
+      if (statNextStart) statNextStart.textContent = "TBD";
+      return;
+    }
+    const items = await loadTournamentRegistry(true);
+    const progressTargets = [];
+    let filtered = items || [];
+    if (roleFilter === "hosting") {
+      filtered = filtered.filter((item) => userId && item.createdBy === userId);
+    } else if (roleFilter === "registered") {
+      filtered = filtered.filter((item) =>
+        registered.has(item.slug || item.id)
+      );
+    } else if (roleFilter === "casting") {
+      if (!userId) {
+        filtered = [];
+      } else {
+        const checks = await Promise.all(
+          filtered.map(async (item) => ({
+            item,
+            isCaster: await isCasterForTournament(item.slug, userId),
+          }))
+        );
+        filtered = checks.filter((row) => row.isCaster).map((row) => row.item);
+      }
+    }
+
+    const now = Date.now();
+    if (statusFilter === "upcoming") {
+      filtered = filtered.filter((item) => item.startTime && item.startTime > now);
+    } else if (statusFilter === "live" || statusFilter === "finished") {
+      const candidates = filtered.filter((item) => item.startTime && item.startTime <= now);
+      const checks = await Promise.all(
+        candidates.map(async (item) => ({
+          item,
+          finished: await getTournamentFinishedStatus(item.slug),
+        }))
+      );
+      filtered = checks
+        .filter((row) => (statusFilter === "finished" ? row.finished : !row.finished))
+        .map((row) => row.item);
+    }
+
+    const sorted = filtered.sort((a, b) => (a.startTime || 0) - (b.startTime || 0));
+    const listItems = sorted.map((item) => ({ ...item, type: "tournament" }));
+
+    if (!listItems.length) {
+      listEl.innerHTML = `<li class="muted">No tournaments found.</li>`;
+      setTournamentListItems([], { mode: `${statusFilter}-${roleFilter}` });
+    } else {
+      setTournamentListItems(listItems, {
+        mode: `${statusFilter}-${roleFilter}`,
+        onPageRender: (targetList) => {
+          const targets = Array.from(
+            targetList.querySelectorAll(".tournament-progress")
+          ).map((progressEl) => {
+            const card = progressEl.closest(".tournament-card");
+            return {
+              slug: progressEl.dataset.slug,
+              el: card,
+            };
+          });
+          updateTournamentProgress(targets);
+        },
+        renderItem: (item, targetList) => {
+          const li = document.createElement("li");
+          li.className = "tournament-card";
+          li.dataset.slug = item.slug;
+          const startLabel = item.startTime
+            ? new Intl.DateTimeFormat("en-GB", {
+                day: "2-digit",
+                month: "short",
+                hour: "2-digit",
+                minute: "2-digit",
+              }).format(new Date(item.startTime))
+            : "TBD";
+          const playerLabel = item.maxPlayers
+            ? `Up to ${item.maxPlayers} players`
+            : "Players TBD";
+          const coverUrl = sanitizeUrl(item.coverImageUrl || "");
+          let statusLabel = "TBD";
+          let statusClass = "status-tbd";
+          if (item.startTime) {
+            if (item.startTime <= now) {
+              statusLabel = "Live";
+              statusClass = "status-started";
+            } else {
+              statusLabel = "Upcoming";
+              statusClass = "status-upcoming";
+            }
+          }
+          const overlayChip = `<span class="status-chip ${statusClass} status-chip-overlay">${statusLabel}</span>`;
+          li.innerHTML = DOMPurify.sanitize(`
+            <div class="card-cover${coverUrl ? " has-image" : ""}"${
+              coverUrl ? ` style="background-image:url('${escapeHtml(coverUrl)}')"` : ""
+            }>
+              ${overlayChip}
+            </div>
+            <div class="card-top">
+              <h4>${escapeHtml(item.name)}</h4>
+              <div class="time-block">
+                <span class="time-label">Start</span>
+                <span class="time-value">${escapeHtml(startLabel)}</span>
+              </div>
+            </div>
+            <div class="meta">
               <span>${escapeHtml(playerLabel)}</span>
               <span>Host: ${escapeHtml(item.createdByName || "Unknown")}</span>
             </div>
@@ -993,34 +1077,33 @@ function renderTournamentList() {
               </div>
               <div class="progress-meta">Loading progress…</div>
             </div>
-            `);
-            const open = () =>
-              enterTournament(item.slug, { circuitSlug: item.circuitSlug || "" });
-            li.addEventListener("click", open);
-            targetList.appendChild(li);
-            progressTargets.push({ slug: item.slug, el: li });
-          },
-        });
-      }
-      if (statTournaments) statTournaments.textContent = String(filtered.length);
-      if (statNextStart) {
-        const next = filtered.find((i) => i.startTime);
-        statNextStart.textContent = next
-          ? new Date(next.startTime).toLocaleString([], {
-              year: "numeric",
-              month: "short",
-              day: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-            })
-          : "TBD";
-      }
-      updateTournamentProgress(progressTargets);
-    })
-    .catch((err) => {
-      console.error("Failed to load tournaments", err);
-      listEl.innerHTML = `<li class="muted error">Failed to load tournaments.</li>`;
-    });
+          `);
+          const open = () =>
+            enterTournament(item.slug, { circuitSlug: item.circuitSlug || "" });
+          li.addEventListener("click", open);
+          targetList.appendChild(li);
+          progressTargets.push({ slug: item.slug, el: li });
+        },
+      });
+    }
+    if (statTournaments) statTournaments.textContent = String(sorted.length);
+    if (statNextStart) {
+      const next = sorted.find((i) => i.startTime);
+      statNextStart.textContent = next
+        ? new Date(next.startTime).toLocaleString([], {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : "TBD";
+    }
+    updateTournamentProgress(progressTargets);
+  } catch (err) {
+    console.error("Failed to load tournaments", err);
+    listEl.innerHTML = `<li class="muted error">Failed to load tournaments.</li>`;
+  }
 }
 
 function computeTournamentProgress(bracket) {
@@ -1044,6 +1127,34 @@ function computeTournamentProgress(bracket) {
     percent,
     isFinished: completed === matches.length,
   };
+}
+
+const tournamentStateCache = new Map();
+
+async function getTournamentStateCached(slug) {
+  if (!slug) return null;
+  if (tournamentStateCache.has(slug)) {
+    return tournamentStateCache.get(slug);
+  }
+  const promise = loadTournamentStateRemote(slug).catch(() => null);
+  tournamentStateCache.set(slug, promise);
+  const resolved = await promise;
+  tournamentStateCache.set(slug, resolved);
+  return resolved;
+}
+
+async function getTournamentFinishedStatus(slug) {
+  const state = await getTournamentStateCached(slug);
+  const bracket = deserializeBracket(state?.bracket);
+  const progress = computeTournamentProgress(bracket);
+  return Boolean(progress?.isFinished);
+}
+
+async function isCasterForTournament(slug, uid) {
+  if (!uid) return false;
+  const state = await getTournamentStateCached(slug);
+  const casters = Array.isArray(state?.casters) ? state.casters : [];
+  return casters.some((entry) => entry?.uid === uid);
 }
 
 function updateTournamentProgress(targets = []) {
