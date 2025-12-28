@@ -366,6 +366,12 @@ export function openMatchInfoModal(
     confirmScoreBtn.textContent = "Confirm score";
     confirmScoreBtn.onclick = canConfirm
       ? () => {
+          const clearMatchCast = () => {
+            if (!state.matchCasts?.[matchId]) return;
+            const nextMatchCasts = { ...(state.matchCasts || {}) };
+            delete nextMatchCasts[matchId];
+            vetoDeps?.saveState?.({ matchCasts: nextMatchCasts });
+          };
           if (walkoverValue === "A") {
             vetoDeps?.updateMatchScore?.(matchId, "W", 0, { finalize: true });
           } else if (walkoverValue === "B") {
@@ -373,6 +379,7 @@ export function openMatchInfoModal(
           } else {
             vetoDeps?.updateMatchScore?.(matchId, winsA, winsB, { finalize: true });
           }
+          clearMatchCast();
           hideMatchInfoModal();
         }
       : null;
@@ -380,6 +387,15 @@ export function openMatchInfoModal(
 
   if (rowsEl) {
     const record = ensureMatchVetoRecord(matchId, bestOf);
+    const participantIds = [pA?.id || null, pB?.id || null];
+    const recordIds = Array.isArray(record.playerIds) ? record.playerIds : [];
+    if (recordIds[0] !== participantIds[0] || recordIds[1] !== participantIds[1]) {
+      record.maps = [];
+      record.vetoed = [];
+      record.mapResults = [];
+      record.playerIds = participantIds;
+      vetoDeps?.saveState?.({ matchVetoes: state.matchVetoes });
+    }
     winners = normalizeMapResults(record.mapResults, bestOf);
     record.mapResults = winners;
     updateMatchInfoHeaderScores({ leftScoreEl, rightScoreEl, winners, match });

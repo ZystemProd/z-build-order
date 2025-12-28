@@ -99,6 +99,7 @@ function displayPlaceholderForSource(match, participantIdx, lookup) {
 }
 
 function renderCastIndicator(match) {
+  if (match?.status === "complete") return "";
   const cast = state.matchCasts?.[match.id] || null;
   if (!cast) return "";
   const casterName = escapeHtml(cast.name || "Caster");

@@ -1,4 +1,5 @@
 import { currentTournamentMeta, currentSlug, state, setStateObj } from "./state.js";
+import { computeEliminationPlacements } from "./bracket/placements.js";
 import { playerKey } from "./playerKey.js";
 import { fetchCircuitMeta, normalizeCircuitTournamentSlugs } from "./circuit.js";
 import { loadTournamentStateRemote } from "./sync/persistence.js";
@@ -174,46 +175,6 @@ export async function getCircuitSeedPoints({
   return totals.get(key) || 0;
 }
 
-function computeEliminationPlacements() {
-  const bracket = state.bracket;
-  const totalPlayers = state.players?.length || 0;
-  if (!bracket || !totalPlayers) {
-    return { error: "Bracket or players are missing." };
-  }
-  const format = (currentTournamentMeta?.format || "").toLowerCase();
-  if (format.includes("round robin")) {
-    return { error: "Round robin placements are not supported yet." };
-  }
-  const placements = new Map();
-  const hasLosers = Array.isArray(bracket.losers) && bracket.losers.length > 0;
-  const eliminationRounds = hasLosers ? bracket.losers : bracket.winners || [];
-  const finalsMatch = hasLosers
-    ? bracket.finals
-    : (bracket.winners || []).slice(-1)[0]?.[0] || null;
-
-  if (!finalsMatch?.winnerId || !finalsMatch?.loserId) {
-    return { error: "Final match is not complete yet." };
-  }
-
-  placements.set(finalsMatch.winnerId, 1);
-  placements.set(finalsMatch.loserId, 2);
-
-  let placement = totalPlayers;
-  eliminationRounds.forEach((round) => {
-    const losers = new Set();
-    (round || []).forEach((match) => {
-      if (match?.loserId && !placements.has(match.loserId)) {
-        losers.add(match.loserId);
-      }
-    });
-    if (!losers.size) return;
-    const start = Math.max(1, placement - losers.size + 1);
-    losers.forEach((pid) => placements.set(pid, start));
-    placement = start - 1;
-  });
-
-  return { placements };
-}
 
 export function handleApplyCircuitPoints(event, { saveState, renderAll } = {}) {
   event?.preventDefault?.();
@@ -227,7 +188,11 @@ export function handleApplyCircuitPoints(event, { saveState, renderAll } = {}) {
     if (statusEl) statusEl.textContent = "Add at least one placement row.";
     return { applied: false, reason: "missing_scheme" };
   }
-  const { placements, error } = computeEliminationPlacements();
+  const { placements, error } = computeEliminationPlacements({
+    bracket: state.bracket,
+    totalPlayers: state.players?.length || 0,
+    format: currentTournamentMeta?.format || "",
+  });
   if (error) {
     if (statusEl) statusEl.textContent = error;
     return { applied: false, reason: "placement_error" };

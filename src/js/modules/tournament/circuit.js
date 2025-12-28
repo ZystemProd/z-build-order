@@ -2,6 +2,7 @@ import { doc, getDoc, setDoc, collection } from "firebase/firestore";
 import DOMPurify from "dompurify";
 import { db } from "../../../app.js";
 import { CIRCUIT_COLLECTION } from "./state.js";
+import { setTournamentListItems } from "./listSlider.js";
 import {
   loadTournamentRegistry,
   loadCircuitRegistry,
@@ -199,42 +200,45 @@ export async function renderCircuitList({ onEnterCircuit } = {}) {
     const normalized = (items || []).map((item) =>
       normalizeCircuitData(item, item.slug || item.id || "")
     );
-    normalized.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-    listEl.innerHTML = "";
-    if (!normalized.length) {
+    const sorted = normalized.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+    if (!sorted.length) {
       listEl.innerHTML = `<li class="muted">No circuits found.</li>`;
+      setTournamentListItems([], { mode: "circuits" });
     } else {
-      normalized.forEach((item) => {
-        const li = document.createElement("li");
-        li.className = "tournament-card circuit-card";
-        const tournamentCount = item.tournaments.length;
-        const description = item.description || "Circuit points race.";
-        const metaBits = [
-          `${tournamentCount} tournaments`,
-          `Host: ${item.createdByName || "Unknown"}`,
-        ];
-        if (item.finalTournamentSlug) {
-          metaBits.unshift(`Finals: ${item.finalTournamentSlug}`);
-        }
-        li.innerHTML = DOMPurify.sanitize(`
-          <div class="card-cover"></div>
-          <div class="card-top">
-            <div class="time-block">
-              <span class="time-label">Tournaments</span>
-              <span class="time-value">${tournamentCount}</span>
+      setTournamentListItems(sorted, {
+        mode: "circuits",
+        renderItem: (item, targetList) => {
+          const li = document.createElement("li");
+          li.className = "tournament-card circuit-card";
+          const tournamentCount = item.tournaments.length;
+          const description = item.description || "Circuit points race.";
+          const metaBits = [
+            `${tournamentCount} tournaments`,
+            `Host: ${item.createdByName || "Unknown"}`,
+          ];
+          if (item.finalTournamentSlug) {
+            metaBits.unshift(`Finals: ${item.finalTournamentSlug}`);
+          }
+          li.innerHTML = DOMPurify.sanitize(`
+            <div class="card-cover"></div>
+            <div class="card-top">
+              <div class="time-block">
+                <span class="time-label">Tournaments</span>
+                <span class="time-value">${tournamentCount}</span>
+              </div>
+              <span class="status-chip status-circuit">Circuit</span>
             </div>
-            <span class="status-chip status-circuit">Circuit</span>
-          </div>
-          <h4>${escapeHtml(item.name)}</h4>
-          <p class="tournament-format">${escapeHtml(description)}</p>
-          <div class="meta">
-            ${metaBits.map((text) => `<span>${escapeHtml(text)}</span>`).join("")}
-          </div>
-        `);
-        if (onEnterCircuit) {
-          li.addEventListener("click", () => onEnterCircuit(item.slug));
-        }
-        listEl.appendChild(li);
+            <h4>${escapeHtml(item.name)}</h4>
+            <p class="tournament-format">${escapeHtml(description)}</p>
+            <div class="meta">
+              ${metaBits.map((text) => `<span>${escapeHtml(text)}</span>`).join("")}
+            </div>
+          `);
+          if (onEnterCircuit) {
+            li.addEventListener("click", () => onEnterCircuit(item.slug));
+          }
+          targetList.appendChild(li);
+        },
       });
     }
     if (statTournaments) statTournaments.textContent = String(normalized.length);

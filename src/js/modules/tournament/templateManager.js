@@ -162,7 +162,7 @@ function applyTournamentTemplate(template, setMapPoolSelection) {
   if (rrAdvanceInput)
     rrAdvanceInput.value = roundRobin.advancePerGroup ?? "";
   if (rrPlayoffsSelect)
-    rrPlayoffsSelect.value = roundRobin.playoffs || "Double Elimination";
+    rrPlayoffsSelect.value = roundRobin.playoffs || "None";
   if (rrBestOfInput) rrBestOfInput.value = roundRobin.bestOf ?? "";
 
   const bestOf = { ...defaultBestOf, ...(settings.bestOf || {}) };

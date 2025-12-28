@@ -106,6 +106,7 @@ import {
   parseMatchNumber,
   raceClassName,
 } from "./bracket/renderUtils.js";
+import { computePlacementsForBracket } from "./bracket/placements.js";
 import { playerKey } from "./playerKey.js";
 import {
   readCircuitPointsTable,
@@ -182,7 +183,6 @@ import {
   refreshMatchInfoPresenceIfOpen,
   refreshVetoModalIfOpen,
 } from "./maps/veto.js";
-import { loadTournamentRegistry } from "./sync/persistence.js";
 import { initTournamentPage } from "./tournamentPageInit.js";
 import {
   loadState as loadLocalState,
@@ -193,6 +193,7 @@ import {
   getStorageKey as getPersistStorageKey,
   getRegisteredTournaments,
   setRegisteredTournament,
+  loadTournamentRegistry,
 } from "./sync/persistence.js";
 import { createFinalTournamentForCircuit } from "./finalsCreate.js";
 import { lockBodyScroll, unlockBodyScroll } from "./modalLock.js";
@@ -219,6 +220,7 @@ import {
 import { createAdminPlayerSearch } from "./admin/addSearchPlayer.js";
 import { createAdminManager } from "./admin/manageAdmins.js";
 import { initCasterControls, renderCasterSection } from "./caster.js";
+import { setTournamentListItems } from "./listSlider.js";
 import {
   INVITE_STATUS,
   normalizeInviteStatus,
@@ -431,6 +433,10 @@ function renderAll() {
     const tournamentFormat = document.getElementById("tournamentFormat");
     const tournamentStart = document.getElementById("tournamentStart");
     const statPlayers = document.getElementById("statPlayers");
+    const placementsRow = document.getElementById("tournamentPlacements");
+    const placementFirst = document.getElementById("placementFirst");
+    const placementSecond = document.getElementById("placementSecond");
+    const placementThirdFourth = document.getElementById("placementThirdFourth");
     const registerBtn = document.getElementById("registerBtn");
     const goLiveBtn = document.getElementById("rebuildBracketBtn");
     const notifyCheckInBtn = document.getElementById("notifyCheckInBtn");
@@ -465,6 +471,29 @@ function renderAll() {
         : "TBD";
     }
     if (statPlayers) statPlayers.textContent = String(eligiblePlayers.length || 0);
+
+    if (placementsRow && placementFirst && placementSecond && placementThirdFourth) {
+      const placements = computePlacementsForBracket(
+        state.bracket,
+        eligiblePlayers.length || 0
+      );
+      if (!placements) {
+        placementsRow.style.display = "none";
+      } else {
+        const playersById = getPlayersMap();
+        const firstId = Array.from(placements.entries()).find(([, p]) => p === 1)?.[0];
+        const secondId = Array.from(placements.entries()).find(([, p]) => p === 2)?.[0];
+        const thirdIds = Array.from(placements.entries())
+          .filter(([, p]) => p === 3)
+          .map(([id]) => id);
+        placementFirst.textContent = playersById.get(firstId)?.name || "—";
+        placementSecond.textContent = playersById.get(secondId)?.name || "—";
+        placementThirdFourth.textContent = thirdIds.length
+          ? thirdIds.map((id) => playersById.get(id)?.name || "—").join(" · ")
+          : "—";
+        placementsRow.style.display = "flex";
+      }
+    }
 
     if (registerBtn) {
       if (state.isLive) {
@@ -891,19 +920,36 @@ function renderTournamentList() {
         }
         return true; // open = all
       });
-
-      listEl.innerHTML = "";
-      if (!filtered.length) {
+      const sorted = filtered.sort((a, b) => (a.startTime || 0) - (b.startTime || 0));
+      if (!sorted.length) {
         listEl.innerHTML = `<li class="muted">No tournaments found.</li>`;
+        setTournamentListItems([], { mode: activeFilter });
       } else {
-        filtered
-          .sort((a, b) => (a.startTime || 0) - (b.startTime || 0))
-          .forEach((item) => {
+        setTournamentListItems(sorted, {
+          mode: activeFilter,
+          onPageRender: (targetList) => {
+            const targets = Array.from(
+              targetList.querySelectorAll(".tournament-progress")
+            ).map((progressEl) => {
+              const card = progressEl.closest(".tournament-card");
+              return {
+                slug: progressEl.dataset.slug,
+                el: card,
+              };
+            });
+            updateTournamentProgress(targets);
+          },
+          renderItem: (item, targetList) => {
             const li = document.createElement("li");
             li.className = "tournament-card";
             li.dataset.slug = item.slug;
             const startLabel = item.startTime
-              ? new Date(item.startTime).toLocaleString()
+              ? new Intl.DateTimeFormat("en-GB", {
+                  day: "2-digit",
+                  month: "short",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                }).format(new Date(item.startTime))
               : "TBD";
             const playerLabel = item.maxPlayers
               ? `Up to ${item.maxPlayers} players`
@@ -922,45 +968,39 @@ function renderTournamentList() {
                 statusClass = "status-upcoming";
               }
             }
+            const overlayChip = `<span class="status-chip ${statusClass} status-chip-overlay">${statusLabel}</span>`;
             li.innerHTML = DOMPurify.sanitize(`
               <div class="card-cover${coverUrl ? " has-image" : ""}"${
                 coverUrl ? ` style="background-image:url('${escapeHtml(coverUrl)}')"` : ""
-              }></div>
+              }>
+                ${overlayChip}
+              </div>
               <div class="card-top">
+                <h4>${escapeHtml(item.name)}</h4>
                 <div class="time-block">
                   <span class="time-label">Start</span>
                   <span class="time-value">${escapeHtml(startLabel)}</span>
                 </div>
-              <span class="status-chip ${statusClass}">${statusLabel}</span>
-            </div>
-            <h4>${escapeHtml(item.name)}</h4>
-            <p class="tournament-format">${escapeHtml(item.format)}</p>
-            <div class="meta">
+              </div>
+              <div class="meta">
               <span>${escapeHtml(playerLabel)}</span>
               <span>Host: ${escapeHtml(item.createdByName || "Unknown")}</span>
             </div>
-            ${
-              isStarted
-                ? `<div class="tournament-progress" data-slug="${escapeHtml(
-                    item.slug
-                  )}">
-                    <span class="progress-label">Progress</span>
-                    <div class="progress-track">
-                      <div class="progress-fill" style="width:0%"></div>
-                    </div>
-                    <div class="progress-meta">Loading progress…</div>
-                  </div>`
-                : ""
-            }
+            <div class="tournament-progress" data-slug="${escapeHtml(item.slug)}">
+              <span class="progress-label">Progress</span>
+              <div class="progress-track">
+                <div class="progress-fill" style="width:0%"></div>
+              </div>
+              <div class="progress-meta">Loading progress…</div>
+            </div>
             `);
             const open = () =>
               enterTournament(item.slug, { circuitSlug: item.circuitSlug || "" });
             li.addEventListener("click", open);
-            listEl.appendChild(li);
-            if (isStarted) {
-              progressTargets.push({ slug: item.slug, el: li });
-            }
-          });
+            targetList.appendChild(li);
+            progressTargets.push({ slug: item.slug, el: li });
+          },
+        });
       }
       if (statTournaments) statTournaments.textContent = String(filtered.length);
       if (statNextStart) {
@@ -998,7 +1038,12 @@ function computeTournamentProgress(bracket) {
     }
   });
   const percent = Math.round((completed / matches.length) * 100);
-  return { completed, total: matches.length, percent };
+  return {
+    completed,
+    total: matches.length,
+    percent,
+    isFinished: completed === matches.length,
+  };
 }
 
 function updateTournamentProgress(targets = []) {
@@ -1014,6 +1059,7 @@ function updateTournamentProgress(targets = []) {
         const progress = computeTournamentProgress(bracket);
         const fill = progressEl.querySelector(".progress-fill");
         const meta = progressEl.querySelector(".progress-meta");
+        const statusChip = el.querySelector(".status-chip");
         if (!fill || !meta) return;
         if (!progress) {
           fill.style.width = "0%";
@@ -1023,6 +1069,11 @@ function updateTournamentProgress(targets = []) {
         const percent = Math.max(0, Math.min(100, progress.percent));
         fill.style.width = `${percent}%`;
         meta.textContent = `${progress.completed}/${progress.total} matches`;
+        if (progress.isFinished && statusChip) {
+          statusChip.textContent = "Finished";
+          statusChip.classList.remove("status-upcoming", "status-started", "status-tbd");
+          statusChip.classList.add("status-finished");
+        }
       } catch (err) {
         console.warn("Failed to load progress", err);
       }

@@ -85,6 +85,27 @@
   <header class="tournament-header">
     <div class="tournament-shell tournament-header-inner">
       <div class="tournament-header-spacer"></div>
+      <div class="tournament-search" id="tournamentSearch">
+        <button id="tournamentSearchToggle" class="tournament-search-toggle" type="button" aria-expanded="false"
+          aria-controls="tournamentSearchInput" aria-label="Search tournaments and circuits">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path
+              d="M15.5 14h-.8l-.3-.3a6.4 6.4 0 1 0-.7.7l.3.3v.8l5 5 1.5-1.5-5-5Zm-5 0A4.5 4.5 0 1 1 10.5 5a4.5 4.5 0 0 1 0 9Z" />
+          </svg>
+        </button>
+        <div class="tournament-search-field">
+          <input id="tournamentSearchInput" class="tournament-search-input" type="search"
+            placeholder="Search tournaments or circuits" autocomplete="off" spellcheck="false" />
+          <button id="tournamentSearchClear" class="tournament-search-clear" type="button"
+            aria-label="Clear search">×</button>
+        </div>
+        <div id="tournamentSearchResults" class="tournament-search-results" style="display:none;">
+          <div id="tournamentSearchStatus" class="tournament-search-status">
+            Type to search tournaments or circuits.
+          </div>
+          <ul id="tournamentSearchList" class="tournament-search-list"></ul>
+        </div>
+      </div>
       <div id="tournamentNotifications" class="tournament-notifications">
         <button id="notificationTrigger" class="notification-trigger" type="button" aria-haspopup="true"
           aria-expanded="false" aria-controls="notificationDropdown" aria-label="Open notifications">
@@ -246,7 +267,21 @@
           <button class="list-tab" data-list-filter="mine">My tournaments</button>
           <button class="list-tab" data-list-filter="hosted">Hosted tournaments</button>
         </div>
-        <ul id="tournamentList" class="tournament-list"></ul>
+        <div class="tournament-list-slider">
+          <button id="tournamentListPrev" class="slider-btn" type="button" aria-label="Previous tournaments">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M15.5 4.5 8 12l7.5 7.5-1.5 1.5L5 12l9-9 1.5 1.5z" />
+            </svg>
+          </button>
+          <div class="tournament-list-viewport">
+            <ul id="tournamentList" class="tournament-list"></ul>
+          </div>
+          <button id="tournamentListNext" class="slider-btn" type="button" aria-label="Next tournaments">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="m8.5 4.5 1.5-1.5 9 9-9 9-1.5-1.5L16 12 8.5 4.5z" />
+            </svg>
+          </button>
+        </div>
       </div>
     </section>
 
@@ -337,6 +372,35 @@
         <div class="hero-main">
           <a class="ghost-link" href="/tournament" id="tournamentBackLink"><span class="ghost-link-icon">←</span>All tournaments</a>
           <h1 id="tournamentTitle">Tournament</h1>
+          <div class="hero-placements hero-placements--stacked" id="tournamentPlacements" style="display:none;">
+            <div class="placement-item" data-place="1">
+              <span class="placement-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" role="img" focusable="false">
+                  <path d="M7 4h10v2h3a1 1 0 0 1 1 1c0 3.866-3.134 7-7 7h-4c-3.866 0-7-3.134-7-7a1 1 0 0 1 1-1h3V4zm-3 4c.47 2.833 2.94 5 5.9 5h4.2c2.96 0 5.43-2.167 5.9-5h-2.9v1a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V8H4zm6 10h4v2h-4v-2zm-2 2h8v2H8v-2z" fill="currentColor"/>
+                </svg>
+              </span>
+              <span class="placement-label">1st</span>
+              <span class="placement-name" id="placementFirst">—</span>
+            </div>
+            <div class="placement-item" data-place="2">
+              <span class="placement-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" role="img" focusable="false">
+                  <path d="M7 4h10v2h3a1 1 0 0 1 1 1c0 3.866-3.134 7-7 7h-4c-3.866 0-7-3.134-7-7a1 1 0 0 1 1-1h3V4zm-3 4c.47 2.833 2.94 5 5.9 5h4.2c2.96 0 5.43-2.167 5.9-5h-2.9v1a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V8H4zm6 10h4v2h-4v-2zm-2 2h8v2H8v-2z" fill="currentColor"/>
+                </svg>
+              </span>
+              <span class="placement-label">2nd</span>
+              <span class="placement-name" id="placementSecond">—</span>
+            </div>
+            <div class="placement-item" data-place="3-4">
+              <span class="placement-icon placement-icon--bronze" aria-hidden="true">
+                <svg viewBox="0 0 24 24" role="img" focusable="false">
+                  <path d="M7 4h10v2h3a1 1 0 0 1 1 1c0 3.866-3.134 7-7 7h-4c-3.866 0-7-3.134-7-7a1 1 0 0 1 1-1h3V4zm-3 4c.47 2.833 2.94 5 5.9 5h4.2c2.96 0 5.43-2.167 5.9-5h-2.9v1a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V8H4zm6 10h4v2h-4v-2zm-2 2h8v2H8v-2z" fill="#cd7f32"/>
+                </svg>
+              </span>
+              <span class="placement-label">3–4</span>
+              <span class="placement-name" id="placementThirdFourth">—</span>
+            </div>
+          </div>
         </div>
         <div class="hero-stats">
         <div class="stat-card">
@@ -707,27 +771,40 @@
                 <option value="Swiss">Swiss</option>
               </select>
             </label>
-            <div class="inline-row" data-format-scope="settings-roundrobin">
-              <label style="flex:1;">Number of groups
-                <input type="number" id="settingsRoundRobinGroups" min="1" />
-              </label>
-              <label style="flex:1;">Advance per group
-                <input type="number" id="settingsRoundRobinAdvance" min="0" />
-              </label>
-              <label style="flex:1;">Playoffs
-                <select id="settingsRoundRobinPlayoffs">
-                  <option value="Double Elimination">Double Elimination</option>
-                  <option value="Single Elimination">Single Elimination</option>
-                  <option value="None">None</option>
-                </select>
-              </label>
-              <label style="flex:1;">Group best of
-                <select id="settingsRoundRobinBestOf">
-                  <option value="1">Bo1</option>
-                  <option value="3">Bo3</option>
-                  <option value="5">Bo5</option>
-                </select>
-              </label>
+            <div class="format-stage" data-format-scope="settings-roundrobin">
+              <p class="eyebrow">Stage 1</p>
+              <h4>Round Robin</h4>
+              <div class="inline-row">
+                <label style="flex:1;">Number of groups
+                  <input type="number" id="settingsRoundRobinGroups" min="1" />
+                </label>
+                <label style="flex:1;">Advance per group
+                  <input type="number" id="settingsRoundRobinAdvance" min="0" />
+                </label>
+                <label style="flex:1;">Group best of
+                  <select id="settingsRoundRobinBestOf">
+                    <option value="1">Bo1</option>
+                    <option value="3">Bo3</option>
+                    <option value="5">Bo5</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+            <div class="format-stage" data-format-scope="settings-roundrobin">
+              <p class="eyebrow">Stage 2</p>
+              <h4>Playoffs</h4>
+              <p class="helper">
+                Optional. Qualifiers advance into the selected playoffs format. Choose None to end after Round Robin.
+              </p>
+              <div class="inline-row">
+                <label style="flex:1;">Playoffs
+                  <select id="settingsRoundRobinPlayoffs">
+                    <option value="Double Elimination">Double Elimination</option>
+                    <option value="Single Elimination">Single Elimination</option>
+                    <option value="None" selected>None</option>
+                  </select>
+                </label>
+              </div>
             </div>
 
             <div class="format-diagram">
@@ -959,8 +1036,6 @@
             <span class="muted">https://zbuildorder.com/tournament/</span>
             <div class="slug-input-wrapper">
               <input type="text" id="tournamentSlugInput" placeholder="my-weekly-cup" />
-              <button type="button" class="icon-btn slug-generate-btn" id="generateSlugBtn"
-                aria-label="Generate random slug">↻</button>
             </div>
           </div>
           <p class="helper" id="slugStatus"></p>
@@ -1079,27 +1154,40 @@
             <option value="Swiss">Swiss</option>
           </select>
         </label>
-        <div class="inline-row" data-format-scope="create-roundrobin">
-          <label style="flex:1;">Number of groups
-            <input type="number" id="roundRobinGroupsInput" min="1" />
-          </label>
-          <label style="flex:1;">Advance per group
-            <input type="number" id="roundRobinAdvanceInput" min="0" />
-          </label>
-          <label style="flex:1;">Playoffs
-            <select id="roundRobinPlayoffsSelect">
-              <option value="Double Elimination">Double Elimination</option>
-              <option value="Single Elimination">Single Elimination</option>
-              <option value="None">None</option>
-            </select>
-          </label>
-          <label style="flex:1;">Group best of
-            <select id="roundRobinBestOfInput">
-              <option value="1">Bo1</option>
-              <option value="3">Bo3</option>
-              <option value="5">Bo5</option>
-            </select>
-          </label>
+        <div class="format-stage" data-format-scope="create-roundrobin">
+          <p class="eyebrow">Stage 1</p>
+          <h4>Round Robin</h4>
+          <div class="inline-row">
+            <label style="flex:1;">Number of groups
+              <input type="number" id="roundRobinGroupsInput" min="1" />
+            </label>
+            <label style="flex:1;">Advance per group
+              <input type="number" id="roundRobinAdvanceInput" min="0" />
+            </label>
+            <label style="flex:1;">Group best of
+              <select id="roundRobinBestOfInput">
+                <option value="1">Bo1</option>
+                <option value="3">Bo3</option>
+                <option value="5">Bo5</option>
+              </select>
+            </label>
+          </div>
+        </div>
+        <div class="format-stage" data-format-scope="create-roundrobin">
+          <p class="eyebrow">Stage 2</p>
+          <h4>Playoffs</h4>
+          <p class="helper">
+            Optional. Qualifiers advance into the selected playoffs format. Choose None to end after Round Robin.
+          </p>
+          <div class="inline-row">
+            <label style="flex:1;">Playoffs
+              <select id="roundRobinPlayoffsSelect">
+                <option value="Double Elimination">Double Elimination</option>
+                <option value="Single Elimination">Single Elimination</option>
+                <option value="None" selected>None</option>
+              </select>
+            </label>
+          </div>
         </div>
         <div class="format-diagram">
             <div class="format-row format-row--upper">
@@ -1308,8 +1396,6 @@
             <span class="muted">https://zbuildorder.com/tournament/</span>
             <div class="slug-input-wrapper">
               <input type="text" id="circuitSlugInput" placeholder="challenger-circuit" />
-              <button type="button" class="icon-btn slug-generate-btn" id="generateCircuitSlugBtn"
-                aria-label="Generate random slug">↻</button>
             </div>
           </div>
           <p class="helper"></p>
@@ -1338,8 +1424,6 @@
             <span class="muted" id="finalSlugPrefix">https://zbuildorder.com/</span>
             <div class="slug-input-wrapper">
               <input type="text" id="finalTournamentSlugInput" placeholder="circuit-finals" />
-              <button type="button" class="icon-btn slug-generate-btn" id="generateFinalSlugBtn"
-                aria-label="Generate random slug">↻</button>
             </div>
           </div>
           <p class="helper"></p>
@@ -1462,27 +1546,40 @@
             <option value="Swiss">Swiss</option>
           </select>
         </label>
-        <div class="inline-row" data-format-scope="final-roundrobin">
-          <label style="flex:1;">Number of groups
-            <input type="number" id="finalRoundRobinGroupsInput" min="1" />
-          </label>
-          <label style="flex:1;">Advance per group
-            <input type="number" id="finalRoundRobinAdvanceInput" min="0" />
-          </label>
-          <label style="flex:1;">Playoffs
-            <select id="finalRoundRobinPlayoffsSelect">
-              <option value="Double Elimination">Double Elimination</option>
-              <option value="Single Elimination">Single Elimination</option>
-              <option value="None">None</option>
-            </select>
-          </label>
-          <label style="flex:1;">Group best of
-            <select id="finalRoundRobinBestOfInput">
-              <option value="1">Bo1</option>
-              <option value="3">Bo3</option>
-              <option value="5">Bo5</option>
-            </select>
-          </label>
+        <div class="format-stage" data-format-scope="final-roundrobin">
+          <p class="eyebrow">Stage 1</p>
+          <h4>Round Robin</h4>
+          <div class="inline-row">
+            <label style="flex:1;">Number of groups
+              <input type="number" id="finalRoundRobinGroupsInput" min="1" />
+            </label>
+            <label style="flex:1;">Advance per group
+              <input type="number" id="finalRoundRobinAdvanceInput" min="0" />
+            </label>
+            <label style="flex:1;">Group best of
+              <select id="finalRoundRobinBestOfInput">
+                <option value="1">Bo1</option>
+                <option value="3">Bo3</option>
+                <option value="5">Bo5</option>
+              </select>
+            </label>
+          </div>
+        </div>
+        <div class="format-stage" data-format-scope="final-roundrobin">
+          <p class="eyebrow">Stage 2</p>
+          <h4>Playoffs</h4>
+          <p class="helper">
+            Optional. Qualifiers advance into the selected playoffs format. Choose None to end after Round Robin.
+          </p>
+          <div class="inline-row">
+            <label style="flex:1;">Playoffs
+              <select id="finalRoundRobinPlayoffsSelect">
+                <option value="Double Elimination">Double Elimination</option>
+                <option value="Single Elimination">Single Elimination</option>
+                <option value="None" selected>None</option>
+              </select>
+            </label>
+          </div>
         </div>
         <div class="format-diagram">
           <div class="format-row format-row--upper">
@@ -1953,11 +2050,11 @@
         </div>
       </div>
       <div class="form-actions" style="margin-top:12px;">
+        <button class="cta primary" id="openMapVetoBtn">Map veto</button>
         <button class="cta primary" id="confirmMatchScoreBtn" style="display:none;">
           Confirm score
         </button>
         <button class="cta ghost" id="castMatchBtn" style="display:none;">Cast</button>
-        <button class="cta primary" id="openMapVetoBtn">Map veto</button>
       </div>
       <p class="helper match-cast-status" id="castMatchStatus" style="display:none;"></p>
     </div>
