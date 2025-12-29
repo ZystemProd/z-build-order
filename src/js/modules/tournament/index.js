@@ -197,6 +197,7 @@ import {
   loadCircuitRegistry,
 } from "./sync/persistence.js";
 import { createFinalTournamentForCircuit } from "./finalsCreate.js";
+import { initCoverReuseModal } from "./reuseImage.js";
 import { lockBodyScroll, unlockBodyScroll } from "./modalLock.js";
 import {
   configureFinalMapPool,
@@ -456,6 +457,20 @@ function renderAll() {
 
     if (tournamentTitle) {
       tournamentTitle.textContent = currentTournamentMeta.name || "Tournament";
+    }
+    const tournamentHero = document.querySelector("#tournamentView .hero");
+    if (tournamentHero) {
+      const coverUrl = sanitizeUrl(currentTournamentMeta.coverImageUrl || "");
+      if (coverUrl) {
+        tournamentHero.classList.add("has-cover");
+        tournamentHero.style.setProperty(
+          "--hero-cover-image",
+          `url("${coverUrl}")`
+        );
+      } else {
+        tournamentHero.classList.remove("has-cover");
+        tournamentHero.style.removeProperty("--hero-cover-image");
+      }
     }
     if (tournamentFormat) {
       tournamentFormat.textContent = currentTournamentMeta.format || "Tournament";
@@ -945,15 +960,13 @@ async function renderTournamentList() {
               <div class="card-cover">
                 <span class="status-chip status-circuit status-chip-overlay">Circuit</span>
               </div>
-              <div class="card-top">
-                <h4>${escapeHtml(item.name)}</h4>
-                <div class="time-block">
-                  <span class="time-label">Tournaments</span>
-                  <span class="time-value">${tournamentCount}</span>
+              <div class="content-stack">
+                <div class="card-top">
+                  <h4>${escapeHtml(item.name)}</h4>
                 </div>
-              </div>
-              <div class="meta">
-                ${metaBits.map((text) => `<span>${escapeHtml(text)}</span>`).join("")}
+                <div class="meta">
+                  ${metaBits.map((text) => `<span>${escapeHtml(text)}</span>`).join("")}
+                </div>
               </div>
             `);
             li.addEventListener("click", () => enterCircuit(item.slug));
@@ -1037,9 +1050,6 @@ async function renderTournamentList() {
                 minute: "2-digit",
               }).format(new Date(item.startTime))
             : "TBD";
-          const playerLabel = item.maxPlayers
-            ? `Up to ${item.maxPlayers} players`
-            : "Players TBD";
           const coverUrl = sanitizeUrl(item.coverImageUrl || "");
           let statusLabel = "TBD";
           let statusClass = "status-tbd";
@@ -1058,24 +1068,29 @@ async function renderTournamentList() {
               coverUrl ? ` style="background-image:url('${escapeHtml(coverUrl)}')"` : ""
             }>
               ${overlayChip}
-            </div>
-            <div class="card-top">
-              <h4>${escapeHtml(item.name)}</h4>
-              <div class="time-block">
+              <div class="time-block time-block-cover">
                 <span class="time-label">Start</span>
                 <span class="time-value">${escapeHtml(startLabel)}</span>
               </div>
             </div>
-            <div class="meta">
-              <span>${escapeHtml(playerLabel)}</span>
-              <span>Host: ${escapeHtml(item.createdByName || "Unknown")}</span>
-            </div>
-            <div class="tournament-progress" data-slug="${escapeHtml(item.slug)}">
-              <span class="progress-label">Progress</span>
-              <div class="progress-track">
-                <div class="progress-fill" style="width:0%"></div>
+            <div class="content-stack">
+              <div class="card-top">
+                <h4>${escapeHtml(item.name)}</h4>
               </div>
-              <div class="progress-meta">Loading progress…</div>
+              <div class="meta">
+                <span>Host: ${escapeHtml(item.createdByName || "Unknown")}</span>
+              </div>
+              <div class="tournament-progress" data-slug="${escapeHtml(item.slug)}">
+                <span class="progress-label">Progress</span>
+                <div class="progress-track">
+                  <div class="progress-fill" style="width:0%"></div>
+                </div>
+                <div class="progress-meta">Loading progress…</div>
+              </div>
+              <div class="time-block time-block-row">
+                <span class="time-label">Start</span>
+                <span class="time-value">${escapeHtml(startLabel)}</span>
+              </div>
             </div>
           `);
           const open = () =>
@@ -1130,17 +1145,29 @@ function computeTournamentProgress(bracket) {
 }
 
 const tournamentStateCache = new Map();
+const TOURNAMENT_PROGRESS_TTL_MS = 30000;
 
-async function getTournamentStateCached(slug) {
+async function getTournamentStateCached(slug, { maxAgeMs = TOURNAMENT_PROGRESS_TTL_MS } = {}) {
   if (!slug) return null;
-  if (tournamentStateCache.has(slug)) {
-    return tournamentStateCache.get(slug);
+  const cached = tournamentStateCache.get(slug);
+  const now = Date.now();
+  if (cached?.value && now - cached.ts < maxAgeMs) {
+    return cached.value;
   }
-  const promise = loadTournamentStateRemote(slug).catch(() => null);
-  tournamentStateCache.set(slug, promise);
-  const resolved = await promise;
-  tournamentStateCache.set(slug, resolved);
-  return resolved;
+  if (cached?.promise) {
+    return cached.promise;
+  }
+  const promise = loadTournamentStateRemote(slug)
+    .then((value) => {
+      tournamentStateCache.set(slug, { value, ts: Date.now() });
+      return value;
+    })
+    .catch(() => {
+      tournamentStateCache.delete(slug);
+      return null;
+    });
+  tournamentStateCache.set(slug, { promise, ts: now });
+  return promise;
 }
 
 async function getTournamentFinishedStatus(slug) {
@@ -1165,7 +1192,7 @@ function updateTournamentProgress(targets = []) {
       const progressEl = el.querySelector(".tournament-progress");
       if (!progressEl) return;
       try {
-        const remote = await loadTournamentStateRemote(slug);
+        const remote = await getTournamentStateCached(slug);
         const bracket = deserializeBracket(remote?.bracket);
         const progress = computeTournamentProgress(bracket);
         const fill = progressEl.querySelector(".progress-fill");
@@ -1230,6 +1257,7 @@ async function populateCreateForm() {
     imagePreview.removeAttribute("src");
     imagePreview.style.display = "none";
     delete imagePreview.dataset.tempPreview;
+    delete imagePreview.dataset.reuseUrl;
   }
   if (checkInSelect) checkInSelect.value = "0";
   if (templateSelect) templateSelect.value = "";
@@ -1317,7 +1345,7 @@ async function confirmDeleteTournament() {
     }
     await deleteDoc(doc(collection(db, TOURNAMENT_COLLECTION), slug));
     await deleteDoc(doc(collection(db, TOURNAMENT_STATE_COLLECTION), slug));
-    await deleteTournamentCoverByUrl(coverImageUrl);
+    await deleteTournamentCoverByUrl(coverImageUrl, slug);
     await deleteTournamentCoverFolder(slug);
     await deleteTournamentPresence(slug);
     try {
@@ -1697,9 +1725,50 @@ function isFirebaseStorageUrl(url) {
   return /^gs:\/\//.test(url) || url.includes("firebasestorage.googleapis.com");
 }
 
-async function deleteTournamentCoverByUrl(coverImageUrl) {
+function isCoverUrlInSlugFolder(url, slug) {
+  if (!url || !slug) return false;
+  const encodedSlug = encodeURIComponent(slug);
+  return (
+    url.includes(`tournamentCovers/${slug}/`) ||
+    url.includes(`tournamentCovers%2F${encodedSlug}%2F`)
+  );
+}
+
+async function isCoverUrlUsedElsewhere(coverImageUrl, excludeSlug) {
+  const trimmed = String(coverImageUrl || "").trim();
+  if (!trimmed) return false;
+  try {
+    const registry = await loadTournamentRegistry(true);
+    return (registry || []).some((item) => {
+      if (!item || item.slug === excludeSlug) return false;
+      return String(item.coverImageUrl || "").trim() === trimmed;
+    });
+  } catch (err) {
+    console.warn("Failed to verify cover image usage", err);
+    return true;
+  }
+}
+
+async function isCoverFolderUsedElsewhere(slug, excludeSlug) {
+  if (!slug) return false;
+  try {
+    const registry = await loadTournamentRegistry(true);
+    return (registry || []).some((item) => {
+      if (!item || item.slug === excludeSlug) return false;
+      return isCoverUrlInSlugFolder(String(item.coverImageUrl || "").trim(), slug);
+    });
+  } catch (err) {
+    console.warn("Failed to verify cover folder usage", err);
+    return true;
+  }
+}
+
+async function deleteTournamentCoverByUrl(coverImageUrl, slug) {
   const trimmed = String(coverImageUrl || "").trim();
   if (!trimmed || !isFirebaseStorageUrl(trimmed)) return;
+  if (slug && !isCoverUrlInSlugFolder(trimmed, slug)) return;
+  const usedElsewhere = await isCoverUrlUsedElsewhere(trimmed, slug);
+  if (usedElsewhere) return;
   try {
     const coverRef = storageRef(storage, trimmed);
     await deleteObject(coverRef);
@@ -1710,6 +1779,8 @@ async function deleteTournamentCoverByUrl(coverImageUrl) {
 
 async function deleteTournamentCoverFolder(slug) {
   if (!slug) return;
+  const usedElsewhere = await isCoverFolderUsedElsewhere(slug, slug);
+  if (usedElsewhere) return;
   try {
     const folderRef = storageRef(storage, `tournamentCovers/${slug}`);
     const list = await listAll(folderRef);
@@ -1747,7 +1818,9 @@ async function handleSaveSettings(event) {
   const checkInSelect = document.getElementById("settingsCheckInSelect");
   const qualifyInput = document.getElementById("settingsCircuitQualifyCount");
   const imageInput = document.getElementById("settingsImageInput");
+  const imagePreview = document.getElementById("settingsImagePreview");
   const imageFile = imageInput?.files?.[0] || null;
+  const reuseUrl = imagePreview?.dataset.reuseUrl || "";
   const newSlugRaw = (slugInput?.value || "").trim();
   const newSlug = newSlugRaw || currentSlug || "";
   const slugChanged = newSlug && newSlug !== currentSlug;
@@ -1771,6 +1844,9 @@ async function handleSaveSettings(event) {
     ? readCircuitPointsTable()
     : null;
   let coverImageUrl = currentTournamentMeta?.coverImageUrl || "";
+  if (!imageFile && reuseUrl) {
+    coverImageUrl = reuseUrl;
+  }
   if (imageFile) {
     try {
       coverImageUrl = await uploadTournamentCover(imageFile, newSlug);
@@ -1856,6 +1932,7 @@ async function handleCreateCircuit(event) {
   const finalDescriptionInput = document.getElementById("finalTournamentDescriptionInput");
   const finalRulesInput = document.getElementById("finalTournamentRulesInput");
   const finalImageInput = document.getElementById("finalTournamentImageInput");
+  const finalImagePreview = document.getElementById("finalTournamentImagePreview");
   const finalQualifyInput = document.getElementById("finalQualifyCountInput");
   const modal = document.getElementById("createCircuitModal");
   const name = (nameInput?.value || "").trim();
@@ -1878,6 +1955,7 @@ async function handleCreateCircuit(event) {
   const finalDescription = finalDescriptionInput?.value || "";
   const finalRules = finalRulesInput?.value || "";
   const finalImageFile = finalImageInput?.files?.[0] || null;
+  const finalReuseUrl = finalImagePreview?.dataset.reuseUrl || "";
   const finalQualifyRaw = finalQualifyInput?.value ?? "";
   const finalQualifyCount =
     finalQualifyRaw === "" || finalQualifyRaw === null || finalQualifyRaw === undefined
@@ -1955,6 +2033,7 @@ async function handleCreateCircuit(event) {
         finalSlug,
         finalPayload,
         finalImageFile,
+        finalCoverUrl: finalReuseUrl,
       });
       finalCreated = true;
     } catch (err) {
@@ -1990,7 +2069,9 @@ async function handleCreateTournament(event) {
   const descriptionInput = document.getElementById("tournamentDescriptionInput");
   const rulesInput = document.getElementById("tournamentRulesInput");
   const imageInput = document.getElementById("tournamentImageInput");
+  const imagePreview = document.getElementById("tournamentImagePreview");
   const imageFile = imageInput?.files?.[0] || null;
+  const reuseUrl = imagePreview?.dataset.reuseUrl || "";
   const modal = document.getElementById("createTournamentModal");
   const circuitSlug = (modal?.dataset.circuitSlug || "").trim();
   const isCircuitFinal = circuitSlug
@@ -2050,6 +2131,16 @@ async function handleCreateTournament(event) {
         );
       } catch (err) {
         showToast?.(err?.message || "Failed to upload cover image.", "error");
+      }
+    } else if (reuseUrl) {
+      try {
+        await setDoc(
+          doc(collection(db, TOURNAMENT_COLLECTION), slug),
+          { coverImageUrl: reuseUrl },
+          { merge: true }
+        );
+      } catch (err) {
+        console.error("Failed to reuse cover image", err);
       }
     }
     if (circuitSlug) {
@@ -2231,6 +2322,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     notifyCheckInPlayers,
     goLiveTournament,
   });
+  initCoverReuseModal();
   initCasterControls({ saveState });
   initFinalAdminSearch();
   initAdminInviteModal();

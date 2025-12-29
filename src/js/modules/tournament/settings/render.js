@@ -98,10 +98,12 @@ export function populateSettingsPanel({
       imagePreview.src = tournament.coverImageUrl;
       imagePreview.style.display = "block";
       delete imagePreview.dataset.tempPreview;
+      imagePreview.dataset.reuseUrl = tournament.coverImageUrl;
     } else {
       imagePreview.removeAttribute("src");
       imagePreview.style.display = "none";
       delete imagePreview.dataset.tempPreview;
+      delete imagePreview.dataset.reuseUrl;
     }
   }
   const requirePulseInput = document.getElementById("settingsRequirePulseLink");

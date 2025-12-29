@@ -20,7 +20,7 @@ import { lockBodyScroll, unlockBodyScroll } from "./modalLock.js";
 import { initTournamentNotifications } from "./notifications.js";
 import { initTournamentTemplateManager } from "./templateManager.js";
 import { initTournamentSearch } from "./search/tournamentSearch.js";
-import { initTournamentListSlider, refreshTournamentListLayout } from "./listSlider.js";
+import { initTournamentListSlider, refreshTournamentListLayout, loadMoreTournamentListItems } from "./listSlider.js";
 
 export function initTournamentPage({
   handleRegistration,
@@ -357,6 +357,7 @@ export function initTournamentPage({
           URL.revokeObjectURL(previewEl.dataset.tempPreview);
         } catch (_) {}
       }
+      delete previewEl.dataset.reuseUrl;
       previewEl.src = url;
       previewEl.style.display = "block";
       previewEl.dataset.tempPreview = url;
@@ -778,13 +779,81 @@ export function initTournamentPage({
   document.querySelectorAll(".tab-btn").forEach((btn) => {
     btn.addEventListener("click", () => switchTab(btn.dataset.tab));
   });
+  const closeAdminPanels = () => {
+    document.querySelectorAll(".hero-admin-panel.is-open").forEach((panel) => {
+      panel.classList.remove("is-open");
+      const toggle = panel.closest(".hero")?.querySelector(".hero-admin-toggle");
+      if (toggle) toggle.setAttribute("aria-expanded", "false");
+    });
+  };
+  document.querySelectorAll(".hero-admin-toggle").forEach((toggle) => {
+    toggle.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const hero = toggle.closest(".hero");
+      const panel = hero?.querySelector(".hero-admin-panel");
+      if (!panel) return;
+      const isOpen = panel.classList.toggle("is-open");
+      toggle.setAttribute("aria-expanded", String(isOpen));
+    });
+  });
+  document.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (target.closest(".hero-admin-panel") || target.closest(".hero-admin-toggle")) return;
+    closeAdminPanels();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeAdminPanels();
+  });
+  const placements = document.getElementById("tournamentPlacements");
+  const placementsSlot = document.getElementById("tournamentPlacementsMobileSlot");
+  const placementsHome = placements?.parentElement || null;
+  const placementsHomeNext = placements?.nextSibling || null;
+  const updatePlacementsLocation = () => {
+    if (!placements || !placementsSlot || !placementsHome) return;
+    const isMobile =
+      window.matchMedia && window.matchMedia("(max-width: 640px)").matches;
+    if (isMobile) {
+      if (placements.parentElement !== placementsSlot) {
+        placementsSlot.appendChild(placements);
+      }
+      return;
+    }
+    if (placements.parentElement === placementsHome) return;
+    if (placementsHomeNext && placementsHomeNext.parentNode === placementsHome) {
+      placementsHome.insertBefore(placements, placementsHomeNext);
+    } else {
+      placementsHome.appendChild(placements);
+    }
+  };
   let resizeTimer = null;
   window.addEventListener("resize", () => {
     if (resizeTimer) window.clearTimeout(resizeTimer);
     resizeTimer = window.setTimeout(() => {
       refreshTournamentListLayout();
+      updatePlacementsLocation();
+      closeAdminPanels();
     }, 150);
   });
+  updatePlacementsLocation();
+
+  const listViewport = document.querySelector(".tournament-list-viewport");
+  if (listViewport && "IntersectionObserver" in window) {
+    const sentinel = document.createElement("div");
+    sentinel.className = "list-sentinel";
+    listViewport.appendChild(sentinel);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            loadMoreTournamentListItems();
+          }
+        });
+      },
+      { root: listViewport, rootMargin: "120px 0px", threshold: 0 }
+    );
+    observer.observe(sentinel);
+  }
   const statusSelect = document.getElementById("tournamentStatusSelect");
   const roleSelect = document.getElementById("tournamentRoleSelect");
   document.querySelectorAll("#tournamentTypeTabs .list-tab").forEach((btn) => {

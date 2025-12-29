@@ -145,11 +145,14 @@ export function normalizeCircuitData(data = {}, fallbackSlug = "") {
     .map((entry) => (typeof entry === "string" ? entry : entry?.slug))
     .filter(Boolean);
   const createdAt = data.createdAt?.toMillis ? data.createdAt.toMillis() : data.createdAt;
+  const coverImageUrl =
+    data.coverImageUrl || data.coverUrl || data.coverImage || "";
   return {
     id: data.id || fallbackSlug,
     slug: data.slug || fallbackSlug,
     name: data.name || fallbackSlug,
     description: data.description || "",
+    coverImageUrl,
     tournaments: Array.from(new Set(slugs)),
     finalTournamentSlug: data.finalTournamentSlug || "",
     pointsOverrides:
@@ -256,11 +259,25 @@ export async function renderCircuitView(
   const titleEl = document.getElementById("circuitTitle");
   const descEl = document.getElementById("circuitDescription");
   const statTournaments = document.getElementById("circuitStatTournaments");
-  const statPlayers = document.getElementById("circuitStatPlayers");
+  const statNextStart = document.getElementById("circuitStatNextStart");
   const finalLink = document.getElementById("circuitFinalLink");
+  const circuitHero = document.querySelector("#circuitView .hero");
   if (titleEl) titleEl.textContent = meta?.name || "Circuit";
   if (descEl) {
     descEl.textContent = meta?.description || "Circuit overview.";
+  }
+  if (circuitHero) {
+    const coverUrl = sanitizeUrl(meta?.coverImageUrl || "");
+    if (coverUrl) {
+      circuitHero.classList.add("has-cover");
+      circuitHero.style.setProperty(
+        "--hero-cover-image",
+        `url("${coverUrl}")`
+      );
+    } else {
+      circuitHero.classList.remove("has-cover");
+      circuitHero.style.removeProperty("--hero-cover-image");
+    }
   }
   const finalSlug = String(meta?.finalTournamentSlug || "").trim();
   if (finalLink) {
@@ -277,7 +294,29 @@ export async function renderCircuitView(
   }
   const slugs = normalizeCircuitTournamentSlugs(meta);
   if (statTournaments) statTournaments.textContent = String(slugs.length);
-  if (statPlayers) statPlayers.textContent = "0";
+  if (statNextStart) statNextStart.textContent = "TBD";
+  if (statNextStart && slugs.length) {
+    try {
+      const registry = await loadTournamentRegistry(true);
+      const now = Date.now();
+      const nextStart = (registry || [])
+        .filter((item) => slugs.includes(item.slug))
+        .map((item) => item.startTime)
+        .filter((time) => Number.isFinite(time) && time > now)
+        .sort((a, b) => a - b)[0];
+      if (nextStart) {
+        statNextStart.textContent = new Date(nextStart).toLocaleString([], {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+      }
+    } catch (_) {
+      // ignore
+    }
+  }
   await Promise.all([
     renderCircuitTournamentList(meta, slugs, {
       onEnterTournament,
@@ -342,17 +381,11 @@ export async function renderCircuitTournamentList(
       if (meta?.finalTournamentSlug && slug === meta.finalTournamentSlug) {
         metaBits.unshift("Finals event");
       }
-      const actionSlot = showDelete
-        ? `<div class="card-actions">
-            <button class="cta small danger circuit-delete-btn" data-slug="${escapeHtml(
-              item.slug
-            )}">Delete</button>
-          </div>`
-        : "";
       li.innerHTML = DOMPurify.sanitize(`
         <div class="card-cover${coverUrl ? " has-image" : ""}"${
           coverUrl ? ` style="background-image:url('${escapeHtml(coverUrl)}')"` : ""
         }></div>
+        <h4>${escapeHtml(item.name)}</h4>
         <div class="card-top">
           <div class="time-block">
             <span class="time-label">Start</span>
@@ -360,20 +393,11 @@ export async function renderCircuitTournamentList(
           </div>
           <span class="status-chip ${statusClass}">${statusLabel}</span>
         </div>
-        <h4>${escapeHtml(item.name)}</h4>
         <p class="tournament-format">${escapeHtml(item.format || "Tournament")}</p>
         <div class="meta">
           ${metaBits.map((text) => `<span>${escapeHtml(text)}</span>`).join("")}
         </div>
-        ${actionSlot}
       `);
-      const deleteBtn = li.querySelector(".circuit-delete-btn");
-      if (deleteBtn && onDeleteTournament) {
-        deleteBtn.addEventListener("click", (event) => {
-          event.stopPropagation();
-          onDeleteTournament(item.slug);
-        });
-      }
       if (onEnterTournament) {
         li.addEventListener("click", () => onEnterTournament(item.slug, meta?.slug || ""));
       }
@@ -557,7 +581,6 @@ export async function buildCircuitLeaderboard(meta, slugs = [], { excludeSlug } 
 export async function renderCircuitLeaderboard(meta, slugs = [], { showEdit = false } = {}) {
   const body = document.getElementById("circuitLeaderboardBody");
   const note = document.getElementById("circuitLeaderboardNote");
-  const statPlayers = document.getElementById("circuitStatPlayers");
   const editBtn = document.getElementById("openCircuitPointsEditBtn");
   const downloadBtn = document.getElementById("downloadCircuitLeaderboardBtn");
   if (!body) return;
@@ -567,7 +590,6 @@ export async function renderCircuitLeaderboard(meta, slugs = [], { showEdit = fa
   if (!slugs.length) {
     body.innerHTML = `<tr><td colspan="4" class="helper">No tournaments yet.</td></tr>`;
     if (note) note.textContent = "Add tournaments to build the leaderboard.";
-    if (statPlayers) statPlayers.textContent = "0";
     if (editBtn) editBtn.disabled = true;
     if (downloadBtn) downloadBtn.disabled = true;
     return;
@@ -577,7 +599,6 @@ export async function renderCircuitLeaderboard(meta, slugs = [], { showEdit = fa
     if (!usedSlugs.length) {
       body.innerHTML = `<tr><td colspan="4" class="helper">No tournaments yet.</td></tr>`;
       if (note) note.textContent = "Add tournaments to build the leaderboard.";
-      if (statPlayers) statPlayers.textContent = "0";
       if (editBtn) editBtn.disabled = true;
       if (downloadBtn) downloadBtn.disabled = true;
       return;
@@ -585,7 +606,6 @@ export async function renderCircuitLeaderboard(meta, slugs = [], { showEdit = fa
     if (!leaderboard.length) {
       body.innerHTML = `<tr><td colspan="4" class="helper">No players yet.</td></tr>`;
       if (note) note.textContent = "Points will appear after tournaments log players.";
-      if (statPlayers) statPlayers.textContent = "0";
       if (editBtn) editBtn.disabled = true;
       if (downloadBtn) downloadBtn.disabled = true;
       return;
@@ -621,13 +641,11 @@ export async function renderCircuitLeaderboard(meta, slugs = [], { showEdit = fa
       downloadBtn.disabled = false;
       downloadBtn.onclick = () => downloadCircuitLeaderboardCsv(leaderboard, meta);
     }
-    if (statPlayers) statPlayers.textContent = String(leaderboard.length);
     if (note) note.textContent = `Totals across ${usedSlugs.length} tournaments.`;
   } catch (err) {
     console.error("Failed to load circuit leaderboard", err);
     body.innerHTML = `<tr><td colspan="4" class="helper">Failed to load leaderboard.</td></tr>`;
     if (note) note.textContent = "Try refreshing in a moment.";
-    if (statPlayers) statPlayers.textContent = "0";
     if (editBtn) editBtn.disabled = true;
     if (downloadBtn) downloadBtn.disabled = true;
   }
@@ -688,6 +706,7 @@ export async function populateCreateCircuitForm() {
     finalImagePreview.removeAttribute("src");
     finalImagePreview.style.display = "none";
     delete finalImagePreview.dataset.tempPreview;
+    delete finalImagePreview.dataset.reuseUrl;
   }
   if (finalSlugInput && slugInput) {
     const baseSlug = (slugInput.value || "").trim().toLowerCase();

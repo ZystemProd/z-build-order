@@ -80,6 +80,7 @@ export async function loadTournamentRegistry(force = false) {
         startTime: startTime || null,
         createdBy: data.createdBy || null,
         createdByName: data.createdByName || data.hostName || null,
+        circuitSlug: data.circuitSlug || null,
         bestOf: data.bestOf || defaultState.bestOf || null,
       };
     });
@@ -132,6 +133,7 @@ export async function loadCircuitRegistry(force = false) {
         slug: data.slug || d.id,
         name: data.name || d.id,
         description: data.description || "",
+        coverImageUrl: data.coverImageUrl || data.coverUrl || data.coverImage || "",
         tournaments: Array.from(new Set(slugs)),
         finalTournamentSlug: data.finalTournamentSlug || "",
         createdBy: data.createdBy || null,

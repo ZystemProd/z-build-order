@@ -12,6 +12,7 @@ export async function createFinalTournamentForCircuit({
   finalSlug,
   finalPayload,
   finalImageFile,
+  finalCoverUrl,
 } = {}) {
   if (!db || !doc || !collection || !setDoc) {
     throw new Error("Missing database helpers for final tournament creation.");
@@ -37,6 +38,12 @@ export async function createFinalTournamentForCircuit({
     } catch (err) {
       showToast?.(err?.message || "Failed to upload final cover image.", "error");
     }
+  } else if (finalCoverUrl) {
+    await setDoc(
+      doc(collection(db, tournamentCollection), finalSlug),
+      { coverImageUrl: finalCoverUrl },
+      { merge: true }
+    );
   }
 
   await setDoc(

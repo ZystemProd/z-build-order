@@ -144,6 +144,7 @@ export function initTournamentSearch() {
   const tournamentSearchToggle = document.getElementById("tournamentSearchToggle");
   const tournamentSearchInput = document.getElementById("tournamentSearchInput");
   const tournamentSearchClear = document.getElementById("tournamentSearchClear");
+  const tournamentSearchPanel = document.getElementById("tournamentSearchPanel");
   const tournamentSearchResults = document.getElementById("tournamentSearchResults");
   const tournamentSearchStatus = document.getElementById("tournamentSearchStatus");
   const tournamentSearchList = document.getElementById("tournamentSearchList");
@@ -153,8 +154,8 @@ export function initTournamentSearch() {
   const setTournamentSearchOpen = (open) => {
     tournamentSearch.classList.toggle("is-open", open);
     tournamentSearchToggle.setAttribute("aria-expanded", open ? "true" : "false");
-    if (tournamentSearchResults) {
-      tournamentSearchResults.style.display = open ? "block" : "none";
+    if (tournamentSearchPanel) {
+      tournamentSearchPanel.style.display = open ? "block" : "none";
     }
     if (open) tournamentSearchInput.focus();
   };
@@ -193,6 +194,42 @@ export function initTournamentSearch() {
   let renderedCount = 0;
   let currentQuery = "";
 
+  const handleSearchInput = (value) => {
+    if (searchTimer) window.clearTimeout(searchTimer);
+    searchTimer = window.setTimeout(() => {
+      const query = value.trim();
+      currentQuery = query;
+      if (!query) {
+        currentResults = [];
+        renderedCount = 0;
+        renderTournamentSearchResults([], "", {
+          listEl: tournamentSearchList,
+          statusEl: tournamentSearchStatus,
+        });
+        return;
+      }
+      const token = ++searchToken;
+      if (tournamentSearchStatus) {
+        tournamentSearchStatus.textContent = "Searching...";
+      }
+      searchTournamentDirectory(query, { limit: null })
+        .then((items = []) => {
+          if (token !== searchToken) return;
+          currentResults = items;
+          renderNextBatch({ reset: true });
+        })
+        .catch(() => {
+          if (token !== searchToken) return;
+          if (tournamentSearchStatus) {
+            tournamentSearchStatus.textContent = "Search failed.";
+          }
+          if (tournamentSearchList) {
+            tournamentSearchList.innerHTML = "";
+          }
+        });
+    }, 150);
+  };
+
   const updateStatus = () => {
     if (!tournamentSearchStatus) return;
     if (!currentQuery) {
@@ -230,39 +267,7 @@ export function initTournamentSearch() {
   };
 
   tournamentSearchInput.addEventListener("input", () => {
-    if (searchTimer) window.clearTimeout(searchTimer);
-    searchTimer = window.setTimeout(() => {
-      const query = tournamentSearchInput.value.trim();
-      currentQuery = query;
-      if (!query) {
-        currentResults = [];
-        renderedCount = 0;
-        renderTournamentSearchResults([], "", {
-          listEl: tournamentSearchList,
-          statusEl: tournamentSearchStatus,
-        });
-        return;
-      }
-      const token = ++searchToken;
-      if (tournamentSearchStatus) {
-        tournamentSearchStatus.textContent = "Searching...";
-      }
-      searchTournamentDirectory(query, { limit: null })
-        .then((items = []) => {
-          if (token !== searchToken) return;
-          currentResults = items;
-          renderNextBatch({ reset: true });
-        })
-        .catch(() => {
-          if (token !== searchToken) return;
-          if (tournamentSearchStatus) {
-            tournamentSearchStatus.textContent = "Search failed.";
-          }
-          if (tournamentSearchList) {
-            tournamentSearchList.innerHTML = "";
-          }
-        });
-    }, 150);
+    handleSearchInput(tournamentSearchInput.value);
   });
 
   if (tournamentSearchList) {
@@ -287,6 +292,7 @@ export function initTournamentSearch() {
 
   document.addEventListener("click", (event) => {
     if (tournamentSearch.contains(event.target)) return;
+    if (tournamentSearchPanel && tournamentSearchPanel.contains(event.target)) return;
     setTournamentSearchOpen(false);
   });
 }

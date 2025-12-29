@@ -93,17 +93,19 @@
               d="M15.5 14h-.8l-.3-.3a6.4 6.4 0 1 0-.7.7l.3.3v.8l5 5 1.5-1.5-5-5Zm-5 0A4.5 4.5 0 1 1 10.5 5a4.5 4.5 0 0 1 0 9Z" />
           </svg>
         </button>
-        <div class="tournament-search-field">
-          <input id="tournamentSearchInput" class="tournament-search-input" type="search"
-            placeholder="Search tournaments or circuits" autocomplete="off" spellcheck="false" />
-          <button id="tournamentSearchClear" class="tournament-search-clear" type="button"
-            aria-label="Clear search">×</button>
-        </div>
-        <div id="tournamentSearchResults" class="tournament-search-results" style="display:none;">
-          <div id="tournamentSearchStatus" class="tournament-search-status">
-            Type to search tournaments or circuits.
+        <div class="tournament-search-panel" id="tournamentSearchPanel">
+          <div class="tournament-search-field">
+            <input id="tournamentSearchInput" class="tournament-search-input" type="search"
+              placeholder="Search" autocomplete="off" spellcheck="false" />
+            <button id="tournamentSearchClear" class="tournament-search-clear" type="button"
+              aria-label="Clear search">×</button>
           </div>
-          <ul id="tournamentSearchList" class="tournament-search-list"></ul>
+          <div id="tournamentSearchResults" class="tournament-search-results">
+            <div id="tournamentSearchStatus" class="tournament-search-status">
+              Type to search tournaments or circuits.
+            </div>
+            <ul id="tournamentSearchList" class="tournament-search-list"></ul>
+          </div>
         </div>
       </div>
       <div id="tournamentNotifications" class="tournament-notifications">
@@ -255,16 +257,15 @@
 
       <div class="card tournament-list-card is-tournaments">
         <div class="card-header tournament-filter-header">
-          <div>
-            <div class="list-tabs" id="tournamentTypeTabs">
+          <div class="tournament-header-left">
+            <div class="list-tabs tournament-type-row" id="tournamentTypeTabs">
               <button class="list-tab active" data-type-filter="tournaments">Tournaments</button>
               <button class="list-tab" data-type-filter="circuits">Circuits</button>
             </div>
-            <h3 id="tournamentListTitle">Tournaments</h3>
           </div>
           <div class="tournament-filter-controls" id="tournamentFilterControls">
             <label class="tournament-filter">
-              <span class="tournament-filter-label">Filter by status</span>
+              <span class="tournament-filter-label">Status</span>
               <select id="tournamentStatusSelect" class="tournament-filter-select">
                 <option value="all">All</option>
                 <option value="live">Live</option>
@@ -273,7 +274,7 @@
               </select>
             </label>
             <label class="tournament-filter">
-              <span class="tournament-filter-label">Filter by role</span>
+              <span class="tournament-filter-label">Role</span>
               <select id="tournamentRoleSelect" class="tournament-filter-select">
                 <option value="all">All</option>
                 <option value="registered">Registered</option>
@@ -281,8 +282,13 @@
                 <option value="hosting">Hosting</option>
               </select>
             </label>
+            <button id="refreshTournaments" class="cta ghost small icon-only" aria-label="Refresh">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path
+                  d="M12 6V3L7.5 7.5 12 12V9a5 5 0 1 1-5 5H5a7 7 0 1 0 7-8Z" />
+              </svg>
+            </button>
           </div>
-          <button id="refreshTournaments" class="cta ghost small">Refresh</button>
         </div>
         <div class="tournament-list-slider">
           <button id="tournamentListPrev" class="slider-btn" type="button" aria-label="Previous tournaments">
@@ -308,7 +314,12 @@
         <div class="hero-main">
           <a class="ghost-link" href="/tournament"><span class="ghost-link-icon">←</span>All tournaments</a>
           <p class="eyebrow">Circuit</p>
-          <h1 id="circuitTitle">Circuit</h1>
+          <div class="hero-title-row">
+            <h1 id="circuitTitle">Circuit</h1>
+            <button class="hero-admin-toggle" type="button" aria-expanded="false">
+              Admins
+            </button>
+          </div>
           <p class="lede" id="circuitDescription">Circuit overview.</p>
           <div class="hero-actions">
             <button id="openCreateCircuitTournament" class="cta primary small" style="display:none;">
@@ -316,17 +327,17 @@
             </button>
           </div>
         </div>
-        <div class="hero-stats">
+        <div class="hero-stats hero-stats-stacked">
           <div class="stat-card">
             <p>Tournaments</p>
             <h2 id="circuitStatTournaments">0</h2>
           </div>
-          <div class="stat-card accent">
-            <p>Players ranked</p>
-            <h2 id="circuitStatPlayers">0</h2>
-          </div>
+        <div class="stat-card accent">
+          <p>Next tournament starts</p>
+          <h2 id="circuitStatNextStart">TBD</h2>
         </div>
-        <div class="hero-admin-panel">
+        </div>
+        <div class="hero-admin-panel" id="circuitAdminPanel">
           <div class="hero-admins" id="circuitAdminSection">
             <div class="hero-admins-header">
               <span class="eyebrow">Admins</span>
@@ -388,7 +399,12 @@
       <header class="hero hero-with-admins">
         <div class="hero-main">
           <a class="ghost-link" href="/tournament" id="tournamentBackLink"><span class="ghost-link-icon">←</span>All tournaments</a>
-          <h1 id="tournamentTitle">Tournament</h1>
+          <div class="hero-title-row">
+            <h1 id="tournamentTitle">Tournament</h1>
+            <button class="hero-admin-toggle" type="button" aria-expanded="false">
+              Admins
+            </button>
+          </div>
           <div class="hero-placements hero-placements--stacked" id="tournamentPlacements" style="display:none;">
             <div class="placement-item" data-place="1">
               <span class="placement-icon" aria-hidden="true">
@@ -429,7 +445,7 @@
           <h2 id="tournamentStart">TBD</h2>
         </div>
         </div>
-        <div class="hero-admin-panel">
+        <div class="hero-admin-panel" id="tournamentAdminPanel">
           <div class="hero-admins" id="tournamentAdminSection">
             <div class="hero-admins-header">
               <span class="eyebrow">Admins</span>
@@ -441,6 +457,8 @@
           </div>
         </div>
       </header>
+
+      <div id="tournamentPlacementsMobileSlot" class="tournament-placements-slot"></div>
 
     <main class="page-stack">
       <div class="tab-bar" id="tabBar">
@@ -694,7 +712,13 @@
             </label>
             <label>Cover image
               <div class="image-upload">
-                <input type="file" id="settingsImageInput" accept="image/*" />
+                <div class="image-upload-actions">
+                  <input type="file" id="settingsImageInput" accept="image/*" />
+                  <button type="button" class="cta ghost small cover-reuse-btn" data-cover-input="settingsImageInput"
+                    data-cover-preview="settingsImagePreview">
+                    Reuse cover
+                  </button>
+                </div>
                 <div class="image-preview">
                   <img id="settingsImagePreview" alt="Tournament cover preview" />
                 </div>
@@ -1088,7 +1112,13 @@
         </label>
         <label>Cover image
           <div class="image-upload">
-            <input type="file" id="tournamentImageInput" accept="image/*" />
+            <div class="image-upload-actions">
+              <input type="file" id="tournamentImageInput" accept="image/*" />
+              <button type="button" class="cta ghost small cover-reuse-btn" data-cover-input="tournamentImageInput"
+                data-cover-preview="tournamentImagePreview">
+                Reuse cover
+              </button>
+            </div>
             <div class="image-preview">
               <img id="tournamentImagePreview" alt="Tournament cover preview" />
             </div>
@@ -1340,6 +1370,17 @@
     </div>
   </div>
 
+  <div id="coverReuseModal" class="modal" style="display:none;">
+    <div class="modal-content cover-reuse-modal">
+      <button class="modal-close-button" id="closeCoverReuseModal" aria-label="Close cover picker">×</button>
+      <div class="modal-title-row">
+        <h3>Reuse cover image</h3>
+      </div>
+      <p class="helper">Choose a cover you've already uploaded.</p>
+      <div id="coverReuseGrid" class="cover-reuse-grid"></div>
+    </div>
+  </div>
+
   <div id="tournamentTemplateModal" class="modal create-modal" style="display:none;">
     <div class="template-manager-layout">
       <aside class="template-manager-sidebar">
@@ -1480,7 +1521,13 @@
         </label>
         <label>Cover image
           <div class="image-upload">
-            <input type="file" id="finalTournamentImageInput" accept="image/*" />
+            <div class="image-upload-actions">
+              <input type="file" id="finalTournamentImageInput" accept="image/*" />
+              <button type="button" class="cta ghost small cover-reuse-btn"
+                data-cover-input="finalTournamentImageInput" data-cover-preview="finalTournamentImagePreview">
+                Reuse cover
+              </button>
+            </div>
             <div class="image-preview">
               <img id="finalTournamentImagePreview" alt="Finals cover preview" />
             </div>
