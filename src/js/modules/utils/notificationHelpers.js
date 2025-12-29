@@ -1,6 +1,6 @@
 import { auth, db } from "../../../app.js";
 import { listPublicClans } from "../clan.js";
-import { createNotificationDot } from "../uiHandlers.js";
+import { createNotificationDot } from "../notificationDot.js";
 
 export async function checkForJoinRequestNotifications() {
   const clans = await listPublicClans();

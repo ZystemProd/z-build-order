@@ -74,6 +74,13 @@ export async function getPublisherClanInfo(uid) {
   return null;
 }
 
+async function normalizePublisherClan(publisherClan, publisherId) {
+  if (publisherClan?.logoUrlSmall) return publisherClan;
+  if (!publisherId) return publisherClan || null;
+  const fresh = await getPublisherClanInfo(publisherId);
+  return fresh || publisherClan || null;
+}
+
 async function getUserClansMap() {
   const map = {};
   const user = auth.currentUser;
@@ -83,7 +90,11 @@ async function getUserClansMap() {
   clansSnap.forEach((doc) => {
     const clan = doc.data();
     if (clan.members?.includes(user.uid)) {
-      map[doc.id] = { name: clan.name, logoUrl: clan.logoUrl };
+      map[doc.id] = {
+        name: clan.name,
+        logoUrl: clan.logoUrl,
+        logoUrlSmall: clan.logoUrlSmall,
+      };
     }
   });
   return map;
@@ -212,8 +223,10 @@ async function fetchNextCommunityBuilds(batchSize = 20) {
       const hotnessScore =
         (upvotes - downvotes) / Math.pow(ageInHours + 2, gravity);
 
-      const publisherClan =
-        data.publisherClan || (await getPublisherClanInfo(data.publisherId));
+      const publisherClan = await normalizePublisherClan(
+        data.publisherClan,
+        data.publisherId
+      );
       return {
         id: doc.id,
         title: data.title || "Untitled Build",
@@ -850,8 +863,10 @@ export async function searchCommunityBuilds(searchTerm) {
 
     const clanId = (data.sharedToClans || []).find((cid) => userClanMap[cid]);
       const clanInfo = clanId ? userClanMap[clanId] : null;
-      const publisherClan =
-        data.publisherClan || (await getPublisherClanInfo(data.publisherId));
+      const publisherClan = await normalizePublisherClan(
+        data.publisherClan,
+        data.publisherId
+      );
 
       return {
         id: doc.id,
@@ -1001,7 +1016,9 @@ function renderCommunityBuildBatch(builds) {
     const clanChip =
       localStorage.getItem("communityBuildType") === "clan" && build.clanInfo
         ? `<span class="meta-chip clan-chip"><img src="${
-            build.clanInfo.logoUrl || "./img/clan/logo.webp"
+            build.clanInfo.logoUrlSmall ||
+            build.clanInfo.logoUrl ||
+            "./img/clan/logo.webp"
           }" alt="${DOMPurify.sanitize(
             build.clanInfo.name
           )}" class="meta-icon" width="16" height="16" loading="lazy" decoding="async">${
@@ -1020,7 +1037,9 @@ function renderCommunityBuildBatch(builds) {
           ${clanChip}
           <span class="meta-chip publisher-chip">
             <img src="${
-              build.publisherClan?.logoUrl || "./img/SVG/user-svgrepo-com.svg"
+              build.publisherClan?.logoUrlSmall ||
+              build.publisherClan?.logoUrl ||
+              "./img/SVG/user-svgrepo-com.svg"
             }" alt="Publisher" class="meta-icon" width="16" height="16" loading="lazy" decoding="async">
             ${DOMPurify.sanitize(build.publisher)}
           </span>
@@ -1173,8 +1192,10 @@ export async function filterCommunityBuilds(filter = "all") {
 
         const clanId = (data.sharedToClans || []).find((id) => userClanMap[id]);
         const clanInfo = clanId ? userClanMap[clanId] : null;
-        const publisherClan =
-          data.publisherClan || (await getPublisherClanInfo(data.publisherId));
+        const publisherClan = await normalizePublisherClan(
+          data.publisherClan,
+          data.publisherId
+        );
 
         return {
           id: doc.id,

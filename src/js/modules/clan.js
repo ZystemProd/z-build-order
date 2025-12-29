@@ -23,14 +23,19 @@ import {
   getDownloadURL,
   ref as storageRef,
 } from "firebase/storage";
-import { createNotificationDot } from "./uiHandlers.js";
+import { createNotificationDot } from "./notificationDot.js";
 import { showToast } from "./toastHandler.js";
 import { app, db } from "../../app.js";
 import { checkForJoinRequestNotifications } from "./utils/notificationHelpers.js";
 import DOMPurify from "dompurify";
 import { logAnalyticsEvent } from "./analyticsHelper.js";
+import { prepareImageForUpload, validateImageFile } from "./imageUtils.js";
 
 const storage = getStorage(app);
+const CLAN_LOGO_SIZE = 256;
+const CLAN_LOGO_SMALL_SIZE = 96;
+const CLAN_LOGO_MAX_BYTES = 2 * 1024 * 1024;
+const CLAN_LOGO_QUALITY = 0.85;
 
 let currentClanView = null;
 
@@ -52,15 +57,34 @@ export async function getUsernameFromUid(uid) {
 }
 
 export async function uploadClanLogo(file, clanId) {
-  const storage = getStorage(app);
   const filePath = `clanLogos/${clanId}/logo.webp`;
   const storageRef = ref(storage, filePath);
-
-  await uploadBytes(storageRef, file, { contentType: "image/webp" });
+  const processed = await prepareImageForUpload(file, {
+    targetWidth: CLAN_LOGO_SIZE,
+    targetHeight: CLAN_LOGO_SIZE,
+    quality: CLAN_LOGO_QUALITY,
+    outputType: "image/webp",
+    fallbackType: "image/jpeg",
+  });
+  await uploadBytes(storageRef, processed.blob, { contentType: processed.contentType });
 
   // ✅ Get real download URL
   const url = await getDownloadURL(storageRef);
   return url;
+}
+
+export async function uploadClanLogoSmall(file, clanId) {
+  const filePath = `clanLogos/${clanId}/logo-small.webp`;
+  const storageRef = ref(storage, filePath);
+  const processed = await prepareImageForUpload(file, {
+    targetWidth: CLAN_LOGO_SMALL_SIZE,
+    targetHeight: CLAN_LOGO_SMALL_SIZE,
+    quality: CLAN_LOGO_QUALITY,
+    outputType: "image/webp",
+    fallbackType: "image/jpeg",
+  });
+  await uploadBytes(storageRef, processed.blob, { contentType: processed.contentType });
+  return getDownloadURL(storageRef);
 }
 
 export async function createClan({
@@ -91,19 +115,20 @@ export async function createClan({
 
   // Step 2: Optional logo upload with validation
   if (logoFile) {
-    const validTypes = ["image/png", "image/jpeg", "image/webp"];
-    const maxSize = 2 * 1024 * 1024;
-
-    if (!validTypes.includes(logoFile.type)) {
-      throw new Error("Only PNG, JPG, or WEBP files are allowed.");
-    }
-    if (logoFile.size > maxSize) {
-      throw new Error("Image is too large. Max 2MB.");
+    const error = validateImageFile(logoFile, {
+      maxBytes: CLAN_LOGO_MAX_BYTES,
+      allowedTypes: ["image/png", "image/jpeg", "image/webp"],
+    });
+    if (error) {
+      throw new Error(error);
     }
 
-    // Upload and update the logoUrl
-    const logoUrl = await uploadClanLogo(logoFile, clanDoc.id);
-    await updateDoc(clanDoc, { logoUrl });
+    // Upload and update the logo URLs
+    const [logoUrl, logoUrlSmall] = await Promise.all([
+      uploadClanLogo(logoFile, clanDoc.id),
+      uploadClanLogoSmall(logoFile, clanDoc.id),
+    ]);
+    await updateDoc(clanDoc, { logoUrl, logoUrlSmall });
   }
 
   logAnalyticsEvent("clan_created", { name });
@@ -148,7 +173,12 @@ export async function getUserClans(uid) {
   snap.forEach((d) => {
     const data = d.data();
     if (data.members?.includes(uid)) {
-      clans.push({ id: d.id, name: data.name, logoUrl: data.logoUrl });
+      clans.push({
+        id: d.id,
+        name: data.name,
+        logoUrl: data.logoUrl,
+        logoUrlSmall: data.logoUrlSmall,
+      });
     }
   });
   return clans;
@@ -783,6 +813,14 @@ async function renderManageTab(tab, clan) {
       const roleWrapper = document.createElement("div");
       roleWrapper.className = "role-wrapper";
 
+      const isSelf = member.uid === auth.currentUser?.uid;
+      const isTargetCaptain =
+        member.role === "Captain" || member.uid === clan.adminUid;
+
+      const canChangeRole =
+        (myRole === "Captain" && !isSelf) ||
+        (myRole === "Co-Captain" && !isSelf && !isTargetCaptain);
+
       const roleText = document.createElement("span");
       roleText.textContent = member.role;
       roleText.className = "role-text";
@@ -804,13 +842,12 @@ async function renderManageTab(tab, clan) {
         roleSelect.appendChild(option);
       });
 
-      const isSelf = member.uid === auth.currentUser?.uid;
-      const isTargetCaptain =
-        member.role === "Captain" || member.uid === clan.adminUid;
-
-      const canChangeRole =
-        (myRole === "Captain" && !isSelf) ||
-        (myRole === "Co-Captain" && !isSelf && !isTargetCaptain);
+      if (canChangeRole && !isTargetCaptain) {
+        const removeOption = document.createElement("option");
+        removeOption.value = "Remove";
+        removeOption.textContent = "Remove";
+        roleSelect.appendChild(removeOption);
+      }
 
       if (!canChangeRole) {
         roleWrapper.appendChild(roleText);
@@ -819,6 +856,26 @@ async function renderManageTab(tab, clan) {
 
         roleSelect.onchange = async () => {
           const newRole = roleSelect.value;
+
+          if (newRole === "Remove") {
+            if (isTargetCaptain) {
+              showToast("You cannot remove the Captain.", "error");
+              roleSelect.value = member.role;
+              return;
+            }
+            const confirmed = await confirmClanMemberRemoval(member.username);
+            if (!confirmed) {
+              roleSelect.value = member.role;
+              return;
+            }
+            await updateDoc(doc(db, "clans", clan.id), {
+              members: arrayRemove(member.uid),
+              [`memberInfo.${member.uid}`]: deleteField(),
+            });
+            showToast(`${member.username} removed from clan`, "success");
+            await renderManageClanUI(clan.id);
+            return;
+          }
 
           if (newRole === "Captain" && auth.currentUser?.uid !== clan.adminUid) {
             showToast("Only the admin can assign Captain role.", "error");
@@ -1113,19 +1170,20 @@ async function renderManageTab(tab, clan) {
         const file = logoInput.files[0]; // ✅ corrected here
 
         if (file) {
-          const validTypes = ["image/png", "image/jpeg", "image/webp"];
-          const maxSize = 2 * 1024 * 1024; // 2MB
-
-          if (!validTypes.includes(file.type)) {
-            throw new Error("Only PNG, JPG, or WEBP files are allowed.");
+          const error = validateImageFile(file, {
+            maxBytes: CLAN_LOGO_MAX_BYTES,
+            allowedTypes: ["image/png", "image/jpeg", "image/webp"],
+          });
+          if (error) {
+            throw new Error(error);
           }
 
-          if (file.size > maxSize) {
-            throw new Error("Image is too large. Max 2MB.");
-          }
-
-          const logoUrl = await uploadClanLogo(file, clan.id);
+          const [logoUrl, logoUrlSmall] = await Promise.all([
+            uploadClanLogo(file, clan.id),
+            uploadClanLogoSmall(file, clan.id),
+          ]);
           updates.logoUrl = logoUrl;
+          updates.logoUrlSmall = logoUrlSmall;
         }
 
         await updateDoc(doc(db, "clans", clan.id), updates);
@@ -1161,20 +1219,6 @@ async function renderManageTab(tab, clan) {
       try {
         // Delete Firestore document
         await deleteDoc(doc(db, "clans", clan.id));
-
-        // Clean up any related notifications
-        const notifQuery = query(
-          collection(db, "notifications"),
-          where("clanId", "==", clan.id)
-        );
-        try {
-          const notifSnap = await getDocs(notifQuery);
-          notifSnap.forEach(async (docSnap) => {
-            await deleteDoc(docSnap.ref).catch(() => {});
-          });
-        } catch (err) {
-          console.warn("Skipping notification cleanup:", err.message);
-        }
 
         // Clean up storage if a logo was uploaded
         if (clan.logoUrl && clan.logoUrl.includes("clanLogos")) {
@@ -1268,6 +1312,82 @@ async function renderManageTab(tab, clan) {
     scrollWrapper.appendChild(form);
     settingsTab.appendChild(scrollWrapper);
   }
+}
+
+function ensureClanMemberRemovalModal() {
+  let modal = document.getElementById("confirmClanMemberRemovalModal");
+  if (modal) return modal;
+
+  modal = document.createElement("div");
+  modal.id = "confirmClanMemberRemovalModal";
+  modal.className = "modal";
+  modal.style.display = "none";
+
+  const content = document.createElement("div");
+  content.className = "small-modal clan-confirm-modal";
+
+  const title = document.createElement("h3");
+  title.textContent = "Remove member";
+
+  const message = document.createElement("p");
+  message.id = "confirmClanMemberRemovalText";
+
+  const buttons = document.createElement("div");
+  buttons.className = "modal-buttons";
+
+  const confirmBtn = document.createElement("button");
+  confirmBtn.className = "confirm-button";
+  confirmBtn.id = "confirmClanMemberRemovalYes";
+  confirmBtn.textContent = "Remove";
+
+  const cancelBtn = document.createElement("button");
+  cancelBtn.className = "cancel-button";
+  cancelBtn.id = "confirmClanMemberRemovalNo";
+  cancelBtn.textContent = "Cancel";
+
+  buttons.append(confirmBtn, cancelBtn);
+  content.append(title, message, buttons);
+  modal.appendChild(content);
+  document.body.appendChild(modal);
+
+  return modal;
+}
+
+function confirmClanMemberRemoval(memberName) {
+  const modal = ensureClanMemberRemovalModal();
+  const message = modal.querySelector("#confirmClanMemberRemovalText");
+  const confirmBtn = modal.querySelector("#confirmClanMemberRemovalYes");
+  const cancelBtn = modal.querySelector("#confirmClanMemberRemovalNo");
+
+  if (message) {
+    message.textContent = `Remove ${memberName} from the clan?`;
+  }
+
+  modal.style.display = "block";
+
+  return new Promise((resolve) => {
+    const cleanup = () => {
+      confirmBtn?.removeEventListener("click", onConfirm);
+      cancelBtn?.removeEventListener("click", onCancel);
+      modal.removeEventListener("mousedown", onBackdrop);
+    };
+
+    const close = (result) => {
+      modal.style.display = "none";
+      cleanup();
+      resolve(result);
+    };
+
+    const onConfirm = () => close(true);
+    const onCancel = () => close(false);
+    const onBackdrop = (event) => {
+      if (event.target === modal) close(false);
+    };
+
+    confirmBtn?.addEventListener("click", onConfirm);
+    cancelBtn?.addEventListener("click", onCancel);
+    modal.addEventListener("mousedown", onBackdrop);
+  });
 }
 
 function createClanBanner(clan) {

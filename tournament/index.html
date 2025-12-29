@@ -1,0 +1,2172 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <base href="/" />
+  <title>Z-Build Order | Tournament Center</title>
+  <meta name="description"
+    content="Find, create, and run StarCraft 2 tournaments with live brackets, registration, and SC2Pulse seeding." />
+  <meta property="og:title" content="Z-Build Order Tournament Bracket" />
+  <meta property="og:description"
+    content="Register players, seed by points and MMR, and track live brackets for your tournaments." />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="https://zbuildorder.com/img/og-image.webp" />
+  <link rel="icon" type="image/x-icon" href="/img/favicon.ico" />
+  <link rel="preload" href="/public/css/tournament.css" as="style" />
+  <link rel="preload" href="/public/css/showToast.css" as="style" />
+  <link rel="modulepreload" href="/tournament.js" />
+  <style>
+    body.tournament-body {
+      margin: 0;
+      background: #080a12;
+      color: #e7e9f3;
+      min-height: 100vh;
+      padding: 24px 6vw;
+    }
+
+    .tournament-shell {
+      max-width: 1180px;
+      margin: 0 auto;
+    }
+
+    .hero {
+      display: grid;
+      gap: 24px;
+    }
+
+    .hero-admins {
+      display: grid;
+      gap: 12px;
+    }
+
+    .hero-admins-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .hero-admins-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .hero-admin-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      font-size: 0.9rem;
+    }
+
+    .hero-admin-role {
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.16);
+      font-size: 0.7rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+  </style>
+  <link rel="stylesheet" href="/public/css/tournament.css" />
+  <link id="clanStylesheet" rel="stylesheet" href="/public/css/clan.css" />
+  <link rel="stylesheet" href="/public/css/showToast.css" />
+</head>
+
+<body class="tournament-body">
+  <div id="toast-container"></div>
+
+  <header class="tournament-header">
+    <div class="tournament-shell tournament-header-inner">
+      <div class="tournament-header-spacer"></div>
+      <div class="tournament-search" id="tournamentSearch">
+        <button id="tournamentSearchToggle" class="tournament-search-toggle" type="button" aria-expanded="false"
+          aria-controls="tournamentSearchInput" aria-label="Search tournaments and circuits">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path
+              d="M15.5 14h-.8l-.3-.3a6.4 6.4 0 1 0-.7.7l.3.3v.8l5 5 1.5-1.5-5-5Zm-5 0A4.5 4.5 0 1 1 10.5 5a4.5 4.5 0 0 1 0 9Z" />
+          </svg>
+        </button>
+        <div class="tournament-search-panel" id="tournamentSearchPanel">
+          <div class="tournament-search-field">
+            <input id="tournamentSearchInput" class="tournament-search-input" type="search"
+              placeholder="Search" autocomplete="off" spellcheck="false" />
+            <button id="tournamentSearchClear" class="tournament-search-clear" type="button"
+              aria-label="Clear search">×</button>
+          </div>
+          <div id="tournamentSearchResults" class="tournament-search-results">
+            <div id="tournamentSearchStatus" class="tournament-search-status">
+              Type to search tournaments or circuits.
+            </div>
+            <ul id="tournamentSearchList" class="tournament-search-list"></ul>
+          </div>
+        </div>
+      </div>
+      <div id="tournamentNotifications" class="tournament-notifications">
+        <button id="notificationTrigger" class="notification-trigger" type="button" aria-haspopup="true"
+          aria-expanded="false" aria-controls="notificationDropdown" aria-label="Open notifications">
+          <img src="img/SVG/bell.svg" alt="" class="notification-icon" />
+          <span id="notificationCount" class="notification-count" aria-hidden="true"></span>
+        </button>
+        <div id="notificationDropdown" class="notification-dropdown" style="display: none;">
+          <div class="notification-dropdown-header">
+            <span class="notification-dropdown-title">Notifications</span>
+            <button id="notificationViewAll" class="notification-view-all" type="button">View all</button>
+          </div>
+          <ul id="notificationList" class="notification-dropdown-list"></ul>
+        </div>
+      </div>
+      <div id="auth-container" class="auth-inline">
+        <div class="auth-info">
+          <div id="authLoadingWrapper" class="auth-loading">
+            <div id="authLoading" class="spinner"></div>
+            <span id="authLoadingText">Loading user...</span>
+          </div>
+
+          <div class="user-details">
+            <p id="userName" class="user-name fade-in" style="display: none;">Guest</p>
+          </div>
+
+          <img id="userPhoto" class="user-avatar fade-in" src="img/avatar/marine_avatar_1.webp" alt="User Avatar"
+            style="display: none;" />
+
+          <div id="userMenu" class="user-menu" style="display: none;">
+            <div class="menu-section">
+              <p id="userNameMenu" class="user-name fade-in">Guest</p>
+              <p id="userMmrMenu" class="user-mmr" style="display: none;">MMR: --</p>
+              <hr id="userNameDivider" class="menu-divider" />
+              <button class="menu-item" id="mapVetoBtn">
+                <img src="img/SVG/map-solid.svg" class="menu-icon" /> Map Veto
+              </button>
+              <hr class="menu-divider" />
+              <button class="menu-item" id="showClanModalButton">
+                <img src="img/SVG/clan.svg" class="menu-icon" /> Clans
+              </button>
+              <hr class="menu-divider" />
+              <button id="showStatsButton" class="menu-item">
+                <img src="img/SVG/stats.svg" class="menu-icon" /> My Stats
+              </button>
+              <hr class="menu-divider" />
+              <button class="menu-item" id="settingsBtn">
+                <img src="img/SVG/settings.svg" class="menu-icon" /> Settings
+              </button>
+              <hr class="menu-divider" />
+              <button class="menu-item" id="switchAccountBtn">
+                <img src="img/SVG/switch.svg" class="menu-icon" /> Switch Account
+              </button>
+              <button class="menu-item" id="signOutBtn">
+                <img src="img/SVG/logout.svg" class="menu-icon" /> Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <button id="signInBtn" class="auth-button">Sign In</button>
+      </div>
+    </div>
+  </header>
+
+  <div id="notificationModal" class="modal" style="display: none;">
+    <div class="modal-content notification-modal">
+      <button id="closeNotificationModal" class="modal-close-button" type="button" aria-label="Close notifications">
+        ×
+      </button>
+      <div class="notification-modal-header">
+        <h3>Notifications</h3>
+      </div>
+      <div class="notification-modal-body">
+        <div class="notification-sidebar">
+          <div id="notificationSidebarList" class="notification-sidebar-list"></div>
+        </div>
+        <div class="notification-detail">
+          <p id="notificationDetailTitle" class="notification-detail-title"></p>
+          <p id="notificationDetailMeta" class="notification-detail-meta"></p>
+          <div id="notificationDetailBody" class="notification-detail-body"></div>
+          <div id="notificationDetailActions" class="notification-detail-actions"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="adminInviteModal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <button id="closeAdminInviteModal" class="modal-close-button" type="button" aria-label="Close admin invite">
+        ×
+      </button>
+      <div class="modal-title-row">
+        <h3 id="adminInviteTitle">Manage admins</h3>
+      </div>
+      <div class="admin-invite-grid">
+        <div class="admin-invite-current">
+          <p class="eyebrow">Current admins</p>
+          <div class="admin-invite-list" id="adminInviteCurrentList"></div>
+        </div>
+        <div class="admin-invite-search">
+          <label>Find user by username
+            <input id="adminInviteSearchInput" type="text" placeholder="Search username..." autocomplete="off"
+              spellcheck="false" />
+          </label>
+          <div class="admin-search-results" id="adminInviteSearchResults"></div>
+          <p class="helper" id="adminInviteStatus"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="usernameModal" class="modal" style="display: none">
+    <div class="modal-content scrollable-modal">
+      <h3>Choose a Username</h3>
+      <input type="text" id="usernameInput" placeholder="Enter your username" />
+      <br /><br />
+      <button id="confirmUsernameButton">Confirm</button>
+    </div>
+  </div>
+
+  <main id="mainContent">
+    <div class="tournament-shell">
+    <!-- Landing: list & create -->
+    <section id="landingView" class="landing" style="display:none;">
+      <div class="hero landing-hero">
+        <div class="hero-main">
+          <a class="ghost-link" href="/index.html">Back to Z-Build Order</a>
+          <p class="eyebrow">Tournament Center</p>
+          <h1>Find or host your SC2 tournament.</h1>
+          <p class="lede">Browse tournaments or spin up a new one with custom links and formats.</p>
+          <div class="hero-actions">
+            <button id="openCreateTournament" class="cta primary">Create a tournament</button>
+            <button id="openCreateCircuit" class="cta ghost">Create a circuit</button>
+          </div>
+        </div>
+      <div class="hero-stats">
+        <div class="stat-card accent">
+          <p>Next start</p>
+          <h2 id="statNextStart">TBD</h2>
+        </div>
+        <div class="stat-card">
+          <p>Active tournaments</p>
+          <h2 id="statTournaments">0</h2>
+        </div>
+      </div>
+      </div>
+
+      <div class="card tournament-list-card is-tournaments">
+        <div class="card-header tournament-filter-header">
+          <div class="tournament-header-left">
+            <div class="list-tabs tournament-type-row" id="tournamentTypeTabs">
+              <button class="list-tab active" data-type-filter="tournaments">Tournaments</button>
+              <button class="list-tab" data-type-filter="circuits">Circuits</button>
+            </div>
+          </div>
+          <div class="tournament-filter-controls" id="tournamentFilterControls">
+            <label class="tournament-filter">
+              <span class="tournament-filter-label">Status</span>
+              <select id="tournamentStatusSelect" class="tournament-filter-select">
+                <option value="all">All</option>
+                <option value="live">Live</option>
+                <option value="upcoming">Upcoming</option>
+                <option value="finished">Finished</option>
+              </select>
+            </label>
+            <label class="tournament-filter">
+              <span class="tournament-filter-label">Role</span>
+              <select id="tournamentRoleSelect" class="tournament-filter-select">
+                <option value="all">All</option>
+                <option value="registered">Registered</option>
+                <option value="casting">Casting</option>
+                <option value="hosting">Hosting</option>
+              </select>
+            </label>
+            <button id="refreshTournaments" class="cta ghost small icon-only" aria-label="Refresh">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path
+                  d="M12 6V3L7.5 7.5 12 12V9a5 5 0 1 1-5 5H5a7 7 0 1 0 7-8Z" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="tournament-list-slider">
+          <button id="tournamentListPrev" class="slider-btn" type="button" aria-label="Previous tournaments">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M15.5 4.5 8 12l7.5 7.5-1.5 1.5L5 12l9-9 1.5 1.5z" />
+            </svg>
+          </button>
+          <div class="tournament-list-viewport">
+            <ul id="tournamentList" class="tournament-list"></ul>
+          </div>
+          <button id="tournamentListNext" class="slider-btn" type="button" aria-label="Next tournaments">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="m8.5 4.5 1.5-1.5 9 9-9 9-1.5-1.5L16 12 8.5 4.5z" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Circuit detail -->
+    <section id="circuitView" style="display:none;">
+      <header class="hero hero-with-admins">
+        <div class="hero-main">
+          <a class="ghost-link" href="/tournament"><span class="ghost-link-icon">←</span>All tournaments</a>
+          <p class="eyebrow">Circuit</p>
+          <div class="hero-title-row">
+            <h1 id="circuitTitle">Circuit</h1>
+            <button class="hero-admin-toggle" type="button" aria-expanded="false">
+              Admins
+            </button>
+          </div>
+          <p class="lede" id="circuitDescription">Circuit overview.</p>
+          <div class="hero-actions">
+            <button id="openCreateCircuitTournament" class="cta primary small" style="display:none;">
+              Create tournament
+            </button>
+          </div>
+        </div>
+        <div class="hero-stats hero-stats-stacked">
+          <div class="stat-card">
+            <p>Tournaments</p>
+            <h2 id="circuitStatTournaments">0</h2>
+          </div>
+        <div class="stat-card accent">
+          <p>Next tournament starts</p>
+          <h2 id="circuitStatNextStart">TBD</h2>
+        </div>
+        </div>
+        <div class="hero-admin-panel" id="circuitAdminPanel">
+          <div class="hero-admins" id="circuitAdminSection">
+            <div class="hero-admins-header">
+              <span class="eyebrow">Admins</span>
+              <button id="inviteCircuitAdminBtn" class="cta ghost small" type="button" style="display:none;">
+                Manage admins
+              </button>
+            </div>
+            <div class="hero-admins-list" id="circuitAdminList"></div>
+          </div>
+        </div>
+      </header>
+
+      <main class="page-stack">
+        <div class="circuit-grid">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <p class="eyebrow">Circuit tournaments</p>
+                <h3>Included tournaments</h3>
+              </div>
+              <button id="refreshCircuitBtn" class="cta ghost small">Refresh</button>
+            </div>
+            <ul id="circuitTournamentList" class="tournament-list circuit-tournament-list"></ul>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <p class="eyebrow">Leaderboard</p>
+                <h3>Points standings</h3>
+              </div>
+              <button id="downloadCircuitLeaderboardBtn" class="cta ghost small" style="display:none;">
+                Download CSV
+              </button>
+              <button id="openCircuitPointsEditBtn" class="cta ghost small" style="display:none;">
+                Edit points
+              </button>
+            </div>
+            <div class="table-wrapper leaderboard-scroll custom-scroll">
+              <table class="players-table leaderboard-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Player</th>
+                    <th class="points-cell">Points</th>
+                    <th class="events-cell">Events</th>
+                  </tr>
+                </thead>
+                <tbody id="circuitLeaderboardBody"></tbody>
+              </table>
+            </div>
+            <p id="circuitLeaderboardNote" class="helper"></p>
+          </div>
+        </div>
+      </main>
+    </section>
+
+    <!-- Tournament detail -->
+    <section id="tournamentView" style="display:none;">
+      <header class="hero hero-with-admins">
+        <div class="hero-main">
+          <a class="ghost-link" href="/tournament" id="tournamentBackLink"><span class="ghost-link-icon">←</span>All tournaments</a>
+          <div class="hero-title-row">
+            <h1 id="tournamentTitle">Tournament</h1>
+            <button class="hero-admin-toggle" type="button" aria-expanded="false">
+              Admins
+            </button>
+          </div>
+          <div class="hero-placements hero-placements--stacked" id="tournamentPlacements" style="display:none;">
+            <div class="placement-item" data-place="1">
+              <span class="placement-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" role="img" focusable="false">
+                  <path d="M7 4h10v2h3a1 1 0 0 1 1 1c0 3.866-3.134 7-7 7h-4c-3.866 0-7-3.134-7-7a1 1 0 0 1 1-1h3V4zm-3 4c.47 2.833 2.94 5 5.9 5h4.2c2.96 0 5.43-2.167 5.9-5h-2.9v1a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V8H4zm6 10h4v2h-4v-2zm-2 2h8v2H8v-2z" fill="currentColor"/>
+                </svg>
+              </span>
+              <span class="placement-label">1st</span>
+              <span class="placement-name" id="placementFirst">—</span>
+            </div>
+            <div class="placement-item" data-place="2">
+              <span class="placement-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" role="img" focusable="false">
+                  <path d="M7 4h10v2h3a1 1 0 0 1 1 1c0 3.866-3.134 7-7 7h-4c-3.866 0-7-3.134-7-7a1 1 0 0 1 1-1h3V4zm-3 4c.47 2.833 2.94 5 5.9 5h4.2c2.96 0 5.43-2.167 5.9-5h-2.9v1a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V8H4zm6 10h4v2h-4v-2zm-2 2h8v2H8v-2z" fill="currentColor"/>
+                </svg>
+              </span>
+              <span class="placement-label">2nd</span>
+              <span class="placement-name" id="placementSecond">—</span>
+            </div>
+            <div class="placement-item" data-place="3-4">
+              <span class="placement-icon placement-icon--bronze" aria-hidden="true">
+                <svg viewBox="0 0 24 24" role="img" focusable="false">
+                  <path d="M7 4h10v2h3a1 1 0 0 1 1 1c0 3.866-3.134 7-7 7h-4c-3.866 0-7-3.134-7-7a1 1 0 0 1 1-1h3V4zm-3 4c.47 2.833 2.94 5 5.9 5h4.2c2.96 0 5.43-2.167 5.9-5h-2.9v1a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V8H4zm6 10h4v2h-4v-2zm-2 2h8v2H8v-2z" fill="#cd7f32"/>
+                </svg>
+              </span>
+              <span class="placement-label">3–4</span>
+              <span class="placement-name" id="placementThirdFourth">—</span>
+            </div>
+          </div>
+        </div>
+        <div class="hero-stats">
+        <div class="stat-card">
+          <p>Registered</p>
+          <h2 id="statPlayers">0</h2>
+        </div>
+        <div class="stat-card accent">
+          <p>Start</p>
+          <h2 id="tournamentStart">TBD</h2>
+        </div>
+        </div>
+        <div class="hero-admin-panel" id="tournamentAdminPanel">
+          <div class="hero-admins" id="tournamentAdminSection">
+            <div class="hero-admins-header">
+              <span class="eyebrow">Admins</span>
+              <button id="inviteTournamentAdminBtn" class="cta ghost small" type="button" style="display:none;">
+                Invite admin
+              </button>
+            </div>
+            <div class="hero-admins-list" id="tournamentAdminList"></div>
+          </div>
+        </div>
+      </header>
+
+      <div id="tournamentPlacementsMobileSlot" class="tournament-placements-slot"></div>
+
+    <main class="page-stack">
+      <div class="tab-bar" id="tabBar">
+        <div class="tab-group public-tabs">
+          <button class="tab-btn active" data-tab="bracketTab">Bracket</button>
+          <button class="tab-btn" data-tab="descriptionTab">Description &amp; Rules</button>
+          <button class="tab-btn" data-tab="mapsTab">Maps</button>
+          <button class="tab-btn" data-tab="registrationTab" id="adminTabBtn">Registration</button>
+        </div>
+        <div class="tab-divider" data-admin-only="true" aria-hidden="true"></div>
+        <div class="tab-group admin-tabs" data-admin-only="true">
+          <button class="tab-btn" data-tab="seedingTab" id="seedingTabBtn" style="display:none;">Seeding</button>
+          <button class="tab-btn" data-tab="settingsTab" id="settingsTabBtn" data-admin-only="true"
+            style="display:none;">Settings</button>
+          <button class="tab-btn" data-tab="circuitPointsTab" id="circuitPointsTabBtn" data-admin-only="true"
+            style="display:none;">Circuit points</button>
+        </div>
+      </div>
+
+      <section id="descriptionTab" class="tab-panel">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3>Description</h3>
+            </div>
+          </div>
+          <div id="tournamentDescriptionBody" class="helper"></div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3>Rules</h3>
+            </div>
+          </div>
+          <div id="tournamentRulesBody" class="helper"></div>
+        </div>
+      </section>
+
+      <section id="mapsTab" class="tab-panel">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3>Map Pool</h3>
+              <p class="helper">Fixed for this event (non-interactive)</p>
+            </div>
+          </div>
+          <div id="tournamentMapGrid" class="map-pool-grid"></div>
+        </div>
+      </section>
+
+      <section id="bracketTab" class="tab-panel active">
+        <div class="card bracket-card">
+          <div class="card-header">
+            <div>
+              <p class="eyebrow">Bracket</p>
+              <h3 id="bracketTitle">Double elimination</h3>
+            </div>
+            <div class="live-dot not-live" id="liveDot">Not Live</div>
+          </div>
+          <div id="bracketNotLive" class="not-live-panel" style="display:none;">
+            <p class="helper">Bracket will appear when the tournament goes live.</p>
+            <ul id="registeredPlayersList" class="registered-list"></ul>
+          </div>
+          <div id="bracketGrid" class="bracket-grid">
+            <div class="placeholder">No players yet. Add players to generate the bracket.</div>
+          </div>
+        </div>
+        <div class="card activity-card" id="activityCard">
+          <div class="card-header">
+            <div>
+              <p class="eyebrow">Stream View</p>
+              <h3>Live updates</h3>
+            </div>
+          </div>
+          <ul id="activityList" class="activity-list"></ul>
+        </div>
+      </section>
+
+      <section id="registrationTab" class="tab-panel">
+        <div class="card" id="registrationCard">
+          <div class="card-header">
+            <div>
+              <p class="eyebrow">Registration</p>
+              <h3>Add or update players</h3>
+            </div>
+            <div class="checkin-row">
+              <p id="checkInStatus" class="checkin-status"></p>
+              <button type="button" id="checkInBtn" class="cta ghost" style="display:none;">Check in</button>
+            </div>
+          </div>
+          <form id="registrationForm" class="form-grid">
+            <label>
+              Player name
+              <input id="playerNameInput" type="text" placeholder="e.g. Hydralisk" required />
+            </label>
+            <label>
+              Race
+              <select id="raceSelect" disabled>
+                <option value="Zerg">Zerg</option>
+                <option value="Protoss">Protoss</option>
+                <option value="Terran">Terran</option>
+                <option value="Random">Random</option>
+              </select>
+            </label>
+            <label class="readonly-field">
+              SC2Pulse profile (set in Settings)
+              <input id="pulseLinkDisplay" type="text" placeholder="Add your SC2Pulse link in Settings" />
+            </label>
+            <label class="readonly-field">
+              MMR (auto)
+              <input id="mmrDisplay" type="text" placeholder="MMR will load from SC2Pulse" readonly />
+            </label>
+            <div class="form-actions">
+              <button type="submit" class="cta primary" id="registerBtn">Register</button>
+            </div>
+            <p id="mmrStatus" class="helper" style="display:none;"></p>
+          </form>
+          <div class="caster-section" id="casterSection">
+            <p class="helper">
+              Register as a caster to stream the game on Twitch. A host or admin must accept your request.
+            </p>
+            <div class="caster-actions">
+              <button type="button" class="cta ghost" id="requestCasterBtn">Request caster access</button>
+              <p class="helper" id="casterRequestStatus"></p>
+            </div>
+            <div class="caster-requests" id="casterRequestPanel" data-admin-only="true" style="display:none;">
+              <div class="section-title">
+                <p class="eyebrow">Caster requests</p>
+                <h4>Awaiting approval</h4>
+              </div>
+              <div class="caster-request-list" id="casterRequestList"></div>
+              <p class="helper" id="casterRequestAdminStatus"></p>
+            </div>
+          </div>
+          <div class="admin-add-player" data-admin-only="true" id="finalAdminAddPanel" style="display:none;">
+            <label>Find player by username
+              <input id="finalAdminSearchInput" type="text" placeholder="Search username..."
+                autocomplete="off" spellcheck="false" />
+            </label>
+            <div class="admin-search-results" id="finalAdminSearchResults"></div>
+            <p class="helper" id="finalAdminSearchStatus"></p>
+          </div>
+        </div>
+
+      </section>
+
+      <section id="seedingTab" class="tab-panel" data-admin-only="true">
+        <div class="card" id="seedingCard">
+          <div class="card-header">
+            <div>
+              <p class="eyebrow">Seeding</p>
+              <h3>Points-first ranking</h3>
+            </div>
+            <div class="seed-actions">
+              <span id="seedingNotice" class="badge warning" style="display:none;">Seeding changed - rebuild
+                needed</span>
+              <button id="rebuildBracketBtn" class="cta small ghost">Go Live</button>
+              <button id="notifyCheckInBtn" class="cta small ghost">Notify check-in</button>
+              <button id="resetTournamentBtn" class="cta small subtle">Reset tournament</button>
+            </div>
+          </div>
+          <div class="publish-checkbox-row" id="finalAutoAddRow" style="display:none;">
+            <span>Auto-add from Leaderboard</span>
+            <div class="checkbox-wrapper-59 checkbox-wrapper-59--blue">
+              <label class="switch">
+                <input type="checkbox" id="finalAutoAddToggle" />
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+          <p class="helper" id="finalAutoAddStatus"></p>
+          <div class="table-wrapper">
+            <table class="players-table">
+              <thead>
+                <tr>
+                  <th>Seed</th>
+                  <th>Player</th>
+                  <th>Status</th>
+                  <th>Points</th>
+                  <th>MMR</th>
+                  <th>SC2Pulse</th>
+                  <th>Check-in</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="playersTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="settingsTab" class="tab-panel" data-admin-only="true">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <p class="eyebrow">Admin</p>
+              <h3>Edit tournament settings</h3>
+            </div>
+          </div>
+          <div class="settings-tabs" id="settingsTabs">
+            <button class="settings-tab-btn active" data-settings-tab="settingsGeneral">General</button>
+            <button class="settings-tab-btn" data-settings-tab="settingsDesc">Description &amp; Rules</button>
+            <button class="settings-tab-btn" data-settings-tab="settingsMaps">Maps</button>
+            <button class="settings-tab-btn" data-settings-tab="settingsFormat">Format</button>
+          </div>
+          <div class="settings-panel active" id="settingsGeneral">
+            <label>Tournament name
+              <input type="text" id="settingsNameInput" placeholder="My Weekly Cup" />
+            </label>
+            <label>Custom URL slug
+              <div class="inline-row">
+                <span class="muted">https://zbuildorder.com/tournament/</span>
+              <input type="text" id="settingsSlugInput" placeholder="my-weekly-cup" />
+              </div>
+              <p class="helper">Slug changes are locked for existing tournaments.</p>
+            </label>
+            <label>Start time
+              <div class="datetime-row">
+                <input type="text" id="settingsStartInput" class="datetime-input" placeholder="YYYY-MM-DD HH:MM" />
+                <button type="button" class="icon-btn datepicker-btn" data-datepicker-for="settingsStartInput"
+                  aria-label="Pick start time">
+                  <img src="img/SVG/time.svg" alt="" aria-hidden="true" />
+                </button>
+              </div>
+            </label>
+            <label>Max players
+              <input type="number" id="settingsMaxPlayersInput" min="2" max="512" placeholder="32" />
+            </label>
+            <div id="settingsCircuitQualifyRow" style="display:none;">
+              <label>Final qualifiers from circuit leaderboard
+                <input type="number" id="settingsCircuitQualifyCount" min="0" placeholder="8" />
+              </label>
+              <p class="helper">Only the top N on the circuit leaderboard can register for finals.</p>
+            </div>
+            <label>Check-in opens (before start)
+              <select id="settingsCheckInSelect">
+                <option value="0">0 min</option>
+                <option value="15">15 min</option>
+                <option value="30">30 min</option>
+                <option value="45">45 min</option>
+                <option value="60">1h</option>
+                <option value="75">1h 15</option>
+                <option value="90">1h 30</option>
+                <option value="105">1h 45</option>
+                <option value="120">2h</option>
+                <option value="135">2h 15</option>
+                <option value="150">2h 30</option>
+                <option value="165">2h 45</option>
+                <option value="180">3h</option>
+              </select>
+            </label>
+            <label>Cover image
+              <div class="image-upload">
+                <div class="image-upload-actions">
+                  <input type="file" id="settingsImageInput" accept="image/*" />
+                  <button type="button" class="cta ghost small cover-reuse-btn" data-cover-input="settingsImageInput"
+                    data-cover-preview="settingsImagePreview">
+                    Reuse cover
+                  </button>
+                </div>
+                <div class="image-preview">
+                  <img id="settingsImagePreview" alt="Tournament cover preview" />
+                </div>
+                <p class="helper">Recommended 1200x630. JPG/PNG/WebP.</p>
+              </div>
+            </label>
+            <div class="publish-checkbox-row">
+              <span>Require SC2Pulse link for registration</span>
+              <div class="checkbox-wrapper-59">
+                <label class="switch">
+                  <input type="checkbox" id="settingsRequirePulseLink" checked />
+                  <span class="slider"></span>
+                </label>
+              </div>
+            </div>
+            <p class="helper">When enabled, players must submit their SC2Pulse link to register.</p>
+          </div>
+          <div class="settings-panel" id="settingsDesc">
+            <label>Description
+              <div class="markdown-editor">
+                <div class="markdown-toolbar">
+                  <button type="button" class="toolbar-btn" data-settings-desc-action="heading">H2</button>
+                  <button type="button" class="toolbar-btn" data-settings-desc-action="bold"><strong>B</strong></button>
+                  <button type="button" class="toolbar-btn" data-settings-desc-action="italic"><em>I</em></button>
+                  <button type="button" class="toolbar-btn" data-settings-desc-action="bullet">- List</button>
+                  <button type="button" class="toolbar-btn" data-settings-desc-action="numbered">1. List</button>
+                  <button type="button" class="toolbar-btn" data-settings-desc-action="quote">" "</button>
+                  <button type="button" class="toolbar-btn" data-settings-desc-action="link">Link</button>
+                  <button type="button" class="toolbar-btn" data-settings-desc-action="image">Image</button>
+                  <button type="button" class="toolbar-btn" data-settings-desc-action="code">&lt;/&gt;</button>
+                </div>
+                <textarea id="settingsDescriptionInput" class="markdown-input" rows="8"
+                  placeholder="Describe the event..."></textarea>
+              </div>
+            </label>
+            <label>Rules
+              <div class="markdown-editor">
+                <div class="markdown-toolbar">
+                  <button type="button" class="toolbar-btn" data-settings-rules-action="heading">H2</button>
+                  <button type="button" class="toolbar-btn"
+                    data-settings-rules-action="bold"><strong>B</strong></button>
+                  <button type="button" class="toolbar-btn" data-settings-rules-action="italic"><em>I</em></button>
+                  <button type="button" class="toolbar-btn" data-settings-rules-action="bullet">- List</button>
+                  <button type="button" class="toolbar-btn" data-settings-rules-action="numbered">1. List</button>
+                  <button type="button" class="toolbar-btn" data-settings-rules-action="quote">" "</button>
+                  <button type="button" class="toolbar-btn" data-settings-rules-action="link">Link</button>
+                  <button type="button" class="toolbar-btn" data-settings-rules-action="image">Image</button>
+                  <button type="button" class="toolbar-btn" data-settings-rules-action="code">&lt;/&gt;</button>
+                </div>
+                <textarea id="settingsRulesInput" class="markdown-input" rows="8"
+                  placeholder="Add eligibility, format, communication, and fair play rules..."></textarea>
+              </div>
+            </label>
+            <div class="markdown-preview">
+              <p class="eyebrow">Description Preview</p>
+              <div id="settingsDescriptionPreview" class="helper"></div>
+            </div>
+            <div class="markdown-preview">
+              <p class="eyebrow">Rules Preview</p>
+              <div id="settingsRulesPreview" class="helper"></div>
+            </div>
+          </div>
+          <div class="settings-panel" id="settingsMaps">
+            <div class="map-pool-picker">
+              <div class="picker-header">
+                <div>
+                  <p class="eyebrow">Maps</p>
+                  <h4>Chosen map pool</h4>
+                </div>
+                <div class="picker-actions">
+                  <button type="button" class="cta small ghost" id="settingsUseLadderMapsBtn">All ladder maps</button>
+                  <button type="button" class="cta small subtle" id="settingsClearMapPoolBtn">Custom</button>
+                </div>
+              </div>
+              <div id="settingsChosenMapList" class="map-pool-grid chosen-grid"></div>
+              <div class="picker-header" style="margin-top:12px;">
+                <div>
+                  <h4>All 1v1 maps</h4>
+                  <p class="helper">Click to add/remove. Includes current + archive.</p>
+                </div>
+              </div>
+              <div id="settingsMapPoolPicker" class="map-pool-grid selectable"></div>
+            </div>
+          </div>
+          <div class="settings-panel" id="settingsFormat">
+            <label>Format
+              <select id="settingsFormatSelect">
+                <option value="Double Elimination">Double Elimination</option>
+                <option value="Single Elimination">Single Elimination</option>
+                <option value="Round Robin">Round Robin</option>
+                <option value="Swiss">Swiss</option>
+              </select>
+            </label>
+            <div class="format-stage" data-format-scope="settings-roundrobin">
+              <p class="eyebrow">Stage 1</p>
+              <h4>Round Robin</h4>
+              <div class="inline-row">
+                <label style="flex:1;">Number of groups
+                  <input type="number" id="settingsRoundRobinGroups" min="1" />
+                </label>
+                <label style="flex:1;">Advance per group
+                  <input type="number" id="settingsRoundRobinAdvance" min="0" />
+                </label>
+                <label style="flex:1;">Group best of
+                  <select id="settingsRoundRobinBestOf">
+                    <option value="1">Bo1</option>
+                    <option value="3">Bo3</option>
+                    <option value="5">Bo5</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+            <div class="format-stage" data-format-scope="settings-roundrobin">
+              <p class="eyebrow">Stage 2</p>
+              <h4>Playoffs</h4>
+              <p class="helper">
+                Optional. Qualifiers advance into the selected playoffs format. Choose None to end after Round Robin.
+              </p>
+              <div class="inline-row">
+                <label style="flex:1;">Playoffs
+                  <select id="settingsRoundRobinPlayoffs">
+                    <option value="Double Elimination">Double Elimination</option>
+                    <option value="Single Elimination">Single Elimination</option>
+                    <option value="None" selected>None</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+
+            <div class="format-diagram">
+
+              <!-- UPPER ROW -->
+              <div class="format-row format-row--upper">
+                <!-- Upper bracket (long box) -->
+                <div class="format-col format-col--upper-main">
+                  <div class="format-title">Upper bracket</div>
+                  <div class="format-box format-box--big format-box--upper"></div>
+                  <label class="format-input">
+                    Best of
+                    <select id="settingsBestOfUpper">
+                      <option value="1">Bo1</option>
+                      <option value="3">Bo3</option>
+                      <option value="5">Bo5</option>
+                      <option value="7">Bo7</option>
+                      <option value="9">Bo9</option>
+                    </select>
+                  </label>
+
+                </div>
+
+                <!-- Quarterfinals (single big box) -->
+                <div class="format-col format-col--quarter">
+                  <div class="format-title">Quarterfinals</div>
+                  <div class="format-box format-box--big format-box--qf"></div>
+                  <label class="format-input">
+                    Best of
+                    <select id="settingsBestOfQuarter">
+                      <option value="1">Bo1</option>
+                      <option value="3">Bo3</option>
+                      <option value="5">Bo5</option>
+                      <option value="7">Bo7</option>
+                      <option value="9">Bo9</option>
+                    </select>
+                  </label>
+                </div>
+
+
+                <!-- Semi-finals -->
+                <div class="format-col format-col--semi">
+                  <div class="format-title">Semi-finals</div>
+                  <div class="format-box format-box--medium format-box--semi"></div>
+                  <label class="format-input">
+                    Best of
+                    <select id="settingsBestOfSemi">
+                      <option value="1">Bo1</option>
+                      <option value="3">Bo3</option>
+                      <option value="5">Bo5</option>
+                      <option value="7">Bo7</option>
+                      <option value="9">Bo9</option>
+                    </select>
+                  </label>
+
+                </div>
+
+                <!-- Upper Final -->
+                <div class="format-col format-col--upper-final">
+                  <div class="format-title">Upper Final</div>
+                  <div class="format-box format-box--medium format-box--upper-final"></div>
+                  <label class="format-input">
+                    Best of
+                    <select id="settingsBestOfUpperFinal">
+                      <option value="1">Bo1</option>
+                      <option value="3">Bo3</option>
+                      <option value="5">Bo5</option>
+                      <option value="7">Bo7</option>
+                      <option value="9">Bo9</option>
+                    </select>
+                  </label>
+                </div>
+
+                <!-- Grand Final -->
+                <div class="format-col format-col--final">
+                  <div class="format-title">Grand Final</div>
+                  <div class="format-box format-box--medium format-box--final"></div>
+                  <label class="format-input">
+                    Best of
+                    <select id="settingsBestOfFinal">
+                      <option value="1">Bo1</option>
+                      <option value="3">Bo3</option>
+                      <option value="5">Bo5</option>
+                      <option value="7">Bo7</option>
+                      <option value="9">Bo9</option>
+                    </select>
+                  </label>
+
+                </div>
+              </div>
+
+              <!-- LOWER ROW -->
+              <div class="format-row format-row--lower">
+                <!-- Lower bracket (long box) -->
+                <div class="format-col format-col--lower-main">
+                  <div class="format-title">Lower bracket</div>
+                  <div class="format-box format-box--big format-box--lower"></div>
+                  <label class="format-input">
+                    Best of
+                    <select id="settingsBestOfLower">
+                      <option value="1">Bo1</option>
+                      <option value="3">Bo3</option>
+                      <option value="5">Bo5</option>
+                      <option value="7">Bo7</option>
+                      <option value="9">Bo9</option>
+                    </select>
+                  </label>
+
+                </div>
+
+                <!-- LB Semi-finals -->
+                <div class="format-col format-col--lb-extra">
+                  <div class="format-title">LB Semi-finals</div>
+                  <div class="format-box format-box--medium format-box--lb-semi"></div>
+                  <label class="format-input">
+                    Best of
+                    <select id="settingsBestOfLowerSemi">
+                      <option value="1">Bo1</option>
+                      <option value="3">Bo3</option>
+                      <option value="5">Bo5</option>
+                      <option value="7">Bo7</option>
+                      <option value="9">Bo9</option>
+                    </select>
+                  </label>
+                </div>
+
+                <!-- LB Finals -->
+                <div class="format-col format-col--lb-extra">
+                  <div class="format-title">LB Finals</div>
+                  <div class="format-box format-box--medium format-box--lb-final"></div>
+                  <label class="format-input">
+                    Best of
+                    <select id="settingsBestOfLowerFinal">
+                      <option value="1">Bo1</option>
+                      <option value="3">Bo3</option>
+                      <option value="5">Bo5</option>
+                      <option value="7">Bo7</option>
+                      <option value="9">Bo9</option>
+                    </select>
+                  </label>
+                </div>
+
+                <!-- spacer no longer needed, but keep hidden by CSS if you want -->
+                <div class="format-col format-col--spacer"></div>
+
+              </div>
+
+            </div>
+          </div>
+          <div class="form-actions" style="margin-top:16px;">
+            <button class="cta primary" id="saveSettingsBtn">Save settings</button>
+          </div>
+          <div class="form-actions danger-actions">
+            <button class="cta danger" id="deleteTournamentBtn">Delete tournament</button>
+          </div>
+        </div>
+      </section>
+      <section id="circuitPointsTab" class="tab-panel" data-admin-only="true">
+        <div class="card">
+          <div id="circuitPointsPanel" class="circuit-points-panel" style="display:none;">
+            <div>
+              <p class="eyebrow">Circuit</p>
+              <h4>Circuit points</h4>
+            </div>
+            <p class="helper">Assign points for placements in this tournament. Ties share the same points.</p>
+            <div class="table-wrapper">
+              <table class="players-table circuit-points-table">
+                <thead>
+                  <tr>
+                    <th>Place</th>
+                    <th>Points</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="circuitPointsBody"></tbody>
+              </table>
+            </div>
+            <div class="circuit-points-actions">
+              <button class="cta small ghost" id="addCircuitPointsRow" type="button">
+                Add placement
+              </button>
+              <button class="cta small primary" id="applyCircuitPointsBtn" type="button">
+                Apply points to players
+              </button>
+            </div>
+            <p class="helper" id="circuitPointsStatus"></p>
+          </div>
+        </div>
+      </section>
+    </main>
+  </section>
+    </div>
+  </main>
+
+  <!-- Create tournament modal -->
+  <div id="createTournamentModal" class="modal create-modal" style="display:none;">
+    <div class="modal-content">
+      <div class="modal-title-row">
+        <h3>Create tournament</h3>
+        <div class="form-actions inline-actions">
+          <div class="template-select cta primary">
+            <select id="tournamentTemplateSelect" aria-label="Tournament template">
+              <option value="" selected>Template</option>
+              <option value="__manager__">Template manager...</option>
+            </select>
+            <span class="template-select-caret">v</span>
+          </div>
+          <button class="cta primary template-manager-hide" id="saveTournamentBtn">Create</button>
+          <button class="cta primary template-manager-only" id="saveTournamentTemplateBtn" type="button">
+            Save template
+          </button>
+        </div>
+      </div>
+      <div class="settings-tabs" id="createTabs">
+        <button class="settings-tab-btn active" data-create-tab="createGeneral">General</button>
+        <button class="settings-tab-btn" data-create-tab="createDesc">Description &amp; Rules</button>
+        <button class="settings-tab-btn" data-create-tab="createMaps">Maps</button>
+        <button class="settings-tab-btn" data-create-tab="createFormat">Format</button>
+      </div>
+      <div class="settings-panel active" id="createGeneral">
+        <label class="template-manager-only">Template name <span class="required">*</span>
+          <input type="text" id="tournamentTemplateNameInput" placeholder="Weekly cup settings" />
+        </label>
+        <label>Tournament name <span class="required">*</span>
+          <input type="text" id="tournamentNameInput" placeholder="My Weekly Cup" required />
+        </label>
+        <label class="template-manager-hide">Custom URL slug
+          <div class="inline-row">
+            <span class="muted">https://zbuildorder.com/tournament/</span>
+            <div class="slug-input-wrapper">
+              <input type="text" id="tournamentSlugInput" placeholder="my-weekly-cup" />
+            </div>
+          </div>
+          <p class="helper" id="slugStatus"></p>
+        </label>
+        <label class="template-manager-hide">Start time
+          <div class="datetime-row">
+            <input type="text" id="tournamentStartInput" class="datetime-input" placeholder="YYYY-MM-DD HH:MM" />
+            <button type="button" class="icon-btn datepicker-btn" data-datepicker-for="tournamentStartInput"
+              aria-label="Pick start time">
+              <img src="img/SVG/time.svg" alt="" aria-hidden="true" />
+            </button>
+          </div>
+        </label>
+        <label>Max players
+          <input type="number" id="tournamentMaxPlayersInput" min="2" max="512" placeholder="32" />
+        </label>
+        <label>Check-in opens (before start)
+          <select id="checkInSelect">
+            <option value="0">0 min</option>
+            <option value="15">15 min</option>
+            <option value="30">30 min</option>
+            <option value="45">45 min</option>
+            <option value="60">1h</option>
+            <option value="75">1h 15</option>
+            <option value="90">1h 30</option>
+            <option value="105">1h 45</option>
+            <option value="120">2h</option>
+            <option value="135">2h 15</option>
+            <option value="150">2h 30</option>
+            <option value="165">2h 45</option>
+            <option value="180">3h</option>
+          </select>
+        </label>
+        <label>Cover image
+          <div class="image-upload">
+            <div class="image-upload-actions">
+              <input type="file" id="tournamentImageInput" accept="image/*" />
+              <button type="button" class="cta ghost small cover-reuse-btn" data-cover-input="tournamentImageInput"
+                data-cover-preview="tournamentImagePreview">
+                Reuse cover
+              </button>
+            </div>
+            <div class="image-preview">
+              <img id="tournamentImagePreview" alt="Tournament cover preview" />
+            </div>
+            <p class="helper">Recommended 1200x630. JPG/PNG/WebP.</p>
+          </div>
+        </label>
+      </div>
+      <div class="settings-panel" id="createDesc">
+        <label>Description
+          <div class="markdown-editor">
+            <div class="markdown-toolbar">
+              <button type="button" class="toolbar-btn" data-desc-action="heading">H2</button>
+              <button type="button" class="toolbar-btn" data-desc-action="bold"><strong>B</strong></button>
+              <button type="button" class="toolbar-btn" data-desc-action="italic"><em>I</em></button>
+              <button type="button" class="toolbar-btn" data-desc-action="bullet">- List</button>
+              <button type="button" class="toolbar-btn" data-desc-action="numbered">1. List</button>
+              <button type="button" class="toolbar-btn" data-desc-action="quote">" "</button>
+              <button type="button" class="toolbar-btn" data-desc-action="link">Link</button>
+              <button type="button" class="toolbar-btn" data-desc-action="image">Image</button>
+              <button type="button" class="toolbar-btn" data-desc-action="code">&lt;/&gt;</button>
+            </div>
+            <textarea id="tournamentDescriptionInput" class="markdown-input" rows="10"
+              placeholder="Write rules, schedule, map pool..."></textarea>
+          </div>
+        </label>
+        <label>Rules
+          <div class="markdown-editor">
+            <div class="markdown-toolbar">
+              <button type="button" class="toolbar-btn" data-rules-action="heading">H2</button>
+              <button type="button" class="toolbar-btn" data-rules-action="bold"><strong>B</strong></button>
+              <button type="button" class="toolbar-btn" data-rules-action="italic"><em>I</em></button>
+              <button type="button" class="toolbar-btn" data-rules-action="bullet">- List</button>
+              <button type="button" class="toolbar-btn" data-rules-action="numbered">1. List</button>
+              <button type="button" class="toolbar-btn" data-rules-action="quote">" "</button>
+              <button type="button" class="toolbar-btn" data-rules-action="link">Link</button>
+              <button type="button" class="toolbar-btn" data-rules-action="image">Image</button>
+              <button type="button" class="toolbar-btn" data-rules-action="code">&lt;/&gt;</button>
+            </div>
+            <textarea id="tournamentRulesInput" class="markdown-input" rows="10"
+              placeholder="Add eligibility, format, communication, and fair play rules..."></textarea>
+          </div>
+        </label>
+        <div class="markdown-preview">
+          <p class="eyebrow">Description Preview</p>
+          <div id="tournamentDescriptionPreview" class="helper"></div>
+        </div>
+        <div class="markdown-preview">
+          <p class="eyebrow">Rules Preview</p>
+          <div id="tournamentRulesPreview" class="helper"></div>
+        </div>
+      </div>
+      <div class="settings-panel" id="createMaps">
+        <div class="map-pool-picker">
+          <div class="picker-header">
+            <div>
+              <p class="eyebrow">Maps</p>
+              <h4>Chosen map pool</h4>
+            </div>
+            <div class="picker-actions">
+              <button type="button" class="cta small ghost" id="useLadderMapsBtn">All ladder maps</button>
+              <button type="button" class="cta small subtle" id="clearMapPoolBtn">Custom</button>
+            </div>
+          </div>
+          <div id="chosenMapList" class="map-pool-grid chosen-grid"></div>
+          <div class="picker-header" style="margin-top:12px;">
+            <div>
+              <h4>All 1v1 maps</h4>
+              <p class="helper">Click to add/remove. Includes current + archive.</p>
+            </div>
+          </div>
+          <div id="mapPoolPicker" class="map-pool-grid selectable"></div>
+        </div>
+      </div>
+      <div class="settings-panel" id="createFormat">
+        <label>Format
+          <select id="tournamentFormatSelect">
+            <option value="Double Elimination">Double Elimination</option>
+            <option value="Single Elimination">Single Elimination</option>
+            <option value="Round Robin">Round Robin</option>
+            <option value="Swiss">Swiss</option>
+          </select>
+        </label>
+        <div class="format-stage" data-format-scope="create-roundrobin">
+          <p class="eyebrow">Stage 1</p>
+          <h4>Round Robin</h4>
+          <div class="inline-row">
+            <label style="flex:1;">Number of groups
+              <input type="number" id="roundRobinGroupsInput" min="1" />
+            </label>
+            <label style="flex:1;">Advance per group
+              <input type="number" id="roundRobinAdvanceInput" min="0" />
+            </label>
+            <label style="flex:1;">Group best of
+              <select id="roundRobinBestOfInput">
+                <option value="1">Bo1</option>
+                <option value="3">Bo3</option>
+                <option value="5">Bo5</option>
+              </select>
+            </label>
+          </div>
+        </div>
+        <div class="format-stage" data-format-scope="create-roundrobin">
+          <p class="eyebrow">Stage 2</p>
+          <h4>Playoffs</h4>
+          <p class="helper">
+            Optional. Qualifiers advance into the selected playoffs format. Choose None to end after Round Robin.
+          </p>
+          <div class="inline-row">
+            <label style="flex:1;">Playoffs
+              <select id="roundRobinPlayoffsSelect">
+                <option value="Double Elimination">Double Elimination</option>
+                <option value="Single Elimination">Single Elimination</option>
+                <option value="None" selected>None</option>
+              </select>
+            </label>
+          </div>
+        </div>
+        <div class="format-diagram">
+            <div class="format-row format-row--upper">
+              <div class="format-col format-col--upper-main">
+                <div class="format-title">Upper bracket</div>
+                <div class="format-box format-box--big format-box--upper"></div>
+              <label class="format-input">
+                Best of
+                <select id="bestOfUpperInput">
+                  <option value="1">Bo1</option>
+                  <option value="3">Bo3</option>
+                  <option value="5">Bo5</option>
+                  <option value="7">Bo7</option>
+                  <option value="9">Bo9</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="format-col format-col--quarter">
+              <div class="format-title">Quarterfinals</div>
+              <div class="format-box format-box--big format-box--qf"></div>
+              <label class="format-input">
+                Best of
+                <select id="bestOfQuarterInput">
+                  <option value="1">Bo1</option>
+                  <option value="3">Bo3</option>
+                  <option value="5">Bo5</option>
+                  <option value="7">Bo7</option>
+                  <option value="9">Bo9</option>
+                </select>
+              </label>
+            </div>
+
+              <div class="format-col format-col--semi">
+                <div class="format-title">Semi-finals</div>
+                <div class="format-box format-box--medium format-box--semi"></div>
+                <label class="format-input">
+                Best of
+                <select id="bestOfSemiInput">
+                  <option value="1">Bo1</option>
+                  <option value="3">Bo3</option>
+                  <option value="5">Bo5</option>
+                  <option value="7">Bo7</option>
+                  <option value="9">Bo9</option>
+                </select>
+              </label>
+              </div>
+
+              <div class="format-col format-col--upper-final">
+                <div class="format-title">Upper Final</div>
+                <div class="format-box format-box--medium format-box--upper-final"></div>
+                <label class="format-input">
+                  Best of
+                  <select id="bestOfUpperFinalInput">
+                    <option value="1">Bo1</option>
+                    <option value="3">Bo3</option>
+                    <option value="5">Bo5</option>
+                    <option value="7">Bo7</option>
+                    <option value="9">Bo9</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="format-col format-col--final">
+                <div class="format-title">Grand Final</div>
+                <div class="format-box format-box--medium format-box--final"></div>
+                <label class="format-input">
+                  Best of
+                  <select id="bestOfFinalInput">
+                    <option value="1">Bo1</option>
+                    <option value="3">Bo3</option>
+                    <option value="5">Bo5</option>
+                    <option value="7">Bo7</option>
+                    <option value="9">Bo9</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+
+          <div class="format-row format-row--lower">
+            <div class="format-col format-col--lower-main">
+              <div class="format-title">Lower bracket</div>
+              <div class="format-box format-box--big format-box--lower"></div>
+              <label class="format-input">
+                Best of
+                <select id="bestOfLowerInput">
+                  <option value="1">Bo1</option>
+                  <option value="3">Bo3</option>
+                  <option value="5">Bo5</option>
+                  <option value="7">Bo7</option>
+                  <option value="9">Bo9</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="format-col format-col--lb-extra">
+              <div class="format-title">LB Semi-finals</div>
+              <div class="format-box format-box--medium format-box--lb-semi"></div>
+              <label class="format-input">
+                Best of
+                <select id="bestOfLowerSemiInput">
+                  <option value="1">Bo1</option>
+                  <option value="3">Bo3</option>
+                  <option value="5">Bo5</option>
+                  <option value="7">Bo7</option>
+                  <option value="9">Bo9</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="format-col format-col--lb-extra">
+              <div class="format-title">LB Finals</div>
+              <div class="format-box format-box--medium format-box--lb-final"></div>
+              <label class="format-input">
+                Best of
+                <select id="bestOfLowerFinalInput">
+                  <option value="1">Bo1</option>
+                  <option value="3">Bo3</option>
+                  <option value="5">Bo5</option>
+                  <option value="7">Bo7</option>
+                  <option value="9">Bo9</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="format-col format-col--spacer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="form-actions create-modal-footer">
+        <button class="cta subtle" id="closeCreateTournament">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="coverReuseModal" class="modal" style="display:none;">
+    <div class="modal-content cover-reuse-modal">
+      <button class="modal-close-button" id="closeCoverReuseModal" aria-label="Close cover picker">×</button>
+      <div class="modal-title-row">
+        <h3>Reuse cover image</h3>
+      </div>
+      <p class="helper">Choose a cover you've already uploaded.</p>
+      <div id="coverReuseGrid" class="cover-reuse-grid"></div>
+    </div>
+  </div>
+
+  <div id="tournamentTemplateModal" class="modal create-modal" style="display:none;">
+    <div class="template-manager-layout">
+      <aside class="template-manager-sidebar">
+        <div class="template-manager-sidebar-header">
+          <h3>Template manager</h3>
+          <button class="icon-btn" id="closeTournamentTemplateModal" aria-label="Close template manager">×</button>
+        </div>
+        <button class="cta small ghost" id="newTournamentTemplateBtn" type="button">
+          New template
+        </button>
+        <div class="template-manager-list" id="tournamentTemplateList"></div>
+        <p class="helper template-manager-empty" id="tournamentTemplateEmpty">
+          No templates saved yet.
+        </p>
+        <div class="template-manager-actions">
+          <button class="cta small danger" id="deleteTournamentTemplateBtn" type="button">
+            Delete template
+          </button>
+        </div>
+      </aside>
+      <div class="template-manager-main" id="tournamentTemplateMain"></div>
+    </div>
+  </div>
+
+  <div id="circuitPointsModal" class="modal create-modal" style="display:none;">
+    <div class="modal-content scrollable-modal">
+      <div class="modal-title-row">
+        <h3>Edit circuit points</h3>
+        <div class="form-actions inline-actions">
+          <button class="cta primary" id="saveCircuitPointsBtn">Save</button>
+        </div>
+      </div>
+      <label class="inline-filter">
+        <span class="muted">Search</span>
+        <input type="text" id="circuitPointsSearch" placeholder="Filter players..." />
+      </label>
+      <p class="helper">Update points for this circuit leaderboard.</p>
+      <div class="table-wrapper custom-scroll">
+        <table class="players-table">
+          <thead>
+            <tr>
+              <th>Player</th>
+              <th>Points</th>
+            </tr>
+          </thead>
+          <tbody id="circuitPointsEditBody"></tbody>
+        </table>
+      </div>
+      <div class="form-actions">
+        <button class="cta subtle" id="closeCircuitPointsModal">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create circuit modal -->
+  <div id="createCircuitModal" class="modal create-modal" style="display:none;">
+    <div class="modal-content">
+      <div class="modal-title-row">
+        <h3>Create circuit</h3>
+        <div class="form-actions inline-actions">
+          <button class="cta ghost" id="backCreateCircuitStep">Back</button>
+          <button class="cta primary" id="nextCreateCircuitStep">Next</button>
+        </div>
+      </div>
+      <div class="settings-panel create-circuit-panel active" id="createCircuitGeneral">
+        <label>Circuit name <span class="required">*</span>
+          <input type="text" id="circuitNameInput" placeholder="Monthly Challenger Circuit" required />
+        </label>
+        <label>Custom URL slug
+          <div class="inline-row">
+            <span class="muted">https://zbuildorder.com/tournament/</span>
+            <div class="slug-input-wrapper">
+              <input type="text" id="circuitSlugInput" placeholder="challenger-circuit" />
+            </div>
+          </div>
+          <p class="helper"></p>
+        </label>
+        <label>Description
+          <textarea id="circuitDescriptionInput" class="markdown-input" rows="6"
+            placeholder="What makes this circuit special?"></textarea>
+        </label>
+      </div>
+      <div class="settings-panel create-circuit-panel" id="createFinalPanel">
+        <div class="final-settings-title">
+          <p class="eyebrow">Final Tournament Settings</p>
+        </div>
+        <div class="settings-tabs" id="createFinalTabs">
+          <button class="settings-tab-btn active" data-final-create-tab="createFinalGeneral">General</button>
+          <button class="settings-tab-btn" data-final-create-tab="createFinalDesc">Description &amp; Rules</button>
+          <button class="settings-tab-btn" data-final-create-tab="createFinalMaps">Maps</button>
+          <button class="settings-tab-btn" data-final-create-tab="createFinalFormat">Format</button>
+        </div>
+        <div class="settings-panel create-final-panel active" id="createFinalGeneral">
+        <label>Final tournament name <span class="required">*</span>
+          <input type="text" id="finalTournamentNameInput" placeholder="Circuit Finals" required />
+        </label>
+        <label>Custom URL slug
+          <div class="inline-row">
+            <span class="muted" id="finalSlugPrefix">https://zbuildorder.com/</span>
+            <div class="slug-input-wrapper">
+              <input type="text" id="finalTournamentSlugInput" placeholder="circuit-finals" />
+            </div>
+          </div>
+          <p class="helper"></p>
+        </label>
+        <label>Start time
+          <div class="datetime-row">
+            <input type="text" id="finalTournamentStartInput" class="datetime-input" placeholder="YYYY-MM-DD HH:MM" />
+            <button type="button" class="icon-btn datepicker-btn" data-datepicker-for="finalTournamentStartInput"
+              aria-label="Pick start time">
+              <img src="img/SVG/time.svg" alt="" aria-hidden="true" />
+            </button>
+          </div>
+        </label>
+        <label>Max players
+          <input type="number" id="finalTournamentMaxPlayersInput" min="2" max="512" placeholder="16" />
+        </label>
+        <label>Qualify from leaderboard
+          <input type="number" id="finalQualifyCountInput" min="0" placeholder="8" />
+        </label>
+        <p class="helper">Only the top N on the circuit leaderboard can register for finals.</p>
+        <label>Check-in opens (before start)
+          <select id="finalCheckInSelect">
+            <option value="0">0 min</option>
+            <option value="15">15 min</option>
+            <option value="30">30 min</option>
+            <option value="45">45 min</option>
+            <option value="60">1h</option>
+            <option value="75">1h 15</option>
+            <option value="90">1h 30</option>
+            <option value="105">1h 45</option>
+            <option value="120">2h</option>
+            <option value="135">2h 15</option>
+            <option value="150">2h 30</option>
+            <option value="165">2h 45</option>
+            <option value="180">3h</option>
+          </select>
+        </label>
+        <label>Cover image
+          <div class="image-upload">
+            <div class="image-upload-actions">
+              <input type="file" id="finalTournamentImageInput" accept="image/*" />
+              <button type="button" class="cta ghost small cover-reuse-btn"
+                data-cover-input="finalTournamentImageInput" data-cover-preview="finalTournamentImagePreview">
+                Reuse cover
+              </button>
+            </div>
+            <div class="image-preview">
+              <img id="finalTournamentImagePreview" alt="Finals cover preview" />
+            </div>
+            <p class="helper">Recommended 1200x630. JPG/PNG/WebP.</p>
+          </div>
+        </label>
+      </div>
+      <div class="settings-panel create-final-panel" id="createFinalDesc">
+        <label>Description
+          <div class="markdown-editor">
+            <div class="markdown-toolbar">
+              <button type="button" class="toolbar-btn" data-final-desc-action="heading">H2</button>
+              <button type="button" class="toolbar-btn" data-final-desc-action="bold"><strong>B</strong></button>
+              <button type="button" class="toolbar-btn" data-final-desc-action="italic"><em>I</em></button>
+              <button type="button" class="toolbar-btn" data-final-desc-action="bullet">- List</button>
+              <button type="button" class="toolbar-btn" data-final-desc-action="numbered">1. List</button>
+              <button type="button" class="toolbar-btn" data-final-desc-action="quote">" "</button>
+              <button type="button" class="toolbar-btn" data-final-desc-action="link">Link</button>
+              <button type="button" class="toolbar-btn" data-final-desc-action="image">Image</button>
+              <button type="button" class="toolbar-btn" data-final-desc-action="code">&lt;/&gt;</button>
+            </div>
+            <textarea id="finalTournamentDescriptionInput" class="markdown-input" rows="10"
+              placeholder="Write rules, schedule, map pool..."></textarea>
+          </div>
+        </label>
+        <label>Rules
+          <div class="markdown-editor">
+            <div class="markdown-toolbar">
+              <button type="button" class="toolbar-btn" data-final-rules-action="heading">H2</button>
+              <button type="button" class="toolbar-btn" data-final-rules-action="bold"><strong>B</strong></button>
+              <button type="button" class="toolbar-btn" data-final-rules-action="italic"><em>I</em></button>
+              <button type="button" class="toolbar-btn" data-final-rules-action="bullet">- List</button>
+              <button type="button" class="toolbar-btn" data-final-rules-action="numbered">1. List</button>
+              <button type="button" class="toolbar-btn" data-final-rules-action="quote">" "</button>
+              <button type="button" class="toolbar-btn" data-final-rules-action="link">Link</button>
+              <button type="button" class="toolbar-btn" data-final-rules-action="image">Image</button>
+              <button type="button" class="toolbar-btn" data-final-rules-action="code">&lt;/&gt;</button>
+            </div>
+            <textarea id="finalTournamentRulesInput" class="markdown-input" rows="10"
+              placeholder="Add eligibility, format, communication, and fair play rules..."></textarea>
+          </div>
+        </label>
+        <div class="markdown-preview">
+          <p class="eyebrow">Description Preview</p>
+          <div id="finalTournamentDescriptionPreview" class="helper"></div>
+        </div>
+        <div class="markdown-preview">
+          <p class="eyebrow">Rules Preview</p>
+          <div id="finalTournamentRulesPreview" class="helper"></div>
+        </div>
+      </div>
+      <div class="settings-panel create-final-panel" id="createFinalMaps">
+        <div class="map-pool-picker">
+          <div class="picker-header">
+            <div>
+              <p class="eyebrow">Maps</p>
+              <h4>Chosen map pool</h4>
+            </div>
+            <div class="picker-actions">
+              <button type="button" class="cta small ghost" id="finalUseLadderMapsBtn">All ladder maps</button>
+              <button type="button" class="cta small subtle" id="finalClearMapPoolBtn">Custom</button>
+            </div>
+          </div>
+          <div id="finalChosenMapList" class="map-pool-grid chosen-grid"></div>
+          <div class="picker-header" style="margin-top:12px;">
+            <div>
+              <h4>All 1v1 maps</h4>
+              <p class="helper">Click to add/remove. Includes current + archive.</p>
+            </div>
+          </div>
+          <div id="finalMapPoolPicker" class="map-pool-grid selectable"></div>
+        </div>
+      </div>
+      <div class="settings-panel create-final-panel" id="createFinalFormat">
+        <label>Format
+          <select id="finalFormatSelect">
+            <option value="Double Elimination">Double Elimination</option>
+            <option value="Single Elimination">Single Elimination</option>
+            <option value="Round Robin">Round Robin</option>
+            <option value="Swiss">Swiss</option>
+          </select>
+        </label>
+        <div class="format-stage" data-format-scope="final-roundrobin">
+          <p class="eyebrow">Stage 1</p>
+          <h4>Round Robin</h4>
+          <div class="inline-row">
+            <label style="flex:1;">Number of groups
+              <input type="number" id="finalRoundRobinGroupsInput" min="1" />
+            </label>
+            <label style="flex:1;">Advance per group
+              <input type="number" id="finalRoundRobinAdvanceInput" min="0" />
+            </label>
+            <label style="flex:1;">Group best of
+              <select id="finalRoundRobinBestOfInput">
+                <option value="1">Bo1</option>
+                <option value="3">Bo3</option>
+                <option value="5">Bo5</option>
+              </select>
+            </label>
+          </div>
+        </div>
+        <div class="format-stage" data-format-scope="final-roundrobin">
+          <p class="eyebrow">Stage 2</p>
+          <h4>Playoffs</h4>
+          <p class="helper">
+            Optional. Qualifiers advance into the selected playoffs format. Choose None to end after Round Robin.
+          </p>
+          <div class="inline-row">
+            <label style="flex:1;">Playoffs
+              <select id="finalRoundRobinPlayoffsSelect">
+                <option value="Double Elimination">Double Elimination</option>
+                <option value="Single Elimination">Single Elimination</option>
+                <option value="None" selected>None</option>
+              </select>
+            </label>
+          </div>
+        </div>
+        <div class="format-diagram">
+          <div class="format-row format-row--upper">
+            <div class="format-col format-col--upper-main">
+              <div class="format-title">Upper bracket</div>
+              <div class="format-box format-box--big format-box--upper"></div>
+              <label class="format-input">
+                Best of
+                <select id="finalBestOfUpperInput">
+                  <option value="1">Bo1</option>
+                  <option value="3">Bo3</option>
+                  <option value="5">Bo5</option>
+                  <option value="7">Bo7</option>
+                  <option value="9">Bo9</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="format-col format-col--quarter">
+              <div class="format-title">Quarterfinals</div>
+              <div class="format-box format-box--big format-box--qf"></div>
+              <label class="format-input">
+                Best of
+                <select id="finalBestOfQuarterInput">
+                  <option value="1">Bo1</option>
+                  <option value="3">Bo3</option>
+                  <option value="5">Bo5</option>
+                  <option value="7">Bo7</option>
+                  <option value="9">Bo9</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="format-col format-col--semi">
+              <div class="format-title">Semi-finals</div>
+              <div class="format-box format-box--medium format-box--semi"></div>
+              <label class="format-input">
+                Best of
+                <select id="finalBestOfSemiInput">
+                  <option value="1">Bo1</option>
+                  <option value="3">Bo3</option>
+                  <option value="5">Bo5</option>
+                  <option value="7">Bo7</option>
+                  <option value="9">Bo9</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="format-col format-col--upper-final">
+              <div class="format-title">Upper Final</div>
+              <div class="format-box format-box--medium format-box--upper-final"></div>
+              <label class="format-input">
+                Best of
+                <select id="finalBestOfUpperFinalInput">
+                  <option value="1">Bo1</option>
+                  <option value="3">Bo3</option>
+                  <option value="5">Bo5</option>
+                  <option value="7">Bo7</option>
+                  <option value="9">Bo9</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="format-col format-col--final">
+              <div class="format-title">Grand Final</div>
+              <div class="format-box format-box--medium format-box--final"></div>
+              <label class="format-input">
+                Best of
+                <select id="finalBestOfFinalInput">
+                  <option value="1">Bo1</option>
+                  <option value="3">Bo3</option>
+                  <option value="5">Bo5</option>
+                  <option value="7">Bo7</option>
+                  <option value="9">Bo9</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <div class="format-row format-row--lower">
+            <div class="format-col format-col--lower-main">
+              <div class="format-title">Lower bracket</div>
+              <div class="format-box format-box--big format-box--lower"></div>
+              <label class="format-input">
+                Best of
+                <select id="finalBestOfLowerInput">
+                  <option value="1">Bo1</option>
+                  <option value="3">Bo3</option>
+                  <option value="5">Bo5</option>
+                  <option value="7">Bo7</option>
+                  <option value="9">Bo9</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="format-col format-col--lb-extra">
+              <div class="format-title">LB Semi-finals</div>
+              <div class="format-box format-box--medium format-box--lb-semi"></div>
+              <label class="format-input">
+                Best of
+                <select id="finalBestOfLowerSemiInput">
+                  <option value="1">Bo1</option>
+                  <option value="3">Bo3</option>
+                  <option value="5">Bo5</option>
+                  <option value="7">Bo7</option>
+                  <option value="9">Bo9</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="format-col format-col--lb-extra">
+              <div class="format-title">LB Finals</div>
+              <div class="format-box format-box--medium format-box--lb-final"></div>
+              <label class="format-input">
+                Best of
+                <select id="finalBestOfLowerFinalInput">
+                  <option value="1">Bo1</option>
+                  <option value="3">Bo3</option>
+                  <option value="5">Bo5</option>
+                  <option value="7">Bo7</option>
+                  <option value="9">Bo9</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="format-col format-col--spacer"></div>
+          </div>
+        </div>
+      </div>
+      </div>
+      <div class="form-actions">
+        <button class="cta subtle" id="closeCreateCircuit">Cancel</button>
+        <button class="cta primary" id="saveCircuitBtn">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete tournament modal -->
+  <div id="confirmDeleteTournamentModal" class="modal">
+    <div class="modal-content small-modal">
+      <h3>Delete tournament</h3>
+      <p id="confirmDeleteTournamentMessage" class="helper">
+        This will permanently delete the tournament and its bracket data.
+      </p>
+      <div class="form-actions">
+        <button class="cta danger" id="confirmDeleteTournamentBtn">Yes, delete</button>
+        <button class="cta ghost" id="cancelDeleteTournamentBtn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <link rel="stylesheet" href="/vendor/flatpickr/flatpickr.min.css" />
+  <link rel="stylesheet" href="/vendor/flatpickr/flatpickr-dark.min.css" />
+  <script src="/vendor/flatpickr/flatpickr.min.js"></script>
+  <script type="module" src="/src/js/modules/tournament.js"></script>
+
+  <div id="settingsModal" class="modal">
+    <div class="modal-content small-modal">
+      <span class="close-modal" id="closeSettingsModal">&times;</span>
+      <h3 class="settings-modal-title">Settings</h3>
+      <div class="settings-tabs" id="userSettingsTabs">
+        <button class="settings-tab-btn active" data-user-settings-tab="settingsGeneral">General</button>
+        <button class="settings-tab-btn" data-user-settings-tab="settingsTournament">Tournament</button>
+      </div>
+      <div class="settings-panel active" id="settingsGeneral">
+        <div class="settings-avatar-section">
+          <div class="settings-avatar-preview">
+            <img id="settingsCurrentAvatar" src="img/avatar/marine_avatar_1.webp" alt="Current avatar" />
+          </div>
+          <button type="button" class="settings-avatar-button" id="changeAvatarBtn">
+            Change Avatar
+          </button>
+        </div>
+        <hr class="settings-divider" />
+        <div class="settings-username-section">
+          <label for="settingsUsernameInput" class="settings-label">Username</label>
+          <div class="settings-username-row">
+            <input id="settingsUsernameInput" class="settings-input" type="text" maxlength="20" placeholder="New username"
+              autocomplete="off" spellcheck="false" />
+            <button type="button" class="settings-username-button" id="saveUsernameButton">
+              <img src="img/SVG/pencil.svg" class="menu-icon" alt="" aria-hidden="true" />
+              Update
+            </button>
+          </div>
+          <p id="settingsUsernameStatus" class="settings-helper-text">
+            Use 3-20 letters, numbers, or underscores.
+          </p>
+        </div>
+        <hr class="settings-divider" />
+        <div class="publish-checkbox-row">
+          <span>Enable Bracket Input</span>
+          <div class="checkbox-wrapper-59">
+            <label class="switch">
+              <input type="checkbox" id="bracketInputToggle" checked />
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+        <div class="publish-checkbox-row">
+          <span>Show Build Input</span>
+          <div class="checkbox-wrapper-59">
+            <label class="switch">
+              <input type="checkbox" id="buildInputToggle" checked />
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+        <div class="publish-checkbox-row">
+          <span>Main Clan</span>
+          <select id="mainClanSelect" class="styled-dropdown"></select>
+        </div>
+        <hr class="settings-divider" />
+        <div class="settings-danger-zone">
+          <button type="button" class="settings-danger-button" id="deleteAccountBtn">
+            <img src="img/SVG/trash.svg" class="menu-icon" alt="" aria-hidden="true" />
+            Delete Account
+          </button>
+          <p class="settings-danger-note">This action will permanently remove your account.</p>
+        </div>
+      </div>
+      <div class="settings-panel" id="settingsTournament">
+        <div class="settings-username-section">
+          <div class="settings-label-row">
+            <label for="sc2PulseInput" class="settings-label">SC2Pulse Link</label>
+            <button type="button" class="help-circle animated-help" id="pulseHelpBtn"
+              aria-label="How to find your SC2Pulse link" title="How to find your SC2Pulse link">
+              ?
+            </button>
+          </div>
+          <div class="settings-username-row">
+            <input id="sc2PulseInput" class="settings-input" type="url"
+              placeholder="https://sc2pulse.nephest.com/sc2/?type=character&id=..." autocomplete="off" spellcheck="false" />
+            <button type="button" class="settings-username-button" id="connectPulseBtn">
+              <img src="img/SVG/stats.svg" class="menu-icon" alt="" aria-hidden="true" />
+              Update
+            </button>
+          </div>
+          <p id="pulseStatusText" class="settings-helper-text">
+            Paste your SC2Pulse profile link to sync your latest MMR.
+          </p>
+          <div class="settings-secondary-pulse">
+            <button type="button" class="secondary-pulse-button" id="openSecondaryPulseModalBtn">
+              Manage secondary SC2Pulse links
+            </button>
+          </div>
+        </div>
+        <div class="settings-username-section">
+          <label for="settingsTwitchInput" class="settings-label">Twitch Channel</label>
+          <div class="settings-username-row">
+            <input
+              id="settingsTwitchInput"
+              class="settings-input"
+              type="text"
+              placeholder="https://www.twitch.tv/username"
+            />
+            <button type="button" class="settings-username-button" id="saveTwitchButton">
+              Save
+            </button>
+          </div>
+          <p id="settingsTwitchStatus" class="settings-helper-text">
+            Add your Twitch channel to link your stream.
+          </p>
+        </div>
+        <div class="settings-username-section">
+          <label for="settingsCountrySelect" class="settings-label">Country</label>
+          <select id="settingsCountrySelect" class="settings-input styled-dropdown"></select>
+          <p id="settingsCountryStatus" class="settings-helper-text">
+            Select where you are from.
+          </p>
+        </div>
+      </div>
+        <div id="pulseHelpModal" class="modal">
+          <div class="modal-content">
+            <span class="close" id="closePulseHelp">&times;</span>
+            <h3>How to find your SC2Pulse link</h3>
+            <ol>
+              <li>Open your SC2Pulse profile and go to the MMR tab.</li>
+              <li>Copy the URL from the address bar (looks like <code>https://sc2pulse.nephest.com/sc2/?type=character&id=579686&m=1</code>).
+              </li>
+            <li>Paste that URL here and click Update.</li>
+          </ol>
+        </div>
+      </div>
+      <div id="secondaryPulseModal" class="modal">
+        <div class="modal-content small-modal">
+          <span class="close-modal" id="closeSecondaryPulseModal">&times;</span>
+          <h3>Secondary SC2Pulse links</h3>
+          <p class="helper settings-helper-text">Add up to five optional SC2Pulse profiles.</p>
+          <div id="secondaryPulseList" class="secondary-pulse-list"></div>
+          <div class="secondary-actions">
+            <button type="button" class="cta small ghost" id="secondaryAddInputBtn">
+              Add another link
+            </button>
+            <button type="button" class="cta primary" id="saveSecondaryPulseBtn">
+              Save links
+            </button>
+          </div>
+          <p id="secondaryPulseHelper" class="settings-helper-text">
+            You can save up to 5 secondary SC2Pulse links.
+          </p>
+        </div>
+      </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="avatarModal" class="modal" style="display: none;">
+    <div class="modal-content avatar-modal-content">
+      <button id="closeAvatarModal" class="modal-close-button" aria-label="Close avatar selector">&times;</button>
+      <h3>Select an Avatar</h3>
+      <div id="avatarGrid" class="avatar-grid"></div>
+    </div>
+  </div>
+
+  <div id="deleteAccountModal" class="modal">
+    <div class="modal-content">
+      <h3>?? Confirm Account Deletion</h3>
+      <p>This will permanently delete your account and personal builds.</p>
+      <div class="publish-checkbox-row">
+        <span>Also delete my published community builds</span>
+        <div class="checkbox-wrapper-59">
+          <label class="switch">
+            <input type="checkbox" id="deleteCommunityBuildsCheckbox" />
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+      <br /><br />
+      <button id="confirmDeleteAccountButton" class="auth-button">Yes, Delete My Account</button>
+      <button id="cancelDeleteAccountButton" class="auth-button">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Clan Modal -->
+  <div id="clanModal" class="modal">
+    <div class="modal-content-template">
+      <div class="template-header">
+        <span class="close-modal" id="closeClanModal">&times;</span>
+        <h3>Clans</h3>
+        <div class="clan-main-tabs">
+          <button id="createClanBtn" class="clan-main-tab-button" data-view="create">Create Clan</button>
+          <button id="manageClanBtn" class="clan-main-tab-button" data-view="manage">Manage Clan</button>
+          <button id="findClanBtn" class="clan-main-tab-button" data-view="find">Find a Clan</button>
+        </div>
+      </div>
+
+      <div class="clan-views">
+        <div id="createClanView" class="clan-subview"></div>
+        <div id="manageClanView" class="clan-subview">
+          <div class="clan-tabs">
+            <button class="clan-tab-button" data-tab="members">Members</button>
+            <button class="clan-tab-button" data-tab="requests">Requests</button>
+            <button class="clan-tab-button" data-tab="settings">Settings</button>
+          </div>
+          <div id="chooseManageClanView" class="clan-subview"></div>
+          <div class="clan-tab-content" id="clan-members-tab"></div>
+          <div class="clan-tab-content" id="clan-requests-tab"></div>
+          <div class="clan-tab-content" id="clan-settings-tab"></div>
+        </div>
+        <div id="findClanView" class="clan-subview"></div>
+        <div id="viewClanPage" class="clan-subview"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Match Veto Modal -->
+  <div id="vetoModal" class="modal" style="display:none;">
+    <div class="modal-content veto-modal">
+      <div class="modal-header">
+        <h3>Map veto</h3>
+        <button class="icon-btn" id="closeVetoModal" aria-label="Close veto modal">×</button>
+      </div>
+      <div class="veto-status">
+        <p class="helper" id="vetoMatchLabel"></p>
+        <p class="helper" id="vetoBestOfLabel"></p>
+      </div>
+      <div id="vetoMapPool" class="map-pool-grid selectable"></div>
+      <div class="form-actions" style="margin-top:12px;">
+        <button class="cta primary" id="saveVetoBtn">Done</button>
+        <button class="cta danger" id="resetVetoBtn">Reset veto</button>
+      </div>
+    </div>
+  </div>
+  <div id="confirmResetVetoModal" class="modal">
+    <div class="modal-content small-modal">
+      <h3>Reset veto</h3>
+      <p class="helper">
+        This clears all current vetoes and picks for this match.
+      </p>
+      <div class="form-actions">
+        <button class="cta danger" id="confirmResetVetoBtn">Yes, reset</button>
+        <button class="cta ghost" id="cancelResetVetoBtn">Cancel</button>
+      </div>
+    </div>
+  </div>
+  <!-- Match Info Modal -->
+  <div id="matchInfoModal" class="modal" style="display:none;">
+    <div class="modal-content match-info-modal">
+      <div class="modal-header">
+        <h3 id="matchInfoTitle">Match</h3>
+        <button class="icon-btn match-info-help-btn" id="matchInfoHelpBtn" aria-label="Match help"
+          title="How scoring and map veto works">?</button>
+        <div class="match-info-help-popover" id="matchInfoHelpPopover" aria-live="polite">
+          <div class="match-info-help-title">Scoring</div>
+          <div class="match-info-help-body">
+            Click the left or right pill for each map to mark the winner. Click again to clear.
+          </div>
+          <div class="match-info-help-title">Map veto</div>
+          <div class="match-info-help-body">
+            Use the “Map veto” button to open the veto flow (only match players can change it).
+          </div>
+        </div>
+        <button class="icon-btn" id="closeMatchInfoModal" aria-label="Close match info modal">x</button>
+      </div>
+      <div class="match-info-toprow">
+        <div class="match-info-meta">
+          <p class="helper" id="matchInfoBestOf"></p>
+          <p class="helper" id="matchInfoServer"></p>
+        </div>
+        <div class="match-info-walkover">
+          <label class="helper" for="matchInfoWalkoverSelect">Walkover</label>
+          <select id="matchInfoWalkoverSelect" class="match-info-walkover-select">
+            <option value="">None</option>
+            <option value="A">Left forfeits</option>
+            <option value="B">Right forfeits</option>
+          </select>
+        </div>
+      </div>
+      <div class="match-info-scoreboard">
+        <table class="match-info-table">
+          <thead>
+            <tr>
+              <th class="match-info-player-col">
+                <div class="match-info-player-head">
+                  <div id="matchInfoLeftScore" class="match-info-score">0</div>
+                  <div class="match-info-player-name">
+                    <span id="matchInfoLeftFlag" class="match-info-flag" aria-hidden="true"></span>
+                    <span id="matchInfoLeftName"></span>
+                    <span id="matchInfoLeftPresence" class="match-info-presence offline" aria-label="Player offline"></span>
+                  </div>
+                </div>
+              </th>
+              <th class="match-info-map-col">VS</th>
+              <th class="match-info-player-col">
+                <div class="match-info-player-head">
+                  <div id="matchInfoRightScore" class="match-info-score">0</div>
+                  <div class="match-info-player-name">
+                    <span id="matchInfoRightFlag" class="match-info-flag" aria-hidden="true"></span>
+                    <span id="matchInfoRightName"></span>
+                    <span id="matchInfoRightPresence" class="match-info-presence offline" aria-label="Player offline"></span>
+                  </div>
+                </div>
+              </th>
+            </tr>
+          </thead>
+          <tbody id="matchInfoMapRows"></tbody>
+        </table>
+        <div class="match-info-vetoes">
+          <div class="match-info-veto-col">
+            <div class="match-info-veto-title">Vetoes</div>
+            <ul id="matchInfoLeftVetoes" class="match-info-veto-list"></ul>
+          </div>
+          <div class="match-info-veto-spacer" aria-hidden="true"></div>
+          <div class="match-info-veto-col">
+            <div class="match-info-veto-title">Vetoes</div>
+            <ul id="matchInfoRightVetoes" class="match-info-veto-list"></ul>
+          </div>
+        </div>
+      </div>
+      <div class="form-actions" style="margin-top:12px;">
+        <button class="cta primary" id="openMapVetoBtn">Map veto</button>
+        <button class="cta primary" id="confirmMatchScoreBtn" style="display:none;">
+          Confirm score
+        </button>
+        <button class="cta ghost" id="castMatchBtn" style="display:none;">Cast</button>
+      </div>
+      <p class="helper match-cast-status" id="castMatchStatus" style="display:none;"></p>
+    </div>
+  </div>
+
+  <div id="playerDetailModal" class="modal" style="display:none;">
+    <div class="modal-content player-detail-card">
+      <button class="modal-close-button" id="closePlayerDetailModal" aria-label="Close player details">&times;</button>
+      <div class="player-detail-header">
+        <img id="playerDetailAvatar" src="img/avatar/marine_avatar_1.webp" alt="Player avatar" />
+        <div class="player-detail-meta">
+          <h3 id="playerDetailName">
+            <span id="playerDetailNameText">Player</span>
+            <span id="playerDetailCountryFlag" class="player-detail-flag" aria-hidden="true"></span>
+          </h3>
+          <div class="player-detail-tags">
+            <span id="playerDetailClan" class="badge muted" style="display:none;"></span>
+            <span id="playerDetailRace" class="badge muted"></span>
+          </div>
+          <div id="playerDetailPoints" class="helper"></div>
+        </div>
+      </div>
+      <div class="player-detail-grid">
+        <div class="player-detail-section">
+          <p class="eyebrow">SC2Pulse</p>
+          <div id="playerDetailPulseName" class="helper"></div>
+          <a id="playerDetailMainPulse" class="pill-link" target="_blank" rel="noopener">Not provided</a>
+          <div id="playerDetailSecondary" class="secondary-pulse-list"></div>
+        </div>
+        <div class="player-detail-section">
+          <p class="eyebrow">Twitch</p>
+          <a id="playerDetailTwitch" class="pill-link" target="_blank" rel="noopener">
+            <img src="img/SVG/glitch_flat_purple.svg" class="menu-icon" aria-hidden="true" />
+            Not provided
+          </a>
+        </div>
+        <div class="player-detail-section">
+          <p class="eyebrow">MMR by race</p>
+          <ul id="playerDetailMmrList" class="mmr-list"></ul>
+        </div>
+        <div class="player-detail-section">
+          <p class="eyebrow">Achievements</p>
+          <div id="playerDetailAchievements" class="helper">Coming soon.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+
+</html>

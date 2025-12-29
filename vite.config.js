@@ -11,6 +11,7 @@ export default defineConfig({
         main: path.resolve(__dirname, "index.html"),
         viewBuild: path.resolve(__dirname, "viewBuild.html"),
         veto: path.resolve(__dirname, "veto.html"),
+        tournament: path.resolve(__dirname, "tournament/index.html"),
       },
       output: {
         entryFileNames: "[name].js",

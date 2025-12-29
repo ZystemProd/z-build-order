@@ -1,7 +1,10 @@
 // functions/index.js
 const { onDocumentWritten } = require("firebase-functions/v2/firestore");
 const { onRequest } = require("firebase-functions/v2/https");
+const functions = require("firebase-functions");
 const admin = require("firebase-admin");
+const fetch = require("node-fetch"); // node-fetch@2
+const cheerio = require("cheerio");
 const chromium = require("@sparticuz/chromium");
 const puppeteer = require("puppeteer-core");
 const { JSDOM } = require("jsdom");
@@ -9,7 +12,7 @@ const createDOMPurify = require("dompurify");
 const path = require("path");
 const fs = require("fs/promises");
 
-admin.initializeApp();
+if (!admin.apps.length) admin.initializeApp();
 const bucket = admin.storage().bucket();
 const firestore = admin.firestore();
 
@@ -18,6 +21,8 @@ const DOMPurify = createDOMPurify(window);
 
 const SITE_URL =
   process.env.SITE_URL || "https://zbuildorder.com/viewBuild.html";
+const TOURNAMENT_BASE_URL =
+  process.env.TOURNAMENT_BASE_URL || "https://zbuildorder.com";
 
 const BOT_USER_AGENTS = [
   /googlebot/i,
@@ -46,6 +51,9 @@ const SPA_REMOTE_URL = sanitizeUrl(
   "https://zbuildorder.com/viewBuild.html"
 );
 
+const PULSE_ALLOWED_HOSTS = new Set(["sc2pulse.nephest.com"]);
+const PULSE_API_BASE = "https://sc2pulse.nephest.com/sc2/api";
+
 const CHROMIUM_ARGS = [
   ...chromium.args,
   "--no-sandbox",
@@ -72,6 +80,43 @@ function sanitizeUrl(value, fallback) {
     return sanitized;
   }
   return sanitizeText(fallback, fallback);
+}
+
+function getStartTimeMs(meta) {
+  const raw = meta?.startTime;
+  if (!raw) return null;
+  if (raw?.toMillis) return raw.toMillis();
+  if (typeof raw === "number") return raw;
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.getTime();
+}
+
+function getCheckInWindowMinutes(meta) {
+  const minutes = Number(meta?.checkInWindowMinutes || 0);
+  return Number.isFinite(minutes) && minutes > 0 ? minutes : 0;
+}
+
+function isInviteAccepted(player) {
+  const normalized = String(player?.inviteStatus || "").toLowerCase();
+  if (normalized === "pending" || normalized === "denied") return false;
+  return true;
+}
+
+function buildTournamentUrl(meta, slug) {
+  if (!slug) return "";
+  const circuitSlug = meta?.circuitSlug || "";
+  const path = circuitSlug
+    ? `/tournament/${circuitSlug}/${slug}`
+    : `/tournament/${slug}`;
+  return `${TOURNAMENT_BASE_URL}${path}`;
+}
+
+function safeTaskId(value) {
+  const base = sanitizeText(value, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
+  return base || "tournament";
 }
 
 // Create a simple, stable slug for titles
@@ -199,6 +244,587 @@ function absoluteCanonical(host, path) {
   const cleanHost = sanitizeText(host || "zbuildorder.com", "zbuildorder.com");
   const cleanPath = sanitizeText(path || "/", "/");
   return `https://${cleanHost}${cleanPath}`;
+}
+
+function normalizePulseUrl(rawUrl) {
+  if (!rawUrl) return "";
+  const cleaned = sanitizeText(rawUrl, "").trim();
+  const withProtocol = /^https?:\/\//i.test(cleaned)
+    ? cleaned
+    : `https://${cleaned}`;
+
+  try {
+    const url = new URL(withProtocol);
+    if (url.protocol !== "https:") return "";
+    if (!PULSE_ALLOWED_HOSTS.has(url.hostname)) return "";
+
+    // Keep only whitelisted params
+    const allowedParams = new Set(["type", "id", "characterId", "accountId", "m"]);
+    const kept = new URLSearchParams();
+    for (const [k, v] of url.searchParams.entries()) {
+      if (allowedParams.has(k)) kept.append(k, v);
+    }
+
+    // Default type if missing
+    if (!kept.has("type")) kept.set("type", "character");
+
+    const normalized = new URL(
+      `${url.protocol}//${url.host}${url.pathname}`
+    );
+    normalized.search = kept.toString();
+    // strip hash
+    return normalized.toString();
+  } catch (_) {
+    return "";
+  }
+}
+
+function extractPulseMmr(html) {
+  if (!html || typeof html !== "string") return null;
+
+  const patterns = [
+    /"last"\s*:\s*([0-9]{3,5})/i,
+    /"current"\s*:\s*([0-9]{3,5})/i,
+    /mmr[^0-9]{0,10}([0-9]{3,5})/i,
+    /rating[^0-9]{0,10}([0-9]{3,5})/i,
+  ];
+
+  for (const regex of patterns) {
+    const match = html.match(regex);
+    if (match?.[1]) return Number(match[1]);
+  }
+
+  return null;
+}
+
+function parsePulseUrlDetails(raw) {
+  try {
+    const u = new URL(raw);
+    const idParam =
+      u.searchParams.get("id") ||
+      u.searchParams.get("characterId") ||
+      u.searchParams.get("accountId");
+    const idNum = idParam ? Number(idParam) : null;
+    const region = u.searchParams.get("m") || "";
+    return {
+      cleanUrl: `${u.origin}${u.pathname}${u.search}`,
+      id: Number.isFinite(idNum) ? idNum : null,
+      region,
+    };
+  } catch (_) {
+    return { cleanUrl: raw || "", id: null, region: "" };
+  }
+}
+
+const MMR_MIN = 500;
+const MMR_MAX = 6000;
+
+function mmrInRange(n) {
+  return Number.isFinite(n) && n >= MMR_MIN && n <= MMR_MAX;
+}
+
+function collectRatings(obj, bucket = []) {
+  if (obj === null || obj === undefined) return bucket;
+  if (typeof obj === "number") {
+    if (Number.isFinite(obj) && obj >= MMR_MIN && obj <= MMR_MAX) {
+      bucket.push(obj);
+    }
+    return bucket;
+  }
+  if (typeof obj === "string") {
+    const m = obj.match(/(\d{3,5})/);
+    if (m) {
+      const n = Number(m[1]);
+      if (Number.isFinite(n) && n >= MMR_MIN && n <= MMR_MAX) {
+        bucket.push(n);
+      }
+    }
+    return bucket;
+  }
+  if (Array.isArray(obj)) {
+    obj.forEach((item) => collectRatings(item, bucket));
+    return bucket;
+  }
+  if (typeof obj === "object") {
+    for (const [, val] of Object.entries(obj)) {
+      collectRatings(val, bucket);
+    }
+  }
+  return bucket;
+}
+
+const RACE_MAP = {
+  zerg: "zerg",
+  z: "zerg",
+  protoss: "protoss",
+  p: "protoss",
+  terran: "terran",
+  t: "terran",
+  random: "random",
+  r: "random",
+};
+
+function normalizeRace(value) {
+  if (typeof value === "string") {
+    const k = value.trim().toLowerCase();
+    return RACE_MAP[k] || null;
+  }
+  if (typeof value === "number") {
+    // Best-guess mapping if SC2Pulse uses numeric races
+    const numericMap = {
+      0: "terran",
+      1: "zerg",
+      2: "protoss",
+      3: "random",
+    };
+    return numericMap[value] || null;
+  }
+  return null;
+}
+
+function toMillis(val) {
+  if (val === null || val === undefined) return null;
+  if (typeof val === "number") {
+    if (val > 1e12) return val; // already ms
+    if (val > 1e9) return val * 1000; // seconds
+    return null;
+  }
+  if (typeof val === "string") {
+    const n = Number(val);
+    if (Number.isFinite(n)) return toMillis(n);
+    const d = Date.parse(val);
+    return Number.isNaN(d) ? null : d;
+  }
+  return null;
+}
+
+function raceFromLegacyUid(legacyUid) {
+  if (!legacyUid || typeof legacyUid !== "string") return null;
+  const parts = legacyUid.split(".");
+  const last = parts[parts.length - 1];
+  if (!last) return null;
+  const num = Number(last);
+  if (!Number.isFinite(num)) return null;
+  const map = { 1: "terran", 2: "protoss", 3: "zerg", 4: "random" };
+  return map[num] || null;
+}
+
+function raceFromRaceGames(raceGames) {
+  if (!raceGames || typeof raceGames !== "object") return null;
+  const entries = Object.entries(raceGames).filter(
+    ([, v]) => Number(v) > 0 || v === 0
+  );
+  if (!entries.length) return null;
+  // Prefer the key with the largest games value
+  entries.sort((a, b) => (Number(b[1]) || 0) - (Number(a[1]) || 0));
+  const key = entries[0][0];
+  return normalizeRace(key);
+}
+
+function normalizeTeamRace(team) {
+  const fromLegacy =
+    raceFromLegacyUid(team?.legacyUid) || raceFromLegacyUid(team?.legacyId);
+  if (fromLegacy) return fromLegacy;
+
+  const members = Array.isArray(team?.members) ? team.members : [];
+  for (const m of members) {
+    const rg = m?.raceGames || team?.raceGames;
+    const race = raceFromRaceGames(rg);
+    if (race) return race;
+  }
+
+  const teamRace = raceFromRaceGames(team?.raceGames);
+  if (teamRace) return teamRace;
+
+  return null;
+}
+
+function extractRaceRatingsFromTeams(teams = []) {
+  const byRaceDetailed = {};
+
+  teams.forEach((team) => {
+    const rating = Number(team?.rating);
+    if (!mmrInRange(rating)) return;
+
+    const race = normalizeTeamRace(team);
+    if (!race) return;
+
+    const time =
+      toMillis(team?.lastPlayed) ||
+      toMillis(team?.primaryDataUpdated) ||
+      toMillis(team?.joined) ||
+      (Number.isFinite(Number(team?.season))
+        ? Number(team.season) * 1_000_000
+        : null);
+
+    const existing = byRaceDetailed[race];
+    if (
+      !existing ||
+      (time && (!existing.time || time > existing.time)) ||
+      (!existing.time && !time)
+    ) {
+      byRaceDetailed[race] = { rating, time };
+    }
+  });
+
+  const byRace = {};
+  Object.entries(byRaceDetailed).forEach(([race, data]) => {
+    byRace[race] = data.rating;
+  });
+
+  return { byRaceDetailed, byRace };
+}
+
+function mergeRaceDetails(target, incoming) {
+  const result = { ...target };
+  Object.entries(incoming || {}).forEach(([race, data]) => {
+    const existing = result[race];
+    if (
+      !existing ||
+      (data.time && (!existing.time || data.time > existing.time)) ||
+      (!existing.time && !data.time)
+    ) {
+      result[race] = data;
+    }
+  });
+  return result;
+}
+
+function collapseRaceDetails(details) {
+  const byRace = {};
+  Object.entries(details || {}).forEach(([race, data]) => {
+    if (data && mmrInRange(data.rating)) {
+      byRace[race] = data.rating;
+    }
+  });
+  return byRace;
+}
+
+function collectRaceRatings(obj, acc = []) {
+  if (obj === null || obj === undefined) return acc;
+
+  if (Array.isArray(obj)) {
+    obj.forEach((item) => collectRaceRatings(item, acc));
+    return acc;
+  }
+
+  if (typeof obj === "object") {
+    const raceValue =
+      normalizeRace(obj.race) ||
+      normalizeRace(obj.raceId) ||
+      normalizeRace(obj.faction);
+
+    let timeValue =
+      toMillis(obj.lastPlayed || obj.lastMatchTime || obj.timestamp || obj.time);
+
+    const ratings = [];
+    for (const [key, val] of Object.entries(obj)) {
+      const k = key.toLowerCase();
+      const isRatingKey = k.includes("rating") || k.includes("mmr");
+      const isSummaryKey =
+        k.includes("avg") || k.includes("average") || k.includes("max") || k.includes("best") || k.includes("peak");
+      const priority =
+        k.includes("last") || k.includes("current") ? 2 : isRatingKey ? 1 : 0;
+
+      // Ignore summary/peak/avg keys to avoid picking inflated historical values
+      if (isRatingKey && !isSummaryKey) {
+        let n = null;
+        if (typeof val === "number") {
+          n = val;
+        } else if (typeof val === "string") {
+          const m = val.match(/(\d{3,5})/);
+          n = m ? Number(m[1]) : null;
+        }
+        if (Number.isFinite(n) && n >= MMR_MIN && n <= MMR_MAX) {
+          ratings.push({ rating: n, priority });
+        }
+      }
+
+      // capture additional time hints
+      if (
+        !timeValue &&
+        (k.includes("time") || k.includes("date") || k.includes("updated"))
+      ) {
+        timeValue = timeValue || toMillis(val);
+      }
+    }
+
+    if (raceValue && ratings.length) {
+      ratings.forEach((r) =>
+        acc.push({
+          race: raceValue,
+          rating: r.rating,
+          time: timeValue || null,
+          priority: r.priority,
+        })
+      );
+    }
+
+    // Recurse into child objects
+    for (const val of Object.values(obj)) {
+      collectRaceRatings(val, acc);
+    }
+  }
+
+  return acc;
+}
+
+function extractPulseNameFromTeamEntry(entry) {
+  if (!entry) return "";
+
+  const membersArray = Array.isArray(entry.members)
+    ? entry.members
+    : Array.isArray(entry.members?.members)
+    ? entry.members.members
+    : null;
+
+  const firstMember =
+    membersArray && membersArray.length ? membersArray[0] : null;
+
+  const candidateNames = [
+    firstMember?.character?.tag,
+    firstMember?.character?.name,
+    firstMember?.account?.tag,
+    firstMember?.account?.battleTag,
+    entry?.members?.character?.tag,
+    entry?.members?.character?.name,
+    entry?.members?.account?.tag,
+    entry?.members?.account?.battleTag,
+  ]
+    .filter(Boolean)
+    .map((name) => name.toString().trim());
+
+  const cleaned = candidateNames
+    .map((name) => name.split("#")[0] || name)
+    .find(Boolean);
+
+  return cleaned || "";
+}
+
+function extractPulseNameFromCharacterEntry(entry) {
+  if (!entry) return "";
+  const candidateNames = [
+    entry?.members?.character?.tag,
+    entry?.members?.character?.name,
+    entry?.members?.account?.tag,
+    entry?.members?.account?.battleTag,
+  ]
+    .filter(Boolean)
+    .map((name) => name.toString().trim());
+
+  const cleaned = candidateNames
+    .map((name) => name.split("#")[0] || name)
+    .find(Boolean);
+
+  return cleaned || "";
+}
+
+function cleanPulseName(name) {
+  if (!name || typeof name !== "string") return "";
+  const trimmed = name.trim();
+  if (!trimmed) return "";
+  return trimmed.split("#")[0] || trimmed;
+}
+
+async function fetchRaceRatingsFromTeamsApi(details) {
+  const raceDetails = {};
+  let lastStatus = null;
+  let pulseName = "";
+
+  const ids = [];
+  if (details?.id) {
+    ids.push({ key: "characterId", value: details.id });
+    ids.push({ key: "accountId", value: details.id });
+  }
+
+  const tried = new Set();
+
+  for (const { key, value } of ids) {
+    const url = `${PULSE_API_BASE}/character-teams?${key}=${value}&queue=LOTV_1V1`;
+    if (tried.has(url)) continue;
+    tried.add(url);
+
+    try {
+      const resp = await fetch(url, { headers: { Accept: "application/json" } });
+      lastStatus = resp.status;
+      if (!resp.ok) continue;
+      const json = await resp.json();
+      if (!pulseName) {
+        const first = Array.isArray(json) ? json[0] : null;
+        pulseName = extractPulseNameFromTeamEntry(first);
+      }
+      const { byRaceDetailed } = extractRaceRatingsFromTeams(json);
+      Object.assign(
+        raceDetails,
+        mergeRaceDetails(raceDetails, byRaceDetailed)
+      );
+    } catch (e) {
+      functions.logger.warn(`Failed to fetch character-teams from ${url}`, e);
+    }
+  }
+
+  const byRace = collapseRaceDetails(raceDetails);
+  const mmr = Object.values(byRace).filter(mmrInRange).reduce((a, b) => Math.max(a, b), 0) || null;
+
+  return { byRace, mmr, lastStatus, pulseName };
+}
+
+function extractRaceRatingsFromCharactersPayload(json) {
+  const raceDetails = {};
+  const arr = Array.isArray(json) ? json : [];
+
+  arr.forEach((item) => {
+    const rating =
+      Number(item?.currentStats?.rating) ||
+      Number(item?.rating) ||
+      null;
+    if (!mmrInRange(rating)) return;
+
+    const race =
+      raceFromRaceGames(item?.members?.raceGames) ||
+      raceFromRaceGames(item?.raceGames) ||
+      null;
+    const time =
+      toMillis(item?.currentStats?.updated) ||
+      toMillis(item?.primaryDataUpdated) ||
+      null;
+
+    if (!race) return;
+    const existing = raceDetails[race];
+    if (
+      !existing ||
+      (time && (!existing.time || time > existing.time)) ||
+      (!existing.time && !time)
+    ) {
+      raceDetails[race] = { rating, time };
+    }
+  });
+
+  return {
+    byRace: collapseRaceDetails(raceDetails),
+    byRaceDetailed: raceDetails,
+  };
+}
+
+async function fetchRaceRatingsFromCharacters(details) {
+  let lastStatus = null;
+  const raceDetails = {};
+  const urls = [];
+  let pulseName = "";
+
+  // Try the direct character endpoint to get a reliable display name
+  if (details?.id) {
+    const profileUrl = `${PULSE_API_BASE}/characters/${details.id}`;
+    try {
+      const resp = await fetch(profileUrl, {
+        headers: { Accept: "application/json" },
+      });
+      lastStatus = resp.status;
+      if (resp.ok) {
+        const json = await resp.json();
+        const candidate = json?.name || json?.battleTag || json?.tag;
+        pulseName = cleanPulseName(candidate);
+      }
+    } catch (e) {
+      functions.logger.warn(
+        `Failed to fetch character profile from ${profileUrl}`,
+        e
+      );
+    }
+  }
+
+  if (details?.id) {
+    urls.push(`${PULSE_API_BASE}/characters?characterId=${details.id}`);
+    urls.push(`${PULSE_API_BASE}/characters?accountId=${details.id}`);
+  }
+
+  const tried = new Set();
+
+  for (const url of urls) {
+    if (tried.has(url)) continue;
+    tried.add(url);
+    try {
+      const resp = await fetch(url, { headers: { Accept: "application/json" } });
+      lastStatus = resp.status;
+      if (!resp.ok) continue;
+      const json = await resp.json();
+      if (!pulseName) {
+        const first = Array.isArray(json) ? json[0] : null;
+        pulseName = extractPulseNameFromCharacterEntry(first);
+      }
+      const { byRaceDetailed } = extractRaceRatingsFromCharactersPayload(json);
+      Object.assign(
+        raceDetails,
+        mergeRaceDetails(raceDetails, byRaceDetailed)
+      );
+    } catch (e) {
+      functions.logger.warn(`Failed to fetch characters from ${url}`, e);
+    }
+  }
+
+  const byRace = collapseRaceDetails(raceDetails);
+  const mmr = Object.values(byRace).filter(mmrInRange).reduce((a, b) => Math.max(a, b), 0) || null;
+
+  return { byRace, mmr, lastStatus, pulseName };
+}
+
+async function fetchPulseMmrViaBrowser(url) {
+  let browser;
+  let page;
+  try {
+    browser = await puppeteer.launch({
+      args: CHROMIUM_ARGS,
+      defaultViewport: { width: 1280, height: 720 },
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless !== false,
+    });
+
+    page = await browser.newPage();
+    await page.goto(url, {
+      waitUntil: "networkidle2",
+      timeout: 15_000,
+    });
+
+    // Wait a moment for client-side rendering
+    await page.waitForTimeout(1_000);
+
+    const mmr = await page.evaluate(() => {
+      const candidates = [];
+      const walk = (root) => {
+        if (!root || candidates.length > 50) return;
+        const text = (root.textContent || "").trim();
+        if (text) candidates.push(text);
+        for (const child of root.children || []) walk(child);
+      };
+      walk(document.body || document);
+      const combined = candidates.join(" ");
+      const patterns = [
+        /MMR[^0-9]{0,8}([0-9]{3,5})/i,
+        /rating[^0-9]{0,8}([0-9]{3,5})/i,
+      ];
+      for (const r of patterns) {
+        const m = combined.match(r);
+        if (m?.[1]) return Number(m[1]);
+      }
+      return null;
+    });
+
+    return mmr;
+  } catch (error) {
+    console.warn("? Puppeteer MMR fetch failed:", error?.message || error);
+    return null;
+  } finally {
+    if (page) {
+      try {
+        await page.close();
+      } catch (_) {}
+    }
+    if (browser) {
+      try {
+        await browser.close();
+      } catch (_) {}
+    }
+  }
 }
 
 function addCanonicalLink(html, canonicalUrl) {
@@ -904,6 +1530,120 @@ async function getPrerenderedHtml(buildId) {
 
   return renderAndStoreBuild(buildId);
 }
+
+// Gen 2 HTTPS function for SC2Pulse MMR fetch via Firestore-stored URL
+exports.fetchPulseMmr = onRequest({ region: "us-central1" }, async (req, res) => {
+  // CORS handling
+  const origin = req.headers.origin || "";
+  const allowedOrigins = [
+    "https://zbuildorder.com",
+    "https://www.zbuildorder.com",
+    "https://z-build-order--dev-1osorzic.web.app",
+    "http://localhost:5173",
+  ];
+
+  if (allowedOrigins.includes(origin)) {
+    res.set("Access-Control-Allow-Origin", origin);
+  }
+
+  res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+  if (req.method === "OPTIONS") {
+    return res.status(204).send("");
+  }
+
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed. Use POST." });
+  }
+
+  try {
+    const { uid, url: overrideUrl } = req.body || {};
+    if (!uid) {
+      return res.status(400).json({ error: "Missing uid in request body." });
+    }
+
+    const userRef = admin.firestore().collection("users").doc(uid);
+    const userSnap = await userRef.get();
+
+    if (!userSnap.exists) {
+      return res.status(404).json({ error: "User document not found." });
+    }
+
+    const data = userSnap.data();
+    const sc2PulseUrl = overrideUrl || data.sc2PulseUrl;
+
+    if (!sc2PulseUrl) {
+      return res.status(400).json({ error: "User has no sc2PulseUrl set." });
+    }
+
+    const normalized = normalizePulseUrl(sc2PulseUrl);
+    if (!normalized) {
+      return res.status(400).json({ error: "Invalid SC2Pulse URL." });
+    }
+    const details = parsePulseUrlDetails(normalized);
+
+    functions.logger.info(`Fetching SC2Pulse MMR for uid=${uid}`, {
+      pulseId: details.id,
+    });
+
+    let byRace = {};
+    let mmr = null;
+    let lastStatus = null;
+    let pulseName = "";
+
+    const teamResult = await fetchRaceRatingsFromTeamsApi(details);
+    byRace = { ...byRace, ...teamResult.byRace };
+    mmr = teamResult.mmr;
+    lastStatus = teamResult.lastStatus;
+    pulseName = teamResult.pulseName || pulseName;
+
+    if (!mmr || !pulseName) {
+      const charResult = await fetchRaceRatingsFromCharacters(details);
+      if (!Object.keys(byRace).length) {
+        byRace = { ...byRace, ...charResult.byRace };
+      }
+      mmr = mmr || charResult.mmr;
+      pulseName = charResult.pulseName || pulseName;
+      if (!mmr && Object.values(byRace).length) {
+        const valid = Object.values(byRace).filter(mmrInRange);
+        if (valid.length) {
+          mmr = Math.max(...valid);
+        }
+      }
+      lastStatus = charResult.lastStatus ?? lastStatus;
+    }
+
+    if (!mmrInRange(mmr)) {
+      let statusCode = 500;
+      let message = "Could not parse MMR from SC2Pulse API.";
+      if (lastStatus === 404) {
+        statusCode = 404;
+        message = "Profile not found on SC2Pulse.";
+      } else if (lastStatus && lastStatus >= 500) {
+        statusCode = 502;
+        message = "SC2Pulse is unavailable. Please try again later.";
+      }
+      return res.status(statusCode).json({ error: message });
+    }
+
+    await userRef.set(
+      {
+        sc2PulseUrl: normalized,
+        lastKnownMMRByRace: byRace,
+        lastMmrUpdated: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    functions.logger.info(`MMR for uid=${uid} updated to ${mmr}`, { byRace });
+
+    return res.status(200).json({ mmr, byRace, pulseName: pulseName || null });
+  } catch (err) {
+    functions.logger.error("fetchPulseMmr crashed:", err);
+    return res.status(500).json({ error: "Internal server error." });
+  }
+});
 
 exports.renderNewBuild = onDocumentWritten(
   {

@@ -695,7 +695,6 @@ export async function syncToPublishedBuild(buildId, buildData) {
   const db = getFirestore();
   const user = getAuth().currentUser;
   if (!user) return;
-
   const publishedRef = doc(db, "publishedBuilds", buildId);
   const existingSnap = await getDoc(publishedRef);
 
@@ -727,6 +726,7 @@ export async function syncToPublishedBuild(buildId, buildData) {
           name: clan.name,
           tag: clan.abbreviation || clan.tag || "",
           logoUrl: clan.logoUrl || null,
+          logoUrlSmall: clan.logoUrlSmall || null,
         };
       }
     } catch (e) {

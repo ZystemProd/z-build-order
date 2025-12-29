@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+<title>Trophy</title>
+<path fill="#f5c542" d="M14 8h36v10c0 8.6-7.4 15-18 15s-18-6.4-18-15V8z"/>
+<path fill="#f8d66b" d="M22 8h20v8c0 5.5-4.5 10-10 10s-10-4.5-10-10V8z"/>
+<path fill="#c08a1c" d="M25 38h14v8H25z"/>
+<path fill="#d39b2b" d="M22 46h20v4H22z"/>
+<path fill="#1f1f28" d="M18 50h28v6H18z"/>
+<path fill="#c08a1c" d="M10 10h8v4c0 4.4-3.6 8-8 8H8c-3.3 0-6-2.7-6-6V8h8c0 1.1 0 1.1 0 2z"/>
+<path fill="#c08a1c" d="M54 10h8v8c0 3.3-2.7 6-6 6h-2c-4.4 0-8-3.6-8-8v-4h8c0-1.1 0-1.1 0-2z"/>
+<path fill="#fefefe" d="M32 18.5 28.6 21l1 4-3.6-2.4-3.6 2.4 1-4L20 18.5l4.2-.4L24.8 14l2.2 3.9 4.2.6z"/>
+<circle cx="32" cy="12" r="4" fill="#fce58b"/>
+</svg>
