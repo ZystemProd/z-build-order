@@ -10,6 +10,7 @@ import {
 } from "./sync/persistence.js";
 import { sanitizeUrl, escapeHtml } from "./bracket/renderUtils.js";
 import { playerKey } from "./playerKey.js";
+import { syncMarkdownSurfaceForInput } from "./markdownEditor.js";
 
 function normalizeRaceLabel(raw) {
   const val = (raw || "").toString().toLowerCase();
@@ -681,12 +682,15 @@ export async function populateCreateCircuitForm() {
   const finalQualifyInput = document.getElementById("finalQualifyCountInput");
   if (nameInput) nameInput.value = "";
   if (descInput) descInput.value = "";
+  syncMarkdownSurfaceForInput(descInput);
   if (slugInput && !slugInput.value) {
     slugInput.value = await generateCircuitSlug();
   }
   if (finalNameInput) finalNameInput.value = "";
   if (finalDescInput) finalDescInput.value = "";
   if (finalRulesInput) finalRulesInput.value = "";
+  syncMarkdownSurfaceForInput(finalDescInput);
+  syncMarkdownSurfaceForInput(finalRulesInput);
   if (finalStartInput) {
     finalStartInput.value = "";
     if (finalStartInput._flatpickr) {

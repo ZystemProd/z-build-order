@@ -21,6 +21,7 @@ import { initTournamentNotifications } from "./notifications.js";
 import { initTournamentTemplateManager } from "./templateManager.js";
 import { initTournamentSearch } from "./search/tournamentSearch.js";
 import { initTournamentListSlider, refreshTournamentListLayout, loadMoreTournamentListItems } from "./listSlider.js";
+import { initQuillEditors, syncQuillById } from "./markdownEditor.js";
 
 export function initTournamentPage({
   handleRegistration,
@@ -121,13 +122,9 @@ export function initTournamentPage({
   const testBracketPrevBtn = document.getElementById("testBracketPrev");
   const testBracketNextBtn = document.getElementById("testBracketNext");
   const descriptionInput = document.getElementById("tournamentDescriptionInput");
-  const descToolbarBtns = document.querySelectorAll("[data-desc-action]");
   const rulesInput = document.getElementById("tournamentRulesInput");
-  const rulesToolbarBtns = document.querySelectorAll("[data-rules-action]");
   const finalDescriptionInput = document.getElementById("finalTournamentDescriptionInput");
-  const finalDescToolbarBtns = document.querySelectorAll("[data-final-desc-action]");
   const finalRulesInput = document.getElementById("finalTournamentRulesInput");
-  const finalRulesToolbarBtns = document.querySelectorAll("[data-final-rules-action]");
   const mapPoolPicker = document.getElementById("mapPoolPicker");
   const useLadderMapsBtn = document.getElementById("useLadderMapsBtn");
   const clearMapPoolBtn = document.getElementById("clearMapPoolBtn");
@@ -141,8 +138,6 @@ export function initTournamentPage({
   const createFinalTabBtns = document.querySelectorAll("[data-final-create-tab]");
   const createFinalPanels = document.querySelectorAll("#createFinalPanel .create-final-panel");
   const saveSettingsBtn = document.getElementById("saveSettingsBtn");
-  const settingsDescToolbarBtns = document.querySelectorAll("[data-settings-desc-action]");
-  const settingsRulesToolbarBtns = document.querySelectorAll("[data-settings-rules-action]");
   const createImageInput = document.getElementById("tournamentImageInput");
   const createImagePreview = document.getElementById("tournamentImagePreview");
   const finalImageInput = document.getElementById("finalTournamentImageInput");
@@ -174,6 +169,73 @@ export function initTournamentPage({
   const closeVetoModal = document.getElementById("closeVetoModal");
   const saveVetoBtn = document.getElementById("saveVetoBtn");
   const refreshCircuitBtn = document.getElementById("refreshCircuitBtn");
+  const syncQuillFromInputs = () => {
+    [
+      "settingsDescriptionInput",
+      "settingsRulesInput",
+      "tournamentDescriptionInput",
+      "tournamentRulesInput",
+      "finalTournamentDescriptionInput",
+      "finalTournamentRulesInput",
+    ].forEach((id) => {
+      const input = document.getElementById(id);
+      if (input) syncQuillById(id, input.value || "");
+    });
+  };
+  const quillConfigs = [
+    {
+      editorId: "settingsDescriptionEditor",
+      textareaId: "settingsDescriptionInput",
+      placeholder: "Describe the event...",
+    },
+    {
+      editorId: "settingsRulesEditor",
+      textareaId: "settingsRulesInput",
+      placeholder: "Add eligibility, format, communication, and fair play rules...",
+    },
+    {
+      editorId: "tournamentDescriptionEditor",
+      textareaId: "tournamentDescriptionInput",
+      placeholder: "Write rules, schedule, map pool...",
+    },
+    {
+      editorId: "tournamentRulesEditor",
+      textareaId: "tournamentRulesInput",
+      placeholder: "Add eligibility, format, communication, and fair play rules...",
+    },
+    {
+      editorId: "finalTournamentDescriptionEditor",
+      textareaId: "finalTournamentDescriptionInput",
+      placeholder: "Write rules, schedule, map pool...",
+    },
+    {
+      editorId: "finalTournamentRulesEditor",
+      textareaId: "finalTournamentRulesInput",
+      placeholder: "Add eligibility, format, communication, and fair play rules...",
+    },
+  ];
+  initQuillEditors(quillConfigs);
+  syncQuillFromInputs();
+
+  const preventLabelFocus = (root) => {
+    if (!root) return;
+    root.addEventListener("click", (event) => {
+      const label = event.target.closest("label");
+      if (!label) return;
+      if (
+        event.target.closest(
+          "input, select, textarea, button, .quill-editor, .ql-toolbar, .ql-container, .ql-editor, .ql-picker"
+        )
+      ) {
+        return;
+      }
+      event.preventDefault();
+    });
+  };
+
+  preventLabelFocus(document.querySelector("#createTournamentModal .settings-panel"));
+  preventLabelFocus(document.querySelector("#settingsTab .settings-panel"));
+  preventLabelFocus(document.querySelector("#createFinalPanel"));
 
   const setModalVisible = (modal, visible, display = "flex") => {
     if (!modal) return;
@@ -183,6 +245,17 @@ export function initTournamentPage({
     } else {
       unlockBodyScroll();
     }
+  };
+
+  const resetMarkdownToolState = (root) => {
+    if (!root) return;
+    root.querySelectorAll(".markdown-surface[data-editor-for]").forEach((surface) => {
+      delete surface.dataset.pendingActions;
+      delete surface.dataset.pendingDisplay;
+      delete surface.dataset.lastFormatAction;
+      delete surface.dataset.preservePendingTs;
+      delete surface.dataset.activeStyles;
+    });
   };
 
 
@@ -411,6 +484,8 @@ export function initTournamentPage({
     templateManager?.ensureCreateModalHome();
     templateManager?.setTemplateManagerMode(false);
     templateManager?.refreshTemplateUI();
+    resetMarkdownToolState(createModal);
+    syncQuillFromInputs();
     setModalVisible(createModal, true);
   });
   closeCreateTournament?.addEventListener("click", () => {
@@ -418,6 +493,7 @@ export function initTournamentPage({
       templateManager.closeTemplateManager(false);
       return;
     }
+    resetMarkdownToolState(createModal);
     setModalVisible(createModal, false);
   });
   window.addEventListener("mousedown", (e) => {
@@ -578,26 +654,6 @@ export function initTournamentPage({
     if (!preview) return;
     preview.innerHTML = renderMarkdown(finalRulesInput.value || "");
   });
-  descToolbarBtns.forEach((btn) => {
-    btn.addEventListener("click", () =>
-      applyFormattingInline(btn.dataset.descAction, "tournamentDescriptionInput")
-    );
-  });
-  rulesToolbarBtns.forEach((btn) => {
-    btn.addEventListener("click", () =>
-      applyFormattingInline(btn.dataset.rulesAction, "tournamentRulesInput")
-    );
-  });
-  finalDescToolbarBtns.forEach((btn) => {
-    btn.addEventListener("click", () =>
-      applyFormattingInline(btn.dataset.finalDescAction, "finalTournamentDescriptionInput")
-    );
-  });
-  finalRulesToolbarBtns.forEach((btn) => {
-    btn.addEventListener("click", () =>
-      applyFormattingInline(btn.dataset.finalRulesAction, "finalTournamentRulesInput")
-    );
-  });
   bindImagePreview(createImageInput, createImagePreview);
   bindImagePreview(finalImageInput, finalImagePreview);
   bindImagePreview(settingsImageInput, settingsImagePreview);
@@ -617,7 +673,6 @@ export function initTournamentPage({
     toggleFinalMapSelection?.(card.dataset.mapName);
   });
   bindSettingsEvents({
-    applyFormatting: applyFormattingInline,
     setMapPoolSelection,
     getDefaultMapPoolNames,
     toggleMapSelection,
@@ -911,9 +966,33 @@ export function initTournamentPage({
     },
   ];
 
+  const clampMaxPlayersInput = (input, { clampMin = true } = {}) => {
+    if (!input) return false;
+    const raw = input.value.trim();
+    if (!raw) return false;
+    const value = Number(raw);
+    if (!Number.isFinite(value)) return false;
+    const clamped = clampMin
+      ? Math.max(2, Math.min(32, Math.round(value)))
+      : Math.min(32, Math.round(value));
+    if (String(clamped) !== raw) {
+      input.value = String(clamped);
+      return true;
+    }
+    return false;
+  };
+
   formatDiagrams.forEach((entry) => {
     updateFormatDiagramTitles(entry);
-    entry.maxPlayersInput?.addEventListener("input", () => updateFormatDiagramTitles(entry));
+    entry.maxPlayersInput?.addEventListener("input", () => {
+      clampMaxPlayersInput(entry.maxPlayersInput, { clampMin: false });
+      updateFormatDiagramTitles(entry);
+    });
+    entry.maxPlayersInput?.addEventListener("blur", () => {
+      if (clampMaxPlayersInput(entry.maxPlayersInput)) {
+        updateFormatDiagramTitles(entry);
+      }
+    });
     entry.formatSelect?.addEventListener("change", () => updateFormatDiagramTitles(entry));
     const playoffsSelect = getPlayoffsSelectForRoot(entry.root);
     playoffsSelect?.addEventListener("change", () => updateFormatDiagramTitles(entry));

@@ -1,6 +1,7 @@
 import DOMPurify from "dompurify";
 import { defaultBestOf } from "../state.js";
 import { normalizeRoundRobinSettings } from "../bracket/build.js";
+import { syncMarkdownSurfaceForInput } from "../markdownEditor.js";
 
 export function applyBestOfToSettings(bestOf) {
   const upperInput = document.getElementById("settingsBestOfUpper");
@@ -71,6 +72,10 @@ export function populateSettingsPanel({
   if (slugInput) slugInput.value = tournament.slug || "";
   if (descInput) descInput.value = tournament.description || "";
   if (rulesInput) rulesInput.value = tournament.rules || "";
+  syncMarkdownSurfaceForInput(descInput);
+  syncMarkdownSurfaceForInput(rulesInput);
+  syncMarkdownSurfaceForInput(descInput);
+  syncMarkdownSurfaceForInput(rulesInput);
   if (formatSelect)
     formatSelect.value =
       tournament.format || storedFormat || "Double Elimination";

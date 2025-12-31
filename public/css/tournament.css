@@ -146,7 +146,7 @@ a {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin-top: 12px
+  margin-top: 12px;
 }
 
 .hero-placements--stacked {
@@ -1198,12 +1198,9 @@ a {
 
 .checkin-select-pill {
   appearance: none;
-  background-image:
-    linear-gradient(45deg, transparent 50%, currentColor 50%),
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
     linear-gradient(135deg, currentColor 50%, transparent 50%);
-  background-position:
-    calc(100% - 14px) 52%,
-    calc(100% - 8px) 52%;
+  background-position: calc(100% - 14px) 52%, calc(100% - 8px) 52%;
   background-size: 6px 6px, 6px 6px;
   background-repeat: no-repeat;
   padding-right: 22px;
@@ -1648,8 +1645,8 @@ a {
 
 .match-card.ready {
   border-color: rgba(78, 213, 255, 0.32);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(78, 213, 255, 0.18),
-    0 0 22px rgba(78, 213, 255, 0.16);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(78, 213, 255, 0.18), 0 0 22px rgba(78, 213, 255, 0.16);
 }
 
 .match-card.tree *,
@@ -1977,7 +1974,6 @@ a {
   letter-spacing: 0.04em;
   z-index: 10;
 }
-
 
 .result-select,
 .score-select,
@@ -2479,7 +2475,11 @@ a {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, rgba(17, 24, 43, 0) 0%, var(--panel-2) 60%);
+  background: linear-gradient(
+    90deg,
+    rgba(17, 24, 43, 0) 0%,
+    var(--panel-2) 60%
+  );
 }
 
 .tournament-search-cover.is-empty {
@@ -2497,7 +2497,7 @@ a {
 
 .tournament-search-title,
 .tournament-search-meta span:first-child {
-  text-shadow: 0px 2px 6px rgba(0,0,0,1);
+  text-shadow: 0px 2px 6px rgba(0, 0, 0, 1);
 }
 
 .tournament-search-tag {
@@ -3153,6 +3153,7 @@ a {
 #createTournamentModal .modal-content {
   display: flex;
   flex-direction: column;
+  height: 82vh;
 }
 
 .template-manager-only {
@@ -3178,7 +3179,18 @@ a {
   padding: 0;
   position: relative;
   font-size: 14px;
-  margin-top: 10px;
+  margin-top: 0;
+  border-radius: 999px;
+  box-shadow: none;
+  color: var(--text);
+}
+
+.template-select.cta,
+.template-select.cta.primary {
+  background: var(--panel);
+  border: 1px solid var(--stroke);
+  color: var(--text);
+  box-shadow: none;
 }
 
 .template-select select {
@@ -3344,6 +3356,22 @@ a {
   color: var(--text);
 }
 
+.modal-content select {
+  margin-top: 8px;
+  padding: 10px 36px 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--stroke);
+  background: var(--panel);
+  color: var(--text);
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%23cdd6f4' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 12px 8px;
+}
+
 .modal-content button {
   margin-top: 10px;
 }
@@ -3436,13 +3464,16 @@ a {
   min-height: 325px;
 }
 
-
 .tournament-card .card-cover {
   width: 100%;
   height: 140px;
   border-radius: 12px;
   border: 1px solid var(--stroke);
-  background: linear-gradient(135deg, rgba(78, 213, 255, 0.12), rgba(15, 20, 33, 0.9));
+  background: linear-gradient(
+    135deg,
+    rgba(78, 213, 255, 0.12),
+    rgba(15, 20, 33, 0.9)
+  );
   background-size: cover;
   background-position: center;
   position: relative;
@@ -3705,7 +3736,11 @@ a {
   border-radius: 10px;
   padding: 10px;
   background: rgba(255, 255, 255, 0.02);
-  min-height: 60px;
+  text-align: left;
+}
+
+.markdown-preview .helper {
+  text-align: left;
 }
 
 .markdown-editor {
@@ -3736,7 +3771,7 @@ a {
 }
 
 .image-preview {
-  width: 100%;
+  width: min(420px, 100%);
   aspect-ratio: 1200 / 630;
   border-radius: 12px;
   border: 1px solid var(--stroke);
@@ -3811,28 +3846,17 @@ a {
   gap: 8px;
 }
 
-.toolbar-btn {
-  border: 1px solid var(--stroke);
-  background: linear-gradient(
-    135deg,
-    rgba(78, 213, 255, 0.12),
-    rgba(78, 213, 255, 0.04)
-  );
-  color: var(--text);
-  padding: 6px 12px;
-  border-radius: 10px;
-  cursor: pointer;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  box-shadow: 0 4px 18px rgba(78, 213, 255, 0.12);
-  min-width: 46px;
-  text-align: center;
+.markdown-field {
+  margin-bottom: 14px;
 }
 
-.toolbar-btn:hover {
-  border-color: var(--accent-2);
-  transform: translateY(-1px);
+.markdown-label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: var(--text);
 }
+
 
 .markdown-input {
   width: 100%;
@@ -3846,6 +3870,11 @@ a {
   resize: vertical;
 }
 
+.markdown-editor .markdown-input {
+  display: none;
+}
+
+
 .markdown-input.compact {
   min-height: 120px;
 }
@@ -3853,6 +3882,82 @@ a {
 .markdown-input:focus {
   outline: 2px solid var(--accent-2);
   border-color: var(--accent-2);
+}
+
+.quill-editor {
+  min-height: 200px;
+}
+
+.quill-editor .ql-toolbar {
+  border: 1px solid var(--stroke);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 10px;
+  margin-bottom: 8px;
+}
+
+.quill-editor .ql-container {
+  border: 1px solid var(--stroke);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text);
+  min-height: 140px;
+}
+
+.quill-editor .ql-editor {
+  min-height: 140px;
+  font-family: "Inter", system-ui, sans-serif;
+  color: var(--text);
+}
+
+.quill-editor .ql-toolbar .ql-picker,
+.quill-editor .ql-toolbar .ql-picker-label,
+.quill-editor .ql-toolbar button {
+  color: var(--text);
+}
+
+.quill-editor .ql-toolbar .ql-stroke {
+  stroke: var(--text);
+}
+
+.quill-editor .ql-toolbar .ql-fill {
+  fill: var(--text);
+}
+
+.quill-editor .ql-toolbar .ql-picker-label,
+.quill-editor .ql-toolbar button {
+  opacity: 0.9;
+}
+
+.quill-editor .ql-toolbar button.ql-active,
+.quill-editor .ql-toolbar button:hover,
+.quill-editor .ql-toolbar .ql-picker-label:hover {
+  color: var(--accent-2);
+  opacity: 1;
+}
+
+.quill-editor .ql-toolbar button.ql-active .ql-stroke,
+.quill-editor .ql-toolbar button:hover .ql-stroke,
+.quill-editor .ql-toolbar .ql-picker-label:hover .ql-stroke {
+  stroke: var(--accent-2);
+}
+
+.quill-editor .ql-toolbar button.ql-active .ql-fill,
+.quill-editor .ql-toolbar button:hover .ql-fill,
+.quill-editor .ql-toolbar .ql-picker-label:hover .ql-fill {
+  fill: var(--accent-2);
+}
+
+.quill-editor .ql-editor p {
+  margin: 0 0 6px 0;
+}
+
+.quill-editor .ql-editor a {
+  color: var(--accent-2);
+}
+
+.quill-editor .ql-toolbar button:hover,
+.quill-editor .ql-toolbar button.ql-active {
+  color: var(--text);
 }
 
 @media (max-width: 1100px) {
@@ -4022,6 +4127,22 @@ a {
   flex: 1 1 auto;
 }
 
+.create-modal .settings-panel input,
+.create-modal .settings-panel select,
+.create-modal .settings-panel textarea {
+  width: auto;
+  max-width: 360px;
+  align-self: flex-start;
+}
+
+.create-modal .settings-panel #tournamentDescriptionInput,
+.create-modal .settings-panel #tournamentRulesInput {
+  width: 100%;
+  max-width: 100%;
+  align-self: stretch;
+}
+
+
 .modal-title-row {
   display: flex;
   align-items: center;
@@ -4122,6 +4243,7 @@ a {
 #settingsTab select,
 #settingsTab textarea {
   width: 100%;
+  max-width: 360px;
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid var(--stroke);
@@ -4269,6 +4391,11 @@ textarea:focus {
   font-size: 14px;
   line-height: 1;
   cursor: default;
+  font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji",
+    "Twemoji Mozilla", "Segoe UI Symbol", sans-serif !important;
+  font-variant-emoji: emoji;
+  align-items: center;
+  justify-content: center;
 }
 
 .match-info-presence {
@@ -4520,21 +4647,29 @@ textarea:focus {
   background: rgba(255, 107, 107, 0.12);
 }
 
-.match-info-row[data-preview-winner="A"] .match-info-pick-cell[data-side="A"]::before,
-.match-info-pick-cell[data-side="A"]:not(.is-winner):not(.is-loser):hover::before {
+.match-info-row[data-preview-winner="A"]
+  .match-info-pick-cell[data-side="A"]::before,
+.match-info-pick-cell[data-side="A"]:not(.is-winner):not(
+    .is-loser
+  ):hover::before {
   background: rgba(74, 222, 128, 0.12);
 }
 
-.match-info-row[data-preview-winner="A"] .match-info-pick-cell[data-side="B"]::before {
+.match-info-row[data-preview-winner="A"]
+  .match-info-pick-cell[data-side="B"]::before {
   background: rgba(255, 107, 107, 0.1);
 }
 
-.match-info-row[data-preview-winner="B"] .match-info-pick-cell[data-side="B"]::before,
-.match-info-pick-cell[data-side="B"]:not(.is-winner):not(.is-loser):hover::before {
+.match-info-row[data-preview-winner="B"]
+  .match-info-pick-cell[data-side="B"]::before,
+.match-info-pick-cell[data-side="B"]:not(.is-winner):not(
+    .is-loser
+  ):hover::before {
   background: rgba(74, 222, 128, 0.12);
 }
 
-.match-info-row[data-preview-winner="B"] .match-info-pick-cell[data-side="A"]::before {
+.match-info-row[data-preview-winner="B"]
+  .match-info-pick-cell[data-side="A"]::before {
   background: rgba(255, 107, 107, 0.1);
 }
 
@@ -4737,18 +4872,18 @@ textarea:focus {
     gap: 6px;
   }
 
-.status-chip-inline {
-  display: none;
-}
+  .status-chip-inline {
+    display: none;
+  }
 
-.tournament-card .time-block-cover {
-  display: none;
-}
+  .tournament-card .time-block-cover {
+    display: none;
+  }
 
-.tournament-card .card-cover .time-block,
-.tournament-card .card-cover .time-block-cover {
-  display: none;
-}
+  .tournament-card .card-cover .time-block,
+  .tournament-card .card-cover .time-block-cover {
+    display: none;
+  }
 
   .tournament-card .time-block-cover {
     position: absolute;
@@ -4757,7 +4892,11 @@ textarea:focus {
     bottom: 0;
     z-index: 2;
     padding: 3px 4px 4px;
-    background: linear-gradient(180deg, transparent 0%, rgba(9, 13, 22, 0.9) 55%);
+    background: linear-gradient(
+      180deg,
+      transparent 0%,
+      rgba(9, 13, 22, 0.9) 55%
+    );
     border-radius: 0 0 10px 10px;
   }
 
@@ -4775,11 +4914,11 @@ textarea:focus {
     min-width: 0;
   }
 
-.tournament-card .status-chip.status-chip-overlay,
-.circuit-card .status-chip.status-chip-overlay {
-  top: 8px;
-  right: 8px;
-}
+  .tournament-card .status-chip.status-chip-overlay,
+  .circuit-card .status-chip.status-chip-overlay {
+    top: 8px;
+    right: 8px;
+  }
 
   .tournament-card .time-label,
   .tournament-card .progress-label {
@@ -5042,6 +5181,12 @@ label {
 
 .settings-panel.active {
   display: flex;
+}
+
+.settings-panel select {
+  width: auto;
+  max-width: 260px;
+  align-self: flex-start;
 }
 
 .format-stage {
@@ -5428,6 +5573,20 @@ label {
   font-size: 20px;
   line-height: 1;
   cursor: default;
+  font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji",
+    "Twemoji Mozilla", "Segoe UI Symbol", sans-serif !important;
+  font-variant-emoji: emoji;
+  align-items: center;
+  justify-content: center;
+}
+
+.match-info-flag img,
+.player-detail-flag img {
+  width: 1em;
+  height: 1em;
+  display: block;
+  border: none;
+  box-shadow: none;
 }
 
 .player-detail-tags {
@@ -5683,7 +5842,8 @@ label {
 }
 
 .checkbox-wrapper-59--blue .slider {
-  box-shadow: 0 0 0 2px rgba(255, 128, 128, 0.6), 0 0 4px rgba(255, 128, 128, 0.5);
+  box-shadow: 0 0 0 2px rgba(255, 128, 128, 0.6),
+    0 0 4px rgba(255, 128, 128, 0.5);
 }
 
 .checkbox-wrapper-59--blue .slider:before {

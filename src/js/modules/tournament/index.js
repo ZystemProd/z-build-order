@@ -2,8 +2,10 @@ import {
   auth,
   app,
   db,
+  ensureSettingsUiReady,
   getCurrentUsername,
   getCurrentUserAvatarUrl,
+  getCurrentUserProfile,
   getPulseState,
   initializeAuthUI,
 } from "../../../app.js";
@@ -274,7 +276,10 @@ const {
   initAdminInviteModal,
 } = adminManager;
 function renderMarkdown(text = "") {
-  return DOMPurify.sanitize(text || "").replace(/\n/g, "<br>");
+  const raw = text || "";
+  const hasHtml = /<\/?[a-z][\s\S]*>/i.test(raw);
+  const sanitized = DOMPurify.sanitize(raw);
+  return hasHtml ? sanitized : sanitized.replace(/\n/g, "<br>");
 }
 async function loadMapCatalog() {
   if (mapCatalogLoaded) return mapCatalog;
@@ -366,6 +371,77 @@ const updateSettingsRulesPreview = () =>
 function applyFormattingInline(action, textareaId) {
   const textarea = document.getElementById(textareaId);
   if (!textarea) return;
+  const surface = document.querySelector(
+    `.markdown-surface[data-editor-for="${textareaId}"]`
+  );
+  if (surface?.isContentEditable) {
+    surface.focus();
+    const selection = window.getSelection();
+    const selectedText = selection?.toString() || "";
+    const exec = (command, value = null) => {
+      try {
+        document.execCommand(command, false, value);
+      } catch (_) {
+        // ignore unsupported commands
+      }
+    };
+    const styles = (surface.dataset.activeStyles || "")
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+    const toggleStyle = (styleKey) => {
+      const idx = styles.indexOf(styleKey);
+      if (idx >= 0) {
+        styles.splice(idx, 1);
+      } else {
+        styles.push(styleKey);
+      }
+      surface.dataset.activeStyles = styles.join(",");
+      surface.classList.toggle("is-bold", styles.includes("bold"));
+      surface.classList.toggle("is-italic", styles.includes("italic"));
+    };
+    const hasSelection =
+      selection &&
+      !selection.isCollapsed &&
+      surface.contains(selection.anchorNode) &&
+      surface.contains(selection.focusNode);
+    const isEmpty = !surface.textContent?.trim();
+    const toggleActions = ["bold", "italic", "bullet", "numbered"];
+
+    if (action === "bold" || action === "italic") {
+      if (hasSelection) {
+        exec(action === "bold" ? "bold" : "italic");
+      } else {
+        toggleStyle(action === "bold" ? "bold" : "italic");
+      }
+    } else if (action === "bullet") {
+      exec("insertUnorderedList");
+    } else if (action === "numbered") {
+      exec("insertOrderedList");
+    } else if (action === "link") {
+      const url = window.prompt("Link URL", "https://");
+      if (url) {
+        if (selectedText) {
+          exec("createLink", url);
+        } else {
+          exec("insertHTML", `<a href="${url}">${url}</a>`);
+        }
+      }
+    }
+
+    if (isEmpty && toggleActions.includes(action)) {
+      surface.dataset.pendingActions = styles.join(",");
+    } else {
+      delete surface.dataset.pendingActions;
+    }
+    textarea.value = surface.innerHTML;
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    if (typeof window !== "undefined") {
+      window.__updateMarkdownToolbarState?.();
+    }
+    return;
+  }
+
   const start = textarea.selectionStart;
   const end = textarea.selectionEnd;
   const value = textarea.value;
@@ -2340,6 +2416,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     await loadMapCatalog();
     setMapPoolSelection(getDefaultMapPoolNames());
     resetFinalMapPoolSelection();
+    ensureSettingsUiReady();
     initializeAuthUI();
     hydratePulseFromState(getPulseState());
     await handleRouteChange();
@@ -3039,7 +3116,11 @@ async function handleRegistration(event) {
   const mainClanSelect = document.getElementById("mainClanSelect");
   const selectedClanOption = mainClanSelect?.selectedOptions?.[0];
   const selectedClanId = mainClanSelect?.value || "";
-  const countryCode = document.getElementById("settingsCountrySelect")?.value?.trim().toUpperCase() || "";
+  const profileCountry = getCurrentUserProfile?.()?.country || "";
+  const countryCode =
+    document.getElementById("settingsCountrySelect")?.value?.trim().toUpperCase() ||
+    String(profileCountry).trim().toUpperCase() ||
+    "";
   let clanName = selectedClanOption?.textContent || "";
   let clanAbbreviation = selectedClanOption?.dataset?.abbr || "";
   let clanLogoUrl = selectedClanOption?.dataset?.logoUrl || "";

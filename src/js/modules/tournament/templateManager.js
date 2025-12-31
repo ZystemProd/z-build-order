@@ -3,6 +3,7 @@ import { defaultBestOf, defaultRoundRobinSettings } from "./state.js";
 import { readBestOf } from "./tournamentPayloads.js";
 import { extractRoundRobinSettings, syncFormatFieldVisibility } from "./settings/ui.js";
 import { slugify } from "./slugs.js";
+import { syncMarkdownSurfaceForInput } from "./markdownEditor.js";
 
 const TOURNAMENT_TEMPLATE_STORAGE_KEY = "zbo:tournamentTemplates:v1";
 let tournamentTemplates = loadTournamentTemplates();
@@ -156,6 +157,10 @@ function applyTournamentTemplate(template, setMapPoolSelection) {
   }
   if (descriptionInput) descriptionInput.value = settings.description || "";
   if (rulesInput) rulesInput.value = settings.rules || "";
+  syncMarkdownSurfaceForInput(descriptionInput);
+  syncMarkdownSurfaceForInput(rulesInput);
+  syncMarkdownSurfaceForInput(descriptionInput);
+  syncMarkdownSurfaceForInput(rulesInput);
 
   const roundRobin = settings.roundRobin || defaultRoundRobinSettings;
   if (rrGroupsInput) rrGroupsInput.value = roundRobin.groups ?? "";
