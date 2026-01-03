@@ -29,6 +29,7 @@ import { getCasterEntryByUid } from "../caster.js";
 import { getMatchLookup, resolveParticipants } from "../bracket/lookup.js";
 import { escapeHtml, getBestOfForMatch } from "../bracket/renderUtils.js";
 import { renderBracketView } from "../bracket/render.js";
+import { setupMatchChatUi, teardownMatchChatUi } from "../chat/matchChat.js";
 
 const PRESENCE_COLLECTION = "tournamentPresence";
 const PRESENCE_TTL_MS = 45_000;
@@ -375,6 +376,7 @@ export function openVetoModal(matchId, { getPlayersMap, getDefaultMapPoolNames, 
   const resetBtn = document.getElementById("resetVetoBtn");
   const doneBtn = document.getElementById("saveVetoBtn");
   if (modal) modal.dataset.matchId = matchId || "";
+  if (modal) modal.dataset.forceOpen = "true";
   const lookup = getMatchLookup(state.bracket || {});
   const match = lookup.get(matchId);
   const bestOfRaw = getBestOfForMatch(match || { bracket: "winners", round: 1 });
@@ -413,6 +415,12 @@ export function openVetoModal(matchId, { getPlayersMap, getDefaultMapPoolNames, 
   const higher = ordered[1] || ordered[0] || null;
 
   const saved = state.matchVetoes?.[matchId];
+  console.debug("[veto] openVetoModal", {
+    matchId,
+    hasSaved: Boolean(saved),
+    savedPicks: saved?.maps?.length || 0,
+    savedVetoes: saved?.vetoed?.length || 0,
+  });
   if (saved) {
     const usedNames = new Set([
       ...(saved.maps || []).map((m) => m.map),
@@ -536,6 +544,13 @@ export function openMatchInfoModal(
     (isAdmin || isParticipant) && match?.status !== "complete";
 
   modal.dataset.canEditResults = canEditResults ? "true" : "false";
+  setupMatchChatUi({
+    matchId,
+    leftPlayer: pA,
+    rightPlayer: pB,
+    isParticipant,
+    uid,
+  });
 
   if (title) {
     const bracketLabel =
@@ -693,10 +708,17 @@ export function openMatchInfoModal(
     const record = ensureMatchVetoRecord(matchId, bestOf);
     const participantIds = [pA?.id || null, pB?.id || null];
     const recordIds = Array.isArray(record.playerIds) ? record.playerIds : [];
-    if (recordIds[0] !== participantIds[0] || recordIds[1] !== participantIds[1]) {
+    const hasRecordedIds = recordIds.length === 2 && recordIds.some((id) => id);
+    const idsChanged =
+      hasRecordedIds &&
+      (recordIds[0] !== participantIds[0] || recordIds[1] !== participantIds[1]);
+    if (idsChanged) {
       record.maps = [];
       record.vetoed = [];
       record.mapResults = [];
+      record.playerIds = participantIds;
+      vetoDeps?.saveState?.({ matchVetoes: state.matchVetoes });
+    } else if (!hasRecordedIds) {
       record.playerIds = participantIds;
       vetoDeps?.saveState?.({ matchVetoes: state.matchVetoes });
     }
@@ -1028,14 +1050,14 @@ function renderMatchInfoRows(rowsEl, { bestOf, pickedMaps, winners }) {
 
     if (winner === "A") {
       leftTd.classList.add("is-winner");
-      leftTd.textContent = "W";
+      leftTd.textContent = "Win";
       rightTd.classList.add("is-loser");
-      rightTd.textContent = "L";
+      rightTd.textContent = "Loss";
     } else if (winner === "B") {
       leftTd.classList.add("is-loser");
-      leftTd.textContent = "L";
+      leftTd.textContent = "Loss";
       rightTd.classList.add("is-winner");
-      rightTd.textContent = "W";
+      rightTd.textContent = "Win";
     } else {
       leftTd.textContent = "";
       rightTd.textContent = "";
@@ -1058,6 +1080,7 @@ export function hideMatchInfoModal() {
     modal.style.display = "none";
     delete modal.dataset.matchId;
   }
+  teardownMatchChatUi();
   stopPresenceTracking();
   if (presenceUiTimer) clearInterval(presenceUiTimer);
   presenceUiTimer = null;
@@ -1380,16 +1403,36 @@ export function handleVetoPoolClick(e) {
     }
   }
 
+  autoPickLastMapIfNeeded();
   persistLiveVetoState();
   renderVetoPoolGrid();
   renderVetoStatus();
 }
 
+function autoPickLastMapIfNeeded() {
+  if (!vetoState || vetoState.stage !== "pick") return;
+  const bestOf = Math.max(1, Number(vetoState.bestOf) || 1);
+  const picksNeeded = bestOf - vetoState.picks.length;
+  if (vetoState.remaining.length !== 1 || picksNeeded !== 1) return;
+  const [picked] = vetoState.remaining.splice(0, 1);
+  if (!picked) return;
+  const picker =
+    vetoState.turn === "low"
+      ? vetoState.lowerName || "Player A"
+      : vetoState.higherName || "Player B";
+  vetoState.picks.push({ map: picked.name, picker, action: "pick" });
+  vetoState.stage = "done";
+}
+
 export function hideVetoModal() {
   const modal = document.getElementById("vetoModal");
   const poolEl = document.getElementById("vetoMapPool");
+  if (currentVetoMatchId && vetoState) {
+    persistLiveVetoState();
+  }
   if (modal) modal.style.display = "none";
   if (modal) delete modal.dataset.matchId;
+  if (modal) delete modal.dataset.forceOpen;
   if (poolEl) poolEl.onclick = null;
   // keep global presence subscription alive for match info; veto modal itself doesn't affect presence
   setCurrentVetoMatchIdState(null);
@@ -1460,6 +1503,12 @@ function persistLiveVetoState() {
     },
     mapResults: existing.mapResults || [],
   };
+  console.debug("[veto] persistLiveVetoState", {
+    matchId: currentVetoMatchId,
+    picks: vetoState.picks?.length || 0,
+    vetoed: vetoState.vetoed?.length || 0,
+    stage: vetoState.stage,
+  });
   vetoDeps?.saveState?.({ matchVetoes: state.matchVetoes });
 }
 
@@ -1483,12 +1532,19 @@ export function saveVetoSelection() {
     },
     mapResults: existingMapResults,
   };
+  console.debug("[veto] saveVetoSelection", {
+    matchId,
+    picks: trimmed.length,
+    vetoed: (vetoState.vetoed || []).length,
+    bestOf: vetoState.bestOf,
+  });
   const lookup = getMatchLookup(state.bracket || {});
   const match = lookup.get(currentVetoMatchId);
   if (match) match.bestOf = vetoState.bestOf || match.bestOf || defaultBestOf.upper;
   vetoDeps?.saveState?.({ matchVetoes: state.matchVetoes, bracket: state.bracket });
   renderVetoStatus();
   renderVetoPoolGrid();
+  showToast?.("Map veto saved.", "success");
   hideVetoModal();
   openMatchInfoModal(matchId, vetoDeps);
 }
@@ -1602,9 +1658,9 @@ export function refreshVetoModalIfOpen() {
   if (!vetoDeps) return;
   const modal = document.getElementById("vetoModal");
   if (!modal) return;
-  const visible = modal.style.display && modal.style.display !== "none";
-  if (!visible) return;
   const matchId = modal.dataset.matchId;
   if (!matchId) return;
+  const visible = modal.style.display && modal.style.display !== "none";
+  if (!visible && modal.dataset.forceOpen !== "true") return;
   openVetoModal(matchId, vetoDeps);
 }

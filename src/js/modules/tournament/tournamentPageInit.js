@@ -68,6 +68,9 @@ export function initTournamentPage({
   updatePlayerPoints,
   setPlayerCheckIn,
   removePlayer,
+  setManualSeedingEnabled,
+  getManualSeedingActive,
+  handleManualSeedingReorder,
   updateMatchScore,
   renderAll,
   saveState,
@@ -94,6 +97,7 @@ export function initTournamentPage({
   const jumpToBracket = document.getElementById("jumpToBracket");
   const bracketGrid = document.getElementById("bracketGrid");
   const playersTable = document.getElementById("playersTableBody");
+  const manualSeedingToggle = document.getElementById("manualSeedingToggle");
   const autoFillBtn = document.getElementById("autoFillBtn");
   const checkInBtn = document.getElementById("checkInBtn");
   const signInBtn = document.getElementById("signInBtn");
@@ -634,26 +638,6 @@ export function initTournamentPage({
     window.__switchSettingsTab = switchSettingsTab;
   }
 
-  descriptionInput?.addEventListener("input", () => {
-    const preview = document.getElementById("tournamentDescriptionPreview");
-    if (!preview) return;
-    preview.innerHTML = renderMarkdown(descriptionInput.value || "");
-  });
-  rulesInput?.addEventListener("input", () => {
-    const preview = document.getElementById("tournamentRulesPreview");
-    if (!preview) return;
-    preview.innerHTML = renderMarkdown(rulesInput.value || "");
-  });
-  finalDescriptionInput?.addEventListener("input", () => {
-    const preview = document.getElementById("finalTournamentDescriptionPreview");
-    if (!preview) return;
-    preview.innerHTML = renderMarkdown(finalDescriptionInput.value || "");
-  });
-  finalRulesInput?.addEventListener("input", () => {
-    const preview = document.getElementById("finalTournamentRulesPreview");
-    if (!preview) return;
-    preview.innerHTML = renderMarkdown(finalRulesInput.value || "");
-  });
   bindImagePreview(createImageInput, createImagePreview);
   bindImagePreview(finalImageInput, finalImagePreview);
   bindImagePreview(settingsImageInput, settingsImagePreview);
@@ -822,13 +806,104 @@ export function initTournamentPage({
   });
 
   bracketGrid?.addEventListener("change", (e) => {
-    if (e.target.matches(".score-select")) {
-      const matchId = e.target.dataset.matchId;
+    if (e.target.matches(".result-select, .score-select")) {
+      const card = e.target.closest(".match-card");
+      const matchId = e.target.dataset.matchId || card?.dataset?.matchId;
       if (!matchId) return;
-      const selects = document.querySelectorAll(`.score-select[data-match-id="${matchId}"]`);
+      const selects = card
+        ? card.querySelectorAll('select.result-select, select.score-select')
+        : document.querySelectorAll(`select.result-select[data-match-id="${matchId}"], select.score-select[data-match-id="${matchId}"]`);
       const vals = Array.from(selects).map((s) => s.value || "0");
       updateMatchScore?.(matchId, vals[0], vals[1]);
     }
+  });
+
+  manualSeedingToggle?.addEventListener("change", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) return;
+    setManualSeedingEnabled?.(target.checked);
+  });
+
+  let draggedRow = null;
+  let dropTarget = null;
+  const clearDropTargets = () => {
+    if (dropTarget) {
+      dropTarget.classList.remove("drop-before", "drop-after");
+      dropTarget = null;
+    }
+  };
+
+  playersTable?.addEventListener("dragstart", (event) => {
+    if (!getManualSeedingActive?.()) return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const row = target.closest("tr");
+    const handle = target.closest(".seeding-drag-handle");
+    if (!row || !handle) {
+      event.preventDefault();
+      return;
+    }
+    draggedRow = row;
+    row.classList.add("is-dragging");
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", row.dataset.playerId || "");
+    }
+  });
+
+  playersTable?.addEventListener("dragover", (event) => {
+    if (!getManualSeedingActive?.() || !draggedRow) return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const row = target.closest("tr");
+    if (!row || row === draggedRow) return;
+    event.preventDefault();
+    const rect = row.getBoundingClientRect();
+    const dropAfter = event.clientY > rect.top + rect.height / 2;
+    if (dropTarget && dropTarget !== row) {
+      dropTarget.classList.remove("drop-before", "drop-after");
+    }
+    row.classList.toggle("drop-before", !dropAfter);
+    row.classList.toggle("drop-after", dropAfter);
+    dropTarget = row;
+  });
+
+  playersTable?.addEventListener("dragleave", (event) => {
+    if (!getManualSeedingActive?.() || !draggedRow) return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const row = target.closest("tr");
+    if (!row || row !== dropTarget) return;
+    clearDropTargets();
+  });
+
+  playersTable?.addEventListener("drop", (event) => {
+    if (!getManualSeedingActive?.() || !draggedRow) return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const row = target.closest("tr");
+    if (!row || row === draggedRow) return;
+    event.preventDefault();
+    const rect = row.getBoundingClientRect();
+    const dropAfter = event.clientY > rect.top + rect.height / 2;
+    if (dropAfter) {
+      row.after(draggedRow);
+    } else {
+      row.before(draggedRow);
+    }
+    const nextOrder = Array.from(playersTable.querySelectorAll("tr"))
+      .map((item) => item.dataset.playerId || "")
+      .filter(Boolean);
+    handleManualSeedingReorder?.(nextOrder);
+    clearDropTargets();
+  });
+
+  playersTable?.addEventListener("dragend", () => {
+    if (draggedRow) {
+      draggedRow.classList.remove("is-dragging");
+    }
+    draggedRow = null;
+    clearDropTargets();
   });
 
   document.querySelectorAll(".tab-btn").forEach((btn) => {
@@ -911,6 +986,7 @@ export function initTournamentPage({
   }
   const statusSelect = document.getElementById("tournamentStatusSelect");
   const roleSelect = document.getElementById("tournamentRoleSelect");
+  const ownerBtn = document.getElementById("tournamentMyFilterBtn");
   document.querySelectorAll("#tournamentTypeTabs .list-tab").forEach((btn) => {
     btn.addEventListener("click", () => {
       document
@@ -922,6 +998,12 @@ export function initTournamentPage({
   });
   statusSelect?.addEventListener("change", () => renderTournamentList());
   roleSelect?.addEventListener("change", () => renderTournamentList());
+  ownerBtn?.addEventListener("click", () => {
+    const next = !ownerBtn.classList.contains("active");
+    ownerBtn.classList.toggle("active", next);
+    ownerBtn.setAttribute("aria-pressed", next ? "true" : "false");
+    renderTournamentList();
+  });
   renderTournamentList();
 
   attachPlayerDetailHandlers({ getPlayersMap });

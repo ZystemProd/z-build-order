@@ -95,6 +95,7 @@ function readTournamentTemplateForm(mapPoolSelection) {
   const formatSelect = document.getElementById("tournamentFormatSelect");
   const maxPlayersInput = document.getElementById("tournamentMaxPlayersInput");
   const checkInSelect = document.getElementById("checkInSelect");
+  const accessSelect = document.getElementById("tournamentAccessSelect");
   const descriptionInput = document.getElementById("tournamentDescriptionInput");
   const rulesInput = document.getElementById("tournamentRulesInput");
   const name = (nameInput?.value || "").trim();
@@ -108,6 +109,7 @@ function readTournamentTemplateForm(mapPoolSelection) {
     ? Number(maxPlayersInput.value)
     : null;
   const checkInWindowMinutes = getCheckInWindowMinutes(checkInSelect);
+  const isInviteOnly = accessSelect?.value === "closed";
   const description = descriptionInput?.value || "";
   const rules = rulesInput?.value || "";
   const rrSettings = extractRoundRobinSettings(
@@ -123,6 +125,7 @@ function readTournamentTemplateForm(mapPoolSelection) {
       format,
       maxPlayers,
       checkInWindowMinutes,
+      isInviteOnly,
       description,
       rules,
       roundRobin: rrSettings,
@@ -138,6 +141,7 @@ function applyTournamentTemplate(template, setMapPoolSelection) {
   const formatSelect = document.getElementById("tournamentFormatSelect");
   const maxPlayersInput = document.getElementById("tournamentMaxPlayersInput");
   const checkInSelect = document.getElementById("checkInSelect");
+  const accessSelect = document.getElementById("tournamentAccessSelect");
   const descriptionInput = document.getElementById("tournamentDescriptionInput");
   const rulesInput = document.getElementById("tournamentRulesInput");
   const rrGroupsInput = document.getElementById("roundRobinGroupsInput");
@@ -154,6 +158,9 @@ function applyTournamentTemplate(template, setMapPoolSelection) {
   }
   if (checkInSelect) {
     checkInSelect.value = String(settings.checkInWindowMinutes || 0);
+  }
+  if (accessSelect) {
+    accessSelect.value = settings.isInviteOnly ? "closed" : "open";
   }
   if (descriptionInput) descriptionInput.value = settings.description || "";
   if (rulesInput) rulesInput.value = settings.rules || "";

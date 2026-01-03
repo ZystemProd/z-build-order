@@ -171,7 +171,7 @@ export function renderPlayerRow(player, score, label, bestOf, match, participant
     const placeholderText = displayPlaceholderForSource(match, participantIdx, lookup);
     return `<div class="player-row">
       <div class="player-name placeholder-tag">${escapeHtml(placeholderText)}</div>
-      <select class="result-select" disabled>
+      <select class="result-select score-select" data-match-id="${match.id}" data-player-idx="${participantIdx}" disabled>
         <option value="0">0</option>
       </select>
     </div>`;
@@ -186,7 +186,7 @@ export function renderPlayerRow(player, score, label, bestOf, match, participant
   } MMR</div>
       </div>
     </div>
-    <select class="result-select" name="score-${label}" data-player="${label}">
+    <select class="result-select score-select" name="score-${label}" data-player="${label}" data-match-id="${match.id}" data-player-idx="${participantIdx}">
       ${renderScoreOptions(score, bestOf)}
     </select>
   </div>`;
@@ -210,8 +210,8 @@ export function renderScoreOptions(current, bestOf = 3) {
 export function clampScoreSelectOptions() {
   if (!state?.bracket) return;
   const lookup = getMatchLookup(state.bracket);
-  document.querySelectorAll("select.score-select").forEach((sel) => {
-    const matchId = sel.dataset.matchId;
+  document.querySelectorAll("select.result-select, select.score-select").forEach((sel) => {
+    const matchId = sel.dataset.matchId || sel.closest(".match-card")?.dataset?.matchId;
     const match = lookup.get(matchId);
     const bestOf = getBestOfForMatch(match || { bracket: "winners", round: 1 });
     const maxWins = Math.max(1, Math.ceil((bestOf || 1) / 2));

@@ -81,6 +81,7 @@ export async function loadTournamentRegistry(force = false) {
         createdBy: data.createdBy || null,
         createdByName: data.createdByName || data.hostName || null,
         circuitSlug: data.circuitSlug || null,
+        isInviteOnly: Boolean(data.isInviteOnly),
         bestOf: data.bestOf || defaultState.bestOf || null,
       };
     });
@@ -157,11 +158,15 @@ export function loadState(currentSlug, applySeedingFn, deserializeBracketFn) {
     const raw = localStorage.getItem(getStorageKey(currentSlug));
     if (!raw) return { ...defaultState };
     const parsed = JSON.parse(raw);
+    const bracket = deserializeBracketFn
+      ? deserializeBracketFn(parsed.bracket)
+      : parsed.bracket;
     return {
       ...defaultState,
       ...parsed,
-      players: applySeedingFn(parsed.players || []),
+      players: applySeedingFn(parsed.players || [], parsed),
       activity: parsed.activity || [],
+      bracket,
     };
   } catch (_) {
     return { ...defaultState };
@@ -194,7 +199,7 @@ export async function hydrateStateFromRemote(
   const merged = {
     ...defaultState,
     ...remote,
-    players: applySeedingFn(remote.players || []),
+    players: applySeedingFn(remote.players || [], remote),
     activity: remote.activity || [],
     bracket: deserializeBracketFn(remote.bracket),
   };

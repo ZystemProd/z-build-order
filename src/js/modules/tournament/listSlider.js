@@ -1,6 +1,8 @@
+import { updateTournamentListPagination } from "./listSliderPagination.js";
+
 const SLIDER_GAP_PX = 12;
 const SLIDER_MIN_CARD_WIDTH = 240;
-const SLIDER_DISABLE_MAX = 640;
+const SLIDER_DISABLE_MAX = 670;
 const MOBILE_PAGE_SIZE = 6;
 
 const state = {
@@ -90,6 +92,12 @@ function renderPage() {
   }
   if (prevBtn) prevBtn.disabled = sliderDisabled || state.page <= 0;
   if (nextBtn) nextBtn.disabled = sliderDisabled || state.page >= maxPage;
+  updateTournamentListPagination(listEl, {
+    page: state.page,
+    pageSize: state.pageSize,
+    total,
+    isMobile: state.isMobile,
+  });
 }
 
 export function setTournamentListItems(
