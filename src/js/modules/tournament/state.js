@@ -63,12 +63,12 @@ export const defaultBestOf = {
   upper: 3,
   quarter: 3,
   semi: 3,
-  upperFinal: 5,
+  upperFinal: 3,
   final: 5,
   // lower bracket
   lower: 1,
-  lowerSemi: 3,
-  lowerFinal: 5,
+  lowerSemi: 1,
+  lowerFinal: 3,
 };
 export const defaultRoundRobinSettings = {
   groups: 4,

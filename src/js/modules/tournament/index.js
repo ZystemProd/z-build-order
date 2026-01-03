@@ -1625,6 +1625,24 @@ async function populateCreateForm() {
     templateNameInput.value = "";
     delete templateNameInput.dataset.templateId;
   }
+  const bestOfUpperInput = document.getElementById("bestOfUpperInput");
+  const bestOfLowerInput = document.getElementById("bestOfLowerInput");
+  const bestOfLowerSemiInput = document.getElementById("bestOfLowerSemiInput");
+  const bestOfLowerFinalInput = document.getElementById("bestOfLowerFinalInput");
+  const bestOfQuarterInput = document.getElementById("bestOfQuarterInput");
+  const bestOfSemiInput = document.getElementById("bestOfSemiInput");
+  const bestOfUpperFinalInput = document.getElementById("bestOfUpperFinalInput");
+  const bestOfFinalInput = document.getElementById("bestOfFinalInput");
+  if (bestOfUpperInput) bestOfUpperInput.value = String(defaultBestOf.upper);
+  if (bestOfLowerInput) bestOfLowerInput.value = String(defaultBestOf.lower);
+  if (bestOfLowerSemiInput) bestOfLowerSemiInput.value = String(defaultBestOf.lowerSemi);
+  if (bestOfLowerFinalInput) bestOfLowerFinalInput.value = String(defaultBestOf.lowerFinal);
+  if (bestOfQuarterInput) bestOfQuarterInput.value = String(defaultBestOf.quarter);
+  if (bestOfSemiInput) bestOfSemiInput.value = String(defaultBestOf.semi);
+  if (bestOfUpperFinalInput) {
+    bestOfUpperFinalInput.value = String(defaultBestOf.upperFinal);
+  }
+  if (bestOfFinalInput) bestOfFinalInput.value = String(defaultBestOf.final);
   setCreateTournamentCircuitContext("");
 }
 
