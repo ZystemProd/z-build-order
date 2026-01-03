@@ -1,5 +1,5 @@
 // functions/index.js
-const { onDocumentWritten } = require("firebase-functions/v2/firestore");
+const { onDocumentWritten, onDocumentDeleted } = require("firebase-functions/v2/firestore");
 const { onRequest } = require("firebase-functions/v2/https");
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
@@ -256,7 +256,7 @@ function normalizePulseUrl(rawUrl) {
   try {
     const url = new URL(withProtocol);
     if (url.protocol !== "https:") return "";
-    if (!PULSE_ALLOWED_HOSTS.has(url.hostname)) return "";
+  if (!PULSE_ALLOWED_HOSTS.has(url.hostname)) return "";
 
     // Keep only whitelisted params
     const allowedParams = new Set(["type", "id", "characterId", "accountId", "m"]);
@@ -314,6 +314,75 @@ function parsePulseUrlDetails(raw) {
   } catch (_) {
     return { cleanUrl: raw || "", id: null, region: "" };
   }
+}
+
+function toArray(value) {
+  if (Array.isArray(value)) return value;
+  if (value && typeof value === "object") {
+    return Object.keys(value)
+      .sort((a, b) => Number(a) - Number(b))
+      .map((key) => value[key]);
+  }
+  return [];
+}
+
+function normalizeRounds(rounds) {
+  return toArray(rounds).map((round) => toArray(round));
+}
+
+function collectMatchesFromBracket(bracket) {
+  if (!bracket || typeof bracket !== "object") return [];
+  const winners = normalizeRounds(bracket.winners);
+  const losers = normalizeRounds(bracket.losers);
+  const groups = toArray(bracket.groups);
+  const matches = [];
+  winners.forEach((round) => matches.push(...round));
+  losers.forEach((round) => matches.push(...round));
+  groups.forEach((group) => {
+    matches.push(...toArray(group?.matches));
+  });
+  if (bracket.finals) matches.push(bracket.finals);
+  return matches.filter(Boolean);
+}
+
+function isMatchComplete(match) {
+  if (!match || typeof match !== "object") return false;
+  if (match.status === "complete") return true;
+  return Boolean(match.winnerId || match.walkover);
+}
+
+function isTournamentComplete(bracket) {
+  if (!bracket || typeof bracket !== "object") return false;
+
+  if (bracket.finals && isMatchComplete(bracket.finals)) {
+    return true;
+  }
+
+  const winners = normalizeRounds(bracket.winners);
+  if (winners.length) {
+    const lastRound = winners[winners.length - 1] || [];
+    const finalMatch = lastRound[0];
+    if (finalMatch && isMatchComplete(finalMatch)) {
+      return true;
+    }
+  }
+
+  const losers = normalizeRounds(bracket.losers);
+  const groups = toArray(bracket.groups);
+  const hasPlayoffs =
+    winners.flat().length || losers.flat().length || bracket.finals;
+  if (groups.length && !hasPlayoffs) {
+    const groupMatches = groups.flatMap((group) =>
+      toArray(group?.matches)
+    );
+    if (groupMatches.length && groupMatches.every(isMatchComplete)) {
+      return true;
+    }
+  }
+
+  const allMatches = collectMatchesFromBracket(bracket);
+  if (!allMatches.length) return false;
+  return allMatches.every(isMatchComplete);
 }
 
 const MMR_MIN = 500;
@@ -1644,6 +1713,91 @@ exports.fetchPulseMmr = onRequest({ region: "us-central1" }, async (req, res) =>
     return res.status(500).json({ error: "Internal server error." });
   }
 });
+
+exports.cleanupTournamentChatOnComplete = onDocumentWritten(
+  {
+    document: "tournamentStates/{slug}",
+    region: "us-central1",
+  },
+  async (event) => {
+    const slug = event.params.slug;
+    const afterSnap = event.data.after;
+    if (!afterSnap || !afterSnap.exists) return null;
+    const data = afterSnap.data() || {};
+    const bracket = data.bracket;
+    if (!bracket) return null;
+    const completed = isTournamentComplete(bracket);
+    if (!completed) return null;
+
+    if (!data.completedAt) {
+      try {
+        await afterSnap.ref.set(
+          { completedAt: admin.firestore.FieldValue.serverTimestamp() },
+          { merge: true }
+        );
+      } catch (err) {
+        console.error("Failed to set completedAt", err);
+      }
+    }
+
+    try {
+      const matchesRef = firestore
+        .collection("tournamentChats")
+        .doc(slug)
+        .collection("matches");
+      await firestore.recursiveDelete(matchesRef);
+    } catch (err) {
+      console.error("Failed to delete tournament chat", err);
+    }
+
+    return null;
+  }
+);
+
+async function deleteTournamentChatTree(slug) {
+  if (!slug) return;
+  try {
+    const chatDoc = firestore.collection("tournamentChats").doc(slug);
+    await firestore.recursiveDelete(chatDoc);
+  } catch (err) {
+    console.error("Failed to delete tournament chat tree", err);
+  }
+}
+
+async function deleteTournamentPresenceTree(slug) {
+  if (!slug) return;
+  try {
+    const presenceDoc = firestore.collection("tournamentPresence").doc(slug);
+    await firestore.recursiveDelete(presenceDoc);
+  } catch (err) {
+    console.error("Failed to delete tournament presence tree", err);
+  }
+}
+
+async function deleteTournamentStateDoc(slug) {
+  if (!slug) return;
+  try {
+    await firestore.collection("tournamentStates").doc(slug).delete();
+  } catch (err) {
+    console.error("Failed to delete tournament state doc", err);
+  }
+}
+
+exports.cleanupTournamentOnDelete = onDocumentDeleted(
+  {
+    document: "tournaments/{slug}",
+    region: "us-central1",
+  },
+  async (event) => {
+    const slug = event.params.slug;
+    await Promise.all([
+      deleteTournamentChatTree(slug),
+      deleteTournamentPresenceTree(slug),
+      deleteTournamentStateDoc(slug),
+    ]);
+    return null;
+  }
+);
 
 exports.renderNewBuild = onDocumentWritten(
   {

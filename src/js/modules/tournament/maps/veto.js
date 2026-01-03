@@ -29,6 +29,7 @@ import { getCasterEntryByUid } from "../caster.js";
 import { getMatchLookup, resolveParticipants } from "../bracket/lookup.js";
 import { escapeHtml, getBestOfForMatch } from "../bracket/renderUtils.js";
 import { renderBracketView } from "../bracket/render.js";
+import { setupMatchChatUi, teardownMatchChatUi } from "../chat/matchChat.js";
 
 const PRESENCE_COLLECTION = "tournamentPresence";
 const PRESENCE_TTL_MS = 45_000;
@@ -41,12 +42,316 @@ let presenceContext = { matchId: null, leftPlayerId: null, rightPlayerId: null }
 let presenceSlug = null;
 let presenceWriteDenied = false;
 const countryFlagCache = new Map();
+const countryUidCache = new Map();
 const COUNTRY_NAME_BY_CODE = new Map(
   (Array.isArray(countries) ? countries : []).map((entry) => [
     String(entry?.code || "").toUpperCase(),
     String(entry?.name || ""),
   ])
 );
+const ISO3_TO_ISO2 = {
+  "ABW": "AW",
+  "AFG": "AF",
+  "AGO": "AO",
+  "AIA": "AI",
+  "ALA": "AX",
+  "ALB": "AL",
+  "AND": "AD",
+  "ARE": "AE",
+  "ARG": "AR",
+  "ARM": "AM",
+  "ASM": "AS",
+  "ATA": "AQ",
+  "ATF": "TF",
+  "ATG": "AG",
+  "AUS": "AU",
+  "AUT": "AT",
+  "AZE": "AZ",
+  "BDI": "BI",
+  "BEL": "BE",
+  "BEN": "BJ",
+  "BES": "BQ",
+  "BFA": "BF",
+  "BGD": "BD",
+  "BGR": "BG",
+  "BHR": "BH",
+  "BHS": "BS",
+  "BIH": "BA",
+  "BLM": "BL",
+  "BLR": "BY",
+  "BLZ": "BZ",
+  "BMU": "BM",
+  "BOL": "BO",
+  "BRA": "BR",
+  "BRB": "BB",
+  "BRN": "BN",
+  "BTN": "BT",
+  "BVT": "BV",
+  "BWA": "BW",
+  "CAF": "CF",
+  "CAN": "CA",
+  "CCK": "CC",
+  "CHE": "CH",
+  "CHL": "CL",
+  "CHN": "CN",
+  "CIV": "CI",
+  "CMR": "CM",
+  "COD": "CD",
+  "COG": "CG",
+  "COK": "CK",
+  "COL": "CO",
+  "COM": "KM",
+  "CPV": "CV",
+  "CRI": "CR",
+  "CUB": "CU",
+  "CUW": "CW",
+  "CXR": "CX",
+  "CYM": "KY",
+  "CYP": "CY",
+  "CZE": "CZ",
+  "DEU": "DE",
+  "DJI": "DJ",
+  "DMA": "DM",
+  "DNK": "DK",
+  "DOM": "DO",
+  "DZA": "DZ",
+  "ECU": "EC",
+  "EGY": "EG",
+  "ERI": "ER",
+  "ESH": "EH",
+  "ESP": "ES",
+  "EST": "EE",
+  "ETH": "ET",
+  "FIN": "FI",
+  "FJI": "FJ",
+  "FLK": "FK",
+  "FRA": "FR",
+  "FRO": "FO",
+  "FSM": "FM",
+  "GAB": "GA",
+  "GBR": "GB",
+  "GEO": "GE",
+  "GGY": "GG",
+  "GHA": "GH",
+  "GIB": "GI",
+  "GIN": "GN",
+  "GLP": "GP",
+  "GMB": "GM",
+  "GNB": "GW",
+  "GNQ": "GQ",
+  "GRC": "GR",
+  "GRD": "GD",
+  "GRL": "GL",
+  "GTM": "GT",
+  "GUF": "GF",
+  "GUM": "GU",
+  "GUY": "GY",
+  "HKG": "HK",
+  "HMD": "HM",
+  "HND": "HN",
+  "HRV": "HR",
+  "HTI": "HT",
+  "HUN": "HU",
+  "IDN": "ID",
+  "IMN": "IM",
+  "IND": "IN",
+  "IOT": "IO",
+  "IRL": "IE",
+  "IRN": "IR",
+  "IRQ": "IQ",
+  "ISL": "IS",
+  "ISR": "IL",
+  "ITA": "IT",
+  "JAM": "JM",
+  "JEY": "JE",
+  "JOR": "JO",
+  "JPN": "JP",
+  "KAZ": "KZ",
+  "KEN": "KE",
+  "KGZ": "KG",
+  "KHM": "KH",
+  "KIR": "KI",
+  "KNA": "KN",
+  "KOR": "KR",
+  "KWT": "KW",
+  "LAO": "LA",
+  "LBN": "LB",
+  "LBR": "LR",
+  "LBY": "LY",
+  "LCA": "LC",
+  "LIE": "LI",
+  "LKA": "LK",
+  "LSO": "LS",
+  "LTU": "LT",
+  "LUX": "LU",
+  "LVA": "LV",
+  "MAC": "MO",
+  "MAF": "MF",
+  "MAR": "MA",
+  "MCO": "MC",
+  "MDA": "MD",
+  "MDG": "MG",
+  "MDV": "MV",
+  "MEX": "MX",
+  "MHL": "MH",
+  "MKD": "MK",
+  "MLI": "ML",
+  "MLT": "MT",
+  "MMR": "MM",
+  "MNE": "ME",
+  "MNG": "MN",
+  "MNP": "MP",
+  "MOZ": "MZ",
+  "MRT": "MR",
+  "MSR": "MS",
+  "MTQ": "MQ",
+  "MUS": "MU",
+  "MWI": "MW",
+  "MYS": "MY",
+  "MYT": "YT",
+  "NAM": "NA",
+  "NCL": "NC",
+  "NER": "NE",
+  "NFK": "NF",
+  "NGA": "NG",
+  "NIC": "NI",
+  "NIU": "NU",
+  "NLD": "NL",
+  "NOR": "NO",
+  "NPL": "NP",
+  "NRU": "NR",
+  "NZL": "NZ",
+  "OMN": "OM",
+  "PAK": "PK",
+  "PAN": "PA",
+  "PCN": "PN",
+  "PER": "PE",
+  "PHL": "PH",
+  "PLW": "PW",
+  "PNG": "PG",
+  "POL": "PL",
+  "PRI": "PR",
+  "PRK": "KP",
+  "PRT": "PT",
+  "PRY": "PY",
+  "PSE": "PS",
+  "PYF": "PF",
+  "QAT": "QA",
+  "REU": "RE",
+  "ROU": "RO",
+  "RUS": "RU",
+  "RWA": "RW",
+  "SAU": "SA",
+  "SDN": "SD",
+  "SEN": "SN",
+  "SGP": "SG",
+  "SGS": "GS",
+  "SHN": "SH",
+  "SJM": "SJ",
+  "SLB": "SB",
+  "SLE": "SL",
+  "SLV": "SV",
+  "SMR": "SM",
+  "SOM": "SO",
+  "SPM": "PM",
+  "SRB": "RS",
+  "SSD": "SS",
+  "STP": "ST",
+  "SUR": "SR",
+  "SVK": "SK",
+  "SVN": "SI",
+  "SWE": "SE",
+  "SWZ": "SZ",
+  "SXM": "SX",
+  "SYC": "SC",
+  "SYR": "SY",
+  "TCA": "TC",
+  "TCD": "TD",
+  "TGO": "TG",
+  "THA": "TH",
+  "TJK": "TJ",
+  "TKL": "TK",
+  "TKM": "TM",
+  "TLS": "TL",
+  "TON": "TO",
+  "TTO": "TT",
+  "TUN": "TN",
+  "TUR": "TR",
+  "TUV": "TV",
+  "TWN": "TW",
+  "TZA": "TZ",
+  "UGA": "UG",
+  "UKR": "UA",
+  "UMI": "UM",
+  "URY": "UY",
+  "USA": "US",
+  "UZB": "UZ",
+  "VAT": "VA",
+  "VCT": "VC",
+  "VEN": "VE",
+  "VGB": "VG",
+  "VIR": "VI",
+  "VNM": "VN",
+  "VUT": "VU",
+  "WLF": "WF",
+  "WSM": "WS",
+  "YEM": "YE",
+  "ZAF": "ZA",
+  "ZMB": "ZM",
+  "ZWE": "ZW",
+};
+
+function normalizeCountryName(name) {
+  return String(name || "").toUpperCase().replace(/[^A-Z]/g, "");
+}
+
+const COUNTRY_CODE_BY_NAME = new Map(
+  (Array.isArray(countries) ? countries : [])
+    .map((entry) => [
+      normalizeCountryName(entry?.name || ""),
+      String(entry?.code || "").toUpperCase(),
+    ])
+    .filter(([key, code]) => key && code)
+);
+
+function emojiToTwemojiUrl(emoji) {
+  if (!emoji) return "";
+  const codepoints = [];
+  for (const symbol of emoji) {
+    const code = symbol.codePointAt(0);
+    if (code) codepoints.push(code.toString(16));
+  }
+  if (!codepoints.length) return "";
+  return `https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/${codepoints.join("-")}.svg`;
+}
+
+function setFlagIcon(flagEl, emoji) {
+  if (!flagEl) return;
+  while (flagEl.firstChild) flagEl.removeChild(flagEl.firstChild);
+  if (!emoji) return;
+  const img = document.createElement("img");
+  img.src = emojiToTwemojiUrl(emoji);
+  img.alt = "";
+  img.setAttribute("aria-hidden", "true");
+  flagEl.appendChild(img);
+}
+
+function getUsernameCandidates(rawName) {
+  const cleaned = String(rawName || "").trim();
+  if (!cleaned) return [];
+  const candidates = new Set([cleaned]);
+  const bracketStripped = cleaned.replace(/^[\[(].+?[\]\)]\s*/, "").trim();
+  if (bracketStripped) candidates.add(bracketStripped);
+  if (bracketStripped.includes("|")) {
+    const tail = bracketStripped.split("|").pop()?.trim();
+    if (tail) candidates.add(tail);
+  }
+  const parts = bracketStripped.split(/\s+/).filter(Boolean);
+  if (parts.length === 2 && parts[0].length <= 4 && parts[1].length >= 3) {
+    candidates.add(parts[1]);
+  }
+  return Array.from(candidates);
+}
 
 function setFlagTitle(flagEl, code) {
   if (!flagEl) return;
@@ -71,6 +376,7 @@ export function openVetoModal(matchId, { getPlayersMap, getDefaultMapPoolNames, 
   const resetBtn = document.getElementById("resetVetoBtn");
   const doneBtn = document.getElementById("saveVetoBtn");
   if (modal) modal.dataset.matchId = matchId || "";
+  if (modal) modal.dataset.forceOpen = "true";
   const lookup = getMatchLookup(state.bracket || {});
   const match = lookup.get(matchId);
   const bestOfRaw = getBestOfForMatch(match || { bracket: "winners", round: 1 });
@@ -109,6 +415,12 @@ export function openVetoModal(matchId, { getPlayersMap, getDefaultMapPoolNames, 
   const higher = ordered[1] || ordered[0] || null;
 
   const saved = state.matchVetoes?.[matchId];
+  console.debug("[veto] openVetoModal", {
+    matchId,
+    hasSaved: Boolean(saved),
+    savedPicks: saved?.maps?.length || 0,
+    savedVetoes: saved?.vetoed?.length || 0,
+  });
   if (saved) {
     const usedNames = new Set([
       ...(saved.maps || []).map((m) => m.map),
@@ -232,6 +544,13 @@ export function openMatchInfoModal(
     (isAdmin || isParticipant) && match?.status !== "complete";
 
   modal.dataset.canEditResults = canEditResults ? "true" : "false";
+  setupMatchChatUi({
+    matchId,
+    leftPlayer: pA,
+    rightPlayer: pB,
+    isParticipant,
+    uid,
+  });
 
   if (title) {
     const bracketLabel =
@@ -306,19 +625,19 @@ export function openMatchInfoModal(
   }
   if (leftFlagEl) {
     const flag = countryCodeToFlag(pA?.country || "");
-    leftFlagEl.textContent = flag;
+    setFlagIcon(leftFlagEl, flag);
     leftFlagEl.style.display = flag ? "inline-flex" : "none";
     setFlagTitle(leftFlagEl, pA?.country || "");
-    if (!flag && pA?.uid) {
+    if (!flag) {
       void hydrateCountryFlag(pA, leftFlagEl);
     }
   }
   if (rightFlagEl) {
     const flag = countryCodeToFlag(pB?.country || "");
-    rightFlagEl.textContent = flag;
+    setFlagIcon(rightFlagEl, flag);
     rightFlagEl.style.display = flag ? "inline-flex" : "none";
     setFlagTitle(rightFlagEl, pB?.country || "");
-    if (!flag && pB?.uid) {
+    if (!flag) {
       void hydrateCountryFlag(pB, rightFlagEl);
     }
   }
@@ -389,10 +708,17 @@ export function openMatchInfoModal(
     const record = ensureMatchVetoRecord(matchId, bestOf);
     const participantIds = [pA?.id || null, pB?.id || null];
     const recordIds = Array.isArray(record.playerIds) ? record.playerIds : [];
-    if (recordIds[0] !== participantIds[0] || recordIds[1] !== participantIds[1]) {
+    const hasRecordedIds = recordIds.length === 2 && recordIds.some((id) => id);
+    const idsChanged =
+      hasRecordedIds &&
+      (recordIds[0] !== participantIds[0] || recordIds[1] !== participantIds[1]);
+    if (idsChanged) {
       record.maps = [];
       record.vetoed = [];
       record.mapResults = [];
+      record.playerIds = participantIds;
+      vetoDeps?.saveState?.({ matchVetoes: state.matchVetoes });
+    } else if (!hasRecordedIds) {
       record.playerIds = participantIds;
       vetoDeps?.saveState?.({ matchVetoes: state.matchVetoes });
     }
@@ -595,11 +921,11 @@ function normalizeMapResults(mapResults, bestOf) {
 }
 
 async function hydrateCountryFlag(player, flagEl) {
-  const uid = String(player?.uid || "").trim();
-  if (!uid || !flagEl) return;
-  if (countryFlagCache.has(uid)) {
+  let uid = String(player?.uid || "").trim();
+  if (!flagEl) return;
+  if (uid && countryFlagCache.has(uid)) {
     const cached = countryFlagCache.get(uid) || "";
-    flagEl.textContent = cached;
+    setFlagIcon(flagEl, cached);
     flagEl.style.display = cached ? "inline-flex" : "none";
     if (cached && player?.country) {
       setFlagTitle(flagEl, player.country);
@@ -610,15 +936,47 @@ async function hydrateCountryFlag(player, flagEl) {
     return;
   }
   try {
+    if (!uid) {
+      const rawName = String(player?.name || "").trim();
+      const nameKey = rawName.toLowerCase();
+      if (nameKey && countryUidCache.has(nameKey)) {
+        uid = countryUidCache.get(nameKey) || "";
+      } else if (rawName) {
+        const candidates = getUsernameCandidates(rawName);
+        for (const candidate of candidates) {
+          if (!candidate) continue;
+          let usernameSnap = await getDoc(doc(db, "usernames", candidate));
+          if (!usernameSnap.exists() && candidate.toLowerCase() !== candidate) {
+            usernameSnap = await getDoc(
+              doc(db, "usernames", candidate.toLowerCase())
+            );
+          }
+          if (!usernameSnap.exists()) continue;
+          const resolved = String(
+            usernameSnap.data()?.userId || usernameSnap.data()?.uid || ""
+          ).trim();
+          if (resolved) {
+            uid = resolved;
+            countryUidCache.set(nameKey, resolved);
+            player.uid = resolved;
+            break;
+          }
+        }
+      }
+    }
+    if (!uid) {
+      return;
+    }
     const snap = await getDoc(doc(db, "users", uid));
     const code = snap.exists() ? String(snap.data()?.country || "") : "";
     const flag = countryCodeToFlag(code);
     countryFlagCache.set(uid, flag);
     if (flag) {
-      flagEl.textContent = flag;
+      setFlagIcon(flagEl, flag);
       flagEl.style.display = "inline-flex";
       player.country = code.toUpperCase();
       setFlagTitle(flagEl, player.country);
+      vetoDeps?.saveState?.({ players: state.players });
     } else {
       setFlagTitle(flagEl, "");
     }
@@ -639,10 +997,18 @@ function countryCodeToFlag(raw) {
   if (code === "WLS") {
     return "\u{1F3F4}\u{E0067}\u{E0062}\u{E0077}\u{E006C}\u{E0073}\u{E007F}";
   }
-  if (code.length !== 2) return "";
+  let resolved = code;
+  if (resolved.length === 3) {
+    resolved = ISO3_TO_ISO2[resolved] || resolved;
+  }
+  if (resolved.length !== 2) {
+    const nameKey = normalizeCountryName(resolved);
+    resolved = COUNTRY_CODE_BY_NAME.get(nameKey) || "";
+  }
+  if (resolved.length !== 2) return "";
   const A = 0x1f1e6;
-  const first = code.charCodeAt(0) - 65;
-  const second = code.charCodeAt(1) - 65;
+  const first = resolved.charCodeAt(0) - 65;
+  const second = resolved.charCodeAt(1) - 65;
   if (first < 0 || first > 25 || second < 0 || second > 25) return "";
   return String.fromCodePoint(A + first, A + second);
 }
@@ -684,14 +1050,14 @@ function renderMatchInfoRows(rowsEl, { bestOf, pickedMaps, winners }) {
 
     if (winner === "A") {
       leftTd.classList.add("is-winner");
-      leftTd.textContent = "W";
+      leftTd.textContent = "Win";
       rightTd.classList.add("is-loser");
-      rightTd.textContent = "L";
+      rightTd.textContent = "Loss";
     } else if (winner === "B") {
       leftTd.classList.add("is-loser");
-      leftTd.textContent = "L";
+      leftTd.textContent = "Loss";
       rightTd.classList.add("is-winner");
-      rightTd.textContent = "W";
+      rightTd.textContent = "Win";
     } else {
       leftTd.textContent = "";
       rightTd.textContent = "";
@@ -714,6 +1080,7 @@ export function hideMatchInfoModal() {
     modal.style.display = "none";
     delete modal.dataset.matchId;
   }
+  teardownMatchChatUi();
   stopPresenceTracking();
   if (presenceUiTimer) clearInterval(presenceUiTimer);
   presenceUiTimer = null;
@@ -1036,16 +1403,36 @@ export function handleVetoPoolClick(e) {
     }
   }
 
+  autoPickLastMapIfNeeded();
   persistLiveVetoState();
   renderVetoPoolGrid();
   renderVetoStatus();
 }
 
+function autoPickLastMapIfNeeded() {
+  if (!vetoState || vetoState.stage !== "pick") return;
+  const bestOf = Math.max(1, Number(vetoState.bestOf) || 1);
+  const picksNeeded = bestOf - vetoState.picks.length;
+  if (vetoState.remaining.length !== 1 || picksNeeded !== 1) return;
+  const [picked] = vetoState.remaining.splice(0, 1);
+  if (!picked) return;
+  const picker =
+    vetoState.turn === "low"
+      ? vetoState.lowerName || "Player A"
+      : vetoState.higherName || "Player B";
+  vetoState.picks.push({ map: picked.name, picker, action: "pick" });
+  vetoState.stage = "done";
+}
+
 export function hideVetoModal() {
   const modal = document.getElementById("vetoModal");
   const poolEl = document.getElementById("vetoMapPool");
+  if (currentVetoMatchId && vetoState) {
+    persistLiveVetoState();
+  }
   if (modal) modal.style.display = "none";
   if (modal) delete modal.dataset.matchId;
+  if (modal) delete modal.dataset.forceOpen;
   if (poolEl) poolEl.onclick = null;
   // keep global presence subscription alive for match info; veto modal itself doesn't affect presence
   setCurrentVetoMatchIdState(null);
@@ -1116,6 +1503,12 @@ function persistLiveVetoState() {
     },
     mapResults: existing.mapResults || [],
   };
+  console.debug("[veto] persistLiveVetoState", {
+    matchId: currentVetoMatchId,
+    picks: vetoState.picks?.length || 0,
+    vetoed: vetoState.vetoed?.length || 0,
+    stage: vetoState.stage,
+  });
   vetoDeps?.saveState?.({ matchVetoes: state.matchVetoes });
 }
 
@@ -1139,12 +1532,19 @@ export function saveVetoSelection() {
     },
     mapResults: existingMapResults,
   };
+  console.debug("[veto] saveVetoSelection", {
+    matchId,
+    picks: trimmed.length,
+    vetoed: (vetoState.vetoed || []).length,
+    bestOf: vetoState.bestOf,
+  });
   const lookup = getMatchLookup(state.bracket || {});
   const match = lookup.get(currentVetoMatchId);
   if (match) match.bestOf = vetoState.bestOf || match.bestOf || defaultBestOf.upper;
   vetoDeps?.saveState?.({ matchVetoes: state.matchVetoes, bracket: state.bracket });
   renderVetoStatus();
   renderVetoPoolGrid();
+  showToast?.("Map veto saved.", "success");
   hideVetoModal();
   openMatchInfoModal(matchId, vetoDeps);
 }
@@ -1258,9 +1658,9 @@ export function refreshVetoModalIfOpen() {
   if (!vetoDeps) return;
   const modal = document.getElementById("vetoModal");
   if (!modal) return;
-  const visible = modal.style.display && modal.style.display !== "none";
-  if (!visible) return;
   const matchId = modal.dataset.matchId;
   if (!matchId) return;
+  const visible = modal.style.display && modal.style.display !== "none";
+  if (!visible && modal.dataset.forceOpen !== "true") return;
   openVetoModal(matchId, vetoDeps);
 }

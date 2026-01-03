@@ -1,6 +1,16 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isChatParticipant(slug, matchId) {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/tournamentChats/$(slug)/matches/$(matchId))
+        && request.auth.uid in get(/databases/$(database)/documents/tournamentChats/$(slug)/matches/$(matchId)).data.participants;
+    }
+    function isTournamentOwner(slug) {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/tournaments/$(slug))
+        && request.auth.uid == get(/databases/$(database)/documents/tournaments/$(slug)).data.createdBy;
+    }
 
     // ? USERS
     match /users/{userId} {
@@ -214,6 +224,36 @@ service cloud.firestore {
     match /tournamentPresence/{slug}/matchInfo/{uid} {
       allow read: if true;
       allow create, update, delete: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // ? TOURNAMENT MATCH CHAT
+    match /tournamentChats/{slug}/matches/{matchId} {
+      allow read: if request.auth != null && request.auth.uid in resource.data.participants;
+      allow create: if request.auth != null
+        && request.resource.data.participants is list
+        && request.auth.uid in request.resource.data.participants
+        && request.resource.data.participants.size() <= 25
+        && request.resource.data.keys().hasOnly(["participants", "updatedAt"]);
+      allow update: if request.auth != null
+        && request.auth.uid in resource.data.participants
+        && request.resource.data.participants is list
+        && request.resource.data.participants.size() <= 25
+        && request.resource.data.participants.hasAll(resource.data.participants)
+        && request.resource.data.keys().hasOnly(["participants", "updatedAt"]);
+      allow delete: if isTournamentOwner(slug);
+
+      match /messages/{messageId} {
+        allow read: if isChatParticipant(slug, matchId);
+        allow create: if request.auth != null
+          && request.resource.data.keys().hasOnly(["text", "uid", "name", "createdAt", "clientCreatedAt"])
+          && request.resource.data.text is string
+          && request.resource.data.text.size() >= 1
+          && request.resource.data.text.size() <= 500
+          && request.resource.data.uid == request.auth.uid
+          && isChatParticipant(slug, matchId);
+        allow update: if false;
+        allow delete: if isTournamentOwner(slug);
+      }
     }
 
     // ? USER NOTIFICATIONS

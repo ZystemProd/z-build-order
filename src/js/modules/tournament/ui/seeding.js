@@ -2,10 +2,12 @@ import { escapeHtml } from "../bracket/renderUtils.js";
 
 export function renderSeedingTable(
   players = [],
-  { isLive = false, isAdmin = false } = {}
+  { isLive = false, isAdmin = false, manualSeeding = false } = {}
 ) {
   const body = document.getElementById("playersTableBody");
   if (!body) return;
+  body.classList.toggle("manual-seeding-active", manualSeeding && !isLive);
+  body.classList.toggle("manual-seeding-locked", manualSeeding && isLive);
 
   const normalizeInviteStatus = (status) => {
     const normalized = (status || "").toLowerCase();
@@ -29,7 +31,12 @@ export function renderSeedingTable(
     const points = Number.isFinite(p.points) ? p.points : 0;
     const mmr = Number.isFinite(p.mmr) ? Math.round(p.mmr) : null;
     const pulseLink = p.sc2Link || "";
-    const raceTag = race ? `<span class="helper">${escapeHtml(race)}</span>` : "";
+    const raceTag =
+      inviteStatus === "pending"
+        ? `<span class="helper">TBD</span>`
+        : race
+        ? `<span class="helper">${escapeHtml(race)}</span>`
+        : "";
     const pulseHtml = pulseLink
       ? `<a href="${escapeHtml(pulseLink)}" target="_blank" rel="noopener">Link</a>`
       : "-";
@@ -53,9 +60,18 @@ export function renderSeedingTable(
       ? `<span class="helper">-</span>`
       : checkinPill;
 
+    const dragHandle = manualSeeding
+      ? `<span class="seeding-drag-handle ${isLive ? "is-disabled" : ""}" title="Drag to reorder" aria-hidden="true" ${isLive ? "" : 'draggable="true"'}>&equiv;</span>`
+      : "";
+
     return `
-      <tr>
-        <td>#${seed}</td>
+      <tr data-player-id="${escapeHtml(p.id || "")}">
+        <td class="seed-cell">
+          <div class="seed-cell-inner">
+            ${dragHandle}
+            <span class="seed-index">#${seed}</span>
+          </div>
+        </td>
         <td>
           <div class="player-line">
             <span class="player-name">${name}</span>

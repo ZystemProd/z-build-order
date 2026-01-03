@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "deploy": "npm run build && firebase deploy",
     "preview-deploy": "npm run clean-dist && npm run build && firebase hosting:channel:deploy dev",
-    "clean-dist": "npx rimraf dist/* dist/.[!.]* dist/..?*",
+    "clean-dist": "npx rimraf dist",
     "clean": "rimraf node_modules/.vite dist",
     "minify-firebase": "node scripts/minify-firebase.js"
   },

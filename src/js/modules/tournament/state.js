@@ -24,6 +24,8 @@ export const defaultState = {
   pointsLedger: {},
   bracket: null,
   needsReseed: false,
+  manualSeedingEnabled: false,
+  manualSeedingOrder: [],
   activity: [],
   lastUpdated: Date.now(),
   bracketLayoutVersion: 1,

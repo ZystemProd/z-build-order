@@ -2,8 +2,10 @@ import {
   auth,
   app,
   db,
+  ensureSettingsUiReady,
   getCurrentUsername,
   getCurrentUserAvatarUrl,
+  getCurrentUserProfile,
   getPulseState,
   initializeAuthUI,
 } from "../../../app.js";
@@ -126,6 +128,7 @@ import {
   updateCircuitSlugPreview,
   populateCreateCircuitForm,
 } from "./circuit.js";
+import { renderActivityList } from "./activity.js";
 import {
   renderPlayerRow,
   renderScoreOptions,
@@ -228,8 +231,6 @@ import {
   normalizeInviteStatus,
   isInviteAccepted,
   getEligiblePlayers,
-  seedEligiblePlayers,
-  applyRosterSeeding,
 } from "./rosterSeeding.js";
 import {
   handleTournamentInviteAction,
@@ -274,7 +275,10 @@ const {
   initAdminInviteModal,
 } = adminManager;
 function renderMarkdown(text = "") {
-  return DOMPurify.sanitize(text || "").replace(/\n/g, "<br>");
+  const raw = text || "";
+  const hasHtml = /<\/?[a-z][\s\S]*>/i.test(raw);
+  const sanitized = DOMPurify.sanitize(raw);
+  return hasHtml ? sanitized : sanitized.replace(/\n/g, "<br>");
 }
 async function loadMapCatalog() {
   if (mapCatalogLoaded) return mapCatalog;
@@ -321,7 +325,7 @@ function syncFromRemote(incoming) {
   setStateObj({
     ...defaultState,
     ...incoming,
-    players: applyRosterSeeding(incoming.players || []),
+    players: applyRosterSeedingWithMode(incoming.players || [], incoming),
     pointsLedger: incoming.pointsLedger || {},
     activity: incoming.activity || [],
     bracket: deserializeBracket(incoming.bracket),
@@ -366,6 +370,77 @@ const updateSettingsRulesPreview = () =>
 function applyFormattingInline(action, textareaId) {
   const textarea = document.getElementById(textareaId);
   if (!textarea) return;
+  const surface = document.querySelector(
+    `.markdown-surface[data-editor-for="${textareaId}"]`
+  );
+  if (surface?.isContentEditable) {
+    surface.focus();
+    const selection = window.getSelection();
+    const selectedText = selection?.toString() || "";
+    const exec = (command, value = null) => {
+      try {
+        document.execCommand(command, false, value);
+      } catch (_) {
+        // ignore unsupported commands
+      }
+    };
+    const styles = (surface.dataset.activeStyles || "")
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+    const toggleStyle = (styleKey) => {
+      const idx = styles.indexOf(styleKey);
+      if (idx >= 0) {
+        styles.splice(idx, 1);
+      } else {
+        styles.push(styleKey);
+      }
+      surface.dataset.activeStyles = styles.join(",");
+      surface.classList.toggle("is-bold", styles.includes("bold"));
+      surface.classList.toggle("is-italic", styles.includes("italic"));
+    };
+    const hasSelection =
+      selection &&
+      !selection.isCollapsed &&
+      surface.contains(selection.anchorNode) &&
+      surface.contains(selection.focusNode);
+    const isEmpty = !surface.textContent?.trim();
+    const toggleActions = ["bold", "italic", "bullet", "numbered"];
+
+    if (action === "bold" || action === "italic") {
+      if (hasSelection) {
+        exec(action === "bold" ? "bold" : "italic");
+      } else {
+        toggleStyle(action === "bold" ? "bold" : "italic");
+      }
+    } else if (action === "bullet") {
+      exec("insertUnorderedList");
+    } else if (action === "numbered") {
+      exec("insertOrderedList");
+    } else if (action === "link") {
+      const url = window.prompt("Link URL", "https://");
+      if (url) {
+        if (selectedText) {
+          exec("createLink", url);
+        } else {
+          exec("insertHTML", `<a href="${url}">${url}</a>`);
+        }
+      }
+    }
+
+    if (isEmpty && toggleActions.includes(action)) {
+      surface.dataset.pendingActions = styles.join(",");
+    } else {
+      delete surface.dataset.pendingActions;
+    }
+    textarea.value = surface.innerHTML;
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    if (typeof window !== "undefined") {
+      window.__updateMarkdownToolbarState?.();
+    }
+    return;
+  }
+
   const start = textarea.selectionStart;
   const end = textarea.selectionEnd;
   const value = textarea.value;
@@ -405,6 +480,151 @@ function getPlayersMap() {
   return new Map((state.players || []).map((p) => [p.id, p]));
 }
 
+function getManualSeedingSettings(snapshot = state) {
+  return {
+    enabled: Boolean(snapshot?.manualSeedingEnabled),
+    order: Array.isArray(snapshot?.manualSeedingOrder)
+      ? snapshot.manualSeedingOrder
+      : [],
+  };
+}
+
+function buildManualOrder(players = [], manualOrder = []) {
+  const byId = new Map((players || []).map((player) => [player.id, player]));
+  const nextOrder = [];
+  const used = new Set();
+  (manualOrder || []).forEach((id) => {
+    if (!id || used.has(id) || !byId.has(id)) return;
+    nextOrder.push(id);
+    used.add(id);
+  });
+  const remaining = (players || []).filter(
+    (player) => player?.id && !used.has(player.id)
+  );
+  if (!remaining.length) return nextOrder;
+  const seededRemaining = applySeeding(
+    remaining.map((player) => ({ ...player }))
+  );
+  seededRemaining.forEach((player) => {
+    if (!player?.id || used.has(player.id)) return;
+    nextOrder.push(player.id);
+    used.add(player.id);
+  });
+  return nextOrder;
+}
+
+function applyManualSeeding(players = [], manualOrder = []) {
+  const clones = (players || []).map((player) => ({ ...player }));
+  const byId = new Map(clones.map((player) => [player.id, player]));
+  const nextOrder = buildManualOrder(clones, manualOrder);
+  const seeded = nextOrder
+    .map((id) => byId.get(id))
+    .filter(Boolean);
+  seeded.forEach((player, idx) => {
+    player.seed = idx + 1;
+  });
+  return seeded;
+}
+
+function seedPlayersForState(players = [], snapshot = state) {
+  const { enabled, order } = getManualSeedingSettings(snapshot);
+  if (enabled) {
+    return applyManualSeeding(players, order);
+  }
+  return applySeeding((players || []).map((player) => ({ ...player })));
+}
+
+function seedEligiblePlayersWithMode(players = [], snapshot = state) {
+  const eligible = getEligiblePlayers(players);
+  const seededEligible = seedPlayersForState(eligible, snapshot);
+  const seedById = new Map(
+    seededEligible.map((player) => [player.id, player.seed])
+  );
+  const mergedPlayers = (players || []).map((player) => {
+    const inviteStatus = normalizeInviteStatus(player.inviteStatus);
+    const seed = seedById.get(player.id);
+    if (Number.isFinite(seed)) {
+      return { ...player, seed, inviteStatus };
+    }
+    if (inviteStatus !== INVITE_STATUS.accepted) {
+      const { seed: _seed, ...rest } = player;
+      return { ...rest, inviteStatus };
+    }
+    return { ...player, inviteStatus };
+  });
+  return { seededEligible, mergedPlayers };
+}
+
+function applyRosterSeedingWithMode(players = [], snapshot = state) {
+  return seedEligiblePlayersWithMode(players, snapshot).mergedPlayers;
+}
+
+function getManualSeedingActive() {
+  return Boolean(state.manualSeedingEnabled) && !state.isLive;
+}
+
+function applySeedingStateUpdate(nextSnapshot, reason) {
+  const hasCompletedMatches = bracketHasResults();
+  setStateObj(nextSnapshot);
+  if (!state.isLive && !hasCompletedMatches) {
+    rebuildBracket(true, reason);
+    return;
+  }
+  const { mergedPlayers } = seedEligiblePlayersWithMode(
+    state.players || [],
+    nextSnapshot
+  );
+  saveState({
+    manualSeedingEnabled: nextSnapshot.manualSeedingEnabled,
+    manualSeedingOrder: nextSnapshot.manualSeedingOrder,
+    players: mergedPlayers,
+    needsReseed: hasCompletedMatches,
+  });
+  if (hasCompletedMatches) {
+    setSeedingNotice(true);
+  }
+  renderAll();
+}
+
+function setManualSeedingEnabled(nextEnabled) {
+  if (state.isLive) {
+    showToast?.("Tournament is live. Seeding is locked.", "error");
+    renderAll();
+    return;
+  }
+  const enabled = Boolean(nextEnabled);
+  const current = getManualSeedingSettings(state);
+  const nextOrder = enabled
+    ? buildManualOrder(state.players || [], current.order)
+    : current.order;
+  const nextSnapshot = {
+    ...state,
+    manualSeedingEnabled: enabled,
+    manualSeedingOrder: nextOrder,
+  };
+  applySeedingStateUpdate(
+    nextSnapshot,
+    enabled ? "Manual seeding enabled" : "Automatic seeding enabled"
+  );
+}
+
+function handleManualSeedingReorder(nextOrder = []) {
+  if (!Array.isArray(nextOrder) || !nextOrder.length) return;
+  if (state.isLive) return;
+  const normalizedOrder = buildManualOrder(state.players || [], nextOrder);
+  const currentOrder = getManualSeedingSettings(state).order;
+  const isSame =
+    normalizedOrder.length === currentOrder.length &&
+    normalizedOrder.every((id, idx) => id === currentOrder[idx]);
+  if (isSame && state.manualSeedingEnabled) return;
+  const nextSnapshot = {
+    ...state,
+    manualSeedingEnabled: true,
+    manualSeedingOrder: normalizedOrder,
+  };
+  applySeedingStateUpdate(nextSnapshot, "Manual seeding updated");
+}
+
 function handleApplyCircuitPoints(event) {
   const result = handleApplyCircuitPointsCore(event, { saveState, renderAll });
   if (!result?.applied || !currentTournamentMeta?.slug) return;
@@ -422,13 +642,13 @@ function handleApplyCircuitPoints(event) {
 
 function renderAll() {
   // Update seeding table
-  const seedingSnapshot = applySeeding(
-    (state.players || []).map((player) => ({ ...player }))
-  );
+  const seedingSnapshot = seedPlayersForState(state.players || [], state);
   renderSeedingTable(seedingSnapshot, {
     isLive: state.isLive,
     isAdmin,
+    manualSeeding: state.manualSeedingEnabled,
   });
+  updateManualSeedingUi();
 
   if (currentTournamentMeta) {
     const tournamentTitle = document.getElementById("tournamentTitle");
@@ -454,6 +674,8 @@ function renderAll() {
       : null;
     const currentInviteStatus = normalizeInviteStatus(currentPlayer?.inviteStatus);
     const eligiblePlayers = getEligiblePlayers(state.players || []);
+    const isInviteOnly = isInviteOnlyTournament(currentTournamentMeta);
+    const accessNote = document.getElementById("registrationAccessNote");
 
     if (tournamentTitle) {
       tournamentTitle.textContent = currentTournamentMeta.name || "Tournament";
@@ -487,6 +709,17 @@ function renderAll() {
         : "TBD";
     }
     if (statPlayers) statPlayers.textContent = String(eligiblePlayers.length || 0);
+
+    if (accessNote) {
+      if (isInviteOnly && !isAdmin) {
+        accessNote.textContent =
+          "This tournament is invite-only. Ask an admin for an invite.";
+        accessNote.style.display = "block";
+      } else {
+        accessNote.textContent = "";
+        accessNote.style.display = "none";
+      }
+    }
 
     if (placementsRow && placementFirst && placementSecond && placementThirdFourth) {
       const placements = computePlacementsForBracket(
@@ -524,6 +757,9 @@ function renderAll() {
       } else if (currentPlayer) {
         registerBtn.textContent = "Unregister";
         registerBtn.disabled = false;
+      } else if (isInviteOnly && !isAdmin) {
+        registerBtn.textContent = "Invite required";
+        registerBtn.disabled = true;
       } else {
         registerBtn.textContent = "Register";
         registerBtn.disabled = false;
@@ -577,6 +813,7 @@ function renderAll() {
     if (activityCard) {
       activityCard.style.display = state.isLive ? "" : "none";
     }
+    renderActivityList({ state, escapeHtml, formatTime });
     populateSettingsPanelUI({
       tournament: currentTournamentMeta,
       setMapPoolSelection,
@@ -598,6 +835,9 @@ function renderAll() {
   const bracketContainer = document.getElementById("bracketGrid");
   const bracket = state.bracket;
   const playersArr = state.players || [];
+  const format = currentTournamentMeta?.format || "Tournament";
+  const isRoundRobinFormat = (fmt) =>
+    (fmt || "").toLowerCase().includes("round robin");
   const layoutVersion = state.bracketLayoutVersion || 1;
   const needsLayoutUpgrade =
     bracket &&
@@ -607,8 +847,31 @@ function renderAll() {
     rebuildBracket(true, "Updated bracket layout");
     return;
   }
+  const needsBracketRepair = (() => {
+    if (!bracket || !playersArr.length) return false;
+    if (bracketHasRecordedResults(bracket)) return false;
+    if (isRoundRobinFormat(format)) return false;
+    const { seededEligible } = seedEligiblePlayersWithMode(state.players || [], state);
+    const expected = buildBracket(
+      seededEligible,
+      currentTournamentMeta || {},
+      isRoundRobinFormat
+    );
+    const actualIds = getAllMatches(bracket)
+      .map((m) => m?.id)
+      .filter(Boolean);
+    const expectedIds = getAllMatches(expected)
+      .map((m) => m?.id)
+      .filter(Boolean);
+    if (actualIds.length !== expectedIds.length) return true;
+    const expectedSet = new Set(expectedIds);
+    return actualIds.some((id) => !expectedSet.has(id));
+  })();
+  if (needsBracketRepair) {
+    rebuildBracket(true, "Bracket repaired");
+    return;
+  }
   if (bracketContainer && bracket) {
-    const format = currentTournamentMeta?.format || "Tournament";
     let lookup = getMatchLookup(bracket);
     const playersById = getPlayersMap();
     if (format.toLowerCase().includes("round robin")) {
@@ -735,7 +998,7 @@ function goLiveTournament() {
     showToast?.("No checked-in players to go live.", "error");
     return;
   }
-  const seededPlayers = applySeeding(checkedInPlayers);
+  const seededPlayers = seedPlayersForState(checkedInPlayers, state);
   const bracket = buildBracket(
     seededPlayers,
     currentTournamentMeta || {},
@@ -752,19 +1015,44 @@ function goLiveTournament() {
   renderAll();
 }
 
-function addActivity(message) {
+function addActivity(message, options = {}) {
   if (!message) return;
-  const entry = { message, time: Date.now() };
+  const entry = {
+    message,
+    time: Date.now(),
+    type: options.type,
+  };
   const next = {
     activity: [entry, ...(state.activity || [])].slice(0, 50),
   };
   saveState(next);
+  renderActivityList({ state, escapeHtml, formatTime });
 }
 
 function setSeedingNotice(show) {
   const el = document.getElementById("seedingNotice");
   if (el) {
     el.style.display = show ? "block" : "none";
+  }
+}
+
+function updateManualSeedingUi() {
+  const toggle = document.getElementById("manualSeedingToggle");
+  const help = document.getElementById("manualSeedingHelp");
+  const enabled = Boolean(state.manualSeedingEnabled);
+  const locked = state.isLive;
+  if (toggle) {
+    toggle.checked = enabled;
+    toggle.disabled = locked;
+  }
+  if (help) {
+    if (enabled) {
+      help.textContent = locked
+        ? "Manual seeding is locked while live."
+        : "Drag rows to set manual seed order.";
+    } else {
+      help.textContent = "Automatic seeding uses points and MMR.";
+    }
   }
 }
 
@@ -862,11 +1150,55 @@ function resetTournament() {
 }
 
 function updateMatchScore(matchId, scoreA, scoreB, options = {}) {
+  const lookupBefore = state?.bracket ? getMatchLookup(state.bracket) : null;
+  const matchBefore = lookupBefore?.get(matchId) || null;
+  const prevScores = Array.isArray(matchBefore?.scores)
+    ? [...matchBefore.scores]
+    : null;
+  const prevWalkover = matchBefore?.walkover || null;
+  const prevStatus = matchBefore?.status || null;
+  const prevWinnerId = matchBefore?.winnerId || null;
   updateMatchScoreCore(matchId, scoreA, scoreB, {
     saveState,
     renderAll,
     ...options,
   });
+  if (options?.finalize === false) return;
+  const lookupAfter = state?.bracket ? getMatchLookup(state.bracket) : null;
+  const matchAfter = lookupAfter?.get(matchId) || null;
+  if (!matchAfter) return;
+  const nextScores = Array.isArray(matchAfter.scores) ? matchAfter.scores : [];
+  const changed =
+    !prevScores ||
+    prevScores[0] !== nextScores[0] ||
+    prevScores[1] !== nextScores[1] ||
+    prevWalkover !== matchAfter.walkover;
+  const completedNow =
+    matchAfter.status === "complete" && prevStatus !== "complete";
+  const winnerChanged = prevWinnerId !== matchAfter.winnerId;
+  const hasScore =
+    (nextScores[0] || 0) > 0 ||
+    (nextScores[1] || 0) > 0 ||
+    !!matchAfter.walkover;
+  if ((!changed && !completedNow && !winnerChanged) || !hasScore) return;
+  const playersById = getPlayersMap();
+  const participants = resolveParticipants(matchAfter, lookupAfter, playersById);
+  const nameA = participants[0]?.name || "TBD";
+  const nameB = participants[1]?.name || "TBD";
+  const scoreAOut = Number.isFinite(nextScores[0]) ? nextScores[0] : 0;
+  const scoreBOut = Number.isFinite(nextScores[1]) ? nextScores[1] : 0;
+  addActivity(
+    `Score submitted: ${nameA} ${scoreAOut}-${scoreBOut} ${nameB}`,
+    {
+      type: "score",
+      score: {
+        nameA,
+        nameB,
+        scoreA: scoreAOut,
+        scoreB: scoreBOut,
+      },
+    }
+  );
 }
 
 function saveState(next = {}, options = {}) {
@@ -884,7 +1216,10 @@ function saveState(next = {}, options = {}) {
 }
 
 function rebuildBracket(force = false, reason = "") {
-  const { seededEligible, mergedPlayers } = seedEligiblePlayers(state.players || []);
+  const { seededEligible, mergedPlayers } = seedEligiblePlayersWithMode(
+    state.players || [],
+    state
+  );
   setStateObj({ ...state, players: mergedPlayers, needsReseed: false });
   const isRoundRobin = (fmt) =>
     (fmt || "").toLowerCase().includes("round robin");
@@ -915,6 +1250,8 @@ async function renderTournamentList() {
     document.getElementById("tournamentStatusSelect")?.value || "all";
   const roleFilter =
     document.getElementById("tournamentRoleSelect")?.value || "all";
+  const ownerBtn = document.getElementById("tournamentMyFilterBtn");
+  const ownerFilterActive = ownerBtn?.classList.contains("active") || false;
   const filterControls = document.getElementById("tournamentFilterControls");
   if (listTitle) {
     listTitle.textContent = typeFilter === "circuits" ? "Circuits" : "Tournaments";
@@ -926,6 +1263,9 @@ async function renderTournamentList() {
   }
   if (filterControls) {
     filterControls.style.display = typeFilter === "circuits" ? "none" : "flex";
+  }
+  if (ownerBtn) {
+    ownerBtn.style.display = typeFilter === "circuits" ? "none" : "inline-flex";
   }
   const userId = auth?.currentUser?.uid || null;
   const registered = new Set(getRegisteredTournaments());
@@ -981,6 +1321,13 @@ async function renderTournamentList() {
     const items = await loadTournamentRegistry(true);
     const progressTargets = [];
     let filtered = items || [];
+    if (ownerFilterActive) {
+      if (!userId) {
+        filtered = [];
+      } else {
+        filtered = filtered.filter((item) => item.createdBy === userId);
+      }
+    }
     if (roleFilter === "hosting") {
       filtered = filtered.filter((item) => userId && item.createdBy === userId);
     } else if (roleFilter === "registered") {
@@ -1017,15 +1364,24 @@ async function renderTournamentList() {
         .map((row) => row.item);
     }
 
-    const sorted = filtered.sort((a, b) => (a.startTime || 0) - (b.startTime || 0));
+    const sorted = filtered.sort((a, b) => {
+      const aHasStart = Number.isFinite(a.startTime);
+      const bHasStart = Number.isFinite(b.startTime);
+      if (aHasStart !== bHasStart) return aHasStart ? -1 : 1;
+      const aTime = aHasStart ? a.startTime : 0;
+      const bTime = bHasStart ? b.startTime : 0;
+      return aTime - bTime;
+    });
     const listItems = sorted.map((item) => ({ ...item, type: "tournament" }));
 
     if (!listItems.length) {
       listEl.innerHTML = `<li class="muted">No tournaments found.</li>`;
-      setTournamentListItems([], { mode: `${statusFilter}-${roleFilter}` });
+      setTournamentListItems([], {
+        mode: `${statusFilter}-${roleFilter}-${ownerFilterActive ? "mine" : "all"}`,
+      });
     } else {
       setTournamentListItems(listItems, {
-        mode: `${statusFilter}-${roleFilter}`,
+        mode: `${statusFilter}-${roleFilter}-${ownerFilterActive ? "mine" : "all"}`,
         onPageRender: (targetList) => {
           const targets = Array.from(
             targetList.querySelectorAll(".tournament-progress")
@@ -1062,14 +1418,17 @@ async function renderTournamentList() {
               statusClass = "status-upcoming";
             }
           }
+          const accessLabel = item.isInviteOnly ? "Closed" : "Open";
+          const accessClass = item.isInviteOnly ? "status-closed" : "status-open";
           const overlayChip = `<span class="status-chip ${statusClass} status-chip-overlay">${statusLabel}</span>`;
+          const accessChip = `<span class="status-chip ${accessClass} status-chip-access">${accessLabel}</span>`;
           li.innerHTML = DOMPurify.sanitize(`
             <div class="card-cover${coverUrl ? " has-image" : ""}"${
               coverUrl ? ` style="background-image:url('${escapeHtml(coverUrl)}')"` : ""
             }>
               ${overlayChip}
+              ${accessChip}
               <div class="time-block time-block-cover">
-                <span class="time-label">Start</span>
                 <span class="time-value">${escapeHtml(startLabel)}</span>
               </div>
             </div>
@@ -1088,7 +1447,6 @@ async function renderTournamentList() {
                 <div class="progress-meta">Loading progress…</div>
               </div>
               <div class="time-block time-block-row">
-                <span class="time-label">Start</span>
                 <span class="time-value">${escapeHtml(startLabel)}</span>
               </div>
             </div>
@@ -1197,7 +1555,7 @@ function updateTournamentProgress(targets = []) {
         const progress = computeTournamentProgress(bracket);
         const fill = progressEl.querySelector(".progress-fill");
         const meta = progressEl.querySelector(".progress-meta");
-        const statusChip = el.querySelector(".status-chip");
+        const statusChip = el.querySelector(".status-chip.status-chip-overlay");
         if (!fill || !meta) return;
         if (!progress) {
           fill.style.width = "0%";
@@ -1250,6 +1608,7 @@ async function populateCreateForm() {
   const imageInput = document.getElementById("tournamentImageInput");
   const imagePreview = document.getElementById("tournamentImagePreview");
   const checkInSelect = document.getElementById("checkInSelect");
+  const accessSelect = document.getElementById("tournamentAccessSelect");
   const templateSelect = document.getElementById("tournamentTemplateSelect");
   const templateNameInput = document.getElementById("tournamentTemplateNameInput");
   if (imageInput) imageInput.value = "";
@@ -1260,6 +1619,7 @@ async function populateCreateForm() {
     delete imagePreview.dataset.reuseUrl;
   }
   if (checkInSelect) checkInSelect.value = "0";
+  if (accessSelect) accessSelect.value = "open";
   if (templateSelect) templateSelect.value = "";
   if (templateNameInput) {
     templateNameInput.value = "";
@@ -1343,11 +1703,12 @@ async function confirmDeleteTournament() {
         console.warn("Failed to load tournament cover image", err);
       }
     }
+    await deleteTournamentChatHistory(slug);
+    await deleteTournamentPresence(slug);
     await deleteDoc(doc(collection(db, TOURNAMENT_COLLECTION), slug));
     await deleteDoc(doc(collection(db, TOURNAMENT_STATE_COLLECTION), slug));
     await deleteTournamentCoverByUrl(coverImageUrl, slug);
     await deleteTournamentCoverFolder(slug);
-    await deleteTournamentPresence(slug);
     try {
       localStorage.removeItem(getPersistStorageKey(slug));
     } catch (_) {
@@ -1464,7 +1825,7 @@ async function enterTournament(slug, options = {}) {
     backLink.lastChild.textContent = circuitSlug ? "Circuit page" : "All tournaments";
   }
   // Load local state for this slug
-  const local = loadLocalState(slug, applyRosterSeeding, deserializeBracket);
+  const local = loadLocalState(slug, applyRosterSeedingWithMode, deserializeBracket);
   setStateObj(local);
   // Try remote meta first
   try {
@@ -1501,7 +1862,7 @@ async function enterTournament(slug, options = {}) {
   // Hydrate remote state (merge) and render
   await hydrateStateFromRemote(
     slug,
-    applyRosterSeeding,
+    applyRosterSeedingWithMode,
     deserializeBracket,
     saveState,
     renderAll
@@ -1578,6 +1939,13 @@ function setStatus(el, message, isError = false) {
   el.textContent = message || "";
   el.classList.toggle("error", !!isError);
   el.classList.toggle("status-ok", !isError);
+}
+
+function isInviteOnlyTournament(meta) {
+  if (!meta) return false;
+  if (typeof meta.isInviteOnly === "boolean") return meta.isInviteOnly;
+  const access = String(meta.accessType || meta.registrationType || "").toLowerCase();
+  return access === "closed" || access === "invite-only" || access === "invite";
 }
 
 function getDefaultMapPoolNames() {
@@ -1659,6 +2027,7 @@ function updateCheckInUI() {
     ? (state.players || []).find((p) => p.uid === currentUid)
     : null;
   const inviteStatus = normalizeInviteStatus(currentPlayer?.inviteStatus);
+  const isInviteOnly = isInviteOnlyTournament(currentTournamentMeta);
 
   if (state.isLive || !getCheckInWindowMinutesFromMeta(currentTournamentMeta) || !startMs) {
     checkInBtn.style.display = "none";
@@ -1678,7 +2047,9 @@ function updateCheckInUI() {
 
   if (!currentPlayer) {
     checkInBtn.style.display = "none";
-    checkInStatus.textContent = "Register to check in.";
+    checkInStatus.textContent = isInviteOnly && !isAdmin
+      ? "Invite required to check in."
+      : "Register to check in.";
     checkInStatus.classList.add("is-open");
     return;
   }
@@ -1718,6 +2089,30 @@ async function deleteTournamentPresence(slug) {
     await Promise.all(snap.docs.map((docSnap) => deleteDoc(docSnap.ref)));
   } catch (err) {
     console.warn("Failed to delete tournament presence data", err);
+  }
+}
+
+async function deleteTournamentChatHistory(slug) {
+  if (!slug) return;
+  try {
+    const matchesRef = collection(db, "tournamentChats", slug, "matches");
+    const matchesSnap = await getDocs(matchesRef);
+    for (const matchDoc of matchesSnap.docs) {
+      try {
+        const messagesRef = collection(matchDoc.ref, "messages");
+        const messagesSnap = await getDocs(messagesRef);
+        await Promise.all(messagesSnap.docs.map((msg) => deleteDoc(msg.ref)));
+      } catch (err) {
+        console.warn("Failed to delete match chat messages", err);
+      }
+      try {
+        await deleteDoc(matchDoc.ref);
+      } catch (err) {
+        console.warn("Failed to delete match chat doc", err);
+      }
+    }
+  } catch (err) {
+    console.warn("Failed to delete tournament chat history", err);
   }
 }
 
@@ -1816,6 +2211,7 @@ async function handleSaveSettings(event) {
   const startInput = document.getElementById("settingsStartInput");
   const maxPlayersInput = document.getElementById("settingsMaxPlayersInput");
   const checkInSelect = document.getElementById("settingsCheckInSelect");
+  const accessSelect = document.getElementById("settingsAccessSelect");
   const qualifyInput = document.getElementById("settingsCircuitQualifyCount");
   const imageInput = document.getElementById("settingsImageInput");
   const imagePreview = document.getElementById("settingsImagePreview");
@@ -1838,6 +2234,7 @@ async function handleSaveSettings(event) {
       ? null
       : Number(qualifyRaw);
   const checkInWindowMinutes = getCheckInWindowMinutes(checkInSelect);
+  const isInviteOnly = accessSelect?.value === "closed";
   const mapPool = Array.from(mapPoolSelection || []);
   const rrSettings = extractRoundRobinSettingsUI("settings", defaultRoundRobinSettings);
   const circuitPoints = currentTournamentMeta?.circuitSlug
@@ -1866,6 +2263,7 @@ async function handleSaveSettings(event) {
     maxPlayers,
     startTime,
     checkInWindowMinutes,
+    isInviteOnly,
     bestOf,
     mapPool,
     roundRobin: rrSettings,
@@ -2066,6 +2464,7 @@ async function handleCreateTournament(event) {
   const startInput = document.getElementById("tournamentStartInput");
   const maxPlayersInput = document.getElementById("tournamentMaxPlayersInput");
   const checkInSelect = document.getElementById("checkInSelect");
+  const accessSelect = document.getElementById("tournamentAccessSelect");
   const descriptionInput = document.getElementById("tournamentDescriptionInput");
   const rulesInput = document.getElementById("tournamentRulesInput");
   const imageInput = document.getElementById("tournamentImageInput");
@@ -2096,6 +2495,7 @@ async function handleCreateTournament(event) {
     ? Number(maxPlayersInput.value)
     : null;
   const checkInWindowMinutes = getCheckInWindowMinutes(checkInSelect);
+  const isInviteOnly = accessSelect?.value === "closed";
   const description = descriptionInput?.value || "";
   const rules = rulesInput?.value || "";
   const rrSettings = extractRoundRobinSettingsUI("create", defaultRoundRobinSettings);
@@ -2109,6 +2509,7 @@ async function handleCreateTournament(event) {
       maxPlayers,
       startTime,
       checkInWindowMinutes,
+      isInviteOnly,
       mapPool: Array.from(mapPoolSelection || []),
       createdBy: auth.currentUser?.uid || null,
       createdByName: getCurrentUsername() || "Unknown host",
@@ -2239,7 +2640,7 @@ document.addEventListener("tournament:notification-action", (event) => {
     saveState,
     renderAll,
     rebuildBracket,
-    seedEligiblePlayers,
+    seedEligiblePlayers: seedEligiblePlayersWithMode,
     bracketHasResults,
     showToast,
   });
@@ -2308,6 +2709,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     updatePlayerPoints,
     setPlayerCheckIn,
     removePlayer,
+    setManualSeedingEnabled,
+    getManualSeedingActive,
+    handleManualSeedingReorder,
     updateMatchScore,
     renderAll,
     saveState,
@@ -2340,6 +2744,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     await loadMapCatalog();
     setMapPoolSelection(getDefaultMapPoolNames());
     resetFinalMapPoolSelection();
+    ensureSettingsUiReady();
     initializeAuthUI();
     hydratePulseFromState(getPulseState());
     await handleRouteChange();
@@ -2587,9 +2992,9 @@ async function maybeAutoAddFinalPlayers({ force = false } = {}) {
     return;
   }
   const hasCompletedMatches = bracketHasResults();
-  const seededPlayers = applySeeding(state.players);
+  const { mergedPlayers } = seedEligiblePlayersWithMode(state.players, state);
   saveState({
-    players: seededPlayers,
+    players: mergedPlayers,
     needsReseed: hasCompletedMatches,
   });
   if (!hasCompletedMatches) {
@@ -2786,7 +3191,7 @@ function autoFillPlayers() {
     });
   });
 
-  const seededPlayers = applySeeding(state.players);
+  const seededPlayers = seedPlayersForState(state.players, state);
   saveState({ players: seededPlayers, needsReseed: false });
   rebuildBracket(true, "Dev auto-fill");
   addActivity("Auto-filled 32 players for testing.");
@@ -2868,7 +3273,7 @@ function setTestBracketCount(count) {
   });
   state.players = testPlayers;
   state.pointsLedger = ledger;
-  const seededPlayers = applySeeding(state.players);
+  const seededPlayers = seedPlayersForState(state.players, state);
   saveState({ players: seededPlayers, needsReseed: false });
   rebuildBracket(true, `Test harness (${clamped} players)`);
   updateTestHarnessLabel();
@@ -2906,6 +3311,7 @@ async function handleRegistration(event) {
   const requirePulseLinkEnabled =
     currentTournamentMeta?.requirePulseLink ?? requirePulseLinkSetting;
   const pointsField = document.getElementById("pointsInput");
+  const isInviteOnly = isInviteOnlyTournament(currentTournamentMeta);
 
   if (!auth.currentUser) {
     setStatus(
@@ -2939,6 +3345,15 @@ async function handleRegistration(event) {
     event.target.reset();
     hydratePulseFromState(pulseProfile);
     renderAll();
+    return;
+  }
+
+  if (isInviteOnly && !isAdmin) {
+    setStatus(
+      statusEl,
+      "This tournament is invite-only. Ask an admin for an invite.",
+      true
+    );
     return;
   }
 
@@ -3039,7 +3454,11 @@ async function handleRegistration(event) {
   const mainClanSelect = document.getElementById("mainClanSelect");
   const selectedClanOption = mainClanSelect?.selectedOptions?.[0];
   const selectedClanId = mainClanSelect?.value || "";
-  const countryCode = document.getElementById("settingsCountrySelect")?.value?.trim().toUpperCase() || "";
+  const profileCountry = getCurrentUserProfile?.()?.country || "";
+  const countryCode =
+    document.getElementById("settingsCountrySelect")?.value?.trim().toUpperCase() ||
+    String(profileCountry).trim().toUpperCase() ||
+    "";
   let clanName = selectedClanOption?.textContent || "";
   let clanAbbreviation = selectedClanOption?.dataset?.abbr || "";
   let clanLogoUrl = selectedClanOption?.dataset?.logoUrl || "";
@@ -3078,7 +3497,7 @@ async function handleRegistration(event) {
   });
 
   const hasCompletedMatches = bracketHasResults();
-  const { mergedPlayers } = seedEligiblePlayers(state.players);
+  const { mergedPlayers } = seedEligiblePlayersWithMode(state.players, state);
   const nextState = {
     players: mergedPlayers,
     needsReseed: hasCompletedMatches,
@@ -3232,7 +3651,7 @@ function initFinalAdminSearch() {
         pulseName: pulse.name || pulse.accountName || "",
         uid: userId,
       });
-      const { mergedPlayers } = seedEligiblePlayers(state.players);
+      const { mergedPlayers } = seedEligiblePlayersWithMode(state.players, state);
       saveState({ players: mergedPlayers });
       addActivity(`Admin invited ${newPlayer.name}.`);
       try {
@@ -3352,6 +3771,18 @@ function resolvePlayerAvatar(player) {
 
 function serializeBracket(bracket) {
   if (!bracket || typeof bracket !== "object") return bracket;
+  const toArr = (obj) =>
+    Array.isArray(obj)
+      ? obj
+      : obj && typeof obj === "object"
+      ? Object.keys(obj)
+          .sort((a, b) => Number(a) - Number(b))
+          .map((key) => obj[key])
+      : [];
+  const normalizeRounds = (rounds) =>
+    toArr(rounds)
+      .map((round) => toArr(round))
+      .filter((round) => round.length);
   const toObj = (arr) =>
     Array.isArray(arr)
       ? arr.reduce((acc, round, idx) => {
@@ -3359,11 +3790,15 @@ function serializeBracket(bracket) {
           return acc;
         }, {})
       : arr || {};
+  const winnersRounds = normalizeRounds(bracket.winners);
+  const losersRounds = normalizeRounds(bracket.losers);
   return {
     ...bracket,
-    winners: toObj(bracket.winners),
-    losers: toObj(bracket.losers),
-    groups: toObj(bracket.groups),
+    winners: toObj(winnersRounds),
+    losers: toObj(losersRounds),
+    groups: toArr(bracket.groups),
+    winnersRoundCount: winnersRounds.length,
+    losersRoundCount: losersRounds.length,
   };
 }
 
@@ -3377,10 +3812,26 @@ function deserializeBracket(bracket) {
           .sort((a, b) => Number(a) - Number(b))
           .map((key) => obj[key])
       : [];
+  const normalizeRounds = (rounds) =>
+    toArr(rounds)
+      .map((round) => toArr(round))
+      .filter((round) => round.length);
+  const clampRounds = (rounds, count) => {
+    if (!Number.isFinite(count)) return rounds;
+    return rounds.slice(0, Math.max(0, count));
+  };
+  const winners = clampRounds(
+    normalizeRounds(bracket.winners),
+    bracket.winnersRoundCount
+  );
+  const losers = clampRounds(
+    normalizeRounds(bracket.losers),
+    bracket.losersRoundCount
+  );
   return {
     ...bracket,
-    winners: toArr(bracket.winners),
-    losers: toArr(bracket.losers),
+    winners,
+    losers,
     groups: toArr(bracket.groups),
   };
 }

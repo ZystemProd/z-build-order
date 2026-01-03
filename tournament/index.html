@@ -74,6 +74,7 @@
     }
 
   </style>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css" />
   <link rel="stylesheet" href="/public/css/tournament.css" />
   <link id="clanStylesheet" rel="stylesheet" href="/public/css/clan.css" />
   <link rel="stylesheet" href="/public/css/showToast.css" />
@@ -262,6 +263,9 @@
               <button class="list-tab active" data-type-filter="tournaments">Tournaments</button>
               <button class="list-tab" data-type-filter="circuits">Circuits</button>
             </div>
+            <button id="tournamentMyFilterBtn" class="list-tab" type="button" aria-pressed="false">
+              My tournaments
+            </button>
           </div>
           <div class="tournament-filter-controls" id="tournamentFilterControls">
             <label class="tournament-filter">
@@ -304,6 +308,7 @@
               <path d="m8.5 4.5 1.5-1.5 9 9-9 9-1.5-1.5L16 12 8.5 4.5z" />
             </svg>
           </button>
+          <div class="tournament-list-pagination" aria-hidden="true"></div>
         </div>
       </div>
     </section>
@@ -549,6 +554,7 @@
               <button type="button" id="checkInBtn" class="cta ghost" style="display:none;">Check in</button>
             </div>
           </div>
+          <p id="registrationAccessNote" class="helper" style="display:none;"></p>
           <form id="registrationForm" class="form-grid">
             <label>
               Player name
@@ -630,6 +636,16 @@
             </div>
           </div>
           <p class="helper" id="finalAutoAddStatus"></p>
+          <div class="publish-checkbox-row seeding-mode-row">
+            <span>Manual seeding</span>
+            <div class="checkbox-wrapper-59">
+              <label class="switch">
+                <input type="checkbox" id="manualSeedingToggle" />
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+          <p class="helper" id="manualSeedingHelp">Automatic seeding uses points and MMR.</p>
           <div class="table-wrapper">
             <table class="players-table">
               <thead>
@@ -685,7 +701,7 @@
               </div>
             </label>
             <label>Max players
-              <input type="number" id="settingsMaxPlayersInput" min="2" max="512" placeholder="32" />
+              <input type="number" id="settingsMaxPlayersInput" min="2" max="32" value="32" />
             </label>
             <div id="settingsCircuitQualifyRow" style="display:none;">
               <label>Final qualifiers from circuit leaderboard
@@ -710,6 +726,13 @@
                 <option value="180">3h</option>
               </select>
             </label>
+            <label>Tournament access
+              <select id="settingsAccessSelect">
+                <option value="open">Open (anyone can register)</option>
+                <option value="closed">Closed (invite-only)</option>
+              </select>
+            </label>
+            <p class="helper">Invite-only tournaments require admins to invite players.</p>
             <label>Cover image
               <div class="image-upload">
                 <div class="image-upload-actions">
@@ -737,48 +760,22 @@
             <p class="helper">When enabled, players must submit their SC2Pulse link to register.</p>
           </div>
           <div class="settings-panel" id="settingsDesc">
-            <label>Description
+            <div class="markdown-field">
+              <div class="markdown-label">Description</div>
               <div class="markdown-editor">
-                <div class="markdown-toolbar">
-                  <button type="button" class="toolbar-btn" data-settings-desc-action="heading">H2</button>
-                  <button type="button" class="toolbar-btn" data-settings-desc-action="bold"><strong>B</strong></button>
-                  <button type="button" class="toolbar-btn" data-settings-desc-action="italic"><em>I</em></button>
-                  <button type="button" class="toolbar-btn" data-settings-desc-action="bullet">- List</button>
-                  <button type="button" class="toolbar-btn" data-settings-desc-action="numbered">1. List</button>
-                  <button type="button" class="toolbar-btn" data-settings-desc-action="quote">" "</button>
-                  <button type="button" class="toolbar-btn" data-settings-desc-action="link">Link</button>
-                  <button type="button" class="toolbar-btn" data-settings-desc-action="image">Image</button>
-                  <button type="button" class="toolbar-btn" data-settings-desc-action="code">&lt;/&gt;</button>
-                </div>
+                <div id="settingsDescriptionEditor" class="quill-editor"></div>
                 <textarea id="settingsDescriptionInput" class="markdown-input" rows="8"
-                  placeholder="Describe the event..."></textarea>
+                  placeholder="Describe the event..." aria-hidden="true" tabindex="-1" style="display:none;"></textarea>
               </div>
-            </label>
-            <label>Rules
-              <div class="markdown-editor">
-                <div class="markdown-toolbar">
-                  <button type="button" class="toolbar-btn" data-settings-rules-action="heading">H2</button>
-                  <button type="button" class="toolbar-btn"
-                    data-settings-rules-action="bold"><strong>B</strong></button>
-                  <button type="button" class="toolbar-btn" data-settings-rules-action="italic"><em>I</em></button>
-                  <button type="button" class="toolbar-btn" data-settings-rules-action="bullet">- List</button>
-                  <button type="button" class="toolbar-btn" data-settings-rules-action="numbered">1. List</button>
-                  <button type="button" class="toolbar-btn" data-settings-rules-action="quote">" "</button>
-                  <button type="button" class="toolbar-btn" data-settings-rules-action="link">Link</button>
-                  <button type="button" class="toolbar-btn" data-settings-rules-action="image">Image</button>
-                  <button type="button" class="toolbar-btn" data-settings-rules-action="code">&lt;/&gt;</button>
-                </div>
-                <textarea id="settingsRulesInput" class="markdown-input" rows="8"
-                  placeholder="Add eligibility, format, communication, and fair play rules..."></textarea>
-              </div>
-            </label>
-            <div class="markdown-preview">
-              <p class="eyebrow">Description Preview</p>
-              <div id="settingsDescriptionPreview" class="helper"></div>
             </div>
-            <div class="markdown-preview">
-              <p class="eyebrow">Rules Preview</p>
-              <div id="settingsRulesPreview" class="helper"></div>
+            <div class="markdown-field">
+              <div class="markdown-label">Rules</div>
+              <div class="markdown-editor">
+                <div id="settingsRulesEditor" class="quill-editor"></div>
+                <textarea id="settingsRulesInput" class="markdown-input" rows="8"
+                  placeholder="Add eligibility, format, communication, and fair play rules..." aria-hidden="true"
+                  tabindex="-1" style="display:none;"></textarea>
+              </div>
             </div>
           </div>
           <div class="settings-panel" id="settingsMaps">
@@ -1046,7 +1043,7 @@
       <div class="modal-title-row">
         <h3>Create tournament</h3>
         <div class="form-actions inline-actions">
-          <div class="template-select cta primary">
+          <div class="template-select">
             <select id="tournamentTemplateSelect" aria-label="Tournament template">
               <option value="" selected>Template</option>
               <option value="__manager__">Template manager...</option>
@@ -1091,7 +1088,7 @@
           </div>
         </label>
         <label>Max players
-          <input type="number" id="tournamentMaxPlayersInput" min="2" max="512" placeholder="32" />
+          <input type="number" id="tournamentMaxPlayersInput" min="2" max="32" value="32" />
         </label>
         <label>Check-in opens (before start)
           <select id="checkInSelect">
@@ -1110,6 +1107,13 @@
             <option value="180">3h</option>
           </select>
         </label>
+        <label>Tournament access
+          <select id="tournamentAccessSelect">
+            <option value="open" selected>Open (anyone can register)</option>
+            <option value="closed">Closed (invite-only)</option>
+          </select>
+        </label>
+        <p class="helper">Invite-only tournaments require admins to invite players.</p>
         <label>Cover image
           <div class="image-upload">
             <div class="image-upload-actions">
@@ -1127,47 +1131,23 @@
         </label>
       </div>
       <div class="settings-panel" id="createDesc">
-        <label>Description
+        <div class="markdown-field">
+          <div class="markdown-label">Description</div>
           <div class="markdown-editor">
-            <div class="markdown-toolbar">
-              <button type="button" class="toolbar-btn" data-desc-action="heading">H2</button>
-              <button type="button" class="toolbar-btn" data-desc-action="bold"><strong>B</strong></button>
-              <button type="button" class="toolbar-btn" data-desc-action="italic"><em>I</em></button>
-              <button type="button" class="toolbar-btn" data-desc-action="bullet">- List</button>
-              <button type="button" class="toolbar-btn" data-desc-action="numbered">1. List</button>
-              <button type="button" class="toolbar-btn" data-desc-action="quote">" "</button>
-              <button type="button" class="toolbar-btn" data-desc-action="link">Link</button>
-              <button type="button" class="toolbar-btn" data-desc-action="image">Image</button>
-              <button type="button" class="toolbar-btn" data-desc-action="code">&lt;/&gt;</button>
-            </div>
+            <div id="tournamentDescriptionEditor" class="quill-editor"></div>
             <textarea id="tournamentDescriptionInput" class="markdown-input" rows="10"
-              placeholder="Write rules, schedule, map pool..."></textarea>
+              placeholder="Write rules, schedule, map pool..." aria-hidden="true" tabindex="-1"
+              style="display:none;"></textarea>
           </div>
-        </label>
-        <label>Rules
-          <div class="markdown-editor">
-            <div class="markdown-toolbar">
-              <button type="button" class="toolbar-btn" data-rules-action="heading">H2</button>
-              <button type="button" class="toolbar-btn" data-rules-action="bold"><strong>B</strong></button>
-              <button type="button" class="toolbar-btn" data-rules-action="italic"><em>I</em></button>
-              <button type="button" class="toolbar-btn" data-rules-action="bullet">- List</button>
-              <button type="button" class="toolbar-btn" data-rules-action="numbered">1. List</button>
-              <button type="button" class="toolbar-btn" data-rules-action="quote">" "</button>
-              <button type="button" class="toolbar-btn" data-rules-action="link">Link</button>
-              <button type="button" class="toolbar-btn" data-rules-action="image">Image</button>
-              <button type="button" class="toolbar-btn" data-rules-action="code">&lt;/&gt;</button>
-            </div>
-            <textarea id="tournamentRulesInput" class="markdown-input" rows="10"
-              placeholder="Add eligibility, format, communication, and fair play rules..."></textarea>
-          </div>
-        </label>
-        <div class="markdown-preview">
-          <p class="eyebrow">Description Preview</p>
-          <div id="tournamentDescriptionPreview" class="helper"></div>
         </div>
-        <div class="markdown-preview">
-          <p class="eyebrow">Rules Preview</p>
-          <div id="tournamentRulesPreview" class="helper"></div>
+        <div class="markdown-field">
+          <div class="markdown-label">Rules</div>
+          <div class="markdown-editor">
+            <div id="tournamentRulesEditor" class="quill-editor"></div>
+            <textarea id="tournamentRulesInput" class="markdown-input" rows="10"
+              placeholder="Add eligibility, format, communication, and fair play rules..." aria-hidden="true"
+              tabindex="-1" style="display:none;"></textarea>
+          </div>
         </div>
       </div>
       <div class="settings-panel" id="createMaps">
@@ -1496,7 +1476,7 @@
           </div>
         </label>
         <label>Max players
-          <input type="number" id="finalTournamentMaxPlayersInput" min="2" max="512" placeholder="16" />
+          <input type="number" id="finalTournamentMaxPlayersInput" min="2" max="32" value="32" />
         </label>
         <label>Qualify from leaderboard
           <input type="number" id="finalQualifyCountInput" min="0" placeholder="8" />
@@ -1536,47 +1516,22 @@
         </label>
       </div>
       <div class="settings-panel create-final-panel" id="createFinalDesc">
-        <label>Description
+        <div class="markdown-field">
+          <div class="markdown-label">Description</div>
           <div class="markdown-editor">
-            <div class="markdown-toolbar">
-              <button type="button" class="toolbar-btn" data-final-desc-action="heading">H2</button>
-              <button type="button" class="toolbar-btn" data-final-desc-action="bold"><strong>B</strong></button>
-              <button type="button" class="toolbar-btn" data-final-desc-action="italic"><em>I</em></button>
-              <button type="button" class="toolbar-btn" data-final-desc-action="bullet">- List</button>
-              <button type="button" class="toolbar-btn" data-final-desc-action="numbered">1. List</button>
-              <button type="button" class="toolbar-btn" data-final-desc-action="quote">" "</button>
-              <button type="button" class="toolbar-btn" data-final-desc-action="link">Link</button>
-              <button type="button" class="toolbar-btn" data-final-desc-action="image">Image</button>
-              <button type="button" class="toolbar-btn" data-final-desc-action="code">&lt;/&gt;</button>
-            </div>
+            <div id="finalTournamentDescriptionEditor" class="quill-editor"></div>
             <textarea id="finalTournamentDescriptionInput" class="markdown-input" rows="10"
-              placeholder="Write rules, schedule, map pool..."></textarea>
+              placeholder="Write rules, schedule, map pool..." aria-hidden="true" tabindex="-1" style="display:none;"></textarea>
           </div>
-        </label>
-        <label>Rules
-          <div class="markdown-editor">
-            <div class="markdown-toolbar">
-              <button type="button" class="toolbar-btn" data-final-rules-action="heading">H2</button>
-              <button type="button" class="toolbar-btn" data-final-rules-action="bold"><strong>B</strong></button>
-              <button type="button" class="toolbar-btn" data-final-rules-action="italic"><em>I</em></button>
-              <button type="button" class="toolbar-btn" data-final-rules-action="bullet">- List</button>
-              <button type="button" class="toolbar-btn" data-final-rules-action="numbered">1. List</button>
-              <button type="button" class="toolbar-btn" data-final-rules-action="quote">" "</button>
-              <button type="button" class="toolbar-btn" data-final-rules-action="link">Link</button>
-              <button type="button" class="toolbar-btn" data-final-rules-action="image">Image</button>
-              <button type="button" class="toolbar-btn" data-final-rules-action="code">&lt;/&gt;</button>
-            </div>
-            <textarea id="finalTournamentRulesInput" class="markdown-input" rows="10"
-              placeholder="Add eligibility, format, communication, and fair play rules..."></textarea>
-          </div>
-        </label>
-        <div class="markdown-preview">
-          <p class="eyebrow">Description Preview</p>
-          <div id="finalTournamentDescriptionPreview" class="helper"></div>
         </div>
-        <div class="markdown-preview">
-          <p class="eyebrow">Rules Preview</p>
-          <div id="finalTournamentRulesPreview" class="helper"></div>
+        <div class="markdown-field">
+          <div class="markdown-label">Rules</div>
+          <div class="markdown-editor">
+            <div id="finalTournamentRulesEditor" class="quill-editor"></div>
+            <textarea id="finalTournamentRulesInput" class="markdown-input" rows="10"
+              placeholder="Add eligibility, format, communication, and fair play rules..." aria-hidden="true"
+              tabindex="-1" style="display:none;"></textarea>
+          </div>
         </div>
       </div>
       <div class="settings-panel create-final-panel" id="createFinalMaps">
@@ -2121,6 +2076,24 @@
         <button class="cta ghost" id="castMatchBtn" style="display:none;">Cast</button>
       </div>
       <p class="helper match-cast-status" id="castMatchStatus" style="display:none;"></p>
+      <div class="match-chat" id="matchChatSection" style="display:none;">
+        <div class="match-chat-toggle-row">
+          <button class="cta ghost small match-chat-toggle" id="matchChatToggle" type="button"
+            aria-expanded="false" aria-controls="matchChatPanel">
+            <span class="match-chat-label" id="matchChatLabel">Match chat</span>
+          </button>
+          <span class="match-chat-unread" id="matchChatUnread" aria-hidden="true"></span>
+        </div>
+        <div class="match-chat-panel" id="matchChatPanel" style="display:none;">
+          <div class="match-chat-history custom-scroll" id="matchChatHistory"></div>
+          <form class="match-chat-form" id="matchChatForm">
+            <input id="matchChatInput" type="text" maxlength="500" placeholder="Message..."
+              autocomplete="off" />
+            <button class="cta small primary" id="matchChatSendBtn" type="submit">Send</button>
+          </form>
+          <p class="helper" id="matchChatStatus"></p>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -2167,6 +2140,7 @@
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
 </body>
 
 </html>
