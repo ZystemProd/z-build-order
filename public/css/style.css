@@ -22,12 +22,12 @@
   --active-color: #3b7493;
   --link-color: #fc0;
   /* Rails sizing for right-edge variation lines */
-  --rails-line-width: 6px;     /* width of a single vertical label line */
-  --rails-gap: 3px;            /* gap between lines */
-  --rails-max-lines: 5;        /* we render up to 5 */
+  --rails-line-width: 6px; /* width of a single vertical label line */
+  --rails-gap: 3px; /* gap between lines */
+  --rails-max-lines: 5; /* we render up to 5 */
   --rails-right-padding: calc(
-    var(--rails-line-width) * var(--rails-max-lines) +
-    var(--rails-gap) * (var(--rails-max-lines) - 1) + 10px
+    var(--rails-line-width) * var(--rails-max-lines) + var(--rails-gap) *
+      (var(--rails-max-lines) - 1) + 10px
   );
 }
 
@@ -41,6 +41,18 @@ body {
   overflow-y: scroll; /* Show vertical scrollbar */
   overflow-x: hidden;
   min-height: 100%;
+}
+
+#landingView {
+  margin-top: 65px;
+}
+
+.card-header {
+  user-select: none;
+}
+
+.ghost-link {
+  user-select: none;
 }
 
 /* Replay drag-and-drop overlay */
@@ -241,6 +253,9 @@ body.dark .transpose-group {
   border: 4px solid rgba(255, 255, 255, 0.2);
   border-top: 4px solid #ffffff;
   border-radius: 50%;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  aspect-ratio: 1 / 1;
   animation: spin 0.8s linear infinite;
   margin: 40px auto;
 }
@@ -280,10 +295,12 @@ body.dark .transpose-group {
   border: 2px solid transparent;
   cursor: pointer; /* Make the whole container clickable */
   transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  user-select: none;
 }
 
-/* Map Veto tile matches auth-container styling */
-#mapVetoTile.map-veto-tile {
+/* Floating utility tiles beside auth-container */
+#mapVetoTile.map-veto-tile,
+#tournamentTile.tournament-tile {
   position: fixed;
   top: 10px;
   right: 10px; /* Will be adjusted via JS to sit left of auth-container */
@@ -303,13 +320,21 @@ body.dark .transpose-group {
   transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
-#mapVetoTile.map-veto-tile:hover {
+#mapVetoTile.map-veto-tile:hover,
+#tournamentTile.tournament-tile:hover {
   transform: none;
   box-shadow: 0 0 10px #00bfff78;
 }
 
-/* Inline header veto button is hidden by default (desktop uses floating tile) */
-#mapVetoBtn {
+#tournamentTile.tournament-tile {
+  background: linear-gradient(135deg, #3a2b55, #253358);
+  border: 1px solid rgba(255, 193, 7, 0.35);
+  box-shadow: 0 0 12px rgba(255, 193, 7, 0.25);
+}
+
+/* Inline header buttons are hidden by default (desktop uses floating tiles) */
+#mapVetoBtn,
+#tournamentBtn {
   display: none;
 }
 
@@ -339,87 +364,12 @@ body.dark .transpose-group {
   border: 0;
 }
 
-/* Game Selector */
-#game-select {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  padding: 10px;
-  height: 70px;
-  width: 70px;
-  background-color: #37373780;
-  border-radius: 12px;
-  display: none !important;
-  flex-direction: column;
-  align-items: center;
-  z-index: 999;
-}
-
-#game-select .selected-game img {
-  width: 50px;
-  height: 50px;
-  object-fit: cover;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-#game-select .game-dropdown {
-  display: none;
-  position: absolute;
-  top: 60px;
-  left: 0;
-  background-color: #373737;
-  padding: 5px;
-  border-radius: 8px;
-  min-width: 210px;
-  white-space: nowrap;
-}
-
-#game-select .game-dropdown {
-  display: none;
-}
-
-#game-select .game-dropdown {
-  display: none;
-}
-
-#game-select .game-dropdown.open {
-  display: block;
-}
-
-#game-select .game-option {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px;
-}
-
-#game-select .game-option img {
-  width: 30px;
-  height: 30px;
-  border-radius: 4px;
-}
-
-#game-select .game-option.disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-#game-select:hover {
-  background-color: #6b6b6b80;
-}
-
+/* Dropdown button */
 .dropdown {
   position: relative;
   display: inline-block;
 }
 
-#game-select .game-dropdown .game-option:hover {
-  background-color: #f0f0f02b; /* or your highlight color */
-  cursor: pointer;
-}
-
-/* Dropdown button */
 .dropdown-btn {
   background-color: #444;
   color: white;
@@ -1110,12 +1060,15 @@ button:hover {
 .branch-select-mode #buildOrderTable {
   position: relative;
   z-index: 2001; /* above the dim overlay */
-  box-shadow: 0 0 0 2px rgba(95, 229, 255, 0.25), 0 12px 36px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 0 0 2px rgba(95, 229, 255, 0.25),
+    0 12px 36px rgba(0, 0, 0, 0.45);
 }
 .branch-select-mode #buildOrderTable {
   cursor: crosshair;
 }
-.branch-select-mode { cursor: not-allowed; }
+.branch-select-mode {
+  cursor: not-allowed;
+}
 .branch-select-mode #buildOrderTable tr:hover td {
   background-color: rgba(255, 255, 255, 0.04);
 }
@@ -1600,6 +1553,47 @@ textarea::-webkit-scrollbar-thumb:hover {
   background-color: rgba(0, 0, 0, 0.4); /* Black with opacity */
 }
 
+#settingsModal {
+  padding: 4vh 0;
+}
+
+#settingsModal .modal-content {
+  margin: 4vh auto;
+  height: auto;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  width: 610px;
+  padding: 14px 20px 20px;
+  position: relative;
+  background: #1f1f1f;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+#settingsModal .settings-panel {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 12px;
+}
+
+#settingsModal .settings-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+#settingsModal .settings-panel::-webkit-scrollbar-thumb {
+  background: #444;
+  border-radius: 3px;
+}
+
+#settingsModal .settings-panel::-webkit-scrollbar-thumb:hover {
+  background: #5a5a5a;
+}
+
+#settingsModal .settings-panel {
+  scrollbar-width: thin;
+  scrollbar-color: #444 transparent;
+}
+
 body.modal-open {
   overflow: hidden;
 }
@@ -1617,7 +1611,8 @@ body.modal-open {
   margin: 10% auto; /* 10% from the top and centered */
   padding: 20px;
   border: 1px solid #888;
-  max-width: 70%; /* Width of the modal */
+  max-width: 80%; /* Width of the modal */
+  width: 560px;
   height: 70%;
   border-radius: 8px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
@@ -4204,6 +4199,13 @@ td {
   animation: softPulse 1.5s ease-in-out infinite;
 }
 
+/* SC2Pulse help icon in settings: tighter sizing, no extra margin */
+#pulseHelpBtn {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+}
+
 @keyframes softPulse {
   0% {
     box-shadow: 0 0 10px rgba(0, 191, 255, 0.4);
@@ -4404,6 +4406,8 @@ td {
   max-width: 420px;
   min-height: 400px;
   height: auto;
+  max-height: 90vh;
+  overflow-y: auto;
   background: #2b2b2b;
   padding: 30px 24px;
   border-radius: 14px;
@@ -4556,6 +4560,9 @@ td {
   border: 2px solid #ccc;
   border-top: 2px solid #00e676;
   border-radius: 50%;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  aspect-ratio: 1 / 1;
   animation: spin 1s linear infinite;
   z-index: 2;
 }
@@ -4582,6 +4589,7 @@ td {
   z-index: 1000;
   display: none;
   animation: fadeIn 0.2s ease-in-out;
+  user-select: none;
 }
 
 .user-menu .menu-section {
@@ -4593,6 +4601,16 @@ td {
   text-align: center;
   padding: 0 12px 6px;
   word-break: break-word;
+}
+
+.user-menu .user-mmr {
+  display: none;
+  text-align: center;
+  padding: 0 12px 6px;
+  margin-top: -4px;
+  color: #9ae6b4;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .menu-item {
@@ -4803,6 +4821,16 @@ td {
   gap: 12px;
   margin-bottom: 16px;
   padding-top: 4px;
+}
+
+.clan-views {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* Subview tabs inside Manage */
@@ -5794,17 +5822,23 @@ button.btn-small {
   }
   #showBuildsButton,
   #showCommunityModalButton,
-  #mapVetoBtn {
+  #mapVetoBtn,
+  #tournamentBtn {
     transform: scale(1.4);
     margin: 5px;
   }
   /* Show inline veto button and hide floating tile on mobile */
-  #mapVetoBtn {
+  #mapVetoBtn,
+  #tournamentBtn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
   }
-  #mapVetoTile {
+  #tournamentBtn {
+    display: none;
+  }
+  #mapVetoTile,
+  #tournamentTile {
     display: none !important;
   }
   .filters-wrapper {
@@ -6247,23 +6281,6 @@ optgroup[label="Terran"] {
     border: none;
     margin-left: auto;
   }
-  #main-header #game-select {
-    position: relative;
-    top: 0;
-    right: 0;
-    background-color: transparent;
-    padding: 0;
-    height: 40px;
-    flex-direction: row;
-  }
-  #main-header #game-select .selected-game img {
-    width: 32px;
-    height: 32px;
-  }
-  #main-header #game-select .game-dropdown {
-    top: calc(100% + 5px);
-    right: 0;
-  }
   #main-header button {
     border: none;
     padding: 0 10px;
@@ -6418,6 +6435,9 @@ optgroup[label="Terran"] {
   font-weight: 600;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  width: auto;
+  min-width: 0;
+  text-transform: none;
 }
 
 .settings-avatar-button:hover {
@@ -6431,6 +6451,68 @@ optgroup[label="Terran"] {
   margin: 18px 0;
 }
 
+.settings-modal-title {
+  margin: 0 0 10px;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+#settingsModal .close-modal {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.settings-tabs {
+  display: flex;
+  gap: 0;
+  margin: 0;
+  flex-wrap: wrap;
+  padding: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.settings-tab-btn {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: none;
+  background: #2f2f2f;
+  background: rgba(255, 255, 255, 0.04);
+  color: #e6e6e6;
+  border-radius: 10px 10px 0 0;
+  padding: 8px 18px;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+  user-select: none;
+  font-weight: 600;
+  position: relative;
+  top: 0;
+  margin: 0;
+}
+
+.settings-tab-btn.active {
+  background: linear-gradient(135deg, #4cc9f0, #4895ef);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  box-shadow: none;
+  z-index: 1;
+}
+
+.settings-panel {
+  display: none;
+  gap: 12px;
+  flex-direction: column;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 14px;
+  margin-top: 0;
+}
+
+.settings-panel.active {
+  display: flex;
+}
+
 .settings-username-section {
   display: flex;
   flex-direction: column;
@@ -6438,15 +6520,116 @@ optgroup[label="Terran"] {
   margin: 6px 0 14px;
 }
 
+.settings-secondary-pulse {
+  margin-top: 6px;
+}
+
+.secondary-pulse-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+  color: #f5f4f1;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+  font-size: 0.9rem;
+  user-select: none;
+}
+
+.secondary-pulse-button:hover {
+  border-color: rgba(0, 188, 212, 0.6);
+  background: rgba(0, 188, 212, 0.08);
+}
+
+.secondary-pulse-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.secondary-pulse-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.secondary-pulse-row input {
+  flex: 1;
+}
+
+.secondary-remove-btn {
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.05);
+  color: #e86363;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.secondary-remove-btn:hover {
+  border-color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.12);
+}
+
+.secondary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
 .settings-label {
   font-weight: 600;
   color: #e6e6e6;
+}
+
+.settings-label-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .settings-username-row {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.mmr-badge-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.mmr-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--race-color, #9ae6b4);
+  background: rgba(255, 255, 255, 0.05);
+  color: #f0f0f0;
+  font-weight: 700;
+}
+
+.mmr-badge-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
+.mmr-updated {
+  margin-top: 6px;
+  color: #9ca3af;
+  font-size: 0.9rem;
 }
 
 .settings-input {

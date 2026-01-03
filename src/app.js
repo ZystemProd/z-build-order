@@ -1,47 +1,50 @@
-import { initializeApp } from "firebase/app";
-import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
-import { initAnalytics } from "./js/modules/analyticsHelper.js";
+import { app, auth, db } from "./js/modules/firebase.js";
+import { initCookieConsent } from "./js/modules/cookieConsent.js";
 import {
-  getAuth,
-  GoogleAuthProvider,
-  signInWithPopup,
+  deferSvgImagesIn,
+  deferWebpImagesIn,
+  hydrateLazyImages,
+  observeVisibilityForLazyImages,
+  setupModalImageLazyLoading,
+} from "./js/modules/ui/lazyImages.js";
+import {
+  initFloatingTilePositioning,
+  updateFloatingTilePositions,
+} from "./js/modules/ui/floatingTiles.js";
+import {
   signOut,
-  deleteUser,
-  onAuthStateChanged,
   setPersistence,
   browserLocalPersistence,
 } from "firebase/auth";
 import {
-  initializeFirestore,
-  getDocs,
-  collection,
-  doc,
-  getDoc,
-  setDoc,
-  deleteDoc,
-  runTransaction,
-  writeBatch,
-  query,
-  where,
-  collectionGroup,
-  persistentLocalCache,
-  persistentMultipleTabManager,
-  memoryLocalCache,
-} from "firebase/firestore";
-import { bannedWords } from "./js/data/bannedWords.js";
-import { showToast } from "./js/modules/toastHandler.js";
-import { resetBuildInputs } from "./js/modules/utils.js";
-
-// Firebase config
-const firebaseConfig = {
-  apiKey: "AIzaSyBBLnneYwLDfIp-Oep2MvExGnVk_EvDQoo",
-  authDomain: "z-build-order.firebaseapp.com",
-  projectId: "z-build-order",
-  storageBucket: "z-build-order.firebasestorage.app",
-  messagingSenderId: "22023941178",
-  appId: "1:22023941178:web:ba417e9a52332a8e055903",
-  measurementId: "G-LBDMKMG1W9",
-};
+  closeUserMenu,
+  handleSignIn,
+  handleSignOut,
+  handleSwitchAccount,
+  initAuthMenuToggle,
+  initializeAuthUI,
+} from "./js/modules/auth/ui.js";
+import { initDeleteAccountFlow } from "./js/modules/auth/deleteAccount.js";
+import {
+  DEFAULT_AVATAR_URL,
+  getCurrentUserAvatarUrl,
+  setupAvatarModal,
+} from "./js/modules/settings/avatar.js";
+import {
+  setupUsernameSettingsSection,
+} from "./js/modules/settings/username.js";
+import {
+  buildMmrBadges,
+  setupPulseSettingsSection,
+  setupSecondaryPulseModal,
+} from "./js/modules/settings/pulse.js";
+import { setupTwitchSettingsSection } from "./js/modules/settings/twitch.js";
+import { setupCountrySelector } from "./js/modules/settings/country.js";
+import {
+  getCurrentUsername as getCurrentUsernameState,
+  getCurrentUserProfile,
+  getPulseState,
+} from "./js/modules/settings/state.js";
 
 // --- DOM Reset --- //
 document.addEventListener("DOMContentLoaded", () => {
@@ -53,372 +56,29 @@ document.addEventListener("DOMContentLoaded", () => {
   if (userPhoto) userPhoto.style.display = "none";
   if (userName) userName.style.display = "none";
   if (userNameMenu) userNameMenu.style.display = "none";
-  if (userMenu) userMenu.style.display = "none";
-
-  setupUsernameSettingsSection();
-
-  // Position the Map Veto tile relative to auth-container
-  try { updateMapVetoPosition(); } catch (_) {}
-});
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = initializeFirestore(app, {
-  localCache:
-    typeof window === "undefined"
-      ? memoryLocalCache()
-      : persistentLocalCache({
-          tabManager: persistentMultipleTabManager(),
-        }),
-});
-const provider = new GoogleAuthProvider();
-
-const appCheck = initializeAppCheck(app, {
-  provider: new ReCaptchaV3Provider("6LcBBWsrAAAAALLmBNIhl-zKPa8KRj8mXMldoKbN"),
-  isTokenAutoRefreshEnabled: true, // auto refresh recommended
-});
-
-function updateMapVetoPosition() {
-  const authEl = document.getElementById("auth-container");
-  const vetoEl = document.getElementById("mapVetoTile");
-  if (!authEl || !vetoEl) return;
-
-  // Skip on mobile (tile is hidden there)
-  if (window.matchMedia && window.matchMedia("(max-width: 768px)").matches) {
-    return;
+  if (userMenu) {
+    userMenu.style.display = "none";
+    deferWebpImagesIn(userMenu);
+    deferSvgImagesIn(userMenu);
+    observeVisibilityForLazyImages(userMenu);
   }
-
-  // Preferred horizontal gap between elements
-  const gap = 16; // px
-
-  const rect = authEl.getBoundingClientRect();
-  if (!rect || rect.width === 0) {
-    vetoEl.style.right = "10px";
-    return;
+  const replayOverlay = document.getElementById("replayDropOverlay");
+  if (replayOverlay) {
+    deferSvgImagesIn(replayOverlay);
+    observeVisibilityForLazyImages(replayOverlay);
   }
+  setupModalImageLazyLoading();
 
-  // Place tile to the left of auth container with a fixed gap
-  const targetRight = Math.max(10, window.innerWidth - rect.left + gap);
-  vetoEl.style.right = `${targetRight}px`;
-}
-
-window.addEventListener("resize", () => {
-  try { updateMapVetoPosition(); } catch (_) {}
-});
-window.addEventListener("load", () => {
-  try { updateMapVetoPosition(); } catch (_) {}
-});
-
-function initCookieConsent() {
-  const banner = document.getElementById("cookieBanner");
-  const acceptBtn = document.getElementById("cookieAccept");
-  const declineBtn = document.getElementById("cookieDecline");
-
-  const consent = localStorage.getItem("analyticsConsent");
-
-  if (consent === "accepted") {
-    import("firebase/analytics").then(({ getAnalytics }) => {
-      getAnalytics(app);
-      initAnalytics(app);
-    });
-    if (banner) banner.style.display = "none";
-    return;
-  }
-
-  if (consent === "declined") {
-    if (banner) banner.style.display = "none";
-    return;
-  }
-
-  if (!banner) return;
-
-  banner.style.display = "block";
-  if (acceptBtn) {
-    acceptBtn.addEventListener("click", async () => {
-      localStorage.setItem("analyticsConsent", "accepted");
-      banner.style.display = "none";
-      try {
-        const { getAnalytics } = await import("firebase/analytics");
-        getAnalytics(app);
-        initAnalytics(app);
-      } catch (_) {
-        // ignore analytics load errors
-      }
-    });
-  }
-  if (declineBtn) {
-    declineBtn.addEventListener("click", () => {
-      localStorage.setItem("analyticsConsent", "declined");
-      banner.style.display = "none";
-    });
-  }
-}
-
-initCookieConsent();
-
-const DEFAULT_AVATAR_URL = "img/avatar/marine_avatar_1.webp";
-const AVATAR_MANIFEST_URL = "img/avatar/avatars.json";
-const FALLBACK_AVATAR_OPTIONS = [
-  "img/avatar/marine_avatar_1.webp",
-  "img/avatar/protoss_avatar_1.webp",
-  "img/avatar/zergling_avatar_1.webp",
-];
-
-let currentUserAvatarUrl = DEFAULT_AVATAR_URL;
-let avatarOptionsCache = null;
-let avatarModalInitialized = false;
-let lastFocusedBeforeAvatarModal = null;
-let currentUsername = null;
-let usernameFormInitialized = false;
-const normalizedBannedWords = bannedWords.map((word) =>
-  (word || "").toLowerCase()
-);
-
-const avatarModalElements = {
-  changeBtn: null,
-  modal: null,
-  grid: null,
-  closeBtn: null,
-};
-
-function sanitizeAvatarUrl(url) {
-  if (typeof url !== "string") return DEFAULT_AVATAR_URL;
-  const trimmed = url.trim();
-  if (!trimmed) return DEFAULT_AVATAR_URL;
-  const lower = trimmed.toLowerCase();
-  const allowedStarts = [
-    "http://",
-    "https://",
-    "data:image",
-    "img/",
-    "/img/",
-    "./img/",
-  ];
-  if (allowedStarts.some((prefix) => lower.startsWith(prefix))) {
-    return trimmed.replace(/^\.\//, "");
-  }
-  return trimmed.endsWith(".webp")
-    ? `img/avatar/${trimmed}`
-    : DEFAULT_AVATAR_URL;
-}
-
-function emitAvatarUpdate(avatarUrl) {
-  const sanitized = sanitizeAvatarUrl(avatarUrl);
-  const settingsPreview = document.getElementById("settingsCurrentAvatar");
-  if (settingsPreview) {
-    settingsPreview.src = sanitized;
-  }
-
-  window.dispatchEvent(
-    new CustomEvent("user-avatar-updated", { detail: { avatarUrl: sanitized } })
-  );
-}
-
-async function loadAvatarOptions() {
-  if (Array.isArray(avatarOptionsCache) && avatarOptionsCache.length) {
-    return avatarOptionsCache;
-  }
-
-  const options = new Set([DEFAULT_AVATAR_URL]);
-
+  // Position the floating utility tiles relative to auth-container
   try {
-    const response = await fetch(AVATAR_MANIFEST_URL, { cache: "no-store" });
-    if (response.ok) {
-      const payload = await response.json();
-      if (Array.isArray(payload)) {
-        payload.forEach((entry) => {
-          if (typeof entry !== "string") return;
-          const sanitized = sanitizeAvatarUrl(entry);
-          if (sanitized) options.add(sanitized);
-        });
-      }
-    }
-  } catch (error) {
-    console.warn(
-      "Failed to load avatar manifest, using fallback avatars.",
-      error
-    );
-  }
+    updateFloatingTilePositions();
+  } catch (_) {}
+});
 
-  FALLBACK_AVATAR_OPTIONS.forEach((fallback) => {
-    const sanitized = sanitizeAvatarUrl(fallback);
-    if (sanitized) options.add(sanitized);
-  });
+initFloatingTilePositioning();
+initCookieConsent(app);
 
-  avatarOptionsCache = Array.from(options);
-  return avatarOptionsCache;
-}
-
-function updateAvatarSelectionHighlight(selectedUrl) {
-  const grid = avatarModalElements.grid;
-  if (!grid) return;
-
-  const sanitizedSelected = sanitizeAvatarUrl(selectedUrl);
-
-  grid.querySelectorAll(".avatar-option").forEach((button) => {
-    const isSelected = button.dataset.avatar === sanitizedSelected;
-    button.classList.toggle("is-selected", isSelected);
-    button.setAttribute("aria-pressed", isSelected ? "true" : "false");
-  });
-}
-
-async function populateAvatarGrid() {
-  const grid = avatarModalElements.grid;
-  if (!grid) return;
-
-  const avatars = await loadAvatarOptions();
-  grid.innerHTML = "";
-
-  avatars.forEach((avatarUrl) => {
-    const sanitized = sanitizeAvatarUrl(avatarUrl);
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "avatar-option";
-    button.dataset.avatar = sanitized;
-    button.setAttribute("aria-pressed", "false");
-    button.setAttribute("aria-label", "Select avatar");
-
-    const img = document.createElement("img");
-    img.src = sanitized;
-    img.alt = "Avatar option";
-    img.loading = "lazy";
-
-    button.appendChild(img);
-    button.addEventListener("click", () => handleAvatarSelection(sanitized));
-    grid.appendChild(button);
-  });
-
-  updateAvatarSelectionHighlight(currentUserAvatarUrl);
-}
-
-async function openAvatarModal() {
-  if (!avatarModalInitialized) return;
-  if (!auth.currentUser) {
-    showToast("Sign in to change your avatar.", "info");
-    return;
-  }
-
-  closeUserMenu();
-  await populateAvatarGrid();
-
-  const modal = avatarModalElements.modal;
-  if (!modal) return;
-
-  lastFocusedBeforeAvatarModal = document.activeElement;
-  modal.style.display = "block";
-  modal.setAttribute("aria-hidden", "false");
-
-  const focusTarget =
-    avatarModalElements.closeBtn ||
-    modal.querySelector(".avatar-option") ||
-    modal;
-  if (focusTarget && typeof focusTarget.focus === "function") {
-    focusTarget.focus();
-  }
-}
-
-function closeAvatarModal() {
-  const modal = avatarModalElements.modal;
-  if (!modal) return;
-
-  modal.style.display = "none";
-  modal.setAttribute("aria-hidden", "true");
-  if (
-    lastFocusedBeforeAvatarModal &&
-    typeof lastFocusedBeforeAvatarModal.focus === "function"
-  ) {
-    lastFocusedBeforeAvatarModal.focus();
-  }
-  lastFocusedBeforeAvatarModal = null;
-}
-
-async function handleAvatarSelection(avatarUrl) {
-  const user = auth.currentUser;
-  if (!user) {
-    showToast("Sign in to change your avatar.", "info");
-    return;
-  }
-
-  const sanitized = sanitizeAvatarUrl(avatarUrl);
-  if (!sanitized) return;
-
-  try {
-    const userRef = doc(db, "users", user.uid);
-    await setDoc(
-      userRef,
-      { profile: { avatarUrl: sanitized } },
-      { merge: true }
-    );
-
-    currentUserAvatarUrl = sanitized;
-    updateAvatarSelectionHighlight(sanitized);
-
-    if (auth.currentUser) {
-      auth.currentUser.photoURL = sanitized;
-    }
-
-    const userPhotoEl = document.getElementById("userPhoto");
-    if (userPhotoEl) {
-      userPhotoEl.src = sanitized;
-    }
-
-    emitAvatarUpdate(sanitized);
-    showToast("Avatar updated!", "success");
-    closeAvatarModal();
-  } catch (error) {
-    console.error("Failed to update avatar:", error);
-    showToast("Failed to update avatar. Please try again.", "error");
-  }
-}
-
-function resolveUserAvatar(userData) {
-  const profileAvatar = userData?.profile?.avatarUrl;
-  if (profileAvatar) return profileAvatar;
-  return "img/default-avatar.webp";
-}
-
-function setupAvatarModal() {
-  if (avatarModalInitialized) {
-    updateAvatarSelectionHighlight(currentUserAvatarUrl);
-    return;
-  }
-
-  const changeBtn = document.getElementById("changeAvatarBtn");
-  const modal = document.getElementById("avatarModal");
-  const grid = document.getElementById("avatarGrid");
-  const closeBtn = document.getElementById("closeAvatarModal");
-
-  if (!changeBtn || !modal || !grid || !closeBtn) {
-    return;
-  }
-
-  avatarModalElements.changeBtn = changeBtn;
-  avatarModalElements.modal = modal;
-  avatarModalElements.grid = grid;
-  avatarModalElements.closeBtn = closeBtn;
-
-  changeBtn.addEventListener("click", async (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    await openAvatarModal();
-  });
-
-  closeBtn.addEventListener("click", closeAvatarModal);
-  modal.addEventListener("click", (event) => {
-    if (event.target === modal) {
-      closeAvatarModal();
-    }
-  });
-
-  window.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && modal.style.display === "block") {
-      closeAvatarModal();
-    }
-  });
-
-  avatarModalInitialized = true;
-}
+let settingsUiReady = false;
 
 /*
 // If testing locally, you can enable Firebase emulators by importing
@@ -427,676 +87,25 @@ function setupAvatarModal() {
 */
 // Set persistence
 setPersistence(auth, browserLocalPersistence);
+initAuthMenuToggle();
+initDeleteAccountFlow({ closeUserMenu });
 
-/*********************************************************************
- * Username Management
- *********************************************************************/
-function containsBannedUsernameWord(username) {
-  const lower = (username || "").toLowerCase();
-  return normalizedBannedWords.some((badWord) => lower.includes(badWord));
+// Expose for other modules that run before module bundling combines scope
+if (typeof window !== "undefined") {
+  window.buildMmrBadges = buildMmrBadges;
+  window.hydrateLazyImages = hydrateLazyImages;
 }
 
-function validateUsernameValue(rawInput) {
-  const trimmed = typeof rawInput === "string" ? rawInput.trim() : "";
-  if (!trimmed) {
-    return { valid: false, message: "Username cannot be empty." };
-  }
-  if (!/^[a-zA-Z0-9_]{3,20}$/.test(trimmed)) {
-    return {
-      valid: false,
-      message: "Username must be 3-20 characters, only letters, numbers, or _",
-    };
-  }
-  if (containsBannedUsernameWord(trimmed)) {
-    return {
-      valid: false,
-      message: "Username contains inappropriate words or reserved terms.",
-    };
-  }
-  return { valid: true, cleaned: trimmed, message: "" };
-}
-
-function setSettingsUsernameStatus(message, tone = "muted") {
-  const statusEl = document.getElementById("settingsUsernameStatus");
-  if (!statusEl) return;
-
-  let color = "#b0b0b0";
-  if (tone === "error") color = "#ff9a9a";
-  else if (tone === "success") color = "#9ae6b4";
-  else if (tone === "info") color = "#8be9fd";
-
-  statusEl.textContent = message;
-  statusEl.style.color = color;
-}
-
-function setSettingsUsernameValue(value) {
-  const input = document.getElementById("settingsUsernameInput");
-  if (input) input.value = value || "";
-}
-
-function setSettingsUsernameDisabled(isDisabled) {
-  const input = document.getElementById("settingsUsernameInput");
-  const saveBtn = document.getElementById("saveUsernameButton");
-  if (input) input.disabled = isDisabled;
-  if (saveBtn) saveBtn.disabled = isDisabled;
-}
-
-function setupUsernameSettingsSection() {
-  if (usernameFormInitialized) return;
-  const input = document.getElementById("settingsUsernameInput");
-  const saveBtn = document.getElementById("saveUsernameButton");
-  if (!input || !saveBtn) return;
-
-  input.addEventListener("input", () => {
-    const value = input.value || "";
-    if (!value.trim()) {
-      input.classList.remove("username-valid", "username-invalid");
-      setSettingsUsernameStatus(
-        "Use 3-20 letters, numbers, or underscores.",
-        "muted"
-      );
-      return;
-    }
-
-    const validation = validateUsernameValue(value);
-    if (validation.valid) {
-      input.classList.add("username-valid");
-      input.classList.remove("username-invalid");
-      setSettingsUsernameStatus(
-        "Looks good. Availability is checked when you save.",
-        "info"
-      );
-    } else {
-      input.classList.remove("username-valid");
-      input.classList.add("username-invalid");
-      setSettingsUsernameStatus(validation.message, "error");
-    }
-  });
-
-  saveBtn.addEventListener("click", async (event) => {
-    event.preventDefault();
-    await handleUsernameUpdate();
-  });
-
-  usernameFormInitialized = true;
-}
-
-async function writeInBatches(docSnaps, updater) {
-  if (!Array.isArray(docSnaps) || docSnaps.length === 0) return;
-
-  let batch = writeBatch(db);
-  const commits = [];
-  let opCount = 0;
-
-  for (const snap of docSnaps) {
-    updater(batch, snap);
-    opCount += 1;
-    if (opCount >= 450) {
-      commits.push(batch.commit());
-      batch = writeBatch(db);
-      opCount = 0;
-    }
-  }
-
-  if (opCount > 0) {
-    commits.push(batch.commit());
-  }
-
-  await Promise.all(commits);
-}
-
-async function updateUserBuildUsernames(userId, newUsername) {
-  const buildsRef = collection(db, `users/${userId}/builds`);
-  const snap = await getDocs(buildsRef);
-  if (snap.empty) return;
-
-  await writeInBatches(snap.docs, (batch, docSnap) => {
-    batch.set(
-      docSnap.ref,
-      { publisher: newUsername, username: newUsername },
-      { merge: true }
-    );
-  });
-}
-
-async function updatePublishedBuildUsernames(userId, newUsername) {
-  const publishedRef = collection(db, "publishedBuilds");
-  const publishedSnap = await getDocs(
-    query(publishedRef, where("publisherId", "==", userId))
-  );
-  if (publishedSnap.empty) return;
-
-  await writeInBatches(publishedSnap.docs, (batch, docSnap) => {
-    batch.set(
-      docSnap.ref,
-      { username: newUsername, publisher: newUsername },
-      { merge: true }
-    );
-  });
-}
-
-async function updateUserCommentsUsername(userId, newUsername) {
-  const commentsSnap = await getDocs(
-    query(collectionGroup(db, "comments"), where("userId", "==", userId))
-  );
-  if (commentsSnap.empty) return;
-
-  await writeInBatches(commentsSnap.docs, (batch, docSnap) => {
-    batch.update(docSnap.ref, { username: newUsername });
-  });
-}
-
-async function propagateUsernameChange(userId, newUsername) {
-  let hadError = false;
-  const tasks = [
-    updateUserBuildUsernames(userId, newUsername).catch((err) => {
-      console.error("? Failed to update personal builds with new username", err);
-      hadError = true;
-    }),
-    updatePublishedBuildUsernames(userId, newUsername).catch((err) => {
-      console.error("? Failed to update published builds with new username", err);
-      hadError = true;
-    }),
-    updateUserCommentsUsername(userId, newUsername).catch((err) => {
-      console.error("? Failed to update comments with new username", err);
-      hadError = true;
-    }),
-  ];
-
-  await Promise.all(tasks);
-  return !hadError;
-}
-
-function applyUsernameToDom(newUsername) {
-  const displayName = newUsername || "Guest";
-
-  const userName = document.getElementById("userName");
-  if (userName) userName.innerText = displayName;
-  const userNameMenu = document.getElementById("userNameMenu");
-  if (userNameMenu) userNameMenu.innerText = displayName;
-
-  const buildPublisher = document.getElementById("buildPublisher");
-  if (buildPublisher) buildPublisher.innerText = displayName;
-  const buildPublisherMobile = document.getElementById("buildPublisherMobile");
-  if (buildPublisherMobile) buildPublisherMobile.innerText = displayName;
-
-  const currentUserId = auth.currentUser?.uid;
-  if (currentUserId) {
-    document
-      .querySelectorAll(
-        `.comment-card[data-user-id="${currentUserId}"] .comment-identity`
-      )
-      .forEach((btn) => {
-        btn.textContent = displayName;
-      });
-  }
-
-  setSettingsUsernameValue(displayName);
-  setSettingsUsernameDisabled(!auth.currentUser);
-}
-
-async function handleUsernameUpdate() {
-  const input = document.getElementById("settingsUsernameInput");
-  const saveBtn = document.getElementById("saveUsernameButton");
-  if (!input || !saveBtn) return;
-
-  const user = auth.currentUser;
-  if (!user) {
-    setSettingsUsernameStatus("Please sign in to change your username.", "error");
-    showToast("? Please sign in to change your username.", "error");
-    return;
-  }
-
-  const validation = validateUsernameValue(input.value || "");
-  if (!validation.valid) {
-    setSettingsUsernameStatus(validation.message, "error");
-    showToast(validation.message, "error");
-    return;
-  }
-
-  const desiredUsername = validation.cleaned;
-  if (
-    currentUsername &&
-    currentUsername.toLowerCase() === desiredUsername.toLowerCase()
-  ) {
-    setSettingsUsernameStatus("You're already using that username.", "info");
-    showToast("You're already using that username.", "info");
-    return;
-  }
-
-  setSettingsUsernameDisabled(true);
-  setSettingsUsernameStatus("Checking availability...", "info");
-
-  try {
-    await runTransaction(db, async (transaction) => {
-      const userRef = doc(db, "users", user.uid);
-      const userSnap = await transaction.get(userRef);
-      const existingUsername = userSnap.exists()
-        ? userSnap.data().username || null
-        : null;
-
-      if (
-        existingUsername &&
-        existingUsername.toLowerCase() === desiredUsername.toLowerCase()
-      ) {
-        throw new Error("username_same");
-      }
-
-      const usernameRef = doc(db, "usernames", desiredUsername);
-      const usernameSnap = await transaction.get(usernameRef);
-      const usernameData = usernameSnap.exists() ? usernameSnap.data() : null;
-
-      if (usernameData && usernameData.userId !== user.uid) {
-        throw new Error("username_taken");
-      }
-
-      transaction.set(
-        userRef,
-        { username: desiredUsername, userId: user.uid },
-        { merge: true }
-      );
-      transaction.set(usernameRef, { userId: user.uid });
-
-      if (
-        existingUsername &&
-        existingUsername !== desiredUsername
-      ) {
-        transaction.delete(doc(db, "usernames", existingUsername));
-      }
-    });
-
-    const propagated = await propagateUsernameChange(user.uid, desiredUsername);
-    currentUsername = desiredUsername;
-    applyUsernameToDom(desiredUsername);
-
-    setSettingsUsernameStatus(
-      propagated
-        ? `Username updated to ${desiredUsername}.`
-        : "Username updated. Some content may take a moment to refresh.",
-      propagated ? "success" : "info"
-    );
-    showToast(
-      propagated
-        ? `? Username updated to ${desiredUsername}`
-        : "Username updated. Some content may take a moment to refresh.",
-      propagated ? "success" : "info"
-    );
-  } catch (error) {
-    let message = "? Failed to update username. Please try again.";
-    if (error.message === "username_taken") {
-      message = "? That username is already taken.";
-    } else if (error.message === "username_same") {
-      message = "You're already using that username.";
-    }
-    console.error("Username update failed:", error);
-    setSettingsUsernameStatus(message.replace("?", "").trim(), "error");
-    showToast(message, "error");
-  } finally {
-    setSettingsUsernameDisabled(false);
-  }
-}
-
-async function checkAndSetUsername(user) {
-  const userRef = doc(db, "users", user.uid);
-  const userSnapshot = await getDoc(userRef);
-
-  if (!userSnapshot.exists() || !userSnapshot.data().username) {
-    const usernameModal = document.getElementById("usernameModal");
-    const usernameInput = document.getElementById("usernameInput");
-
-    usernameModal.style.display = "block";
-
-    usernameInput.addEventListener("input", async () => {
-      const validation = validateUsernameValue(usernameInput.value || "");
-      const hasValue = (usernameInput.value || "").trim().length > 0;
-
-      if (!hasValue) {
-        usernameInput.classList.remove("username-valid", "username-invalid");
-        return;
-      }
-
-      if (!validation.valid) {
-        usernameInput.classList.remove("username-valid");
-        usernameInput.classList.add("username-invalid");
-        return;
-      }
-
-      const usernameDoc = doc(db, "usernames", validation.cleaned);
-      const usernameSnap = await getDoc(usernameDoc);
-
-      if (usernameSnap.exists()) {
-        usernameInput.classList.remove("username-valid");
-        usernameInput.classList.add("username-invalid");
-      } else {
-        usernameInput.classList.remove("username-invalid");
-        usernameInput.classList.add("username-valid");
-      }
-    });
-
-    document.getElementById("confirmUsernameButton").onclick = async () => {
-      const validation = validateUsernameValue(usernameInput.value || "");
-      if (!validation.valid) {
-        showToast(validation.message, "error");
-        return;
-      }
-
-      const username = validation.cleaned;
-      const usernameDoc = doc(db, "usernames", username);
-      const usernameSnap = await getDoc(usernameDoc);
-
-      if (usernameSnap.exists()) {
-        showToast("? That username is already taken.", "error");
-      } else {
-        await setDoc(userRef, { username, userId: user.uid }, { merge: true });
-        await setDoc(usernameDoc, { userId: user.uid });
-
-        showToast("? Username set as: " + username, "success");
-
-        document.getElementById("userName").innerText = username;
-        document.getElementById("userNameMenu").innerText = username;
-        document.getElementById("userNameMenu").style.display = "inline-block";
-        document.getElementById("userName").style.display = "inline-block";
-        document.getElementById("userPhoto").style.display = "inline-block";
-        usernameModal.style.display = "none";
-      }
-    };
-  }
-}
-/*********************************************************************
- * UI Updates Based on Auth State
- *********************************************************************/
-export function initializeAuthUI() {
-  const authLoadingWrapper = document.getElementById("authLoadingWrapper");
-  const userName = document.getElementById("userName");
-  const userPhoto = document.getElementById("userPhoto");
-  const userMenu = document.getElementById("userMenu");
-  const userNameMenu = document.getElementById("userNameMenu");
-  const signInBtn = document.getElementById("signInBtn");
-  const showClanBtn = document.getElementById("showClanModalButton");
-  const mapVetoBtn = document.getElementById("mapVetoBtn");
-  const settingsMenuItem = document.getElementById("settingsBtn");
-  const statsMenuItem = document.getElementById("showStatsButton");
-  const switchAccountMenuItem = document.getElementById("switchAccountBtn");
-  const signOutMenuItem = document.getElementById("signOutBtn");
-  const deleteAccountMenuItem = document.getElementById("deleteAccountBtn");
-  const menuDividers = document.querySelectorAll("#userMenu .menu-divider");
-  const settingsAvatarImg = document.getElementById("settingsCurrentAvatar");
-
+export function ensureSettingsUiReady() {
+  if (settingsUiReady) return;
   setupUsernameSettingsSection();
-  setupAvatarModal();
-
-  // ✅ IMMEDIATE HIDE to prevent any flashing before Firebase loads
-  if (userMenu) userMenu.style.display = "none";
-  menuDividers.forEach((d) => (d.style.display = "none"));
-
-  if (authLoadingWrapper) authLoadingWrapper.style.display = "flex";
-  if (userName) userName.style.display = "none";
-  if (userPhoto) userPhoto.style.display = "none";
-
-  onAuthStateChanged(auth, async (user) => {
-    if (user) {
-      const authContainerEl = document.getElementById("auth-container");
-      if (authContainerEl) authContainerEl.classList.add("is-auth");
-      const userRef = doc(db, "users", user.uid);
-      const userSnapshot = await getDoc(userRef);
-
-      let userData = userSnapshot.exists() ? userSnapshot.data() : {};
-      let username = userData?.username ?? null;
-
-      if (!username) {
-        await checkAndSetUsername(user);
-        const updatedSnapshot = await getDoc(userRef);
-        userData = updatedSnapshot.exists() ? updatedSnapshot.data() : userData;
-        username = userData?.username ?? "Guest";
-      }
-
-      currentUsername = username || "Guest";
-      setSettingsUsernameDisabled(false);
-      setSettingsUsernameValue(currentUsername);
-      setSettingsUsernameStatus(
-        "Use 3-20 letters, numbers, or underscores.",
-        "muted"
-      );
-
-      currentUserAvatarUrl = resolveUserAvatar(userData);
-
-      if (userName) userName.innerText = username || "Guest";
-      if (userNameMenu) userNameMenu.innerText = username || "Guest";
-      if (userPhoto) userPhoto.src = currentUserAvatarUrl;
-      if (settingsAvatarImg) settingsAvatarImg.src = currentUserAvatarUrl;
-      updateAvatarSelectionHighlight(currentUserAvatarUrl);
-      emitAvatarUpdate(currentUserAvatarUrl);
-      if (signInBtn) signInBtn.style.display = "none";
-      if (showClanBtn) showClanBtn.disabled = false;
-      // map veto inline button visibility handled via CSS media queries
-      if (showClanBtn) showClanBtn.style.display = "block";
-      if (settingsMenuItem) settingsMenuItem.style.display = "block";
-      if (statsMenuItem) statsMenuItem.style.display = "block";
-      if (switchAccountMenuItem) switchAccountMenuItem.style.display = "block";
-      if (signOutMenuItem) signOutMenuItem.style.display = "block";
-      if (deleteAccountMenuItem)
-        deleteAccountMenuItem.style.display = "inline-flex";
-      menuDividers.forEach((d) => (d.style.display = "block"));
-      try { updateMapVetoPosition(); } catch (_) {}
-    } else {
-      const authContainerEl = document.getElementById("auth-container");
-      if (authContainerEl) authContainerEl.classList.remove("is-auth");
-      currentUserAvatarUrl = DEFAULT_AVATAR_URL;
-      currentUsername = null;
-      updateAvatarSelectionHighlight(DEFAULT_AVATAR_URL);
-      emitAvatarUpdate(DEFAULT_AVATAR_URL);
-      closeAvatarModal();
-      if (userName) userName.innerText = "Guest";
-      if (userNameMenu) userNameMenu.innerText = "Guest";
-      if (userPhoto) userPhoto.src = DEFAULT_AVATAR_URL;
-      if (settingsAvatarImg) settingsAvatarImg.src = DEFAULT_AVATAR_URL;
-      setSettingsUsernameDisabled(true);
-      setSettingsUsernameValue("");
-      setSettingsUsernameStatus(
-        "Sign in to update your username.",
-        "muted"
-      );
-      if (userMenu) userMenu.style.display = "none";
-      if (signInBtn) signInBtn.style.display = "inline-block";
-      if (showClanBtn) showClanBtn.disabled = true;
-      // map veto inline button visibility handled via CSS media queries
-      if (showClanBtn) showClanBtn.style.display = "none";
-      if (settingsMenuItem) settingsMenuItem.style.display = "none";
-      if (statsMenuItem) statsMenuItem.style.display = "none";
-      if (switchAccountMenuItem) switchAccountMenuItem.style.display = "none";
-      if (signOutMenuItem) signOutMenuItem.style.display = "none";
-      if (deleteAccountMenuItem) deleteAccountMenuItem.style.display = "none";
-      menuDividers.forEach((d) => (d.style.display = "none"));
-      resetBuildInputs();
-      try { updateMapVetoPosition(); } catch (_) {}
-    }
-
-    if (authLoadingWrapper) authLoadingWrapper.style.display = "none";
-    if (userName) userName.style.display = "inline";
-    if (userNameMenu) userNameMenu.style.display = "inline-block";
-    if (userPhoto) userPhoto.style.display = "inline";
-    try { updateMapVetoPosition(); } catch (_) {}
-  });
+  setupPulseSettingsSection();
+  setupTwitchSettingsSection();
+  setupCountrySelector();
+  setupSecondaryPulseModal();
+  setupAvatarModal({ closeUserMenu });
+  settingsUiReady = true;
 }
-
-/*********************************************************************
- * Auth Button Functions
- *********************************************************************/
-function closeUserMenu() {
-  const menu = document.getElementById("userMenu");
-  if (menu) {
-    menu.style.display = "none";
-    setTimeout(() => (menu.style.display = ""), 100); // Reset visibility for next toggle
-  }
-}
-
-export function handleSignIn() {
-  signInWithPopup(auth, provider)
-    .then(() => {
-      initializeAuthUI();
-    })
-    .catch((error) => {
-      console.error("❌ Sign in error:", error);
-    });
-}
-
-export function handleSignOut() {
-  signOut(auth)
-    .then(() => {
-      resetBuildInputs();
-      initializeAuthUI();
-      closeUserMenu();
-      window.location.reload();
-    })
-    .catch((error) => {
-      console.error("❌ Sign out error:", error);
-    });
-}
-
-export async function handleSwitchAccount() {
-  try {
-    await signOut(auth);
-    const result = await signInWithPopup(auth, provider);
-    initializeAuthUI();
-    closeUserMenu();
-    window.location.reload();
-  } catch (err) {
-    console.error("❌ Error switching accounts:", err);
-  }
-}
-
-/*********************************************************************
- * Account Deletion (User Menu)
- *********************************************************************/
-const deleteAccountBtn = document.getElementById("deleteAccountBtn");
-const deleteAccountModal = document.getElementById("deleteAccountModal");
-const confirmDeleteAccountButton = document.getElementById(
-  "confirmDeleteAccountButton"
-);
-const cancelDeleteAccountButton = document.getElementById(
-  "cancelDeleteAccountButton"
-);
-
-if (deleteAccountBtn) {
-  deleteAccountBtn.addEventListener("click", () => {
-    deleteAccountModal.style.display = "block";
-  });
-}
-
-if (cancelDeleteAccountButton) {
-  cancelDeleteAccountButton.addEventListener("click", () => {
-    deleteAccountModal.style.display = "none";
-  });
-}
-
-if (confirmDeleteAccountButton) {
-  confirmDeleteAccountButton.addEventListener("click", async () => {
-    const deleteCommunityBuilds = document.getElementById(
-      "deleteCommunityBuildsCheckbox"
-    ).checked;
-
-    const user = auth.currentUser;
-    const userId = user.uid;
-
-    try {
-      const db = getFirestore();
-
-      // 1. Get the username first
-      const userRef = doc(db, "users", userId);
-      const userSnapshot = await getDoc(userRef);
-
-      let usernameToDelete = null;
-      if (userSnapshot.exists()) {
-        usernameToDelete = userSnapshot.data().username || null;
-      }
-
-      // 2. Delete user document
-      await deleteDoc(userRef);
-
-      // 3. Delete username mapping
-      if (usernameToDelete) {
-        const usernameDoc = doc(db, "usernames", usernameToDelete);
-        await deleteDoc(usernameDoc);
-        console.log(`✅ Deleted username mapping: ${usernameToDelete}`);
-      }
-
-      // 4. Delete all user's personal builds
-      const buildsRef = collection(db, `users/${userId}/builds`);
-      const buildSnapshots = await getDocs(buildsRef);
-      const deletePersonalBuilds = buildSnapshots.docs.map((doc) =>
-        deleteDoc(doc.ref)
-      );
-      await Promise.all(deletePersonalBuilds);
-      console.log("✅ Deleted all personal builds");
-
-      // 5. Optionally delete community builds by this user
-      if (deleteCommunityBuilds && usernameToDelete) {
-        const publishedRef = collection(db, "publishedBuilds");
-        const querySnapshot = await getDocs(publishedRef);
-        const toDelete = querySnapshot.docs.filter(
-          (doc) =>
-            doc.data().username === usernameToDelete ||
-            doc.data().publisher === usernameToDelete
-        );
-        const deleteCommunity = toDelete.map((doc) => deleteDoc(doc.ref));
-        await Promise.all(deleteCommunity);
-        console.log(`✅ Deleted ${toDelete.length} community builds`);
-      }
-
-      // 6. Delete Firebase Auth account
-      await deleteUser(user);
-      closeUserMenu();
-      showToast("✅ Account deleted successfully.", "success");
-
-      deleteAccountModal.style.display = "none";
-      setTimeout(() => (window.location.href = "/"), 2000);
-    } catch (error) {
-      console.error("❌ Error deleting account:", error);
-      showToast(
-        "❌ Failed to delete account. Try re-logging in first.",
-        "error"
-      );
-    }
-  });
-}
-
-/*********************************************************************
- * Auth Container Click Menu (replaces avatar click)
- *********************************************************************/
-const userMenu = document.getElementById("userMenu");
-const authContainer = document.getElementById("auth-container");
-const userPhoto = document.getElementById("userPhoto");
-
-if (authContainer && userMenu) {
-  // Toggle menu on auth container click
-  authContainer.addEventListener("click", (event) => {
-    // Only allow toggling when user is signed in
-    if (!auth.currentUser) return;
-    // Do not toggle if clicking the sign-in button
-    const signInBtn = document.getElementById("signInBtn");
-    if (
-      signInBtn &&
-      (event.target === signInBtn || signInBtn.contains(event.target))
-    ) {
-      return;
-    }
-    // Prevent toggling when clicking inside the open menu itself
-    if (userMenu.contains(event.target)) return;
-    event.stopPropagation();
-    userMenu.style.display =
-      userMenu.style.display === "block" ? "none" : "block";
-  });
-
-  // Close menu if clicking outside of both auth container and the menu
-  window.addEventListener("click", (e) => {
-    const clickedInsideAuth = authContainer.contains(e.target);
-    const clickedInsideMenu = userMenu.contains(e.target);
-    if (!clickedInsideAuth && !clickedInsideMenu) {
-      userMenu.style.display = "none";
-    }
-  });
-}
-
 /*********************************************************************
  * Username Modal Closing Behavior
  *********************************************************************/
@@ -1130,7 +139,20 @@ async function handleCancelUsername() {
   await signOut(auth);
 }
 
-export { app, auth, db };
+function getCurrentUsername() {
+  return getCurrentUsernameState() || auth.currentUser?.displayName || "";
+}
+
+export {
+  app,
+  auth,
+  db,
+  initializeAuthUI,
+  getPulseState,
+  getCurrentUserProfile,
+  getCurrentUsername,
+  getCurrentUserAvatarUrl,
+};
 window.handleSignIn = handleSignIn;
 window.handleSignOut = handleSignOut;
 window.handleSwitchAccount = handleSwitchAccount;

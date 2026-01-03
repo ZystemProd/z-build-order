@@ -4,31 +4,59 @@ import DOMPurify from "dompurify";
 
 let koFiOverlayInitialized = false;
 let koFiOverlayInitStarted = false;
+let koFiOverlayScriptPromise = null;
+
+const buildModalRaceImages = [
+  "img/race/terran2.webp",
+  "img/race/zerg2.webp",
+  "img/race/protoss2.webp",
+];
+let buildModalRaceImagesPreloaded = false;
+
+function loadKoFiOverlayScript() {
+  if (window.kofiWidgetOverlay) return Promise.resolve();
+  if (koFiOverlayScriptPromise) return koFiOverlayScriptPromise;
+  koFiOverlayScriptPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://storage.ko-fi.com/cdn/scripts/overlay-widget.js";
+    script.defer = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Ko-fi overlay failed to load"));
+    document.head.appendChild(script);
+  });
+  return koFiOverlayScriptPromise;
+}
 
 function initKoFiOverlay() {
   if (koFiOverlayInitialized || koFiOverlayInitStarted) return;
   koFiOverlayInitStarted = true;
-  const attempt = () => {
-    if (
-      window.kofiWidgetOverlay &&
-      typeof window.kofiWidgetOverlay.draw === "function"
-    ) {
-      window.kofiWidgetOverlay.draw("zystem", {
-        type: "floating-chat",
-        "floating-chat.donateButton.text": "Donate",
-        "floating-chat.donateButton.background-color": "#d9534f",
-        "floating-chat.donateButton.text-color": "#fff",
-      });
-      const overlay = document.querySelector('[id^="kofi-widget-overlay"]');
-      if (overlay) {
-        overlay.style.display = "none";
-        koFiOverlayInitialized = true;
-      }
-    } else {
-      setTimeout(attempt, 300);
-    }
-  };
-  attempt();
+  loadKoFiOverlayScript()
+    .then(() => {
+      const attempt = () => {
+        if (
+          window.kofiWidgetOverlay &&
+          typeof window.kofiWidgetOverlay.draw === "function"
+        ) {
+          window.kofiWidgetOverlay.draw("zystem", {
+            type: "floating-chat",
+            "floating-chat.donateButton.text": "Donate",
+            "floating-chat.donateButton.background-color": "#d9534f",
+            "floating-chat.donateButton.text-color": "#fff",
+          });
+          const overlay = document.querySelector('[id^="kofi-widget-overlay"]');
+          if (overlay) {
+            overlay.style.display = "none";
+            koFiOverlayInitialized = true;
+          }
+        } else {
+          setTimeout(attempt, 300);
+        }
+      };
+      attempt();
+    })
+    .catch(() => {
+      koFiOverlayInitStarted = false;
+    });
 }
 import {
   saveCurrentBuild,
@@ -55,8 +83,8 @@ import {
   initializeSectionToggles,
   initializeTextareaClickHandler,
   showBuildOrderHelpModal,
-  createNotificationDot,
 } from "../uiHandlers.js";
+import { createNotificationDot } from "../notificationDot.js";
 import {
   initializeTooltips,
   updateTooltips,
@@ -68,7 +96,6 @@ import {
   renderCreateClanUI,
   renderChooseManageClanUI,
   renderFindClanUI,
-  getUserClans,
 } from "../clan.js";
 // Static imports to avoid dynamic + static duplication warnings
 import {
@@ -146,6 +173,7 @@ function debounce(fn, delay = 50) {
 function adjustCatPosition() {
   try {
     const box = document.getElementById("box");
+    const input = document.getElementById("buildOrderInput");
     if (!box) return;
 
     // If the cat is hidden by CSS (mobile), reset any shift and skip
@@ -153,6 +181,17 @@ function adjustCatPosition() {
     if (cs.display === "none") {
       box.style.removeProperty("--cat-shift");
       return;
+    }
+
+    if (input) {
+      const inputRect = input.getBoundingClientRect();
+      const catEl = document.querySelector("#box .cat") || box;
+      const catRect = catEl.getBoundingClientRect();
+      const boxRect = box.getBoundingClientRect();
+      const delta = inputRect.top - catRect.top;
+      const alignOffset = 46; // move cat up to align with input top border
+      const newTop = window.scrollY + boxRect.top + delta - alignOffset;
+      box.style.top = `${Math.max(0, Math.round(newTop))}px`;
     }
 
     // Helper: compute how much we need to move left to clear buttons
@@ -218,12 +257,7 @@ import {
 } from "../helpers/sharedEventUtils.js";
 import {
   isBracketInputEnabled,
-  setBracketInputEnabled,
   isBuildInputShown,
-  setBuildInputShown,
-  loadUserSettings,
-  getMainClanId,
-  setMainClanId,
 } from "../settings.js";
 import { checkForJoinRequestNotifications } from "../utils/notificationHelpers.js";
 import { logAnalyticsEvent } from "../analyticsHelper.js";
@@ -282,24 +316,40 @@ function showSupportModal() {
   if (modal) modal.style.display = "block";
 }
 
-async function populateMainClanDropdown() {
-  const select = document.getElementById("mainClanSelect");
-  if (!select) return;
-  const user = auth.currentUser;
-  if (!user) return;
-  select.innerHTML = "";
-  const clans = await getUserClans(user.uid);
-  const noneOpt = document.createElement("option");
-  noneOpt.value = "";
-  noneOpt.textContent = "None";
-  select.appendChild(noneOpt);
-  clans.forEach((c) => {
-    const opt = document.createElement("option");
-    opt.value = c.id;
-    opt.textContent = c.name;
-    select.appendChild(opt);
+function preloadBuildModalRaceImages() {
+  if (buildModalRaceImagesPreloaded) return;
+  buildModalRaceImagesPreloaded = true;
+  buildModalRaceImages.forEach((src) => {
+    const img = new Image();
+    img.decoding = "async";
+    img.loading = "eager";
+    img.src = src;
   });
-  select.value = getMainClanId();
+}
+
+const settingsInitOptions = {
+  onBracketToggleChange: () => {
+    updateSupplyColumnVisibility();
+    updateBuildInputPlaceholder();
+  },
+  onBuildToggleChange: () => {
+    updateBuildInputVisibility();
+  },
+};
+
+async function openSettingsModal() {
+  const mod = await import("../settingsModalInit.js");
+  if (typeof mod.openSettingsModal === "function") {
+    await mod.openSettingsModal(settingsInitOptions);
+    return;
+  }
+  if (typeof mod.initUserSettingsModal === "function") {
+    mod.initUserSettingsModal(settingsInitOptions);
+  }
+  const modal = document.getElementById("settingsModal");
+  if (modal) {
+    modal.style.display = "block";
+  }
 }
 
 // Templates modal will be set up lazily when first opened
@@ -318,9 +368,14 @@ let currentBuildFilter = "all";
  ----------------- */
 export async function initializeIndexPage() {
   console.log("🛠 Initializing Index Page");
-  initKoFiOverlay();
   const supportLink = document.getElementById("supportersLink");
   if (supportLink) supportLink.textContent = "support";
+
+  window.addEventListener("user-profile-updated", () => {
+    updateSupplyColumnVisibility();
+    updateBuildInputVisibility();
+    updateBuildInputPlaceholder();
+  });
 
   const restoreCommunity = localStorage.getItem("restoreCommunityModal");
   const filterType = localStorage.getItem("communityFilterType");
@@ -398,6 +453,30 @@ export async function initializeIndexPage() {
   safeAdd("signInBtn", "click", window.handleSignIn);
   safeAdd("signOutBtn", "click", window.handleSignOut);
   safeAdd("switchAccountBtn", "click", window.handleSwitchAccount);
+
+  const buildsBtn = document.getElementById("showBuildsButton");
+  if (buildsBtn) {
+    const preload = () => preloadBuildModalRaceImages();
+    buildsBtn.addEventListener("mouseenter", preload, { once: true });
+    buildsBtn.addEventListener("focus", preload, { once: true });
+    buildsBtn.addEventListener("touchstart", preload, {
+      once: true,
+      passive: true,
+    });
+    buildsBtn.addEventListener("click", preload, { once: true });
+  }
+
+  const communityBtn = document.getElementById("showCommunityModalButton");
+  if (communityBtn) {
+    const preload = () => preloadBuildModalRaceImages();
+    communityBtn.addEventListener("mouseenter", preload, { once: true });
+    communityBtn.addEventListener("focus", preload, { once: true });
+    communityBtn.addEventListener("touchstart", preload, {
+      once: true,
+      passive: true,
+    });
+    communityBtn.addEventListener("click", preload, { once: true });
+  }
 
   // --- Main Build Buttons
   const saveBuildButton = document.getElementById("saveBuildButton");
@@ -587,9 +666,6 @@ export async function initializeIndexPage() {
     // ✅ If logged in, do user setup
     if (user) {
       await checkForJoinRequestNotifications();
-      initializeUserData(user);
-      await loadUserSettings();
-      await populateMainClanDropdown();
       const builds = await fetchUserBuilds();
       setSavedBuilds(builds);
       saveSavedBuildsToLocalStorage();
@@ -1125,44 +1201,6 @@ export async function initializeIndexPage() {
     }
   });
 
-  safeAdd("closeSettingsModal", "click", () => {
-    const modal = document.getElementById("settingsModal");
-    if (modal) modal.style.display = "none";
-  });
-
-  const settingsModal = document.getElementById("settingsModal");
-  window.addEventListener("mousedown", (event) => {
-    if (settingsModal && event.target === settingsModal) {
-      settingsModal.style.display = "none";
-    }
-  });
-
-  const bracketToggle = document.getElementById("bracketInputToggle");
-  if (bracketToggle) {
-    bracketToggle.checked = isBracketInputEnabled();
-    bracketToggle.addEventListener("change", () => {
-      setBracketInputEnabled(bracketToggle.checked);
-      updateSupplyColumnVisibility();
-      updateBuildInputPlaceholder();
-    });
-  }
-
-  const inputToggle = document.getElementById("buildInputToggle");
-  if (inputToggle) {
-    inputToggle.checked = isBuildInputShown();
-    inputToggle.addEventListener("change", () => {
-      setBuildInputShown(inputToggle.checked);
-      updateBuildInputVisibility();
-    });
-  }
-
-  const mainClanSelect = document.getElementById("mainClanSelect");
-  if (mainClanSelect) {
-    mainClanSelect.addEventListener("change", () => {
-      setMainClanId(mainClanSelect.value);
-    });
-  }
-
   safeAdd("closePrivacyModal", "click", () => {
     const modal = document.getElementById("privacyModal");
     if (modal) modal.style.display = "none";
@@ -1266,24 +1304,6 @@ export async function initializeIndexPage() {
       modal.style.display = "none";
     }
   });
-
-  const gameSelect = document.getElementById("game-select");
-  if (gameSelect) {
-    const selectedGame = gameSelect.querySelector(".selected-game");
-    const dropdown = gameSelect.querySelector(".game-dropdown");
-
-    selectedGame.addEventListener("click", (e) => {
-      e.stopPropagation(); // Prevent click from bubbling
-      dropdown.classList.toggle("open");
-    });
-
-    // Optional: close when clicking outside
-    document.addEventListener("click", (e) => {
-      if (!gameSelect.contains(e.target)) {
-        dropdown.classList.remove("open");
-      }
-    });
-  }
 
   // 🆕 Share button trigger
   safeAdd("shareBuildButton", "click", async () => {
@@ -1411,32 +1431,17 @@ export async function initializeIndexPage() {
 
   // Community builds load lazily when the modal is opened
 
-  // This will load the necessary user data after successful authentication
-  async function initializeUserData(user) {
-    const userRef = doc(db, "users", user.uid);
-    const userSnapshot = await getDoc(userRef);
-
-    if (userSnapshot.exists()) {
-      const data = userSnapshot.data() || {};
-      const username = data.username || "Guest";
-      document.getElementById("userName").innerText = username;
-      const avatarUrl =
-        data?.profile?.avatarUrl ||
-        data?.avatarUrl ||
-        "img/avatar/marine_avatar_1.webp";
-      document.getElementById("userPhoto").src = avatarUrl;
-      document.getElementById("userNameMenu").innerText = username;
-    } else {
-      // Handle case when user data doesn't exist
-      console.log("No user data found!");
-    }
-  }
-
   document.getElementById("mapVetoBtn")?.addEventListener("click", () => {
     window.location.href = "/veto.html";
   });
   document.getElementById("mapVetoTile")?.addEventListener("click", () => {
     window.location.href = "/veto.html";
+  });
+  document.getElementById("tournamentBtn")?.addEventListener("click", () => {
+    window.location.href = "/tournament/";
+  });
+  document.getElementById("tournamentTile")?.addEventListener("click", () => {
+    window.location.href = "/tournament/";
   });
 
   document.getElementById("showStatsButton")?.addEventListener("click", () => {
@@ -1466,16 +1471,10 @@ export async function initializeIndexPage() {
     });
   }
 
-  document.getElementById("settingsBtn")?.addEventListener("click", () => {
+  safeAdd("settingsBtn", "click", async () => {
     const userMenu = document.getElementById("userMenu");
     if (userMenu) userMenu.style.display = "none";
-    const modal = document.getElementById("settingsModal");
-    if (modal) {
-      modal.style.display = "block";
-      const toggle = document.getElementById("bracketInputToggle");
-      if (toggle) toggle.checked = isBracketInputEnabled();
-      populateMainClanDropdown();
-    }
+    await openSettingsModal();
   });
 
   const clanModal = document.getElementById("clanModal");
@@ -1568,19 +1567,14 @@ export async function initializeIndexPage() {
 
   // Open modals from flags set on other pages (e.g., viewBuild)
   try {
-    const openSettings = localStorage.getItem("openSettingsOnLoad") === "true";
+    const openSettings =
+      localStorage.getItem("openSettingsOnLoad") === "true";
     const openStats = localStorage.getItem("openStatsOnLoad") === "true";
     const openClans = localStorage.getItem("openClanModalOnLoad") === "true";
 
     if (openSettings) {
       localStorage.removeItem("openSettingsOnLoad");
-      const modal = document.getElementById("settingsModal");
-      if (modal) {
-        modal.style.display = "block";
-        const toggle = document.getElementById("bracketInputToggle");
-        if (toggle) toggle.checked = isBracketInputEnabled();
-        await populateMainClanDropdown();
-      }
+      await openSettingsModal();
     }
 
     if (openStats) {

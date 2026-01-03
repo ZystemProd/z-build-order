@@ -1,6 +1,6 @@
 #box {
   position: absolute;
-  top: 213px;
+  top: 164px;
   left: 50%;
   /* Allow JS to nudge the cat left to avoid overlapping right-side buttons */
   transform: translateX(calc(-50% - var(--cat-shift, 0px)));

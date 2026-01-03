@@ -27,12 +27,29 @@ export function initializeViewBuildPage() {
   safeAdd("signOutBtn", "click", window.handleSignOut);
   safeAdd("switchAccountBtn", "click", window.handleSwitchAccount);
   safeAdd("importBuildButton", "click", importBuildHandler);
+  safeAdd("settingsBtn", "click", async () => {
+    const userMenu = document.getElementById("userMenu");
+    if (userMenu) userMenu.style.display = "none";
+    const mod = await import("../settingsModalInit.js");
+    if (typeof mod.openSettingsModal === "function") {
+      await mod.openSettingsModal();
+    } else if (typeof mod.initUserSettingsModal === "function") {
+      mod.initUserSettingsModal();
+      const modal = document.getElementById("settingsModal");
+      if (modal) modal.style.display = "block";
+    }
+  });
   
   // User menu actions: mirror index.html behavior
   safeAdd("mapVetoBtn", "click", () => {
     const userMenu = document.getElementById("userMenu");
     if (userMenu) userMenu.style.display = "none";
     window.location.href = "/veto.html";
+  });
+  safeAdd("tournamentBtn", "click", () => {
+    const userMenu = document.getElementById("userMenu");
+    if (userMenu) userMenu.style.display = "none";
+    window.location.href = "/tournament/";
   });
 
   // These modals live on index.html; set a flag and route there
@@ -50,12 +67,6 @@ export function initializeViewBuildPage() {
     window.location.href = "/index.html";
   });
 
-  safeAdd("settingsBtn", "click", () => {
-    const userMenu = document.getElementById("userMenu");
-    if (userMenu) userMenu.style.display = "none";
-    try { localStorage.setItem("openSettingsOnLoad", "true"); } catch {}
-    window.location.href = "/index.html";
-  });
   initializeSectionToggles();
 }
 

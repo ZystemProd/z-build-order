@@ -27,12 +27,18 @@ import {
   MapAnnotations,
 } from "./interactive_map.js"; // ✅ Map support
 import { updateYouTubeEmbed, clearYouTubeEmbed } from "./youtube.js";
-import { addVariationTabListeners } from "./init/viewBuildPageInit.js";
+import {
+  addVariationTabListeners,
+  initializeViewBuildPage,
+} from "./init/viewBuildPageInit.js";
 import { getPublisherClanInfo } from "./community.js";
 import { showToast } from "./toastHandler.js";
 import { bannedWords } from "../data/bannedWords.js";
 
 initializeAuthUI();
+document.addEventListener("DOMContentLoaded", () => {
+  initializeViewBuildPage();
+});
 
 const adminEmails = (
   Array.isArray(window?.adminEmails) ? window.adminEmails : []
@@ -833,6 +839,7 @@ function renderOptimisticBuild(build) {
   const iconSrc =
     build.publisherIcon ||
     build.publisherAvatarUrl ||
+    build.publisherClan?.logoUrlSmall ||
     build.publisherClan?.logoUrl ||
     build.publisherClan?.logo ||
     DEFAULT_AVATAR_URL;
@@ -3189,8 +3196,11 @@ async function loadBuild() {
     }
 
     let clanInfo = build.publisherClan || null;
-    if (!clanInfo && build.publisherId) {
-      clanInfo = await getPublisherClanInfo(build.publisherId);
+    if (build.publisherId && (!clanInfo || !clanInfo.logoUrlSmall)) {
+      const freshClan = await getPublisherClanInfo(build.publisherId);
+      if (freshClan) {
+        clanInfo = freshClan;
+      }
     }
     const publisherAvatar =
       build.publisherAvatarUrl ||
@@ -3201,6 +3211,7 @@ async function loadBuild() {
       build.publisherIconUrl ||
       build.publisherIconURL ||
       build.publisherIcon ||
+      clanInfo?.logoUrlSmall ||
       clanInfo?.logoUrl ||
       DEFAULT_AVATAR_URL;
     const iconEl = document.getElementById("buildPublisherIcon");
@@ -4040,5 +4051,3 @@ document.addEventListener("keydown", (event) => {
 window.addEventListener("popstate", () => {
   loadBuild();
 });
-
-

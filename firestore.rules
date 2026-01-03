@@ -181,7 +181,51 @@ service cloud.firestore {
       }
     }
 
+    // ? TOURNAMENTS
+    match /tournaments/{slug} {
+      // Public read; adjust to restrict if needed
+      allow read: if true;
+
+      // Any signed-in user can create
+      allow create: if request.auth != null;
+
+      // Only creator can update/delete
+      allow update, delete: if request.auth != null &&
+        request.auth.uid == resource.data.createdBy;
+    }
+
+    // ? TOURNAMENT STATE (players, bracket, activity)
+    match /tournamentStates/{slug} {
+      // Allow public reads (adjust if you want private)
+      allow read: if true;
+      // Allow signed-in users to sync state; tighten if needed
+      allow write: if request.auth != null;
+    }
+
+    // ? TOURNAMENT CIRCUITS
+    match /tournamentCircuits/{slug} {
+      allow read: if true;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null &&
+        request.auth.uid == resource.data.createdBy;
+    }
+
+    // ? TOURNAMENT PRESENCE (lightweight UI presence)
+    match /tournamentPresence/{slug}/matchInfo/{uid} {
+      allow read: if true;
+      allow create, update, delete: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // ? USER NOTIFICATIONS
+    match /users/{userId}/notifications/{notificationId} {
+      allow get: if request.auth != null && request.auth.uid == userId;
+      allow list: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null
+        && request.resource.data.userId is string
+        && request.resource.data.userId == userId
+        && request.resource.data.senderUid == request.auth.uid;
+      allow update, delete: if request.auth != null && request.auth.uid == userId;
+    }
 
   }
 }
-

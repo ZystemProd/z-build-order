@@ -1260,12 +1260,6 @@ export function showBuildOrderHelpModal() {
   modal.style.display = "block";
 }
 
-export function createNotificationDot() {
-  const dot = document.createElement("div");
-  dot.className = "notification-dot";
-  return dot;
-}
-
 // ----- Variation Manager modal (rename + reorder)
 function openVariationManager() {
   const vars = variationState.order.map((vid) => {
