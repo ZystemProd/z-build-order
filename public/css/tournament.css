@@ -516,6 +516,39 @@ a {
   box-shadow: 0 10px 30px rgba(78, 213, 255, 0.35);
 }
 
+.cta:disabled,
+.cta[disabled] {
+  cursor: not-allowed;
+  opacity: 0.75;
+  transform: none;
+  box-shadow: none;
+}
+
+.cta:disabled:hover,
+.cta[disabled]:hover {
+  border-color: var(--stroke);
+  box-shadow: none;
+  transform: none;
+}
+
+#registerBtn:disabled {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--muted);
+  border: 1px solid var(--stroke);
+}
+
+.cta.pulse-sync {
+  background: linear-gradient(135deg, #e6c86a, #d7a62c);
+  border: 1px solid rgba(215, 166, 44, 0.9);
+  color: #1d1203;
+  box-shadow: none;
+}
+
+.cta.pulse-sync:hover {
+  border-color: rgba(215, 166, 44, 1);
+  box-shadow: 0 10px 24px rgba(215, 166, 44, 0.35);
+}
+
 .page-stack {
   display: flex;
   flex-direction: column;
@@ -592,6 +625,12 @@ a {
   border-radius: 18px;
   padding: 18px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+#settingsTab .card {
+  background: var(--panel-2);
+  border-radius: 12px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
 }
 
 .card-header {
@@ -820,11 +859,109 @@ a {
   border-color: var(--accent-2);
 }
 
+.admin-settings-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.admin-settings-grid .settings-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 220px) minmax(260px, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.admin-settings-grid .settings-row-label {
+  font-size: 14px;
+  color: var(--muted);
+  padding-top: 6px;
+}
+
+.admin-settings-grid .settings-row-control {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.admin-settings-grid .settings-row-control input,
+.admin-settings-grid .settings-row-control select,
+.admin-settings-grid .settings-row-control .inline-row,
+.admin-settings-grid .settings-row-control .image-upload {
+  width: 100%;
+}
+
+.admin-settings-grid .settings-row-control .helper {
+  margin: 0;
+  text-align: left;
+}
+
+#settingsTab .admin-settings-grid .settings-row-control input,
+#settingsTab .admin-settings-grid .settings-row-control select,
+#settingsTab .settings-cover-row input,
+#settingsTab .settings-cover-row select {
+  margin-top: 0;
+}
+
+.settings-toggle-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.settings-toggle-row .helper {
+  margin: 0;
+}
+
+.settings-cover-row {
+  display: block;
+  margin-top: 16px;
+}
+
+.settings-cover-row .helper {
+  text-align: left;
+}
+
+@media (max-width: 900px) {
+  .admin-settings-grid .settings-row {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-settings-grid .settings-row-label {
+    padding-top: 0;
+  }
+}
+
 .form-actions {
   display: flex;
   gap: 10px;
   align-items: center;
   margin-top: 4px;
+}
+
+.sync-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-left: 6px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  opacity: 0;
+  transform: translateY(1px);
+  transition: opacity 0.2s ease;
+  animation: sync-spin 0.7s linear infinite;
+}
+
+#syncPulseBtn.is-loading + .sync-spinner {
+  opacity: 1;
+}
+
+@keyframes sync-spin {
+  to {
+    transform: translateY(1px) rotate(360deg);
+  }
 }
 
 .veto-modal .form-actions #resetVetoBtn {
@@ -3442,6 +3579,10 @@ a {
   overflow-y: auto;
 }
 
+.circuit-settings-modal {
+  width: min(480px, 92vw);
+}
+
 .modal-content input {
   width: 100%;
   margin-top: 8px;
@@ -3878,6 +4019,11 @@ a {
   align-items: center;
 }
 
+.leaderboard-table.has-first-places thead tr,
+.leaderboard-table.has-first-places tbody tr {
+  grid-template-columns: 44px minmax(0, 1fr) 70px 90px 70px;
+}
+
 .leaderboard-table th,
 .leaderboard-table td {
   display: block;
@@ -3901,6 +4047,11 @@ a {
   white-space: normal;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.leaderboard-table th.first-place-cell,
+.leaderboard-table td.first-place-cell {
+  text-align: center;
 }
 
 .leaderboard-table td.points-cell {
@@ -4413,13 +4564,14 @@ a {
   overflow: hidden;
 }
 
-.create-modal .settings-panel {
+.create-modal .settings-panel,
+#settingsTab .settings-panel {
   min-height: 0;
   max-height: none;
   overflow-y: auto;
   overflow-x: visible;
   flex: 1 1 auto;
-  padding: 0 20px 0, 20px;
+  padding: 0 20px;
 }
 
 .create-modal .settings-panel input,
@@ -4492,6 +4644,38 @@ a {
   border-top: 1px solid var(--stroke);
 }
 
+.admin-add-player .section-title,
+.caster-section .section-title {
+  margin: 0 0 6px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.section-title .section-subtitle {
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: 16px;
+  color: var(--text);
+  margin: 0;
+  font-weight: 600;
+}
+
+.caster-section {
+  margin-top: 18px;
+}
+
+.admin-add-player {
+  margin-top: 22px;
+}
+
 .admin-search-results {
   display: grid;
   gap: 8px;
@@ -4540,25 +4724,63 @@ a {
   box-shadow: 0 0 0 2px rgba(78, 213, 255, 0.25);
 }
 
-/* Settings tab: match create modal input styling */
-#settingsTab input,
-#settingsTab select,
-#settingsTab textarea {
-  width: 100%;
-  max-width: 360px;
+/* Settings tab: mirror create modal layout */
+#settingsTab .settings-panel label {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+#settingsTab .settings-panel input,
+#settingsTab .settings-panel select,
+#settingsTab .settings-panel textarea {
+  width: auto !important;
+  max-width: 360px !important;
+  align-self: flex-start;
+  margin-top: 8px;
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid var(--stroke);
-  background: var(--panel-2);
+  background: var(--panel);
   color: var(--text);
+  display: block;
 }
 
-#settingsTab input:focus,
-#settingsTab select:focus,
-#settingsTab textarea:focus {
+#settingsTab .settings-panel select {
+  padding: 10px 36px 10px 12px;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%23cdd6f4' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 12px 8px;
+}
+
+#settingsTab .settings-panel input:focus,
+#settingsTab .settings-panel select:focus,
+#settingsTab .settings-panel textarea:focus {
   outline: none;
   border-color: var(--accent-2);
   box-shadow: 0 0 0 2px rgba(78, 213, 255, 0.25);
+}
+
+#settingsTab #settingsDescriptionInput,
+#settingsTab #settingsRulesInput {
+  width: 100% !important;
+  max-width: 100% !important;
+  align-self: stretch;
+}
+
+#settingsStartInput {
+  width: 160px !important;
+  max-width: 160px !important;
+}
+
+#settingsNameInput {
+  width: 300px !important;
+  max-width: 300px !important;
 }
 
 #createCircuitModal .form-actions {
@@ -5762,8 +5984,8 @@ label {
 select[id^="bestOf"],
 select[id^="settingsBestOf"],
 select[id^="finalBestOf"] {
-  width: 60px;
-  max-width: 60px;
+  width: 70px;
+  max-width: 70px;
 }
 
 .create-modal .settings-panel select[id^="bestOf"],
@@ -5772,8 +5994,8 @@ select[id^="finalBestOf"] {
 #settingsTab select[id^="bestOf"],
 #settingsTab select[id^="settingsBestOf"],
 #settingsTab select[id^="finalBestOf"] {
-  width: 60px !important;
-  max-width: 60px !important;
+  width: 70px !important;
+  max-width: 70px !important;
 }
 
 /* Optional spacer – no longer needed visually, keep hidden if present */

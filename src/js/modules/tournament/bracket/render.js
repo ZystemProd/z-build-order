@@ -516,6 +516,25 @@ export function layoutBracketSection(
       slotMap.set(id, remap.get(slot) ?? slot);
     });
   }
+  if (titlePrefix === "Upper" && slotMap.size) {
+    const playerCount = Number(roundLabelOptions?.playerCount || 0);
+    if (playerCount < 24) {
+      // Preserve legacy spacing for smaller brackets to avoid overlaps.
+      // (21-23 entrants are handled via template slot tweaks.)
+    } else {
+    const slots = Array.from(slotMap.values());
+    const minSlot = Math.min(...slots);
+    const maxSlot = Math.max(...slots);
+    const targetRange = Math.max(1, maxMatches - 1);
+    const currentRange = maxSlot - minSlot;
+    if (currentRange > targetRange) {
+      const scale = currentRange / targetRange;
+      slotMap.forEach((slot, id) => {
+        slotMap.set(id, (slot - minSlot) / scale);
+      });
+    }
+    }
+  }
 
   const allSlots = Array.from(slotMap.values());
   const minSlot =
@@ -1202,7 +1221,7 @@ export function renderBracketView({
     playersById,
     0,
     ROUND_TITLE_BAND,
-    { hasGrandFinal: Boolean(bracket.finals) }
+    { hasGrandFinal: Boolean(bracket.finals), playerCount: bracket.seedOrder?.length || 0 }
   );
 
   let lower = { html: "", height: 0 };

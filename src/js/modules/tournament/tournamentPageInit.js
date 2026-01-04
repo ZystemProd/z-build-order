@@ -28,6 +28,9 @@ export function initTournamentPage({
   handleCreateTournament,
   handleCreateCircuit,
   openCircuitTournamentModal,
+  openCircuitSettingsModal,
+  closeCircuitSettingsModal,
+  saveCircuitSettings,
   openDeleteTournamentModal,
   confirmDeleteTournament,
   closeDeleteTournamentModal,
@@ -83,6 +86,7 @@ export function initTournamentPage({
   checkInCurrentPlayer,
   notifyCheckInPlayers,
   goLiveTournament,
+  syncPulseNow,
 }) {
   ensureTestHarnessPanel();
   initTournamentNotifications();
@@ -104,6 +108,7 @@ export function initTournamentPage({
   const signOutBtn = document.getElementById("signOutBtn");
   const switchAccountBtn = document.getElementById("switchAccountBtn");
   const settingsBtn = document.getElementById("settingsBtn");
+  const syncPulseBtn = document.getElementById("syncPulseBtn");
   const raceSelect = document.getElementById("raceSelect");
   const openRegisterBtn = document.getElementById("openRegisterBtn");
   const openCreateTournament = document.getElementById("openCreateTournament");
@@ -111,12 +116,16 @@ export function initTournamentPage({
   const closeCreateTournament = document.getElementById("closeCreateTournament");
   const saveTournamentBtn = document.getElementById("saveTournamentBtn");
   const openCreateCircuitTournament = document.getElementById("openCreateCircuitTournament");
+  const openCircuitSettingsBtn = document.getElementById("openCircuitSettingsBtn");
   const deleteTournamentBtn = document.getElementById("deleteTournamentBtn");
   const confirmDeleteTournamentBtn = document.getElementById("confirmDeleteTournamentBtn");
   const cancelDeleteTournamentBtn = document.getElementById("cancelDeleteTournamentBtn");
   const deleteTournamentModal = document.getElementById("confirmDeleteTournamentModal");
   const openCreateCircuit = document.getElementById("openCreateCircuit");
   const createCircuitModal = document.getElementById("createCircuitModal");
+  const circuitSettingsModal = document.getElementById("circuitSettingsModal");
+  const closeCircuitSettingsBtn = document.getElementById("closeCircuitSettingsModal");
+  const saveCircuitSettingsBtn = document.getElementById("saveCircuitSettingsBtn");
   const closeCreateCircuit = document.getElementById("closeCreateCircuit");
   const saveCircuitBtn = document.getElementById("saveCircuitBtn");
   const nextCreateCircuitStep = document.getElementById("nextCreateCircuitStep");
@@ -473,10 +482,24 @@ export function initTournamentPage({
       if (modal) modal.style.display = "block";
     }
   });
+  syncPulseBtn?.addEventListener("click", async () => {
+    if (syncPulseBtn.classList.contains("is-loading")) return;
+    if (typeof syncPulseNow !== "function") return;
+    syncPulseBtn.classList.add("is-loading");
+    syncPulseBtn.disabled = true;
+    syncPulseBtn.setAttribute("aria-busy", "true");
+    try {
+      await syncPulseNow();
+    } finally {
+      syncPulseBtn.classList.remove("is-loading");
+      syncPulseBtn.disabled = false;
+      syncPulseBtn.removeAttribute("aria-busy");
+    }
+  });
   raceSelect?.addEventListener("change", () => {
     const statusEl = document.getElementById("mmrStatus");
     const normalizedRace = normalizeRaceLabel(raceSelect.value);
-    updateMmrDisplay(statusEl, normalizedRace ? mmrForRace(normalizedRace) : null);
+    updateMmrDisplay(statusEl, normalizedRace || null);
   });
   openRegisterBtn?.addEventListener("click", () => {
     switchTab("registrationTab");
@@ -537,6 +560,15 @@ export function initTournamentPage({
   openCreateCircuitTournament?.addEventListener("click", () => {
     openCircuitTournamentModal?.();
   });
+  openCircuitSettingsBtn?.addEventListener("click", () => {
+    openCircuitSettingsModal?.();
+  });
+  closeCircuitSettingsBtn?.addEventListener("click", () => {
+    closeCircuitSettingsModal?.();
+  });
+  saveCircuitSettingsBtn?.addEventListener("click", () => {
+    saveCircuitSettings?.();
+  });
   deleteTournamentBtn?.addEventListener("click", () => {
     openDeleteTournamentModal?.();
   });
@@ -553,6 +585,15 @@ export function initTournamentPage({
       e.target === deleteTournamentModal
     ) {
       closeDeleteTournamentModal?.();
+    }
+  });
+  window.addEventListener("mousedown", (e) => {
+    if (
+      circuitSettingsModal &&
+      circuitSettingsModal.style.display === "flex" &&
+      e.target === circuitSettingsModal
+    ) {
+      closeCircuitSettingsModal?.();
     }
   });
   const setCreateCircuitStep = (step) => {

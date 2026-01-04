@@ -46,6 +46,7 @@ export let isAdmin = false;
 export let registryCache = null;
 export let currentTournamentMeta = null;
 export let requirePulseLinkSetting = true;
+export let requirePulseSyncSetting = true;
 export let mapPoolSelection = new Set(FALLBACK_LADDER_MAPS.map((m) => m.name));
 export let mapCatalog = [];
 export let mapCatalogLoaded = false;
@@ -114,6 +115,9 @@ export function setCurrentTournamentMetaState(next) {
 }
 export function setRequirePulseLinkSettingState(next) {
   requirePulseLinkSetting = next;
+}
+export function setRequirePulseSyncSettingState(next) {
+  requirePulseSyncSetting = next;
 }
 export function setMapPoolSelectionState(next) {
   mapPoolSelection = next;

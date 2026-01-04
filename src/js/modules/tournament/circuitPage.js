@@ -23,8 +23,10 @@ export function createCircuitPageHandlers({
 
   function updateCircuitAdminVisibility() {
     const createBtn = document.getElementById("openCreateCircuitTournament");
-    if (!createBtn) return;
-    createBtn.style.display = getIsCircuitAdmin() ? "inline-flex" : "none";
+    const settingsBtn = document.getElementById("openCircuitSettingsBtn");
+    const canManage = getIsCircuitAdmin();
+    if (createBtn) createBtn.style.display = canManage ? "inline-flex" : "none";
+    if (settingsBtn) settingsBtn.style.display = canManage ? "inline-flex" : "none";
   }
 
   function recomputeCircuitAdminFromMeta() {

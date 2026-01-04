@@ -101,6 +101,8 @@ export function buildSettingsPayload({
   bestOf,
   mapPool,
   roundRobin,
+  requirePulseLink,
+  requirePulseSync,
   circuitQualifyCount,
 }) {
   return {
@@ -114,6 +116,8 @@ export function buildSettingsPayload({
     startTime: startTime ? startTime.getTime() : null,
     checkInWindowMinutes,
     isInviteOnly: Boolean(isInviteOnly),
+    requirePulseLink: Boolean(requirePulseLink),
+    requirePulseSync: Boolean(requirePulseSync),
     circuitQualifyCount,
     bestOf,
     mapPool,

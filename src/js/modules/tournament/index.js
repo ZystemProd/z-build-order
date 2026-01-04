@@ -8,6 +8,7 @@ import {
   getCurrentUserProfile,
   getPulseState,
   initializeAuthUI,
+  syncPulseNow,
 } from "../../../app.js";
 import { onAuthStateChanged } from "firebase/auth";
 import {
@@ -57,6 +58,7 @@ import {
   registryCache,
   currentTournamentMeta,
   requirePulseLinkSetting,
+  requirePulseSyncSetting,
   mapPoolSelection,
   mapCatalog,
   mapCatalogLoaded,
@@ -71,6 +73,7 @@ import {
   setRegistryCacheState,
   setCurrentTournamentMetaState,
   setRequirePulseLinkSettingState,
+  setRequirePulseSyncSettingState,
   setMapPoolSelectionState,
   setMapCatalogState,
   setMapCatalogLoadedState,
@@ -123,7 +126,9 @@ import {
   fetchCircuitMeta,
   buildCircuitLeaderboard,
   renderCircuitList,
+  renderCircuitLeaderboard,
   renderCircuitView,
+  normalizeCircuitTournamentSlugs,
   generateCircuitSlug,
   updateCircuitSlugPreview,
   populateCreateCircuitForm,
@@ -248,6 +253,12 @@ const storage = getStorage(app);
 let currentCircuitMeta = null;
 let isCircuitAdmin = false;
 let circuitPointsBtnTemplate = null;
+let pulseSyncSessionCompleted = false;
+let secondaryPulseSyncSessionCompleted = false;
+let pulseSyncRequired = false;
+let secondaryPulseSyncRequired = false;
+let lastPulseUrl = "";
+let lastSecondarySignature = "";
 const adminManager = createAdminManager({
   auth,
   db,
@@ -676,6 +687,11 @@ function renderAll() {
     const eligiblePlayers = getEligiblePlayers(state.players || []);
     const isInviteOnly = isInviteOnlyTournament(currentTournamentMeta);
     const accessNote = document.getElementById("registrationAccessNote");
+    const syncPulseBtn = document.getElementById("syncPulseBtn");
+    const syncPulseSpinner = document.getElementById("syncPulseSpinner");
+    const requirePulseSyncEnabled =
+      currentTournamentMeta?.requirePulseSync ?? requirePulseSyncSetting;
+    const pulseGate = getPulseSyncGateStatus();
 
     if (tournamentTitle) {
       tournamentTitle.textContent = currentTournamentMeta.name || "Tournament";
@@ -760,10 +776,24 @@ function renderAll() {
       } else if (isInviteOnly && !isAdmin) {
         registerBtn.textContent = "Invite required";
         registerBtn.disabled = true;
+      } else if (pulseGate.needsSync) {
+        registerBtn.textContent = "Register";
+        registerBtn.disabled = true;
       } else {
         registerBtn.textContent = "Register";
         registerBtn.disabled = false;
       }
+    }
+
+    if (syncPulseBtn) {
+      const label = syncPulseBtn.querySelector(".sync-label");
+      if (label) label.textContent = "Sync SC2Pulse";
+      const isLoading = syncPulseBtn.classList.contains("is-loading");
+      syncPulseBtn.style.display = requirePulseSyncEnabled ? "" : "none";
+      syncPulseBtn.disabled = !auth.currentUser || isLoading;
+    }
+    if (syncPulseSpinner) {
+      syncPulseSpinner.style.display = requirePulseSyncEnabled ? "" : "none";
     }
 
     if (goLiveBtn) {
@@ -1675,6 +1705,48 @@ async function openCircuitTournamentModal() {
   }
 }
 
+function openCircuitSettingsModal() {
+  if (!currentCircuitMeta?.slug || !isCircuitAdmin) return;
+  const modal = document.getElementById("circuitSettingsModal");
+  const toggle = document.getElementById("circuitSettingsFirstPlaceSortToggle");
+  if (toggle) toggle.checked = Boolean(currentCircuitMeta?.sortByFirstPlace);
+  if (modal) {
+    modal.style.display = "flex";
+    lockBodyScroll();
+  }
+}
+
+function closeCircuitSettingsModal() {
+  const modal = document.getElementById("circuitSettingsModal");
+  if (!modal) return;
+  modal.style.display = "none";
+  unlockBodyScroll();
+}
+
+async function saveCircuitSettings() {
+  if (!currentCircuitMeta?.slug || !isCircuitAdmin) return;
+  const toggle = document.getElementById("circuitSettingsFirstPlaceSortToggle");
+  const sortByFirstPlace = Boolean(toggle?.checked);
+  try {
+    await setDoc(
+      doc(collection(db, CIRCUIT_COLLECTION), currentCircuitMeta.slug),
+      { sortByFirstPlace },
+      { merge: true }
+    );
+    currentCircuitMeta = { ...currentCircuitMeta, sortByFirstPlace };
+    await renderCircuitLeaderboard(
+      currentCircuitMeta,
+      normalizeCircuitTournamentSlugs(currentCircuitMeta),
+      { showEdit: isCircuitAdmin }
+    );
+    showToast?.("Circuit settings saved.", "success");
+    closeCircuitSettingsModal();
+  } catch (err) {
+    console.error("Failed to save circuit settings", err);
+    showToast?.("Failed to save circuit settings.", "error");
+  }
+}
+
 function openDeleteTournamentModal({ slug, circuitSlug } = {}) {
   const targetSlug = slug || currentSlug || "";
   if (!targetSlug) return;
@@ -1955,8 +2027,90 @@ const {
 function setStatus(el, message, isError = false) {
   if (!el) return;
   el.textContent = message || "";
+  el.style.display = message ? "block" : "none";
   el.classList.toggle("error", !!isError);
   el.classList.toggle("status-ok", !isError);
+}
+
+function getPulseSyncGateStatus() {
+  const requirePulseSyncEnabled =
+    currentTournamentMeta?.requirePulseSync ?? requirePulseSyncSetting;
+  if (!requirePulseSyncEnabled) {
+    return {
+      needsSync: false,
+      needsMain: false,
+      needsSecondary: false,
+      message: "",
+    };
+  }
+  if (!auth.currentUser) {
+    return {
+      needsSync: false,
+      needsMain: false,
+      needsSecondary: false,
+      message: "",
+    };
+  }
+  const needsMain = pulseSyncRequired && !pulseSyncSessionCompleted;
+  const needsSecondary =
+    secondaryPulseSyncRequired && !secondaryPulseSyncSessionCompleted;
+  const needsSync = needsMain || needsSecondary;
+  let message = "";
+  if (needsMain && needsSecondary) {
+    message =
+      "Update your SC2Pulse link and secondary links in Settings before registering.";
+  } else if (needsMain) {
+    message = "Update your SC2Pulse link in Settings before registering.";
+  } else if (needsSecondary) {
+    message =
+      "Update your secondary SC2Pulse links in Settings before registering.";
+  }
+  return { needsSync, needsMain, needsSecondary, message };
+}
+
+function normalizePulseSyncUrl(url = "") {
+  return sanitizeUrl((url || "").trim());
+}
+
+function extractSecondaryPulseUrls(secondary = []) {
+  if (!Array.isArray(secondary)) return [];
+  const urls = secondary
+    .map((entry) => (entry && typeof entry === "object" ? entry.url : entry))
+    .map((url) => normalizePulseSyncUrl(url))
+    .filter(Boolean);
+  return Array.from(new Set(urls));
+}
+
+function computeSecondarySignature(secondary = []) {
+  const urls = extractSecondaryPulseUrls(secondary).sort();
+  return urls.length ? urls.join("|") : "";
+}
+
+function resetPulseSyncSessionState() {
+  pulseSyncSessionCompleted = false;
+  secondaryPulseSyncSessionCompleted = false;
+  pulseSyncRequired = false;
+  secondaryPulseSyncRequired = false;
+  lastPulseUrl = "";
+  lastSecondarySignature = "";
+}
+
+function syncPulseRegistrationRequirements(pulseState = null) {
+  const source = pulseState || getPulseState?.() || {};
+  const url = normalizePulseSyncUrl(source?.url || "");
+  const secondarySignature = computeSecondarySignature(source?.secondary || []);
+
+  if (url !== lastPulseUrl) {
+    pulseSyncSessionCompleted = false;
+    lastPulseUrl = url;
+  }
+  if (secondarySignature !== lastSecondarySignature) {
+    secondaryPulseSyncSessionCompleted = false;
+    lastSecondarySignature = secondarySignature;
+  }
+
+  pulseSyncRequired = Boolean(url);
+  secondaryPulseSyncRequired = Boolean(secondarySignature);
 }
 
 function isInviteOnlyTournament(meta) {
@@ -2231,6 +2385,8 @@ async function handleSaveSettings(event) {
   const checkInSelect = document.getElementById("settingsCheckInSelect");
   const accessSelect = document.getElementById("settingsAccessSelect");
   const qualifyInput = document.getElementById("settingsCircuitQualifyCount");
+  const requirePulseInput = document.getElementById("settingsRequirePulseLink");
+  const requirePulseSyncInput = document.getElementById("settingsRequirePulseSync");
   const imageInput = document.getElementById("settingsImageInput");
   const imagePreview = document.getElementById("settingsImagePreview");
   const imageFile = imageInput?.files?.[0] || null;
@@ -2258,6 +2414,10 @@ async function handleSaveSettings(event) {
   const circuitPoints = currentTournamentMeta?.circuitSlug
     ? readCircuitPointsTable()
     : null;
+  const requirePulseLink =
+    requirePulseInput?.checked ?? currentTournamentMeta?.requirePulseLink ?? true;
+  const requirePulseSync =
+    requirePulseSyncInput?.checked ?? currentTournamentMeta?.requirePulseSync ?? true;
   let coverImageUrl = currentTournamentMeta?.coverImageUrl || "";
   if (!imageFile && reuseUrl) {
     coverImageUrl = reuseUrl;
@@ -2285,6 +2445,8 @@ async function handleSaveSettings(event) {
     bestOf,
     mapPool,
     roundRobin: rrSettings,
+    requirePulseLink,
+    requirePulseSync,
     circuitQualifyCount:
       currentTournamentMeta?.isCircuitFinal &&
       Number.isFinite(qualifyCount) &&
@@ -2310,6 +2472,8 @@ async function handleSaveSettings(event) {
   }
 
   setCurrentTournamentMetaState(meta);
+  setRequirePulseLinkSettingState(requirePulseLink);
+  setRequirePulseSyncSettingState(requirePulseSync);
   saveState({ bracket: state.bracket }); // keep bracket but bump timestamp via saveState
   // Reflect slug in the settings input
   const settingsSlugInput = document.getElementById("settingsSlugInput");
@@ -2339,6 +2503,7 @@ async function handleCreateCircuit(event) {
   const nameInput = document.getElementById("circuitNameInput");
   const slugInput = document.getElementById("circuitSlugInput");
   const descriptionInput = document.getElementById("circuitDescriptionInput");
+  const firstPlaceToggle = document.getElementById("circuitFirstPlaceSortToggle");
   const finalNameInput = document.getElementById("finalTournamentNameInput");
   const finalSlugInput = document.getElementById("finalTournamentSlugInput");
   const finalFormatSelect = document.getElementById("finalFormatSelect");
@@ -2356,6 +2521,7 @@ async function handleCreateCircuit(event) {
     (slugInput?.value || "").trim().toLowerCase() ||
     (await generateCircuitSlug());
   const description = descriptionInput?.value || "";
+  const sortByFirstPlace = Boolean(firstPlaceToggle?.checked);
   const finalName =
     (finalNameInput?.value || "").trim() || (name ? `${name} Finals` : "");
   let finalSlug = (finalSlugInput?.value || "").trim().toLowerCase();
@@ -2402,6 +2568,7 @@ async function handleCreateCircuit(event) {
     name,
     slug,
     description,
+    sortByFirstPlace,
     tournaments: [],
     finalTournamentSlug: "",
     admins: [],
@@ -2623,13 +2790,41 @@ function toggleMapSelection(name) {
 
 if (typeof window !== "undefined") {
   window.addEventListener("pulse-state-changed", (event) => {
+    syncPulseRegistrationRequirements(event.detail);
     hydratePulseFromState(event.detail);
+    if (currentTournamentMeta) {
+      renderAll();
+    }
+  });
+  window.addEventListener("pulse-sync-complete", (event) => {
+    syncPulseRegistrationRequirements(getPulseState?.());
+    pulseSyncSessionCompleted = true;
+    if (event?.detail?.url) {
+      lastPulseUrl = normalizePulseSyncUrl(event.detail.url);
+    }
+    if (currentTournamentMeta) {
+      renderAll();
+    }
+  });
+  window.addEventListener("pulse-secondary-sync-complete", () => {
+    syncPulseRegistrationRequirements(getPulseState?.());
+    secondaryPulseSyncSessionCompleted = true;
+    if (currentTournamentMeta) {
+      renderAll();
+    }
   });
 }
 
-onAuthStateChanged?.(auth, () => {
+onAuthStateChanged?.(auth, (user) => {
   recomputeAdminFromMeta();
   recomputeCircuitAdminFromMeta();
+  resetPulseSyncSessionState();
+  if (user) {
+    syncPulseRegistrationRequirements(getPulseState?.());
+  }
+  if (currentTournamentMeta) {
+    renderAll();
+  }
 });
 
 document.addEventListener("tournament:notification-action", (event) => {
@@ -2687,6 +2882,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     handleCreateTournament,
     handleCreateCircuit,
     openCircuitTournamentModal,
+    openCircuitSettingsModal,
+    closeCircuitSettingsModal,
+    saveCircuitSettings,
     openDeleteTournamentModal,
     confirmDeleteTournament,
     closeDeleteTournamentModal,
@@ -2743,6 +2941,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     checkInCurrentPlayer,
     notifyCheckInPlayers,
     goLiveTournament,
+    syncPulseNow,
   });
   initCoverReuseModal();
   initCasterControls({ saveState });
@@ -3375,6 +3574,12 @@ async function handleRegistration(event) {
     return;
   }
 
+  const pulseGate = getPulseSyncGateStatus();
+  if (pulseGate.needsSync) {
+    setStatus(statusEl, pulseGate.message, true);
+    return;
+  }
+
   if (!name) {
     setStatus(statusEl, "Player name is required.", true);
     return;
@@ -3713,13 +3918,17 @@ function mmrForRace(raceLabel) {
   return null;
 }
 
-function updateMmrDisplay(statusEl) {
+function updateMmrDisplay(statusEl, nextRace = null) {
+  if (nextRace !== null) {
+    setDerivedRaceState(nextRace || null);
+    setDerivedMmrState(nextRace ? mmrForRace(nextRace) : null);
+  }
   const mmrDisplay = document.getElementById("mmrDisplay");
   if (mmrDisplay) {
     if (derivedRace) {
       mmrDisplay.value = Number.isFinite(derivedMmr)
         ? `${derivedMmr} MMR`
-        : "No rank";
+      : "No rank";
     } else {
       mmrDisplay.value = "";
     }
@@ -3743,6 +3952,12 @@ function updateMmrDisplay(statusEl) {
       "Set your SC2Pulse link in Settings to load race and MMR.",
       true
     );
+    return;
+  }
+
+  const pulseGate = getPulseSyncGateStatus();
+  if (pulseGate.needsSync) {
+    setStatus(statusEl, pulseGate.message, true);
     return;
   }
 

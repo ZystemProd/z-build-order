@@ -330,6 +330,9 @@
             <button id="openCreateCircuitTournament" class="cta primary small" style="display:none;">
               Create tournament
             </button>
+            <button id="openCircuitSettingsBtn" class="cta ghost small" style="display:none;">
+              Settings
+            </button>
           </div>
         </div>
         <div class="hero-stats hero-stats-stacked">
@@ -381,11 +384,12 @@
               </button>
             </div>
             <div class="table-wrapper leaderboard-scroll custom-scroll">
-              <table class="players-table leaderboard-table">
+              <table id="circuitLeaderboardTable" class="players-table leaderboard-table">
                 <thead>
                   <tr>
                     <th>#</th>
                     <th>Player</th>
+                    <th id="circuitLeaderboardFirstPlaceHeader" class="first-place-cell">1st</th>
                     <th class="points-cell">Points</th>
                     <th class="events-cell">Events</th>
                   </tr>
@@ -547,7 +551,6 @@
           <div class="card-header">
             <div>
               <p class="eyebrow">Registration</p>
-              <h3>Add or update players</h3>
             </div>
             <div class="checkin-row">
               <p id="checkInStatus" class="checkin-status"></p>
@@ -579,10 +582,15 @@
             </label>
             <div class="form-actions">
               <button type="submit" class="cta primary" id="registerBtn">Register</button>
+              <button type="button" class="cta pulse-sync" id="syncPulseBtn">
+                <span class="sync-label">Sync SC2Pulse</span>
+              </button>
+              <span class="sync-spinner" id="syncPulseSpinner" aria-hidden="true"></span>
             </div>
             <p id="mmrStatus" class="helper" style="display:none;"></p>
           </form>
           <div class="caster-section" id="casterSection">
+            <div class="section-title">Caster</div>
             <p class="helper">
               Register as a caster to stream the game on Twitch. A host or admin must accept your request.
             </p>
@@ -593,15 +601,16 @@
             <div class="caster-requests" id="casterRequestPanel" data-admin-only="true" style="display:none;">
               <div class="section-title">
                 <p class="eyebrow">Caster requests</p>
-                <h4>Awaiting approval</h4>
+                <h4 class="section-subtitle">Awaiting approval</h4>
               </div>
               <div class="caster-request-list" id="casterRequestList"></div>
               <p class="helper" id="casterRequestAdminStatus"></p>
             </div>
           </div>
           <div class="admin-add-player" data-admin-only="true" id="finalAdminAddPanel" style="display:none;">
+            <div class="section-title">Add player</div>
             <label>Find player by username
-              <input id="finalAdminSearchInput" type="text" placeholder="Search username..."
+              <input id="finalAdminSearchInput" class="settings-input" type="text" placeholder="Search username..."
                 autocomplete="off" spellcheck="false" />
             </label>
             <div class="admin-search-results" id="finalAdminSearchResults"></div>
@@ -681,59 +690,111 @@
             <button class="settings-tab-btn" data-settings-tab="settingsFormat">Format</button>
           </div>
           <div class="settings-panel active" id="settingsGeneral">
-            <label>Tournament name
-              <input type="text" id="settingsNameInput" placeholder="My Weekly Cup" />
-            </label>
-            <label>Custom URL slug
-              <div class="inline-row">
-                <span class="muted">https://zbuildorder.com/tournament/</span>
-              <input type="text" id="settingsSlugInput" placeholder="my-weekly-cup" />
+            <div class="admin-settings-grid">
+              <div class="settings-row">
+                <div class="settings-row-label">Tournament name</div>
+                <div class="settings-row-control">
+                  <input type="text" id="settingsNameInput" placeholder="My Weekly Cup" />
+                </div>
               </div>
-              <p class="helper">Slug changes are locked for existing tournaments.</p>
-            </label>
-            <label>Start time
-              <div class="datetime-row">
-                <input type="text" id="settingsStartInput" class="datetime-input" placeholder="YYYY-MM-DD HH:MM" />
-                <button type="button" class="icon-btn datepicker-btn" data-datepicker-for="settingsStartInput"
-                  aria-label="Pick start time">
-                  <img src="img/SVG/time.svg" alt="" aria-hidden="true" />
-                </button>
+              <div class="settings-row">
+                <div class="settings-row-label">Custom URL slug</div>
+                <div class="settings-row-control">
+                  <div class="inline-row">
+                    <span class="muted">https://zbuildorder.com/tournament/</span>
+                    <div class="slug-input-wrapper">
+                      <input type="text" id="settingsSlugInput" placeholder="my-weekly-cup" />
+                    </div>
+                  </div>
+                  <p class="helper">Slug changes are locked for existing tournaments.</p>
+                </div>
               </div>
-            </label>
-            <label>Max players
-              <input type="number" id="settingsMaxPlayersInput" min="2" max="32" value="32" />
-            </label>
-            <div id="settingsCircuitQualifyRow" style="display:none;">
-              <label>Final qualifiers from circuit leaderboard
-                <input type="number" id="settingsCircuitQualifyCount" min="0" placeholder="8" />
-              </label>
-              <p class="helper">Only the top N on the circuit leaderboard can register for finals.</p>
+              <div class="settings-row">
+                <div class="settings-row-label">Start time</div>
+                <div class="settings-row-control">
+                  <div class="datetime-row">
+                    <input type="text" id="settingsStartInput" class="datetime-input" placeholder="YYYY-MM-DD HH:MM"
+                      autocomplete="off" autocorrect="off" spellcheck="false" />
+                    <button type="button" class="icon-btn datepicker-btn" data-datepicker-for="settingsStartInput"
+                      aria-label="Pick start time">
+                      <img src="img/SVG/time.svg" alt="" aria-hidden="true" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-label">Max players</div>
+                <div class="settings-row-control">
+                  <input type="number" id="settingsMaxPlayersInput" min="2" max="32" value="32" />
+                </div>
+              </div>
+              <div id="settingsCircuitQualifyRow" class="settings-row" style="display:none;">
+                <div class="settings-row-label">Final qualifiers from circuit leaderboard</div>
+                <div class="settings-row-control">
+                  <input type="number" id="settingsCircuitQualifyCount" min="0" placeholder="8" />
+                  <p class="helper">Only the top N on the circuit leaderboard can register for finals.</p>
+                </div>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-label">Check-in opens (before start)</div>
+                <div class="settings-row-control">
+                  <select id="settingsCheckInSelect">
+                    <option value="0">0 min</option>
+                    <option value="15">15 min</option>
+                    <option value="30">30 min</option>
+                    <option value="45">45 min</option>
+                    <option value="60">1h</option>
+                    <option value="75">1h 15</option>
+                    <option value="90">1h 30</option>
+                    <option value="105">1h 45</option>
+                    <option value="120">2h</option>
+                    <option value="135">2h 15</option>
+                    <option value="150">2h 30</option>
+                    <option value="165">2h 45</option>
+                    <option value="180">3h</option>
+                  </select>
+                </div>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-label">Tournament access</div>
+                <div class="settings-row-control">
+                  <select id="settingsAccessSelect">
+                    <option value="open">Open (anyone can register)</option>
+                    <option value="closed">Closed (invite-only)</option>
+                  </select>
+                  <p class="helper">Invite-only tournaments require admins to invite players.</p>
+                </div>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-label">Require SC2Pulse link for registration</div>
+                <div class="settings-row-control">
+                  <div class="settings-toggle-row">
+                    <div class="checkbox-wrapper-59">
+                      <label class="switch">
+                        <input type="checkbox" id="settingsRequirePulseLink" checked />
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                    <p class="helper">When enabled, players must submit their SC2Pulse link to register.</p>
+                  </div>
+                </div>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-label">Require SC2Pulse sync before registration</div>
+                <div class="settings-row-control">
+                  <div class="settings-toggle-row">
+                    <div class="checkbox-wrapper-59">
+                      <label class="switch">
+                        <input type="checkbox" id="settingsRequirePulseSync" checked />
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                    <p class="helper">When enabled, players must sync SC2Pulse before registering.</p>
+                  </div>
+                </div>
+              </div>
             </div>
-            <label>Check-in opens (before start)
-              <select id="settingsCheckInSelect">
-                <option value="0">0 min</option>
-                <option value="15">15 min</option>
-                <option value="30">30 min</option>
-                <option value="45">45 min</option>
-                <option value="60">1h</option>
-                <option value="75">1h 15</option>
-                <option value="90">1h 30</option>
-                <option value="105">1h 45</option>
-                <option value="120">2h</option>
-                <option value="135">2h 15</option>
-                <option value="150">2h 30</option>
-                <option value="165">2h 45</option>
-                <option value="180">3h</option>
-              </select>
-            </label>
-            <label>Tournament access
-              <select id="settingsAccessSelect">
-                <option value="open">Open (anyone can register)</option>
-                <option value="closed">Closed (invite-only)</option>
-              </select>
-            </label>
-            <p class="helper">Invite-only tournaments require admins to invite players.</p>
-            <label>Cover image
+            <label class="settings-cover-row">Cover image
               <div class="image-upload">
                 <div class="image-upload-actions">
                   <input type="file" id="settingsImageInput" accept="image/*" />
@@ -748,16 +809,6 @@
                 <p class="helper">Recommended 1200x630. JPG/PNG/WebP.</p>
               </div>
             </label>
-            <div class="publish-checkbox-row">
-              <span>Require SC2Pulse link for registration</span>
-              <div class="checkbox-wrapper-59">
-                <label class="switch">
-                  <input type="checkbox" id="settingsRequirePulseLink" checked />
-                  <span class="slider"></span>
-                </label>
-              </div>
-            </div>
-            <p class="helper">When enabled, players must submit their SC2Pulse link to register.</p>
           </div>
           <div class="settings-panel" id="settingsDesc">
             <div class="markdown-field">
@@ -1415,6 +1466,28 @@
     </div>
   </div>
 
+  <div id="circuitSettingsModal" class="modal" style="display:none;">
+    <div class="modal-content circuit-settings-modal">
+      <div class="modal-title-row">
+        <h3>Circuit settings</h3>
+      </div>
+      <div class="publish-checkbox-row">
+        <span>Sort leaderboard by 1st-place finishes</span>
+        <div class="checkbox-wrapper-59">
+          <label class="switch">
+            <input type="checkbox" id="circuitSettingsFirstPlaceSortToggle" />
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+      <p class="helper">When enabled, the leaderboard ranks by 1st-place finishes, then points.</p>
+      <div class="form-actions">
+        <button class="cta subtle" id="closeCircuitSettingsModal">Close</button>
+        <button class="cta primary" id="saveCircuitSettingsBtn">Save</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Create circuit modal -->
   <div id="createCircuitModal" class="modal create-modal" style="display:none;">
     <div class="modal-content">
@@ -1442,6 +1515,16 @@
           <textarea id="circuitDescriptionInput" class="markdown-input" rows="6"
             placeholder="What makes this circuit special?"></textarea>
         </label>
+        <div class="publish-checkbox-row">
+          <span>Sort leaderboard by 1st-place finishes</span>
+          <div class="checkbox-wrapper-59">
+            <label class="switch">
+              <input type="checkbox" id="circuitFirstPlaceSortToggle" />
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+        <p class="helper">When enabled, the leaderboard ranks by 1st-place finishes, then points.</p>
       </div>
       <div class="settings-panel create-circuit-panel" id="createFinalPanel">
         <div class="final-settings-title">

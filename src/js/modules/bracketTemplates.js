@@ -1170,17 +1170,17 @@ export const WINNERS_TEMPLATES = {
         b: { type: "player", seed: 20 },
       }, // B
       {
-        slot: 4,
+        slot: 3,
         a: { type: "player", seed: 12 },
         b: { type: "player", seed: 21 },
       }, // C
       {
-        slot: 6,
+        slot: 4,
         a: { type: "player", seed: 15 },
         b: { type: "player", seed: 18 },
       }, // D
       {
-        slot: 8,
+        slot: 6,
         a: { type: "player", seed: 14 },
         b: { type: "player", seed: 19 },
       }, // E
@@ -1291,22 +1291,22 @@ export const WINNERS_TEMPLATES = {
         b: { type: "player", seed: 20 },
       }, // B
       {
-        slot: 4,
+        slot: 3,
         a: { type: "player", seed: 12 },
         b: { type: "player", seed: 21 },
       }, // C
       {
-        slot: 6,
+        slot: 4,
         a: { type: "player", seed: 15 },
         b: { type: "player", seed: 18 },
       }, // D
       {
-        slot: 8,
+        slot: 5,
         a: { type: "player", seed: 14 },
         b: { type: "player", seed: 19 },
       }, // E
       {
-        slot: 9,
+        slot: 6,
         a: { type: "player", seed: 11 },
         b: { type: "player", seed: 22 },
       }, // F
@@ -1417,27 +1417,27 @@ export const WINNERS_TEMPLATES = {
         b: { type: "player", seed: 20 },
       }, // B
       {
-        slot: 4,
+        slot: 3,
         a: { type: "player", seed: 12 },
         b: { type: "player", seed: 21 },
       }, // C
       {
-        slot: 6,
+        slot: 4,
         a: { type: "player", seed: 15 },
         b: { type: "player", seed: 18 },
       }, // D
       {
-        slot: 8,
+        slot: 5,
         a: { type: "player", seed: 10 },
         b: { type: "player", seed: 23 },
       }, // E
       {
-        slot: 10,
+        slot: 6,
         a: { type: "player", seed: 14 },
         b: { type: "player", seed: 19 },
       }, // F
       {
-        slot: 12,
+        slot: 7,
         a: { type: "player", seed: 11 },
         b: { type: "player", seed: 22 },
       }, // G

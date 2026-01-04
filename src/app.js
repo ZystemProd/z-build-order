@@ -37,6 +37,7 @@ import {
   buildMmrBadges,
   setupPulseSettingsSection,
   setupSecondaryPulseModal,
+  syncPulseNow,
 } from "./js/modules/settings/pulse.js";
 import { setupTwitchSettingsSection } from "./js/modules/settings/twitch.js";
 import { setupCountrySelector } from "./js/modules/settings/country.js";
@@ -152,6 +153,7 @@ export {
   getCurrentUserProfile,
   getCurrentUsername,
   getCurrentUserAvatarUrl,
+  syncPulseNow,
 };
 window.handleSignIn = handleSignIn;
 window.handleSignOut = handleSignOut;

@@ -8,6 +8,7 @@ import {
   loadCircuitRegistry,
   loadTournamentStateRemote,
 } from "./sync/persistence.js";
+import { computePlacementsForBracket } from "./bracket/placements.js";
 import { sanitizeUrl, escapeHtml } from "./bracket/renderUtils.js";
 import { playerKey } from "./playerKey.js";
 import { syncMarkdownSurfaceForInput } from "./markdownEditor.js";
@@ -71,10 +72,38 @@ function resolveSecondaryPulseEntry(entry) {
   return null;
 }
 
-function buildCircuitLeaderboardCsv(leaderboard = []) {
-  const headers = [
-    "Placement",
-    "Player Name",
+function normalizeBracketForPlacements(bracket) {
+  if (!bracket || typeof bracket !== "object") return bracket || null;
+  const toArr = (obj) =>
+    Array.isArray(obj)
+      ? obj
+      : obj && typeof obj === "object"
+      ? Object.keys(obj)
+          .sort((a, b) => Number(a) - Number(b))
+          .map((key) => obj[key])
+      : [];
+  const normalizeRounds = (rounds) =>
+    toArr(rounds)
+      .map((round) => toArr(round))
+      .filter((round) => round.length);
+  const clampRounds = (rounds, count) => {
+    if (!Number.isFinite(count)) return rounds;
+    return rounds.slice(0, Math.max(0, count));
+  };
+  const winners = clampRounds(normalizeRounds(bracket.winners), bracket.winnersRoundCount);
+  const losers = clampRounds(normalizeRounds(bracket.losers), bracket.losersRoundCount);
+  return {
+    ...bracket,
+    winners,
+    losers,
+    groups: toArr(bracket.groups),
+  };
+}
+
+function buildCircuitLeaderboardCsv(leaderboard = [], { includeFirstPlaces = false } = {}) {
+  const headers = ["Placement", "Player Name"];
+  if (includeFirstPlaces) headers.push("1st Place Wins");
+  headers.push(
     "Points",
     "Main SC2Pulse Name",
     "Main SC2Pulse URL",
@@ -83,8 +112,8 @@ function buildCircuitLeaderboardCsv(leaderboard = []) {
     "Secondary SC2Pulse Name",
     "Secondary SC2Pulse URL",
     "Secondary Race",
-    "Secondary MMR",
-  ];
+    "Secondary MMR"
+  );
   const rows = [headers];
   (leaderboard || []).forEach((entry, idx) => {
     const mainRace = normalizeRaceLabel(entry?.race || "") || entry?.race || "";
@@ -99,9 +128,11 @@ function buildCircuitLeaderboardCsv(leaderboard = []) {
     );
     const secondaryRace = secondaryRaceRaw || "";
     const secondaryMmr = Number.isFinite(secondaryMmrRaw) ? secondaryMmrRaw : "";
-    rows.push([
-      idx + 1,
-      entry?.name || "",
+    const baseRow = [idx + 1, entry?.name || ""];
+    if (includeFirstPlaces) {
+      baseRow.push(Number.isFinite(entry?.firstPlaces) ? entry.firstPlaces : 0);
+    }
+    baseRow.push(
       Number.isFinite(entry?.points) ? entry.points : "",
       mainPulseName,
       entry?.sc2Link || "",
@@ -110,8 +141,9 @@ function buildCircuitLeaderboardCsv(leaderboard = []) {
       secondaryName,
       secondaryUrl,
       secondaryRace,
-      secondaryMmr,
-    ]);
+      secondaryMmr
+    );
+    rows.push(baseRow);
   });
 
   const escapeCsv = (value) => {
@@ -128,7 +160,9 @@ function buildCircuitLeaderboardCsv(leaderboard = []) {
 function downloadCircuitLeaderboardCsv(leaderboard, meta) {
   const slug = String(meta?.slug || "leaderboard").trim() || "leaderboard";
   const safeSlug = slug.replace(/[^a-z0-9_-]+/gi, "-");
-  const csv = buildCircuitLeaderboardCsv(leaderboard);
+  const csv = buildCircuitLeaderboardCsv(leaderboard, {
+    includeFirstPlaces: Boolean(meta?.sortByFirstPlace),
+  });
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -160,6 +194,7 @@ export function normalizeCircuitData(data = {}, fallbackSlug = "") {
       data.pointsOverrides && typeof data.pointsOverrides === "object"
         ? { ...data.pointsOverrides }
         : {},
+    sortByFirstPlace: Boolean(data.sortByFirstPlace),
     admins: Array.isArray(data.admins) ? data.admins : [],
     createdBy: data.createdBy || null,
     createdByName: data.createdByName || data.hostName || null,
@@ -510,6 +545,15 @@ export async function buildCircuitLeaderboard(meta, slugs = [], { excludeSlug } 
     if (!snapshot) return;
     const tournamentSlug = filtered[idx];
     const players = Array.isArray(snapshot.players) ? snapshot.players : [];
+    const bracket = normalizeBracketForPlacements(snapshot.bracket);
+    const placements = computePlacementsForBracket(bracket, players.length || 0);
+    const winnerId = placements
+      ? Array.from(placements.entries()).find(([, place]) => place === 1)?.[0]
+      : null;
+    const winner = winnerId
+      ? players.find((player) => player?.id === winnerId)
+      : null;
+    const winnerKey = winner ? playerKey(winner.name, winner.sc2Link) : "";
     players.forEach((player) => {
       const key = playerKey(player.name, player.sc2Link);
       if (!key) return;
@@ -521,6 +565,7 @@ export async function buildCircuitLeaderboard(meta, slugs = [], { excludeSlug } 
       const entry = totals.get(key) || {
         name: player.name || "Unknown",
         points: 0,
+        firstPlaces: 0,
         tournaments: new Set(),
         sc2Link: player.sc2Link || "",
         pulseName: "",
@@ -556,9 +601,13 @@ export async function buildCircuitLeaderboard(meta, slugs = [], { excludeSlug } 
       ) {
         entry.secondaryPulseLinks = player.secondaryPulseLinks;
       }
+      if (winnerKey && key === winnerKey) {
+        entry.firstPlaces += 1;
+      }
       totals.set(key, entry);
     });
   });
+  const useFirstPlaceSort = Boolean(meta?.sortByFirstPlace);
   const leaderboard = Array.from(totals.entries())
     .map(([key, entry]) => {
       const override = Number(meta?.pointsOverrides?.[key]);
@@ -566,6 +615,7 @@ export async function buildCircuitLeaderboard(meta, slugs = [], { excludeSlug } 
         key,
         name: entry.name,
         points: Number.isFinite(override) ? override : entry.points,
+        firstPlaces: entry.firstPlaces || 0,
         tournaments: entry.tournaments.size,
         sc2Link: entry.sc2Link || "",
         pulseName: entry.pulseName || "",
@@ -575,7 +625,13 @@ export async function buildCircuitLeaderboard(meta, slugs = [], { excludeSlug } 
         secondaryPulseProfiles: entry.secondaryPulseProfiles || [],
       };
     })
-    .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
+    .sort((a, b) => {
+      if (useFirstPlaceSort) {
+        const diff = (b.firstPlaces || 0) - (a.firstPlaces || 0);
+        if (diff) return diff;
+      }
+      return b.points - a.points || a.name.localeCompare(b.name);
+    });
   return { leaderboard, slugs: filtered };
 }
 
@@ -584,12 +640,20 @@ export async function renderCircuitLeaderboard(meta, slugs = [], { showEdit = fa
   const note = document.getElementById("circuitLeaderboardNote");
   const editBtn = document.getElementById("openCircuitPointsEditBtn");
   const downloadBtn = document.getElementById("downloadCircuitLeaderboardBtn");
+  const table = document.getElementById("circuitLeaderboardTable");
+  const firstPlaceHeader = document.getElementById("circuitLeaderboardFirstPlaceHeader");
   if (!body) return;
+  const showFirstPlaces = Boolean(meta?.sortByFirstPlace);
+  const columnCount = showFirstPlaces ? 5 : 4;
+  if (table) table.classList.toggle("has-first-places", showFirstPlaces);
+  if (firstPlaceHeader) {
+    firstPlaceHeader.style.display = showFirstPlaces ? "" : "none";
+  }
   if (editBtn) editBtn.style.display = showEdit ? "inline-flex" : "none";
   if (downloadBtn) downloadBtn.style.display = showEdit ? "inline-flex" : "none";
-  body.innerHTML = `<tr><td colspan="4" class="helper">Loading leaderboard...</td></tr>`;
+  body.innerHTML = `<tr><td colspan="${columnCount}" class="helper">Loading leaderboard...</td></tr>`;
   if (!slugs.length) {
-    body.innerHTML = `<tr><td colspan="4" class="helper">No tournaments yet.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="${columnCount}" class="helper">No tournaments yet.</td></tr>`;
     if (note) note.textContent = "Add tournaments to build the leaderboard.";
     if (editBtn) editBtn.disabled = true;
     if (downloadBtn) downloadBtn.disabled = true;
@@ -598,14 +662,14 @@ export async function renderCircuitLeaderboard(meta, slugs = [], { showEdit = fa
   try {
     const { leaderboard, slugs: usedSlugs } = await buildCircuitLeaderboard(meta, slugs);
     if (!usedSlugs.length) {
-      body.innerHTML = `<tr><td colspan="4" class="helper">No tournaments yet.</td></tr>`;
+      body.innerHTML = `<tr><td colspan="${columnCount}" class="helper">No tournaments yet.</td></tr>`;
       if (note) note.textContent = "Add tournaments to build the leaderboard.";
       if (editBtn) editBtn.disabled = true;
       if (downloadBtn) downloadBtn.disabled = true;
       return;
     }
     if (!leaderboard.length) {
-      body.innerHTML = `<tr><td colspan="4" class="helper">No players yet.</td></tr>`;
+      body.innerHTML = `<tr><td colspan="${columnCount}" class="helper">No players yet.</td></tr>`;
       if (note) note.textContent = "Points will appear after tournaments log players.";
       if (editBtn) editBtn.disabled = true;
       if (downloadBtn) downloadBtn.disabled = true;
@@ -622,6 +686,10 @@ export async function renderCircuitLeaderboard(meta, slugs = [], { showEdit = fa
       const nameCell = document.createElement("td");
       nameCell.textContent = entry.name || "Unknown";
 
+      const firstPlaceCell = document.createElement("td");
+      firstPlaceCell.className = "first-place-cell";
+      firstPlaceCell.textContent = String(entry.firstPlaces || 0);
+
       const pointsCell = document.createElement("td");
       pointsCell.className = "points-cell";
       pointsCell.textContent = String(entry.points || 0);
@@ -630,7 +698,11 @@ export async function renderCircuitLeaderboard(meta, slugs = [], { showEdit = fa
       eventsCell.className = "events-cell";
       eventsCell.textContent = String(entry.tournaments || 0);
 
-      row.append(rankCell, nameCell, pointsCell, eventsCell);
+      if (showFirstPlaces) {
+        row.append(rankCell, nameCell, firstPlaceCell, pointsCell, eventsCell);
+      } else {
+        row.append(rankCell, nameCell, pointsCell, eventsCell);
+      }
       body.appendChild(row);
       editEntries.push({ key: entry.key, name: entry.name, points: entry.points });
     });
@@ -645,7 +717,7 @@ export async function renderCircuitLeaderboard(meta, slugs = [], { showEdit = fa
     if (note) note.textContent = `Totals across ${usedSlugs.length} tournaments.`;
   } catch (err) {
     console.error("Failed to load circuit leaderboard", err);
-    body.innerHTML = `<tr><td colspan="4" class="helper">Failed to load leaderboard.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="${columnCount}" class="helper">Failed to load leaderboard.</td></tr>`;
     if (note) note.textContent = "Try refreshing in a moment.";
     if (editBtn) editBtn.disabled = true;
     if (downloadBtn) downloadBtn.disabled = true;
@@ -670,6 +742,7 @@ export async function populateCreateCircuitForm() {
   const nameInput = document.getElementById("circuitNameInput");
   const slugInput = document.getElementById("circuitSlugInput");
   const descInput = document.getElementById("circuitDescriptionInput");
+  const firstPlaceToggle = document.getElementById("circuitFirstPlaceSortToggle");
   const finalNameInput = document.getElementById("finalTournamentNameInput");
   const finalSlugInput = document.getElementById("finalTournamentSlugInput");
   const finalDescInput = document.getElementById("finalTournamentDescriptionInput");
@@ -683,6 +756,7 @@ export async function populateCreateCircuitForm() {
   if (nameInput) nameInput.value = "";
   if (descInput) descInput.value = "";
   syncMarkdownSurfaceForInput(descInput);
+  if (firstPlaceToggle) firstPlaceToggle.checked = false;
   if (slugInput && !slugInput.value) {
     slugInput.value = await generateCircuitSlug();
   }

@@ -209,15 +209,20 @@ export function buildEliminationBracket(players, { includeLosers = true } = {}) 
     roundNumber++;
   }
 
-  const losers = buildLosersBracket(winners, baseSize, total, numPlayIns);
+  const losers = includeLosers
+    ? buildLosersBracket(winners, baseSize, total, numPlayIns)
+    : [];
 
-  const finals = createMatch(
-    "finals",
-    1,
-    1,
-    winnerSource(winners[winners.length - 1][0]),
-    losers.length ? winnerSource(losers[losers.length - 1][0]) : null
-  );
+  const finals =
+    includeLosers && losers.length
+      ? createMatch(
+          "finals",
+          1,
+          1,
+          winnerSource(winners[winners.length - 1][0]),
+          winnerSource(losers[losers.length - 1][0])
+        )
+      : null;
 
   return { winners, losers, finals, seedOrder };
 }
