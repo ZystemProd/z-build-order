@@ -51,6 +51,12 @@ export function getSelectValue(match, idx, bestOf = 3) {
 }
 
 export function getBestOfForMatch(match) {
+  if (match?.bracket === "group") {
+    const groupBestOf = Number(currentTournamentMeta?.roundRobin?.bestOf);
+    if (Number.isFinite(groupBestOf) && groupBestOf > 0) {
+      return groupBestOf;
+    }
+  }
   if (Number.isFinite(match?.bestOf) && match.bestOf > 0) {
     return match.bestOf;
   }

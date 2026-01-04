@@ -9,13 +9,26 @@ export function syncFormatFieldVisibility(scope) {
       ? "finalFormatSelect"
       : "tournamentFormatSelect";
   const value = document.getElementById(selectId)?.value || "";
-  const isRR = (value || "").toLowerCase().startsWith("round robin");
+  const normalized = (value || "").toLowerCase();
+  const isRR = normalized.startsWith("round robin");
+  const isDual =
+    normalized.includes("gsl") || normalized.includes("dual tournament");
   const rrBlocks = document.querySelectorAll(
     `[data-format-scope="${scope}-roundrobin"]`
   );
   rrBlocks.forEach((el) => {
-    el.style.display = isRR ? "flex" : "none";
+    el.style.display = isRR || isDual ? "flex" : "none";
   });
+  const labelId =
+    scope === "settings"
+      ? "settingsGroupStageLabel"
+      : scope === "final"
+      ? "finalGroupStageLabel"
+      : "createGroupStageLabel";
+  const label = document.getElementById(labelId);
+  if (label) {
+    label.textContent = isDual ? "Dual Tournament Groups" : "Round Robin";
+  }
 }
 
 export function updateSettingsDescriptionPreview(renderMarkdown) {

@@ -121,6 +121,9 @@ export function initTournamentPage({
   const confirmDeleteTournamentBtn = document.getElementById("confirmDeleteTournamentBtn");
   const cancelDeleteTournamentBtn = document.getElementById("cancelDeleteTournamentBtn");
   const deleteTournamentModal = document.getElementById("confirmDeleteTournamentModal");
+  const resetTournamentModal = document.getElementById("confirmResetTournamentModal");
+  const confirmResetTournamentBtn = document.getElementById("confirmResetTournamentBtn");
+  const cancelResetTournamentBtn = document.getElementById("cancelResetTournamentBtn");
   const openCreateCircuit = document.getElementById("openCreateCircuit");
   const createCircuitModal = document.getElementById("createCircuitModal");
   const circuitSettingsModal = document.getElementById("circuitSettingsModal");
@@ -157,6 +160,9 @@ export function initTournamentPage({
   const finalImagePreview = document.getElementById("finalTournamentImagePreview");
   const settingsImageInput = document.getElementById("settingsImageInput");
   const settingsImagePreview = document.getElementById("settingsImagePreview");
+  const tournamentMaxPlayersInput = document.getElementById("tournamentMaxPlayersInput");
+  const settingsMaxPlayersInput = document.getElementById("settingsMaxPlayersInput");
+  const finalMaxPlayersInput = document.getElementById("finalTournamentMaxPlayersInput");
   const nameInput = document.getElementById("tournamentNameInput");
   const slugInput = document.getElementById("tournamentSlugInput");
   const circuitSlugInput = document.getElementById("circuitSlugInput");
@@ -228,6 +234,42 @@ export function initTournamentPage({
     },
   ];
   initQuillEditors(quillConfigs);
+
+  const isDualTournamentFormat = (value) => {
+    const normalized = (value || "").toLowerCase();
+    return normalized.includes("gsl") || normalized.includes("dual tournament");
+  };
+
+  const snapToMultiple = (value, step) => {
+    if (!Number.isFinite(value) || !step) return value;
+    return Math.round(value / step) * step;
+  };
+
+  const syncMaxPlayersInput = (formatSelect, input) => {
+    if (!formatSelect || !input) return;
+    if (!input.dataset.defaultStep) {
+      input.dataset.defaultStep = input.step || "1";
+      input.dataset.defaultMin = input.min || "2";
+    }
+    const isDual = isDualTournamentFormat(formatSelect.value);
+    if (isDual) {
+      input.step = "4";
+      input.min = "4";
+    } else {
+      input.step = input.dataset.defaultStep;
+      input.min = input.dataset.defaultMin;
+    }
+
+    const maxCap = Number(input.max || 0) || 32;
+    const minCap = Number(input.min || 0) || 2;
+    const current = Number(input.value || input.placeholder || "");
+    if (!Number.isFinite(current)) return;
+    const next = isDual ? snapToMultiple(current, 4) : current;
+    const clamped = Math.min(maxCap, Math.max(minCap, next));
+    if (Number.isFinite(clamped)) {
+      input.value = String(clamped);
+    }
+  };
   syncQuillFromInputs();
 
   const preventLabelFocus = (root) => {
@@ -347,7 +389,11 @@ export function initTournamentPage({
 
   const resolvePlayoffsFormat = (rootEl, formatValue) => {
     const raw = (formatValue || "").toLowerCase();
-    if (!raw.startsWith("round robin")) {
+    const isGroupStage =
+      raw.startsWith("round robin") ||
+      raw.includes("gsl") ||
+      raw.includes("dual tournament");
+    if (!isGroupStage) {
       return formatValue || "";
     }
     const playoffsSelect = getPlayoffsSelectForRoot(rootEl);
@@ -358,6 +404,10 @@ export function initTournamentPage({
     if (!root) return;
     const formatValue = formatSelect?.value || "";
     const format = formatValue.toLowerCase();
+    const isGroupStageFormat =
+      format.startsWith("round robin") ||
+      format.includes("gsl") ||
+      format.includes("dual tournament");
     const playoffsValue = resolvePlayoffsFormat(root, formatValue);
     const playoffsLower = (playoffsValue || "").toLowerCase();
     const isDoubleElim =
@@ -415,7 +465,7 @@ export function initTournamentPage({
     if (lowerRow) {
       lowerRow.style.display = isSingleElim ? "none" : "";
     }
-    if (format.startsWith("round robin")) {
+    if (isGroupStageFormat) {
       root.style.display = playoffsLower === "none" ? "none" : "";
     } else {
       root.style.display = "";
@@ -461,7 +511,7 @@ export function initTournamentPage({
   initDatePickers();
   rebuildBtn?.addEventListener("click", () => goLiveTournament?.());
   resetBtn?.addEventListener("click", () => {
-    resetTournament?.();
+    setModalVisible(resetTournamentModal, true);
   });
   autoFillBtn?.addEventListener("click", autoFillPlayers);
   checkInBtn?.addEventListener("click", () => checkInCurrentPlayer?.());
@@ -578,6 +628,13 @@ export function initTournamentPage({
   cancelDeleteTournamentBtn?.addEventListener("click", () => {
     closeDeleteTournamentModal?.();
   });
+  confirmResetTournamentBtn?.addEventListener("click", () => {
+    resetTournament?.();
+    setModalVisible(resetTournamentModal, false);
+  });
+  cancelResetTournamentBtn?.addEventListener("click", () => {
+    setModalVisible(resetTournamentModal, false);
+  });
   window.addEventListener("mousedown", (e) => {
     if (
       deleteTournamentModal &&
@@ -585,6 +642,15 @@ export function initTournamentPage({
       e.target === deleteTournamentModal
     ) {
       closeDeleteTournamentModal?.();
+    }
+  });
+  window.addEventListener("mousedown", (e) => {
+    if (
+      resetTournamentModal &&
+      resetTournamentModal.style.display === "flex" &&
+      e.target === resetTournamentModal
+    ) {
+      setModalVisible(resetTournamentModal, false);
     }
   });
   window.addEventListener("mousedown", (e) => {
@@ -725,9 +791,21 @@ export function initTournamentPage({
     settingsBestOfFinal,
   ].forEach((el) => el?.addEventListener("input", () => {}));
 
-  createFormatSelect?.addEventListener("change", () => syncFormatFieldVisibility("create"));
-  settingsFormatSelect?.addEventListener("change", () => syncFormatFieldVisibility("settings"));
-  finalFormatSelect?.addEventListener("change", () => syncFormatFieldVisibility("final"));
+  createFormatSelect?.addEventListener("change", () => {
+    syncFormatFieldVisibility("create");
+    syncMaxPlayersInput(createFormatSelect, tournamentMaxPlayersInput);
+  });
+  settingsFormatSelect?.addEventListener("change", () => {
+    syncFormatFieldVisibility("settings");
+    syncMaxPlayersInput(settingsFormatSelect, settingsMaxPlayersInput);
+  });
+  finalFormatSelect?.addEventListener("change", () => {
+    syncFormatFieldVisibility("final");
+    syncMaxPlayersInput(finalFormatSelect, finalMaxPlayersInput);
+  });
+  syncMaxPlayersInput(createFormatSelect, tournamentMaxPlayersInput);
+  syncMaxPlayersInput(settingsFormatSelect, settingsMaxPlayersInput);
+  syncMaxPlayersInput(finalFormatSelect, finalMaxPlayersInput);
   closeVetoModal?.addEventListener("click", () => hideVetoModal());
   saveVetoBtn?.addEventListener("click", () => saveVetoSelection());
 
@@ -785,7 +863,7 @@ export function initTournamentPage({
 
   enableDragScroll(bracketGrid, {
     ignoreSelector:
-      'a, button, input, select, textarea, label, summary, details, [contenteditable="true"], [data-no-drag], .name-text:not(.is-placeholder), .hover-info-container, .score-select, .row-actions',
+      'a, button, input, select, textarea, label, summary, details, [contenteditable="true"], [data-no-drag], .group-stage-scroll, .playoff-scroll, .name-text:not(.is-placeholder), .hover-info-container, .score-select, .row-actions',
   });
 
   if (bracketGrid) {

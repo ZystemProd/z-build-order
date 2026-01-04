@@ -857,12 +857,13 @@
                 <option value="Double Elimination">Double Elimination</option>
                 <option value="Single Elimination">Single Elimination</option>
                 <option value="Round Robin">Round Robin</option>
+                <option value="GSL/Dual Tournament">GSL/Dual Tournament</option>
                 <option value="Swiss">Swiss</option>
               </select>
             </label>
             <div class="format-stage" data-format-scope="settings-roundrobin">
               <p class="eyebrow">Stage 1</p>
-              <h4>Round Robin</h4>
+              <h4 id="settingsGroupStageLabel">Round Robin</h4>
               <div class="inline-row">
                 <label style="flex:1;">Number of groups
                   <input type="number" id="settingsRoundRobinGroups" min="1" />
@@ -1043,10 +1044,8 @@
 
             </div>
           </div>
-          <div class="form-actions" style="margin-top:16px;">
+          <div class="form-actions settings-actions" style="margin-top:16px;">
             <button class="cta primary" id="saveSettingsBtn">Save settings</button>
-          </div>
-          <div class="form-actions danger-actions">
             <button class="cta danger" id="deleteTournamentBtn">Delete tournament</button>
           </div>
         </div>
@@ -1229,12 +1228,13 @@
             <option value="Double Elimination">Double Elimination</option>
             <option value="Single Elimination">Single Elimination</option>
             <option value="Round Robin">Round Robin</option>
+            <option value="GSL/Dual Tournament">GSL/Dual Tournament</option>
             <option value="Swiss">Swiss</option>
           </select>
         </label>
         <div class="format-stage" data-format-scope="create-roundrobin">
           <p class="eyebrow">Stage 1</p>
-          <h4>Round Robin</h4>
+          <h4 id="createGroupStageLabel">Round Robin</h4>
           <div class="inline-row">
             <label style="flex:1;">Number of groups
               <input type="number" id="roundRobinGroupsInput" min="1" />
@@ -1645,12 +1645,13 @@
             <option value="Double Elimination">Double Elimination</option>
             <option value="Single Elimination">Single Elimination</option>
             <option value="Round Robin">Round Robin</option>
+            <option value="GSL/Dual Tournament">GSL/Dual Tournament</option>
             <option value="Swiss">Swiss</option>
           </select>
         </label>
         <div class="format-stage" data-format-scope="final-roundrobin">
           <p class="eyebrow">Stage 1</p>
-          <h4>Round Robin</h4>
+          <h4 id="finalGroupStageLabel">Round Robin</h4>
           <div class="inline-row">
             <label style="flex:1;">Number of groups
               <input type="number" id="finalRoundRobinGroupsInput" min="1" />
@@ -1829,6 +1830,20 @@
       <div class="form-actions">
         <button class="cta danger" id="confirmDeleteTournamentBtn">Yes, delete</button>
         <button class="cta ghost" id="cancelDeleteTournamentBtn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reset tournament modal -->
+  <div id="confirmResetTournamentModal" class="modal">
+    <div class="modal-content small-modal">
+      <h3>Reset tournament</h3>
+      <p class="helper">
+        This will reset the bracket and remove all players.
+      </p>
+      <div class="form-actions">
+        <button class="cta danger" id="confirmResetTournamentBtn">Yes, reset</button>
+        <button class="cta ghost" id="cancelResetTournamentBtn">Cancel</button>
       </div>
     </div>
   </div>

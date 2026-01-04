@@ -1153,11 +1153,38 @@ export function renderRoundRobinView(
     .join("");
 
   const playoffsHtml = renderRoundRobinPlayoffs(bracket, lookup, playersById);
+  const playoffsWrap = playoffsHtml
+    ? `<details class="stage-section" open data-stage="playoffs">
+        <summary class="stage-header">
+          <div class="stage-title">
+            <span class="eyebrow">Stage 2</span>
+            <h4>Playoffs</h4>
+          </div>
+          <span class="stage-toggle" aria-hidden="true"></span>
+        </summary>
+        <div class="stage-body">
+          <div class="playoff-scroll">${playoffsHtml}</div>
+        </div>
+      </details>`
+    : "";
 
-  return DOMPurify.sanitize(`<div class="group-stage">
-    ${groupHtml}
-  </div>
-  ${playoffsHtml}`);
+  return DOMPurify.sanitize(`<details class="stage-section" open data-stage="groups">
+    <summary class="stage-header">
+      <div class="stage-title">
+        <span class="eyebrow">Stage 1</span>
+        <h4>Group Stage</h4>
+      </div>
+      <span class="stage-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="stage-body">
+      <div class="group-stage-scroll">
+        <div class="group-stage">
+          ${groupHtml}
+        </div>
+      </div>
+    </div>
+  </details>
+  ${playoffsWrap}`);
 }
 
 export function renderBracketView({
@@ -1184,8 +1211,13 @@ export function renderBracketView({
 
   buildMatchLetters(bracket);
 
-  const isSingleElimination = format.toLowerCase().startsWith("single");
-  const isRoundRobin = format.toLowerCase().includes("round robin");
+  const normalizedFormat = format.toLowerCase();
+  const isSingleElimination = normalizedFormat.startsWith("single");
+  const isRoundRobin = normalizedFormat.includes("round robin");
+  const isDualTournament =
+    normalizedFormat.includes("gsl") ||
+    normalizedFormat.includes("dual tournament");
+  const isGroupStage = isRoundRobin || isDualTournament;
 
   if (isRoundRobin) {
     ensurePlayoffs?.(bracket);
@@ -1194,7 +1226,7 @@ export function renderBracketView({
   const lookup = getMatchLookup(bracket);
   const playersById = getPlayersMap();
 
-  if (isRoundRobin) {
+  if (isGroupStage) {
     grid.innerHTML = renderRoundRobinView(
       { ...bracket, computeGroupStandings },
       playersById,

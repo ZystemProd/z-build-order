@@ -100,6 +100,7 @@ import {
   buildRoundRobinBracket,
   buildLosersBracket,
   createMatch,
+  isDualTournamentFormat,
   normalizeRoundRobinSettings,
   normalizePlayoffMode,
 } from "./bracket/build.js";
@@ -166,6 +167,7 @@ import {
   attachPlayerDetailHandlers,
 } from "./playerDetail.js";
 import { renderSeedingTable } from "./ui/seeding.js";
+import { enableDragScroll } from "./ui/dragScroll.js";
 import {
   applyBestOfToSettings,
   populateSettingsPanel as populateSettingsPanelUI,
@@ -679,6 +681,7 @@ function renderAll() {
     const bracketNotLive = document.getElementById("bracketNotLive");
     const registeredPlayersList = document.getElementById("registeredPlayersList");
     const activityCard = document.getElementById("activityCard");
+    const bracketTitle = document.getElementById("bracketTitle");
     const currentUid = auth.currentUser?.uid || null;
     const currentPlayer = currentUid
       ? (state.players || []).find((p) => p.uid === currentUid)
@@ -712,6 +715,14 @@ function renderAll() {
     }
     if (tournamentFormat) {
       tournamentFormat.textContent = currentTournamentMeta.format || "Tournament";
+    }
+    if (bracketTitle) {
+      const formatLabel = (currentTournamentMeta.format || "").toLowerCase();
+      const isGroupStage =
+        formatLabel.includes("round robin") || isDualTournamentFormat(formatLabel);
+      bracketTitle.textContent = isGroupStage
+        ? "Group Stage"
+        : currentTournamentMeta.format || "Bracket";
     }
     if (tournamentStart) {
       tournamentStart.textContent = startMs
@@ -868,6 +879,8 @@ function renderAll() {
   const format = currentTournamentMeta?.format || "Tournament";
   const isRoundRobinFormat = (fmt) =>
     (fmt || "").toLowerCase().includes("round robin");
+  const isGroupStageFormat = (fmt) =>
+    isRoundRobinFormat(fmt) || isDualTournamentFormat(fmt);
   const layoutVersion = state.bracketLayoutVersion || 1;
   const needsLayoutUpgrade =
     bracket &&
@@ -880,7 +893,7 @@ function renderAll() {
   const needsBracketRepair = (() => {
     if (!bracket || !playersArr.length) return false;
     if (bracketHasRecordedResults(bracket)) return false;
-    if (isRoundRobinFormat(format)) return false;
+    if (isGroupStageFormat(format)) return false;
     const { seededEligible } = seedEligiblePlayersWithMode(state.players || [], state);
     const expected = buildBracket(
       seededEligible,
@@ -904,7 +917,7 @@ function renderAll() {
   if (bracketContainer && bracket) {
     let lookup = getMatchLookup(bracket);
     const playersById = getPlayersMap();
-    if (format.toLowerCase().includes("round robin")) {
+    if (isGroupStageFormat(format)) {
       const changed = ensureRoundRobinPlayoffs(bracket, playersById, lookup);
       if (changed) {
         lookup = getMatchLookup(bracket);
@@ -932,6 +945,20 @@ function renderAll() {
     attachMatchHoverHandlers();
     annotateConnectorPlayers(lookup, playersById);
     clampScoreSelectOptions();
+    const groupScrolls = bracketContainer.querySelectorAll(
+      ".group-stage-scroll, .playoff-scroll"
+    );
+    groupScrolls.forEach((el) => {
+      if (el.dataset.dragScrollBound === "true") return;
+      enableDragScroll(el, {
+        axisLock: true,
+        scrollXElement: el,
+        scrollYElement: el,
+        ignoreSelector:
+          'a, button, input, select, textarea, label, [contenteditable="true"], [data-no-drag]',
+      });
+      el.dataset.dragScrollBound = "true";
+    });
   }
   updateTooltips?.();
 }
@@ -1028,6 +1055,10 @@ function goLiveTournament() {
     showToast?.("No checked-in players to go live.", "error");
     return;
   }
+  const { mergedPlayers } = seedEligiblePlayersWithMode(
+    state.players || [],
+    state
+  );
   const seededPlayers = seedPlayersForState(checkedInPlayers, state);
   const bracket = buildBracket(
     seededPlayers,
@@ -1035,7 +1066,7 @@ function goLiveTournament() {
     (fmt) => (fmt || "").toLowerCase().includes("round robin")
   );
   saveState({
-    players: seededPlayers,
+    players: mergedPlayers,
     bracket,
     needsReseed: false,
     bracketLayoutVersion: CURRENT_BRACKET_LAYOUT_VERSION,
@@ -2163,6 +2194,21 @@ function getCheckInWindowMinutesFromMeta(meta) {
   return Number.isFinite(minutes) && minutes > 0 ? minutes : 0;
 }
 
+function normalizeMaxPlayersForFormat(rawValue, format, input = null) {
+  if (rawValue === null || rawValue === undefined || rawValue === "") {
+    return null;
+  }
+  const parsed = Number(rawValue);
+  if (!Number.isFinite(parsed)) return null;
+  const maxCap = Number(input?.max || 0) || 32;
+  const minCap = isDualTournamentFormat(format) ? 4 : Number(input?.min || 0) || 2;
+  if (!isDualTournamentFormat(format)) {
+    return Math.min(maxCap, Math.max(minCap, parsed));
+  }
+  const snapped = Math.round(parsed / 4) * 4;
+  return Math.min(maxCap, Math.max(minCap, snapped));
+}
+
 function getCheckInWindowState(meta) {
   const startMs = getStartTimeMs(meta);
   const windowMinutes = getCheckInWindowMinutesFromMeta(meta);
@@ -2399,9 +2445,14 @@ async function handleSaveSettings(event) {
   const description = descInput?.value || "";
   const rules = rulesInput?.value || "";
   const startTime = startInput?.value ? new Date(startInput.value) : null;
-  const maxPlayers = maxPlayersInput?.value
-    ? Number(maxPlayersInput.value)
-    : null;
+  const maxPlayers = normalizeMaxPlayersForFormat(
+    maxPlayersInput?.value,
+    format,
+    maxPlayersInput
+  );
+  if (maxPlayersInput && Number.isFinite(maxPlayers)) {
+    maxPlayersInput.value = String(maxPlayers);
+  }
   const qualifyRaw = qualifyInput?.value ?? "";
   const qualifyCount =
     qualifyRaw === "" || qualifyRaw === null || qualifyRaw === undefined
@@ -2530,9 +2581,14 @@ async function handleCreateCircuit(event) {
   }
   const finalFormat = (finalFormatSelect?.value || "Double Elimination").trim();
   const finalStartTime = finalStartInput?.value ? new Date(finalStartInput.value) : null;
-  const finalMaxPlayers = finalMaxPlayersInput?.value
-    ? Number(finalMaxPlayersInput.value)
-    : null;
+  const finalMaxPlayers = normalizeMaxPlayersForFormat(
+    finalMaxPlayersInput?.value,
+    finalFormat,
+    finalMaxPlayersInput
+  );
+  if (finalMaxPlayersInput && Number.isFinite(finalMaxPlayers)) {
+    finalMaxPlayersInput.value = String(finalMaxPlayers);
+  }
   const finalCheckInWindowMinutes = getCheckInWindowMinutes(finalCheckInSelect);
   const finalDescription = finalDescriptionInput?.value || "";
   const finalRules = finalRulesInput?.value || "";
@@ -2676,9 +2732,14 @@ async function handleCreateTournament(event) {
   }
   const format = (formatSelect?.value || "Double Elimination").trim();
   const startTime = startInput?.value ? new Date(startInput.value) : null;
-  const maxPlayers = maxPlayersInput?.value
-    ? Number(maxPlayersInput.value)
-    : null;
+  const maxPlayers = normalizeMaxPlayersForFormat(
+    maxPlayersInput?.value,
+    format,
+    maxPlayersInput
+  );
+  if (maxPlayersInput && Number.isFinite(maxPlayers)) {
+    maxPlayersInput.value = String(maxPlayers);
+  }
   const checkInWindowMinutes = getCheckInWindowMinutes(checkInSelect);
   const isInviteOnly = accessSelect?.value === "closed";
   const description = descriptionInput?.value || "";
