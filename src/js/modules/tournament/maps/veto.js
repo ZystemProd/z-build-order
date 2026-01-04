@@ -370,6 +370,10 @@ function setFlagTitle(flagEl, code) {
 
 export function openVetoModal(matchId, { getPlayersMap, getDefaultMapPoolNames, getMapByName }) {
   setCurrentVetoMatchIdState(matchId);
+  if (!state.isLive && !isAdmin) {
+    showToast?.("Tournament is not live. Bracket is read-only.", "warning");
+    return;
+  }
   const modal = document.getElementById("vetoModal");
   const label = document.getElementById("vetoMatchLabel");
   const bestOfLabel = document.getElementById("vetoBestOfLabel");
@@ -541,7 +545,7 @@ export function openMatchInfoModal(
     (me?.id && (me.id === leftPlayerId || me.id === rightPlayerId)) ||
     (uid && (uid === pA?.uid || uid === pB?.uid));
   const canEditResults =
-    (isAdmin || isParticipant) && match?.status !== "complete";
+    isAdmin || (state.isLive && isParticipant && match?.status !== "complete");
 
   modal.dataset.canEditResults = canEditResults ? "true" : "false";
   setupMatchChatUi({

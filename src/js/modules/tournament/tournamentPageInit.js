@@ -36,7 +36,6 @@ export function initTournamentPage({
   closeDeleteTournamentModal,
   handleSaveSettings,
   rebuildBracket,
-  setSeedingNotice,
   autoFillPlayers,
   normalizeRaceLabel,
   mmrForRace,
@@ -85,7 +84,7 @@ export function initTournamentPage({
   resetTournament,
   checkInCurrentPlayer,
   notifyCheckInPlayers,
-  goLiveTournament,
+  toggleLiveTournament,
   syncPulseNow,
 }) {
   ensureTestHarnessPanel();
@@ -160,6 +159,8 @@ export function initTournamentPage({
   const finalImagePreview = document.getElementById("finalTournamentImagePreview");
   const settingsImageInput = document.getElementById("settingsImageInput");
   const settingsImagePreview = document.getElementById("settingsImagePreview");
+  const settingsRequirePulseLink = document.getElementById("settingsRequirePulseLink");
+  const settingsRequirePulseSync = document.getElementById("settingsRequirePulseSync");
   const tournamentMaxPlayersInput = document.getElementById("tournamentMaxPlayersInput");
   const settingsMaxPlayersInput = document.getElementById("settingsMaxPlayersInput");
   const finalMaxPlayersInput = document.getElementById("finalTournamentMaxPlayersInput");
@@ -509,7 +510,7 @@ export function initTournamentPage({
   registrationForm?.addEventListener("submit", handleRegistration);
 
   initDatePickers();
-  rebuildBtn?.addEventListener("click", () => goLiveTournament?.());
+  rebuildBtn?.addEventListener("click", () => toggleLiveTournament?.());
   resetBtn?.addEventListener("click", () => {
     setModalVisible(resetTournamentModal, true);
   });
@@ -775,6 +776,16 @@ export function initTournamentPage({
     handleRemoveCircuitPointsRow,
     handleApplyCircuitPoints,
   });
+  const updateMmrStatusPreview = () => {
+    const statusEl = document.getElementById("mmrStatus");
+    if (!statusEl) return;
+    updateMmrDisplay(statusEl, null, {
+      requirePulseLinkEnabled: settingsRequirePulseLink?.checked,
+      requirePulseSyncEnabled: settingsRequirePulseSync?.checked,
+    });
+  };
+  settingsRequirePulseLink?.addEventListener("change", updateMmrStatusPreview);
+  settingsRequirePulseSync?.addEventListener("change", updateMmrStatusPreview);
 
   [
     bestOfUpperInput,

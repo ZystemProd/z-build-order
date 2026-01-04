@@ -287,7 +287,6 @@ export async function handleTournamentInviteAction({
   currentSlug,
   state,
   isLive,
-  setSeedingNotice,
   saveState,
   renderAll,
   rebuildBracket,
@@ -348,7 +347,6 @@ export async function handleTournamentInviteAction({
           status === INVITE_STATUS.accepted ? "Invite accepted" : "Invite declined"
         );
       } else {
-        setSeedingNotice(true);
         renderAll();
       }
     } else {

@@ -593,9 +593,6 @@ function applySeedingStateUpdate(nextSnapshot, reason) {
     players: mergedPlayers,
     needsReseed: hasCompletedMatches,
   });
-  if (hasCompletedMatches) {
-    setSeedingNotice(true);
-  }
   renderAll();
 }
 
@@ -688,12 +685,12 @@ function renderAll() {
       : null;
     const currentInviteStatus = normalizeInviteStatus(currentPlayer?.inviteStatus);
     const eligiblePlayers = getEligiblePlayers(state.players || []);
+    const hasCheckedIn = eligiblePlayers.some((player) => player.checkedInAt);
     const isInviteOnly = isInviteOnlyTournament(currentTournamentMeta);
     const accessNote = document.getElementById("registrationAccessNote");
     const syncPulseBtn = document.getElementById("syncPulseBtn");
     const syncPulseSpinner = document.getElementById("syncPulseSpinner");
-    const requirePulseSyncEnabled =
-      currentTournamentMeta?.requirePulseSync ?? requirePulseSyncSetting;
+    const requirePulseSyncEnabled = getRequirePulseSyncEnabled();
     const pulseGate = getPulseSyncGateStatus();
 
     if (tournamentTitle) {
@@ -808,8 +805,13 @@ function renderAll() {
     }
 
     if (goLiveBtn) {
-      goLiveBtn.disabled = state.isLive;
-      goLiveBtn.textContent = state.isLive ? "Live" : "Go Live";
+      if (state.isLive) {
+        goLiveBtn.disabled = false;
+        goLiveBtn.textContent = "Set Not Live";
+      } else {
+        goLiveBtn.disabled = !hasCheckedIn;
+        goLiveBtn.textContent = "Go Live";
+      }
     }
     if (notifyCheckInBtn) {
       const checkInState = getCheckInWindowState(currentTournamentMeta);
@@ -827,23 +829,26 @@ function renderAll() {
     }
 
     if (bracketGrid && bracketNotLive) {
-      if (!state.isLive && !isAdmin) {
-        bracketGrid.style.display = "none";
+      if (!state.isLive) {
+        bracketGrid.style.display = "flex";
         bracketNotLive.style.display = "block";
         if (registeredPlayersList) {
-          const items = eligiblePlayers.map((p) => {
-            const name = escapeHtml(p.name || "Unknown");
-            const race = (p.race || "").trim();
-            const raceClass = raceClassName(race);
-            const raceLabel = race ? escapeHtml(race) : "Race TBD";
-            const mmr = Number.isFinite(p.mmr) ? `${Math.round(p.mmr)} MMR` : "MMR TBD";
-            return `<li data-player-id="${escapeHtml(p.id || "")}">
-              <span class="race-strip ${raceClass}"></span>
-              <span class="name-text">${name}</span>
-              <span class="registered-meta">${raceLabel} · ${mmr}</span>
-            </li>`;
-          });
-          registeredPlayersList.innerHTML = items.join("");
+          registeredPlayersList.style.display = isAdmin ? "none" : "";
+          if (!isAdmin) {
+            const items = eligiblePlayers.map((p) => {
+              const name = escapeHtml(p.name || "Unknown");
+              const race = (p.race || "").trim();
+              const raceClass = raceClassName(race);
+              const raceLabel = race ? escapeHtml(race) : "Race TBD";
+              const mmr = Number.isFinite(p.mmr) ? `${Math.round(p.mmr)} MMR` : "MMR TBD";
+              return `<li data-player-id="${escapeHtml(p.id || "")}">
+                <span class="race-strip ${raceClass}"></span>
+                <span class="name-text">${name}</span>
+                <span class="registered-meta">${raceLabel} · ${mmr}</span>
+              </li>`;
+            });
+            registeredPlayersList.innerHTML = items.join("");
+          }
         }
       } else {
         bracketGrid.style.display = "flex";
@@ -960,6 +965,7 @@ function renderAll() {
       el.dataset.dragScrollBound = "true";
     });
   }
+  applyBracketReadOnlyState(!state.isLive && !isAdmin);
   updateTooltips?.();
 }
 
@@ -1076,6 +1082,24 @@ function goLiveTournament() {
   renderAll();
 }
 
+function setTournamentNotLive() {
+  if (!state.isLive) {
+    showToast?.("Tournament is already not live.", "success");
+    return;
+  }
+  saveState({ isLive: false });
+  addActivity("Tournament set to not live.");
+  renderAll();
+}
+
+function toggleLiveTournament() {
+  if (state.isLive) {
+    setTournamentNotLive();
+    return;
+  }
+  goLiveTournament();
+}
+
 function addActivity(message, options = {}) {
   if (!message) return;
   const entry = {
@@ -1088,13 +1112,6 @@ function addActivity(message, options = {}) {
   };
   saveState(next);
   renderActivityList({ state, escapeHtml, formatTime });
-}
-
-function setSeedingNotice(show) {
-  const el = document.getElementById("seedingNotice");
-  if (el) {
-    el.style.display = show ? "block" : "none";
-  }
 }
 
 function updateManualSeedingUi() {
@@ -1142,6 +1159,38 @@ function bracketHasRecordedResults(bracket) {
     return false;
   }
   return false;
+}
+
+function applyBracketReadOnlyState(readOnly) {
+  const bracketGrid = document.getElementById("bracketGrid");
+  if (!bracketGrid) return;
+  bracketGrid.classList.toggle("bracket-readonly", readOnly);
+  bracketGrid
+    .querySelectorAll("select.result-select, select.score-select")
+    .forEach((el) => {
+      if (readOnly) {
+        if (!el.disabled) {
+          el.dataset.readOnlyDisabled = "true";
+          el.disabled = true;
+        }
+      } else if (el.dataset.readOnlyDisabled === "true") {
+        el.disabled = false;
+        delete el.dataset.readOnlyDisabled;
+      }
+    });
+  bracketGrid.querySelectorAll("button.veto-btn").forEach((btn) => {
+    if (readOnly) {
+      if (!btn.disabled) {
+        btn.dataset.readOnlyDisabled = "true";
+        btn.disabled = true;
+      }
+      btn.setAttribute("aria-disabled", "true");
+    } else if (btn.dataset.readOnlyDisabled === "true") {
+      btn.disabled = false;
+      btn.setAttribute("aria-disabled", "false");
+      delete btn.dataset.readOnlyDisabled;
+    }
+  });
 }
 
 
@@ -1207,10 +1256,13 @@ function resetTournament() {
   saveState(empty);
   rebuildBracket(true, "Tournament reset");
   addActivity("Tournament reset.");
-  setSeedingNotice(false);
 }
 
 function updateMatchScore(matchId, scoreA, scoreB, options = {}) {
+  if (!state.isLive && !isAdmin) {
+    showToast?.("Tournament is not live. Bracket is read-only.", "error");
+    return;
+  }
   const lookupBefore = state?.bracket ? getMatchLookup(state.bracket) : null;
   const matchBefore = lookupBefore?.get(matchId) || null;
   const prevScores = Array.isArray(matchBefore?.scores)
@@ -2064,8 +2116,7 @@ function setStatus(el, message, isError = false) {
 }
 
 function getPulseSyncGateStatus() {
-  const requirePulseSyncEnabled =
-    currentTournamentMeta?.requirePulseSync ?? requirePulseSyncSetting;
+  const requirePulseSyncEnabled = getRequirePulseSyncEnabled();
   if (!requirePulseSyncEnabled) {
     return {
       needsSync: false,
@@ -2192,6 +2243,32 @@ function getStartTimeMs(meta) {
 function getCheckInWindowMinutesFromMeta(meta) {
   const minutes = Number(meta?.checkInWindowMinutes || 0);
   return Number.isFinite(minutes) && minutes > 0 ? minutes : 0;
+}
+
+function normalizeBooleanSetting(value, fallback = true) {
+  if (value === undefined || value === null) return fallback;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["false", "0", "no", "off"].includes(normalized)) return false;
+    if (["true", "1", "yes", "on"].includes(normalized)) return true;
+  }
+  return Boolean(value);
+}
+
+function getRequirePulseLinkEnabled(meta = currentTournamentMeta) {
+  return normalizeBooleanSetting(
+    meta?.requirePulseLink,
+    requirePulseLinkSetting
+  );
+}
+
+function getRequirePulseSyncEnabled(meta = currentTournamentMeta) {
+  return normalizeBooleanSetting(
+    meta?.requirePulseSync,
+    requirePulseSyncSetting
+  );
 }
 
 function normalizeMaxPlayersForFormat(rawValue, format, input = null) {
@@ -2525,6 +2602,7 @@ async function handleSaveSettings(event) {
   setCurrentTournamentMetaState(meta);
   setRequirePulseLinkSettingState(requirePulseLink);
   setRequirePulseSyncSettingState(requirePulseSync);
+  updateMmrDisplay(document.getElementById("mmrStatus"));
   saveState({ bracket: state.bracket }); // keep bracket but bump timestamp via saveState
   // Reflect slug in the settings input
   const settingsSlugInput = document.getElementById("settingsSlugInput");
@@ -2910,7 +2988,6 @@ document.addEventListener("tournament:notification-action", (event) => {
     currentSlug,
     state,
     isLive: state.isLive,
-    setSeedingNotice,
     saveState,
     renderAll,
     rebuildBracket,
@@ -2951,7 +3028,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     closeDeleteTournamentModal,
     handleSaveSettings,
     rebuildBracket,
-    setSeedingNotice,
     autoFillPlayers,
     normalizeRaceLabel,
     mmrForRace,
@@ -3001,7 +3077,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     resetTournament,
     checkInCurrentPlayer,
     notifyCheckInPlayers,
-    goLiveTournament,
+    toggleLiveTournament,
     syncPulseNow,
   });
   initCoverReuseModal();
@@ -3278,7 +3354,6 @@ async function maybeAutoAddFinalPlayers({ force = false } = {}) {
   if (!hasCompletedMatches) {
     rebuildBracket(true, "Auto-added leaderboard finalists");
   } else {
-    setSeedingNotice(true);
     renderAll();
   }
   setFinalAutoAddStatus(`Auto-added ${added} player(s).`);
@@ -3290,8 +3365,7 @@ function hydratePulseFromState(pulseState) {
   const mmrDisplay = document.getElementById("mmrDisplay");
   const pulseLinkDisplay = document.getElementById("pulseLinkDisplay");
   const statusEl = document.getElementById("mmrStatus");
-  const requirePulseLinkEnabled =
-    currentTournamentMeta?.requirePulseLink ?? requirePulseLinkSetting;
+  const requirePulseLinkEnabled = getRequirePulseLinkEnabled();
 
   const byRace =
     pulseState && typeof pulseState.byRace === "object"
@@ -3586,8 +3660,7 @@ async function handleRegistration(event) {
     : manualPulseLink
     ? sanitizeUrl(manualPulseLink)
     : "";
-  const requirePulseLinkEnabled =
-    currentTournamentMeta?.requirePulseLink ?? requirePulseLinkSetting;
+  const requirePulseLinkEnabled = getRequirePulseLinkEnabled();
   const pointsField = document.getElementById("pointsInput");
   const isInviteOnly = isInviteOnlyTournament(currentTournamentMeta);
 
@@ -3800,7 +3873,6 @@ async function handleRegistration(event) {
   if (shouldAutoRebuild) {
     rebuildBracket(true, "Roster updated");
   } else {
-    setSeedingNotice(true);
     if (!state.bracket || !state.bracket.winners?.length) {
       rebuildBracket(true, "Initial bracket");
     } else {
@@ -3979,7 +4051,7 @@ function mmrForRace(raceLabel) {
   return null;
 }
 
-function updateMmrDisplay(statusEl, nextRace = null) {
+function updateMmrDisplay(statusEl, nextRace = null, options = {}) {
   if (nextRace !== null) {
     setDerivedRaceState(nextRace || null);
     setDerivedMmrState(nextRace ? mmrForRace(nextRace) : null);
@@ -3998,10 +4070,23 @@ function updateMmrDisplay(statusEl, nextRace = null) {
   if (!statusEl) statusEl = document.getElementById("mmrStatus");
   if (!statusEl) return;
 
+  const resolveOverride = (value, fallback) =>
+    value === undefined ? fallback : Boolean(value);
+  const requirePulseLinkEnabled = resolveOverride(
+    options.requirePulseLinkEnabled,
+    getRequirePulseLinkEnabled()
+  );
+  const requirePulseSyncEnabled = resolveOverride(
+    options.requirePulseSyncEnabled,
+    getRequirePulseSyncEnabled()
+  );
+
   if (!auth.currentUser) {
     setStatus(
       statusEl,
-      "Sign in and set your SC2Pulse link in Settings to register.",
+      requirePulseLinkEnabled
+        ? "Sign in and set your SC2Pulse link in Settings to register."
+        : "Sign in to register.",
       true
     );
     return;
@@ -4010,16 +4095,20 @@ function updateMmrDisplay(statusEl, nextRace = null) {
   if (!pulseProfile?.url) {
     setStatus(
       statusEl,
-      "Set your SC2Pulse link in Settings to load race and MMR.",
-      true
+      requirePulseLinkEnabled
+        ? "Set your SC2Pulse link in Settings to load race and MMR."
+        : "SC2Pulse link is optional. Add one in Settings to load race and MMR.",
+      requirePulseLinkEnabled
     );
     return;
   }
 
-  const pulseGate = getPulseSyncGateStatus();
-  if (pulseGate.needsSync) {
-    setStatus(statusEl, pulseGate.message, true);
-    return;
+  if (requirePulseSyncEnabled) {
+    const pulseGate = getPulseSyncGateStatus();
+    if (pulseGate.needsSync) {
+      setStatus(statusEl, pulseGate.message, true);
+      return;
+    }
   }
 
   if (derivedRace && Number.isFinite(derivedMmr)) {

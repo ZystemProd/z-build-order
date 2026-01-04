@@ -528,7 +528,7 @@
             <div class="live-dot not-live" id="liveDot">Not Live</div>
           </div>
           <div id="bracketNotLive" class="not-live-panel" style="display:none;">
-            <p class="helper">Bracket will appear when the tournament goes live.</p>
+            <p class="helper">Tournament paused - updates in progress.</p>
             <ul id="registeredPlayersList" class="registered-list"></ul>
           </div>
           <div id="bracketGrid" class="bracket-grid">
@@ -628,8 +628,6 @@
               <h3>Points-first ranking</h3>
             </div>
             <div class="seed-actions">
-              <span id="seedingNotice" class="badge warning" style="display:none;">Seeding changed - rebuild
-                needed</span>
               <button id="rebuildBracketBtn" class="cta small ghost">Go Live</button>
               <button id="notifyCheckInBtn" class="cta small ghost">Notify check-in</button>
               <button id="resetTournamentBtn" class="cta small subtle">Reset tournament</button>
@@ -2231,8 +2229,15 @@
           <ul id="playerDetailMmrList" class="mmr-list"></ul>
         </div>
         <div class="player-detail-section">
-          <p class="eyebrow">Achievements</p>
-          <div id="playerDetailAchievements" class="helper">Coming soon.</div>
+          <div class="player-detail-section-header">
+            <p class="eyebrow">Achievements</p>
+            <button id="playerDetailAchievementSort" class="pill achievement-sort-toggle" type="button"
+              data-sort="recent" aria-pressed="false">
+              Sort: Recent
+            </button>
+          </div>
+          <ul id="playerDetailAchievements" class="achievement-list custom-scroll"></ul>
+          <p id="playerDetailAchievementsEmpty" class="helper" style="display:none;"></p>
         </div>
       </div>
     </div>

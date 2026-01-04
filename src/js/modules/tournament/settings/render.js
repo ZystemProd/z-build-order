@@ -3,6 +3,18 @@ import { defaultBestOf } from "../state.js";
 import { normalizeRoundRobinSettings } from "../bracket/build.js";
 import { syncMarkdownSurfaceForInput } from "../markdownEditor.js";
 
+function normalizeBooleanSetting(value, fallback = true) {
+  if (value === undefined || value === null) return fallback;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["false", "0", "no", "off"].includes(normalized)) return false;
+    if (["true", "1", "yes", "on"].includes(normalized)) return true;
+  }
+  return Boolean(value);
+}
+
 export function applyBestOfToSettings(bestOf) {
   const upperInput = document.getElementById("settingsBestOfUpper");
   const lowerInput = document.getElementById("settingsBestOfLower");
@@ -118,9 +130,15 @@ export function populateSettingsPanel({
   }
   const requirePulseInput = document.getElementById("settingsRequirePulseLink");
   if (requirePulseInput)
-    requirePulseInput.checked = tournament.requirePulseLink ?? true;
+    requirePulseInput.checked = normalizeBooleanSetting(
+      tournament.requirePulseLink,
+      true
+    );
   if (requirePulseSyncInput)
-    requirePulseSyncInput.checked = tournament.requirePulseSync ?? true;
+    requirePulseSyncInput.checked = normalizeBooleanSetting(
+      tournament.requirePulseSync,
+      true
+    );
   setMapPoolSelection(
     tournament.mapPool?.length ? tournament.mapPool : getDefaultMapPoolNames()
   );

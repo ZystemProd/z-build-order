@@ -6363,6 +6363,85 @@ select[id^="finalBestOf"] {
   padding: 12px;
 }
 
+.player-detail-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.player-detail-section-header .eyebrow {
+  margin: 0;
+}
+
+.achievement-sort-toggle {
+  cursor: pointer;
+  border-color: var(--stroke);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+}
+
+.achievement-sort-toggle:hover {
+  border-color: rgba(78, 213, 255, 0.5);
+}
+
+.achievement-sort-toggle:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.achievement-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.achievement-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--stroke);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.achievement-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.achievement-title {
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.achievement-date {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.achievement-place {
+  flex-shrink: 0;
+}
+
+.achievement-trophy {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+}
+
 .player-detail-section .pill-link {
   display: inline-flex;
   align-items: center;
@@ -6557,8 +6636,14 @@ select[id^="finalBestOf"] {
 }
 
 .checkbox-wrapper-59 input[type="checkbox"] {
-  visibility: hidden;
-  display: none;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
 }
 
 .checkbox-wrapper-59 *,
