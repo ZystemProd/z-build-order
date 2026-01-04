@@ -750,6 +750,7 @@ export function openMatchInfoModal(
         const row = cell.closest("tr");
         const idx = Number(row?.dataset?.mapIdx || "-1");
         if (!row || !Number.isFinite(idx) || idx < 0 || idx >= bestOf) return;
+        if (idx > getNextOpenMapIndex(winners, bestOf)) return;
         if (winners[idx]) return;
         row.dataset.previewWinner = cell.dataset.side || "";
       };
@@ -771,8 +772,14 @@ export function openMatchInfoModal(
         const idx = Number(row?.dataset?.mapIdx || "-1");
         const side = cell.dataset.side === "B" ? "B" : "A";
         if (!row || !Number.isFinite(idx) || idx < 0 || idx >= bestOf) return;
+        if (idx > getNextOpenMapIndex(winners, bestOf)) return;
 
         winners[idx] = winners[idx] === side ? null : side;
+        if (!winners[idx]) {
+          for (let i = idx + 1; i < bestOf; i++) {
+            winners[i] = null;
+          }
+        }
         record.mapResults = winners;
 
         const winsA = winners.filter((w) => w === "A").length;
@@ -1013,9 +1020,15 @@ function countryCodeToFlag(raw) {
   return String.fromCodePoint(A + first, A + second);
 }
 
+function getNextOpenMapIndex(winners, bestOf) {
+  const idx = winners.findIndex((winner) => !winner);
+  return idx === -1 ? bestOf : idx;
+}
+
 function renderMatchInfoRows(rowsEl, { bestOf, pickedMaps, winners }) {
   rowsEl.innerHTML = "";
   const needed = Math.max(1, Math.ceil(bestOf / 2));
+  const nextOpenIdx = getNextOpenMapIndex(winners, bestOf);
   let winsA = 0;
   let winsB = 0;
   let decidedAt = -1;
@@ -1030,6 +1043,7 @@ function renderMatchInfoRows(rowsEl, { bestOf, pickedMaps, winners }) {
     const mapLabel = pickedMaps[i]?.map || `Map ${i + 1}`;
     const winner = winners[i] === "B" ? "B" : winners[i] === "A" ? "A" : null;
     const isAfterDecision = isDecided && i > decidedAt;
+    const isLockedByOrder = i > nextOpenIdx;
 
     const tr = document.createElement("tr");
     tr.className = "match-info-row";
@@ -1063,10 +1077,10 @@ function renderMatchInfoRows(rowsEl, { bestOf, pickedMaps, winners }) {
       rightTd.textContent = "";
     }
 
-    if (isAfterDecision) {
+    if (isAfterDecision || isLockedByOrder) {
       leftTd.classList.add("is-disabled");
       rightTd.classList.add("is-disabled");
-      mapTd.classList.add("is-eliminated");
+      if (isAfterDecision) mapTd.classList.add("is-eliminated");
     }
 
     tr.append(leftTd, mapTd, rightTd);
