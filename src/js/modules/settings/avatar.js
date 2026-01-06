@@ -221,8 +221,10 @@ async function handleAvatarSelection(avatarUrl) {
 
 function resolveUserAvatar(userData) {
   const profileAvatar = userData?.profile?.avatarUrl;
+  const legacyAvatar = userData?.avatarUrl;
   if (profileAvatar) return profileAvatar;
-  return "img/default-avatar.webp";
+  if (legacyAvatar) return legacyAvatar;
+  return DEFAULT_AVATAR_URL;
 }
 
 function setupAvatarModal({ closeUserMenu } = {}) {

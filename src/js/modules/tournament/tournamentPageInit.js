@@ -59,6 +59,9 @@ export function initTournamentPage({
   setFinalMapPoolSelection,
   toggleFinalMapSelection,
   resetFinalMapPoolSelection,
+  setCircuitFinalMapPoolSelection,
+  toggleCircuitFinalMapSelection,
+  resetCircuitFinalMapPoolSelection,
   updateSettingsDescriptionPreview,
   updateSettingsRulesPreview,
   getPlayersMap,
@@ -69,6 +72,7 @@ export function initTournamentPage({
   currentMapPoolMode,
   updatePlayerPoints,
   setPlayerCheckIn,
+  setPlayerForfeit,
   removePlayer,
   setManualSeedingEnabled,
   getManualSeedingActive,
@@ -146,17 +150,26 @@ export function initTournamentPage({
   const finalMapPoolPicker = document.getElementById("finalMapPoolPicker");
   const finalUseLadderMapsBtn = document.getElementById("finalUseLadderMapsBtn");
   const finalClearMapPoolBtn = document.getElementById("finalClearMapPoolBtn");
+  const circuitFinalMapPoolPicker = document.getElementById("circuitFinalMapPoolPicker");
+  const circuitFinalUseLadderMapsBtn = document.getElementById("circuitFinalUseLadderMapsBtn");
+  const circuitFinalClearMapPoolBtn = document.getElementById("circuitFinalClearMapPoolBtn");
   const settingsTabBtns = document.querySelectorAll("[data-settings-tab]");
   const settingsPanels = document.querySelectorAll("#settingsTab .settings-panel");
   const createTabBtns = document.querySelectorAll("[data-create-tab]");
   const createPanels = document.querySelectorAll("#createTournamentModal .settings-panel");
   const createFinalTabBtns = document.querySelectorAll("[data-final-create-tab]");
   const createFinalPanels = document.querySelectorAll("#createFinalPanel .create-final-panel");
+  const circuitSettingsTabBtns = document.querySelectorAll("[data-circuit-settings-tab]");
+  const circuitSettingsPanels = document.querySelectorAll(".circuit-settings-panel");
+  const circuitFinalTabBtns = document.querySelectorAll("[data-final-settings-tab]");
+  const circuitFinalPanels = document.querySelectorAll("#circuitSettingsFinal .circuit-final-panel");
   const saveSettingsBtn = document.getElementById("saveSettingsBtn");
   const createImageInput = document.getElementById("tournamentImageInput");
   const createImagePreview = document.getElementById("tournamentImagePreview");
   const finalImageInput = document.getElementById("finalTournamentImageInput");
   const finalImagePreview = document.getElementById("finalTournamentImagePreview");
+  const circuitFinalImageInput = document.getElementById("circuitFinalImageInput");
+  const circuitFinalImagePreview = document.getElementById("circuitFinalImagePreview");
   const settingsImageInput = document.getElementById("settingsImageInput");
   const settingsImagePreview = document.getElementById("settingsImagePreview");
   const settingsRequirePulseLink = document.getElementById("settingsRequirePulseLink");
@@ -164,6 +177,7 @@ export function initTournamentPage({
   const tournamentMaxPlayersInput = document.getElementById("tournamentMaxPlayersInput");
   const settingsMaxPlayersInput = document.getElementById("settingsMaxPlayersInput");
   const finalMaxPlayersInput = document.getElementById("finalTournamentMaxPlayersInput");
+  const circuitFinalMaxPlayersInput = document.getElementById("circuitFinalMaxPlayersInput");
   const nameInput = document.getElementById("tournamentNameInput");
   const slugInput = document.getElementById("tournamentSlugInput");
   const circuitSlugInput = document.getElementById("circuitSlugInput");
@@ -178,6 +192,7 @@ export function initTournamentPage({
   const bestOfFinalInput = document.getElementById("bestOfFinalInput");
   const createFormatSelect = document.getElementById("tournamentFormatSelect");
   const finalFormatSelect = document.getElementById("finalFormatSelect");
+  const circuitFinalFormatSelect = document.getElementById("circuitFinalFormatSelect");
   const settingsBestOfUpper = document.getElementById("settingsBestOfUpper");
   const settingsBestOfLower = document.getElementById("settingsBestOfLower");
   const settingsBestOfQuarter = document.getElementById("settingsBestOfQuarter");
@@ -197,6 +212,8 @@ export function initTournamentPage({
       "tournamentRulesInput",
       "finalTournamentDescriptionInput",
       "finalTournamentRulesInput",
+      "circuitFinalDescriptionInput",
+      "circuitFinalRulesInput",
     ].forEach((id) => {
       const input = document.getElementById(id);
       if (input) syncQuillById(id, input.value || "");
@@ -231,6 +248,16 @@ export function initTournamentPage({
     {
       editorId: "finalTournamentRulesEditor",
       textareaId: "finalTournamentRulesInput",
+      placeholder: "Add eligibility, format, communication, and fair play rules...",
+    },
+    {
+      editorId: "circuitFinalDescriptionEditor",
+      textareaId: "circuitFinalDescriptionInput",
+      placeholder: "Write rules, schedule, map pool...",
+    },
+    {
+      editorId: "circuitFinalRulesEditor",
+      textareaId: "circuitFinalRulesInput",
       placeholder: "Add eligibility, format, communication, and fair play rules...",
     },
   ];
@@ -732,6 +759,30 @@ export function initTournamentPage({
       );
     });
   });
+  const switchCircuitSettingsTab = (targetId) => {
+    if (!targetId) return;
+    circuitSettingsTabBtns.forEach((b) =>
+      b.classList.toggle("active", b.dataset.circuitSettingsTab === targetId)
+    );
+    circuitSettingsPanels.forEach((panel) =>
+      panel.classList.toggle("active", panel.id === targetId)
+    );
+  };
+  circuitSettingsTabBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      switchCircuitSettingsTab(btn.dataset.circuitSettingsTab);
+    });
+  });
+  circuitFinalTabBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const target = btn.dataset.finalSettingsTab;
+      if (!target) return;
+      circuitFinalTabBtns.forEach((b) => b.classList.toggle("active", b === btn));
+      circuitFinalPanels.forEach((panel) =>
+        panel.classList.toggle("active", panel.id === target)
+      );
+    });
+  });
   const switchSettingsTab = (targetId) => {
     if (!targetId) return;
     settingsTabBtns.forEach((b) => b.classList.toggle("active", b.dataset.settingsTab === targetId));
@@ -749,6 +800,7 @@ export function initTournamentPage({
   bindImagePreview(createImageInput, createImagePreview);
   bindImagePreview(finalImageInput, finalImagePreview);
   bindImagePreview(settingsImageInput, settingsImagePreview);
+  bindImagePreview(circuitFinalImageInput, circuitFinalImagePreview);
 
   bindMapSelectionEvents({
     setMapPoolSelection,
@@ -763,6 +815,17 @@ export function initTournamentPage({
     const card = e.target.closest(".tournament-map-card");
     if (!card) return;
     toggleFinalMapSelection?.(card.dataset.mapName);
+  });
+  circuitFinalUseLadderMapsBtn?.addEventListener("click", () =>
+    setCircuitFinalMapPoolSelection?.(getDefaultMapPoolNames())
+  );
+  circuitFinalClearMapPoolBtn?.addEventListener("click", () =>
+    setCircuitFinalMapPoolSelection?.([])
+  );
+  circuitFinalMapPoolPicker?.addEventListener("click", (e) => {
+    const card = e.target.closest(".tournament-map-card");
+    if (!card) return;
+    toggleCircuitFinalMapSelection?.(card.dataset.mapName);
   });
   bindSettingsEvents({
     setMapPoolSelection,
@@ -814,9 +877,14 @@ export function initTournamentPage({
     syncFormatFieldVisibility("final");
     syncMaxPlayersInput(finalFormatSelect, finalMaxPlayersInput);
   });
+  circuitFinalFormatSelect?.addEventListener("change", () => {
+    syncFormatFieldVisibility("circuitfinal");
+    syncMaxPlayersInput(circuitFinalFormatSelect, circuitFinalMaxPlayersInput);
+  });
   syncMaxPlayersInput(createFormatSelect, tournamentMaxPlayersInput);
   syncMaxPlayersInput(settingsFormatSelect, settingsMaxPlayersInput);
   syncMaxPlayersInput(finalFormatSelect, finalMaxPlayersInput);
+  syncMaxPlayersInput(circuitFinalFormatSelect, circuitFinalMaxPlayersInput);
   closeVetoModal?.addEventListener("click", () => hideVetoModal());
   saveVetoBtn?.addEventListener("click", () => saveVetoSelection());
 
@@ -925,6 +993,11 @@ export function initTournamentPage({
     if (e.target.matches(".remove-player")) {
       const id = e.target.dataset.playerId;
       removePlayer?.(id);
+    }
+    if (e.target.matches(".forfeit-player")) {
+      const id = e.target.dataset.playerId;
+      const next = e.target.dataset.forfeit === "true";
+      setPlayerForfeit?.(id, next);
     }
   });
   playersTable?.addEventListener("change", (e) => {

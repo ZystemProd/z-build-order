@@ -32,6 +32,7 @@ import {
   listAll,
 } from "firebase/storage";
 import { showToast } from "../toastHandler.js";
+import { logAnalyticsEvent } from "../analyticsHelper.js";
 import DOMPurify from "dompurify";
 import { prepareImageForUpload, validateImageFile } from "../imageUtils.js";
 import {
@@ -104,6 +105,7 @@ import {
   normalizeRoundRobinSettings,
   normalizePlayoffMode,
 } from "./bracket/build.js";
+import { formatLocalDateTimeInput } from "./dateTime.js";
 import {
   escapeHtml,
   sanitizeUrl,
@@ -150,7 +152,7 @@ import {
 } from "./bracket/render.js";
 import { computeGroupStandings } from "./bracket/standings.js";
 import { ensureRoundRobinPlayoffs } from "./bracket/playoffs.js";
-import { updateMatchScore as updateMatchScoreCore } from "./bracket/update.js";
+import { applyForfeitWalkovers, updateMatchScore as updateMatchScoreCore } from "./bracket/update.js";
 import {
   renderMapsTab as renderMapsTabUI,
   renderChosenMaps as renderChosenMapsUI,
@@ -165,6 +167,7 @@ import {
 import {
   setupPlayerDetailModal,
   attachPlayerDetailHandlers,
+  refreshPlayerDetailModalIfOpen,
 } from "./playerDetail.js";
 import { renderSeedingTable } from "./ui/seeding.js";
 import { enableDragScroll } from "./ui/dragScroll.js";
@@ -229,6 +232,7 @@ import {
   buildSettingsPayload,
   readBestOf,
 } from "./tournamentPayloads.js";
+import { syncQuillById } from "./markdownEditor.js";
 import { createAdminPlayerSearch } from "./admin/addSearchPlayer.js";
 import { createAdminManager } from "./admin/manageAdmins.js";
 import { initCasterControls, renderCasterSection } from "./caster.js";
@@ -261,6 +265,8 @@ let pulseSyncRequired = false;
 let secondaryPulseSyncRequired = false;
 let lastPulseUrl = "";
 let lastSecondarySignature = "";
+let circuitFinalMapPoolSelection = new Set();
+let circuitFinalMapPoolMode = "ladder";
 const adminManager = createAdminManager({
   auth,
   db,
@@ -344,6 +350,7 @@ function syncFromRemote(incoming) {
     bracket: deserializeBracket(incoming.bracket),
   });
   renderAll();
+  refreshPlayerDetailModalIfOpen(getPlayersMap);
   refreshMatchInfoModalIfOpen?.();
   refreshVetoModalIfOpen?.();
 }
@@ -653,7 +660,12 @@ function handleApplyCircuitPoints(event) {
 function renderAll() {
   // Update seeding table
   const seedingSnapshot = seedPlayersForState(state.players || [], state);
-  renderSeedingTable(seedingSnapshot, {
+  const forfeitUndoBlocked = getForfeitUndoBlockedIds();
+  const seededWithForfeitStatus = seedingSnapshot.map((player) => ({
+    ...player,
+    forfeitUndoBlocked: forfeitUndoBlocked.has(player.id),
+  }));
+  renderSeedingTable(seededWithForfeitStatus, {
     isLive: state.isLive,
     isAdmin,
     manualSeeding: state.manualSeedingEnabled,
@@ -664,6 +676,8 @@ function renderAll() {
     const tournamentTitle = document.getElementById("tournamentTitle");
     const tournamentFormat = document.getElementById("tournamentFormat");
     const tournamentStart = document.getElementById("tournamentStart");
+    const descriptionBody = document.getElementById("tournamentDescriptionBody");
+    const rulesBody = document.getElementById("tournamentRulesBody");
     const statPlayers = document.getElementById("statPlayers");
     const placementsRow = document.getElementById("tournamentPlacements");
     const placementFirst = document.getElementById("placementFirst");
@@ -712,6 +726,14 @@ function renderAll() {
     }
     if (tournamentFormat) {
       tournamentFormat.textContent = currentTournamentMeta.format || "Tournament";
+    }
+    if (descriptionBody) {
+      descriptionBody.innerHTML = renderMarkdown(
+        currentTournamentMeta.description || ""
+      );
+    }
+    if (rulesBody) {
+      rulesBody.innerHTML = renderMarkdown(currentTournamentMeta.rules || "");
     }
     if (bracketTitle) {
       const formatLabel = (currentTournamentMeta.format || "").toLowerCase();
@@ -1226,6 +1248,65 @@ function updatePlayerPoints(id, points) {
   );
   saveState({ players, needsReseed: true });
   rebuildBracket(true, "Points updated");
+}
+
+function matchHasManualResult(match) {
+  if (!match || match.forfeitApplied) return false;
+  const scores = Array.isArray(match.scores) ? match.scores : [];
+  const hasScore = (scores[0] || 0) + (scores[1] || 0) > 0;
+  const hasWalkover = Boolean(match.walkover);
+  const hasWinner = Boolean(match.winnerId);
+  const isComplete = match.status === "complete";
+  return hasScore || hasWalkover || (hasWinner && isComplete);
+}
+
+function getForfeitUndoBlockedIds() {
+  const blocked = new Set();
+  if (!state?.bracket) return blocked;
+  const lookup = getMatchLookup(state.bracket);
+  const playersById = getPlayersMap();
+  for (const match of lookup.values()) {
+    if (!match || !matchHasManualResult(match)) continue;
+    const participants = resolveParticipants(match, lookup, playersById);
+    participants.forEach((player) => {
+      if (player?.id && player?.forfeit) {
+        blocked.add(player.id);
+      }
+    });
+  }
+  return blocked;
+}
+
+function setPlayerForfeit(id, shouldForfeit) {
+  if (!id) return;
+  if (!shouldForfeit && state?.bracket) {
+    const lookup = getMatchLookup(state.bracket);
+    const playersById = getPlayersMap();
+    for (const match of lookup.values()) {
+      if (!match) continue;
+      const participants = resolveParticipants(match, lookup, playersById);
+      const ids = [participants[0]?.id, participants[1]?.id].filter(Boolean);
+      if (!ids.includes(id)) continue;
+      if (matchHasManualResult(match)) {
+        showToast?.("Cannot undo forfeit after a later match has a recorded score.", "error");
+        return;
+      }
+    }
+  }
+  const players = (state.players || []).map((p) =>
+    p.id === id ? { ...p, forfeit: shouldForfeit } : p
+  );
+  saveState({ players });
+  renderAll();
+  applyForfeitWalkovers({ saveState, renderAll });
+  const changed = players.find((p) => p.id === id);
+  if (changed) {
+    addActivity(
+      `${changed.name || "Player"} ${
+        shouldForfeit ? "marked as forfeit" : "forfeit removed"
+      }.`
+    );
+  }
 }
 
 function setPlayerCheckIn(id, shouldCheckIn) {
@@ -1792,11 +1873,92 @@ function openCircuitSettingsModal() {
   if (!currentCircuitMeta?.slug || !isCircuitAdmin) return;
   const modal = document.getElementById("circuitSettingsModal");
   const toggle = document.getElementById("circuitSettingsFirstPlaceSortToggle");
+  const nameInput = document.getElementById("circuitSettingsNameInput");
+  const slugInput = document.getElementById("circuitSettingsSlugInput");
+  const descriptionInput = document.getElementById("circuitSettingsDescriptionInput");
+  const finalNameInput = document.getElementById("circuitFinalNameInput");
+  const finalSlugInput = document.getElementById("circuitFinalSlugInput");
+  const finalStartInput = document.getElementById("circuitFinalStartInput");
+  const finalMaxPlayersInput = document.getElementById("circuitFinalMaxPlayersInput");
+  const finalQualifyInput = document.getElementById("circuitFinalQualifyCountInput");
+  const finalCheckInSelect = document.getElementById("circuitFinalCheckInSelect");
+  const finalDescriptionInput = document.getElementById("circuitFinalDescriptionInput");
+  const finalRulesInput = document.getElementById("circuitFinalRulesInput");
+  const finalFormatSelect = document.getElementById("circuitFinalFormatSelect");
+  const finalImagePreview = document.getElementById("circuitFinalImagePreview");
   if (toggle) toggle.checked = Boolean(currentCircuitMeta?.sortByFirstPlace);
+  if (nameInput) nameInput.value = currentCircuitMeta?.name || "";
+  if (slugInput) slugInput.value = currentCircuitMeta?.slug || "";
+  if (descriptionInput) descriptionInput.value = currentCircuitMeta?.description || "";
+  const finalSlug = currentCircuitMeta?.finalTournamentSlug || "";
+  if (finalSlugInput) finalSlugInput.value = finalSlug;
   if (modal) {
     modal.style.display = "flex";
     lockBodyScroll();
   }
+  if (!finalSlug) return;
+  getDoc(doc(collection(db, TOURNAMENT_COLLECTION), finalSlug))
+    .then((snap) => {
+      if (!snap.exists()) return;
+      const meta = snap.data() || {};
+      if (finalNameInput) finalNameInput.value = meta.name || "";
+      if (finalStartInput && meta.startTime) {
+        try {
+          finalStartInput.value = formatLocalDateTimeInput(meta.startTime);
+          if (finalStartInput._flatpickr) {
+            finalStartInput._flatpickr.setDate(new Date(meta.startTime), false);
+          }
+        } catch (_) {
+          // ignore
+        }
+      }
+      if (finalMaxPlayersInput && meta.maxPlayers) {
+        finalMaxPlayersInput.value = String(meta.maxPlayers);
+      }
+      if (finalQualifyInput && Number.isFinite(meta.circuitQualifyCount)) {
+        finalQualifyInput.value = String(meta.circuitQualifyCount);
+      }
+      if (finalCheckInSelect) {
+        finalCheckInSelect.value = String(meta.checkInWindowMinutes || 0);
+      }
+      if (finalDescriptionInput) finalDescriptionInput.value = meta.description || "";
+      if (finalRulesInput) finalRulesInput.value = meta.rules || "";
+      syncQuillById?.("circuitFinalDescriptionInput", finalDescriptionInput?.value || "");
+      syncQuillById?.("circuitFinalRulesInput", finalRulesInput?.value || "");
+      if (finalFormatSelect) {
+        finalFormatSelect.value = meta.format || "Double Elimination";
+        syncFormatFieldVisibility("circuitfinal");
+      }
+      const rr = meta.roundRobin || defaultRoundRobinSettings;
+      const rrGroups = document.getElementById("circuitFinalRoundRobinGroupsInput");
+      const rrAdvance = document.getElementById("circuitFinalRoundRobinAdvanceInput");
+      const rrPlayoffs = document.getElementById("circuitFinalRoundRobinPlayoffsSelect");
+      const rrBestOf = document.getElementById("circuitFinalRoundRobinBestOfInput");
+      if (rrGroups) rrGroups.value = String(rr.groups ?? defaultRoundRobinSettings.groups);
+      if (rrAdvance) rrAdvance.value = String(rr.advancePerGroup ?? defaultRoundRobinSettings.advancePerGroup);
+      if (rrPlayoffs) rrPlayoffs.value = rr.playoffs || defaultRoundRobinSettings.playoffs;
+      if (rrBestOf) rrBestOf.value = String(rr.bestOf ?? defaultRoundRobinSettings.bestOf);
+      if (finalImagePreview) finalImagePreview.src = meta.coverImageUrl || "";
+      setCircuitFinalMapPoolSelection(
+        Array.isArray(meta.mapPool) && meta.mapPool.length
+          ? meta.mapPool
+          : getDefaultMapPoolNames()
+      );
+      const bestOf = meta.bestOf || defaultBestOf;
+      const assignBestOf = (id, value) => {
+        const input = document.getElementById(id);
+        if (input && value) input.value = String(value);
+      };
+      assignBestOf("circuitFinalBestOfUpperInput", bestOf.upper);
+      assignBestOf("circuitFinalBestOfLowerInput", bestOf.lower);
+      assignBestOf("circuitFinalBestOfLowerSemiInput", bestOf.lowerSemi);
+      assignBestOf("circuitFinalBestOfLowerFinalInput", bestOf.lowerFinal);
+      assignBestOf("circuitFinalBestOfQuarterInput", bestOf.quarter);
+      assignBestOf("circuitFinalBestOfSemiInput", bestOf.semi);
+      assignBestOf("circuitFinalBestOfUpperFinalInput", bestOf.upperFinal);
+      assignBestOf("circuitFinalBestOfFinalInput", bestOf.final);
+    })
+    .catch(() => {});
 }
 
 function closeCircuitSettingsModal() {
@@ -1809,14 +1971,97 @@ function closeCircuitSettingsModal() {
 async function saveCircuitSettings() {
   if (!currentCircuitMeta?.slug || !isCircuitAdmin) return;
   const toggle = document.getElementById("circuitSettingsFirstPlaceSortToggle");
+  const nameInput = document.getElementById("circuitSettingsNameInput");
+  const descriptionInput = document.getElementById("circuitSettingsDescriptionInput");
+  const finalNameInput = document.getElementById("circuitFinalNameInput");
+  const finalSlugInput = document.getElementById("circuitFinalSlugInput");
+  const finalStartInput = document.getElementById("circuitFinalStartInput");
+  const finalMaxPlayersInput = document.getElementById("circuitFinalMaxPlayersInput");
+  const finalQualifyInput = document.getElementById("circuitFinalQualifyCountInput");
+  const finalCheckInSelect = document.getElementById("circuitFinalCheckInSelect");
+  const finalDescriptionInput = document.getElementById("circuitFinalDescriptionInput");
+  const finalRulesInput = document.getElementById("circuitFinalRulesInput");
+  const finalFormatSelect = document.getElementById("circuitFinalFormatSelect");
+  const finalImageInput = document.getElementById("circuitFinalImageInput");
+  const finalImagePreview = document.getElementById("circuitFinalImagePreview");
   const sortByFirstPlace = Boolean(toggle?.checked);
+  const circuitName = (nameInput?.value || "").trim();
+  const circuitDescription = descriptionInput?.value || "";
   try {
     await setDoc(
       doc(collection(db, CIRCUIT_COLLECTION), currentCircuitMeta.slug),
-      { sortByFirstPlace },
+      {
+        sortByFirstPlace,
+        name: circuitName || currentCircuitMeta?.name || "",
+        description: circuitDescription,
+      },
       { merge: true }
     );
-    currentCircuitMeta = { ...currentCircuitMeta, sortByFirstPlace };
+    currentCircuitMeta = {
+      ...currentCircuitMeta,
+      sortByFirstPlace,
+      name: circuitName || currentCircuitMeta?.name || "",
+      description: circuitDescription,
+    };
+    const finalSlug = (finalSlugInput?.value || "").trim();
+    if (finalSlug) {
+      const finalStartTime = finalStartInput?.value ? new Date(finalStartInput.value) : null;
+      const finalMaxPlayers = normalizeMaxPlayersForFormat(
+        finalMaxPlayersInput?.value,
+        finalFormatSelect?.value || "Double Elimination",
+        finalMaxPlayersInput
+      );
+      if (finalMaxPlayersInput && Number.isFinite(finalMaxPlayers)) {
+        finalMaxPlayersInput.value = String(finalMaxPlayers);
+      }
+      const finalQualifyRaw = finalQualifyInput?.value ?? "";
+      const finalQualifyCount =
+        finalQualifyRaw === "" || finalQualifyRaw === null || finalQualifyRaw === undefined
+          ? null
+          : Number(finalQualifyRaw);
+      const finalPayload = buildFinalTournamentPayload({
+        slug: finalSlug,
+        name: (finalNameInput?.value || "").trim() || "Circuit Finals",
+        description: finalDescriptionInput?.value || "",
+        rules: finalRulesInput?.value || "",
+        format: (finalFormatSelect?.value || "Double Elimination").trim(),
+        maxPlayers: finalMaxPlayers,
+        startTime: finalStartTime,
+        checkInWindowMinutes: getCheckInWindowMinutes(finalCheckInSelect),
+        mapPool: getCircuitFinalMapPoolSelection(),
+        createdBy: auth.currentUser?.uid || null,
+        createdByName: getCurrentUsername() || "Unknown host",
+        roundRobin: extractRoundRobinSettingsUI("circuitfinal", defaultRoundRobinSettings),
+        bestOf: readBestOf("circuitfinal", defaultBestOf),
+        circuitSlug: currentCircuitMeta.slug,
+        circuitQualifyCount: finalQualifyCount,
+      });
+      await setDoc(
+        doc(collection(db, TOURNAMENT_COLLECTION), finalSlug),
+        finalPayload,
+        { merge: true }
+      );
+      const imageFile = finalImageInput?.files?.[0] || null;
+      const reuseUrl = finalImagePreview?.dataset?.reuseUrl || "";
+      if (imageFile) {
+        try {
+          const coverImageUrl = await uploadTournamentCover(imageFile, finalSlug);
+          await setDoc(
+            doc(collection(db, TOURNAMENT_COLLECTION), finalSlug),
+            { coverImageUrl },
+            { merge: true }
+          );
+        } catch (err) {
+          showToast?.(err?.message || "Failed to upload final cover image.", "error");
+        }
+      } else if (reuseUrl) {
+        await setDoc(
+          doc(collection(db, TOURNAMENT_COLLECTION), finalSlug),
+          { coverImageUrl: reuseUrl },
+          { merge: true }
+        );
+      }
+    }
     await renderCircuitLeaderboard(
       currentCircuitMeta,
       normalizeCircuitTournamentSlugs(currentCircuitMeta),
@@ -2038,7 +2283,10 @@ async function enterTournament(slug, options = {}) {
     applyRosterSeedingWithMode,
     deserializeBracket,
     saveState,
-    renderAll
+    () => {
+      renderAll();
+      refreshPlayerDetailModalIfOpen(getPlayersMap);
+    }
   );
   await maybeAutoAddFinalPlayers();
   subscribeTournamentStateRemote(slug);
@@ -2052,6 +2300,7 @@ async function enterTournament(slug, options = {}) {
   isCircuitAdmin = false;
   updateCircuitAdminVisibility();
   renderAll();
+  logAnalyticsEvent("tournament_viewed");
   switchTab("bracketTab");
 }
 
@@ -2757,6 +3006,7 @@ async function handleCreateCircuit(event) {
       console.error("Failed to create final tournament", err);
       showToast?.("Circuit saved, but final tournament failed.", "error");
     }
+    logAnalyticsEvent("circuit_created");
     if (finalCreated) {
       showToast?.("Circuit saved.", "success");
     }
@@ -2888,6 +3138,7 @@ async function handleCreateTournament(event) {
     }
     setCurrentSlugState(slug);
     setCurrentTournamentMetaState(payload);
+    logAnalyticsEvent("tournament_created");
     showToast?.("Tournament saved.", "success");
     if (modal) {
       modal.style.display = "none";
@@ -2927,6 +3178,61 @@ function toggleMapSelection(name) {
   });
 }
 
+function updateCircuitFinalMapButtons() {
+  const ladderBtn = document.getElementById("circuitFinalUseLadderMapsBtn");
+  const customBtn = document.getElementById("circuitFinalClearMapPoolBtn");
+  const isLadder = circuitFinalMapPoolMode === "ladder";
+  ladderBtn?.classList.toggle("active", isLadder);
+  customBtn?.classList.toggle("active", !isLadder);
+}
+
+function renderCircuitFinalMapPoolSelection() {
+  renderMapPoolPickerUI("circuitFinalMapPoolPicker", {
+    mapPoolSelection: circuitFinalMapPoolSelection,
+    getAll1v1Maps,
+  });
+  renderChosenMapsUI("circuitFinalChosenMapList", {
+    mapPoolSelection: circuitFinalMapPoolSelection,
+    getMapByName,
+  });
+  updateCircuitFinalMapButtons();
+}
+
+function setCircuitFinalMapPoolSelection(names) {
+  circuitFinalMapPoolSelection = new Set((names || []).filter(Boolean));
+  circuitFinalMapPoolMode = isDefaultLadderSelection(
+    circuitFinalMapPoolSelection,
+    getDefaultMapPoolNames
+  )
+    ? "ladder"
+    : "custom";
+  renderCircuitFinalMapPoolSelection();
+}
+
+function toggleCircuitFinalMapSelection(name) {
+  if (!name) return;
+  if (circuitFinalMapPoolSelection.has(name)) {
+    circuitFinalMapPoolSelection.delete(name);
+  } else {
+    circuitFinalMapPoolSelection.add(name);
+  }
+  circuitFinalMapPoolMode = isDefaultLadderSelection(
+    circuitFinalMapPoolSelection,
+    getDefaultMapPoolNames
+  )
+    ? "ladder"
+    : "custom";
+  renderCircuitFinalMapPoolSelection();
+}
+
+function resetCircuitFinalMapPoolSelection() {
+  setCircuitFinalMapPoolSelection(getDefaultMapPoolNames());
+}
+
+function getCircuitFinalMapPoolSelection() {
+  return new Set(circuitFinalMapPoolSelection);
+}
+
 if (typeof window !== "undefined") {
   window.addEventListener("pulse-state-changed", (event) => {
     syncPulseRegistrationRequirements(event.detail);
@@ -2951,6 +3257,15 @@ if (typeof window !== "undefined") {
     if (currentTournamentMeta) {
       renderAll();
     }
+  });
+  window.addEventListener("user-avatar-updated", (event) => {
+    const avatarUrl =
+      event?.detail?.avatarUrl || getCurrentUserAvatarUrl?.() || "";
+    syncCurrentPlayerAvatar(avatarUrl);
+  });
+  window.addEventListener("user-profile-updated", () => {
+    const avatarUrl = getCurrentUserAvatarUrl?.() || "";
+    syncCurrentPlayerAvatar(avatarUrl);
   });
 }
 
@@ -3051,6 +3366,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     setFinalMapPoolSelection,
     toggleFinalMapSelection,
     resetFinalMapPoolSelection,
+    setCircuitFinalMapPoolSelection,
+    toggleCircuitFinalMapSelection,
+    resetCircuitFinalMapPoolSelection,
     updateSettingsDescriptionPreview,
     updateSettingsRulesPreview,
     getPlayersMap,
@@ -3061,6 +3379,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     currentMapPoolMode,
     updatePlayerPoints,
     setPlayerCheckIn,
+    setPlayerForfeit,
     removePlayer,
     setManualSeedingEnabled,
     getManualSeedingActive,
@@ -4150,6 +4469,23 @@ function isGoogleAvatarUrl(url = "") {
 function resolvePlayerAvatar(player) {
   const userPhoto = document.getElementById("userPhoto")?.src;
   return player?.avatarUrl || userPhoto || DEFAULT_PLAYER_AVATAR;
+}
+
+function syncCurrentPlayerAvatar(avatarUrl) {
+  const uid = auth?.currentUser?.uid || null;
+  if (!uid) return;
+  const normalized = String(avatarUrl || "").trim();
+  if (!normalized) return;
+  const players = state.players || [];
+  const idx = players.findIndex((player) => player.uid === uid);
+  if (idx < 0) return;
+  const existing = players[idx] || {};
+  if (existing.avatarUrl === normalized) return;
+  const next = [...players];
+  next[idx] = { ...existing, avatarUrl: normalized };
+  saveState({ players: next });
+  renderAll();
+  refreshPlayerDetailModalIfOpen(getPlayersMap);
 }
 
 function serializeBracket(bracket) {

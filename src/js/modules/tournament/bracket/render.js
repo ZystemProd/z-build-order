@@ -36,11 +36,20 @@ function isCurrentUserPlayer(player) {
   return Boolean(currentUsernameHint && (name === currentUsernameHint || pulseName === currentUsernameHint));
 }
 
-function displayValueFor(match, idx) {
-  if (match.walkover === "a") {
+function getWalkoverSide(match, participants) {
+  if (match.walkover) return match.walkover;
+  const [pA, pB] = participants || [];
+  if (pA?.forfeit && !pB) return "a";
+  if (pB?.forfeit && !pA) return "b";
+  return null;
+}
+
+function displayValueFor(match, idx, participants) {
+  const walkover = getWalkoverSide(match, participants);
+  if (walkover === "a") {
     return idx === 0 ? "w/o" : match.scores?.[1] ?? 0;
   }
-  if (match.walkover === "b") {
+  if (walkover === "b") {
     return idx === 1 ? "w/o" : match.scores?.[0] ?? 0;
   }
   return match.scores?.[idx] ?? 0;
@@ -113,6 +122,7 @@ function renderCastIndicator(match) {
 export function renderMatchCard(match, lookup, playersById) {
   const participants = resolveParticipants(match, lookup, playersById);
   const [pA, pB] = participants;
+  const hasScoreReport = Boolean(state?.scoreReports?.[match.id]);
   const statusTag =
     match.walkover === "a"
       ? "Walkover (Player A)"
@@ -123,18 +133,19 @@ export function renderMatchCard(match, lookup, playersById) {
       : "Pending";
 
   const cls = ["match-card"];
+  if (hasScoreReport) cls.push("score-report");
   if (match.status === "complete") cls.push("complete");
   if (match.walkover) cls.push("walkover");
   const isReady = Boolean(pA && pB && match.status !== "complete");
   const isUserMatch = Boolean(isCurrentUserPlayer(pA) || isCurrentUserPlayer(pB));
   if (isReady && isUserMatch) cls.push("ready");
 
-  const valA = displayValueFor(match, 0);
-  const valB = displayValueFor(match, 1);
+  const valA = displayValueFor(match, 0, participants);
+  const valB = displayValueFor(match, 1, participants);
   const canVeto = Boolean(pA && pB && match.status !== "complete");
   const bestOf = getBestOfForMatch(match);
-  const selectValA = getSelectValue(match, 0, bestOf);
-  const selectValB = getSelectValue(match, 1, bestOf);
+  const selectValA = getSelectValue(match, 0, bestOf, participants);
+  const selectValB = getSelectValue(match, 1, bestOf, participants);
   const hasPlayers = Boolean(pA && pB);
 
   const html = `<div class="${cls.join(" ")}" data-match-id="${match.id}">
@@ -210,6 +221,7 @@ export function renderScoreOptions(current, bestOf = 3) {
 export function clampScoreSelectOptions() {
   if (!state?.bracket) return;
   const lookup = getMatchLookup(state.bracket);
+  const playersById = new Map((state.players || []).map((player) => [player.id, player]));
   document.querySelectorAll("select.result-select, select.score-select").forEach((sel) => {
     const matchId = sel.dataset.matchId || sel.closest(".match-card")?.dataset?.matchId;
     const match = lookup.get(matchId);
@@ -226,6 +238,18 @@ export function clampScoreSelectOptions() {
       sel.value = forIdx === 0 ? "W" : String(needed);
     } else if (match?.walkover === "b") {
       sel.value = forIdx === 1 ? "W" : String(needed);
+    } else if (match) {
+      const participants = resolveParticipants(match, lookup, playersById);
+      const previewWalkover = getWalkoverSide(match, participants);
+      if (previewWalkover === "a") {
+        sel.value = forIdx === 0 ? "W" : "0";
+      } else if (previewWalkover === "b") {
+        sel.value = forIdx === 1 ? "W" : "0";
+      } else if ([...sel.options].some((o) => o.value === prev)) {
+        sel.value = prev;
+      } else {
+        sel.value = "0";
+      }
     } else if ([...sel.options].some((o) => o.value === prev)) {
       sel.value = prev;
     } else {
@@ -251,9 +275,11 @@ export function renderSimpleMatch(
   const isReady = Boolean(pA && pB && match?.status !== "complete");
   const isUserMatch = Boolean(isCurrentUserPlayer(pA) || isCurrentUserPlayer(pB));
   const shouldHighlightReady = isReady && isUserMatch;
+  const hasScoreReport = Boolean(state?.scoreReports?.[match.id]);
   const cardClass = isTreeLayout
     ? `match-card tree${shouldHighlightReady ? " ready" : ""}`
     : `match-card group${shouldHighlightReady ? " ready" : ""}`;
+  const scoreReportClass = hasScoreReport ? " score-report" : "";
   const aIsPlaceholder = !pA;
   const bIsPlaceholder = !pB;
   const aName = pA ? pA.name : displayPlaceholderForSource(match, 0, lookup);
@@ -264,10 +290,11 @@ export function renderSimpleMatch(
   const clanLogoB = pB?.clanLogoUrl ? sanitizeUrl(pB.clanLogoUrl) : "";
   const clanNameA = (pA?.clan || "").trim();
   const clanNameB = (pB?.clan || "").trim();
-  const showScores = !!(pA && pB);
   const bestOf = getBestOfForMatch(match);
-  const selectValA = getSelectValue(match, 0, bestOf);
-  const selectValB = getSelectValue(match, 1, bestOf);
+  const selectValA = getSelectValue(match, 0, bestOf, [pA, pB]);
+  const selectValB = getSelectValue(match, 1, bestOf, [pA, pB]);
+  const previewWalkover = getWalkoverSide(match, [pA, pB]);
+  const showScores = !!(pA && pB) || Boolean(previewWalkover);
   const scoreLabelA =
     String(selectValA).toUpperCase() === "W" ? "w/o" : String(selectValA ?? 0);
   const scoreLabelB =
@@ -285,7 +312,7 @@ export function renderSimpleMatch(
       ? `M${parsedGroupNumber}`
       : escapeHtml(getMatchLabel(match));
 
-  const html = `<div class="${cardClass}" data-match-id="${
+  const html = `<div class="${cardClass}${scoreReportClass}" data-match-id="${
     match.id
   }" style="${baseStyle}">
     ${castIndicator}

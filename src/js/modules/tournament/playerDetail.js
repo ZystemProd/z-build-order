@@ -24,6 +24,11 @@ import { updateTooltips } from "../tooltip.js";
 
 const countryFlagCache = new Map();
 const countryUidCache = new Map();
+let activePlayerDetailId = "";
+let activePlayerDetailUid = "";
+let activePlayerDetailKey = "";
+let getPlayersMapRef = null;
+let activeAvatarRefreshToken = 0;
 const COUNTRY_NAME_BY_CODE = new Map(
   (Array.isArray(countries) ? countries : []).map((entry) => [
     String(entry?.code || "").toUpperCase(),
@@ -411,9 +416,14 @@ function formatMmrByRace(player) {
 function isPlaceholderAvatar(url = "") {
   const normalized = String(url || "").trim();
   if (!normalized) return true;
+  const cleaned = normalized.split("?")[0].split("#")[0];
+  const lower = cleaned.toLowerCase();
+  const filename = lower.slice(lower.lastIndexOf("/") + 1);
   return (
-    normalized === DEFAULT_PLAYER_AVATAR ||
-    normalized === DEFAULT_PROFILE_AVATAR
+    lower === DEFAULT_PLAYER_AVATAR.toLowerCase() ||
+    lower === DEFAULT_PROFILE_AVATAR.toLowerCase() ||
+    filename === "marine_avatar_1.webp" ||
+    filename === "default-avatar.webp"
   );
 }
 
@@ -711,9 +721,14 @@ async function updateAchievementsForPlayer(player) {
   }
 }
 
-function resolvePlayerAvatar(player) {
-  const userPhoto = document.getElementById("userPhoto")?.src;
-  return player?.avatarUrl || userPhoto || DEFAULT_PLAYER_AVATAR;
+function resolvePlayerAvatar(player, { isCurrentUser = false } = {}) {
+  const candidate = player?.avatarUrl || "";
+  if (candidate && !isPlaceholderAvatar(candidate)) return candidate;
+  if (isCurrentUser) {
+    const userPhoto = document.getElementById("userPhoto")?.src;
+    if (userPhoto) return userPhoto;
+  }
+  return DEFAULT_PLAYER_AVATAR;
 }
 
 export function setupPlayerDetailModal() {
@@ -725,6 +740,9 @@ export function setupPlayerDetailModal() {
 
   const hide = () => {
     modal.style.display = "none";
+    activePlayerDetailId = "";
+    activePlayerDetailUid = "";
+    activePlayerDetailKey = "";
   };
   const show = () => {
     modal.style.display = "block";
@@ -762,6 +780,9 @@ export function setupPlayerDetailModal() {
 }
 
 export function attachPlayerDetailHandlers({ getPlayersMap }) {
+  if (typeof getPlayersMap === "function") {
+    getPlayersMapRef = getPlayersMap;
+  }
   setupPlayerDetailModal();
   const bracketGrid = document.getElementById("bracketGrid");
   const playersTable = document.getElementById("playersTableBody");
@@ -769,6 +790,7 @@ export function attachPlayerDetailHandlers({ getPlayersMap }) {
 
   const handler = (e) => {
     const inRoundRobinGroupStage = Boolean(e.target.closest(".group-stage"));
+    if (e.target.closest(".forfeit-player")) return;
     if (inRoundRobinGroupStage) {
       const nameTarget = e.target.closest(".name-text");
       if (!nameTarget) return;
@@ -782,7 +804,11 @@ export function attachPlayerDetailHandlers({ getPlayersMap }) {
       return;
     }
 
-    if (
+    const isPlayersTable = Boolean(playersTable && playersTable.contains(e.target));
+    if (isPlayersTable) {
+      const nameTarget = e.target.closest(".player-name");
+      if (!nameTarget) return;
+    } else if (
       e.target.closest("select") ||
       e.target.closest(".remove-player") ||
       e.target.closest(".points-input") ||
@@ -806,7 +832,7 @@ export function attachPlayerDetailHandlers({ getPlayersMap }) {
   registeredPlayersList?.addEventListener("click", handler);
 }
 
-export function openPlayerDetailModal(player) {
+export async function openPlayerDetailModal(player) {
   const modal = document.getElementById("playerDetailModal");
   if (!modal) return;
   const avatar = document.getElementById("playerDetailAvatar");
@@ -820,17 +846,27 @@ export function openPlayerDetailModal(player) {
   const secondaryEl = document.getElementById("playerDetailSecondary");
   const twitchEl = document.getElementById("playerDetailTwitch");
 
+  activePlayerDetailId = String(player?.id || "");
+  activePlayerDetailUid = String(player?.uid || "");
+  activePlayerDetailKey = playerKey(
+    player?.name || player?.pulseName || "",
+    player?.sc2Link || ""
+  );
+
   const isCurrentUser = isCurrentUserPlayer(player);
   const currentAvatar = getCurrentUserAvatarUrl?.() || "";
-  const avatarUrl = resolvePlayerAvatar(player);
+  const useCurrentAvatar =
+    isCurrentUser && currentAvatar && !isPlaceholderAvatar(currentAvatar);
+  const avatarUrl = resolvePlayerAvatar(player, { isCurrentUser });
   if (avatar) {
-    if (isCurrentUser && currentAvatar) {
+    if (useCurrentAvatar) {
       avatar.src = currentAvatar;
       player.avatarUrl = currentAvatar;
     } else {
       avatar.src = avatarUrl;
     }
   }
+  let shouldHydrateProfile = false;
   if (nameEl) {
     const abbr = player?.clanAbbreviation;
     const displayName = player?.pulseName || player?.name;
@@ -848,10 +884,18 @@ export function openPlayerDetailModal(player) {
       setFlagTitle(flagEl, player?.country || "");
       updateTooltips();
       const needsAvatarHydration = isPlaceholderAvatar(player?.avatarUrl);
-      if (!flag || needsAvatarHydration) {
-        void hydratePlayerProfile(player, flagEl, avatar);
-      }
+      shouldHydrateProfile = !flag || needsAvatarHydration;
     }
+  }
+  if (shouldHydrateProfile && flagEl) {
+    await hydratePlayerProfile(player, flagEl, avatar);
+    const refreshedAvatar = resolvePlayerAvatar(player, { isCurrentUser });
+    if (avatar && refreshedAvatar && avatar.src !== refreshedAvatar) {
+      avatar.src = refreshedAvatar;
+    }
+  }
+  if (avatar && isPlaceholderAvatar(avatar.src)) {
+    scheduleAvatarRefresh(avatar, isCurrentUser);
   }
   if (clanEl) {
     const clan = player?.clan || "";
@@ -903,6 +947,77 @@ export function openPlayerDetailModal(player) {
   formatMmrByRace(player);
   modal.dataset.ready = "true";
   modal.showModal?.();
+}
+
+function findPlayerInMap(playersMap, identity) {
+  if (!playersMap || !identity) return null;
+  if (identity.id && playersMap.has(identity.id)) {
+    return playersMap.get(identity.id);
+  }
+  if (identity.uid) {
+    for (const entry of playersMap.values()) {
+      if (String(entry?.uid || "") === identity.uid) {
+        return entry;
+      }
+    }
+  }
+  if (identity.key) {
+    for (const entry of playersMap.values()) {
+      const key = playerKey(entry?.name || "", entry?.sc2Link || "");
+      if (key && key === identity.key) {
+        return entry;
+      }
+    }
+  }
+  return null;
+}
+
+function scheduleAvatarRefresh(avatarEl, isCurrentUser) {
+  if (!getPlayersMapRef || !avatarEl) return;
+  const token = ++activeAvatarRefreshToken;
+  const startedAt = Date.now();
+  const maxMs = 1500;
+  const tick = () => {
+    if (token !== activeAvatarRefreshToken) return;
+    const playersMap = getPlayersMapRef?.();
+    const player = findPlayerInMap(playersMap, {
+      id: activePlayerDetailId,
+      uid: activePlayerDetailUid,
+      key: activePlayerDetailKey,
+    });
+    const nextAvatar = resolvePlayerAvatar(player || {}, { isCurrentUser });
+    if (nextAvatar && !isPlaceholderAvatar(nextAvatar) && avatarEl.src !== nextAvatar) {
+      avatarEl.src = nextAvatar;
+      return;
+    }
+    if (Date.now() - startedAt < maxMs) {
+      setTimeout(tick, 150);
+    }
+  };
+  setTimeout(tick, 150);
+}
+
+export function refreshPlayerDetailModalIfOpen(getPlayersMap) {
+  const modal = document.getElementById("playerDetailModal");
+  if (!modal) return;
+  const isDialogOpen =
+    modal.open === true ||
+    modal.getAttribute("open") !== null ||
+    modal.style.display === "block";
+  if (!isDialogOpen) return;
+  if (!activePlayerDetailId && !activePlayerDetailUid && !activePlayerDetailKey) {
+    return;
+  }
+  const playersMap =
+    typeof getPlayersMap === "function" ? getPlayersMap() : new Map();
+  const player = findPlayerInMap(playersMap, {
+    id: activePlayerDetailId,
+    uid: activePlayerDetailUid,
+    key: activePlayerDetailKey,
+  });
+  if (player) {
+    openPlayerDetailModal(player);
+  }
 }
 
 async function hydratePlayerProfile(player, flagEl, avatarEl) {

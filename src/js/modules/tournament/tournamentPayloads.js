@@ -29,6 +29,16 @@ const BEST_OF_INPUT_IDS = {
     upperFinal: "finalBestOfUpperFinalInput",
     final: "finalBestOfFinalInput",
   },
+  circuitfinal: {
+    upper: "circuitFinalBestOfUpperInput",
+    lower: "circuitFinalBestOfLowerInput",
+    lowerSemi: "circuitFinalBestOfLowerSemiInput",
+    lowerFinal: "circuitFinalBestOfLowerFinalInput",
+    quarter: "circuitFinalBestOfQuarterInput",
+    semi: "circuitFinalBestOfSemiInput",
+    upperFinal: "circuitFinalBestOfUpperFinalInput",
+    final: "circuitFinalBestOfFinalInput",
+  },
 };
 
 export function readBestOf(scope, defaultBestOf) {

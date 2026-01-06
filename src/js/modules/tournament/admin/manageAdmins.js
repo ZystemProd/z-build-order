@@ -178,14 +178,19 @@ export function createAdminManager({
       row.append(labelWrap);
       const actions = document.createElement("div");
       actions.className = "admin-invite-actions";
-      if (entry.role === "Admin" && entry.uid) {
+      if (entry.role === "Admin" && (entry.uid || entry.name)) {
         const button = document.createElement("button");
         button.type = "button";
         button.className = "icon-btn admin-remove-btn";
         button.textContent = "x";
         button.title = "Remove";
         button.setAttribute("aria-label", "Remove");
-        button.dataset.adminRemoveUid = entry.uid;
+        if (entry.uid) {
+          button.dataset.adminRemoveUid = entry.uid;
+        }
+        if (entry.name) {
+          button.dataset.adminRemoveName = entry.name;
+        }
         actions.append(button);
       }
       row.append(actions);
@@ -214,11 +219,18 @@ export function createAdminManager({
     return true;
   };
 
-  const removeAdminFromScope = async (scope, uid) => {
+  const removeAdminFromScope = async (scope, uid, name) => {
     const meta = getAdminInviteMeta(scope);
-    if (!meta?.slug || !uid) return false;
+    if (!meta?.slug || (!uid && !name)) return false;
     const admins = normalizeAdminList(meta.admins);
-    const nextAdmins = admins.filter((admin) => admin.uid !== uid);
+    const targetName = (name || "").trim().toLowerCase();
+    const nextAdmins = admins.filter((admin) => {
+      if (uid && admin.uid) return admin.uid !== uid;
+      if (!uid && targetName) {
+        return (admin.name || "").trim().toLowerCase() !== targetName;
+      }
+      return true;
+    });
     if (nextAdmins.length === admins.length) {
       setAdminInviteStatus("Admin not found.");
       return false;
@@ -326,9 +338,11 @@ export function createAdminManager({
     });
     currentListEl.addEventListener("click", async (event) => {
       const target = event.target.closest("[data-admin-remove-uid]");
-      if (!target) return;
-      const uid = target.dataset.adminRemoveUid || "";
-      const removed = await removeAdminFromScope(currentScope, uid);
+      const nameTarget = event.target.closest("[data-admin-remove-name]");
+      if (!target && !nameTarget) return;
+      const uid = target?.dataset.adminRemoveUid || "";
+      const name = (target?.dataset.adminRemoveName || nameTarget?.dataset.adminRemoveName || "").trim();
+      const removed = await removeAdminFromScope(currentScope, uid, name);
       if (removed) {
         renderAdminInviteCurrent(currentScope);
         showToast?.("Admin removed.", "success");

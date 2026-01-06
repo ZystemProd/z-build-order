@@ -2,6 +2,7 @@ import DOMPurify from "dompurify";
 import { defaultBestOf } from "../state.js";
 import { normalizeRoundRobinSettings } from "../bracket/build.js";
 import { syncMarkdownSurfaceForInput } from "../markdownEditor.js";
+import { formatLocalDateTimeInput } from "../dateTime.js";
 
 function normalizeBooleanSetting(value, fallback = true) {
   if (value === undefined || value === null) return fallback;
@@ -88,19 +89,17 @@ export function populateSettingsPanel({
   if (rulesInput) rulesInput.value = tournament.rules || "";
   syncMarkdownSurfaceForInput(descInput);
   syncMarkdownSurfaceForInput(rulesInput);
-  syncMarkdownSurfaceForInput(descInput);
-  syncMarkdownSurfaceForInput(rulesInput);
   if (formatSelect)
     formatSelect.value =
       tournament.format || storedFormat || "Double Elimination";
   if (maxInput) maxInput.value = tournament.maxPlayers || "";
   if (startInput) {
     startInput.value = tournament.startTime
-      ? new Date(tournament.startTime).toISOString().slice(0, 16)
+      ? formatLocalDateTimeInput(tournament.startTime)
       : "";
     if (startInput._flatpickr) {
       if (startInput.value) {
-        startInput._flatpickr.setDate(startInput.value, false);
+        startInput._flatpickr.setDate(new Date(tournament.startTime), false);
       } else {
         startInput._flatpickr.clear();
       }

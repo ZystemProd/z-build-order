@@ -7,6 +7,8 @@ export function syncFormatFieldVisibility(scope) {
       ? "settingsFormatSelect"
       : scope === "final"
       ? "finalFormatSelect"
+      : scope === "circuitfinal"
+      ? "circuitFinalFormatSelect"
       : "tournamentFormatSelect";
   const value = document.getElementById(selectId)?.value || "";
   const normalized = (value || "").toLowerCase();
@@ -24,6 +26,8 @@ export function syncFormatFieldVisibility(scope) {
       ? "settingsGroupStageLabel"
       : scope === "final"
       ? "finalGroupStageLabel"
+      : scope === "circuitfinal"
+      ? "circuitFinalGroupStageLabel"
       : "createGroupStageLabel";
   const label = document.getElementById(labelId);
   if (label) {
@@ -62,6 +66,13 @@ export function extractRoundRobinSettings(scope, defaultRoundRobinSettings) {
           advance: "finalRoundRobinAdvanceInput",
           playoffs: "finalRoundRobinPlayoffsSelect",
           bestOf: "finalRoundRobinBestOfInput",
+        }
+      : scope === "circuitfinal"
+      ? {
+          groups: "circuitFinalRoundRobinGroupsInput",
+          advance: "circuitFinalRoundRobinAdvanceInput",
+          playoffs: "circuitFinalRoundRobinPlayoffsSelect",
+          bestOf: "circuitFinalRoundRobinBestOfInput",
         }
       : {
           groups: "roundRobinGroupsInput",

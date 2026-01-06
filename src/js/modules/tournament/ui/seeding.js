@@ -60,6 +60,33 @@ export function renderSeedingTable(
       ? `<span class="helper">-</span>`
       : checkinPill;
 
+    const isForfeit = Boolean(p.forfeit);
+    const forfeitUndoBlocked = Boolean(p.forfeitUndoBlocked);
+    const forfeitAction = isAdmin && isLive
+      ? (() => {
+        if (isForfeit && forfeitUndoBlocked) {
+          return `<span class="forfeit-tooltip" data-tooltip="Cannot undo after a later match has a recorded score.">
+            <button
+              class="cta small ghost forfeit-player"
+              data-player-id="${escapeHtml(p.id || "")}"
+              data-forfeit="false"
+              disabled
+              aria-disabled="true"
+            >
+              Undo
+            </button>
+          </span>`;
+        }
+        return `<button
+          class="cta small ${isForfeit ? "ghost" : "danger"} forfeit-player"
+          data-player-id="${escapeHtml(p.id || "")}"
+          data-forfeit="${isForfeit ? "false" : "true"}"
+        >
+          ${isForfeit ? "Undo" : "Forfeit"}
+        </button>`;
+      })()
+      : `<span class="helper">-</span>`;
+
     const dragHandle = manualSeeding
       ? `<span class="seeding-drag-handle ${isLive ? "is-disabled" : ""}" title="Drag to reorder" aria-hidden="true" ${isLive ? "" : 'draggable="true"'}>&equiv;</span>`
       : "";
@@ -97,6 +124,9 @@ export function renderSeedingTable(
           <div class="checkin-cell">
             ${checkInAction}
           </div>
+        </td>
+        <td>
+          ${forfeitAction}
         </td>
         <td>
           ${
