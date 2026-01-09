@@ -38,7 +38,7 @@ export function raceClassName(race) {
   return "race-unknown";
 }
 
-export function getSelectValue(match, idx, bestOf = 3) {
+export function getSelectValue(match, idx, bestOf = 3, participants = null) {
   if (!match) return 0;
   const needed = Math.max(1, Math.ceil((bestOf || 1) / 2));
   if (match.walkover === "a") {
@@ -47,10 +47,25 @@ export function getSelectValue(match, idx, bestOf = 3) {
   if (match.walkover === "b") {
     return idx === 1 ? "W" : String(match.scores?.[0] ?? needed);
   }
+  if (participants) {
+    const [pA, pB] = participants;
+    if (pA?.forfeit && !pB) {
+      return idx === 0 ? "W" : "0";
+    }
+    if (pB?.forfeit && !pA) {
+      return idx === 1 ? "W" : "0";
+    }
+  }
   return match.scores?.[idx] ?? 0;
 }
 
 export function getBestOfForMatch(match) {
+  if (match?.bracket === "group") {
+    const groupBestOf = Number(currentTournamentMeta?.roundRobin?.bestOf);
+    if (Number.isFinite(groupBestOf) && groupBestOf > 0) {
+      return groupBestOf;
+    }
+  }
   if (Number.isFinite(match?.bestOf) && match.bestOf > 0) {
     return match.bestOf;
   }

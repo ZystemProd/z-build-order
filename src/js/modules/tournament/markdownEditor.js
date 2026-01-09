@@ -31,7 +31,9 @@ export function initQuillEditor({ editorId, textareaId, placeholder = "" }) {
   let focusOrigin = null;
 
   // Seed initial content from textarea
-  quill.clipboard.dangerouslyPasteHTML(textarea.value || "");
+  const initialHtml = textarea.value || "";
+  const initialDelta = quill.clipboard.convert(initialHtml);
+  quill.setContents(initialDelta, "silent");
 
   quill.on("text-change", () => {
     const html = sanitizeHtml(editorEl.querySelector(".ql-editor")?.innerHTML);
@@ -87,7 +89,11 @@ export function syncQuillSurfaceForInput(input) {
   if (!input) return;
   const quill = getQuill(input.id);
   if (!quill) return;
-  quill.clipboard.dangerouslyPasteHTML(input.value || "");
+  const nextHtml = input.value || "";
+  const currentHtml = quill.root?.innerHTML || "";
+  if (sanitizeHtml(currentHtml) === sanitizeHtml(nextHtml)) return;
+  const delta = quill.clipboard.convert(nextHtml);
+  quill.setContents(delta, "silent");
 }
 
 // Backward compatibility for legacy imports
@@ -96,5 +102,9 @@ export const syncMarkdownSurfaceForInput = syncQuillSurfaceForInput;
 export function syncQuillById(textareaId, value) {
   const quill = getQuill(textareaId);
   if (!quill) return;
-  quill.clipboard.dangerouslyPasteHTML(value || "");
+  const nextHtml = value || "";
+  const currentHtml = quill.root?.innerHTML || "";
+  if (sanitizeHtml(currentHtml) === sanitizeHtml(nextHtml)) return;
+  const delta = quill.clipboard.convert(nextHtml);
+  quill.setContents(delta, "silent");
 }

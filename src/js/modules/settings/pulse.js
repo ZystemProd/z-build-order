@@ -49,6 +49,17 @@ let pulseUiInitialized = false;
 let pulseHelpInitialized = false;
 let secondaryPulseModalInitialized = false;
 
+function extractSecondaryPulseUrls(secondary) {
+  if (!Array.isArray(secondary)) return [];
+  const urls = secondary
+    .map((entry) =>
+      entry && typeof entry === "object" ? entry.url || "" : entry || ""
+    )
+    .map((entry) => normalizePulseUrlClient(entry))
+    .filter(Boolean);
+  return Array.from(new Set(urls));
+}
+
 function normalizePulseUrlClient(raw) {
   if (!raw) return "";
   const trimmed = raw.trim();
@@ -291,6 +302,32 @@ function dispatchPulseState() {
   );
 }
 
+function dispatchPulseSyncComplete(detail = {}) {
+  if (
+    typeof window === "undefined" ||
+    typeof window.dispatchEvent !== "function"
+  )
+    return;
+  window.dispatchEvent(
+    new CustomEvent("pulse-sync-complete", {
+      detail: { ...detail },
+    })
+  );
+}
+
+function dispatchSecondaryPulseSyncComplete(detail = {}) {
+  if (
+    typeof window === "undefined" ||
+    typeof window.dispatchEvent !== "function"
+  )
+    return;
+  window.dispatchEvent(
+    new CustomEvent("pulse-secondary-sync-complete", {
+      detail: { ...detail },
+    })
+  );
+}
+
 function setupPulseSettingsSection() {
   if (pulseUiInitialized) return;
   const input = document.getElementById("sc2PulseInput");
@@ -498,6 +535,7 @@ function setupSecondaryPulseModal() {
     }
     // Update local state + downstream listeners
     applyPulseStateFromProfile({ ...getPulseState(), secondary: profilesToSave });
+    dispatchSecondaryPulseSyncComplete({ profiles: profilesToSave });
     return profilesToSave;
   };
 
@@ -681,6 +719,7 @@ async function handleConnectPulse(event) {
     const badgeFrag = buildMmrBadges(byRace, overall, pulsePayload.fetchedAt);
     setPulseStatus("Connected.", "success", badgeFrag);
     showToast("? SC2Pulse connected and MMR updated.", "success");
+    dispatchPulseSyncComplete({ url: pulsePayload.url, fetchedAt: pulsePayload.fetchedAt });
   } catch (error) {
     console.error("SC2Pulse fetch failed:", error);
     const message = error?.message || "Failed to fetch MMR from SC2Pulse.";
@@ -689,6 +728,129 @@ async function handleConnectPulse(event) {
   } finally {
     connectBtn.disabled = false;
     connectBtn.innerHTML = originalHtml;
+  }
+}
+
+async function syncSecondaryPulseProfilesFromState() {
+  const user = auth.currentUser;
+  if (!user) {
+    showToast("? Please sign in to sync SC2Pulse.", "error");
+    return { count: 0, updated: false };
+  }
+
+  const currentSecondary = getPulseState().secondary || [];
+  const urls = extractSecondaryPulseUrls(currentSecondary);
+  if (!urls.length) {
+    return { count: 0, updated: false };
+  }
+
+  const existingByUrl = new Map(
+    currentSecondary
+      .filter((entry) => entry && typeof entry === "object" && entry.url)
+      .map((entry) => [normalizePulseUrlClient(entry.url), entry])
+      .filter(([url]) => url)
+  );
+
+  const profiles = [];
+  for (const url of urls) {
+    const nextProfile = { url };
+    try {
+      const payload = await fetchPulseMmrFromBackend(url);
+      const byRace = payload.byRace || null;
+      const mmr = deriveOverallMmr(byRace, Number(payload.mmr));
+      nextProfile.name = (payload.pulseName || "").toString();
+      nextProfile.lastMmrByRace = byRace;
+      nextProfile.lastMmr = Number.isFinite(mmr) ? Math.round(mmr) : null;
+      nextProfile.fetchedAt = Date.now();
+    } catch (err) {
+      const existing = existingByUrl.get(url);
+      if (existing) {
+        profiles.push({ ...existing });
+        continue;
+      }
+    }
+    profiles.push(nextProfile);
+  }
+
+  try {
+    await setDoc(
+      doc(db, "users", user.uid),
+      { pulse: { secondary: profiles } },
+      { merge: true }
+    );
+  } catch (err) {
+    console.error("Failed to sync secondary SC2Pulse links", err);
+    throw err;
+  }
+
+  applyPulseStateFromProfile({ ...getPulseState(), secondary: profiles });
+  dispatchSecondaryPulseSyncComplete({ profiles });
+  return { count: profiles.length, updated: true };
+}
+
+async function syncPulseNow() {
+  if (!auth.currentUser) {
+    showToast("? Please sign in to sync SC2Pulse.", "error");
+    return;
+  }
+
+  const pulseState = getPulseState();
+  const pulseUrl = normalizePulseUrlClient(pulseState?.url || "");
+  const input = document.getElementById("sc2PulseInput");
+  const connectBtn = document.getElementById("connectPulseBtn");
+  if (input && pulseUrl && !input.value.trim()) {
+    input.value = pulseUrl;
+  }
+
+  if (pulseUrl) {
+    try {
+      if (input && connectBtn) {
+        await handleConnectPulse({ preventDefault() {} });
+      } else {
+        const payload = await fetchPulseMmrFromBackend(pulseUrl);
+        const byRace = payload.byRace || null;
+        const overall = deriveOverallMmr(byRace, Number(payload.mmr));
+        const pulsePayload = {
+          url: payload.url || pulseUrl,
+          fetchedAt: Date.now(),
+          lastMmrByRace: byRace,
+          name: payload.pulseName || "",
+          secondary: pulseState.secondary || DEFAULT_PULSE_STATE.secondary,
+        };
+        await setDoc(
+          doc(db, "users", auth.currentUser.uid),
+          { pulse: pulsePayload, sc2PulseUrl: pulsePayload.url },
+          { merge: true }
+        );
+        applyPulseStateFromProfile(pulsePayload);
+        showToast(
+          `? SC2Pulse updated${
+            Number.isFinite(overall) ? "." : ", but no MMR found."
+          }`,
+          "success"
+        );
+        dispatchPulseSyncComplete({
+          url: pulsePayload.url,
+          fetchedAt: pulsePayload.fetchedAt,
+        });
+      }
+    } catch (err) {
+      const message = err?.message || "Failed to sync SC2Pulse.";
+      showToast(message.startsWith("?") ? message : `? ${message}`, "error");
+    }
+  }
+
+  let secondaryResult = { updated: false };
+  try {
+    secondaryResult = await syncSecondaryPulseProfilesFromState();
+  } catch (err) {
+    const message =
+      err?.message || "Failed to sync secondary SC2Pulse links.";
+    showToast(message.startsWith("?") ? message : `? ${message}`, "error");
+  }
+
+  if (!pulseUrl && !secondaryResult.updated) {
+    showToast("? Add your SC2Pulse link in Settings to sync.", "error");
   }
 }
 
@@ -701,4 +863,5 @@ export {
   setPulseStatus,
   setupPulseSettingsSection,
   setupSecondaryPulseModal,
+  syncPulseNow,
 };

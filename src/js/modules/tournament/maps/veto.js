@@ -370,6 +370,10 @@ function setFlagTitle(flagEl, code) {
 
 export function openVetoModal(matchId, { getPlayersMap, getDefaultMapPoolNames, getMapByName }) {
   setCurrentVetoMatchIdState(matchId);
+  if (!state.isLive && !isAdmin) {
+    showToast?.("Tournament is not live. Bracket is read-only.", "warning");
+    return;
+  }
   const modal = document.getElementById("vetoModal");
   const label = document.getElementById("vetoMatchLabel");
   const bestOfLabel = document.getElementById("vetoBestOfLabel");
@@ -513,6 +517,21 @@ export function openMatchInfoModal(
   const confirmScoreBtn = document.getElementById("confirmMatchScoreBtn");
   const castBtn = document.getElementById("castMatchBtn");
   const castStatus = document.getElementById("castMatchStatus");
+  const reportBtn = document.getElementById("matchInfoReportBtn");
+  const reportSection = document.getElementById("matchInfoReportSection");
+  const reportStatus = document.getElementById("matchInfoReportStatus");
+  const reportControls = document.getElementById("matchInfoReportControls");
+  const reportScoreLine = document.getElementById("matchInfoReportScoreline");
+  const reportMaps = document.getElementById("matchInfoReportMaps");
+  const reportSubmitBtn = document.getElementById("matchInfoReportSubmitBtn");
+  const reportCancelBtn = document.getElementById("matchInfoReportCancelBtn");
+  const reportSummary = document.getElementById("matchInfoReportSummary");
+  const reportSummaryText = document.getElementById("matchInfoReportSummaryText");
+  const reportMapSummary = document.getElementById("matchInfoReportMapSummary");
+  const reportSummaryBy = document.getElementById("matchInfoReportSummaryBy");
+  const reportAdminActions = document.getElementById("matchInfoReportAdminActions");
+  const reportApproveBtn = document.getElementById("matchInfoReportApproveBtn");
+  const reportRejectBtn = document.getElementById("matchInfoReportRejectBtn");
   const walkoverSelect = document.getElementById("matchInfoWalkoverSelect");
   const closeBtn = document.getElementById("closeMatchInfoModal");
   const helpBtn = document.getElementById("matchInfoHelpBtn");
@@ -541,7 +560,7 @@ export function openMatchInfoModal(
     (me?.id && (me.id === leftPlayerId || me.id === rightPlayerId)) ||
     (uid && (uid === pA?.uid || uid === pB?.uid));
   const canEditResults =
-    (isAdmin || isParticipant) && match?.status !== "complete";
+    isAdmin || (state.isLive && isParticipant && match?.status !== "complete");
 
   modal.dataset.canEditResults = canEditResults ? "true" : "false";
   setupMatchChatUi({
@@ -750,6 +769,7 @@ export function openMatchInfoModal(
         const row = cell.closest("tr");
         const idx = Number(row?.dataset?.mapIdx || "-1");
         if (!row || !Number.isFinite(idx) || idx < 0 || idx >= bestOf) return;
+        if (idx > getNextOpenMapIndex(winners, bestOf)) return;
         if (winners[idx]) return;
         row.dataset.previewWinner = cell.dataset.side || "";
       };
@@ -771,8 +791,14 @@ export function openMatchInfoModal(
         const idx = Number(row?.dataset?.mapIdx || "-1");
         const side = cell.dataset.side === "B" ? "B" : "A";
         if (!row || !Number.isFinite(idx) || idx < 0 || idx >= bestOf) return;
+        if (idx > getNextOpenMapIndex(winners, bestOf)) return;
 
         winners[idx] = winners[idx] === side ? null : side;
+        if (!winners[idx]) {
+          for (let i = idx + 1; i < bestOf; i++) {
+            winners[i] = null;
+          }
+        }
         record.mapResults = winners;
 
         const winsA = winners.filter((w) => w === "A").length;
@@ -812,6 +838,259 @@ export function openMatchInfoModal(
     };
   }
   updateConfirmScoreButton();
+
+  const scoreReports = state.scoreReports || {};
+  const existingReport = scoreReports[matchId] || null;
+  const canReport =
+    Boolean(uid && isParticipant && leftPlayerId && rightPlayerId);
+  const shouldShowReport = Boolean(existingReport || canReport);
+  if (reportSection) {
+    reportSection.style.display = shouldShowReport ? "grid" : "none";
+  }
+  if (reportStatus) {
+    if (existingReport) {
+      reportStatus.textContent = isAdmin
+        ? "Pending admin review."
+        : "Report submitted.";
+    } else if (canReport) {
+      reportStatus.textContent = "Report a corrected score for admin review.";
+    } else {
+      reportStatus.textContent = "";
+    }
+  }
+  const maxWins = Math.max(1, Math.ceil(bestOf / 2));
+  const clampScore = (value) => {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return 0;
+    return Math.max(0, Math.min(num, maxWins));
+  };
+  const mapNames = Array.from({ length: bestOf }).map(
+    (_, idx) => pickedMaps?.[idx]?.map || `Map ${idx + 1}`
+  );
+  const normalizeReportResults = (results) => {
+    const normalized = normalizeMapResults(results, bestOf);
+    return normalized.map((entry) =>
+      entry === "A" || entry === "B" ? entry : null
+    );
+  };
+  const deriveResultsFromScores = (scoreA, scoreB) => {
+    const winsA = clampScore(scoreA);
+    const winsB = clampScore(scoreB);
+    const next = [];
+    for (let i = 0; i < bestOf; i += 1) {
+      if (i < winsA) next.push("A");
+      else if (i < winsA + winsB) next.push("B");
+      else next.push(null);
+    }
+    return next;
+  };
+  let reportResults = [];
+  if (existingReport?.mapResults?.length) {
+    reportResults = normalizeReportResults(existingReport.mapResults);
+  } else if (
+    Number.isFinite(existingReport?.scoreA) ||
+    Number.isFinite(existingReport?.scoreB)
+  ) {
+    reportResults = deriveResultsFromScores(
+      existingReport?.scoreA || 0,
+      existingReport?.scoreB || 0
+    );
+  } else {
+    reportResults = normalizeReportResults(winners);
+  }
+  const getReportWins = (results) => {
+    const winsA = results.filter((w) => w === "A").length;
+    const winsB = results.filter((w) => w === "B").length;
+    return { winsA, winsB };
+  };
+  const updateReportScoreLine = () => {
+    if (!reportScoreLine) return;
+    const { winsA, winsB } = getReportWins(reportResults);
+    reportScoreLine.textContent = `Proposed: ${aName} ${winsA}-${winsB} ${bName}`;
+  };
+  const renderReportMaps = () => {
+    if (!reportMaps) return;
+    const rows = reportResults
+      .map((winner, idx) => {
+        const mapLabel = escapeHtml(mapNames[idx] || `Map ${idx + 1}`);
+        const options = [
+          `<option value="">-</option>`,
+          `<option value="A" ${winner === "A" ? "selected" : ""}>${escapeHtml(
+            aName
+          )}</option>`,
+          `<option value="B" ${winner === "B" ? "selected" : ""}>${escapeHtml(
+            bName
+          )}</option>`,
+        ].join("");
+        return `<div class="match-info-report-map-row">
+          <div class="match-info-report-map-name">${mapLabel}</div>
+          <select class="match-info-report-select" data-map-idx="${idx}">
+            ${options}
+          </select>
+        </div>`;
+      })
+      .join("");
+    reportMaps.innerHTML = DOMPurify.sanitize(rows);
+  };
+  const renderReportSummaryList = () => {
+    if (!reportMapSummary) return;
+    const rows = reportResults
+      .map((winner, idx) => {
+        const mapLabel = escapeHtml(mapNames[idx] || `Map ${idx + 1}`);
+        const winnerLabel =
+          winner === "A" ? aName : winner === "B" ? bName : "Unreported";
+        return `<div class="match-info-report-summary-row">
+          <span>${mapLabel}</span>
+          <span>${escapeHtml(winnerLabel)}</span>
+        </div>`;
+      })
+      .join("");
+    reportMapSummary.innerHTML = DOMPurify.sanitize(rows);
+  };
+  const validateReportScores = () => {
+    const { winsA, winsB } = getReportWins(reportResults);
+    if (winsA === winsB) return false;
+    return Math.max(winsA, winsB) >= maxWins;
+  };
+  const updateReportSubmitState = () => {
+    if (!reportSubmitBtn) return;
+    reportSubmitBtn.disabled = !validateReportScores();
+  };
+  const showReportControls = (visible) => {
+    if (reportControls) reportControls.style.display = visible ? "grid" : "none";
+  };
+  const showReportSummary = (visible) => {
+    if (reportSummary) reportSummary.style.display = visible ? "grid" : "none";
+  };
+
+  if (reportBtn) {
+    reportBtn.style.display =
+      canReport && !existingReport ? "inline-flex" : "none";
+    reportBtn.onclick = canReport && !existingReport
+      ? () => {
+          renderReportMaps();
+          updateReportScoreLine();
+          updateReportSubmitState();
+          showReportControls(true);
+          reportBtn.style.display = "none";
+        }
+      : null;
+  }
+
+  if (reportCancelBtn) {
+    reportCancelBtn.onclick = () => {
+      showReportControls(false);
+      if (reportBtn && canReport && !existingReport) {
+        reportBtn.style.display = "inline-flex";
+      }
+    };
+  }
+
+  if (reportMaps) {
+    reportMaps.onchange = (e) => {
+      const select = e.target.closest?.(".match-info-report-select");
+      if (!select) return;
+      const idx = Number(select.dataset.mapIdx || "-1");
+      if (!Number.isFinite(idx) || idx < 0 || idx >= bestOf) return;
+      const value = select.value;
+      reportResults[idx] = value === "A" || value === "B" ? value : null;
+      updateReportScoreLine();
+      updateReportSubmitState();
+    };
+  }
+
+  if (reportSubmitBtn) {
+    reportSubmitBtn.onclick = () => {
+      if (!canReport) return;
+      if (!validateReportScores()) {
+        showToast?.("Pick a valid score for the report.", "error");
+        return;
+      }
+      const { winsA, winsB } = getReportWins(reportResults);
+      const reportEntry = {
+        scoreA: winsA,
+        scoreB: winsB,
+        mapResults: reportResults,
+        createdAt: Date.now(),
+        createdByUid: uid,
+        createdByName: getCurrentUsername?.() || "Player",
+        status: "pending",
+      };
+      const next = { ...(state.scoreReports || {}) };
+      next[matchId] = reportEntry;
+      state.scoreReports = next;
+      vetoDeps?.saveState?.({ scoreReports: next });
+      vetoDeps?.renderAll?.();
+      if (reportSummaryText) {
+        reportSummaryText.textContent = `${aName} ${winsA}-${winsB} ${bName}`;
+      }
+      renderReportSummaryList();
+      if (reportSummaryBy) {
+        reportSummaryBy.textContent = `Reported by ${reportEntry.createdByName}.`;
+      }
+      if (reportStatus) reportStatus.textContent = "Report submitted.";
+      showReportControls(false);
+      showReportSummary(true);
+    };
+  }
+
+  if (existingReport) {
+    const { winsA, winsB } = getReportWins(reportResults);
+    if (reportSummaryText) {
+      reportSummaryText.textContent = `${aName} ${winsA}-${winsB} ${bName}`;
+    }
+    renderReportSummaryList();
+    if (reportSummaryBy) {
+      const reporter = existingReport.createdByName || "Player";
+      reportSummaryBy.textContent = `Reported by ${reporter}.`;
+    }
+    showReportControls(false);
+    showReportSummary(true);
+  } else {
+    showReportSummary(false);
+    if (reportMapSummary) reportMapSummary.innerHTML = "";
+    if (reportControls && !canReport) reportControls.style.display = "none";
+  }
+
+  if (reportAdminActions) {
+    reportAdminActions.style.display =
+      isAdmin && existingReport ? "flex" : "none";
+  }
+  if (reportApproveBtn) {
+    reportApproveBtn.onclick =
+      isAdmin && existingReport
+        ? () => {
+            const { winsA, winsB } = getReportWins(reportResults);
+            if (winsA === winsB || Math.max(winsA, winsB) < maxWins) {
+              showToast?.("Report score is not complete.", "error");
+              return;
+            }
+            const record = ensureMatchVetoRecord(matchId, bestOf);
+            record.mapResults = normalizeReportResults(reportResults);
+            vetoDeps?.saveState?.({ matchVetoes: state.matchVetoes });
+            vetoDeps?.updateMatchScore?.(matchId, winsA, winsB, { finalize: true });
+            const next = { ...(state.scoreReports || {}) };
+            delete next[matchId];
+            state.scoreReports = next;
+            vetoDeps?.saveState?.({ scoreReports: next });
+            vetoDeps?.renderAll?.();
+            openMatchInfoModal(matchId, vetoDeps);
+          }
+        : null;
+  }
+  if (reportRejectBtn) {
+    reportRejectBtn.onclick =
+      isAdmin && existingReport
+        ? () => {
+            const next = { ...(state.scoreReports || {}) };
+            delete next[matchId];
+            state.scoreReports = next;
+            vetoDeps?.saveState?.({ scoreReports: next });
+            vetoDeps?.renderAll?.();
+            openMatchInfoModal(matchId, vetoDeps);
+          }
+        : null;
+  }
 
   if (openVetoBtn) {
     const canOpenVeto = isAdmin || isParticipant;
@@ -1013,9 +1292,15 @@ function countryCodeToFlag(raw) {
   return String.fromCodePoint(A + first, A + second);
 }
 
+function getNextOpenMapIndex(winners, bestOf) {
+  const idx = winners.findIndex((winner) => !winner);
+  return idx === -1 ? bestOf : idx;
+}
+
 function renderMatchInfoRows(rowsEl, { bestOf, pickedMaps, winners }) {
   rowsEl.innerHTML = "";
   const needed = Math.max(1, Math.ceil(bestOf / 2));
+  const nextOpenIdx = getNextOpenMapIndex(winners, bestOf);
   let winsA = 0;
   let winsB = 0;
   let decidedAt = -1;
@@ -1030,6 +1315,7 @@ function renderMatchInfoRows(rowsEl, { bestOf, pickedMaps, winners }) {
     const mapLabel = pickedMaps[i]?.map || `Map ${i + 1}`;
     const winner = winners[i] === "B" ? "B" : winners[i] === "A" ? "A" : null;
     const isAfterDecision = isDecided && i > decidedAt;
+    const isLockedByOrder = i > nextOpenIdx;
 
     const tr = document.createElement("tr");
     tr.className = "match-info-row";
@@ -1063,10 +1349,10 @@ function renderMatchInfoRows(rowsEl, { bestOf, pickedMaps, winners }) {
       rightTd.textContent = "";
     }
 
-    if (isAfterDecision) {
+    if (isAfterDecision || isLockedByOrder) {
       leftTd.classList.add("is-disabled");
       rightTd.classList.add("is-disabled");
-      mapTd.classList.add("is-eliminated");
+      if (isAfterDecision) mapTd.classList.add("is-eliminated");
     }
 
     tr.append(leftTd, mapTd, rightTd);

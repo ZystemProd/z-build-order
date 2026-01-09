@@ -1,6 +1,17 @@
 import DOMPurify from "dompurify";
-import { db } from "../../../app.js";
+import {
+  auth,
+  db,
+  getCurrentUserAvatarUrl,
+  getCurrentUsername,
+} from "../../../app.js";
 import { doc, getDoc } from "firebase/firestore";
+import {
+  loadTournamentRegistry,
+  loadTournamentStateRemote,
+} from "./sync/persistence.js";
+import { computePlacementsForBracket } from "./bracket/placements.js";
+import { playerKey } from "./playerKey.js";
 import {
   MAX_SECONDARY_PULSE_LINKS,
   DEFAULT_PLAYER_AVATAR,
@@ -13,6 +24,11 @@ import { updateTooltips } from "../tooltip.js";
 
 const countryFlagCache = new Map();
 const countryUidCache = new Map();
+let activePlayerDetailId = "";
+let activePlayerDetailUid = "";
+let activePlayerDetailKey = "";
+let getPlayersMapRef = null;
+let activeAvatarRefreshToken = 0;
 const COUNTRY_NAME_BY_CODE = new Map(
   (Array.isArray(countries) ? countries : []).map((entry) => [
     String(entry?.code || "").toUpperCase(),
@@ -271,6 +287,19 @@ const ISO3_TO_ISO2 = {
   "ZWE": "ZW",
 };
 
+const DEFAULT_PROFILE_AVATAR = "img/default-avatar.webp";
+
+const ACHIEVEMENT_SORT_RECENT = "recent";
+const ACHIEVEMENT_SORT_BEST = "best";
+const ACHIEVEMENT_BATCH_SIZE = 10;
+const achievementCache = new Map();
+const achievementPromiseCache = new Map();
+let achievementSortMode = ACHIEVEMENT_SORT_RECENT;
+let activeAchievementEntries = [];
+let activeAchievementSorted = [];
+let achievementRenderCount = 0;
+let activeAchievementRequestId = 0;
+
 function normalizeCountryName(name) {
   return String(name || "").toUpperCase().replace(/[^A-Z]/g, "");
 }
@@ -384,9 +413,322 @@ function formatMmrByRace(player) {
   list.innerHTML = DOMPurify.sanitize(rows.join(""));
 }
 
-function resolvePlayerAvatar(player) {
-  const userPhoto = document.getElementById("userPhoto")?.src;
-  return player?.avatarUrl || userPhoto || DEFAULT_PLAYER_AVATAR;
+function isPlaceholderAvatar(url = "") {
+  const normalized = String(url || "").trim();
+  if (!normalized) return true;
+  const cleaned = normalized.split("?")[0].split("#")[0];
+  const lower = cleaned.toLowerCase();
+  const filename = lower.slice(lower.lastIndexOf("/") + 1);
+  return (
+    lower === DEFAULT_PLAYER_AVATAR.toLowerCase() ||
+    lower === DEFAULT_PROFILE_AVATAR.toLowerCase() ||
+    filename === "marine_avatar_1.webp" ||
+    filename === "default-avatar.webp"
+  );
+}
+
+function isCurrentUserPlayer(player) {
+  const currentUid = auth?.currentUser?.uid || "";
+  if (currentUid && player?.uid && player.uid === currentUid) return true;
+  const currentName = (getCurrentUsername?.() || auth?.currentUser?.displayName || "")
+    .trim()
+    .toLowerCase();
+  if (!currentName) return false;
+  const candidates = getUsernameCandidates(player?.name || player?.pulseName || "");
+  return candidates.some((name) => name.toLowerCase() === currentName);
+}
+
+function normalizeBracketForPlacements(bracket) {
+  if (!bracket || typeof bracket !== "object") return bracket || null;
+  const toArr = (obj) =>
+    Array.isArray(obj)
+      ? obj
+      : obj && typeof obj === "object"
+      ? Object.keys(obj)
+          .sort((a, b) => Number(a) - Number(b))
+          .map((key) => obj[key])
+      : [];
+  const normalizeRounds = (rounds) =>
+    toArr(rounds)
+      .map((round) => toArr(round))
+      .filter((round) => round.length);
+  const clampRounds = (rounds, count) => {
+    if (!Number.isFinite(count)) return rounds;
+    return rounds.slice(0, Math.max(0, count));
+  };
+  const winners = clampRounds(
+    normalizeRounds(bracket.winners),
+    bracket.winnersRoundCount
+  );
+  const losers = clampRounds(
+    normalizeRounds(bracket.losers),
+    bracket.losersRoundCount
+  );
+  return {
+    ...bracket,
+    winners,
+    losers,
+    groups: toArr(bracket.groups),
+  };
+}
+
+function getAchievementIdentity(player) {
+  const uid = String(player?.uid || "").trim();
+  const name = player?.name || player?.pulseName || "";
+  const sc2Link = player?.sc2Link || "";
+  const key = name || sc2Link ? playerKey(name, sc2Link) : "";
+  return { uid, key };
+}
+
+function getAchievementCacheKey(identity) {
+  if (identity.uid) return `uid:${identity.uid}`;
+  if (identity.key) return `key:${identity.key}`;
+  return "";
+}
+
+function findMatchingPlayerId(players, identity) {
+  if (!Array.isArray(players)) return "";
+  if (identity.uid) {
+    const match = players.find(
+      (entry) => String(entry?.uid || "").trim() === identity.uid
+    );
+    if (match?.id) return match.id;
+  }
+  if (identity.key) {
+    const match = players.find((entry) => {
+      const key = playerKey(entry?.name || "", entry?.sc2Link || "");
+      return key && key === identity.key;
+    });
+    if (match?.id) return match.id;
+  }
+  return "";
+}
+
+function formatPlacementLabel(place) {
+  const value = Number(place);
+  if (!Number.isFinite(value) || value <= 0) return "TBD";
+  const mod100 = value % 100;
+  let suffix = "th";
+  if (mod100 < 11 || mod100 > 13) {
+    const mod10 = value % 10;
+    if (mod10 === 1) suffix = "st";
+    else if (mod10 === 2) suffix = "nd";
+    else if (mod10 === 3) suffix = "rd";
+  }
+  return `${value}${suffix}`;
+}
+
+function formatTournamentDate(startTime) {
+  if (!Number.isFinite(startTime) || startTime <= 0) return "";
+  const date = new Date(startTime);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString();
+}
+
+function sortAchievementEntries(entries, mode) {
+  const sorted = [...entries];
+  if (mode === ACHIEVEMENT_SORT_BEST) {
+    sorted.sort((a, b) => {
+      const aPlace = Number.isFinite(a.placement) ? a.placement : Infinity;
+      const bPlace = Number.isFinite(b.placement) ? b.placement : Infinity;
+      if (aPlace !== bPlace) return aPlace - bPlace;
+      const aTime = Number.isFinite(a.startTime) ? a.startTime : 0;
+      const bTime = Number.isFinite(b.startTime) ? b.startTime : 0;
+      return bTime - aTime;
+    });
+  } else {
+    sorted.sort((a, b) => {
+      const aTime = Number.isFinite(a.startTime) ? a.startTime : 0;
+      const bTime = Number.isFinite(b.startTime) ? b.startTime : 0;
+      if (aTime !== bTime) return bTime - aTime;
+      const aPlace = Number.isFinite(a.placement) ? a.placement : Infinity;
+      const bPlace = Number.isFinite(b.placement) ? b.placement : Infinity;
+      return aPlace - bPlace;
+    });
+  }
+  return sorted;
+}
+
+function getAchievementElements() {
+  return {
+    listEl: document.getElementById("playerDetailAchievements"),
+    emptyEl: document.getElementById("playerDetailAchievementsEmpty"),
+    sortBtn: document.getElementById("playerDetailAchievementSort"),
+  };
+}
+
+function updateAchievementSortButton(sortBtn) {
+  if (!sortBtn) return;
+  const isBest = achievementSortMode === ACHIEVEMENT_SORT_BEST;
+  sortBtn.textContent = isBest ? "Sort: Best" : "Sort: Recent";
+  sortBtn.dataset.sort = achievementSortMode;
+  sortBtn.setAttribute("aria-pressed", isBest ? "true" : "false");
+}
+
+function buildAchievementItem(entry) {
+  const li = document.createElement("li");
+  li.className = "achievement-item";
+
+  const meta = document.createElement("div");
+  meta.className = "achievement-meta";
+
+  const title = document.createElement("span");
+  title.className = "achievement-title";
+  title.textContent = entry.name;
+
+  const dateText = document.createElement("span");
+  dateText.className = "achievement-date";
+  if (entry.dateText) {
+    dateText.textContent = entry.dateText;
+  }
+
+  meta.append(title);
+  if (entry.dateText) meta.append(dateText);
+
+  const placement = document.createElement("span");
+  placement.className = "pill achievement-place";
+
+  const trophy = document.createElement("img");
+  trophy.className = "achievement-trophy";
+  trophy.src = "img/SVG/trophy.svg";
+  trophy.alt = "";
+  trophy.setAttribute("aria-hidden", "true");
+
+  placement.append(trophy, document.createTextNode(entry.placementLabel));
+
+  li.append(meta, placement);
+  return li;
+}
+
+function renderNextAchievementBatch() {
+  const { listEl, emptyEl } = getAchievementElements();
+  if (!listEl || !emptyEl) return;
+  if (!activeAchievementSorted.length) {
+    emptyEl.textContent = "No podium placements yet.";
+    emptyEl.style.display = "block";
+    return;
+  }
+  if (achievementRenderCount >= activeAchievementSorted.length) return;
+  emptyEl.textContent = "";
+  emptyEl.style.display = "none";
+  const start = achievementRenderCount;
+  const next = activeAchievementSorted.slice(
+    start,
+    start + ACHIEVEMENT_BATCH_SIZE
+  );
+  if (!next.length) return;
+  const fragment = document.createDocumentFragment();
+  next.forEach((entry) => {
+    fragment.append(buildAchievementItem(entry));
+  });
+  listEl.appendChild(fragment);
+  achievementRenderCount += next.length;
+  if (
+    listEl.clientHeight > 0 &&
+    listEl.scrollHeight <= listEl.clientHeight &&
+    achievementRenderCount < activeAchievementSorted.length
+  ) {
+    renderNextAchievementBatch();
+  }
+}
+
+function resetAchievementList() {
+  const { listEl, emptyEl } = getAchievementElements();
+  if (!listEl || !emptyEl) return;
+  listEl.replaceChildren();
+  listEl.scrollTop = 0;
+  activeAchievementSorted = sortAchievementEntries(
+    activeAchievementEntries,
+    achievementSortMode
+  );
+  achievementRenderCount = 0;
+  renderNextAchievementBatch();
+}
+
+async function loadPlayerAchievements(player) {
+  const identity = getAchievementIdentity(player);
+  const cacheKey = getAchievementCacheKey(identity);
+  if (!cacheKey) return [];
+  if (achievementCache.has(cacheKey)) {
+    return achievementCache.get(cacheKey);
+  }
+  if (achievementPromiseCache.has(cacheKey)) {
+    return achievementPromiseCache.get(cacheKey);
+  }
+  const promise = (async () => {
+    const registry = await loadTournamentRegistry();
+    if (!Array.isArray(registry) || !registry.length) return [];
+    const entries = await Promise.all(
+      registry.map(async (meta) => {
+        const slug = meta?.slug || meta?.id || "";
+        if (!slug) return null;
+        const snapshot = await loadTournamentStateRemote(slug);
+        if (!snapshot) return null;
+        const players = Array.isArray(snapshot.players) ? snapshot.players : [];
+        const playerId = findMatchingPlayerId(players, identity);
+        if (!playerId) return null;
+        const bracket = normalizeBracketForPlacements(snapshot.bracket);
+        const placements = computePlacementsForBracket(bracket, players.length || 0);
+        if (!placements) return null;
+        const placement = placements.get(playerId);
+        if (!Number.isFinite(placement)) return null;
+        const rawStartTime = Number(meta?.startTime || snapshot?.lastUpdated || 0);
+        const startTime =
+          Number.isFinite(rawStartTime) && rawStartTime > 0 ? rawStartTime : 0;
+        return {
+          slug,
+          name: meta?.name || slug,
+          placement,
+          placementLabel: formatPlacementLabel(placement),
+          startTime,
+          dateText: formatTournamentDate(startTime),
+        };
+      })
+    );
+    const filtered = entries
+      .filter(Boolean)
+      .filter((entry) => Number(entry?.placement) <= 3);
+    achievementCache.set(cacheKey, filtered);
+    return filtered;
+  })();
+  achievementPromiseCache.set(cacheKey, promise);
+  const results = await promise;
+  achievementPromiseCache.delete(cacheKey);
+  return results;
+}
+
+async function updateAchievementsForPlayer(player) {
+  const { listEl, emptyEl, sortBtn } = getAchievementElements();
+  if (!listEl || !emptyEl) return;
+  const requestId = ++activeAchievementRequestId;
+  activeAchievementEntries = [];
+  activeAchievementSorted = [];
+  achievementRenderCount = 0;
+  listEl.replaceChildren();
+  emptyEl.textContent = "Loading placements...";
+  emptyEl.style.display = "block";
+  if (sortBtn) {
+    sortBtn.disabled = true;
+    updateAchievementSortButton(sortBtn);
+  }
+  const entries = await loadPlayerAchievements(player);
+  if (requestId !== activeAchievementRequestId) return;
+  activeAchievementEntries = entries;
+  resetAchievementList();
+  if (sortBtn) {
+    sortBtn.disabled = entries.length < 2;
+    updateAchievementSortButton(sortBtn);
+  }
+}
+
+function resolvePlayerAvatar(player, { isCurrentUser = false } = {}) {
+  const candidate = player?.avatarUrl || "";
+  if (candidate && !isPlaceholderAvatar(candidate)) return candidate;
+  if (isCurrentUser) {
+    const userPhoto = document.getElementById("userPhoto")?.src;
+    if (userPhoto) return userPhoto;
+  }
+  return DEFAULT_PLAYER_AVATAR;
 }
 
 export function setupPlayerDetailModal() {
@@ -394,15 +736,40 @@ export function setupPlayerDetailModal() {
   const modal = document.getElementById("playerDetailModal");
   if (!modal) return;
   const closeBtn = document.getElementById("closePlayerDetailModal");
+  const { sortBtn, listEl } = getAchievementElements();
 
   const hide = () => {
     modal.style.display = "none";
+    activePlayerDetailId = "";
+    activePlayerDetailUid = "";
+    activePlayerDetailKey = "";
   };
   const show = () => {
     modal.style.display = "block";
   };
 
   closeBtn?.addEventListener("click", hide);
+  if (sortBtn && sortBtn.dataset.bound !== "true") {
+    sortBtn.dataset.bound = "true";
+    sortBtn.addEventListener("click", () => {
+      achievementSortMode =
+        achievementSortMode === ACHIEVEMENT_SORT_RECENT
+          ? ACHIEVEMENT_SORT_BEST
+          : ACHIEVEMENT_SORT_RECENT;
+      updateAchievementSortButton(sortBtn);
+      resetAchievementList();
+    });
+    updateAchievementSortButton(sortBtn);
+  }
+  if (listEl && listEl.dataset.bound !== "true") {
+    listEl.dataset.bound = "true";
+    listEl.addEventListener("scroll", () => {
+      const threshold = 40;
+      if (listEl.scrollTop + listEl.clientHeight >= listEl.scrollHeight - threshold) {
+        renderNextAchievementBatch();
+      }
+    });
+  }
   window.addEventListener("mousedown", (e) => {
     if (e.target === modal) hide();
   });
@@ -413,6 +780,9 @@ export function setupPlayerDetailModal() {
 }
 
 export function attachPlayerDetailHandlers({ getPlayersMap }) {
+  if (typeof getPlayersMap === "function") {
+    getPlayersMapRef = getPlayersMap;
+  }
   setupPlayerDetailModal();
   const bracketGrid = document.getElementById("bracketGrid");
   const playersTable = document.getElementById("playersTableBody");
@@ -420,6 +790,7 @@ export function attachPlayerDetailHandlers({ getPlayersMap }) {
 
   const handler = (e) => {
     const inRoundRobinGroupStage = Boolean(e.target.closest(".group-stage"));
+    if (e.target.closest(".forfeit-player")) return;
     if (inRoundRobinGroupStage) {
       const nameTarget = e.target.closest(".name-text");
       if (!nameTarget) return;
@@ -433,7 +804,11 @@ export function attachPlayerDetailHandlers({ getPlayersMap }) {
       return;
     }
 
-    if (
+    const isPlayersTable = Boolean(playersTable && playersTable.contains(e.target));
+    if (isPlayersTable) {
+      const nameTarget = e.target.closest(".player-name");
+      if (!nameTarget) return;
+    } else if (
       e.target.closest("select") ||
       e.target.closest(".remove-player") ||
       e.target.closest(".points-input") ||
@@ -457,7 +832,7 @@ export function attachPlayerDetailHandlers({ getPlayersMap }) {
   registeredPlayersList?.addEventListener("click", handler);
 }
 
-export function openPlayerDetailModal(player) {
+export async function openPlayerDetailModal(player) {
   const modal = document.getElementById("playerDetailModal");
   if (!modal) return;
   const avatar = document.getElementById("playerDetailAvatar");
@@ -470,13 +845,31 @@ export function openPlayerDetailModal(player) {
   const mainPulseEl = document.getElementById("playerDetailMainPulse");
   const secondaryEl = document.getElementById("playerDetailSecondary");
   const twitchEl = document.getElementById("playerDetailTwitch");
-  const achievementsEl = document.getElementById("playerDetailAchievements");
 
-  const avatarUrl = resolvePlayerAvatar(player);
-  if (avatar) avatar.src = avatarUrl;
+  activePlayerDetailId = String(player?.id || "");
+  activePlayerDetailUid = String(player?.uid || "");
+  activePlayerDetailKey = playerKey(
+    player?.name || player?.pulseName || "",
+    player?.sc2Link || ""
+  );
+
+  const isCurrentUser = isCurrentUserPlayer(player);
+  const currentAvatar = getCurrentUserAvatarUrl?.() || "";
+  const useCurrentAvatar =
+    isCurrentUser && currentAvatar && !isPlaceholderAvatar(currentAvatar);
+  const avatarUrl = resolvePlayerAvatar(player, { isCurrentUser });
+  if (avatar) {
+    if (useCurrentAvatar) {
+      avatar.src = currentAvatar;
+      player.avatarUrl = currentAvatar;
+    } else {
+      avatar.src = avatarUrl;
+    }
+  }
+  let shouldHydrateProfile = false;
   if (nameEl) {
     const abbr = player?.clanAbbreviation;
-    const displayName = player?.pulseName || player?.name;
+    const displayName = player?.name || player?.pulseName;
     const safeName = displayName || "Player";
     const composedName = abbr ? `[${abbr}] ${safeName}` : safeName;
     if (nameTextEl) {
@@ -490,10 +883,19 @@ export function openPlayerDetailModal(player) {
       flagEl.style.display = flag ? "inline-flex" : "none";
       setFlagTitle(flagEl, player?.country || "");
       updateTooltips();
-      if (!flag || !player?.avatarUrl) {
-        void hydratePlayerProfile(player, flagEl, avatar);
-      }
+      const needsAvatarHydration = isPlaceholderAvatar(player?.avatarUrl);
+      shouldHydrateProfile = !flag || needsAvatarHydration;
     }
+  }
+  if (shouldHydrateProfile && flagEl) {
+    await hydratePlayerProfile(player, flagEl, avatar);
+    const refreshedAvatar = resolvePlayerAvatar(player, { isCurrentUser });
+    if (avatar && refreshedAvatar && avatar.src !== refreshedAvatar) {
+      avatar.src = refreshedAvatar;
+    }
+  }
+  if (avatar && isPlaceholderAvatar(avatar.src)) {
+    scheduleAvatarRefresh(avatar, isCurrentUser);
   }
   if (clanEl) {
     const clan = player?.clan || "";
@@ -540,13 +942,82 @@ export function openPlayerDetailModal(player) {
     }
   }
 
-  if (achievementsEl) {
-    achievementsEl.textContent = "Coming soon: tournament wins and milestones.";
-  }
+  void updateAchievementsForPlayer(player);
 
   formatMmrByRace(player);
   modal.dataset.ready = "true";
   modal.showModal?.();
+}
+
+function findPlayerInMap(playersMap, identity) {
+  if (!playersMap || !identity) return null;
+  if (identity.id && playersMap.has(identity.id)) {
+    return playersMap.get(identity.id);
+  }
+  if (identity.uid) {
+    for (const entry of playersMap.values()) {
+      if (String(entry?.uid || "") === identity.uid) {
+        return entry;
+      }
+    }
+  }
+  if (identity.key) {
+    for (const entry of playersMap.values()) {
+      const key = playerKey(entry?.name || "", entry?.sc2Link || "");
+      if (key && key === identity.key) {
+        return entry;
+      }
+    }
+  }
+  return null;
+}
+
+function scheduleAvatarRefresh(avatarEl, isCurrentUser) {
+  if (!getPlayersMapRef || !avatarEl) return;
+  const token = ++activeAvatarRefreshToken;
+  const startedAt = Date.now();
+  const maxMs = 1500;
+  const tick = () => {
+    if (token !== activeAvatarRefreshToken) return;
+    const playersMap = getPlayersMapRef?.();
+    const player = findPlayerInMap(playersMap, {
+      id: activePlayerDetailId,
+      uid: activePlayerDetailUid,
+      key: activePlayerDetailKey,
+    });
+    const nextAvatar = resolvePlayerAvatar(player || {}, { isCurrentUser });
+    if (nextAvatar && !isPlaceholderAvatar(nextAvatar) && avatarEl.src !== nextAvatar) {
+      avatarEl.src = nextAvatar;
+      return;
+    }
+    if (Date.now() - startedAt < maxMs) {
+      setTimeout(tick, 150);
+    }
+  };
+  setTimeout(tick, 150);
+}
+
+export function refreshPlayerDetailModalIfOpen(getPlayersMap) {
+  const modal = document.getElementById("playerDetailModal");
+  if (!modal) return;
+  const isDialogOpen =
+    modal.open === true ||
+    modal.getAttribute("open") !== null ||
+    modal.style.display === "block";
+  if (!isDialogOpen) return;
+  if (!activePlayerDetailId && !activePlayerDetailUid && !activePlayerDetailKey) {
+    return;
+  }
+  const playersMap =
+    typeof getPlayersMap === "function" ? getPlayersMap() : new Map();
+  const player = findPlayerInMap(playersMap, {
+    id: activePlayerDetailId,
+    uid: activePlayerDetailUid,
+    key: activePlayerDetailKey,
+  });
+  if (player) {
+    openPlayerDetailModal(player);
+  }
 }
 
 async function hydratePlayerProfile(player, flagEl, avatarEl) {
@@ -561,11 +1032,11 @@ async function hydratePlayerProfile(player, flagEl, avatarEl) {
     } else {
       setFlagTitle(flagEl, "");
     }
-    if (avatarEl && player?.avatarUrl) {
+    if (avatarEl && player?.avatarUrl && !isPlaceholderAvatar(player.avatarUrl)) {
       avatarEl.src = player.avatarUrl;
+      updateTooltips();
+      return;
     }
-    updateTooltips();
-    return;
   }
   try {
     if (!uid) {
@@ -614,7 +1085,7 @@ async function hydratePlayerProfile(player, flagEl, avatarEl) {
     } else {
       setFlagTitle(flagEl, "");
     }
-    if (profileAvatar && !player?.avatarUrl) {
+    if (profileAvatar && isPlaceholderAvatar(player?.avatarUrl)) {
       player.avatarUrl = profileAvatar;
       if (avatarEl) avatarEl.src = profileAvatar;
     }

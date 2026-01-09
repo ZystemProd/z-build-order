@@ -14,7 +14,6 @@ import {
 import { renderChosenMaps as renderChosenMapsUI, updateMapButtons as updateMapButtonsUI } from "./maps/render.js";
 import { renderMapPoolPicker as renderMapPoolPickerUI } from "./maps/pool.js";
 import { attachPlayerDetailHandlers } from "./playerDetail.js";
-import { ensureTestHarnessPanel } from "./ui/testHarness.js";
 import { enableDragScroll } from "./ui/dragScroll.js";
 import { lockBodyScroll, unlockBodyScroll } from "./modalLock.js";
 import { initTournamentNotifications } from "./notifications.js";
@@ -28,12 +27,17 @@ export function initTournamentPage({
   handleCreateTournament,
   handleCreateCircuit,
   openCircuitTournamentModal,
+  openCircuitSettingsModal,
+  closeCircuitSettingsModal,
+  saveCircuitSettings,
+  openDeleteCircuitModal,
+  confirmDeleteCircuit,
+  closeDeleteCircuitModal,
   openDeleteTournamentModal,
   confirmDeleteTournament,
   closeDeleteTournamentModal,
   handleSaveSettings,
   rebuildBracket,
-  setSeedingNotice,
   autoFillPlayers,
   normalizeRaceLabel,
   mmrForRace,
@@ -57,6 +61,9 @@ export function initTournamentPage({
   setFinalMapPoolSelection,
   toggleFinalMapSelection,
   resetFinalMapPoolSelection,
+  setCircuitFinalMapPoolSelection,
+  toggleCircuitFinalMapSelection,
+  resetCircuitFinalMapPoolSelection,
   updateSettingsDescriptionPreview,
   updateSettingsRulesPreview,
   getPlayersMap,
@@ -67,6 +74,7 @@ export function initTournamentPage({
   currentMapPoolMode,
   updatePlayerPoints,
   setPlayerCheckIn,
+  setPlayerForfeit,
   removePlayer,
   setManualSeedingEnabled,
   getManualSeedingActive,
@@ -77,14 +85,15 @@ export function initTournamentPage({
   handleAddCircuitPointsRow,
   handleRemoveCircuitPointsRow,
   handleApplyCircuitPoints,
-  setTestBracketCount,
-  cycleTestBracketCount,
+  addBotPlayer,
+  removeBotPlayer,
+  removeAllBots,
   resetTournament,
   checkInCurrentPlayer,
   notifyCheckInPlayers,
-  goLiveTournament,
+  toggleLiveTournament,
+  syncPulseNow,
 }) {
-  ensureTestHarnessPanel();
   initTournamentNotifications();
   initTournamentSearch();
   initTournamentListSlider();
@@ -104,6 +113,7 @@ export function initTournamentPage({
   const signOutBtn = document.getElementById("signOutBtn");
   const switchAccountBtn = document.getElementById("switchAccountBtn");
   const settingsBtn = document.getElementById("settingsBtn");
+  const syncPulseBtn = document.getElementById("syncPulseBtn");
   const raceSelect = document.getElementById("raceSelect");
   const openRegisterBtn = document.getElementById("openRegisterBtn");
   const openCreateTournament = document.getElementById("openCreateTournament");
@@ -111,20 +121,31 @@ export function initTournamentPage({
   const closeCreateTournament = document.getElementById("closeCreateTournament");
   const saveTournamentBtn = document.getElementById("saveTournamentBtn");
   const openCreateCircuitTournament = document.getElementById("openCreateCircuitTournament");
+  const openCircuitSettingsBtn = document.getElementById("openCircuitSettingsBtn");
   const deleteTournamentBtn = document.getElementById("deleteTournamentBtn");
   const confirmDeleteTournamentBtn = document.getElementById("confirmDeleteTournamentBtn");
   const cancelDeleteTournamentBtn = document.getElementById("cancelDeleteTournamentBtn");
   const deleteTournamentModal = document.getElementById("confirmDeleteTournamentModal");
+  const resetTournamentModal = document.getElementById("confirmResetTournamentModal");
+  const confirmResetTournamentBtn = document.getElementById("confirmResetTournamentBtn");
+  const cancelResetTournamentBtn = document.getElementById("cancelResetTournamentBtn");
   const openCreateCircuit = document.getElementById("openCreateCircuit");
   const createCircuitModal = document.getElementById("createCircuitModal");
+  const circuitSettingsModal = document.getElementById("circuitSettingsModal");
+  const closeCircuitSettingsBtn = document.getElementById("closeCircuitSettingsModal");
+  const saveCircuitSettingsBtn = document.getElementById("saveCircuitSettingsBtn");
+  const deleteCircuitBtn = document.getElementById("deleteCircuitBtn");
+  const deleteCircuitModal = document.getElementById("confirmDeleteCircuitModal");
+  const confirmDeleteCircuitBtn = document.getElementById("confirmDeleteCircuitBtn");
+  const cancelDeleteCircuitBtn = document.getElementById("cancelDeleteCircuitBtn");
   const closeCreateCircuit = document.getElementById("closeCreateCircuit");
   const saveCircuitBtn = document.getElementById("saveCircuitBtn");
   const nextCreateCircuitStep = document.getElementById("nextCreateCircuitStep");
   const backCreateCircuitStep = document.getElementById("backCreateCircuitStep");
   const refreshTournaments = document.getElementById("refreshTournaments");
-  const testBracketStartBtn = document.getElementById("testBracketStart");
-  const testBracketPrevBtn = document.getElementById("testBracketPrev");
-  const testBracketNextBtn = document.getElementById("testBracketNext");
+  const addBotBtn = document.getElementById("addBotBtn");
+  const removeBotBtn = document.getElementById("removeBotBtn");
+  const removeBotsBtn = document.getElementById("removeBotsBtn");
   const descriptionInput = document.getElementById("tournamentDescriptionInput");
   const rulesInput = document.getElementById("tournamentRulesInput");
   const finalDescriptionInput = document.getElementById("finalTournamentDescriptionInput");
@@ -135,19 +156,34 @@ export function initTournamentPage({
   const finalMapPoolPicker = document.getElementById("finalMapPoolPicker");
   const finalUseLadderMapsBtn = document.getElementById("finalUseLadderMapsBtn");
   const finalClearMapPoolBtn = document.getElementById("finalClearMapPoolBtn");
+  const circuitFinalMapPoolPicker = document.getElementById("circuitFinalMapPoolPicker");
+  const circuitFinalUseLadderMapsBtn = document.getElementById("circuitFinalUseLadderMapsBtn");
+  const circuitFinalClearMapPoolBtn = document.getElementById("circuitFinalClearMapPoolBtn");
   const settingsTabBtns = document.querySelectorAll("[data-settings-tab]");
   const settingsPanels = document.querySelectorAll("#settingsTab .settings-panel");
   const createTabBtns = document.querySelectorAll("[data-create-tab]");
   const createPanels = document.querySelectorAll("#createTournamentModal .settings-panel");
   const createFinalTabBtns = document.querySelectorAll("[data-final-create-tab]");
   const createFinalPanels = document.querySelectorAll("#createFinalPanel .create-final-panel");
+  const circuitSettingsTabBtns = document.querySelectorAll("[data-circuit-settings-tab]");
+  const circuitSettingsPanels = document.querySelectorAll(".circuit-settings-panel");
+  const circuitFinalTabBtns = document.querySelectorAll("[data-final-settings-tab]");
+  const circuitFinalPanels = document.querySelectorAll("#circuitSettingsFinal .circuit-final-panel");
   const saveSettingsBtn = document.getElementById("saveSettingsBtn");
   const createImageInput = document.getElementById("tournamentImageInput");
   const createImagePreview = document.getElementById("tournamentImagePreview");
   const finalImageInput = document.getElementById("finalTournamentImageInput");
   const finalImagePreview = document.getElementById("finalTournamentImagePreview");
+  const circuitFinalImageInput = document.getElementById("circuitFinalImageInput");
+  const circuitFinalImagePreview = document.getElementById("circuitFinalImagePreview");
   const settingsImageInput = document.getElementById("settingsImageInput");
   const settingsImagePreview = document.getElementById("settingsImagePreview");
+  const settingsRequirePulseLink = document.getElementById("settingsRequirePulseLink");
+  const settingsRequirePulseSync = document.getElementById("settingsRequirePulseSync");
+  const tournamentMaxPlayersInput = document.getElementById("tournamentMaxPlayersInput");
+  const settingsMaxPlayersInput = document.getElementById("settingsMaxPlayersInput");
+  const finalMaxPlayersInput = document.getElementById("finalTournamentMaxPlayersInput");
+  const circuitFinalMaxPlayersInput = document.getElementById("circuitFinalMaxPlayersInput");
   const nameInput = document.getElementById("tournamentNameInput");
   const slugInput = document.getElementById("tournamentSlugInput");
   const circuitSlugInput = document.getElementById("circuitSlugInput");
@@ -162,6 +198,7 @@ export function initTournamentPage({
   const bestOfFinalInput = document.getElementById("bestOfFinalInput");
   const createFormatSelect = document.getElementById("tournamentFormatSelect");
   const finalFormatSelect = document.getElementById("finalFormatSelect");
+  const circuitFinalFormatSelect = document.getElementById("circuitFinalFormatSelect");
   const settingsBestOfUpper = document.getElementById("settingsBestOfUpper");
   const settingsBestOfLower = document.getElementById("settingsBestOfLower");
   const settingsBestOfQuarter = document.getElementById("settingsBestOfQuarter");
@@ -181,6 +218,8 @@ export function initTournamentPage({
       "tournamentRulesInput",
       "finalTournamentDescriptionInput",
       "finalTournamentRulesInput",
+      "circuitFinalDescriptionInput",
+      "circuitFinalRulesInput",
     ].forEach((id) => {
       const input = document.getElementById(id);
       if (input) syncQuillById(id, input.value || "");
@@ -217,8 +256,54 @@ export function initTournamentPage({
       textareaId: "finalTournamentRulesInput",
       placeholder: "Add eligibility, format, communication, and fair play rules...",
     },
+    {
+      editorId: "circuitFinalDescriptionEditor",
+      textareaId: "circuitFinalDescriptionInput",
+      placeholder: "Write rules, schedule, map pool...",
+    },
+    {
+      editorId: "circuitFinalRulesEditor",
+      textareaId: "circuitFinalRulesInput",
+      placeholder: "Add eligibility, format, communication, and fair play rules...",
+    },
   ];
   initQuillEditors(quillConfigs);
+
+  const isDualTournamentFormat = (value) => {
+    const normalized = (value || "").toLowerCase();
+    return normalized.includes("gsl") || normalized.includes("dual tournament");
+  };
+
+  const snapToMultiple = (value, step) => {
+    if (!Number.isFinite(value) || !step) return value;
+    return Math.round(value / step) * step;
+  };
+
+  const syncMaxPlayersInput = (formatSelect, input) => {
+    if (!formatSelect || !input) return;
+    if (!input.dataset.defaultStep) {
+      input.dataset.defaultStep = input.step || "1";
+      input.dataset.defaultMin = input.min || "2";
+    }
+    const isDual = isDualTournamentFormat(formatSelect.value);
+    if (isDual) {
+      input.step = "4";
+      input.min = "4";
+    } else {
+      input.step = input.dataset.defaultStep;
+      input.min = input.dataset.defaultMin;
+    }
+
+    const maxCap = Number(input.max || 0) || 32;
+    const minCap = Number(input.min || 0) || 2;
+    const current = Number(input.value || input.placeholder || "");
+    if (!Number.isFinite(current)) return;
+    const next = isDual ? snapToMultiple(current, 4) : current;
+    const clamped = Math.min(maxCap, Math.max(minCap, next));
+    if (Number.isFinite(clamped)) {
+      input.value = String(clamped);
+    }
+  };
   syncQuillFromInputs();
 
   const preventLabelFocus = (root) => {
@@ -338,7 +423,11 @@ export function initTournamentPage({
 
   const resolvePlayoffsFormat = (rootEl, formatValue) => {
     const raw = (formatValue || "").toLowerCase();
-    if (!raw.startsWith("round robin")) {
+    const isGroupStage =
+      raw.startsWith("round robin") ||
+      raw.includes("gsl") ||
+      raw.includes("dual tournament");
+    if (!isGroupStage) {
       return formatValue || "";
     }
     const playoffsSelect = getPlayoffsSelectForRoot(rootEl);
@@ -349,6 +438,10 @@ export function initTournamentPage({
     if (!root) return;
     const formatValue = formatSelect?.value || "";
     const format = formatValue.toLowerCase();
+    const isGroupStageFormat =
+      format.startsWith("round robin") ||
+      format.includes("gsl") ||
+      format.includes("dual tournament");
     const playoffsValue = resolvePlayoffsFormat(root, formatValue);
     const playoffsLower = (playoffsValue || "").toLowerCase();
     const isDoubleElim =
@@ -406,7 +499,7 @@ export function initTournamentPage({
     if (lowerRow) {
       lowerRow.style.display = isSingleElim ? "none" : "";
     }
-    if (format.startsWith("round robin")) {
+    if (isGroupStageFormat) {
       root.style.display = playoffsLower === "none" ? "none" : "";
     } else {
       root.style.display = "";
@@ -450,9 +543,9 @@ export function initTournamentPage({
   registrationForm?.addEventListener("submit", handleRegistration);
 
   initDatePickers();
-  rebuildBtn?.addEventListener("click", () => goLiveTournament?.());
+  rebuildBtn?.addEventListener("click", () => toggleLiveTournament?.());
   resetBtn?.addEventListener("click", () => {
-    resetTournament?.();
+    setModalVisible(resetTournamentModal, true);
   });
   autoFillBtn?.addEventListener("click", autoFillPlayers);
   checkInBtn?.addEventListener("click", () => checkInCurrentPlayer?.());
@@ -473,10 +566,24 @@ export function initTournamentPage({
       if (modal) modal.style.display = "block";
     }
   });
+  syncPulseBtn?.addEventListener("click", async () => {
+    if (syncPulseBtn.classList.contains("is-loading")) return;
+    if (typeof syncPulseNow !== "function") return;
+    syncPulseBtn.classList.add("is-loading");
+    syncPulseBtn.disabled = true;
+    syncPulseBtn.setAttribute("aria-busy", "true");
+    try {
+      await syncPulseNow();
+    } finally {
+      syncPulseBtn.classList.remove("is-loading");
+      syncPulseBtn.disabled = false;
+      syncPulseBtn.removeAttribute("aria-busy");
+    }
+  });
   raceSelect?.addEventListener("change", () => {
     const statusEl = document.getElementById("mmrStatus");
     const normalizedRace = normalizeRaceLabel(raceSelect.value);
-    updateMmrDisplay(statusEl, normalizedRace ? mmrForRace(normalizedRace) : null);
+    updateMmrDisplay(statusEl, normalizedRace || null);
   });
   openRegisterBtn?.addEventListener("click", () => {
     switchTab("registrationTab");
@@ -537,6 +644,18 @@ export function initTournamentPage({
   openCreateCircuitTournament?.addEventListener("click", () => {
     openCircuitTournamentModal?.();
   });
+  openCircuitSettingsBtn?.addEventListener("click", () => {
+    openCircuitSettingsModal?.();
+  });
+  closeCircuitSettingsBtn?.addEventListener("click", () => {
+    closeCircuitSettingsModal?.();
+  });
+  saveCircuitSettingsBtn?.addEventListener("click", () => {
+    saveCircuitSettings?.();
+  });
+  deleteCircuitBtn?.addEventListener("click", () => {
+    openDeleteCircuitModal?.();
+  });
   deleteTournamentBtn?.addEventListener("click", () => {
     openDeleteTournamentModal?.();
   });
@@ -546,6 +665,19 @@ export function initTournamentPage({
   cancelDeleteTournamentBtn?.addEventListener("click", () => {
     closeDeleteTournamentModal?.();
   });
+  confirmDeleteCircuitBtn?.addEventListener("click", () => {
+    confirmDeleteCircuit?.();
+  });
+  cancelDeleteCircuitBtn?.addEventListener("click", () => {
+    closeDeleteCircuitModal?.();
+  });
+  confirmResetTournamentBtn?.addEventListener("click", () => {
+    resetTournament?.();
+    setModalVisible(resetTournamentModal, false);
+  });
+  cancelResetTournamentBtn?.addEventListener("click", () => {
+    setModalVisible(resetTournamentModal, false);
+  });
   window.addEventListener("mousedown", (e) => {
     if (
       deleteTournamentModal &&
@@ -553,6 +685,33 @@ export function initTournamentPage({
       e.target === deleteTournamentModal
     ) {
       closeDeleteTournamentModal?.();
+    }
+  });
+  window.addEventListener("mousedown", (e) => {
+    if (
+      deleteCircuitModal &&
+      deleteCircuitModal.style.display === "flex" &&
+      e.target === deleteCircuitModal
+    ) {
+      closeDeleteCircuitModal?.();
+    }
+  });
+  window.addEventListener("mousedown", (e) => {
+    if (
+      resetTournamentModal &&
+      resetTournamentModal.style.display === "flex" &&
+      e.target === resetTournamentModal
+    ) {
+      setModalVisible(resetTournamentModal, false);
+    }
+  });
+  window.addEventListener("mousedown", (e) => {
+    if (
+      circuitSettingsModal &&
+      circuitSettingsModal.style.display === "flex" &&
+      e.target === circuitSettingsModal
+    ) {
+      closeCircuitSettingsModal?.();
     }
   });
   const setCreateCircuitStep = (step) => {
@@ -624,6 +783,30 @@ export function initTournamentPage({
       );
     });
   });
+  const switchCircuitSettingsTab = (targetId) => {
+    if (!targetId) return;
+    circuitSettingsTabBtns.forEach((b) =>
+      b.classList.toggle("active", b.dataset.circuitSettingsTab === targetId)
+    );
+    circuitSettingsPanels.forEach((panel) =>
+      panel.classList.toggle("active", panel.id === targetId)
+    );
+  };
+  circuitSettingsTabBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      switchCircuitSettingsTab(btn.dataset.circuitSettingsTab);
+    });
+  });
+  circuitFinalTabBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const target = btn.dataset.finalSettingsTab;
+      if (!target) return;
+      circuitFinalTabBtns.forEach((b) => b.classList.toggle("active", b === btn));
+      circuitFinalPanels.forEach((panel) =>
+        panel.classList.toggle("active", panel.id === target)
+      );
+    });
+  });
   const switchSettingsTab = (targetId) => {
     if (!targetId) return;
     settingsTabBtns.forEach((b) => b.classList.toggle("active", b.dataset.settingsTab === targetId));
@@ -641,6 +824,7 @@ export function initTournamentPage({
   bindImagePreview(createImageInput, createImagePreview);
   bindImagePreview(finalImageInput, finalImagePreview);
   bindImagePreview(settingsImageInput, settingsImagePreview);
+  bindImagePreview(circuitFinalImageInput, circuitFinalImagePreview);
 
   bindMapSelectionEvents({
     setMapPoolSelection,
@@ -656,6 +840,17 @@ export function initTournamentPage({
     if (!card) return;
     toggleFinalMapSelection?.(card.dataset.mapName);
   });
+  circuitFinalUseLadderMapsBtn?.addEventListener("click", () =>
+    setCircuitFinalMapPoolSelection?.(getDefaultMapPoolNames())
+  );
+  circuitFinalClearMapPoolBtn?.addEventListener("click", () =>
+    setCircuitFinalMapPoolSelection?.([])
+  );
+  circuitFinalMapPoolPicker?.addEventListener("click", (e) => {
+    const card = e.target.closest(".tournament-map-card");
+    if (!card) return;
+    toggleCircuitFinalMapSelection?.(card.dataset.mapName);
+  });
   bindSettingsEvents({
     setMapPoolSelection,
     getDefaultMapPoolNames,
@@ -668,6 +863,16 @@ export function initTournamentPage({
     handleRemoveCircuitPointsRow,
     handleApplyCircuitPoints,
   });
+  const updateMmrStatusPreview = () => {
+    const statusEl = document.getElementById("mmrStatus");
+    if (!statusEl) return;
+    updateMmrDisplay(statusEl, null, {
+      requirePulseLinkEnabled: settingsRequirePulseLink?.checked,
+      requirePulseSyncEnabled: settingsRequirePulseSync?.checked,
+    });
+  };
+  settingsRequirePulseLink?.addEventListener("change", updateMmrStatusPreview);
+  settingsRequirePulseSync?.addEventListener("change", updateMmrStatusPreview);
 
   [
     bestOfUpperInput,
@@ -684,9 +889,26 @@ export function initTournamentPage({
     settingsBestOfFinal,
   ].forEach((el) => el?.addEventListener("input", () => {}));
 
-  createFormatSelect?.addEventListener("change", () => syncFormatFieldVisibility("create"));
-  settingsFormatSelect?.addEventListener("change", () => syncFormatFieldVisibility("settings"));
-  finalFormatSelect?.addEventListener("change", () => syncFormatFieldVisibility("final"));
+  createFormatSelect?.addEventListener("change", () => {
+    syncFormatFieldVisibility("create");
+    syncMaxPlayersInput(createFormatSelect, tournamentMaxPlayersInput);
+  });
+  settingsFormatSelect?.addEventListener("change", () => {
+    syncFormatFieldVisibility("settings");
+    syncMaxPlayersInput(settingsFormatSelect, settingsMaxPlayersInput);
+  });
+  finalFormatSelect?.addEventListener("change", () => {
+    syncFormatFieldVisibility("final");
+    syncMaxPlayersInput(finalFormatSelect, finalMaxPlayersInput);
+  });
+  circuitFinalFormatSelect?.addEventListener("change", () => {
+    syncFormatFieldVisibility("circuitfinal");
+    syncMaxPlayersInput(circuitFinalFormatSelect, circuitFinalMaxPlayersInput);
+  });
+  syncMaxPlayersInput(createFormatSelect, tournamentMaxPlayersInput);
+  syncMaxPlayersInput(settingsFormatSelect, settingsMaxPlayersInput);
+  syncMaxPlayersInput(finalFormatSelect, finalMaxPlayersInput);
+  syncMaxPlayersInput(circuitFinalFormatSelect, circuitFinalMaxPlayersInput);
   closeVetoModal?.addEventListener("click", () => hideVetoModal());
   saveVetoBtn?.addEventListener("click", () => saveVetoSelection());
 
@@ -744,7 +966,7 @@ export function initTournamentPage({
 
   enableDragScroll(bracketGrid, {
     ignoreSelector:
-      'a, button, input, select, textarea, label, summary, details, [contenteditable="true"], [data-no-drag], .name-text:not(.is-placeholder), .hover-info-container, .score-select, .row-actions',
+      'a, button, input, select, textarea, label, summary, details, [contenteditable="true"], [data-no-drag], .group-stage-scroll, .playoff-scroll, .name-text:not(.is-placeholder), .hover-info-container, .score-select, .row-actions',
   });
 
   if (bracketGrid) {
@@ -795,6 +1017,11 @@ export function initTournamentPage({
     if (e.target.matches(".remove-player")) {
       const id = e.target.dataset.playerId;
       removePlayer?.(id);
+    }
+    if (e.target.matches(".forfeit-player")) {
+      const id = e.target.dataset.playerId;
+      const next = e.target.dataset.forfeit === "true";
+      setPlayerForfeit?.(id, next);
     }
   });
   playersTable?.addEventListener("change", (e) => {
@@ -1080,19 +1307,9 @@ export function initTournamentPage({
     playoffsSelect?.addEventListener("change", () => updateFormatDiagramTitles(entry));
   });
 
-  // Wire test harness buttons if callbacks provided
-  document
-    .getElementById("testBracketStart")
-    ?.addEventListener("click", () => setTestBracketCount?.(16));
-  document
-    .getElementById("testBracketStart32")
-    ?.addEventListener("click", () => setTestBracketCount?.(32));
-  document
-    .getElementById("testBracketPrev")
-    ?.addEventListener("click", () => cycleTestBracketCount?.(-1));
-  document
-    .getElementById("testBracketNext")
-    ?.addEventListener("click", () => cycleTestBracketCount?.(1));
+  addBotBtn?.addEventListener("click", () => addBotPlayer?.());
+  removeBotBtn?.addEventListener("click", () => removeBotPlayer?.());
+  removeBotsBtn?.addEventListener("click", () => removeAllBots?.());
 
   syncFormatFieldVisibility("create");
   syncFormatFieldVisibility("settings");

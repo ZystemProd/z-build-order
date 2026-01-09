@@ -24,6 +24,9 @@ export function applySeeding(players) {
 
 export function buildBracket(players, tournamentMeta = {}, isRoundRobinFormat) {
   const format = tournamentMeta?.format || "Double Elimination";
+  if (isDualTournamentFormat(format)) {
+    return buildDualTournamentBracket(players, tournamentMeta);
+  }
   if (isRoundRobinFormat?.(format)) {
     const rr = normalizeRoundRobinSettings(
       tournamentMeta.roundRobin || defaultRoundRobinSettings
@@ -32,6 +35,117 @@ export function buildBracket(players, tournamentMeta = {}, isRoundRobinFormat) {
   }
   const includeLosers = !format.toLowerCase().startsWith("single");
   return buildEliminationBracket(players, { includeLosers });
+}
+
+export function isDualTournamentFormat(format = "") {
+  const normalized = format.toLowerCase();
+  return normalized.includes("gsl") || normalized.includes("dual tournament");
+}
+
+export function buildDualTournamentBracket(players, tournamentMeta = {}) {
+  const settings = normalizeRoundRobinSettings(
+    tournamentMeta.roundRobin || defaultRoundRobinSettings
+  );
+  const bestOfGroup = settings.bestOf ?? defaultRoundRobinSettings.bestOf ?? 1;
+  const totalPlayers = players.length;
+  const groupCount = Math.max(1, Math.ceil(totalPlayers / 4));
+  const playersById = new Map(players.map((p) => [p.id, p]));
+  const groups = createRoundRobinGroups(players, groupCount).map(
+    (group, idx) => {
+      const labelChar = String.fromCharCode(65 + (idx % 26));
+      const name =
+        groupCount > 26 ? `Group ${idx + 1}` : `Group ${labelChar}`;
+      const matches = createDualTournamentMatches(
+        { ...group, id: `G${idx + 1}`, name },
+        playersById,
+        bestOfGroup
+      );
+      return {
+        id: `G${idx + 1}`,
+        name,
+        playerIds: group.playerIds,
+        matches,
+      };
+    }
+  );
+
+  return {
+    groups,
+    roundRobin: {
+      ...settings,
+      groups: groupCount,
+      advancePerGroup: 2,
+      playoffs: settings.playoffs,
+    },
+    playoffs: { mode: settings.playoffs },
+    winners: [],
+    losers: [],
+    finals: null,
+    seedOrder: players.map((p) => p.id),
+  };
+}
+
+function createDualTournamentMatches(group, playersById, bestOf) {
+  const ids = group.playerIds || [];
+  const seedA = playersById.get(ids[0]) || null;
+  const seedB = playersById.get(ids[1]) || null;
+  const seedC = playersById.get(ids[2]) || null;
+  const seedD = playersById.get(ids[3]) || null;
+
+  const match1 = createMatch(
+    "group",
+    1,
+    1,
+    playerSource(seedA),
+    playerSource(seedD),
+    bestOf
+  );
+  const match2 = createMatch(
+    "group",
+    1,
+    2,
+    playerSource(seedB),
+    playerSource(seedC),
+    bestOf
+  );
+  match1.id = `${group.id}-M1`;
+  match1.groupId = group.id;
+  match2.id = `${group.id}-M2`;
+  match2.groupId = group.id;
+
+  const match3 = createMatch(
+    "group",
+    1,
+    3,
+    winnerSource(match1),
+    winnerSource(match2),
+    bestOf
+  );
+  const match4 = createMatch(
+    "group",
+    1,
+    4,
+    loserSource(match1),
+    loserSource(match2),
+    bestOf
+  );
+  match3.id = `${group.id}-M3`;
+  match3.groupId = group.id;
+  match4.id = `${group.id}-M4`;
+  match4.groupId = group.id;
+
+  const match5 = createMatch(
+    "group",
+    1,
+    5,
+    loserSource(match3),
+    winnerSource(match4),
+    bestOf
+  );
+  match5.id = `${group.id}-M5`;
+  match5.groupId = group.id;
+
+  return [match1, match2, match3, match4, match5];
 }
 
 export function buildEliminationBracket(players, { includeLosers = true } = {}) {
@@ -209,15 +323,20 @@ export function buildEliminationBracket(players, { includeLosers = true } = {}) 
     roundNumber++;
   }
 
-  const losers = buildLosersBracket(winners, baseSize, total, numPlayIns);
+  const losers = includeLosers
+    ? buildLosersBracket(winners, baseSize, total, numPlayIns)
+    : [];
 
-  const finals = createMatch(
-    "finals",
-    1,
-    1,
-    winnerSource(winners[winners.length - 1][0]),
-    losers.length ? winnerSource(losers[losers.length - 1][0]) : null
-  );
+  const finals =
+    includeLosers && losers.length
+      ? createMatch(
+          "finals",
+          1,
+          1,
+          winnerSource(winners[winners.length - 1][0]),
+          winnerSource(losers[losers.length - 1][0])
+        )
+      : null;
 
   return { winners, losers, finals, seedOrder };
 }

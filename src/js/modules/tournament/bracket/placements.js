@@ -67,8 +67,12 @@ export function computeEliminationPlacements({ bracket, totalPlayers, format } =
     return { error: "Bracket or players are missing." };
   }
   const normalized = (format || "").toLowerCase();
-  if (normalized.includes("round robin")) {
-    return { error: "Round robin placements are not supported yet." };
+  if (
+    normalized.includes("round robin") ||
+    normalized.includes("gsl") ||
+    normalized.includes("dual tournament")
+  ) {
+    return { error: "Group-stage placements are not supported yet." };
   }
   const placements = computePlacementsForBracket(bracket, totalPlayers);
   if (!placements) {

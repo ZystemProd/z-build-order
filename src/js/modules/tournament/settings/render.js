@@ -2,6 +2,19 @@ import DOMPurify from "dompurify";
 import { defaultBestOf } from "../state.js";
 import { normalizeRoundRobinSettings } from "../bracket/build.js";
 import { syncMarkdownSurfaceForInput } from "../markdownEditor.js";
+import { formatLocalDateTimeInput } from "../dateTime.js";
+
+function normalizeBooleanSetting(value, fallback = true) {
+  if (value === undefined || value === null) return fallback;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["false", "0", "no", "off"].includes(normalized)) return false;
+    if (["true", "1", "yes", "on"].includes(normalized)) return true;
+  }
+  return Boolean(value);
+}
 
 export function applyBestOfToSettings(bestOf) {
   const upperInput = document.getElementById("settingsBestOfUpper");
@@ -49,6 +62,7 @@ export function populateSettingsPanel({
   const startInput = document.getElementById("settingsStartInput");
   const checkInSelect = document.getElementById("settingsCheckInSelect");
   const accessSelect = document.getElementById("settingsAccessSelect");
+  const visibilitySelect = document.getElementById("settingsVisibilitySelect");
   const imageInput = document.getElementById("settingsImageInput");
   const imagePreview = document.getElementById("settingsImagePreview");
   const rrBestOf = document.getElementById("settingsRoundRobinBestOf");
@@ -69,12 +83,11 @@ export function populateSettingsPanel({
   const rrPlayoffs = document.getElementById("settingsRoundRobinPlayoffs");
   const qualifyRow = document.getElementById("settingsCircuitQualifyRow");
   const qualifyInput = document.getElementById("settingsCircuitQualifyCount");
+  const requirePulseSyncInput = document.getElementById("settingsRequirePulseSync");
   if (nameInput) nameInput.value = tournament.name || "";
   if (slugInput) slugInput.value = tournament.slug || "";
   if (descInput) descInput.value = tournament.description || "";
   if (rulesInput) rulesInput.value = tournament.rules || "";
-  syncMarkdownSurfaceForInput(descInput);
-  syncMarkdownSurfaceForInput(rulesInput);
   syncMarkdownSurfaceForInput(descInput);
   syncMarkdownSurfaceForInput(rulesInput);
   if (formatSelect)
@@ -83,11 +96,11 @@ export function populateSettingsPanel({
   if (maxInput) maxInput.value = tournament.maxPlayers || "";
   if (startInput) {
     startInput.value = tournament.startTime
-      ? new Date(tournament.startTime).toISOString().slice(0, 16)
+      ? formatLocalDateTimeInput(tournament.startTime)
       : "";
     if (startInput._flatpickr) {
       if (startInput.value) {
-        startInput._flatpickr.setDate(startInput.value, false);
+        startInput._flatpickr.setDate(new Date(tournament.startTime), false);
       } else {
         startInput._flatpickr.clear();
       }
@@ -100,6 +113,12 @@ export function populateSettingsPanel({
   }
   if (accessSelect) {
     accessSelect.value = tournament.isInviteOnly ? "closed" : "open";
+  }
+  if (visibilitySelect) {
+    visibilitySelect.value =
+      String(tournament.visibility || "").toLowerCase() === "private"
+        ? "private"
+        : "public";
   }
   if (imageInput) imageInput.value = "";
   if (imagePreview) {
@@ -117,7 +136,15 @@ export function populateSettingsPanel({
   }
   const requirePulseInput = document.getElementById("settingsRequirePulseLink");
   if (requirePulseInput)
-    requirePulseInput.checked = tournament.requirePulseLink ?? true;
+    requirePulseInput.checked = normalizeBooleanSetting(
+      tournament.requirePulseLink,
+      true
+    );
+  if (requirePulseSyncInput)
+    requirePulseSyncInput.checked = normalizeBooleanSetting(
+      tournament.requirePulseSync,
+      true
+    );
   setMapPoolSelection(
     tournament.mapPool?.length ? tournament.mapPool : getDefaultMapPoolNames()
   );
@@ -154,4 +181,5 @@ export function populateSettingsPanel({
     ...(tournament.bestOf || {}),
   });
   syncFormatFieldVisibility("settings");
+  formatSelect?.dispatchEvent(new Event("change"));
 }

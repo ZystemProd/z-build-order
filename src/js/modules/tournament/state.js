@@ -3,6 +3,7 @@ export const BROADCAST_NAME = "zboTournamentLive";
 export const TOURNAMENT_REGISTRY_KEY = "zboTournamentRegistryV1";
 export const TOURNAMENT_COLLECTION = "tournaments";
 export const TOURNAMENT_STATE_COLLECTION = "tournamentStates";
+export const TOURNAMENT_INVITE_LINK_COLLECTION = "tournamentInviteLinks";
 export const CIRCUIT_REGISTRY_KEY = "zboCircuitRegistryV1";
 export const CIRCUIT_COLLECTION = "tournamentCircuits";
 export const MAPS_JSON_URL = "/data/maps.json";
@@ -30,10 +31,12 @@ export const defaultState = {
   lastUpdated: Date.now(),
   bracketLayoutVersion: 1,
   matchVetoes: {},
+  scoreReports: {},
   casters: [],
   casterRequests: [],
   matchCasts: {},
   isLive: false,
+  hasBeenLive: false,
   disableFinalAutoAdd: false,
 };
 
@@ -46,6 +49,7 @@ export let isAdmin = false;
 export let registryCache = null;
 export let currentTournamentMeta = null;
 export let requirePulseLinkSetting = true;
+export let requirePulseSyncSetting = true;
 export let mapPoolSelection = new Set(FALLBACK_LADDER_MAPS.map((m) => m.name));
 export let mapCatalog = [];
 export let mapCatalogLoaded = false;
@@ -63,12 +67,12 @@ export const defaultBestOf = {
   upper: 3,
   quarter: 3,
   semi: 3,
-  upperFinal: 5,
+  upperFinal: 3,
   final: 5,
   // lower bracket
   lower: 1,
-  lowerSemi: 3,
-  lowerFinal: 5,
+  lowerSemi: 1,
+  lowerFinal: 3,
 };
 export const defaultRoundRobinSettings = {
   groups: 4,
@@ -78,10 +82,6 @@ export const defaultRoundRobinSettings = {
 };
 export let currentVetoMatchId = null;
 export let vetoState = null;
-export const bracketTestHarness = {
-  active: false,
-  count: 16,
-};
 export const broadcast =
   typeof BroadcastChannel !== "undefined"
     ? new BroadcastChannel(BROADCAST_NAME)
@@ -114,6 +114,9 @@ export function setCurrentTournamentMetaState(next) {
 }
 export function setRequirePulseLinkSettingState(next) {
   requirePulseLinkSetting = next;
+}
+export function setRequirePulseSyncSettingState(next) {
+  requirePulseSyncSetting = next;
 }
 export function setMapPoolSelectionState(next) {
   mapPoolSelection = next;

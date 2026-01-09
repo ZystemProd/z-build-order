@@ -24,6 +24,80 @@ const CAST_ICON_SVG = `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="fa
 </svg>`;
 
 let currentUsernameHint = "";
+const nameRevealQueue = new Set();
+const lastRenderedParticipantIds = new Map();
+const recentNameReveals = new Map();
+const REVEAL_WINDOW_MS = 1200;
+
+function nameRevealKey(matchId, participantIdx) {
+  return `${matchId || "match"}:${participantIdx ?? "0"}`;
+}
+
+export function queuePlayerNameReveal(matchId, participantIdx) {
+  if (!matchId && participantIdx == null) return;
+  nameRevealQueue.add(nameRevealKey(matchId, participantIdx));
+}
+
+function consumeNameReveal(matchId, participantIdx) {
+  const key = nameRevealKey(matchId, participantIdx);
+  if (!nameRevealQueue.has(key)) return false;
+  nameRevealQueue.delete(key);
+  recentNameReveals.set(key, performance.now());
+  return true;
+}
+
+function shouldRevealParticipant(matchId, participantIdx, playerId) {
+  const key = nameRevealKey(matchId, participantIdx);
+  const now = performance.now();
+  const lastReveal = recentNameReveals.get(key);
+  if (playerId && lastReveal && now - lastReveal < REVEAL_WINDOW_MS) {
+    return false;
+  }
+  const hasPrev = lastRenderedParticipantIds.has(key);
+  const prevId = lastRenderedParticipantIds.get(key) || null;
+  lastRenderedParticipantIds.set(key, playerId || null);
+  if (!hasPrev) {
+    if (!playerId) recentNameReveals.delete(key);
+    return false;
+  }
+  if (playerId && playerId !== prevId) {
+    recentNameReveals.set(key, now);
+    return true;
+  }
+  if (!playerId) recentNameReveals.delete(key);
+  if (recentNameReveals.size > 200) {
+    for (const [k, t] of recentNameReveals) {
+      if (now - t > REVEAL_WINDOW_MS) recentNameReveals.delete(k);
+    }
+  }
+  return false;
+}
+
+function applyNameRevealAnimations(root) {
+  const targets = [
+    ...root.querySelectorAll(".player-name.name-reveal strong"),
+    ...root.querySelectorAll(".name-text.name-reveal"),
+  ];
+  targets.forEach((target) => {
+    if (target.dataset.twDone === "1") return;
+    const text = target.textContent || "";
+    const length = Math.max(text.length, 1);
+    const delayMs = Math.min(70, Math.max(40, Math.round(900 / length)));
+    target.style.setProperty("--tw-char-delay", `${delayMs}ms`);
+    target.style.setProperty("--tw-char-duration", "480ms");
+    target.textContent = "";
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < text.length; i += 1) {
+      const span = document.createElement("span");
+      span.className = "tw-char";
+      span.style.setProperty("--tw-index", i);
+      span.textContent = text[i];
+      frag.appendChild(span);
+    }
+    target.appendChild(frag);
+    target.dataset.twDone = "1";
+  });
+}
 
 function setCurrentUsernameHint(username) {
   currentUsernameHint = (username || "").trim().toLowerCase();
@@ -36,11 +110,20 @@ function isCurrentUserPlayer(player) {
   return Boolean(currentUsernameHint && (name === currentUsernameHint || pulseName === currentUsernameHint));
 }
 
-function displayValueFor(match, idx) {
-  if (match.walkover === "a") {
+function getWalkoverSide(match, participants) {
+  if (match.walkover) return match.walkover;
+  const [pA, pB] = participants || [];
+  if (pA?.forfeit && !pB) return "a";
+  if (pB?.forfeit && !pA) return "b";
+  return null;
+}
+
+function displayValueFor(match, idx, participants) {
+  const walkover = getWalkoverSide(match, participants);
+  if (walkover === "a") {
     return idx === 0 ? "w/o" : match.scores?.[1] ?? 0;
   }
-  if (match.walkover === "b") {
+  if (walkover === "b") {
     return idx === 1 ? "w/o" : match.scores?.[0] ?? 0;
   }
   return match.scores?.[idx] ?? 0;
@@ -113,6 +196,7 @@ function renderCastIndicator(match) {
 export function renderMatchCard(match, lookup, playersById) {
   const participants = resolveParticipants(match, lookup, playersById);
   const [pA, pB] = participants;
+  const hasScoreReport = Boolean(state?.scoreReports?.[match.id]);
   const statusTag =
     match.walkover === "a"
       ? "Walkover (Player A)"
@@ -123,18 +207,19 @@ export function renderMatchCard(match, lookup, playersById) {
       : "Pending";
 
   const cls = ["match-card"];
+  if (hasScoreReport) cls.push("score-report");
   if (match.status === "complete") cls.push("complete");
   if (match.walkover) cls.push("walkover");
   const isReady = Boolean(pA && pB && match.status !== "complete");
   const isUserMatch = Boolean(isCurrentUserPlayer(pA) || isCurrentUserPlayer(pB));
   if (isReady && isUserMatch) cls.push("ready");
 
-  const valA = displayValueFor(match, 0);
-  const valB = displayValueFor(match, 1);
+  const valA = displayValueFor(match, 0, participants);
+  const valB = displayValueFor(match, 1, participants);
   const canVeto = Boolean(pA && pB && match.status !== "complete");
   const bestOf = getBestOfForMatch(match);
-  const selectValA = getSelectValue(match, 0, bestOf);
-  const selectValB = getSelectValue(match, 1, bestOf);
+  const selectValA = getSelectValue(match, 0, bestOf, participants);
+  const selectValB = getSelectValue(match, 1, bestOf, participants);
   const hasPlayers = Boolean(pA && pB);
 
   const html = `<div class="${cls.join(" ")}" data-match-id="${match.id}">
@@ -168,6 +253,7 @@ export function renderMatchCard(match, lookup, playersById) {
 
 export function renderPlayerRow(player, score, label, bestOf, match, participantIdx, lookup) {
   if (!player) {
+    shouldRevealParticipant(match?.id, participantIdx, null);
     const placeholderText = displayPlaceholderForSource(match, participantIdx, lookup);
     return `<div class="player-row">
       <div class="player-name placeholder-tag">${escapeHtml(placeholderText)}</div>
@@ -176,8 +262,17 @@ export function renderPlayerRow(player, score, label, bestOf, match, participant
       </select>
     </div>`;
   }
-  return `<div class="player-row">
-    <div class="player-name player-detail-trigger" data-player-id="${player.id || ""}">
+  const autoReveal = shouldRevealParticipant(
+    match?.id,
+    participantIdx,
+    player.id || null
+  );
+  const revealName =
+    consumeNameReveal(match?.id, participantIdx) || autoReveal;
+  const nameClass = ["player-name", "player-detail-trigger"];
+  if (revealName) nameClass.push("name-reveal");
+  return `<div class="player-row" data-participant-idx="${participantIdx}">
+    <div class="${nameClass.join(" ")}" data-player-id="${player.id || ""}">
       <span class="seed-chip">#${player.seed || "?"}</span>
       <div>
         <strong>${escapeHtml(player.name)}</strong>
@@ -210,6 +305,7 @@ export function renderScoreOptions(current, bestOf = 3) {
 export function clampScoreSelectOptions() {
   if (!state?.bracket) return;
   const lookup = getMatchLookup(state.bracket);
+  const playersById = new Map((state.players || []).map((player) => [player.id, player]));
   document.querySelectorAll("select.result-select, select.score-select").forEach((sel) => {
     const matchId = sel.dataset.matchId || sel.closest(".match-card")?.dataset?.matchId;
     const match = lookup.get(matchId);
@@ -226,6 +322,18 @@ export function clampScoreSelectOptions() {
       sel.value = forIdx === 0 ? "W" : String(needed);
     } else if (match?.walkover === "b") {
       sel.value = forIdx === 1 ? "W" : String(needed);
+    } else if (match) {
+      const participants = resolveParticipants(match, lookup, playersById);
+      const previewWalkover = getWalkoverSide(match, participants);
+      if (previewWalkover === "a") {
+        sel.value = forIdx === 0 ? "W" : "0";
+      } else if (previewWalkover === "b") {
+        sel.value = forIdx === 1 ? "W" : "0";
+      } else if ([...sel.options].some((o) => o.value === prev)) {
+        sel.value = prev;
+      } else {
+        sel.value = "0";
+      }
     } else if ([...sel.options].some((o) => o.value === prev)) {
       sel.value = prev;
     } else {
@@ -251,11 +359,17 @@ export function renderSimpleMatch(
   const isReady = Boolean(pA && pB && match?.status !== "complete");
   const isUserMatch = Boolean(isCurrentUserPlayer(pA) || isCurrentUserPlayer(pB));
   const shouldHighlightReady = isReady && isUserMatch;
+  const hasScoreReport = Boolean(state?.scoreReports?.[match.id]);
   const cardClass = isTreeLayout
     ? `match-card tree${shouldHighlightReady ? " ready" : ""}`
     : `match-card group${shouldHighlightReady ? " ready" : ""}`;
-  const aIsPlaceholder = !pA;
-  const bIsPlaceholder = !pB;
+  const scoreReportClass = hasScoreReport ? " score-report" : "";
+    const aIsPlaceholder = !pA;
+    const bIsPlaceholder = !pB;
+    const autoRevealA = shouldRevealParticipant(match?.id, 0, pA?.id || null);
+    const autoRevealB = shouldRevealParticipant(match?.id, 1, pB?.id || null);
+    const revealA = consumeNameReveal(match?.id, 0) || autoRevealA;
+    const revealB = consumeNameReveal(match?.id, 1) || autoRevealB;
   const aName = pA ? pA.name : displayPlaceholderForSource(match, 0, lookup);
   const bName = pB ? pB.name : displayPlaceholderForSource(match, 1, lookup);
   const raceClassA = raceClassName(pA?.race);
@@ -264,10 +378,11 @@ export function renderSimpleMatch(
   const clanLogoB = pB?.clanLogoUrl ? sanitizeUrl(pB.clanLogoUrl) : "";
   const clanNameA = (pA?.clan || "").trim();
   const clanNameB = (pB?.clan || "").trim();
-  const showScores = !!(pA && pB);
   const bestOf = getBestOfForMatch(match);
-  const selectValA = getSelectValue(match, 0, bestOf);
-  const selectValB = getSelectValue(match, 1, bestOf);
+  const selectValA = getSelectValue(match, 0, bestOf, [pA, pB]);
+  const selectValB = getSelectValue(match, 1, bestOf, [pA, pB]);
+  const previewWalkover = getWalkoverSide(match, [pA, pB]);
+  const showScores = !!(pA && pB) || Boolean(previewWalkover);
   const scoreLabelA =
     String(selectValA).toUpperCase() === "W" ? "w/o" : String(selectValA ?? 0);
   const scoreLabelB =
@@ -285,7 +400,7 @@ export function renderSimpleMatch(
       ? `M${parsedGroupNumber}`
       : escapeHtml(getMatchLabel(match));
 
-  const html = `<div class="${cardClass}" data-match-id="${
+  const html = `<div class="${cardClass}${scoreReportClass}" data-match-id="${
     match.id
   }" style="${baseStyle}">
     ${castIndicator}
@@ -297,15 +412,17 @@ export function renderSimpleMatch(
         pA ? "" : "is-placeholder"
       }">${pA ? `#${pA.seed || "?"}` : ""}</span><span class="race-strip ${raceClassA}"></span>${
         clanLogoA
-          ? `<img class="clan-logo-inline" src="${escapeHtml(clanLogoA)}" alt="Clan logo" ${
-              clanNameA ? `data-tooltip="${escapeHtml(clanNameA)}"` : ""
-            } />`
-          : `<img class="clan-logo-inline is-placeholder" src="img/clan/logo.webp" alt="No clan logo" />`
-      }<span class="name-text ${
-    aIsPlaceholder ? "is-placeholder" : ""
-  }">${escapeHtml(
-     aName
-   )}</span></span>
+            ? `<img class="clan-logo-inline" src="${escapeHtml(
+                clanLogoA
+              )}" alt="Clan logo" loading="eager" decoding="sync" ${
+                clanNameA ? `data-tooltip="${escapeHtml(clanNameA)}"` : ""
+              } />`
+            : `<img class="clan-logo-inline is-placeholder" src="img/clan/logo.webp" alt="No clan logo" loading="eager" decoding="sync" />`
+        }<span class="name-text ${
+      [aIsPlaceholder ? "is-placeholder" : "", revealA && !aIsPlaceholder ? "name-reveal" : ""]
+        .filter(Boolean)
+        .join(" ")
+    }">${escapeHtml(aName)}</span></span>
       <div class="row-actions">
         <div class="score-select score-display ${
           match.winnerId === pA?.id ? "winner" : ""
@@ -321,15 +438,17 @@ export function renderSimpleMatch(
         pB ? "" : "is-placeholder"
       }">${pB ? `#${pB.seed || "?"}` : ""}</span><span class="race-strip ${raceClassB}"></span>${
         clanLogoB
-          ? `<img class="clan-logo-inline" src="${escapeHtml(clanLogoB)}" alt="Clan logo" ${
-              clanNameB ? `data-tooltip="${escapeHtml(clanNameB)}"` : ""
-            } />`
-          : `<img class="clan-logo-inline is-placeholder" src="img/clan/logo.webp" alt="No clan logo" />`
-      }<span class="name-text ${
-    bIsPlaceholder ? "is-placeholder" : ""
-  }">${escapeHtml(
-     bName
-   )}</span></span>
+            ? `<img class="clan-logo-inline" src="${escapeHtml(
+                clanLogoB
+              )}" alt="Clan logo" loading="eager" decoding="sync" ${
+                clanNameB ? `data-tooltip="${escapeHtml(clanNameB)}"` : ""
+              } />`
+            : `<img class="clan-logo-inline is-placeholder" src="img/clan/logo.webp" alt="No clan logo" loading="eager" decoding="sync" />`
+        }<span class="name-text ${
+      [bIsPlaceholder ? "is-placeholder" : "", revealB && !bIsPlaceholder ? "name-reveal" : ""]
+        .filter(Boolean)
+        .join(" ")
+    }">${escapeHtml(bName)}</span></span>
       <div class="row-actions">
         <div class="score-select score-display ${
           match.winnerId === pB?.id ? "winner" : ""
@@ -515,6 +634,25 @@ export function layoutBracketSection(
     slotMap.forEach((slot, id) => {
       slotMap.set(id, remap.get(slot) ?? slot);
     });
+  }
+  if (titlePrefix === "Upper" && slotMap.size) {
+    const playerCount = Number(roundLabelOptions?.playerCount || 0);
+    if (playerCount < 24) {
+      // Preserve legacy spacing for smaller brackets to avoid overlaps.
+      // (21-23 entrants are handled via template slot tweaks.)
+    } else {
+    const slots = Array.from(slotMap.values());
+    const minSlot = Math.min(...slots);
+    const maxSlot = Math.max(...slots);
+    const targetRange = Math.max(1, maxMatches - 1);
+    const currentRange = maxSlot - minSlot;
+    if (currentRange > targetRange) {
+      const scale = currentRange / targetRange;
+      slotMap.forEach((slot, id) => {
+        slotMap.set(id, (slot - minSlot) / scale);
+      });
+    }
+    }
   }
 
   const allSlots = Array.from(slotMap.values());
@@ -1134,11 +1272,38 @@ export function renderRoundRobinView(
     .join("");
 
   const playoffsHtml = renderRoundRobinPlayoffs(bracket, lookup, playersById);
+  const playoffsWrap = playoffsHtml
+    ? `<details class="stage-section" open data-stage="playoffs">
+        <summary class="stage-header">
+          <div class="stage-title">
+            <span class="eyebrow">Stage 2</span>
+            <h4>Playoffs</h4>
+          </div>
+          <span class="stage-toggle" aria-hidden="true"></span>
+        </summary>
+        <div class="stage-body">
+          <div class="playoff-scroll">${playoffsHtml}</div>
+        </div>
+      </details>`
+    : "";
 
-  return DOMPurify.sanitize(`<div class="group-stage">
-    ${groupHtml}
-  </div>
-  ${playoffsHtml}`);
+  return DOMPurify.sanitize(`<details class="stage-section" open data-stage="groups">
+    <summary class="stage-header">
+      <div class="stage-title">
+        <span class="eyebrow">Stage 1</span>
+        <h4>Group Stage</h4>
+      </div>
+      <span class="stage-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="stage-body">
+      <div class="group-stage-scroll">
+        <div class="group-stage">
+          ${groupHtml}
+        </div>
+      </div>
+    </div>
+  </details>
+  ${playoffsWrap}`);
 }
 
 export function renderBracketView({
@@ -1165,8 +1330,13 @@ export function renderBracketView({
 
   buildMatchLetters(bracket);
 
-  const isSingleElimination = format.toLowerCase().startsWith("single");
-  const isRoundRobin = format.toLowerCase().includes("round robin");
+  const normalizedFormat = format.toLowerCase();
+  const isSingleElimination = normalizedFormat.startsWith("single");
+  const isRoundRobin = normalizedFormat.includes("round robin");
+  const isDualTournament =
+    normalizedFormat.includes("gsl") ||
+    normalizedFormat.includes("dual tournament");
+  const isGroupStage = isRoundRobin || isDualTournament;
 
   if (isRoundRobin) {
     ensurePlayoffs?.(bracket);
@@ -1175,18 +1345,19 @@ export function renderBracketView({
   const lookup = getMatchLookup(bracket);
   const playersById = getPlayersMap();
 
-  if (isRoundRobin) {
-    grid.innerHTML = renderRoundRobinView(
-      { ...bracket, computeGroupStandings },
-      playersById,
-      computeGroupStandings
-    );
-    attachMatchHoverHandlers();
-    attachMatchActionHandlers?.();
-    clampScoreSelectOptions();
-    annotateConnectorPlayers(lookup, playersById);
-    return;
-  }
+    if (isGroupStage) {
+      grid.innerHTML = renderRoundRobinView(
+        { ...bracket, computeGroupStandings },
+        playersById,
+        computeGroupStandings
+      );
+      attachMatchHoverHandlers();
+      attachMatchActionHandlers?.();
+      clampScoreSelectOptions();
+      annotateConnectorPlayers(lookup, playersById);
+      applyNameRevealAnimations(grid);
+      return;
+    }
 
   const upperRounds = [...(bracket.winners || [])];
 
@@ -1202,7 +1373,7 @@ export function renderBracketView({
     playersById,
     0,
     ROUND_TITLE_BAND,
-    { hasGrandFinal: Boolean(bracket.finals) }
+    { hasGrandFinal: Boolean(bracket.finals), playerCount: bracket.seedOrder?.length || 0 }
   );
 
   let lower = { html: "", height: 0 };
@@ -1221,13 +1392,14 @@ export function renderBracketView({
       : { html: "", height: 0 };
   }
 
-  grid.innerHTML = DOMPurify.sanitize(`<div class="tree-wrapper">
-    ${upper.html}
-    ${lower.html}
-  </div>`);
+    grid.innerHTML = DOMPurify.sanitize(`<div class="tree-wrapper">
+      ${upper.html}
+      ${lower.html}
+    </div>`);
 
-  attachMatchHoverHandlers();
-  attachMatchActionHandlers?.();
-  clampScoreSelectOptions();
-  annotateConnectorPlayers(lookup, playersById);
-}
+    attachMatchHoverHandlers();
+    attachMatchActionHandlers?.();
+    clampScoreSelectOptions();
+    annotateConnectorPlayers(lookup, playersById);
+    applyNameRevealAnimations(grid);
+  }

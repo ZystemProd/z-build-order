@@ -1,4 +1,5 @@
 import { getBestOfForMatch } from "./renderUtils.js";
+import { resolveParticipants } from "./lookup.js";
 
 // Pure helper to compute round-robin group standings
 export function computeGroupStandings(bracket, group, playersById, lookup) {
@@ -20,10 +21,9 @@ export function computeGroupStandings(bracket, group, playersById, lookup) {
   const matches = group?.matches || [];
   matches.forEach((gm) => {
     const match = lookup?.get(gm.id) || gm;
-    const srcA = match?.sources?.[0] || {};
-    const srcB = match?.sources?.[1] || {};
-    const pA = srcA.playerId || null;
-    const pB = srcB.playerId || null;
+    const [pAObj, pBObj] = resolveParticipants(match, lookup, playersById);
+    const pA = pAObj?.id || null;
+    const pB = pBObj?.id || null;
     if (!pA || !pB) return;
 
     const a = Number(match?.scores?.[0]);
@@ -68,6 +68,7 @@ export function computeGroupStandings(bracket, group, playersById, lookup) {
 
   rows.sort((a, b) => {
     if (b.wins !== a.wins) return b.wins - a.wins;
+    if (a.losses !== b.losses) return a.losses - b.losses;
     if (b.mapDiff !== a.mapDiff) return b.mapDiff - a.mapDiff;
     if (b.mapFor !== a.mapFor) return b.mapFor - a.mapFor;
     const nameA = playersById.get(a.playerId)?.name || "";

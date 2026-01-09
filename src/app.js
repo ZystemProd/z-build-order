@@ -1,4 +1,4 @@
-import { app, auth, db } from "./js/modules/firebase.js";
+import { app, auth, db, functions } from "./js/modules/firebase.js";
 import { initCookieConsent } from "./js/modules/cookieConsent.js";
 import {
   deferSvgImagesIn,
@@ -37,6 +37,7 @@ import {
   buildMmrBadges,
   setupPulseSettingsSection,
   setupSecondaryPulseModal,
+  syncPulseNow,
 } from "./js/modules/settings/pulse.js";
 import { setupTwitchSettingsSection } from "./js/modules/settings/twitch.js";
 import { setupCountrySelector } from "./js/modules/settings/country.js";
@@ -147,11 +148,13 @@ export {
   app,
   auth,
   db,
+  functions,
   initializeAuthUI,
   getPulseState,
   getCurrentUserProfile,
   getCurrentUsername,
   getCurrentUserAvatarUrl,
+  syncPulseNow,
 };
 window.handleSignIn = handleSignIn;
 window.handleSignOut = handleSignOut;

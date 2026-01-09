@@ -480,28 +480,35 @@ export function initTournamentNotifications() {
     }
   });
 
-  onAuthStateChanged(auth, (user) => {
-    if (unsubscribe) {
-      unsubscribe();
-      unsubscribe = null;
+  let retryTimer = null;
+  let retryCount = 0;
+  const MAX_RETRIES = 3;
+
+  const clearRetry = () => {
+    if (retryTimer) {
+      clearTimeout(retryTimer);
+      retryTimer = null;
     }
-    if (!user) {
-      container.style.display = "none";
-      notifications = [];
-      activeId = "";
-      setCount();
-      renderDropdown();
-      renderSidebar();
-      detailTitle.textContent = "Notifications";
-      detailMeta.textContent = "";
-      detailBody.textContent = "Sign in to view notifications.";
-      detailActions.innerHTML = "";
-      return;
-    }
-    container.style.display = "";
+  };
+
+  const resetListenerState = (message) => {
+    notifications = [];
+    activeId = "";
+    setCount();
+    renderDropdown();
+    renderSidebar();
+    detailTitle.textContent = "Notifications";
+    detailMeta.textContent = "";
+    detailBody.textContent = message;
+    detailActions.innerHTML = "";
+  };
+
+  const subscribeToNotifications = (user) => {
     unsubscribe = onSnapshot(
       collection(db, "users", user.uid, "notifications"),
       (snap) => {
+        retryCount = 0;
+        clearRetry();
         notifications = snap.docs
           .map(mapNotification)
           .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
@@ -527,7 +534,41 @@ export function initTournamentNotifications() {
           renderSidebar();
         }
       },
-      (err) => {
+      async (err) => {
+        if (err?.code === "permission-denied" && retryCount < MAX_RETRIES) {
+          retryCount += 1;
+          try {
+            unsubscribe?.();
+          } catch (_) {
+            // ignore
+          }
+          unsubscribe = null;
+          resetListenerState("Unable to load notifications (retrying...)");
+          clearRetry();
+          retryTimer = setTimeout(async () => {
+            try {
+              await user.getIdToken(true);
+            } catch (_) {
+              // ignore token refresh errors; we'll still retry subscribe
+            }
+            if (!auth.currentUser || auth.currentUser.uid !== user.uid) return;
+            subscribeToNotifications(user);
+          }, 750 * retryCount);
+          return;
+        }
+        if (err?.code === "permission-denied") {
+          // Keep UI visible (so the trigger is still reachable), but stop listening.
+          try {
+            unsubscribe?.();
+          } catch (_) {
+            // ignore
+          }
+          unsubscribe = null;
+          clearRetry();
+          resetListenerState("Unable to load notifications.");
+          return;
+        }
+
         console.warn("Notifications listener error", err);
         setCount();
         renderDropdown();
@@ -541,5 +582,26 @@ export function initTournamentNotifications() {
         }
       }
     );
+  };
+
+  onAuthStateChanged(auth, async (user) => {
+    if (unsubscribe) {
+      unsubscribe();
+      unsubscribe = null;
+    }
+    clearRetry();
+    if (!user) {
+      container.style.display = "none";
+      resetListenerState("Sign in to view notifications.");
+      return;
+    }
+    container.style.display = "";
+    resetListenerState("Loading notifications...");
+    try {
+      await user.getIdToken();
+    } catch (_) {
+      // ignore; listener will still try
+    }
+    subscribeToNotifications(user);
   });
 }

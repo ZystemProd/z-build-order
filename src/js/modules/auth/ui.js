@@ -1,6 +1,12 @@
-import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
+import {
+  getAdditionalUserInfo,
+  onAuthStateChanged,
+  signInWithPopup,
+  signOut,
+} from "firebase/auth";
 import { doc, getDoc, getDocs, query, where, limit, collection } from "firebase/firestore";
 import { auth, db, provider, switchAccountProvider } from "../firebase.js";
+import { logAnalyticsEvent } from "../analyticsHelper.js";
 import { showToast } from "../toastHandler.js";
 import { resetBuildInputs } from "../utils.js";
 import { updateFloatingTilePositions } from "../ui/floatingTiles.js";
@@ -67,6 +73,14 @@ function scheduleAuthPopupReset() {
   document.addEventListener("visibilitychange", onVisibility);
 
   setTimeout(resetIfIdle, 4000);
+}
+
+function trackSignupFromCredential(userCredential) {
+  const info = getAdditionalUserInfo(userCredential);
+  if (!info?.isNewUser) return;
+  const providerId = info?.providerId || "";
+  const method = providerId ? providerId.replace(".com", "") : "unknown";
+  logAnalyticsEvent("sign_up", { method });
 }
 
 function initializeAuthUI() {
@@ -244,7 +258,8 @@ function handleSignIn() {
   authPopupInProgress = true;
   scheduleAuthPopupReset();
   signInWithPopup(auth, provider)
-    .then(() => {
+    .then((userCredential) => {
+      trackSignupFromCredential(userCredential);
       initializeAuthUI();
     })
     .catch((error) => {
@@ -277,7 +292,8 @@ async function handleSwitchAccount() {
     authPopupInProgress = true;
     scheduleAuthPopupReset();
     await signOut(auth);
-    await signInWithPopup(auth, switchAccountProvider);
+    const userCredential = await signInWithPopup(auth, switchAccountProvider);
+    trackSignupFromCredential(userCredential);
     initializeAuthUI();
     closeUserMenu();
     window.location.reload();

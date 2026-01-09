@@ -1,4 +1,5 @@
 import { doc, getDoc, getDocs, setDoc, collection } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
 import {
   TOURNAMENT_COLLECTION,
   TOURNAMENT_REGISTRY_KEY,
@@ -8,7 +9,7 @@ import {
   STORAGE_KEY,
   defaultState,
 } from "../state.js";
-import { db } from "../../../../app.js";
+import { db, functions } from "../../../../app.js";
 
 // Local storage helpers
 export function cacheTournamentRegistry(registry) {
@@ -82,6 +83,7 @@ export async function loadTournamentRegistry(force = false) {
         createdByName: data.createdByName || data.hostName || null,
         circuitSlug: data.circuitSlug || null,
         isInviteOnly: Boolean(data.isInviteOnly),
+        visibility: String(data.visibility || "public").toLowerCase() === "private" ? "private" : "public",
         bestOf: data.bestOf || defaultState.bestOf || null,
       };
     });
@@ -235,6 +237,30 @@ export async function persistTournamentStateRemote(
   }
 }
 
+const submitMatchScoreCallable = httpsCallable(functions, "submitMatchScore");
+
+export async function submitMatchScoreRemote(payload, showToast) {
+  if (!payload?.slug || !payload?.matchId) return null;
+  try {
+    const response = await submitMatchScoreCallable({
+      slug: payload.slug,
+      matchId: payload.matchId,
+      scoreA: payload.scoreA,
+      scoreB: payload.scoreB,
+      finalize: payload.finalize !== false,
+    });
+    return response.data || null;
+  } catch (err) {
+    console.error("Failed to submit match score via Cloud Function", err);
+    showToast?.(
+      "Could not submit match score. Changes stay local.",
+      "error"
+    );
+    return null;
+  }
+}
+
+
 export function saveState(
   next,
   options,
@@ -283,3 +309,6 @@ function stripUndefinedDeep(value) {
   }
   return value;
 }
+
+
+
