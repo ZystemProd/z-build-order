@@ -869,7 +869,7 @@ export async function openPlayerDetailModal(player) {
   let shouldHydrateProfile = false;
   if (nameEl) {
     const abbr = player?.clanAbbreviation;
-    const displayName = player?.pulseName || player?.name;
+    const displayName = player?.name || player?.pulseName;
     const safeName = displayName || "Player";
     const composedName = abbr ? `[${abbr}] ${safeName}` : safeName;
     if (nameTextEl) {

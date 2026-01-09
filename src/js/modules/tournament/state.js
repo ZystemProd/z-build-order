@@ -3,6 +3,7 @@ export const BROADCAST_NAME = "zboTournamentLive";
 export const TOURNAMENT_REGISTRY_KEY = "zboTournamentRegistryV1";
 export const TOURNAMENT_COLLECTION = "tournaments";
 export const TOURNAMENT_STATE_COLLECTION = "tournamentStates";
+export const TOURNAMENT_INVITE_LINK_COLLECTION = "tournamentInviteLinks";
 export const CIRCUIT_REGISTRY_KEY = "zboCircuitRegistryV1";
 export const CIRCUIT_COLLECTION = "tournamentCircuits";
 export const MAPS_JSON_URL = "/data/maps.json";
@@ -35,6 +36,7 @@ export const defaultState = {
   casterRequests: [],
   matchCasts: {},
   isLive: false,
+  hasBeenLive: false,
   disableFinalAutoAdd: false,
 };
 

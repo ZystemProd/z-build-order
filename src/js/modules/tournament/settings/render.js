@@ -62,6 +62,7 @@ export function populateSettingsPanel({
   const startInput = document.getElementById("settingsStartInput");
   const checkInSelect = document.getElementById("settingsCheckInSelect");
   const accessSelect = document.getElementById("settingsAccessSelect");
+  const visibilitySelect = document.getElementById("settingsVisibilitySelect");
   const imageInput = document.getElementById("settingsImageInput");
   const imagePreview = document.getElementById("settingsImagePreview");
   const rrBestOf = document.getElementById("settingsRoundRobinBestOf");
@@ -112,6 +113,12 @@ export function populateSettingsPanel({
   }
   if (accessSelect) {
     accessSelect.value = tournament.isInviteOnly ? "closed" : "open";
+  }
+  if (visibilitySelect) {
+    visibilitySelect.value =
+      String(tournament.visibility || "").toLowerCase() === "private"
+        ? "private"
+        : "public";
   }
   if (imageInput) imageInput.value = "";
   if (imagePreview) {

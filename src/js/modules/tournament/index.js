@@ -22,6 +22,8 @@ import {
   arrayUnion,
   arrayRemove,
   onSnapshot,
+  runTransaction,
+  increment,
 } from "firebase/firestore";
 import {
   getStorage,
@@ -38,6 +40,7 @@ import { prepareImageForUpload, validateImageFile } from "../imageUtils.js";
 import {
   TOURNAMENT_COLLECTION,
   TOURNAMENT_STATE_COLLECTION,
+  TOURNAMENT_INVITE_LINK_COLLECTION,
   CIRCUIT_COLLECTION,
   MAPS_JSON_URL,
   FALLBACK_LADDER_MAPS,
@@ -267,6 +270,432 @@ let lastPulseUrl = "";
 let lastSecondarySignature = "";
 let circuitFinalMapPoolSelection = new Set();
 let circuitFinalMapPoolMode = "ladder";
+let inviteLinkGate = {
+  slug: "",
+  token: "",
+  status: "idle", // idle | loading | ready
+  ok: false,
+  message: "",
+};
+let selfClanHydrationInFlight = false;
+let selfClanHydrated = false;
+
+function normalizeTournamentVisibility(value) {
+  return String(value || "").toLowerCase() === "private" ? "private" : "public";
+}
+
+function normalizeTournamentAccess(value) {
+  return String(value || "").toLowerCase() === "closed" ? "closed" : "open";
+}
+
+function getInviteTokenStorageKey(slug) {
+  return `zboInviteToken:${slug || ""}`;
+}
+
+function readInviteTokenFromStorage(slug) {
+  if (typeof window === "undefined" || !slug) return "";
+  try {
+    return String(sessionStorage.getItem(getInviteTokenStorageKey(slug)) || "").trim();
+  } catch (_) {
+    return "";
+  }
+}
+
+function writeInviteTokenToStorage(slug, token) {
+  if (typeof window === "undefined" || !slug) return;
+  try {
+    if (token) {
+      sessionStorage.setItem(getInviteTokenStorageKey(slug), token);
+    } else {
+      sessionStorage.removeItem(getInviteTokenStorageKey(slug));
+    }
+  } catch (_) {
+    // ignore storage errors
+  }
+}
+
+function getInviteTokenFromUrl(slug = currentSlug) {
+  if (typeof window === "undefined") return "";
+  try {
+    const token = String(new URLSearchParams(window.location.search).get("invite") || "").trim();
+    if (token) return token;
+  } catch (_) {
+    // ignore
+  }
+  return readInviteTokenFromStorage(slug);
+}
+
+function getInviteTokenSource(slug = currentSlug) {
+  if (typeof window === "undefined") {
+    return { token: readInviteTokenFromStorage(slug), fromUrl: false };
+  }
+  try {
+    const token = String(new URLSearchParams(window.location.search).get("invite") || "").trim();
+    if (token) return { token, fromUrl: true };
+  } catch (_) {
+    // ignore
+  }
+  return { token: readInviteTokenFromStorage(slug), fromUrl: false };
+}
+
+function getInviteLinkRef(slug, token) {
+  if (!slug || !token) return null;
+  return doc(
+    collection(db, TOURNAMENT_INVITE_LINK_COLLECTION, slug, "links"),
+    token
+  );
+}
+
+function evaluateInviteLinkDoc(docData) {
+  if (!docData || typeof docData !== "object") {
+    return { ok: false, message: "Invite link not found." };
+  }
+  if (docData.revoked) {
+    return { ok: false, message: "Invite link revoked." };
+  }
+  const now = Date.now();
+  const expiresAt = Number(docData.expiresAt);
+  if (Number.isFinite(expiresAt) && expiresAt > 0 && now >= expiresAt) {
+    return { ok: false, message: "Invite link expired." };
+  }
+  const maxUses = Number(docData.maxUses);
+  const uses = Number(docData.uses || 0);
+  if (Number.isFinite(maxUses) && maxUses > 0 && uses >= maxUses) {
+    return { ok: false, message: "Invite link has no remaining uses." };
+  }
+  return { ok: true, message: "Invite link accepted." };
+}
+
+async function refreshInviteLinkGate(slug) {
+  const { token, fromUrl } = getInviteTokenSource(slug);
+  inviteLinkGate = {
+    slug: slug || "",
+    token,
+    status: token ? "loading" : "idle",
+    ok: false,
+    message: token ? "Checking invite link..." : "",
+  };
+  if (!token || !slug) return;
+  try {
+    const ref = getInviteLinkRef(slug, token);
+    if (!ref) return;
+    const snap = await getDoc(ref);
+    if (!snap.exists()) {
+      inviteLinkGate = {
+        slug,
+        token,
+        status: "ready",
+        ok: false,
+        message: "Invite link not found.",
+      };
+      return;
+    }
+    const verdict = evaluateInviteLinkDoc(snap.data() || {});
+    inviteLinkGate = {
+      slug,
+      token,
+      status: "ready",
+      ok: verdict.ok,
+      message: verdict.message,
+    };
+    if (verdict.ok) {
+      writeInviteTokenToStorage(slug, token);
+      if (fromUrl && typeof window !== "undefined") {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("invite");
+        const next =
+          url.pathname + (url.searchParams.toString() ? `?${url.searchParams}` : "") + url.hash;
+        window.history.replaceState({}, "", next);
+      }
+    } else if (!fromUrl) {
+      writeInviteTokenToStorage(slug, "");
+    }
+  } catch (_) {
+    inviteLinkGate = {
+      slug,
+      token,
+      status: "ready",
+      ok: false,
+      message: "Could not verify invite link.",
+    };
+  }
+}
+
+async function claimInviteLinkUse({ slug, token }) {
+  if (!slug || !token) return { ok: false, message: "Invite link missing." };
+  const ref = getInviteLinkRef(slug, token);
+  if (!ref) return { ok: false, message: "Invite link missing." };
+  try {
+    const verdict = await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists()) {
+        return { ok: false, message: "Invite link not found." };
+      }
+      const data = snap.data() || {};
+      const evalResult = evaluateInviteLinkDoc(data);
+      if (!evalResult.ok) return evalResult;
+      tx.update(ref, {
+        uses: increment(1),
+        lastUsedAt: Date.now(),
+      });
+      return { ok: true, message: "Invite link accepted." };
+    });
+    return verdict;
+  } catch (_) {
+    return { ok: false, message: "Could not use invite link." };
+  }
+}
+
+function bytesToBase64Url(bytes) {
+  let binary = "";
+  bytes.forEach((b) => {
+    binary += String.fromCharCode(b);
+  });
+  const base64 = typeof btoa === "function" ? btoa(binary) : "";
+  return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function generateInviteToken() {
+  try {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    return bytesToBase64Url(bytes);
+  } catch (_) {
+    return `inv-${Date.now().toString(36)}-${Math.random().toString(16).slice(2)}`;
+  }
+}
+
+function buildInviteUrl(token) {
+  if (typeof window === "undefined") return "";
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.set("invite", token);
+    return url.toString();
+  } catch (_) {
+    return "";
+  }
+}
+
+async function copyToClipboard(text) {
+  const value = String(text || "");
+  if (!value) return false;
+  try {
+    await navigator.clipboard.writeText(value);
+    return true;
+  } catch (_) {
+    try {
+      const el = document.createElement("textarea");
+      el.value = value;
+      el.setAttribute("readonly", "true");
+      el.style.position = "fixed";
+      el.style.left = "-9999px";
+      document.body.appendChild(el);
+      el.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(el);
+      return ok;
+    } catch (_) {
+      return false;
+    }
+  }
+}
+
+function setInviteLinkStatus(message) {
+  const statusEl = document.getElementById("inviteLinkStatus");
+  if (statusEl) statusEl.textContent = message || "";
+}
+
+async function loadInviteLinks(slug) {
+  if (!slug) return [];
+  const snap = await getDocs(collection(db, TOURNAMENT_INVITE_LINK_COLLECTION, slug, "links"));
+  return snap.docs.map((d) => {
+    const data = d.data() || {};
+    return {
+      token: d.id,
+      ...data,
+      createdAt: data.createdAt?.toMillis ? data.createdAt.toMillis() : data.createdAt || null,
+      lastUsedAt: data.lastUsedAt?.toMillis ? data.lastUsedAt.toMillis() : data.lastUsedAt || null,
+    };
+  });
+}
+
+function renderInviteLinkList(items = [], { slug } = {}) {
+  const listEl = document.getElementById("inviteLinkList");
+  if (!listEl) return;
+  const header = listEl.querySelector(".invite-link-header");
+  listEl.replaceChildren();
+  if (header) listEl.appendChild(header);
+  const rows = Array.isArray(items) ? items : [];
+  if (!rows.length) {
+    const empty = document.createElement("div");
+    empty.className = "muted";
+    empty.textContent = "No invite links yet.";
+    listEl.appendChild(empty);
+    return;
+  }
+  rows
+    .slice()
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+    .forEach((item) => {
+      const row = document.createElement("div");
+      row.className = "invite-link-row invite-link-card";
+      const statusPill = document.createElement("span");
+      statusPill.className = "invite-link-status";
+      const uses = Number(item.uses || 0);
+      const maxUses = Number(item.maxUses);
+      const useLabel =
+        Number.isFinite(maxUses) && maxUses > 0 ? `${uses}/${maxUses}` : `${uses}/∞`;
+      const expiresAt = Number(item.expiresAt);
+      const expired =
+        Number.isFinite(expiresAt) && expiresAt > 0 && Date.now() >= expiresAt;
+      const status = item.revoked
+        ? "revoked"
+        : expired
+        ? "expired"
+        : "active";
+      statusPill.textContent = status;
+      statusPill.classList.toggle("is-active", status === "active");
+      statusPill.classList.toggle("is-expired", status === "expired");
+      statusPill.classList.toggle("is-revoked", status === "revoked");
+
+      const name = document.createElement("span");
+      name.className = "invite-link-name";
+      name.textContent = String(item.name || "").trim() || "—";
+
+      const usesEl = document.createElement("span");
+      usesEl.className = "invite-link-uses";
+      usesEl.textContent = useLabel;
+
+      const expiresEl = document.createElement("span");
+      expiresEl.className = "invite-link-expires";
+      expiresEl.textContent = Number.isFinite(expiresAt) && expiresAt > 0
+        ? new Date(expiresAt).toLocaleString([], {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : "Never";
+
+      const actions = document.createElement("div");
+      actions.className = "invite-link-actions";
+      const copyBtn = document.createElement("button");
+      copyBtn.type = "button";
+      copyBtn.className = "cta small ghost";
+      copyBtn.textContent = "Copy";
+      copyBtn.dataset.inviteCopy = item.token;
+      const revokeBtn = document.createElement("button");
+      revokeBtn.type = "button";
+      revokeBtn.className = "cta small subtle";
+      revokeBtn.textContent = "Revoke";
+      revokeBtn.disabled = Boolean(item.revoked);
+      revokeBtn.dataset.inviteRevoke = item.token;
+      actions.append(copyBtn, revokeBtn);
+      row.append(statusPill, name, usesEl, expiresEl, actions);
+      listEl.appendChild(row);
+    });
+}
+
+async function refreshInviteLinksPanel() {
+  const slug = currentSlug || currentTournamentMeta?.slug || "";
+  if (!slug || !isAdmin || !currentTournamentMeta?.isInviteOnly) return;
+  try {
+    setInviteLinkStatus("Loading invite links...");
+    const links = await loadInviteLinks(slug);
+    renderInviteLinkList(links, { slug });
+    setInviteLinkStatus("");
+  } catch (_) {
+    setInviteLinkStatus("Failed to load invite links.");
+  }
+}
+
+function initInviteLinksPanel() {
+  const createBtn = document.getElementById("createInviteLinkBtn");
+  const listEl = document.getElementById("inviteLinkList");
+  if (createBtn) {
+    createBtn.addEventListener("click", async () => {
+      const slug = currentSlug || currentTournamentMeta?.slug || "";
+      if (!slug || !isAdmin) return;
+      const name = (document.getElementById("inviteLinkNameInput")?.value || "").trim();
+      const maxUsesRaw = document.getElementById("inviteLinkMaxUsesInput")?.value ?? "";
+      const expiresInput = document.getElementById("inviteLinkExpiresInput");
+      const maxUses =
+        maxUsesRaw === "" || maxUsesRaw === null || maxUsesRaw === undefined
+          ? null
+          : Number(maxUsesRaw);
+      const pickedDate = expiresInput?._flatpickr?.selectedDates?.[0] || null;
+      const expiresRaw = expiresInput?.value || "";
+      const expiresAt = pickedDate
+        ? pickedDate.getTime()
+        : expiresRaw
+        ? new Date(expiresRaw).getTime()
+        : null;
+      const token = generateInviteToken();
+      try {
+        setInviteLinkStatus("Creating invite link...");
+        await setDoc(
+          doc(collection(db, TOURNAMENT_INVITE_LINK_COLLECTION, slug, "links"), token),
+          {
+            token,
+            createdAt: serverTimestamp(),
+            createdByUid: auth.currentUser?.uid || "",
+            createdByName: getCurrentUsername?.() || "",
+            name: name || "",
+            maxUses: Number.isFinite(maxUses) && maxUses > 0 ? Math.floor(maxUses) : null,
+            expiresAt: Number.isFinite(expiresAt) && expiresAt > 0 ? expiresAt : null,
+            uses: 0,
+            revoked: false,
+          },
+          { merge: true }
+        );
+        await refreshInviteLinksPanel();
+        const url = buildInviteUrl(token);
+        if (url && (await copyToClipboard(url))) {
+          setInviteLinkStatus("Invite link copied.");
+        } else {
+          setInviteLinkStatus(url ? "Invite link created." : "Invite link created.");
+        }
+      } catch (err) {
+        console.error("Failed to create invite link", err);
+        setInviteLinkStatus("Failed to create invite link.");
+      }
+    });
+  }
+  if (listEl) {
+    listEl.addEventListener("click", async (event) => {
+      const copyBtn = event.target.closest("[data-invite-copy]");
+      const revokeBtn = event.target.closest("[data-invite-revoke]");
+      const slug = currentSlug || currentTournamentMeta?.slug || "";
+      if (!slug || !isAdmin) return;
+      if (copyBtn) {
+        const token = copyBtn.dataset.inviteCopy || "";
+        const url = buildInviteUrl(token);
+        if (url && (await copyToClipboard(url))) {
+          showToast?.("Invite link copied.", "success");
+        } else {
+          showToast?.("Could not copy invite link.", "error");
+        }
+        return;
+      }
+      if (revokeBtn) {
+        const token = revokeBtn.dataset.inviteRevoke || "";
+        try {
+          await setDoc(
+            doc(collection(db, TOURNAMENT_INVITE_LINK_COLLECTION, slug, "links"), token),
+            { revoked: true, revokedAt: Date.now() },
+            { merge: true }
+          );
+          await refreshInviteLinksPanel();
+          showToast?.("Invite link revoked.", "success");
+        } catch (err) {
+          console.error("Failed to revoke invite link", err);
+          showToast?.("Failed to revoke invite link.", "error");
+        }
+      }
+    });
+  }
+}
 const adminManager = createAdminManager({
   auth,
   db,
@@ -317,7 +746,7 @@ async function loadMapCatalog() {
   return mapCatalog;
 }
 
-function syncFromRemote(incoming) {
+  function syncFromRemote(incoming) {
   if (!incoming || typeof incoming !== "object") return;
   const incomingPresence = incoming.presence?.matchInfo || null;
   const currentPresence = state?.presence?.matchInfo || null;
@@ -349,7 +778,7 @@ function syncFromRemote(incoming) {
     activity: incoming.activity || [],
     bracket: deserializeBracket(incoming.bracket),
   });
-  renderAll();
+    renderAll();
   refreshPlayerDetailModalIfOpen(getPlayersMap);
   refreshMatchInfoModalIfOpen?.();
   refreshVetoModalIfOpen?.();
@@ -690,6 +1119,7 @@ function renderAll() {
     const liveDot = document.getElementById("liveDot");
     const bracketGrid = document.getElementById("bracketGrid");
     const bracketNotLive = document.getElementById("bracketNotLive");
+    const bracketNotLiveMessage = document.getElementById("bracketNotLiveMessage");
     const registeredPlayersList = document.getElementById("registeredPlayersList");
     const activityCard = document.getElementById("activityCard");
     const bracketTitle = document.getElementById("bracketTitle");
@@ -702,10 +1132,13 @@ function renderAll() {
     const hasCheckedIn = eligiblePlayers.some((player) => player.checkedInAt);
     const isInviteOnly = isInviteOnlyTournament(currentTournamentMeta);
     const accessNote = document.getElementById("registrationAccessNote");
+    const registrationForm = document.getElementById("registrationForm");
     const syncPulseBtn = document.getElementById("syncPulseBtn");
     const syncPulseSpinner = document.getElementById("syncPulseSpinner");
     const requirePulseSyncEnabled = getRequirePulseSyncEnabled();
     const pulseGate = getPulseSyncGateStatus();
+
+    hydrateCurrentUserClanLogo();
 
     if (tournamentTitle) {
       tournamentTitle.textContent = currentTournamentMeta.name || "Tournament";
@@ -756,14 +1189,41 @@ function renderAll() {
     }
     if (statPlayers) statPlayers.textContent = String(eligiblePlayers.length || 0);
 
+    const tokenActive =
+      isInviteOnly &&
+      !isAdmin &&
+      !currentPlayer &&
+      inviteLinkGate?.slug === currentSlug &&
+      Boolean(inviteLinkGate?.token);
+    const inviteLinkExhausted =
+      tokenActive &&
+      inviteLinkGate.status === "ready" &&
+      !inviteLinkGate.ok &&
+      String(inviteLinkGate.message || "")
+        .toLowerCase()
+        .includes("no remaining uses");
+
     if (accessNote) {
+      accessNote.classList.toggle("is-blocking", inviteLinkExhausted);
       if (isInviteOnly && !isAdmin) {
-        accessNote.textContent =
-          "This tournament is invite-only. Ask an admin for an invite.";
+        if (tokenActive) {
+          accessNote.textContent = inviteLinkGate.message || "Invite link detected.";
+        } else {
+          accessNote.textContent =
+            "This tournament is invite-only. Ask an admin for an invite.";
+        }
         accessNote.style.display = "block";
       } else {
         accessNote.textContent = "";
         accessNote.style.display = "none";
+      }
+    }
+
+    if (registrationForm) {
+      if (inviteLinkExhausted) {
+        registrationForm.style.display = "none";
+      } else {
+        registrationForm.style.display = "";
       }
     }
 
@@ -804,8 +1264,24 @@ function renderAll() {
         registerBtn.textContent = "Unregister";
         registerBtn.disabled = false;
       } else if (isInviteOnly && !isAdmin) {
-        registerBtn.textContent = "Invite required";
-        registerBtn.disabled = true;
+        const tokenActive =
+          inviteLinkGate?.slug === currentSlug && Boolean(inviteLinkGate?.token);
+        if (!tokenActive) {
+          registerBtn.textContent = "Invite required";
+          registerBtn.disabled = true;
+        } else if (inviteLinkGate.status === "loading") {
+          registerBtn.textContent = "Checking invite link...";
+          registerBtn.disabled = true;
+        } else if (!inviteLinkGate.ok) {
+          registerBtn.textContent = "Invite link invalid";
+          registerBtn.disabled = true;
+        } else if (pulseGate.needsSync) {
+          registerBtn.textContent = "Register";
+          registerBtn.disabled = true;
+        } else {
+          registerBtn.textContent = "Register";
+          registerBtn.disabled = false;
+        }
       } else if (pulseGate.needsSync) {
         registerBtn.textContent = "Register";
         registerBtn.disabled = true;
@@ -852,27 +1328,46 @@ function renderAll() {
 
     if (bracketGrid && bracketNotLive) {
       if (!state.isLive) {
-        bracketGrid.style.display = "flex";
+        const hasBeenLive =
+          Boolean(state.hasBeenLive) ||
+          (state.activity || []).some(
+            (entry) =>
+              entry?.message === "Tournament went live." ||
+              entry?.message === "Tournament set to not live."
+          );
+        if (bracketNotLiveMessage) {
+          bracketNotLiveMessage.style.display = hasBeenLive ? "" : "none";
+        }
+        bracketGrid.style.display = "none";
         bracketNotLive.style.display = "block";
         if (registeredPlayersList) {
-          registeredPlayersList.style.display = isAdmin ? "none" : "";
-          if (!isAdmin) {
-            const items = eligiblePlayers.map((p) => {
+          registeredPlayersList.style.display = "";
+          const items = eligiblePlayers.map((p) => {
               const name = escapeHtml(p.name || "Unknown");
               const race = (p.race || "").trim();
               const raceClass = raceClassName(race);
               const raceLabel = race ? escapeHtml(race) : "Race TBD";
               const mmr = Number.isFinite(p.mmr) ? `${Math.round(p.mmr)} MMR` : "MMR TBD";
+              const clanLogo = p?.clanLogoUrl ? sanitizeUrl(p.clanLogoUrl) : "";
+              const clanName = (p?.clan || "").trim();
+              const clanImg = clanLogo
+                ? `<img class="registered-clan-logo" src="${escapeHtml(clanLogo)}" alt="Clan logo" ${
+                    clanName ? `data-tooltip="${escapeHtml(clanName)}"` : ""
+                  } />`
+                : `<img class="registered-clan-logo is-placeholder" src="img/clan/logo.webp" alt="No clan logo" />`;
               return `<li data-player-id="${escapeHtml(p.id || "")}">
                 <span class="race-strip ${raceClass}"></span>
+                ${clanImg}
                 <span class="name-text">${name}</span>
                 <span class="registered-meta">${raceLabel} · ${mmr}</span>
               </li>`;
             });
-            registeredPlayersList.innerHTML = items.join("");
-          }
+          registeredPlayersList.innerHTML = items.join("");
         }
       } else {
+        if (bracketNotLiveMessage) {
+          bracketNotLiveMessage.style.display = "";
+        }
         bracketGrid.style.display = "flex";
         bracketNotLive.style.display = "none";
       }
@@ -1099,6 +1594,7 @@ function goLiveTournament() {
     needsReseed: false,
     bracketLayoutVersion: CURRENT_BRACKET_LAYOUT_VERSION,
     isLive: true,
+    hasBeenLive: true,
   });
   addActivity("Tournament went live.");
   renderAll();
@@ -1109,7 +1605,7 @@ function setTournamentNotLive() {
     showToast?.("Tournament is already not live.", "success");
     return;
   }
-  saveState({ isLive: false });
+  saveState({ isLive: false, hasBeenLive: true });
   addActivity("Tournament set to not live.");
   renderAll();
 }
@@ -1122,19 +1618,19 @@ function toggleLiveTournament() {
   goLiveTournament();
 }
 
-function addActivity(message, options = {}) {
-  if (!message) return;
-  const entry = {
-    message,
-    time: Date.now(),
-    type: options.type,
-  };
-  const next = {
-    activity: [entry, ...(state.activity || [])].slice(0, 50),
-  };
-  saveState(next);
-  renderActivityList({ state, escapeHtml, formatTime });
-}
+  function addActivity(message, options = {}) {
+    if (!message) return;
+    const entry = {
+      message,
+      time: Date.now(),
+      type: options.type,
+    };
+    const next = {
+      activity: [entry, ...(state.activity || [])].slice(0, 50),
+    };
+    saveState(next);
+    renderActivityList({ state, escapeHtml, formatTime });
+  }
 
 function updateManualSeedingUi() {
   const toggle = document.getElementById("manualSeedingToggle");
@@ -1230,6 +1726,44 @@ function createOrUpdatePlayer(data) {
     : [...(state.players || []), merged];
   setStateObj({ ...state, players });
   return merged;
+}
+
+async function hydrateCurrentUserClanLogo() {
+  if (selfClanHydrationInFlight || selfClanHydrated) return;
+  const user = auth.currentUser;
+  if (!user) return;
+  const profile = getCurrentUserProfile?.() || {};
+  const mainClanId = profile?.settings?.mainClanId || "";
+  if (!mainClanId) return;
+  const target = (state.players || []).find(
+    (player) => player?.uid === user.uid && !player?.clanLogoUrl
+  );
+  if (!target) {
+    selfClanHydrated = true;
+    return;
+  }
+  selfClanHydrationInFlight = true;
+  try {
+    const clanDoc = await getDoc(doc(db, "clans", mainClanId));
+    if (!clanDoc.exists()) {
+      selfClanHydrated = true;
+      return;
+    }
+    const clanData = clanDoc.data() || {};
+    const clanLogoUrl = clanData?.logoUrlSmall || clanData?.logoUrl || "";
+    createOrUpdatePlayer({
+      id: target.id,
+      clan: clanData?.name || target.clan || "",
+      clanAbbreviation: clanData?.abbreviation || target.clanAbbreviation || "",
+      clanLogoUrl,
+    });
+    saveState({ players: state.players, needsReseed: state.needsReseed });
+    selfClanHydrated = true;
+  } catch (_) {
+    // ignore hydration errors
+  } finally {
+    selfClanHydrationInFlight = false;
+  }
 }
 
 function removePlayer(id) {
@@ -1338,7 +1872,6 @@ function resetTournament() {
   rebuildBracket(true, "Tournament reset");
   addActivity("Tournament reset.");
 }
-
 function updateMatchScore(matchId, scoreA, scoreB, options = {}) {
   if (!state.isLive && !isAdmin) {
     showToast?.("Tournament is not live. Bracket is read-only.", "error");
@@ -1396,18 +1929,18 @@ function updateMatchScore(matchId, scoreA, scoreB, options = {}) {
 }
 
 function saveState(next = {}, options = {}) {
-  persistState(
-    next,
-    options,
-    state,
-    defaultState,
-    currentSlug,
-    broadcast,
-    setStateObj,
-    (snapshot) =>
-      persistTournamentStateRemote(snapshot, currentSlug, serializeBracket, showToast)
-  );
-}
+    persistState(
+      next,
+      options,
+      state,
+      defaultState,
+      currentSlug,
+      broadcast,
+      setStateObj,
+      (snapshot) =>
+        persistTournamentStateRemote(snapshot, currentSlug, serializeBracket, showToast)
+    );
+  }
 
 function rebuildBracket(force = false, reason = "") {
   const { seededEligible, mergedPlayers } = seedEligiblePlayersWithMode(
@@ -1519,7 +2052,11 @@ async function renderTournamentList() {
       if (!userId) {
         filtered = [];
       } else {
-        filtered = filtered.filter((item) => item.createdBy === userId);
+        filtered = filtered.filter(
+          (item) =>
+            item.createdBy === userId ||
+            registered.has(item.slug || item.id)
+        );
       }
     }
     if (roleFilter === "hosting") {
@@ -1540,6 +2077,12 @@ async function renderTournamentList() {
         );
         filtered = checks.filter((row) => row.isCaster).map((row) => row.item);
       }
+    }
+
+    if (!ownerFilterActive && roleFilter === "all") {
+      filtered = filtered.filter(
+        (item) => normalizeTournamentVisibility(item.visibility) !== "private"
+      );
     }
 
     const now = Date.now();
@@ -1803,6 +2346,7 @@ async function populateCreateForm() {
   const imagePreview = document.getElementById("tournamentImagePreview");
   const checkInSelect = document.getElementById("checkInSelect");
   const accessSelect = document.getElementById("tournamentAccessSelect");
+  const visibilitySelect = document.getElementById("tournamentVisibilitySelect");
   const templateSelect = document.getElementById("tournamentTemplateSelect");
   const templateNameInput = document.getElementById("tournamentTemplateNameInput");
   if (imageInput) imageInput.value = "";
@@ -1814,6 +2358,7 @@ async function populateCreateForm() {
   }
   if (checkInSelect) checkInSelect.value = "0";
   if (accessSelect) accessSelect.value = "open";
+  if (visibilitySelect) visibilitySelect.value = "public";
   if (templateSelect) templateSelect.value = "";
   if (templateNameInput) {
     templateNameInput.value = "";
@@ -1878,6 +2423,8 @@ function openCircuitSettingsModal() {
   const descriptionInput = document.getElementById("circuitSettingsDescriptionInput");
   const finalNameInput = document.getElementById("circuitFinalNameInput");
   const finalSlugInput = document.getElementById("circuitFinalSlugInput");
+  const finalVisibilitySelect = document.getElementById("circuitFinalVisibilitySelect");
+  const finalAccessSelect = document.getElementById("circuitFinalAccessSelect");
   const finalStartInput = document.getElementById("circuitFinalStartInput");
   const finalMaxPlayersInput = document.getElementById("circuitFinalMaxPlayersInput");
   const finalQualifyInput = document.getElementById("circuitFinalQualifyCountInput");
@@ -1890,6 +2437,8 @@ function openCircuitSettingsModal() {
   if (nameInput) nameInput.value = currentCircuitMeta?.name || "";
   if (slugInput) slugInput.value = currentCircuitMeta?.slug || "";
   if (descriptionInput) descriptionInput.value = currentCircuitMeta?.description || "";
+  if (finalVisibilitySelect) finalVisibilitySelect.value = "public";
+  if (finalAccessSelect) finalAccessSelect.value = "open";
   const finalSlug = currentCircuitMeta?.finalTournamentSlug || "";
   if (finalSlugInput) finalSlugInput.value = finalSlug;
   if (modal) {
@@ -1902,6 +2451,12 @@ function openCircuitSettingsModal() {
       if (!snap.exists()) return;
       const meta = snap.data() || {};
       if (finalNameInput) finalNameInput.value = meta.name || "";
+      if (finalVisibilitySelect) {
+        finalVisibilitySelect.value = normalizeTournamentVisibility(meta.visibility);
+      }
+      if (finalAccessSelect) {
+        finalAccessSelect.value = meta.isInviteOnly ? "closed" : "open";
+      }
       if (finalStartInput && meta.startTime) {
         try {
           finalStartInput.value = formatLocalDateTimeInput(meta.startTime);
@@ -1975,6 +2530,8 @@ async function saveCircuitSettings() {
   const descriptionInput = document.getElementById("circuitSettingsDescriptionInput");
   const finalNameInput = document.getElementById("circuitFinalNameInput");
   const finalSlugInput = document.getElementById("circuitFinalSlugInput");
+  const finalVisibilitySelect = document.getElementById("circuitFinalVisibilitySelect");
+  const finalAccessSelect = document.getElementById("circuitFinalAccessSelect");
   const finalStartInput = document.getElementById("circuitFinalStartInput");
   const finalMaxPlayersInput = document.getElementById("circuitFinalMaxPlayersInput");
   const finalQualifyInput = document.getElementById("circuitFinalQualifyCountInput");
@@ -2005,6 +2562,8 @@ async function saveCircuitSettings() {
     };
     const finalSlug = (finalSlugInput?.value || "").trim();
     if (finalSlug) {
+      const finalVisibility = normalizeTournamentVisibility(finalVisibilitySelect?.value);
+      const finalAccess = normalizeTournamentAccess(finalAccessSelect?.value);
       const finalStartTime = finalStartInput?.value ? new Date(finalStartInput.value) : null;
       const finalMaxPlayers = normalizeMaxPlayersForFormat(
         finalMaxPlayersInput?.value,
@@ -2028,6 +2587,8 @@ async function saveCircuitSettings() {
         maxPlayers: finalMaxPlayers,
         startTime: finalStartTime,
         checkInWindowMinutes: getCheckInWindowMinutes(finalCheckInSelect),
+        isInviteOnly: finalAccess === "closed",
+        visibility: finalVisibility,
         mapPool: getCircuitFinalMapPoolSelection(),
         createdBy: auth.currentUser?.uid || null,
         createdByName: getCurrentUsername() || "Unknown host",
@@ -2104,34 +2665,44 @@ function closeDeleteTournamentModal() {
   unlockBodyScroll();
 }
 
+async function getTournamentCoverUrlForDelete(slug) {
+  if (!slug) return "";
+  if (currentTournamentMeta?.slug === slug) {
+    return currentTournamentMeta?.coverImageUrl || "";
+  }
+  try {
+    const tournamentSnap = await getDoc(doc(collection(db, TOURNAMENT_COLLECTION), slug));
+    return tournamentSnap.exists() ? tournamentSnap.data()?.coverImageUrl || "" : "";
+  } catch (err) {
+    console.warn("Failed to load tournament cover image", err);
+    return "";
+  }
+}
+
+async function deleteTournamentBundle(slug, coverImageUrl = "") {
+  if (!slug) return;
+  await deleteTournamentChatHistory(slug);
+  await deleteTournamentPresence(slug);
+  await deleteTournamentInviteLinks(slug);
+  await deleteDoc(doc(collection(db, TOURNAMENT_COLLECTION), slug));
+  await deleteDoc(doc(collection(db, TOURNAMENT_STATE_COLLECTION), slug));
+  await deleteTournamentCoverByUrl(coverImageUrl, slug);
+  await deleteTournamentCoverFolder(slug);
+  try {
+    localStorage.removeItem(getPersistStorageKey(slug));
+  } catch (_) {
+    // ignore
+  }
+}
+
 async function confirmDeleteTournament() {
   const modal = document.getElementById("confirmDeleteTournamentModal");
   if (!modal?.dataset.slug) return;
   const slug = modal.dataset.slug;
   const circuitSlug = modal.dataset.circuitSlug || currentTournamentMeta?.circuitSlug || "";
   try {
-    let coverImageUrl = "";
-    if (currentTournamentMeta?.slug === slug) {
-      coverImageUrl = currentTournamentMeta?.coverImageUrl || "";
-    } else {
-      try {
-        const tournamentSnap = await getDoc(doc(collection(db, TOURNAMENT_COLLECTION), slug));
-        coverImageUrl = tournamentSnap.exists() ? tournamentSnap.data()?.coverImageUrl || "" : "";
-      } catch (err) {
-        console.warn("Failed to load tournament cover image", err);
-      }
-    }
-    await deleteTournamentChatHistory(slug);
-    await deleteTournamentPresence(slug);
-    await deleteDoc(doc(collection(db, TOURNAMENT_COLLECTION), slug));
-    await deleteDoc(doc(collection(db, TOURNAMENT_STATE_COLLECTION), slug));
-    await deleteTournamentCoverByUrl(coverImageUrl, slug);
-    await deleteTournamentCoverFolder(slug);
-    try {
-      localStorage.removeItem(getPersistStorageKey(slug));
-    } catch (_) {
-      // ignore
-    }
+    const coverImageUrl = await getTournamentCoverUrlForDelete(slug);
+    await deleteTournamentBundle(slug, coverImageUrl);
     if (circuitSlug) {
       const updates = { tournaments: arrayRemove(slug) };
       if (currentCircuitMeta?.finalTournamentSlug === slug) {
@@ -2162,6 +2733,66 @@ async function confirmDeleteTournament() {
   } catch (err) {
     console.error("Failed to delete tournament", err);
     showToast?.("Failed to delete tournament.", "error");
+  }
+}
+
+function openDeleteCircuitModal() {
+  if (!currentCircuitMeta?.slug || !isCircuitAdmin) return;
+  const modal = document.getElementById("confirmDeleteCircuitModal");
+  const message = document.getElementById("confirmDeleteCircuitMessage");
+  const circuitSlug = currentCircuitMeta.slug;
+  if (modal) {
+    modal.dataset.slug = circuitSlug;
+    const tournamentSlugs = normalizeCircuitTournamentSlugs(currentCircuitMeta);
+    const count = tournamentSlugs.length;
+    if (message) {
+      message.textContent = `Are you sure you want to delete "${circuitSlug}"? This will delete ${count} tournament${count === 1 ? "" : "s"} and all related data.`;
+    }
+    modal.style.display = "flex";
+    lockBodyScroll();
+  }
+}
+
+function closeDeleteCircuitModal() {
+  const modal = document.getElementById("confirmDeleteCircuitModal");
+  if (!modal) return;
+  delete modal.dataset.slug;
+  modal.style.display = "none";
+  const settingsModal = document.getElementById("circuitSettingsModal");
+  if (!settingsModal || settingsModal.style.display !== "flex") {
+    unlockBodyScroll();
+  }
+}
+
+async function confirmDeleteCircuit() {
+  const modal = document.getElementById("confirmDeleteCircuitModal");
+  const circuitSlug = modal?.dataset.slug || currentCircuitMeta?.slug || "";
+  if (!circuitSlug) return;
+  try {
+    const meta =
+      currentCircuitMeta?.slug === circuitSlug
+        ? currentCircuitMeta
+        : await fetchCircuitMeta(circuitSlug);
+    const tournamentSlugs = normalizeCircuitTournamentSlugs(meta || {});
+    for (const slug of tournamentSlugs) {
+      const coverImageUrl = await getTournamentCoverUrlForDelete(slug);
+      await deleteTournamentBundle(slug, coverImageUrl);
+    }
+    await deleteDoc(doc(collection(db, CIRCUIT_COLLECTION), circuitSlug));
+    if (currentCircuitMeta?.slug === circuitSlug) {
+      currentCircuitMeta = null;
+      isCircuitAdmin = false;
+      updateCircuitAdminVisibility();
+    }
+    showToast?.("Circuit deleted.", "success");
+    closeDeleteCircuitModal();
+    closeCircuitSettingsModal();
+    if (typeof window !== "undefined") {
+      window.location.href = "/tournament/";
+    }
+  } catch (err) {
+    console.error("Failed to delete circuit", err);
+    showToast?.("Failed to delete circuit.", "error");
   }
 }
 
@@ -2266,6 +2897,7 @@ async function enterTournament(slug, options = {}) {
         backLink.href = metaCircuitSlug ? `/tournament/${metaCircuitSlug}` : "/tournament";
         backLink.lastChild.textContent = metaCircuitSlug ? "Circuit page" : "All tournaments";
       }
+      await refreshInviteLinkGate(slug);
     } else {
       if (typeof window !== "undefined") {
         window.location.href = "/404.html";
@@ -2277,6 +2909,7 @@ async function enterTournament(slug, options = {}) {
   }
   // Update admin flag based on ownership
   recomputeAdminFromMeta();
+  await refreshInviteLinksPanel();
   // Hydrate remote state (merge) and render
   await hydrateStateFromRemote(
     slug,
@@ -2660,6 +3293,17 @@ async function deleteTournamentChatHistory(slug) {
   }
 }
 
+async function deleteTournamentInviteLinks(slug) {
+  if (!slug) return;
+  try {
+    const linksRef = collection(db, TOURNAMENT_INVITE_LINK_COLLECTION, slug, "links");
+    const snap = await getDocs(linksRef);
+    await Promise.all(snap.docs.map((docSnap) => deleteDoc(docSnap.ref)));
+  } catch (err) {
+    console.warn("Failed to delete tournament invite links", err);
+  }
+}
+
 function isFirebaseStorageUrl(url) {
   return /^gs:\/\//.test(url) || url.includes("firebasestorage.googleapis.com");
 }
@@ -2756,6 +3400,7 @@ async function handleSaveSettings(event) {
   const maxPlayersInput = document.getElementById("settingsMaxPlayersInput");
   const checkInSelect = document.getElementById("settingsCheckInSelect");
   const accessSelect = document.getElementById("settingsAccessSelect");
+  const visibilitySelect = document.getElementById("settingsVisibilitySelect");
   const qualifyInput = document.getElementById("settingsCircuitQualifyCount");
   const requirePulseInput = document.getElementById("settingsRequirePulseLink");
   const requirePulseSyncInput = document.getElementById("settingsRequirePulseSync");
@@ -2786,6 +3431,7 @@ async function handleSaveSettings(event) {
       : Number(qualifyRaw);
   const checkInWindowMinutes = getCheckInWindowMinutes(checkInSelect);
   const isInviteOnly = accessSelect?.value === "closed";
+  const visibility = normalizeTournamentVisibility(visibilitySelect?.value);
   const mapPool = Array.from(mapPoolSelection || []);
   const rrSettings = extractRoundRobinSettingsUI("settings", defaultRoundRobinSettings);
   const circuitPoints = currentTournamentMeta?.circuitSlug
@@ -2819,6 +3465,7 @@ async function handleSaveSettings(event) {
     startTime,
     checkInWindowMinutes,
     isInviteOnly,
+    visibility,
     bestOf,
     mapPool,
     roundRobin: rrSettings,
@@ -2849,6 +3496,8 @@ async function handleSaveSettings(event) {
   }
 
   setCurrentTournamentMetaState(meta);
+  updateAdminVisibility();
+  await refreshInviteLinksPanel();
   setRequirePulseLinkSettingState(requirePulseLink);
   setRequirePulseSyncSettingState(requirePulseSync);
   updateMmrDisplay(document.getElementById("mmrStatus"));
@@ -2884,6 +3533,8 @@ async function handleCreateCircuit(event) {
   const firstPlaceToggle = document.getElementById("circuitFirstPlaceSortToggle");
   const finalNameInput = document.getElementById("finalTournamentNameInput");
   const finalSlugInput = document.getElementById("finalTournamentSlugInput");
+  const finalVisibilitySelect = document.getElementById("finalTournamentVisibilitySelect");
+  const finalAccessSelect = document.getElementById("finalTournamentAccessSelect");
   const finalFormatSelect = document.getElementById("finalFormatSelect");
   const finalStartInput = document.getElementById("finalTournamentStartInput");
   const finalMaxPlayersInput = document.getElementById("finalTournamentMaxPlayersInput");
@@ -2900,6 +3551,8 @@ async function handleCreateCircuit(event) {
     (await generateCircuitSlug());
   const description = descriptionInput?.value || "";
   const sortByFirstPlace = Boolean(firstPlaceToggle?.checked);
+  const finalVisibility = normalizeTournamentVisibility(finalVisibilitySelect?.value);
+  const finalAccess = normalizeTournamentAccess(finalAccessSelect?.value);
   const finalName =
     (finalNameInput?.value || "").trim() || (name ? `${name} Finals` : "");
   let finalSlug = (finalSlugInput?.value || "").trim().toLowerCase();
@@ -2969,6 +3622,8 @@ async function handleCreateCircuit(event) {
     maxPlayers: finalMaxPlayers,
     startTime: finalStartTime,
     checkInWindowMinutes: finalCheckInWindowMinutes,
+    isInviteOnly: finalAccess === "closed",
+    visibility: finalVisibility,
     mapPool: getFinalMapPoolSelection(),
     createdBy: auth.currentUser?.uid || null,
     createdByName: getCurrentUsername() || "Unknown host",
@@ -3034,6 +3689,7 @@ async function handleCreateTournament(event) {
   const maxPlayersInput = document.getElementById("tournamentMaxPlayersInput");
   const checkInSelect = document.getElementById("checkInSelect");
   const accessSelect = document.getElementById("tournamentAccessSelect");
+  const visibilitySelect = document.getElementById("tournamentVisibilitySelect");
   const descriptionInput = document.getElementById("tournamentDescriptionInput");
   const rulesInput = document.getElementById("tournamentRulesInput");
   const imageInput = document.getElementById("tournamentImageInput");
@@ -3070,6 +3726,7 @@ async function handleCreateTournament(event) {
   }
   const checkInWindowMinutes = getCheckInWindowMinutes(checkInSelect);
   const isInviteOnly = accessSelect?.value === "closed";
+  const visibility = normalizeTournamentVisibility(visibilitySelect?.value);
   const description = descriptionInput?.value || "";
   const rules = rulesInput?.value || "";
   const rrSettings = extractRoundRobinSettingsUI("create", defaultRoundRobinSettings);
@@ -3084,6 +3741,7 @@ async function handleCreateTournament(event) {
       startTime,
       checkInWindowMinutes,
       isInviteOnly,
+      visibility,
       mapPool: Array.from(mapPoolSelection || []),
       createdBy: auth.currentUser?.uid || null,
       createdByName: getCurrentUsername() || "Unknown host",
@@ -3338,6 +3996,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     openCircuitSettingsModal,
     closeCircuitSettingsModal,
     saveCircuitSettings,
+    openDeleteCircuitModal,
+    confirmDeleteCircuit,
+    closeDeleteCircuitModal,
     openDeleteTournamentModal,
     confirmDeleteTournament,
     closeDeleteTournamentModal,
@@ -3402,6 +4063,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   initCoverReuseModal();
   initCasterControls({ saveState });
   initFinalAdminSearch();
+  initInviteLinksPanel();
   initAdminInviteModal();
   initFinalAutoAddToggle();
 
@@ -3486,6 +4148,7 @@ function updateAdminVisibility() {
   const testHarness = document.getElementById("testBracketPanel");
   if (testHarness) testHarness.style.display = isAdmin ? "" : "none";
   updateFinalAdminAddVisibility();
+  updateInviteLinksPanelVisibility();
   updateFinalAutoAddRow();
   if (typeof window !== "undefined") {
     window.__tournamentIsAdmin = isAdmin;
@@ -3511,6 +4174,13 @@ function updateFinalAdminAddVisibility() {
   const panel = document.getElementById("finalAdminAddPanel");
   if (!panel) return;
   panel.style.display = isAdmin ? "block" : "none";
+}
+
+function updateInviteLinksPanelVisibility() {
+  const panel = document.getElementById("inviteLinksPanel");
+  if (!panel) return;
+  const show = isAdmin && Boolean(currentTournamentMeta?.isInviteOnly);
+  panel.style.display = show ? "block" : "none";
 }
 
 function recomputeAdminFromMeta() {
@@ -3779,11 +4449,16 @@ function populatePlayerNameFromProfile() {
   const input = document.getElementById("playerNameInput");
   if (!input) return;
   const current = (input.value || "").trim();
-  if (current) return;
-  const candidate = pulseProfile?.accountName || getCurrentUsername() || "";
-  if (candidate) {
-    input.value = candidate;
+  const username = getCurrentUsername() || getCurrentUserProfile?.()?.username || "";
+  const pulseName = pulseProfile?.accountName || "";
+  if (current) {
+    if (username && current === pulseName && current !== username) {
+      input.value = username;
+    }
+    return;
   }
+  const candidate = username || pulseName;
+  if (candidate) input.value = candidate;
 }
 
 function normalizeRaceLabel(raw) {
@@ -3982,6 +4657,8 @@ async function handleRegistration(event) {
   const requirePulseLinkEnabled = getRequirePulseLinkEnabled();
   const pointsField = document.getElementById("pointsInput");
   const isInviteOnly = isInviteOnlyTournament(currentTournamentMeta);
+  const inviteToken = getInviteTokenFromUrl();
+  const needsInviteLink = Boolean(isInviteOnly && !isAdmin);
 
   if (!auth.currentUser) {
     setStatus(
@@ -4018,13 +4695,21 @@ async function handleRegistration(event) {
     return;
   }
 
-  if (isInviteOnly && !isAdmin) {
-    setStatus(
-      statusEl,
-      "This tournament is invite-only. Ask an admin for an invite.",
-      true
-    );
-    return;
+  if (needsInviteLink) {
+    if (!inviteToken) {
+      setStatus(
+        statusEl,
+        "This tournament is invite-only. Ask an admin for an invite link or a manual invite.",
+        true
+      );
+      return;
+    }
+    const gateMatches =
+      inviteLinkGate?.slug === currentSlug && inviteLinkGate?.token === inviteToken;
+    if (gateMatches && inviteLinkGate.status === "ready" && !inviteLinkGate.ok) {
+      setStatus(statusEl, inviteLinkGate.message || "Invite link invalid.", true);
+      return;
+    }
   }
 
   const pulseGate = getPulseSyncGateStatus();
@@ -4114,8 +4799,11 @@ async function handleRegistration(event) {
     );
     return;
   }
+  const profile = getCurrentUserProfile?.() || {};
   const twitchUrl =
-    document.getElementById("settingsTwitchInput")?.value?.trim() || "";
+    document.getElementById("settingsTwitchInput")?.value?.trim() ||
+    profile?.twitchUrl ||
+    "";
   let secondaryPulseLinks = collectSecondaryPulseLinks();
   const secondaryPulseProfiles =
     Array.isArray(pulseProfile?.secondary) && pulseProfile.secondary.length
@@ -4130,7 +4818,9 @@ async function handleRegistration(event) {
   const mainClanSelect = document.getElementById("mainClanSelect");
   const selectedClanOption = mainClanSelect?.selectedOptions?.[0];
   const selectedClanId = mainClanSelect?.value || "";
-  const profileCountry = getCurrentUserProfile?.()?.country || "";
+  const profileCountry = profile?.country || "";
+  const profileMainClanId = getCurrentUserProfile?.()?.settings?.mainClanId || "";
+  const effectiveClanId = selectedClanId || profileMainClanId;
   const countryCode =
     document.getElementById("settingsCountrySelect")?.value?.trim().toUpperCase() ||
     String(profileCountry).trim().toUpperCase() ||
@@ -4138,9 +4828,9 @@ async function handleRegistration(event) {
   let clanName = selectedClanOption?.textContent || "";
   let clanAbbreviation = selectedClanOption?.dataset?.abbr || "";
   let clanLogoUrl = selectedClanOption?.dataset?.logoUrl || "";
-  if (selectedClanId) {
+  if (effectiveClanId) {
     try {
-      const clanDoc = await getDoc(doc(db, "clans", selectedClanId));
+      const clanDoc = await getDoc(doc(db, "clans", effectiveClanId));
       if (clanDoc.exists()) {
         const clanData = clanDoc.data();
         clanName = clanData?.name || clanName;
@@ -4152,6 +4842,21 @@ async function handleRegistration(event) {
     }
   }
 
+  let inviteLinkMeta = null;
+  if (needsInviteLink) {
+    const claim = await claimInviteLinkUse({ slug: currentSlug, token: inviteToken });
+    if (!claim.ok) {
+      setStatus(statusEl, claim.message || "Invite link invalid.", true);
+      await refreshInviteLinkGate(currentSlug);
+      renderAll();
+      return;
+    }
+    inviteLinkMeta = {
+      invitedAt: Date.now(),
+      invitedByName: "Invite link",
+    };
+  }
+
   const newPlayer = createOrUpdatePlayer({
     name,
     race,
@@ -4159,6 +4864,7 @@ async function handleRegistration(event) {
     mmr: Number.isFinite(mmr) ? mmr : 0,
     points: startingPoints,
     inviteStatus: INVITE_STATUS.accepted,
+    ...(inviteLinkMeta || {}),
     avatarUrl,
     twitchUrl,
     secondaryPulseLinks,
@@ -4488,49 +5194,49 @@ function syncCurrentPlayerAvatar(avatarUrl) {
   refreshPlayerDetailModalIfOpen(getPlayersMap);
 }
 
-function serializeBracket(bracket) {
-  if (!bracket || typeof bracket !== "object") return bracket;
-  const toArr = (obj) =>
-    Array.isArray(obj)
-      ? obj
-      : obj && typeof obj === "object"
-      ? Object.keys(obj)
-          .sort((a, b) => Number(a) - Number(b))
-          .map((key) => obj[key])
-      : [];
-  const normalizeRounds = (rounds) =>
-    toArr(rounds)
-      .map((round) => toArr(round))
-      .filter((round) => round.length);
-  const toObj = (arr) =>
-    Array.isArray(arr)
-      ? arr.reduce((acc, round, idx) => {
-          acc[idx] = round;
-          return acc;
-        }, {})
-      : arr || {};
-  const winnersRounds = normalizeRounds(bracket.winners);
-  const losersRounds = normalizeRounds(bracket.losers);
-  return {
-    ...bracket,
-    winners: toObj(winnersRounds),
-    losers: toObj(losersRounds),
-    groups: toArr(bracket.groups),
-    winnersRoundCount: winnersRounds.length,
-    losersRoundCount: losersRounds.length,
-  };
-}
+  function serializeBracket(bracket) {
+    if (!bracket || typeof bracket !== "object") return bracket;
+    const toArr = (obj) =>
+      Array.isArray(obj)
+        ? obj
+        : obj && typeof obj === "object"
+        ? Object.keys(obj)
+            .sort((a, b) => Number(a) - Number(b))
+            .map((key) => obj[key])
+        : [];
+    const normalizeRounds = (rounds) =>
+      toArr(rounds)
+        .map((round) => toArr(round))
+        .filter((round) => round.length);
+    const toObj = (arr) =>
+      Array.isArray(arr)
+        ? arr.reduce((acc, round, idx) => {
+            acc[idx] = round;
+            return acc;
+          }, {})
+        : arr || {};
+    const winnersRounds = normalizeRounds(bracket.winners);
+    const losersRounds = normalizeRounds(bracket.losers);
+    return {
+      ...bracket,
+      winners: toObj(winnersRounds),
+      losers: toObj(losersRounds),
+      groups: toArr(bracket.groups),
+      winnersRoundCount: winnersRounds.length,
+      losersRoundCount: losersRounds.length,
+    };
+  }
 
-function deserializeBracket(bracket) {
-  if (!bracket || typeof bracket !== "object") return bracket || null;
-  const toArr = (obj) =>
-    Array.isArray(obj)
-      ? obj
-      : obj && typeof obj === "object"
-      ? Object.keys(obj)
-          .sort((a, b) => Number(a) - Number(b))
-          .map((key) => obj[key])
-      : [];
+  function deserializeBracket(bracket) {
+    if (!bracket || typeof bracket !== "object") return bracket || null;
+    const toArr = (obj) =>
+      Array.isArray(obj)
+        ? obj
+        : obj && typeof obj === "object"
+        ? Object.keys(obj)
+            .sort((a, b) => Number(a) - Number(b))
+            .map((key) => obj[key])
+        : [];
   const normalizeRounds = (rounds) =>
     toArr(rounds)
       .map((round) => toArr(round))

@@ -745,6 +745,8 @@ export async function populateCreateCircuitForm() {
   const firstPlaceToggle = document.getElementById("circuitFirstPlaceSortToggle");
   const finalNameInput = document.getElementById("finalTournamentNameInput");
   const finalSlugInput = document.getElementById("finalTournamentSlugInput");
+  const finalVisibilitySelect = document.getElementById("finalTournamentVisibilitySelect");
+  const finalAccessSelect = document.getElementById("finalTournamentAccessSelect");
   const finalDescInput = document.getElementById("finalTournamentDescriptionInput");
   const finalRulesInput = document.getElementById("finalTournamentRulesInput");
   const finalStartInput = document.getElementById("finalTournamentStartInput");
@@ -761,6 +763,8 @@ export async function populateCreateCircuitForm() {
     slugInput.value = await generateCircuitSlug();
   }
   if (finalNameInput) finalNameInput.value = "";
+  if (finalVisibilitySelect) finalVisibilitySelect.value = "public";
+  if (finalAccessSelect) finalAccessSelect.value = "open";
   if (finalDescInput) finalDescInput.value = "";
   if (finalRulesInput) finalRulesInput.value = "";
   syncMarkdownSurfaceForInput(finalDescInput);

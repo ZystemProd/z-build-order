@@ -24,6 +24,80 @@ const CAST_ICON_SVG = `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="fa
 </svg>`;
 
 let currentUsernameHint = "";
+const nameRevealQueue = new Set();
+const lastRenderedParticipantIds = new Map();
+const recentNameReveals = new Map();
+const REVEAL_WINDOW_MS = 1200;
+
+function nameRevealKey(matchId, participantIdx) {
+  return `${matchId || "match"}:${participantIdx ?? "0"}`;
+}
+
+export function queuePlayerNameReveal(matchId, participantIdx) {
+  if (!matchId && participantIdx == null) return;
+  nameRevealQueue.add(nameRevealKey(matchId, participantIdx));
+}
+
+function consumeNameReveal(matchId, participantIdx) {
+  const key = nameRevealKey(matchId, participantIdx);
+  if (!nameRevealQueue.has(key)) return false;
+  nameRevealQueue.delete(key);
+  recentNameReveals.set(key, performance.now());
+  return true;
+}
+
+function shouldRevealParticipant(matchId, participantIdx, playerId) {
+  const key = nameRevealKey(matchId, participantIdx);
+  const now = performance.now();
+  const lastReveal = recentNameReveals.get(key);
+  if (playerId && lastReveal && now - lastReveal < REVEAL_WINDOW_MS) {
+    return true;
+  }
+  const hasPrev = lastRenderedParticipantIds.has(key);
+  const prevId = lastRenderedParticipantIds.get(key) || null;
+  lastRenderedParticipantIds.set(key, playerId || null);
+  if (!hasPrev) {
+    if (!playerId) recentNameReveals.delete(key);
+    return false;
+  }
+  if (playerId && playerId !== prevId) {
+    recentNameReveals.set(key, now);
+    return true;
+  }
+  if (!playerId) recentNameReveals.delete(key);
+  if (recentNameReveals.size > 200) {
+    for (const [k, t] of recentNameReveals) {
+      if (now - t > REVEAL_WINDOW_MS) recentNameReveals.delete(k);
+    }
+  }
+  return false;
+}
+
+function applyNameRevealAnimations(root) {
+  const targets = [
+    ...root.querySelectorAll(".player-name.name-reveal strong"),
+    ...root.querySelectorAll(".name-text.name-reveal"),
+  ];
+  targets.forEach((target) => {
+    if (target.dataset.twDone === "1") return;
+    const text = target.textContent || "";
+    const length = Math.max(text.length, 1);
+    const delayMs = Math.min(70, Math.max(40, Math.round(900 / length)));
+    target.style.setProperty("--tw-char-delay", `${delayMs}ms`);
+    target.style.setProperty("--tw-char-duration", "480ms");
+    target.textContent = "";
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < text.length; i += 1) {
+      const span = document.createElement("span");
+      span.className = "tw-char";
+      span.style.setProperty("--tw-index", i);
+      span.textContent = text[i];
+      frag.appendChild(span);
+    }
+    target.appendChild(frag);
+    target.dataset.twDone = "1";
+  });
+}
 
 function setCurrentUsernameHint(username) {
   currentUsernameHint = (username || "").trim().toLowerCase();
@@ -179,6 +253,7 @@ export function renderMatchCard(match, lookup, playersById) {
 
 export function renderPlayerRow(player, score, label, bestOf, match, participantIdx, lookup) {
   if (!player) {
+    shouldRevealParticipant(match?.id, participantIdx, null);
     const placeholderText = displayPlaceholderForSource(match, participantIdx, lookup);
     return `<div class="player-row">
       <div class="player-name placeholder-tag">${escapeHtml(placeholderText)}</div>
@@ -187,8 +262,17 @@ export function renderPlayerRow(player, score, label, bestOf, match, participant
       </select>
     </div>`;
   }
-  return `<div class="player-row">
-    <div class="player-name player-detail-trigger" data-player-id="${player.id || ""}">
+  const autoReveal = shouldRevealParticipant(
+    match?.id,
+    participantIdx,
+    player.id || null
+  );
+  const revealName =
+    consumeNameReveal(match?.id, participantIdx) || autoReveal;
+  const nameClass = ["player-name", "player-detail-trigger"];
+  if (revealName) nameClass.push("name-reveal");
+  return `<div class="player-row" data-participant-idx="${participantIdx}">
+    <div class="${nameClass.join(" ")}" data-player-id="${player.id || ""}">
       <span class="seed-chip">#${player.seed || "?"}</span>
       <div>
         <strong>${escapeHtml(player.name)}</strong>
@@ -280,8 +364,12 @@ export function renderSimpleMatch(
     ? `match-card tree${shouldHighlightReady ? " ready" : ""}`
     : `match-card group${shouldHighlightReady ? " ready" : ""}`;
   const scoreReportClass = hasScoreReport ? " score-report" : "";
-  const aIsPlaceholder = !pA;
-  const bIsPlaceholder = !pB;
+    const aIsPlaceholder = !pA;
+    const bIsPlaceholder = !pB;
+    const autoRevealA = shouldRevealParticipant(match?.id, 0, pA?.id || null);
+    const autoRevealB = shouldRevealParticipant(match?.id, 1, pB?.id || null);
+    const revealA = consumeNameReveal(match?.id, 0) || autoRevealA;
+    const revealB = consumeNameReveal(match?.id, 1) || autoRevealB;
   const aName = pA ? pA.name : displayPlaceholderForSource(match, 0, lookup);
   const bName = pB ? pB.name : displayPlaceholderForSource(match, 1, lookup);
   const raceClassA = raceClassName(pA?.race);
@@ -324,15 +412,17 @@ export function renderSimpleMatch(
         pA ? "" : "is-placeholder"
       }">${pA ? `#${pA.seed || "?"}` : ""}</span><span class="race-strip ${raceClassA}"></span>${
         clanLogoA
-          ? `<img class="clan-logo-inline" src="${escapeHtml(clanLogoA)}" alt="Clan logo" ${
-              clanNameA ? `data-tooltip="${escapeHtml(clanNameA)}"` : ""
-            } />`
-          : `<img class="clan-logo-inline is-placeholder" src="img/clan/logo.webp" alt="No clan logo" />`
-      }<span class="name-text ${
-    aIsPlaceholder ? "is-placeholder" : ""
-  }">${escapeHtml(
-     aName
-   )}</span></span>
+            ? `<img class="clan-logo-inline" src="${escapeHtml(
+                clanLogoA
+              )}" alt="Clan logo" loading="eager" decoding="sync" ${
+                clanNameA ? `data-tooltip="${escapeHtml(clanNameA)}"` : ""
+              } />`
+            : `<img class="clan-logo-inline is-placeholder" src="img/clan/logo.webp" alt="No clan logo" loading="eager" decoding="sync" />`
+        }<span class="name-text ${
+      [aIsPlaceholder ? "is-placeholder" : "", revealA && !aIsPlaceholder ? "name-reveal" : ""]
+        .filter(Boolean)
+        .join(" ")
+    }">${escapeHtml(aName)}</span></span>
       <div class="row-actions">
         <div class="score-select score-display ${
           match.winnerId === pA?.id ? "winner" : ""
@@ -348,15 +438,17 @@ export function renderSimpleMatch(
         pB ? "" : "is-placeholder"
       }">${pB ? `#${pB.seed || "?"}` : ""}</span><span class="race-strip ${raceClassB}"></span>${
         clanLogoB
-          ? `<img class="clan-logo-inline" src="${escapeHtml(clanLogoB)}" alt="Clan logo" ${
-              clanNameB ? `data-tooltip="${escapeHtml(clanNameB)}"` : ""
-            } />`
-          : `<img class="clan-logo-inline is-placeholder" src="img/clan/logo.webp" alt="No clan logo" />`
-      }<span class="name-text ${
-    bIsPlaceholder ? "is-placeholder" : ""
-  }">${escapeHtml(
-     bName
-   )}</span></span>
+            ? `<img class="clan-logo-inline" src="${escapeHtml(
+                clanLogoB
+              )}" alt="Clan logo" loading="eager" decoding="sync" ${
+                clanNameB ? `data-tooltip="${escapeHtml(clanNameB)}"` : ""
+              } />`
+            : `<img class="clan-logo-inline is-placeholder" src="img/clan/logo.webp" alt="No clan logo" loading="eager" decoding="sync" />`
+        }<span class="name-text ${
+      [bIsPlaceholder ? "is-placeholder" : "", revealB && !bIsPlaceholder ? "name-reveal" : ""]
+        .filter(Boolean)
+        .join(" ")
+    }">${escapeHtml(bName)}</span></span>
       <div class="row-actions">
         <div class="score-select score-display ${
           match.winnerId === pB?.id ? "winner" : ""
@@ -1253,18 +1345,19 @@ export function renderBracketView({
   const lookup = getMatchLookup(bracket);
   const playersById = getPlayersMap();
 
-  if (isGroupStage) {
-    grid.innerHTML = renderRoundRobinView(
-      { ...bracket, computeGroupStandings },
-      playersById,
-      computeGroupStandings
-    );
-    attachMatchHoverHandlers();
-    attachMatchActionHandlers?.();
-    clampScoreSelectOptions();
-    annotateConnectorPlayers(lookup, playersById);
-    return;
-  }
+    if (isGroupStage) {
+      grid.innerHTML = renderRoundRobinView(
+        { ...bracket, computeGroupStandings },
+        playersById,
+        computeGroupStandings
+      );
+      attachMatchHoverHandlers();
+      attachMatchActionHandlers?.();
+      clampScoreSelectOptions();
+      annotateConnectorPlayers(lookup, playersById);
+      applyNameRevealAnimations(grid);
+      return;
+    }
 
   const upperRounds = [...(bracket.winners || [])];
 
@@ -1299,13 +1392,14 @@ export function renderBracketView({
       : { html: "", height: 0 };
   }
 
-  grid.innerHTML = DOMPurify.sanitize(`<div class="tree-wrapper">
-    ${upper.html}
-    ${lower.html}
-  </div>`);
+    grid.innerHTML = DOMPurify.sanitize(`<div class="tree-wrapper">
+      ${upper.html}
+      ${lower.html}
+    </div>`);
 
-  attachMatchHoverHandlers();
-  attachMatchActionHandlers?.();
-  clampScoreSelectOptions();
-  annotateConnectorPlayers(lookup, playersById);
-}
+    attachMatchHoverHandlers();
+    attachMatchActionHandlers?.();
+    clampScoreSelectOptions();
+    annotateConnectorPlayers(lookup, playersById);
+    applyNameRevealAnimations(grid);
+  }

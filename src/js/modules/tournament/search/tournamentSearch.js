@@ -31,6 +31,7 @@ async function searchTournamentDirectory(query, { limit = 10 } = {}) {
   ]);
   const results = [];
   (tournaments || []).forEach((item) => {
+    if (String(item.visibility || "public").toLowerCase() === "private") return;
     const score = scoreSearchFields(term, [
       item.name,
       item.slug,

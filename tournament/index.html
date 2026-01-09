@@ -459,7 +459,7 @@
             <div class="hero-admins-header">
               <span class="eyebrow">Admins</span>
               <button id="inviteTournamentAdminBtn" class="cta ghost small" type="button" style="display:none;">
-                Invite admin
+                Manage admins
               </button>
             </div>
             <div class="hero-admins-list" id="tournamentAdminList"></div>
@@ -528,7 +528,8 @@
             <div class="live-dot not-live" id="liveDot">Not Live</div>
           </div>
           <div id="bracketNotLive" class="not-live-panel" style="display:none;">
-            <p class="helper">Tournament paused - updates in progress.</p>
+            <p class="eyebrow registered-title" id="registeredPlayersTitle">Participent</p>
+            <p class="helper" id="bracketNotLiveMessage">Tournament paused - updates in progress.</p>
             <ul id="registeredPlayersList" class="registered-list"></ul>
           </div>
           <div id="bracketGrid" class="bracket-grid">
@@ -615,6 +616,40 @@
             </label>
             <div class="admin-search-results" id="finalAdminSearchResults"></div>
             <p class="helper" id="finalAdminSearchStatus"></p>
+          </div>
+          <div class="admin-add-player" data-admin-only="true" id="inviteLinksPanel" style="display:none;">
+            <div class="section-title">Invite links</div>
+            <div class="form-grid">
+              <label>Name (optional)
+                <input id="inviteLinkNameInput" type="text" placeholder="e.g. Friends" maxlength="60" />
+              </label>
+              <label>Max uses (optional)
+                <input id="inviteLinkMaxUsesInput" type="number" min="1" placeholder="Unlimited" />
+              </label>
+              <label>Expires at (optional)
+                <div class="datetime-row">
+                  <input id="inviteLinkExpiresInput" type="text" class="datetime-input" placeholder="YYYY-MM-DD HH:MM"
+                    autocomplete="off" autocorrect="off" spellcheck="false" />
+                  <button type="button" class="icon-btn datepicker-btn" data-datepicker-for="inviteLinkExpiresInput"
+                    aria-label="Pick expiry time">
+                    <img src="img/SVG/time.svg" alt="" aria-hidden="true" />
+                  </button>
+                </div>
+              </label>
+            </div>
+            <div class="form-actions" style="margin-top:12px;">
+              <button type="button" class="cta primary small" id="createInviteLinkBtn">Create invite link</button>
+            </div>
+            <div class="invite-link-table" id="inviteLinkList">
+              <div class="invite-link-row invite-link-header">
+                <span>Active</span>
+                <span>Name</span>
+                <span>Uses</span>
+                <span>Expires</span>
+                <span></span>
+              </div>
+            </div>
+            <p class="helper" id="inviteLinkStatus"></p>
           </div>
         </div>
 
@@ -752,6 +787,16 @@
                     <option value="165">2h 45</option>
                     <option value="180">3h</option>
                   </select>
+                </div>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-label">Tournament visibility</div>
+                <div class="settings-row-control">
+                  <select id="settingsVisibilitySelect">
+                    <option value="public">Public (shown in browse)</option>
+                    <option value="private">Private (link only)</option>
+                  </select>
+                  <p class="helper">Private tournaments are hidden from browse listings.</p>
                 </div>
               </div>
               <div class="settings-row">
@@ -1129,7 +1174,8 @@
         </label>
         <label class="template-manager-hide">Start time
           <div class="datetime-row">
-            <input type="text" id="tournamentStartInput" class="datetime-input" placeholder="YYYY-MM-DD HH:MM" />
+            <input type="text" id="tournamentStartInput" class="datetime-input" placeholder="YYYY-MM-DD HH:MM"
+              autocomplete="off" autocorrect="off" spellcheck="false" />
             <button type="button" class="icon-btn datepicker-btn" data-datepicker-for="tournamentStartInput"
               aria-label="Pick start time">
               <img src="img/SVG/time.svg" alt="" aria-hidden="true" />
@@ -1154,6 +1200,12 @@
             <option value="150">2h 30</option>
             <option value="165">2h 45</option>
             <option value="180">3h</option>
+          </select>
+        </label>
+        <label>Tournament visibility
+          <select id="tournamentVisibilitySelect">
+            <option value="public" selected>Public (shown in browse)</option>
+            <option value="private">Private (link only)</option>
           </select>
         </label>
         <label>Tournament access
@@ -1525,9 +1577,22 @@
             </div>
             <p class="helper">Final slug cannot be changed after creation.</p>
           </label>
+          <label>Visibility
+            <select id="circuitFinalVisibilitySelect">
+              <option value="public">Public (shown in browse)</option>
+              <option value="private">Private (link only)</option>
+            </select>
+          </label>
+          <label>Registration
+            <select id="circuitFinalAccessSelect">
+              <option value="open">Open (anyone can register)</option>
+              <option value="closed">Closed (invite-only)</option>
+            </select>
+          </label>
           <label>Start time
             <div class="datetime-row">
-              <input type="text" id="circuitFinalStartInput" class="datetime-input" placeholder="YYYY-MM-DD HH:MM" />
+              <input type="text" id="circuitFinalStartInput" class="datetime-input" placeholder="YYYY-MM-DD HH:MM"
+                autocomplete="off" autocorrect="off" spellcheck="false" />
               <button type="button" class="icon-btn datepicker-btn" data-datepicker-for="circuitFinalStartInput"
                 aria-label="Pick start time">
                 <img src="img/SVG/time.svg" alt="" aria-hidden="true" />
@@ -1793,6 +1858,7 @@
       <div class="form-actions">
         <button class="cta subtle" id="closeCircuitSettingsModal">Close</button>
         <button class="cta primary" id="saveCircuitSettingsBtn">Save</button>
+        <button class="cta danger" id="deleteCircuitBtn">Delete circuit</button>
       </div>
     </div>
   </div>
@@ -1849,20 +1915,33 @@
         <label>Final tournament name <span class="required">*</span>
           <input type="text" id="finalTournamentNameInput" placeholder="Circuit Finals" required />
         </label>
-        <label>Custom URL slug
-          <div class="inline-row">
-            <span class="muted" id="finalSlugPrefix">https://zbuildorder.com/</span>
-            <div class="slug-input-wrapper">
-              <input type="text" id="finalTournamentSlugInput" placeholder="circuit-finals" />
-            </div>
-          </div>
-          <p class="helper"></p>
-        </label>
-        <label>Start time
-          <div class="datetime-row">
-            <input type="text" id="finalTournamentStartInput" class="datetime-input" placeholder="YYYY-MM-DD HH:MM" />
-            <button type="button" class="icon-btn datepicker-btn" data-datepicker-for="finalTournamentStartInput"
-              aria-label="Pick start time">
+         <label>Custom URL slug
+           <div class="inline-row">
+             <span class="muted" id="finalSlugPrefix">https://zbuildorder.com/</span>
+             <div class="slug-input-wrapper">
+               <input type="text" id="finalTournamentSlugInput" placeholder="circuit-finals" />
+             </div>
+           </div>
+           <p class="helper"></p>
+         </label>
+         <label>Visibility
+           <select id="finalTournamentVisibilitySelect">
+             <option value="public" selected>Public (shown in browse)</option>
+             <option value="private">Private (link only)</option>
+           </select>
+         </label>
+         <label>Registration
+           <select id="finalTournamentAccessSelect">
+             <option value="open" selected>Open (anyone can register)</option>
+             <option value="closed">Closed (invite-only)</option>
+           </select>
+         </label>
+         <label>Start time
+           <div class="datetime-row">
+             <input type="text" id="finalTournamentStartInput" class="datetime-input" placeholder="YYYY-MM-DD HH:MM"
+               autocomplete="off" autocorrect="off" spellcheck="false" />
+             <button type="button" class="icon-btn datepicker-btn" data-datepicker-for="finalTournamentStartInput"
+               aria-label="Pick start time">
               <img src="img/SVG/time.svg" alt="" aria-hidden="true" />
             </button>
           </div>
@@ -2139,6 +2218,20 @@
       <div class="form-actions">
         <button class="cta danger" id="confirmDeleteTournamentBtn">Yes, delete</button>
         <button class="cta ghost" id="cancelDeleteTournamentBtn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete circuit modal -->
+  <div id="confirmDeleteCircuitModal" class="modal">
+    <div class="modal-content small-modal">
+      <h3>Delete circuit</h3>
+      <p id="confirmDeleteCircuitMessage" class="helper">
+        This will permanently delete the circuit and every tournament inside it.
+      </p>
+      <div class="form-actions">
+        <button class="cta danger" id="confirmDeleteCircuitBtn">Yes, delete</button>
+        <button class="cta ghost" id="cancelDeleteCircuitBtn">Cancel</button>
       </div>
     </div>
   </div>

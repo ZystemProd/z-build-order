@@ -31,6 +31,9 @@ export function initTournamentPage({
   openCircuitSettingsModal,
   closeCircuitSettingsModal,
   saveCircuitSettings,
+  openDeleteCircuitModal,
+  confirmDeleteCircuit,
+  closeDeleteCircuitModal,
   openDeleteTournamentModal,
   confirmDeleteTournament,
   closeDeleteTournamentModal,
@@ -132,6 +135,10 @@ export function initTournamentPage({
   const circuitSettingsModal = document.getElementById("circuitSettingsModal");
   const closeCircuitSettingsBtn = document.getElementById("closeCircuitSettingsModal");
   const saveCircuitSettingsBtn = document.getElementById("saveCircuitSettingsBtn");
+  const deleteCircuitBtn = document.getElementById("deleteCircuitBtn");
+  const deleteCircuitModal = document.getElementById("confirmDeleteCircuitModal");
+  const confirmDeleteCircuitBtn = document.getElementById("confirmDeleteCircuitBtn");
+  const cancelDeleteCircuitBtn = document.getElementById("cancelDeleteCircuitBtn");
   const closeCreateCircuit = document.getElementById("closeCreateCircuit");
   const saveCircuitBtn = document.getElementById("saveCircuitBtn");
   const nextCreateCircuitStep = document.getElementById("nextCreateCircuitStep");
@@ -647,6 +654,9 @@ export function initTournamentPage({
   saveCircuitSettingsBtn?.addEventListener("click", () => {
     saveCircuitSettings?.();
   });
+  deleteCircuitBtn?.addEventListener("click", () => {
+    openDeleteCircuitModal?.();
+  });
   deleteTournamentBtn?.addEventListener("click", () => {
     openDeleteTournamentModal?.();
   });
@@ -655,6 +665,12 @@ export function initTournamentPage({
   });
   cancelDeleteTournamentBtn?.addEventListener("click", () => {
     closeDeleteTournamentModal?.();
+  });
+  confirmDeleteCircuitBtn?.addEventListener("click", () => {
+    confirmDeleteCircuit?.();
+  });
+  cancelDeleteCircuitBtn?.addEventListener("click", () => {
+    closeDeleteCircuitModal?.();
   });
   confirmResetTournamentBtn?.addEventListener("click", () => {
     resetTournament?.();
@@ -670,6 +686,15 @@ export function initTournamentPage({
       e.target === deleteTournamentModal
     ) {
       closeDeleteTournamentModal?.();
+    }
+  });
+  window.addEventListener("mousedown", (e) => {
+    if (
+      deleteCircuitModal &&
+      deleteCircuitModal.style.display === "flex" &&
+      e.target === deleteCircuitModal
+    ) {
+      closeDeleteCircuitModal?.();
     }
   });
   window.addEventListener("mousedown", (e) => {

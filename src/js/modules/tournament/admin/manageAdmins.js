@@ -178,7 +178,7 @@ export function createAdminManager({
       row.append(labelWrap);
       const actions = document.createElement("div");
       actions.className = "admin-invite-actions";
-      if (entry.role === "Admin" && (entry.uid || entry.name)) {
+      if (entry.role !== "Host" && (entry.uid || entry.name)) {
         const button = document.createElement("button");
         button.type = "button";
         button.className = "icon-btn admin-remove-btn";

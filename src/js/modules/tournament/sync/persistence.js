@@ -82,6 +82,7 @@ export async function loadTournamentRegistry(force = false) {
         createdByName: data.createdByName || data.hostName || null,
         circuitSlug: data.circuitSlug || null,
         isInviteOnly: Boolean(data.isInviteOnly),
+        visibility: String(data.visibility || "public").toLowerCase() === "private" ? "private" : "public",
         bestOf: data.bestOf || defaultState.bestOf || null,
       };
     });
@@ -235,6 +236,7 @@ export async function persistTournamentStateRemote(
   }
 }
 
+
 export function saveState(
   next,
   options,
@@ -283,3 +285,6 @@ function stripUndefinedDeep(value) {
   }
   return value;
 }
+
+
+

@@ -301,14 +301,16 @@ a {
 }
 
 .admin-remove-btn {
-  width: 22px;
-  height: 22px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   margin-top: 0;
   font-size: 13px;
   font-weight: 600;
   line-height: 1;
-  transform: translateY(-2px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: #ff6b6b;
   border-color: rgba(255, 107, 107, 0.4);
   background: rgba(255, 107, 107, 0.08);
@@ -903,11 +905,115 @@ a {
   margin-top: 0;
 }
 
+#registrationAccessNote.is-blocking {
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.invite-link-table {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.invite-link-row {
+  display: grid;
+  grid-template-columns: 90px minmax(120px, 1fr) 90px 170px 170px;
+  gap: 12px;
+  align-items: center;
+}
+
+.invite-link-header {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  padding: 0 4px;
+}
+
+.invite-link-card {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--stroke);
+  background: var(--panel-2);
+}
+
+.invite-link-status {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--stroke);
+  width: fit-content;
+}
+
+.invite-link-status.is-active {
+  border-color: rgba(74, 222, 128, 0.55);
+  color: #6ee7b7;
+  background: #13281e;
+}
+
+.invite-link-status.is-expired {
+  border-color: rgba(251, 146, 60, 0.6);
+  color: #fdba74;
+  background: #2a1b11;
+}
+
+.invite-link-status.is-revoked {
+  border-color: rgba(154, 163, 182, 0.5);
+  color: var(--muted);
+  background: #1a1f2b;
+}
+
+.invite-link-actions {
+  display: inline-flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.invite-link-name {
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.invite-link-uses {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.invite-link-expires {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+@media (max-width: 700px) {
+  .invite-link-row {
+    grid-template-columns: 90px 1fr;
+    grid-template-rows: auto auto;
+    row-gap: 8px;
+  }
+  .invite-link-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+  .invite-link-header {
+    display: none;
+  }
+}
+
 .settings-toggle-row {
   display: inline-flex;
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+.admin-settings-grid .settings-row-control .settings-toggle-row {
+  margin-top: 6px;
 }
 
 .settings-toggle-row .helper {
@@ -1272,7 +1378,30 @@ a {
   padding: 0;
   margin: 10px 0 0 0;
   display: grid;
+  grid-template-columns: 1fr;
   gap: 6px;
+}
+
+.registered-title {
+  margin: 0;
+}
+
+@media (min-width: 640px) {
+  .registered-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 960px) {
+  .registered-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1280px) {
+  .registered-list {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 .registered-list li {
@@ -1281,6 +1410,19 @@ a {
   gap: 10px;
   color: var(--muted);
   font-size: 13px;
+}
+
+.registered-clan-logo {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  object-fit: cover;
+  flex: 0 0 auto;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.registered-clan-logo.is-placeholder {
+  opacity: 0.35;
 }
 
 .registered-list .name-text {
@@ -1754,6 +1896,35 @@ a {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.player-name.name-reveal strong,
+.name-text.name-reveal {
+  display: inline-block;
+  white-space: pre;
+}
+
+.player-name.name-reveal .tw-char,
+.name-text.name-reveal .tw-char {
+  display: inline-block;
+  opacity: 0;
+  animation: player-name-reveal var(--tw-char-duration, 480ms) ease forwards;
+  animation-delay: calc(var(--tw-index) * var(--tw-char-delay, 50ms));
+}
+
+@keyframes player-name-reveal {
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .player-name.name-reveal .tw-char,
+  .name-text.name-reveal .tw-char {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .seed-chip {
