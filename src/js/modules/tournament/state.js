@@ -82,10 +82,6 @@ export const defaultRoundRobinSettings = {
 };
 export let currentVetoMatchId = null;
 export let vetoState = null;
-export const bracketTestHarness = {
-  active: false,
-  count: 16,
-};
 export const broadcast =
   typeof BroadcastChannel !== "undefined"
     ? new BroadcastChannel(BROADCAST_NAME)

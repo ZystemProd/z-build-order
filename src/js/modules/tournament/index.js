@@ -51,7 +51,6 @@ import {
   GOOGLE_AVATAR_PATTERNS,
   defaultBestOf,
   defaultRoundRobinSettings,
-  bracketTestHarness,
   broadcast,
   currentSlug,
   state,
@@ -205,6 +204,7 @@ import {
   hydrateStateFromRemote,
   saveState as persistState,
   persistTournamentStateRemote,
+  submitMatchScoreRemote,
   loadTournamentStateRemote,
   getStorageKey as getPersistStorageKey,
   getRegisteredTournaments,
@@ -1100,6 +1100,7 @@ function renderAll() {
     manualSeeding: state.manualSeedingEnabled,
   });
   updateManualSeedingUi();
+  updateBotManagerCount();
 
   if (currentTournamentMeta) {
     const tournamentTitle = document.getElementById("tournamentTitle");
@@ -1618,19 +1619,19 @@ function toggleLiveTournament() {
   goLiveTournament();
 }
 
-  function addActivity(message, options = {}) {
-    if (!message) return;
-    const entry = {
-      message,
-      time: Date.now(),
-      type: options.type,
-    };
-    const next = {
-      activity: [entry, ...(state.activity || [])].slice(0, 50),
-    };
-    saveState(next);
-    renderActivityList({ state, escapeHtml, formatTime });
-  }
+function addActivity(message, options = {}) {
+  if (!message) return;
+  const entry = {
+    message,
+    time: Date.now(),
+    type: options.type,
+  };
+  const next = {
+    activity: [entry, ...(state.activity || [])].slice(0, 50),
+  };
+  saveState(next, { skipRemote: Boolean(options.skipRemote) });
+  renderActivityList({ state, escapeHtml, formatTime });
+}
 
 function updateManualSeedingUi() {
   const toggle = document.getElementById("manualSeedingToggle");
@@ -1885,8 +1886,10 @@ function updateMatchScore(matchId, scoreA, scoreB, options = {}) {
   const prevWalkover = matchBefore?.walkover || null;
   const prevStatus = matchBefore?.status || null;
   const prevWinnerId = matchBefore?.winnerId || null;
+  const saveLocalState = (next, opts = {}) =>
+    saveState(next, { ...opts, skipRemote: true, keepTimestamp: true });
   updateMatchScoreCore(matchId, scoreA, scoreB, {
-    saveState,
+    saveState: saveLocalState,
     renderAll,
     ...options,
   });
@@ -1924,8 +1927,31 @@ function updateMatchScore(matchId, scoreA, scoreB, options = {}) {
         scoreA: scoreAOut,
         scoreB: scoreBOut,
       },
+      skipRemote: true,
     }
   );
+  const targetSlug = currentSlug || currentTournamentMeta?.slug || "";
+  if (targetSlug) {
+    void submitMatchScoreRemote(
+      {
+        slug: targetSlug,
+        matchId,
+        scoreA,
+        scoreB,
+        finalize: true,
+      },
+      showToast
+    ).then((result) => {
+      if (result?.updated) return;
+      void hydrateStateFromRemote(
+        targetSlug,
+        applyRosterSeedingWithMode,
+        deserializeBracket,
+        saveState,
+        renderAll
+      );
+    });
+  }
 }
 
 function saveState(next = {}, options = {}) {
@@ -4051,9 +4077,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     handleAddCircuitPointsRow,
     handleRemoveCircuitPointsRow,
     handleApplyCircuitPoints,
-    // test harness hooks
-    setTestBracketCount,
-    cycleTestBracketCount,
+    addBotPlayer,
+    removeBotPlayer,
+    removeAllBots,
     resetTournament,
     checkInCurrentPlayer,
     notifyCheckInPlayers,
@@ -4145,8 +4171,6 @@ function updateAdminVisibility() {
     liveCircuitPointsBtn.style.display =
       isAdmin && currentTournamentMeta?.circuitSlug ? "" : "none";
   }
-  const testHarness = document.getElementById("testBracketPanel");
-  if (testHarness) testHarness.style.display = isAdmin ? "" : "none";
   updateFinalAdminAddVisibility();
   updateInviteLinksPanelVisibility();
   updateFinalAutoAddRow();
@@ -4544,93 +4568,145 @@ function autoFillPlayers() {
   showToast?.("Auto-filled 32 players.", "success");
 }
 
-function buildTestPlayers(count) {
-  // 32 clean names (no numbers in the display name)
-  const pool = [
-    "Zephyr",
-    "Astra",
-    "Nexus",
-    "Starlance",
-    "Vortex",
-    "Nightfall",
-    "IonBlade",
-    "WarpDrive",
-    "Pulsefire",
-    "Skyforge",
-    "NovaWing",
-    "CryoCore",
-    "Flux",
-    "Helix",
-    "Frostbyte",
-    "Titanfall",
-    "RubyRock",
-    "Solaris",
-    "VoidReaper",
-    "Tempest",
-    "IronWarden",
-    "Starweaver",
-    "NeonViper",
-    "GrimNova",
-    "ArcRunner",
-    "Quantum",
-    "NightOwl",
-    "DriftKing",
-    "ShadowFox",
-    "LunarEdge",
-    "StormRider",
-    "CoreSync",
-  ];
+const BOT_NAME_POOL = [
+  "Zephyr",
+  "Astra",
+  "Nexus",
+  "Starlance",
+  "Vortex",
+  "Nightfall",
+  "IonBlade",
+  "WarpDrive",
+  "Pulsefire",
+  "Skyforge",
+  "NovaWing",
+  "CryoCore",
+  "Flux",
+  "Helix",
+  "Frostbyte",
+  "Titanfall",
+  "RubyRock",
+  "Solaris",
+  "VoidReaper",
+  "Tempest",
+  "IronWarden",
+  "Starweaver",
+  "NeonViper",
+  "GrimNova",
+  "ArcRunner",
+  "Quantum",
+  "NightOwl",
+  "DriftKing",
+  "ShadowFox",
+  "LunarEdge",
+  "StormRider",
+  "CoreSync",
+];
+const BOT_RACES = ["Zerg", "Protoss", "Terran", "Random"];
 
-  const races = ["Zerg", "Protoss", "Terran", "Random"];
-  const createdAt = Date.now();
-
-  // Shuffle and pick `count` unique names
-  const shuffled = [...pool].sort(() => Math.random() - 0.5);
-  const picked = shuffled.slice(0, Math.min(count, shuffled.length));
-
-  return picked.map((name, idx) => ({
-    id: `test-${idx + 1}`, // ✅ UNIQUE ID (critical!)
-    name, // ✅ No numbers
-    race: races[Math.floor(Math.random() * races.length)],
-    sc2Link: "",
-    mmr: 4000 - idx * 25,
-    points: 1000 - idx,
-    seed: idx + 1,
-    createdAt,
-  }));
+function isBotPlayer(player) {
+  if (!player) return false;
+  if (player.isBot) return true;
+  const id = String(player.id || "");
+  return id.startsWith("bot-") || id.startsWith("test-");
 }
 
-function updateTestHarnessLabel() {
-  const label = document.getElementById("testBracketLabel");
-  if (!label) return;
-  label.textContent = bracketTestHarness.active
-    ? `Testing ${bracketTestHarness.count} players`
-    : "Test harness not started";
+function pickBotName(existingNames) {
+  const found = BOT_NAME_POOL.find(
+    (name) => !existingNames.has(name.toLowerCase())
+  );
+  if (found) return found;
+  let idx = existingNames.size + 1;
+  let name = `Bot ${idx}`;
+  while (existingNames.has(name.toLowerCase())) {
+    idx += 1;
+    name = `Bot ${idx}`;
+  }
+  return name;
 }
 
-function setTestBracketCount(count) {
-  const clamped = Math.max(1, Math.min(32, count));
-  bracketTestHarness.active = true;
-  bracketTestHarness.count = clamped;
-  const testPlayers = buildTestPlayers(clamped);
-  const ledger = {};
-  testPlayers.forEach((p) => {
-    ledger[playerKey(p.name, p.sc2Link)] = p.points ?? 0;
-  });
-  state.players = testPlayers;
-  state.pointsLedger = ledger;
-  const seededPlayers = seedPlayersForState(state.players, state);
-  saveState({ players: seededPlayers, needsReseed: false });
-  rebuildBracket(true, `Test harness (${clamped} players)`);
-  updateTestHarnessLabel();
-}
-
-function cycleTestBracketCount(delta) {
-  if (!bracketTestHarness.active) {
-    setTestBracketCount(16);
+function addBotPlayer() {
+  if (state.isLive) {
+    showToast?.("Tournament is live. Registration is closed.", "error");
     return;
   }
-  setTestBracketCount(bracketTestHarness.count + delta);
+  if (!isAdmin) {
+    showToast?.("Only admins can add bots.", "error");
+    return;
+  }
+  const players = Array.isArray(state.players) ? [...state.players] : [];
+  const existingNames = new Set(
+    players
+      .map((player) => (player?.name || "").trim().toLowerCase())
+      .filter(Boolean)
+  );
+  const name = pickBotName(existingNames);
+  const createdAt = Date.now();
+  const bot = {
+    id: `bot-${createdAt.toString(36)}-${Math.random().toString(16).slice(2, 6)}`,
+    name,
+    race: BOT_RACES[Math.floor(Math.random() * BOT_RACES.length)],
+    sc2Link: "",
+    mmr: 0,
+    points: 0,
+    seed: null,
+    createdAt,
+    isBot: true,
+  };
+  players.push(bot);
+  saveState({ players, needsReseed: true });
+  rebuildBracket(true, `${name} added`);
+  addActivity(`${name} added.`);
+}
+
+function removeAllBots() {
+  if (state.isLive) {
+    showToast?.("Tournament is live. Registration is closed.", "error");
+    return;
+  }
+  if (!isAdmin) {
+    showToast?.("Only admins can remove bots.", "error");
+    return;
+  }
+  const players = Array.isArray(state.players) ? state.players : [];
+  const remaining = players.filter((player) => !isBotPlayer(player));
+  if (remaining.length === players.length) {
+    showToast?.("No bots to remove.", "success");
+    return;
+  }
+  saveState({ players: remaining, needsReseed: true });
+  rebuildBracket(true, "Bots removed");
+  addActivity("All bots removed.");
+}
+
+function updateBotManagerCount() {
+  const label = document.getElementById("botCountText");
+  if (!label) return;
+  const players = Array.isArray(state.players) ? state.players : [];
+  const count = players.filter((player) => isBotPlayer(player)).length;
+  label.textContent = `Bots: ${count}`;
+}
+
+function removeBotPlayer() {
+  if (state.isLive) {
+    showToast?.("Tournament is live. Registration is closed.", "error");
+    return;
+  }
+  if (!isAdmin) {
+    showToast?.("Only admins can remove bots.", "error");
+    return;
+  }
+  const players = Array.isArray(state.players) ? state.players : [];
+  const idx = players.findIndex((player) => isBotPlayer(player));
+  if (idx < 0) {
+    showToast?.("No bots to remove.", "success");
+    return;
+  }
+  const removed = players[idx];
+  const next = [...players.slice(0, idx), ...players.slice(idx + 1)];
+  saveState({ players: next, needsReseed: true });
+  rebuildBracket(true, "Bot removed");
+  addActivity(`${removed?.name || "Bot"} removed.`);
 }
 
 async function handleRegistration(event) {

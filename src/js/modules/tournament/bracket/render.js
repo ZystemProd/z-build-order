@@ -51,7 +51,7 @@ function shouldRevealParticipant(matchId, participantIdx, playerId) {
   const now = performance.now();
   const lastReveal = recentNameReveals.get(key);
   if (playerId && lastReveal && now - lastReveal < REVEAL_WINDOW_MS) {
-    return true;
+    return false;
   }
   const hasPrev = lastRenderedParticipantIds.has(key);
   const prevId = lastRenderedParticipantIds.get(key) || null;

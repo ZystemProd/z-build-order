@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import { getFunctions } from "firebase/functions";
 import {
   initializeFirestore,
   persistentLocalCache,
@@ -20,6 +21,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+const functions = getFunctions(app, "us-central1");
 const db = initializeFirestore(app, {
   localCache:
     typeof window === "undefined"
@@ -54,4 +56,4 @@ if (typeof window !== "undefined") {
   });
 }
 
-export { app, auth, db, provider, switchAccountProvider };
+export { app, auth, db, functions, provider, switchAccountProvider };

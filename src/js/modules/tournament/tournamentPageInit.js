@@ -14,7 +14,6 @@ import {
 import { renderChosenMaps as renderChosenMapsUI, updateMapButtons as updateMapButtonsUI } from "./maps/render.js";
 import { renderMapPoolPicker as renderMapPoolPickerUI } from "./maps/pool.js";
 import { attachPlayerDetailHandlers } from "./playerDetail.js";
-import { ensureTestHarnessPanel } from "./ui/testHarness.js";
 import { enableDragScroll } from "./ui/dragScroll.js";
 import { lockBodyScroll, unlockBodyScroll } from "./modalLock.js";
 import { initTournamentNotifications } from "./notifications.js";
@@ -86,15 +85,15 @@ export function initTournamentPage({
   handleAddCircuitPointsRow,
   handleRemoveCircuitPointsRow,
   handleApplyCircuitPoints,
-  setTestBracketCount,
-  cycleTestBracketCount,
+  addBotPlayer,
+  removeBotPlayer,
+  removeAllBots,
   resetTournament,
   checkInCurrentPlayer,
   notifyCheckInPlayers,
   toggleLiveTournament,
   syncPulseNow,
 }) {
-  ensureTestHarnessPanel();
   initTournamentNotifications();
   initTournamentSearch();
   initTournamentListSlider();
@@ -144,9 +143,9 @@ export function initTournamentPage({
   const nextCreateCircuitStep = document.getElementById("nextCreateCircuitStep");
   const backCreateCircuitStep = document.getElementById("backCreateCircuitStep");
   const refreshTournaments = document.getElementById("refreshTournaments");
-  const testBracketStartBtn = document.getElementById("testBracketStart");
-  const testBracketPrevBtn = document.getElementById("testBracketPrev");
-  const testBracketNextBtn = document.getElementById("testBracketNext");
+  const addBotBtn = document.getElementById("addBotBtn");
+  const removeBotBtn = document.getElementById("removeBotBtn");
+  const removeBotsBtn = document.getElementById("removeBotsBtn");
   const descriptionInput = document.getElementById("tournamentDescriptionInput");
   const rulesInput = document.getElementById("tournamentRulesInput");
   const finalDescriptionInput = document.getElementById("finalTournamentDescriptionInput");
@@ -1308,19 +1307,9 @@ export function initTournamentPage({
     playoffsSelect?.addEventListener("change", () => updateFormatDiagramTitles(entry));
   });
 
-  // Wire test harness buttons if callbacks provided
-  document
-    .getElementById("testBracketStart")
-    ?.addEventListener("click", () => setTestBracketCount?.(16));
-  document
-    .getElementById("testBracketStart32")
-    ?.addEventListener("click", () => setTestBracketCount?.(32));
-  document
-    .getElementById("testBracketPrev")
-    ?.addEventListener("click", () => cycleTestBracketCount?.(-1));
-  document
-    .getElementById("testBracketNext")
-    ?.addEventListener("click", () => cycleTestBracketCount?.(1));
+  addBotBtn?.addEventListener("click", () => addBotPlayer?.());
+  removeBotBtn?.addEventListener("click", () => removeBotPlayer?.());
+  removeBotsBtn?.addEventListener("click", () => removeAllBots?.());
 
   syncFormatFieldVisibility("create");
   syncFormatFieldVisibility("settings");

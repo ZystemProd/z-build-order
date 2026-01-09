@@ -1,6 +1,6 @@
 // functions/index.js
 const { onDocumentWritten, onDocumentDeleted } = require("firebase-functions/v2/firestore");
-const { onRequest } = require("firebase-functions/v2/https");
+const { onRequest, onCall, HttpsError } = require("firebase-functions/v2/https");
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const fetch = require("node-fetch"); // node-fetch@2
@@ -383,6 +383,460 @@ function isTournamentComplete(bracket) {
   const allMatches = collectMatchesFromBracket(bracket);
   if (!allMatches.length) return false;
   return allMatches.every(isMatchComplete);
+}
+
+const DEFAULT_BEST_OF = {
+  upper: 3,
+  quarter: 3,
+  semi: 3,
+  upperFinal: 3,
+  final: 5,
+  lower: 1,
+  lowerSemi: 1,
+  lowerFinal: 3,
+};
+
+function normalizeAdminList(list) {
+  if (!Array.isArray(list)) return [];
+  return list
+    .map((entry) => {
+      if (!entry) return null;
+      if (typeof entry === "string") {
+        return { uid: entry, name: "" };
+      }
+      return {
+        uid: entry.uid || entry.userId || "",
+        name: entry.name || entry.username || "",
+      };
+    })
+    .filter((entry) => entry && (entry.uid || entry.name));
+}
+
+function isAdminForMeta(meta, uid) {
+  if (!uid || !meta) return false;
+  if (meta.createdBy && meta.createdBy === uid) return true;
+  const admins = normalizeAdminList(meta.admins);
+  return admins.some((entry) => entry.uid === uid);
+}
+
+function deserializeBracketState(bracket) {
+  if (!bracket || typeof bracket !== "object") return bracket || null;
+  const toArr = (obj) =>
+    Array.isArray(obj)
+      ? obj
+      : obj && typeof obj === "object"
+      ? Object.keys(obj)
+          .sort((a, b) => Number(a) - Number(b))
+          .map((key) => obj[key])
+      : [];
+  const normalizeRoundList = (rounds) =>
+    toArr(rounds)
+      .map((round) => toArr(round))
+      .filter((round) => round.length);
+  const clampRounds = (rounds, count) => {
+    if (!Number.isFinite(count)) return rounds;
+    return rounds.slice(0, Math.max(0, count));
+  };
+  const winners = clampRounds(
+    normalizeRoundList(bracket.winners),
+    bracket.winnersRoundCount
+  );
+  const losers = clampRounds(
+    normalizeRoundList(bracket.losers),
+    bracket.losersRoundCount
+  );
+  return {
+    ...bracket,
+    winners,
+    losers,
+    groups: toArr(bracket.groups),
+  };
+}
+
+function serializeBracketState(bracket) {
+  if (!bracket || typeof bracket !== "object") return bracket;
+  const toArr = (obj) =>
+    Array.isArray(obj)
+      ? obj
+      : obj && typeof obj === "object"
+      ? Object.keys(obj)
+          .sort((a, b) => Number(a) - Number(b))
+          .map((key) => obj[key])
+      : [];
+  const normalizeRoundList = (rounds) =>
+    toArr(rounds)
+      .map((round) => toArr(round))
+      .filter((round) => round.length);
+  const toObj = (arr) =>
+    Array.isArray(arr)
+      ? arr.reduce((acc, round, idx) => {
+          acc[idx] = round;
+          return acc;
+        }, {})
+      : arr || {};
+  const winnersRounds = normalizeRoundList(bracket.winners);
+  const losersRounds = normalizeRoundList(bracket.losers);
+  return {
+    ...bracket,
+    winners: toObj(winnersRounds),
+    losers: toObj(losersRounds),
+    groups: toArr(bracket.groups),
+    winnersRoundCount: winnersRounds.length,
+    losersRoundCount: losersRounds.length,
+  };
+}
+
+function getMatchLookup(bracket) {
+  const map = new Map();
+  collectMatchesFromBracket(bracket).forEach((match) => {
+    if (match?.id) {
+      map.set(match.id, match);
+    }
+  });
+  return map;
+}
+
+function resolveParticipants(match, lookup, playersById) {
+  const sources = Array.isArray(match?.sources) ? match.sources : [];
+  return sources.map((src) => {
+    if (!src) return null;
+    if (src.type === "player") {
+      return playersById.get(src.playerId) || null;
+    }
+    if (src.type === "match") {
+      const sourceMatch = lookup.get(src.matchId);
+      if (!sourceMatch) return null;
+      if (src.outcome === "winner" && sourceMatch.winnerId) {
+        return playersById.get(sourceMatch.winnerId) || null;
+      }
+      if (src.outcome === "loser" && sourceMatch.loserId) {
+        return playersById.get(sourceMatch.loserId) || null;
+      }
+    }
+    return null;
+  });
+}
+
+function getParticipantIdFromSource(source, lookup) {
+  if (!source) return null;
+  if (source.type === "player") return source.playerId || null;
+  if (source.type === "match") {
+    const sourceMatch = lookup.get(source.matchId);
+    if (!sourceMatch) return null;
+    if (source.outcome === "loser") {
+      return sourceMatch.loserId || null;
+    }
+    return sourceMatch.winnerId || null;
+  }
+  return null;
+}
+
+function isForfeitPlayer(id, playersById) {
+  if (!id) return false;
+  return Boolean(playersById.get(id)?.forfeit);
+}
+
+function getSeedRank(id, playersById, players) {
+  if (!id) return Number.POSITIVE_INFINITY;
+  const player = playersById.get(id);
+  if (!player) return Number.POSITIVE_INFINITY;
+  if (Number.isFinite(player.seed)) return player.seed;
+  const idx = (players || []).findIndex((entry) => entry?.id === id);
+  return idx >= 0 ? idx + 1 : Number.POSITIVE_INFINITY;
+}
+
+function hasManualResult(match) {
+  if (!match) return false;
+  const scores = Array.isArray(match.scores) ? match.scores : [];
+  const hasScore = (scores[0] || 0) + (scores[1] || 0) > 0;
+  const hasManualWalkover = Boolean(match.walkover) && !match.forfeitApplied;
+  const hasManualWinner = Boolean(match.winnerId) && !match.forfeitApplied;
+  const isCompleteManual =
+    match.status === "complete" &&
+    !match.forfeitApplied &&
+    !hasScore &&
+    !hasManualWalkover;
+  return hasScore || hasManualWalkover || hasManualWinner || isCompleteManual;
+}
+
+function normalizeBestOf(meta) {
+  const raw =
+    meta?.bestOf && typeof meta.bestOf === "object" ? meta.bestOf : {};
+  const out = { ...DEFAULT_BEST_OF };
+  for (const key of Object.keys(out)) {
+    const num = Number(raw[key]);
+    if (Number.isFinite(num) && num > 0) out[key] = num;
+  }
+  return out;
+}
+
+function getBestOfForMatch(match, meta, bracket) {
+  if (!match || typeof match !== "object") return 1;
+  if (match.bracket === "group") {
+    const groupBestOf = Number(meta?.roundRobin?.bestOf);
+    if (Number.isFinite(groupBestOf) && groupBestOf > 0) {
+      return groupBestOf;
+    }
+  }
+  if (Number.isFinite(match?.bestOf) && match.bestOf > 0) {
+    return match.bestOf;
+  }
+  const bestOf = normalizeBestOf(meta);
+  const winnersRounds = toArray(bracket?.winners).length || 0;
+  const losersRounds = toArray(bracket?.losers).length || 0;
+
+  if (match.bracket === "winners") {
+    if (match.round === winnersRounds) {
+      if (bracket?.finals) {
+        return bestOf.upperFinal || bestOf.final || DEFAULT_BEST_OF.upperFinal;
+      }
+      return bestOf.final || DEFAULT_BEST_OF.final;
+    }
+    if (match.round === winnersRounds - 1) {
+      return bestOf.semi || DEFAULT_BEST_OF.semi;
+    }
+    if (match.round === winnersRounds - 2) {
+      return bestOf.quarter || DEFAULT_BEST_OF.quarter;
+    }
+    return bestOf.upper || DEFAULT_BEST_OF.upper;
+  }
+
+  if (match.bracket === "losers") {
+    if (match.round === losersRounds) {
+      return (
+        bestOf.lowerFinal ||
+        bestOf.lower ||
+        DEFAULT_BEST_OF.lowerFinal ||
+        DEFAULT_BEST_OF.lower
+      );
+    }
+    if (match.round === losersRounds - 1) {
+      return (
+        bestOf.lowerSemi ||
+        bestOf.lower ||
+        DEFAULT_BEST_OF.lowerSemi ||
+        DEFAULT_BEST_OF.lower
+      );
+    }
+    return bestOf.lower || DEFAULT_BEST_OF.lower;
+  }
+
+  if (match.bracket === "group") {
+    return bestOf.upper || DEFAULT_BEST_OF.upper;
+  }
+
+  return bestOf.final || DEFAULT_BEST_OF.final;
+}
+
+function recomputeMatchOutcome(match, lookup, ctx) {
+  const bestOf = getBestOfForMatch(match, ctx.meta, ctx.bracket) || 1;
+  const needed = Math.max(1, Math.ceil(bestOf / 2));
+  const srcA = match.sources?.[0] || null;
+  const srcB = match.sources?.[1] || null;
+  const idA = getParticipantIdFromSource(srcA, lookup);
+  const idB = getParticipantIdFromSource(srcB, lookup);
+  const forfeitA = isForfeitPlayer(idA, ctx.playersById);
+  const forfeitB = isForfeitPlayer(idB, ctx.playersById);
+  const manualResult = hasManualResult(match);
+
+  if (idA && idB && !manualResult && (forfeitA || forfeitB)) {
+    if (forfeitA && !forfeitB) {
+      match.walkover = "a";
+      match.scores = [0, needed];
+    } else if (forfeitB && !forfeitA) {
+      match.walkover = "b";
+      match.scores = [needed, 0];
+    } else {
+      const seedA = getSeedRank(idA, ctx.playersById, ctx.players);
+      const seedB = getSeedRank(idB, ctx.playersById, ctx.players);
+      const aIsHigher = seedA <= seedB;
+      match.walkover = aIsHigher ? "b" : "a";
+      match.scores = aIsHigher ? [needed, 0] : [0, needed];
+    }
+    match.forfeitApplied = true;
+  } else if (match.forfeitApplied && !manualResult) {
+    match.walkover = null;
+    match.scores = [0, 0];
+    match.forfeitApplied = false;
+  }
+
+  let winnerId = null;
+  let loserId = null;
+  if (match.walkover === "a") {
+    winnerId = idB;
+    loserId = idA;
+  } else if (match.walkover === "b") {
+    winnerId = idA;
+    loserId = idB;
+  } else {
+    const a = Number(match.scores?.[0]);
+    const b = Number(match.scores?.[1]);
+    const valA = Number.isFinite(a) ? a : 0;
+    const valB = Number.isFinite(b) ? b : 0;
+    if (valA !== valB && Math.max(valA, valB) >= needed) {
+      if (valA > valB) {
+        winnerId = idA;
+        loserId = idB;
+      } else {
+        winnerId = idB;
+        loserId = idA;
+      }
+    }
+  }
+
+  const nextStatus = winnerId || match.walkover ? "complete" : "pending";
+  const changed =
+    match.winnerId !== winnerId ||
+    match.loserId !== loserId ||
+    match.status !== nextStatus;
+  match.winnerId = winnerId || null;
+  match.loserId = loserId || null;
+  match.status = nextStatus;
+  return changed;
+}
+
+function buildDependencyMap(lookup) {
+  const dependencies = new Map();
+  for (const match of lookup.values()) {
+    const sources = Array.isArray(match.sources) ? match.sources : [];
+    sources.forEach((src) => {
+      if (src?.type !== "match" || !src.matchId) return;
+      if (!dependencies.has(src.matchId)) {
+        dependencies.set(src.matchId, new Set());
+      }
+      dependencies.get(src.matchId).add(match.id);
+    });
+  }
+  return dependencies;
+}
+
+function cascadeMatchOutcomeUpdates(startMatchId, lookup, ctx) {
+  const dependencies = buildDependencyMap(lookup);
+  const queue = [startMatchId];
+  while (queue.length) {
+    const sourceId = queue.shift();
+    const dependents = dependencies.get(sourceId);
+    if (!dependents) continue;
+    for (const depId of dependents) {
+      const match = lookup.get(depId);
+      if (!match) continue;
+      const changed = recomputeMatchOutcome(match, lookup, ctx);
+      if (changed) queue.push(depId);
+    }
+  }
+}
+
+function updateMatchScoreInBracket({
+  bracket,
+  players,
+  meta,
+  matchId,
+  scoreA,
+  scoreB,
+  finalize = true,
+}) {
+  if (!bracket || !matchId) return { updated: false };
+  const lookup = getMatchLookup(bracket);
+  const match = lookup.get(matchId);
+  if (!match) return { updated: false };
+
+  const bestOf = getBestOfForMatch(match, meta, bracket) || 1;
+  const needed = Math.max(1, Math.ceil(bestOf / 2));
+  const isWalkoverA = String(scoreA).toUpperCase() === "W";
+  const isWalkoverB = String(scoreB).toUpperCase() === "W";
+  const srcA = match.sources?.[0] || null;
+  const srcB = match.sources?.[1] || null;
+  const playersById = new Map(
+    (players || []).filter(Boolean).map((player) => [player.id, player])
+  );
+  const idA = getParticipantIdFromSource(srcA, lookup);
+  const idB = getParticipantIdFromSource(srcB, lookup);
+  const forfeitA = isForfeitPlayer(idA, playersById);
+  const forfeitB = isForfeitPlayer(idB, playersById);
+  const manualResult = hasManualResult(match);
+
+  let walkover = null;
+  let valA = 0;
+  let valB = 0;
+  let winnerId = null;
+  let loserId = null;
+
+  if (idA && idB && !manualResult && (forfeitA || forfeitB)) {
+    if (forfeitA && !forfeitB) {
+      walkover = "a";
+      valA = 0;
+      valB = needed;
+      winnerId = idB;
+      loserId = idA;
+    } else if (forfeitB && !forfeitA) {
+      walkover = "b";
+      valA = needed;
+      valB = 0;
+      winnerId = idA;
+      loserId = idB;
+    } else {
+      const seedA = getSeedRank(idA, playersById, players);
+      const seedB = getSeedRank(idB, playersById, players);
+      const aIsHigher = seedA <= seedB;
+      walkover = aIsHigher ? "b" : "a";
+      valA = aIsHigher ? needed : 0;
+      valB = aIsHigher ? 0 : needed;
+      winnerId = aIsHigher ? idA : idB;
+      loserId = aIsHigher ? idB : idA;
+    }
+    match.forfeitApplied = true;
+  } else if (isWalkoverA && !isWalkoverB) {
+    walkover = "a";
+    valA = 0;
+    valB = needed;
+    winnerId = idB;
+    loserId = idA;
+  } else if (isWalkoverB && !isWalkoverA) {
+    walkover = "b";
+    valA = needed;
+    valB = 0;
+    winnerId = idA;
+    loserId = idB;
+  } else {
+    if (match.forfeitApplied) match.forfeitApplied = false;
+    const a = Number(scoreA);
+    const b = Number(scoreB);
+    valA = Number.isFinite(a) ? a : 0;
+    valB = Number.isFinite(b) ? b : 0;
+    if (valA !== valB && Math.max(valA, valB) >= needed) {
+      if (valA > valB) {
+        winnerId = idA;
+        loserId = idB;
+      } else {
+        winnerId = idB;
+        loserId = idA;
+      }
+    }
+  }
+
+  match.scores = [valA, valB];
+  match.walkover = walkover;
+  if (finalize) {
+    match.winnerId = winnerId || null;
+    match.loserId = loserId || null;
+    match.status = winnerId || walkover ? "complete" : "pending";
+  } else {
+    match.winnerId = null;
+    match.loserId = null;
+    match.status = "pending";
+  }
+
+  if (finalize) {
+    cascadeMatchOutcomeUpdates(matchId, lookup, {
+      bracket,
+      players,
+      playersById,
+      meta,
+    });
+  }
+
+  const shouldClearCast = finalize && match.status === "complete";
+  return { updated: true, shouldClearCast, lookup, playersById };
 }
 
 const MMR_MIN = 500;
@@ -1713,6 +2167,161 @@ exports.fetchPulseMmr = onRequest({ region: "us-central1" }, async (req, res) =>
     return res.status(500).json({ error: "Internal server error." });
   }
 });
+
+exports.submitMatchScore = onCall(
+  { region: "us-central1", enforceAppCheck: true },
+  async (request) => {
+    const uid = request.auth?.uid;
+    if (!uid) {
+      throw new HttpsError("unauthenticated", "Sign in to submit match scores.");
+    }
+
+    const payload = request.data || {};
+    const slug = String(payload.slug || "").trim();
+    const matchId = String(payload.matchId || "").trim();
+    const finalize = payload.finalize !== false;
+    if (!slug || !matchId) {
+      throw new HttpsError("invalid-argument", "Missing slug or matchId.");
+    }
+
+    const scoreA = payload.scoreA;
+    const scoreB = payload.scoreB;
+    const stateRef = firestore.collection("tournamentStates").doc(slug);
+    const metaRef = firestore.collection("tournaments").doc(slug);
+    let result = { updated: false };
+
+    await firestore.runTransaction(async (tx) => {
+      const stateSnap = await tx.get(stateRef);
+      if (!stateSnap.exists) {
+        throw new HttpsError("not-found", "Tournament state not found.");
+      }
+      const stateData = stateSnap.data() || {};
+      if (!stateData.bracket) {
+        throw new HttpsError(
+          "failed-precondition",
+          "Tournament bracket is not ready."
+        );
+      }
+
+      const metaSnap = await tx.get(metaRef);
+      const meta = metaSnap.exists ? metaSnap.data() || {} : {};
+      const admin = isAdminForMeta(meta, uid);
+      if (!stateData.isLive && !admin) {
+        throw new HttpsError(
+          "failed-precondition",
+          "Tournament is not live."
+        );
+      }
+
+      const bracket = deserializeBracketState(stateData.bracket);
+      const lookup = getMatchLookup(bracket);
+      const match = lookup.get(matchId);
+      if (!match) {
+        throw new HttpsError("not-found", "Match not found.");
+      }
+
+      const players = Array.isArray(stateData.players) ? stateData.players : [];
+      const playersById = new Map(
+        players.filter(Boolean).map((player) => [player.id, player])
+      );
+      const participants = resolveParticipants(match, lookup, playersById);
+      const participantUids = participants
+        .map((player) => player?.uid)
+        .filter(Boolean);
+      if (!admin && !participantUids.includes(uid)) {
+        throw new HttpsError(
+          "permission-denied",
+          "You cannot submit scores for this match."
+        );
+      }
+
+      const prevScores = Array.isArray(match.scores)
+        ? [...match.scores]
+        : null;
+      const prevWalkover = match.walkover || null;
+      const prevStatus = match.status || null;
+      const prevWinnerId = match.winnerId || null;
+
+      const updateResult = updateMatchScoreInBracket({
+        bracket,
+        players,
+        meta,
+        matchId,
+        scoreA,
+        scoreB,
+        finalize,
+      });
+      if (!updateResult.updated) {
+        result = { updated: false };
+        return;
+      }
+
+      const matchAfter = lookup.get(matchId);
+      if (!matchAfter) {
+        throw new HttpsError("not-found", "Match update failed.");
+      }
+      const nextScores = Array.isArray(matchAfter.scores)
+        ? matchAfter.scores
+        : [];
+      const changed =
+        !prevScores ||
+        prevScores[0] !== nextScores[0] ||
+        prevScores[1] !== nextScores[1] ||
+        prevWalkover !== matchAfter.walkover;
+      const completedNow =
+        matchAfter.status === "complete" && prevStatus !== "complete";
+      const winnerChanged = prevWinnerId !== matchAfter.winnerId;
+      const hasScore =
+        (nextScores[0] || 0) > 0 ||
+        (nextScores[1] || 0) > 0 ||
+        !!matchAfter.walkover;
+      const shouldLog =
+        finalize && (changed || completedNow || winnerChanged) && hasScore;
+
+      const nextPayload = {
+        bracket: serializeBracketState(bracket),
+        lastUpdated: Date.now(),
+      };
+
+      if (shouldLog) {
+        const updatedParticipants = resolveParticipants(
+          matchAfter,
+          lookup,
+          playersById
+        );
+        const nameA = updatedParticipants[0]?.name || "TBD";
+        const nameB = updatedParticipants[1]?.name || "TBD";
+        const scoreAOut = Number.isFinite(nextScores[0]) ? nextScores[0] : 0;
+        const scoreBOut = Number.isFinite(nextScores[1]) ? nextScores[1] : 0;
+        const entry = {
+          message: `Score submitted: ${nameA} ${scoreAOut}-${scoreBOut} ${nameB}`,
+          time: Date.now(),
+          type: "score",
+        };
+        const prevActivity = Array.isArray(stateData.activity)
+          ? stateData.activity
+          : [];
+        nextPayload.activity = [entry, ...prevActivity].slice(0, 50);
+      }
+
+      if (updateResult.shouldClearCast && stateData.matchCasts?.[matchId]) {
+        const nextMatchCasts = { ...(stateData.matchCasts || {}) };
+        delete nextMatchCasts[matchId];
+        nextPayload.matchCasts = nextMatchCasts;
+      }
+
+      if (!changed && !completedNow && !winnerChanged && !nextPayload.matchCasts) {
+        result = { updated: false };
+        return;
+      }
+
+      tx.set(stateRef, nextPayload, { merge: true });
+      result = { updated: true, lastUpdated: nextPayload.lastUpdated };
+    });
+
+    return result;
+  }
+);
 
 exports.cleanupTournamentChatOnComplete = onDocumentWritten(
   {

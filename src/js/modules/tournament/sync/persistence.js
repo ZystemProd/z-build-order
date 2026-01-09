@@ -1,4 +1,5 @@
 import { doc, getDoc, getDocs, setDoc, collection } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
 import {
   TOURNAMENT_COLLECTION,
   TOURNAMENT_REGISTRY_KEY,
@@ -8,7 +9,7 @@ import {
   STORAGE_KEY,
   defaultState,
 } from "../state.js";
-import { db } from "../../../../app.js";
+import { db, functions } from "../../../../app.js";
 
 // Local storage helpers
 export function cacheTournamentRegistry(registry) {
@@ -233,6 +234,29 @@ export async function persistTournamentStateRemote(
       "Could not sync tournament state to Firestore. Changes stay local.",
       "error"
     );
+  }
+}
+
+const submitMatchScoreCallable = httpsCallable(functions, "submitMatchScore");
+
+export async function submitMatchScoreRemote(payload, showToast) {
+  if (!payload?.slug || !payload?.matchId) return null;
+  try {
+    const response = await submitMatchScoreCallable({
+      slug: payload.slug,
+      matchId: payload.matchId,
+      scoreA: payload.scoreA,
+      scoreB: payload.scoreB,
+      finalize: payload.finalize !== false,
+    });
+    return response.data || null;
+  } catch (err) {
+    console.error("Failed to submit match score via Cloud Function", err);
+    showToast?.(
+      "Could not submit match score. Changes stay local.",
+      "error"
+    );
+    return null;
   }
 }
 
