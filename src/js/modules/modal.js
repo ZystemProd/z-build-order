@@ -635,7 +635,7 @@ export async function openPublishModal(buildId) {
         <span class="label-clan">${DOMPurify.sanitize(clan.name)}</span>
         <div class="checkbox-wrapper-59">
           <label class="switch">
-            <input type="checkbox" class="clanPublishCheckbox" value="${cid}" ${
+            <input type="checkbox" class="clanPublishCheckbox" name="clanPublish-${cid}" value="${cid}" ${
         isShared ? "checked" : ""
       } />
             <span class="slider"></span>

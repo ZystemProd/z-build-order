@@ -159,7 +159,7 @@ function updateTemplatePreview(templateData) {
   <p>${DOMPurify.sanitize(
     templateData.description || "No description available."
   )}</p>
-  <textarea readonly>${DOMPurify.sanitize(
+  <textarea readonly name="templatePreviewInput">${DOMPurify.sanitize(
     templateData.input || "No input available."
   )}</textarea>
 `;

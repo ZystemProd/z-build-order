@@ -801,6 +801,7 @@ export function openMatchInfoModal(
             winners[i] = null;
           }
         }
+        clearMapsAfterDecision(winners, bestOf);
         record.mapResults = winners;
 
         const winsA = winners.filter((w) => w === "A").length;
@@ -926,7 +927,7 @@ export function openMatchInfoModal(
         ].join("");
         return `<div class="match-info-report-map-row">
           <div class="match-info-report-map-name">${mapLabel}</div>
-          <select class="match-info-report-select" data-map-idx="${idx}">
+          <select class="match-info-report-select" data-map-idx="${idx}" name="match-info-report-${idx}">
             ${options}
           </select>
         </div>`;
@@ -1299,6 +1300,27 @@ function countryCodeToFlag(raw) {
 function getNextOpenMapIndex(winners, bestOf) {
   const idx = winners.findIndex((winner) => !winner);
   return idx === -1 ? bestOf : idx;
+}
+
+function clearMapsAfterDecision(winners, bestOf) {
+  const needed = Math.max(1, Math.ceil(bestOf / 2));
+  let winsA = 0;
+  let winsB = 0;
+  let decidedAt = -1;
+  for (let i = 0; i < bestOf; i++) {
+    if (winners[i] === "A") winsA++;
+    else if (winners[i] === "B") winsB++;
+    if (winsA >= needed || winsB >= needed) {
+      decidedAt = i;
+      break;
+    }
+  }
+  if (decidedAt !== -1) {
+    for (let i = decidedAt + 1; i < bestOf; i++) {
+      winners[i] = null;
+    }
+  }
+  return winners;
 }
 
 function renderMatchInfoRows(rowsEl, { bestOf, pickedMaps, winners }) {

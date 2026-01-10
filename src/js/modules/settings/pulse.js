@@ -382,6 +382,7 @@ function setupSecondaryPulseModal() {
   const listEl = document.getElementById("secondaryPulseList");
   const helper = document.getElementById("secondaryPulseHelper");
   if (!openBtn || !modal || !listEl) return;
+  let secondaryPulseRowId = 0;
 
   const extractUrls = (secondary) =>
     Array.isArray(secondary)
@@ -402,6 +403,7 @@ function setupSecondaryPulseModal() {
     const input = document.createElement("input");
     input.type = "url";
     input.className = "settings-input secondary-pulse-input";
+    input.name = `secondary-pulse-${secondaryPulseRowId++}`;
     input.placeholder = "add link here...";
     input.autocomplete = "off";
     input.spellcheck = false;

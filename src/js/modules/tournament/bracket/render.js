@@ -257,7 +257,7 @@ export function renderPlayerRow(player, score, label, bestOf, match, participant
     const placeholderText = displayPlaceholderForSource(match, participantIdx, lookup);
     return `<div class="player-row">
       <div class="player-name placeholder-tag">${escapeHtml(placeholderText)}</div>
-      <select class="result-select score-select" data-match-id="${match.id}" data-player-idx="${participantIdx}" disabled>
+      <select class="result-select score-select" name="score-${match.id}-${participantIdx}" data-match-id="${match.id}" data-player-idx="${participantIdx}" disabled>
         <option value="0">0</option>
       </select>
     </div>`;

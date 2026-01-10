@@ -65,10 +65,10 @@ export function renderCircuitPointsTable(points) {
       (row) => `
       <tr data-circuit-points-row>
         <td>
-          <input type="number" min="1" data-circuit-place value="${row.place}" />
+          <input type="number" min="1" data-circuit-place name="circuit-place-${row.place}" value="${row.place}" />
         </td>
         <td>
-          <input type="number" min="0" data-circuit-points value="${row.points}" />
+          <input type="number" min="0" data-circuit-points name="circuit-points-${row.place}" value="${row.points}" />
         </td>
         <td>
           <button class="cta small ghost circuit-remove-btn" type="button" data-circuit-remove="true">

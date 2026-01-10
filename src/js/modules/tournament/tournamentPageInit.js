@@ -358,10 +358,37 @@ export function initTournamentPage({
       dateFormat: "Y-m-d\\TH:i",
       disableMobile: true,
     };
+    const assignPickerNames = (picker) => {
+      if (!picker?.input) return;
+      const baseName = picker.input.name || picker.input.id || "tournament-date";
+      if (!picker.input.name) picker.input.name = baseName;
+      const setName = (el, suffix) => {
+        if (!el || el.name || el.id) return;
+        el.name = `${baseName}-${suffix}`;
+      };
+      setName(picker.hourElement, "hour");
+      setName(picker.minuteElement, "minute");
+      setName(picker.secondElement, "second");
+      setName(picker.amPM, "ampm");
+      setName(picker.altInput, "alt");
+      setName(picker.mobileInput, "mobile");
+      const monthDropdown =
+        Array.isArray(picker.monthElements) && picker.monthElements.length
+          ? picker.monthElements[0]
+          : picker.monthElement || null;
+      setName(monthDropdown, "month");
+      setName(picker.currentYearElement, "year");
+    };
     const ensurePicker = (input) => {
-      if (!input || input._flatpickr) return input?._flatpickr || null;
+      if (!input) return null;
+      if (input._flatpickr) {
+        assignPickerNames(input._flatpickr);
+        return input._flatpickr;
+      }
       if (typeof window.flatpickr !== "function") return null;
-      return window.flatpickr(input, options);
+      const picker = window.flatpickr(input, options);
+      assignPickerNames(picker);
+      return picker;
     };
     const inputs = [
       document.getElementById("tournamentStartInput"),
