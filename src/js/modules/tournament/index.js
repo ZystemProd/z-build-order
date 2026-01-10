@@ -8,7 +8,6 @@ import {
   getCurrentUserProfile,
   getPulseState,
   initializeAuthUI,
-  syncPulseNow,
 } from "../../../app.js";
 import { onAuthStateChanged } from "firebase/auth";
 import {
@@ -37,6 +36,7 @@ import { showToast } from "../toastHandler.js";
 import { logAnalyticsEvent } from "../analyticsHelper.js";
 import DOMPurify from "dompurify";
 import { prepareImageForUpload, validateImageFile } from "../imageUtils.js";
+import { buildMmrBadges } from "../settings/pulse.js";
 import {
   TOURNAMENT_COLLECTION,
   TOURNAMENT_STATE_COLLECTION,
@@ -61,7 +61,6 @@ import {
   registryCache,
   currentTournamentMeta,
   requirePulseLinkSetting,
-  requirePulseSyncSetting,
   mapPoolSelection,
   mapCatalog,
   mapCatalogLoaded,
@@ -76,7 +75,6 @@ import {
   setRegistryCacheState,
   setCurrentTournamentMetaState,
   setRequirePulseLinkSettingState,
-  setRequirePulseSyncSettingState,
   setMapPoolSelectionState,
   setMapCatalogState,
   setMapCatalogLoadedState,
@@ -258,16 +256,23 @@ const MAX_TOURNAMENT_IMAGE_SIZE = 12 * 1024 * 1024;
 const COVER_TARGET_WIDTH = 1200;
 const COVER_TARGET_HEIGHT = 675;
 const COVER_QUALITY = 0.82;
+const PULSE_ENDPOINTS = (() => {
+  const endpoints = ["/api/pulse-mmr"];
+  if (
+    typeof window !== "undefined" &&
+    window.location.hostname === "localhost"
+  ) {
+    endpoints.push(
+      "http://localhost:5001/z-build-order/us-central1/fetchPulseMmr"
+    );
+  }
+  endpoints.push("https://us-central1-z-build-order.cloudfunctions.net/fetchPulseMmr");
+  return endpoints;
+})();
 const storage = getStorage(app);
 let currentCircuitMeta = null;
 let isCircuitAdmin = false;
 let circuitPointsBtnTemplate = null;
-let pulseSyncSessionCompleted = false;
-let secondaryPulseSyncSessionCompleted = false;
-let pulseSyncRequired = false;
-let secondaryPulseSyncRequired = false;
-let lastPulseUrl = "";
-let lastSecondarySignature = "";
 let circuitFinalMapPoolSelection = new Set();
 let circuitFinalMapPoolMode = "ladder";
 let inviteLinkGate = {
@@ -1134,10 +1139,6 @@ function renderAll() {
     const isInviteOnly = isInviteOnlyTournament(currentTournamentMeta);
     const accessNote = document.getElementById("registrationAccessNote");
     const registrationForm = document.getElementById("registrationForm");
-    const syncPulseBtn = document.getElementById("syncPulseBtn");
-    const syncPulseSpinner = document.getElementById("syncPulseSpinner");
-    const requirePulseSyncEnabled = getRequirePulseSyncEnabled();
-    const pulseGate = getPulseSyncGateStatus();
 
     hydrateCurrentUserClanLogo();
 
@@ -1252,6 +1253,7 @@ function renderAll() {
     }
 
     if (registerBtn) {
+      const isRegisterLoading = registerBtn.classList.contains("is-loading");
       if (state.isLive) {
         registerBtn.textContent = "Registration closed";
         registerBtn.disabled = true;
@@ -1276,31 +1278,14 @@ function renderAll() {
         } else if (!inviteLinkGate.ok) {
           registerBtn.textContent = "Invite link invalid";
           registerBtn.disabled = true;
-        } else if (pulseGate.needsSync) {
-          registerBtn.textContent = "Register";
-          registerBtn.disabled = true;
         } else {
           registerBtn.textContent = "Register";
-          registerBtn.disabled = false;
+          registerBtn.disabled = isRegisterLoading ? true : false;
         }
-      } else if (pulseGate.needsSync) {
-        registerBtn.textContent = "Register";
-        registerBtn.disabled = true;
       } else {
         registerBtn.textContent = "Register";
-        registerBtn.disabled = false;
+        registerBtn.disabled = isRegisterLoading ? true : false;
       }
-    }
-
-    if (syncPulseBtn) {
-      const label = syncPulseBtn.querySelector(".sync-label");
-      if (label) label.textContent = "Sync SC2Pulse";
-      const isLoading = syncPulseBtn.classList.contains("is-loading");
-      syncPulseBtn.style.display = requirePulseSyncEnabled ? "" : "none";
-      syncPulseBtn.disabled = !auth.currentUser || isLoading;
-    }
-    if (syncPulseSpinner) {
-      syncPulseSpinner.style.display = requirePulseSyncEnabled ? "" : "none";
     }
 
     if (goLiveBtn) {
@@ -3023,84 +3008,88 @@ function setStatus(el, message, isError = false) {
   el.classList.toggle("status-ok", !isError);
 }
 
-function getPulseSyncGateStatus() {
-  const requirePulseSyncEnabled = getRequirePulseSyncEnabled();
-  if (!requirePulseSyncEnabled) {
-    return {
-      needsSync: false,
-      needsMain: false,
-      needsSecondary: false,
-      message: "",
-    };
+function setRegisterLoadingState(isLoading) {
+  const registerBtn = document.getElementById("registerBtn");
+  if (!registerBtn) return;
+  const current = Number(registerBtn.dataset.loadingCount || "0");
+  const next = Math.max(0, current + (isLoading ? 1 : -1));
+  registerBtn.dataset.loadingCount = String(next);
+  registerBtn.classList.toggle("is-loading", next > 0);
+  if (next > 0) {
+    if (registerBtn.dataset.prevDisabled === undefined) {
+      registerBtn.dataset.prevDisabled = registerBtn.disabled ? "true" : "false";
+    }
+    registerBtn.disabled = true;
+    registerBtn.setAttribute("aria-busy", "true");
+  } else {
+    if (registerBtn.dataset.prevDisabled !== undefined) {
+      registerBtn.disabled = registerBtn.dataset.prevDisabled === "true";
+      delete registerBtn.dataset.prevDisabled;
+    }
+    registerBtn.removeAttribute("aria-busy");
+    delete registerBtn.dataset.loadingCount;
   }
-  if (!auth.currentUser) {
-    return {
-      needsSync: false,
-      needsMain: false,
-      needsSecondary: false,
-      message: "",
-    };
-  }
-  const needsMain = pulseSyncRequired && !pulseSyncSessionCompleted;
-  const needsSecondary =
-    secondaryPulseSyncRequired && !secondaryPulseSyncSessionCompleted;
-  const needsSync = needsMain || needsSecondary;
-  let message = "";
-  if (needsMain && needsSecondary) {
-    message =
-      "Update your SC2Pulse link and secondary links in Settings before registering.";
-  } else if (needsMain) {
-    message = "Update your SC2Pulse link in Settings before registering.";
-  } else if (needsSecondary) {
-    message =
-      "Update your secondary SC2Pulse links in Settings before registering.";
-  }
-  return { needsSync, needsMain, needsSecondary, message };
 }
 
-function normalizePulseSyncUrl(url = "") {
-  return sanitizeUrl((url || "").trim());
-}
-
-function extractSecondaryPulseUrls(secondary = []) {
-  if (!Array.isArray(secondary)) return [];
-  const urls = secondary
-    .map((entry) => (entry && typeof entry === "object" ? entry.url : entry))
-    .map((url) => normalizePulseSyncUrl(url))
-    .filter(Boolean);
-  return Array.from(new Set(urls));
-}
-
-function computeSecondarySignature(secondary = []) {
-  const urls = extractSecondaryPulseUrls(secondary).sort();
-  return urls.length ? urls.join("|") : "";
-}
-
-function resetPulseSyncSessionState() {
-  pulseSyncSessionCompleted = false;
-  secondaryPulseSyncSessionCompleted = false;
-  pulseSyncRequired = false;
-  secondaryPulseSyncRequired = false;
-  lastPulseUrl = "";
-  lastSecondarySignature = "";
-}
-
-function syncPulseRegistrationRequirements(pulseState = null) {
-  const source = pulseState || getPulseState?.() || {};
-  const url = normalizePulseSyncUrl(source?.url || "");
-  const secondarySignature = computeSecondarySignature(source?.secondary || []);
-
-  if (url !== lastPulseUrl) {
-    pulseSyncSessionCompleted = false;
-    lastPulseUrl = url;
+function normalizeSc2PulseIdUrl(raw = "") {
+  const normalized = sanitizeUrl((raw || "").trim());
+  if (!normalized) return "";
+  try {
+    const url = new URL(normalized);
+    if (url.hostname !== "sc2pulse.nephest.com") return "";
+    const idParam = url.searchParams.get("id");
+    const idNum = Number(idParam);
+    if (!Number.isFinite(idNum) || idNum <= 0) return "";
+    return url.toString();
+  } catch (_) {
+    return "";
   }
-  if (secondarySignature !== lastSecondarySignature) {
-    secondaryPulseSyncSessionCompleted = false;
-    lastSecondarySignature = secondarySignature;
+}
+
+async function fetchPulseMmrFromBackend(url) {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error("Please sign in first.");
   }
 
-  pulseSyncRequired = Boolean(url);
-  secondaryPulseSyncRequired = Boolean(secondarySignature);
+  let lastError = null;
+
+  for (const endpoint of PULSE_ENDPOINTS) {
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uid: user.uid, url }),
+      });
+
+      let payload = {};
+      try {
+        payload = await response.json();
+      } catch (_) {
+        // ignore json parse errors; handled below
+      }
+
+      if (!response.ok) {
+        const message =
+          (payload && payload.error) ||
+          `Failed to fetch MMR (status ${response.status}).`;
+        lastError = new Error(message);
+        continue;
+      }
+
+      if (!Number.isFinite(payload?.mmr)) {
+        lastError = new Error("Could not read MMR from SC2Pulse.");
+        continue;
+      }
+
+      return payload;
+    } catch (err) {
+      lastError = err;
+      continue;
+    }
+  }
+
+  throw lastError || new Error("Failed to fetch MMR from SC2Pulse.");
 }
 
 function isInviteOnlyTournament(meta) {
@@ -3172,13 +3161,6 @@ function getRequirePulseLinkEnabled(meta = currentTournamentMeta) {
   );
 }
 
-function getRequirePulseSyncEnabled(meta = currentTournamentMeta) {
-  return normalizeBooleanSetting(
-    meta?.requirePulseSync,
-    requirePulseSyncSetting
-  );
-}
-
 function normalizeMaxPlayersForFormat(rawValue, format, input = null) {
   if (rawValue === null || rawValue === undefined || rawValue === "") {
     return null;
@@ -3220,7 +3202,8 @@ function updateCheckInUI() {
   if (!currentTournamentMeta) return;
   const checkInBtn = document.getElementById("checkInBtn");
   const checkInStatus = document.getElementById("checkInStatus");
-  if (!checkInBtn || !checkInStatus) return;
+  const checkInCard = document.getElementById("checkInCard");
+  if (!checkInBtn || !checkInStatus || !checkInCard) return;
 
   checkInStatus.classList.remove("is-open", "is-checked", "is-closed");
   const startMs = getStartTimeMs(currentTournamentMeta);
@@ -3235,6 +3218,7 @@ function updateCheckInUI() {
   if (state.isLive || !getCheckInWindowMinutesFromMeta(currentTournamentMeta) || !startMs) {
     checkInBtn.style.display = "none";
     checkInStatus.textContent = "";
+    checkInCard.style.display = "none";
     return;
   }
 
@@ -3245,8 +3229,11 @@ function updateCheckInUI() {
       ? `Check-in opens in ${formatCountdown(timeUntil)}`
       : "Check-in is not open yet.";
     checkInStatus.classList.add("is-closed");
+    checkInCard.style.display = "none";
     return;
   }
+
+  checkInCard.style.display = "flex";
 
   if (!currentPlayer) {
     checkInBtn.style.display = "none";
@@ -3429,7 +3416,6 @@ async function handleSaveSettings(event) {
   const visibilitySelect = document.getElementById("settingsVisibilitySelect");
   const qualifyInput = document.getElementById("settingsCircuitQualifyCount");
   const requirePulseInput = document.getElementById("settingsRequirePulseLink");
-  const requirePulseSyncInput = document.getElementById("settingsRequirePulseSync");
   const imageInput = document.getElementById("settingsImageInput");
   const imagePreview = document.getElementById("settingsImagePreview");
   const imageFile = imageInput?.files?.[0] || null;
@@ -3465,8 +3451,6 @@ async function handleSaveSettings(event) {
     : null;
   const requirePulseLink =
     requirePulseInput?.checked ?? currentTournamentMeta?.requirePulseLink ?? true;
-  const requirePulseSync =
-    requirePulseSyncInput?.checked ?? currentTournamentMeta?.requirePulseSync ?? true;
   let coverImageUrl = currentTournamentMeta?.coverImageUrl || "";
   if (!imageFile && reuseUrl) {
     coverImageUrl = reuseUrl;
@@ -3496,7 +3480,6 @@ async function handleSaveSettings(event) {
     mapPool,
     roundRobin: rrSettings,
     requirePulseLink,
-    requirePulseSync,
     circuitQualifyCount:
       currentTournamentMeta?.isCircuitFinal &&
       Number.isFinite(qualifyCount) &&
@@ -3525,7 +3508,6 @@ async function handleSaveSettings(event) {
   updateAdminVisibility();
   await refreshInviteLinksPanel();
   setRequirePulseLinkSettingState(requirePulseLink);
-  setRequirePulseSyncSettingState(requirePulseSync);
   updateMmrDisplay(document.getElementById("mmrStatus"));
   saveState({ bracket: state.bracket }); // keep bracket but bump timestamp via saveState
   // Reflect slug in the settings input
@@ -3919,25 +3901,7 @@ function getCircuitFinalMapPoolSelection() {
 
 if (typeof window !== "undefined") {
   window.addEventListener("pulse-state-changed", (event) => {
-    syncPulseRegistrationRequirements(event.detail);
     hydratePulseFromState(event.detail);
-    if (currentTournamentMeta) {
-      renderAll();
-    }
-  });
-  window.addEventListener("pulse-sync-complete", (event) => {
-    syncPulseRegistrationRequirements(getPulseState?.());
-    pulseSyncSessionCompleted = true;
-    if (event?.detail?.url) {
-      lastPulseUrl = normalizePulseSyncUrl(event.detail.url);
-    }
-    if (currentTournamentMeta) {
-      renderAll();
-    }
-  });
-  window.addEventListener("pulse-secondary-sync-complete", () => {
-    syncPulseRegistrationRequirements(getPulseState?.());
-    secondaryPulseSyncSessionCompleted = true;
     if (currentTournamentMeta) {
       renderAll();
     }
@@ -3956,10 +3920,6 @@ if (typeof window !== "undefined") {
 onAuthStateChanged?.(auth, (user) => {
   recomputeAdminFromMeta();
   recomputeCircuitAdminFromMeta();
-  resetPulseSyncSessionState();
-  if (user) {
-    syncPulseRegistrationRequirements(getPulseState?.());
-  }
   if (currentTournamentMeta) {
     renderAll();
   }
@@ -4072,6 +4032,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     getManualSeedingActive,
     handleManualSeedingReorder,
     updateMatchScore,
+    updateRegistrationRequirementIcons,
     renderAll,
     saveState,
     handleAddCircuitPointsRow,
@@ -4084,7 +4045,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     checkInCurrentPlayer,
     notifyCheckInPlayers,
     toggleLiveTournament,
-    syncPulseNow,
   });
   initCoverReuseModal();
   initCasterControls({ saveState });
@@ -4373,12 +4333,28 @@ async function maybeAutoAddFinalPlayers({ force = false } = {}) {
   showToast?.(`Auto-added ${added} finalist(s).`, "success");
 }
 
+function renderRegistrationPulseSummary() {
+  const summaryEl = document.getElementById("registrationPulseSummary");
+  if (!summaryEl) return;
+  if (!pulseProfile?.url) {
+    summaryEl.style.display = "none";
+    summaryEl.innerHTML = "";
+    return;
+  }
+  const byRace = pulseProfile?.byRace || null;
+  const overall = Number.isFinite(pulseProfile?.mmr)
+    ? Math.round(pulseProfile.mmr)
+    : null;
+  const updatedAt = pulseProfile?.fetchedAt || null;
+  const badges = buildMmrBadges(byRace, overall, updatedAt);
+  summaryEl.innerHTML = "";
+  summaryEl.style.display = "none";
+}
+
 function hydratePulseFromState(pulseState) {
   const raceSelect = document.getElementById("raceSelect");
-  const mmrDisplay = document.getElementById("mmrDisplay");
   const pulseLinkDisplay = document.getElementById("pulseLinkDisplay");
   const statusEl = document.getElementById("mmrStatus");
-  const requirePulseLinkEnabled = getRequirePulseLinkEnabled();
 
   const byRace =
     pulseState && typeof pulseState.byRace === "object"
@@ -4422,30 +4398,23 @@ function hydratePulseFromState(pulseState) {
 
   const hasProfileUrl = Boolean(pulseProfile?.url);
   if (raceSelect) {
-    const shouldDisable = requirePulseLinkEnabled && !hasProfileUrl;
-    raceSelect.disabled = shouldDisable;
+    raceSelect.disabled = false;
     if (derivedRace) {
       raceSelect.value = derivedRace;
-    } else if (!shouldDisable) {
+    } else {
       raceSelect.value = raceSelect.value || "";
     }
   }
-  if (mmrDisplay) {
-    if (derivedRace) {
-      mmrDisplay.value = Number.isFinite(derivedMmr)
-        ? `${derivedMmr} MMR`
-        : "No rank";
-    } else {
-      mmrDisplay.value = "";
-    }
-  }
   if (pulseLinkDisplay) {
-    if (normalizedUrl) {
+    const manualCleared = pulseLinkDisplay.dataset.manualCleared === "true";
+    if (normalizedUrl && !(manualCleared && !pulseLinkDisplay.value.trim())) {
       pulseLinkDisplay.value = normalizedUrl;
     }
   }
 
   updateMmrDisplay(statusEl);
+  renderRegistrationPulseSummary();
+  updateRegistrationRequirementIcons();
   populatePlayerNameFromProfile();
 }
 
@@ -4479,10 +4448,40 @@ function populatePlayerNameFromProfile() {
     if (username && current === pulseName && current !== username) {
       input.value = username;
     }
+    updateRegistrationRequirementIcons();
     return;
   }
   const candidate = username || pulseName;
   if (candidate) input.value = candidate;
+  updateRegistrationRequirementIcons();
+}
+
+function getPulseRequirementStatus() {
+  const requirePulseLinkEnabled = getRequirePulseLinkEnabled();
+  const manualLink = document.getElementById("pulseLinkDisplay")?.value?.trim() || "";
+  const manualUrl = manualLink ? normalizeSc2PulseIdUrl(manualLink) : "";
+  const settingsUrl = normalizeSc2PulseIdUrl(pulseProfile?.url || "");
+  const hasValid = manualLink ? Boolean(manualUrl) : false;
+  return { requirePulseLinkEnabled, hasValid };
+}
+
+function updateRegistrationRequirementIcons() {
+  const nameInput = document.getElementById("playerNameInput");
+  const nameIcon = document.getElementById("playerNameStatusIcon");
+  const pulseIcon = document.getElementById("pulseLinkStatusIcon");
+
+  if (nameInput && nameIcon) {
+    const name = (nameInput.value || "").trim();
+    const hasLetter = /[A-Za-z]/.test(name);
+    nameIcon.classList.toggle("is-valid", Boolean(name && hasLetter));
+    nameIcon.classList.toggle("is-invalid", !name || (name && !hasLetter));
+  }
+
+  if (pulseIcon) {
+    const { requirePulseLinkEnabled, hasValid } = getPulseRequirementStatus();
+    pulseIcon.classList.toggle("is-valid", hasValid);
+    pulseIcon.classList.toggle("is-invalid", requirePulseLinkEnabled && !hasValid);
+  }
 }
 
 function normalizeRaceLabel(raw) {
@@ -4717,19 +4716,13 @@ async function handleRegistration(event) {
   }
   const name = document.getElementById("playerNameInput")?.value.trim();
   const statusEl = document.getElementById("mmrStatus");
-  const raceSelect = document.getElementById("raceSelect");
-  const selectedRace =
-    normalizeRaceLabel(raceSelect?.value) || derivedRace || "";
-  const race = selectedRace;
-  const sc2Link = pulseProfile?.url ? sanitizeUrl(pulseProfile.url) : "";
-  const mmr = mmrForRace(race);
+  const pulseProfileUrl = normalizeSc2PulseIdUrl(pulseProfile?.url || "");
   const pulseLinkInput = document.getElementById("pulseLinkDisplay");
   const manualPulseLink = pulseLinkInput?.value?.trim() || "";
-  const sc2LinkInput = sc2Link
-    ? sc2Link
-    : manualPulseLink
-    ? sanitizeUrl(manualPulseLink)
+  const manualPulseUrl = manualPulseLink
+    ? normalizeSc2PulseIdUrl(manualPulseLink)
     : "";
+  const sc2LinkInput = pulseProfileUrl || manualPulseUrl || "";
   const requirePulseLinkEnabled = getRequirePulseLinkEnabled();
   const pointsField = document.getElementById("pointsInput");
   const isInviteOnly = isInviteOnlyTournament(currentTournamentMeta);
@@ -4788,14 +4781,16 @@ async function handleRegistration(event) {
     }
   }
 
-  const pulseGate = getPulseSyncGateStatus();
-  if (pulseGate.needsSync) {
-    setStatus(statusEl, pulseGate.message, true);
+  if (!name) {
+    const message = "Player name is required.";
+    setStatus(statusEl, message, true);
+    showToast?.(message, "error");
     return;
   }
-
-  if (!name) {
-    setStatus(statusEl, "Player name is required.", true);
+  if (!/[A-Za-z]/.test(name)) {
+    const message = "Player name must include at least one letter.";
+    setStatus(statusEl, message, true);
+    showToast?.(message, "error");
     return;
   }
 
@@ -4812,111 +4807,157 @@ async function handleRegistration(event) {
       : null;
 
   if (requirePulseLinkEnabled && !sc2LinkInput) {
-    setStatus(
-      statusEl,
-      "This tournament requires your SC2Pulse link.",
-      true
-    );
+    const message = "This tournament requires your SC2Pulse link.";
+    setStatus(statusEl, message, true);
+    showToast?.(message, "error");
+    return;
+  }
+  if (manualPulseLink && !manualPulseUrl) {
+    const message = "SC2Pulse link must include a character id (id=...).";
+    setStatus(statusEl, message, true);
+    if (requirePulseLinkEnabled) {
+      showToast?.(message, "error");
+    }
+    return;
+  }
+  if (!manualPulseLink && pulseProfile?.url && !pulseProfileUrl) {
+    const message =
+      "Update your SC2Pulse link in Settings to include a character id.";
+    setStatus(statusEl, message, true);
+    if (requirePulseLinkEnabled) {
+      showToast?.(message, "error");
+    }
     return;
   }
 
-  const qualification = await enforceCircuitFinalQualification({
-    name,
-    sc2Link: sc2LinkInput,
-    currentTournamentMeta,
-    currentSlug,
-    fetchCircuitMeta,
-    buildCircuitLeaderboard,
-    playerKey,
-  });
-  if (!qualification.ok) {
-    setStatus(statusEl, qualification.message || "Registration is restricted.", true);
-    return;
-  }
+  setRegisterLoadingState(true);
+  try {
+    if (sc2LinkInput) {
+      try {
+        const payload = await fetchPulseMmrFromBackend(sc2LinkInput);
+        const byRace = payload.byRace || null;
+        const overall = Number.isFinite(payload.mmr)
+          ? Math.round(payload.mmr)
+          : null;
+        hydratePulseFromState({
+          url: payload.url || sc2LinkInput,
+          byRace,
+          mmr: overall,
+          fetchedAt: payload.fetchedAt ?? Date.now(),
+          accountName: payload.pulseName || "",
+          secondary: pulseProfile?.secondary || [],
+        });
+        updateMmrDisplay(statusEl);
+      } catch (err) {
+        const message = err?.message || "Failed to fetch MMR from SC2Pulse.";
+        setStatus(statusEl, message, true);
+        return;
+      }
+    }
 
-  if (!race) {
-    setStatus(
-      statusEl,
-      "Could not load your MMR. Refresh SC2Pulse in Settings.",
-      true
-    );
-    return;
-  }
+    const raceSelect = document.getElementById("raceSelect");
+    const selectedRace =
+      normalizeRaceLabel(raceSelect?.value) || derivedRace || "";
+    const race = selectedRace;
+    const mmr = mmrForRace(race);
 
-  if (
-    startingPoints === null &&
-    currentTournamentMeta?.circuitSlug &&
-    name
-  ) {
-    startingPoints = await getCircuitSeedPoints({
+    const qualification = await enforceCircuitFinalQualification({
       name,
       sc2Link: sc2LinkInput,
-      circuitSlug: currentTournamentMeta.circuitSlug,
-      tournamentSlug: currentSlug,
+      currentTournamentMeta,
+      currentSlug,
+      fetchCircuitMeta,
+      buildCircuitLeaderboard,
+      playerKey,
     });
-  }
-
-  if (raceSelect) {
-    raceSelect.value = race;
-  }
-
-  if (Number.isFinite(mmr)) {
-    setStatus(statusEl, `Using ${race} @ ${mmr} MMR from SC2Pulse.`, false);
-  } else {
-    setStatus(statusEl, `No rank found for ${race} — seeding as 0.`, true);
-  }
-
-  const avatarUrl = getCurrentUserAvatarUrl();
-  if (!avatarUrl || isGoogleAvatarUrl(avatarUrl)) {
-    setStatus(
-      statusEl,
-      "Choose your Z-Build Order avatar in Settings before registering (Google profile pictures are not allowed).",
-      true
-    );
-    return;
-  }
-  const profile = getCurrentUserProfile?.() || {};
-  const twitchUrl =
-    document.getElementById("settingsTwitchInput")?.value?.trim() ||
-    profile?.twitchUrl ||
-    "";
-  let secondaryPulseLinks = collectSecondaryPulseLinks();
-  const secondaryPulseProfiles =
-    Array.isArray(pulseProfile?.secondary) && pulseProfile.secondary.length
-      ? pulseProfile.secondary
-      : [];
-  if (!secondaryPulseLinks.length && secondaryPulseProfiles.length) {
-    secondaryPulseLinks = secondaryPulseProfiles
-      .map((entry) => (entry && typeof entry === "object" ? entry.url : ""))
-      .filter(Boolean);
-  }
-  const mmrByRace = pulseProfile?.byRace ? { ...pulseProfile.byRace } : null;
-  const mainClanSelect = document.getElementById("mainClanSelect");
-  const selectedClanOption = mainClanSelect?.selectedOptions?.[0];
-  const selectedClanId = mainClanSelect?.value || "";
-  const profileCountry = profile?.country || "";
-  const profileMainClanId = getCurrentUserProfile?.()?.settings?.mainClanId || "";
-  const effectiveClanId = selectedClanId || profileMainClanId;
-  const countryCode =
-    document.getElementById("settingsCountrySelect")?.value?.trim().toUpperCase() ||
-    String(profileCountry).trim().toUpperCase() ||
-    "";
-  let clanName = selectedClanOption?.textContent || "";
-  let clanAbbreviation = selectedClanOption?.dataset?.abbr || "";
-  let clanLogoUrl = selectedClanOption?.dataset?.logoUrl || "";
-  if (effectiveClanId) {
-    try {
-      const clanDoc = await getDoc(doc(db, "clans", effectiveClanId));
-      if (clanDoc.exists()) {
-        const clanData = clanDoc.data();
-        clanName = clanData?.name || clanName;
-        clanAbbreviation = clanData?.abbreviation || clanAbbreviation;
-        clanLogoUrl = clanData?.logoUrlSmall || clanData?.logoUrl || clanLogoUrl;
-      }
-    } catch (err) {
-      console.warn("Could not fetch clan abbreviation", err);
+    if (!qualification.ok) {
+      setStatus(statusEl, qualification.message || "Registration is restricted.", true);
+      return;
     }
-  }
+
+    if (!race) {
+      setStatus(
+        statusEl,
+        "Could not load your MMR. Refresh SC2Pulse in Settings.",
+        true
+      );
+      return;
+    }
+
+    if (
+      startingPoints === null &&
+      currentTournamentMeta?.circuitSlug &&
+      name
+    ) {
+      startingPoints = await getCircuitSeedPoints({
+        name,
+        sc2Link: sc2LinkInput,
+        circuitSlug: currentTournamentMeta.circuitSlug,
+        tournamentSlug: currentSlug,
+      });
+    }
+
+    if (raceSelect) {
+      raceSelect.value = race;
+    }
+
+    if (Number.isFinite(mmr)) {
+      setStatus(statusEl, `Using ${race} @ ${mmr} MMR from SC2Pulse.`, false);
+    } else {
+      setStatus(statusEl, `No rank found for ${race} - seeding as 0.`, true);
+    }
+
+    const avatarUrl = getCurrentUserAvatarUrl();
+    if (!avatarUrl || isGoogleAvatarUrl(avatarUrl)) {
+      setStatus(
+        statusEl,
+        "Choose your Z-Build Order avatar in Settings before registering (Google profile pictures are not allowed).",
+        true
+      );
+      return;
+    }
+    const profile = getCurrentUserProfile?.() || {};
+    const twitchUrl =
+      document.getElementById("settingsTwitchInput")?.value?.trim() ||
+      profile?.twitchUrl ||
+      "";
+    let secondaryPulseLinks = collectSecondaryPulseLinks();
+    const secondaryPulseProfiles =
+      Array.isArray(pulseProfile?.secondary) && pulseProfile.secondary.length
+        ? pulseProfile.secondary
+        : [];
+    if (!secondaryPulseLinks.length && secondaryPulseProfiles.length) {
+      secondaryPulseLinks = secondaryPulseProfiles
+        .map((entry) => (entry && typeof entry === "object" ? entry.url : ""))
+        .filter(Boolean);
+    }
+    const mmrByRace = pulseProfile?.byRace ? { ...pulseProfile.byRace } : null;
+    const mainClanSelect = document.getElementById("mainClanSelect");
+    const selectedClanOption = mainClanSelect?.selectedOptions?.[0];
+    const selectedClanId = mainClanSelect?.value || "";
+    const profileCountry = profile?.country || "";
+    const profileMainClanId = getCurrentUserProfile?.()?.settings?.mainClanId || "";
+    const effectiveClanId = selectedClanId || profileMainClanId;
+    const countryCode =
+      document.getElementById("settingsCountrySelect")?.value?.trim().toUpperCase() ||
+      String(profileCountry).trim().toUpperCase() ||
+      "";
+    let clanName = selectedClanOption?.textContent || "";
+    let clanAbbreviation = selectedClanOption?.dataset?.abbr || "";
+    let clanLogoUrl = selectedClanOption?.dataset?.logoUrl || "";
+    if (effectiveClanId) {
+      try {
+        const clanDoc = await getDoc(doc(db, "clans", effectiveClanId));
+        if (clanDoc.exists()) {
+          const clanData = clanDoc.data();
+          clanName = clanData?.name || clanName;
+          clanAbbreviation = clanData?.abbreviation || clanAbbreviation;
+          clanLogoUrl = clanData?.logoUrlSmall || clanData?.logoUrl || clanLogoUrl;
+        }
+      } catch (err) {
+        console.warn("Could not fetch clan abbreviation", err);
+      }
+    }
 
   let inviteLinkMeta = null;
   if (needsInviteLink) {
@@ -4984,6 +5025,9 @@ async function handleRegistration(event) {
 
   event.target.reset();
   hydratePulseFromState(pulseProfile);
+  } finally {
+    setRegisterLoadingState(false);
+  }
 }
 
 function setFinalAdminSearchStatus(message) {
@@ -5157,16 +5201,6 @@ function updateMmrDisplay(statusEl, nextRace = null, options = {}) {
     setDerivedRaceState(nextRace || null);
     setDerivedMmrState(nextRace ? mmrForRace(nextRace) : null);
   }
-  const mmrDisplay = document.getElementById("mmrDisplay");
-  if (mmrDisplay) {
-    if (derivedRace) {
-      mmrDisplay.value = Number.isFinite(derivedMmr)
-        ? `${derivedMmr} MMR`
-      : "No rank";
-    } else {
-      mmrDisplay.value = "";
-    }
-  }
 
   if (!statusEl) statusEl = document.getElementById("mmrStatus");
   if (!statusEl) return;
@@ -5176,10 +5210,6 @@ function updateMmrDisplay(statusEl, nextRace = null, options = {}) {
   const requirePulseLinkEnabled = resolveOverride(
     options.requirePulseLinkEnabled,
     getRequirePulseLinkEnabled()
-  );
-  const requirePulseSyncEnabled = resolveOverride(
-    options.requirePulseSyncEnabled,
-    getRequirePulseSyncEnabled()
   );
 
   if (!auth.currentUser) {
@@ -5202,14 +5232,6 @@ function updateMmrDisplay(statusEl, nextRace = null, options = {}) {
       requirePulseLinkEnabled
     );
     return;
-  }
-
-  if (requirePulseSyncEnabled) {
-    const pulseGate = getPulseSyncGateStatus();
-    if (pulseGate.needsSync) {
-      setStatus(statusEl, pulseGate.message, true);
-      return;
-    }
   }
 
   if (derivedRace && Number.isFinite(derivedMmr)) {

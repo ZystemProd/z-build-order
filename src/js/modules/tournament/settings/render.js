@@ -83,7 +83,6 @@ export function populateSettingsPanel({
   const rrPlayoffs = document.getElementById("settingsRoundRobinPlayoffs");
   const qualifyRow = document.getElementById("settingsCircuitQualifyRow");
   const qualifyInput = document.getElementById("settingsCircuitQualifyCount");
-  const requirePulseSyncInput = document.getElementById("settingsRequirePulseSync");
   if (nameInput) nameInput.value = tournament.name || "";
   if (slugInput) slugInput.value = tournament.slug || "";
   if (descInput) descInput.value = tournament.description || "";
@@ -138,11 +137,6 @@ export function populateSettingsPanel({
   if (requirePulseInput)
     requirePulseInput.checked = normalizeBooleanSetting(
       tournament.requirePulseLink,
-      true
-    );
-  if (requirePulseSyncInput)
-    requirePulseSyncInput.checked = normalizeBooleanSetting(
-      tournament.requirePulseSync,
       true
     );
   setMapPoolSelection(

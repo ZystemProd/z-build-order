@@ -115,7 +115,6 @@ export function buildSettingsPayload({
   mapPool,
   roundRobin,
   requirePulseLink,
-  requirePulseSync,
   circuitQualifyCount,
 }) {
   return {
@@ -131,7 +130,6 @@ export function buildSettingsPayload({
     isInviteOnly: Boolean(isInviteOnly),
     visibility: visibility || "public",
     requirePulseLink: Boolean(requirePulseLink),
-    requirePulseSync: Boolean(requirePulseSync),
     circuitQualifyCount,
     bestOf,
     mapPool,

@@ -70,6 +70,9 @@ function normalizePulseUrlClient(raw) {
     const url = new URL(withProtocol);
     if (!["http:", "https:"].includes(url.protocol)) return "";
     if (url.hostname !== "sc2pulse.nephest.com") return "";
+    const idParam = url.searchParams.get("id");
+    const hasId = idParam && Number.isFinite(Number(idParam)) && Number(idParam) > 0;
+    if (!hasId) return "";
     return url.toString();
   } catch (_) {
     return "";
@@ -688,7 +691,10 @@ async function handleConnectPulse(event) {
 
   const normalizedUrl = normalizePulseUrlClient(rawUrl);
   if (!normalizedUrl) {
-    setPulseStatus("Please paste a full sc2pulse.nephest.com link.", "error");
+    setPulseStatus(
+      "Paste a SC2Pulse link that includes a character id (id=...).",
+      "error"
+    );
     return;
   }
 

@@ -58,31 +58,62 @@ export function setupMatchChatUi({
     return;
   }
 
-  stopMatchChat();
-  historyEl.replaceChildren();
-  input.value = "";
-  panel.style.display = "none";
-  toggle.setAttribute("aria-expanded", "false");
-  labelEl.textContent = "Match chat";
-  status.textContent = "";
-  chatIsOpen = false;
-  lastSeenAtMs = 0;
-  unreadCount = 0;
-  hasInitialized = false;
-  chatMatchId = matchId || "";
-  chatUid = uid || "";
-  chatStorageKey = getChatStorageKey(chatMatchId, chatUid);
-  lastSeenAtMs = loadLastSeenAtMs(chatStorageKey);
-  updateUnreadIndicator(0);
+  const nextMatchId = matchId || "";
+  const nextUid = uid || "";
+  const nextStorageKey = getChatStorageKey(nextMatchId, nextUid);
+  const sameContext =
+    nextMatchId === chatMatchId &&
+    nextUid === chatUid &&
+    nextStorageKey === chatStorageKey;
+  const needsFullReset = !section.dataset.chatBound || !sameContext;
 
   const canView = Boolean(uid && (isAdmin || isParticipant));
   if (!canView || !currentSlug || !matchId) {
+    stopMatchChat();
+    historyEl.replaceChildren();
+    input.value = "";
+    panel.style.display = "none";
+    toggle.setAttribute("aria-expanded", "false");
+    labelEl.textContent = "Match chat";
+    status.textContent = "";
+    chatIsOpen = false;
+    lastSeenAtMs = 0;
+    unreadCount = 0;
+    hasInitialized = false;
+    chatMatchId = "";
+    chatUid = "";
+    chatStorageKey = "";
+    delete section.dataset.chatBound;
     section.style.display = "none";
     updateUnreadIndicator(0);
     return;
   }
 
   section.style.display = "grid";
+
+  if (needsFullReset) {
+    stopMatchChat();
+    historyEl.replaceChildren();
+    input.value = "";
+    panel.style.display = "grid";
+    toggle.setAttribute("aria-expanded", "true");
+    labelEl.textContent = "Hide chat";
+    status.textContent = "";
+    chatIsOpen = true;
+    lastSeenAtMs = 0;
+    unreadCount = 0;
+    hasInitialized = false;
+    chatMatchId = nextMatchId;
+    chatUid = nextUid;
+    chatStorageKey = nextStorageKey;
+    lastSeenAtMs = loadLastSeenAtMs(chatStorageKey);
+    updateUnreadIndicator(0);
+    section.dataset.chatBound = "true";
+  } else {
+    panel.style.display = chatIsOpen ? "grid" : "none";
+    toggle.setAttribute("aria-expanded", chatIsOpen ? "true" : "false");
+    labelEl.textContent = chatIsOpen ? "Hide chat" : "Match chat";
+  }
 
   const adminUids = getTournamentAdminUids(currentTournamentMeta);
   const participantUids = uniqueUids([
@@ -92,20 +123,27 @@ export function setupMatchChatUi({
     uid,
   ]);
   const canSend = Boolean(participantUids.includes(uid));
-  void startMatchChat({
-    matchId,
-    participantUids,
-    canSend,
-    uid,
-    displayName: getChatDisplayName(),
-  });
+  const displayName = getChatDisplayName();
+  if (chatContext) {
+    chatContext.canSend = canSend;
+    chatContext.displayName = displayName;
+  }
+  if (!sameContext || !chatUnsub) {
+    void startMatchChat({
+      matchId,
+      participantUids,
+      canSend,
+      uid,
+      displayName,
+    });
+  }
 
   const setFormState = (enabled) => {
     input.disabled = !enabled;
     sendBtn.disabled = !enabled;
   };
 
-  const openChat = async () => {
+  const openChat = () => {
     panel.style.display = "grid";
     toggle.setAttribute("aria-expanded", "true");
     labelEl.textContent = "Hide chat";
@@ -114,14 +152,15 @@ export function setupMatchChatUi({
     updateUnreadIndicator(0);
     setFormState(canSend);
     status.textContent = canSend ? "" : "Only match players can send messages.";
-    await startMatchChat({
-      matchId,
-      participantUids,
-      canSend,
-      uid,
-      displayName: getChatDisplayName(),
-    });
   };
+
+  if (chatIsOpen) {
+    setFormState(canSend);
+    status.textContent = canSend ? "" : "Only match players can send messages.";
+  } else {
+    setFormState(false);
+    status.textContent = "";
+  }
 
   const closeChat = () => {
     panel.style.display = "none";

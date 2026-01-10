@@ -80,6 +80,7 @@ export function initTournamentPage({
   getManualSeedingActive,
   handleManualSeedingReorder,
   updateMatchScore,
+  updateRegistrationRequirementIcons,
   renderAll,
   saveState,
   handleAddCircuitPointsRow,
@@ -92,7 +93,6 @@ export function initTournamentPage({
   checkInCurrentPlayer,
   notifyCheckInPlayers,
   toggleLiveTournament,
-  syncPulseNow,
 }) {
   initTournamentNotifications();
   initTournamentSearch();
@@ -113,8 +113,10 @@ export function initTournamentPage({
   const signOutBtn = document.getElementById("signOutBtn");
   const switchAccountBtn = document.getElementById("switchAccountBtn");
   const settingsBtn = document.getElementById("settingsBtn");
-  const syncPulseBtn = document.getElementById("syncPulseBtn");
   const raceSelect = document.getElementById("raceSelect");
+  const pulseLinkDisplay = document.getElementById("pulseLinkDisplay");
+  const playerNameInput = document.getElementById("playerNameInput");
+  const openPulseSettingsBtn = document.getElementById("openPulseSettingsBtn");
   const openRegisterBtn = document.getElementById("openRegisterBtn");
   const openCreateTournament = document.getElementById("openCreateTournament");
   const createModal = document.getElementById("createTournamentModal");
@@ -179,7 +181,6 @@ export function initTournamentPage({
   const settingsImageInput = document.getElementById("settingsImageInput");
   const settingsImagePreview = document.getElementById("settingsImagePreview");
   const settingsRequirePulseLink = document.getElementById("settingsRequirePulseLink");
-  const settingsRequirePulseSync = document.getElementById("settingsRequirePulseSync");
   const tournamentMaxPlayersInput = document.getElementById("tournamentMaxPlayersInput");
   const settingsMaxPlayersInput = document.getElementById("settingsMaxPlayersInput");
   const finalMaxPlayersInput = document.getElementById("finalTournamentMaxPlayersInput");
@@ -566,20 +567,53 @@ export function initTournamentPage({
       if (modal) modal.style.display = "block";
     }
   });
-  syncPulseBtn?.addEventListener("click", async () => {
-    if (syncPulseBtn.classList.contains("is-loading")) return;
-    if (typeof syncPulseNow !== "function") return;
-    syncPulseBtn.classList.add("is-loading");
-    syncPulseBtn.disabled = true;
-    syncPulseBtn.setAttribute("aria-busy", "true");
-    try {
-      await syncPulseNow();
-    } finally {
-      syncPulseBtn.classList.remove("is-loading");
-      syncPulseBtn.disabled = false;
-      syncPulseBtn.removeAttribute("aria-busy");
+  const openPulseSettings = async () => {
+    const mod = await import("../settingsModalInit.js");
+    if (typeof mod.openSettingsModal === "function") {
+      await mod.openSettingsModal();
+    } else if (typeof mod.initUserSettingsModal === "function") {
+      mod.initUserSettingsModal();
+      const modal = document.getElementById("settingsModal");
+      if (modal) modal.style.display = "block";
     }
+    const modal = document.getElementById("settingsModal");
+    if (modal) {
+      const tabButtons = modal.querySelectorAll("[data-user-settings-tab]");
+      const tabPanels = modal.querySelectorAll(".settings-panel");
+      tabButtons.forEach((btn) => {
+        btn.classList.toggle(
+          "active",
+          btn.dataset.userSettingsTab === "settingsTournament"
+        );
+      });
+      tabPanels.forEach((panel) => {
+        panel.classList.toggle("active", panel.id === "settingsTournament");
+      });
+    }
+    const pulseInput = document.getElementById("sc2PulseInput");
+    if (pulseInput) {
+      pulseInput.classList.add("highlight");
+      pulseInput.focus();
+      pulseInput.scrollIntoView({ behavior: "smooth", block: "center" });
+      setTimeout(() => pulseInput.classList.remove("highlight"), 2000);
+    }
+  };
+  openPulseSettingsBtn?.addEventListener("click", openPulseSettings);
+  if (pulseLinkDisplay) {
+    pulseLinkDisplay.addEventListener("input", () => {
+      if (!raceSelect) return;
+      if (pulseLinkDisplay.value.trim()) {
+        delete pulseLinkDisplay.dataset.manualCleared;
+      } else {
+        pulseLinkDisplay.dataset.manualCleared = "true";
+      }
+      updateRegistrationRequirementIcons?.();
+    });
+  }
+  playerNameInput?.addEventListener("input", () => {
+    updateRegistrationRequirementIcons?.();
   });
+  updateRegistrationRequirementIcons?.();
   raceSelect?.addEventListener("change", () => {
     const statusEl = document.getElementById("mmrStatus");
     const normalizedRace = normalizeRaceLabel(raceSelect.value);
@@ -868,11 +902,9 @@ export function initTournamentPage({
     if (!statusEl) return;
     updateMmrDisplay(statusEl, null, {
       requirePulseLinkEnabled: settingsRequirePulseLink?.checked,
-      requirePulseSyncEnabled: settingsRequirePulseSync?.checked,
     });
   };
   settingsRequirePulseLink?.addEventListener("change", updateMmrStatusPreview);
-  settingsRequirePulseSync?.addEventListener("change", updateMmrStatusPreview);
 
   [
     bestOfUpperInput,

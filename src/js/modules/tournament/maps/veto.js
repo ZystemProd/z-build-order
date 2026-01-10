@@ -4,10 +4,12 @@ import { auth, db, getCurrentUsername } from "../../../../app.js";
 import {
   collection,
   deleteDoc,
+  deleteField,
   doc,
   onSnapshot,
   serverTimestamp,
   setDoc,
+  updateDoc,
 } from "firebase/firestore";
 import { getPreferredServerLabel } from "../../../data/countryRegions.js";
 import countries from "../../../data/countries.json" assert { type: "json" };
@@ -1073,6 +1075,7 @@ export function openMatchInfoModal(
             delete next[matchId];
             state.scoreReports = next;
             vetoDeps?.saveState?.({ scoreReports: next });
+            void clearScoreReportRemote(matchId);
             vetoDeps?.renderAll?.();
             openMatchInfoModal(matchId, vetoDeps);
           }
@@ -1086,6 +1089,7 @@ export function openMatchInfoModal(
             delete next[matchId];
             state.scoreReports = next;
             vetoDeps?.saveState?.({ scoreReports: next });
+            void clearScoreReportRemote(matchId);
             vetoDeps?.renderAll?.();
             openMatchInfoModal(matchId, vetoDeps);
           }
@@ -1399,6 +1403,16 @@ function presenceDocRef(uid) {
 function tournamentStateDocRef() {
   if (!currentSlug) return null;
   return doc(collection(db, TOURNAMENT_STATE_COLLECTION), currentSlug);
+}
+
+async function clearScoreReportRemote(matchId) {
+  const ref = tournamentStateDocRef();
+  if (!ref || !matchId) return;
+  try {
+    await updateDoc(ref, { [`scoreReports.${matchId}`]: deleteField() });
+  } catch (err) {
+    console.warn("Failed to clear score report remotely", err);
+  }
 }
 
 function startPresenceTracking(matchId, hint = null) {
