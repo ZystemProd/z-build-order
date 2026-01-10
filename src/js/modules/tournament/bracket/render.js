@@ -24,10 +24,37 @@ const CAST_ICON_SVG = `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="fa
 </svg>`;
 
 let currentUsernameHint = "";
+let currentUserUidHint = "";
 const nameRevealQueue = new Set();
 const lastRenderedParticipantIds = new Map();
 const recentNameReveals = new Map();
 const REVEAL_WINDOW_MS = 1200;
+const rowElementCache = new WeakMap();
+const cardElementCache = new WeakMap();
+
+function getRowRefs(row) {
+  if (!row) return {};
+  const cached = rowElementCache.get(row);
+  if (cached) return cached;
+  const refs = {
+    seedChip: row.querySelector(".seed-chip"),
+    raceStrip: row.querySelector(".race-strip"),
+    clanImg: row.querySelector("img.clan-logo-inline"),
+    nameText: row.querySelector(".name-text"),
+    scoreEl: row.querySelector(".score-display"),
+  };
+  rowElementCache.set(row, refs);
+  return refs;
+}
+
+function getCardRows(card) {
+  if (!card) return [];
+  const cached = cardElementCache.get(card);
+  if (cached?.rows?.length === 2) return cached.rows;
+  const rows = card.querySelectorAll(".row");
+  cardElementCache.set(card, { rows });
+  return rows;
+}
 
 function nameRevealKey(matchId, participantIdx) {
   return `${matchId || "match"}:${participantIdx ?? "0"}`;
@@ -103,7 +130,14 @@ function setCurrentUsernameHint(username) {
   currentUsernameHint = (username || "").trim().toLowerCase();
 }
 
+function setCurrentUserUidHint(uid) {
+  currentUserUidHint = (uid || "").trim();
+}
+
 function isCurrentUserPlayer(player) {
+  if (currentUserUidHint && player?.uid) {
+    return String(player.uid).trim() === currentUserUidHint;
+  }
   if (!currentUsernameHint) return false;
   const name = (player?.name || "").trim().toLowerCase();
   const pulseName = (player?.pulseName || "").trim().toLowerCase();
@@ -147,11 +181,7 @@ function updateTreeMatchRow(row, player, match, participantIdx, lookup, bestOf, 
   const raceClass = raceClassName(player?.race);
   const clanLogo = player?.clanLogoUrl ? sanitizeUrl(player.clanLogoUrl) : "";
   const clanName = (player?.clan || "").trim();
-  const seedChip = row.querySelector(".seed-chip");
-  const raceStrip = row.querySelector(".race-strip");
-  const clanImg = row.querySelector("img.clan-logo-inline");
-  const nameText = row.querySelector(".name-text");
-  const scoreEl = row.querySelector(".score-display");
+  const { seedChip, raceStrip, clanImg, nameText, scoreEl } = getRowRefs(row);
 
   row.dataset.playerId = player?.id || "";
   row.classList.toggle("winner", match.winnerId === player?.id);
@@ -374,12 +404,20 @@ export function renderMatchCard(match, lookup, playersById) {
   return DOMPurify.sanitize(html);
 }
 
-export function updateTreeMatchCards(matchIds, lookup, playersById, { currentUsername } = {}) {
+export function updateTreeMatchCards(
+  matchIds,
+  lookup,
+  playersById,
+  { currentUsername, currentUid } = {}
+) {
   if (!Array.isArray(matchIds) || !matchIds.length || !lookup || !playersById) {
     return false;
   }
   if (typeof currentUsername === "string") {
     setCurrentUsernameHint(currentUsername);
+  }
+  if (typeof currentUid === "string") {
+    setCurrentUserUidHint(currentUid);
   }
   let updated = false;
   const uniqueIds = Array.from(new Set(matchIds.filter(Boolean)));
@@ -398,7 +436,7 @@ export function updateTreeMatchCards(matchIds, lookup, playersById, { currentUse
     const hasScoreReport = Boolean(state?.scoreReports?.[match.id]);
     card.classList.toggle("ready", isReady && isUserMatch);
     card.classList.toggle("score-report", hasScoreReport);
-    const rows = card.querySelectorAll(".row");
+    const rows = getCardRows(card);
     updateTreeMatchRow(rows[0], pA, match, 0, lookup, bestOf, participants);
     updateTreeMatchRow(rows[1], pB, match, 1, lookup, bestOf, participants);
     updateTreeMatchCastIndicator(card, match);
@@ -1471,11 +1509,13 @@ export function renderBracketView({
   attachMatchActionHandlers,
   computeGroupStandings,
   currentUsername,
+  currentUid,
 }) {
   const grid = document.getElementById("bracketGrid");
   if (!grid) return;
 
   setCurrentUsernameHint(currentUsername);
+  setCurrentUserUidHint(currentUid);
 
   if (!bracket || !players.length) {
     grid.innerHTML = DOMPurify.sanitize(

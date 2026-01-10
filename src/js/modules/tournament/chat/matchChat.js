@@ -10,11 +10,12 @@ import {
   setDoc,
 } from "firebase/firestore";
 import { auth, db, getCurrentUsername } from "../../../../app.js";
-import { currentSlug, currentTournamentMeta, isAdmin } from "../state.js";
+import { currentSlug, currentTournamentMeta, isAdmin, state } from "../state.js";
 
 const MATCH_CHAT_COLLECTION = "tournamentChats";
 const MATCH_CHAT_LIMIT = 50;
 const MATCH_CHAT_MAX_LENGTH = 500;
+const chatParticipantCache = new Map();
 let chatUnsub = null;
 let chatContext = null;
 let chatUnreadEl = null;
@@ -61,14 +62,27 @@ export function setupMatchChatUi({
   const nextMatchId = matchId || "";
   const nextUid = uid || "";
   const nextStorageKey = getChatStorageKey(nextMatchId, nextUid);
+  const sameMatch = nextMatchId === chatMatchId;
   const sameContext =
-    nextMatchId === chatMatchId &&
+    sameMatch &&
     nextUid === chatUid &&
     nextStorageKey === chatStorageKey;
-  const needsFullReset = !section.dataset.chatBound || !sameContext;
+  const needsFullReset = !section.dataset.chatBound || !sameMatch;
 
   const canView = Boolean(uid && (isAdmin || isParticipant));
   if (!canView || !currentSlug || !matchId) {
+    if (sameMatch && section.dataset.chatBound === "true") {
+      stopMatchChat();
+      input.value = "";
+      panel.style.display = chatIsOpen ? "grid" : "none";
+      toggle.setAttribute("aria-expanded", chatIsOpen ? "true" : "false");
+      labelEl.textContent = chatIsOpen ? "Hide chat" : "Match chat";
+      status.textContent = uid
+        ? "Only match players can send messages."
+        : "Sign in to chat.";
+      setFormState(false);
+      return;
+    }
     stopMatchChat();
     historyEl.replaceChildren();
     input.value = "";
@@ -90,6 +104,7 @@ export function setupMatchChatUi({
   }
 
   section.style.display = "grid";
+  const uidLookup = buildPlayerUidLookup(state?.players || []);
 
   if (needsFullReset) {
     stopMatchChat();
@@ -113,12 +128,19 @@ export function setupMatchChatUi({
     panel.style.display = chatIsOpen ? "grid" : "none";
     toggle.setAttribute("aria-expanded", chatIsOpen ? "true" : "false");
     labelEl.textContent = chatIsOpen ? "Hide chat" : "Match chat";
+    if (!sameContext) {
+      chatUid = nextUid;
+      chatStorageKey = nextStorageKey;
+      lastSeenAtMs = loadLastSeenAtMs(chatStorageKey);
+    }
   }
 
   const adminUids = getTournamentAdminUids(currentTournamentMeta);
+  const leftUid = resolvePlayerUid(leftPlayer, uidLookup);
+  const rightUid = resolvePlayerUid(rightPlayer, uidLookup);
   const participantUids = uniqueUids([
-    leftPlayer?.uid,
-    rightPlayer?.uid,
+    leftUid,
+    rightUid,
     ...adminUids,
     uid,
   ]);
@@ -209,6 +231,38 @@ export function setupMatchChatUi({
   };
 }
 
+function buildPlayerUidLookup(players = []) {
+  const byId = new Map();
+  const byName = new Map();
+  players.forEach((player) => {
+    const playerUid = String(player?.uid || "").trim();
+    if (!playerUid) return;
+    if (player?.id) {
+      byId.set(player.id, playerUid);
+    }
+    const name = String(player?.name || "").trim().toLowerCase();
+    if (!name) return;
+    if (!byName.has(name)) byName.set(name, []);
+    byName.get(name).push(playerUid);
+  });
+  return { byId, byName };
+}
+
+function resolvePlayerUid(player, lookup) {
+  if (!player || !lookup) return "";
+  const directUid = String(player?.uid || "").trim();
+  if (directUid) return directUid;
+  if (player?.id && lookup.byId.has(player.id)) {
+    return lookup.byId.get(player.id) || "";
+  }
+  const name = String(player?.name || "").trim().toLowerCase();
+  if (name && lookup.byName.has(name)) {
+    const candidates = lookup.byName.get(name) || [];
+    if (candidates.length === 1) return candidates[0] || "";
+  }
+  return "";
+}
+
 export function teardownMatchChatUi() {
   stopMatchChat();
   const panel = document.getElementById("matchChatPanel");
@@ -283,9 +337,10 @@ async function startMatchChat({
   if (!currentSlug || !matchId || !historyEl) return;
 
   const docRef = doc(db, MATCH_CHAT_COLLECTION, currentSlug, "matches", matchId);
-  const safeParticipants = uniqueUids(participantUids);
+  const cachedParticipants = chatParticipantCache.get(matchId) || [];
+  const safeParticipants = uniqueUids([...cachedParticipants, ...participantUids]);
   try {
-    if (safeParticipants.length) {
+    if (safeParticipants.length && safeParticipants.length <= 25) {
       await setDoc(
         docRef,
         {
@@ -294,11 +349,15 @@ async function startMatchChat({
         },
         { merge: true }
       );
+      chatParticipantCache.set(matchId, safeParticipants);
+    } else if (safeParticipants.length > 25) {
+      console.warn("Match chat participants exceeded limit, skipping sync.");
     }
   } catch (err) {
     console.warn("Failed to sync match chat participants", err);
-    if (status) status.textContent = "Chat is unavailable right now.";
-    return;
+    if (status && err?.code !== "permission-denied") {
+      status.textContent = "Chat is unavailable right now.";
+    }
   }
 
   const messagesRef = collection(

@@ -874,7 +874,6 @@ function shouldUsePartialRender(prevState, nextState, format) {
   if (!safeJsonEqual(prevState.pointsLedger || {}, nextState.pointsLedger || {})) return false;
   if (!safeJsonEqual(prevState.manualSeedingEnabled, nextState.manualSeedingEnabled)) return false;
   if (!safeJsonEqual(prevState.manualSeedingOrder || [], nextState.manualSeedingOrder || [])) return false;
-  if (!safeJsonEqual(prevState.matchVetoes || {}, nextState.matchVetoes || {})) return false;
   if (!safeJsonEqual(prevState.casters || [], nextState.casters || [])) return false;
   if (!safeJsonEqual(prevState.casterRequests || [], nextState.casterRequests || [])) return false;
   return true;
@@ -907,6 +906,14 @@ function shouldUsePartialRender(prevState, nextState, format) {
   const prevState = state;
   const nextPlayers = applyRosterSeedingWithMode(incoming.players || [], incoming);
   const nextBracket = deserializeBracket(incoming.bracket);
+  const inProgressVetoId =
+    currentVetoMatchId && vetoState && vetoState.stage !== "done"
+      ? currentVetoMatchId
+      : null;
+  const inProgressVeto =
+    inProgressVetoId && state.matchVetoes
+      ? state.matchVetoes[inProgressVetoId] || null
+      : null;
   const nextState = {
     ...defaultState,
     ...incoming,
@@ -915,6 +922,12 @@ function shouldUsePartialRender(prevState, nextState, format) {
     activity: incoming.activity || [],
     bracket: nextBracket,
   };
+  if (inProgressVetoId && inProgressVeto) {
+    nextState.matchVetoes = {
+      ...(nextState.matchVetoes || {}),
+      [inProgressVetoId]: inProgressVeto,
+    };
+  }
   const activityChanged = !safeJsonEqual(
     prevState.activity || [],
     nextState.activity || []
@@ -1623,6 +1636,7 @@ function renderAll(matchIds = null) {
     if (shouldPartialUpdate) {
       didPartialUpdate = updateTreeMatchCards(matchIds, lookup, playersById, {
         currentUsername: getCurrentUsername?.() || "",
+        currentUid: auth.currentUser?.uid || "",
       });
       if (didPartialUpdate) {
         annotateConnectorPlayers(lookup, playersById);
@@ -1653,6 +1667,7 @@ function renderAll(matchIds = null) {
           attachMatchActionHandlers,
           computeGroupStandings,
           currentUsername: getCurrentUsername?.() || "",
+          currentUid: auth.currentUser?.uid || "",
         });
       }
       attachMatchHoverHandlers();

@@ -270,16 +270,20 @@ service cloud.firestore {
       );
       allow create: if request.auth != null
         && request.resource.data.participants is list
-        && request.auth.uid in request.resource.data.participants
         && request.resource.data.participants.size() <= 25
-        && request.resource.data.keys().hasOnly(["participants", "updatedAt"]);
+        && request.resource.data.keys().hasOnly(["participants", "updatedAt"])
+        && (request.auth.uid in request.resource.data.participants ||
+            isTournamentOwner(slug) ||
+            isCircuitOwnerForTournament(slug));
       allow update: if request.auth != null
-        && (request.auth.uid in resource.data.participants ||
-            request.auth.uid in request.resource.data.participants)
         && request.resource.data.participants is list
         && request.resource.data.participants.size() <= 25
+        && request.resource.data.keys().hasOnly(["participants", "updatedAt"])
         && request.resource.data.participants.hasAll(resource.data.participants)
-        && request.resource.data.keys().hasOnly(["participants", "updatedAt"]);
+        && (request.auth.uid in resource.data.participants ||
+            request.auth.uid in request.resource.data.participants ||
+            isTournamentOwner(slug) ||
+            isCircuitOwnerForTournament(slug));
       allow delete: if isTournamentOwner(slug) || isCircuitOwnerForTournament(slug);
 
       match /messages/{messageId} {
@@ -292,7 +296,9 @@ service cloud.firestore {
           && request.resource.data.text.size() >= 1
           && request.resource.data.text.size() <= 500
           && request.resource.data.uid == request.auth.uid
-          && isChatParticipant(slug, matchId);
+          && (isChatParticipant(slug, matchId) ||
+              isTournamentOwner(slug) ||
+              isCircuitOwnerForTournament(slug));
         allow update: if false;
         allow delete: if isTournamentOwner(slug) || isCircuitOwnerForTournament(slug);
       }

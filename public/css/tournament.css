@@ -2774,6 +2774,11 @@ details.stage-section:not([open]) .stage-toggle::after {
   transition-delay: 0ms;
 }
 
+.match-card.tree.ready .hover-info-container {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .hover-info-container:hover {
   border-color: var(--accent-2);
 }
@@ -5412,7 +5417,7 @@ textarea:focus {
 }
 
 .match-chat-history {
-  max-height: 180px;
+  height: 180px;
   overflow-y: auto;
   display: grid;
   gap: 6px;
@@ -5420,6 +5425,7 @@ textarea:focus {
 }
 
 .match-chat-message {
+  height: 56px;
   display: grid;
   gap: 4px;
   padding: 8px 10px;
