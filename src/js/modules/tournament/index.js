@@ -142,6 +142,7 @@ import {
   renderScoreOptions,
   clampScoreSelectOptions,
   renderSimpleMatch,
+  updateTreeMatchCards,
   layoutBracketSection,
   attachMatchHoverHandlers,
   annotateConnectorPlayers,
@@ -291,6 +292,14 @@ function normalizeTournamentVisibility(value) {
 
 function normalizeTournamentAccess(value) {
   return String(value || "").toLowerCase() === "closed" ? "closed" : "open";
+}
+
+function isRoundRobinFormat(format) {
+  return String(format || "").toLowerCase().includes("round robin");
+}
+
+function isGroupStageFormat(format) {
+  return isRoundRobinFormat(format) || isDualTournamentFormat(format);
 }
 
 function getInviteTokenStorageKey(slug) {
@@ -751,6 +760,126 @@ async function loadMapCatalog() {
   return mapCatalog;
 }
 
+function safeJsonEqual(a, b) {
+  if (a === b) return true;
+  try {
+    return JSON.stringify(a) === JSON.stringify(b);
+  } catch (_) {
+    return false;
+  }
+}
+
+function isSameSources(a, b) {
+  if (a === b) return true;
+  if (!Array.isArray(a) || !Array.isArray(b)) return false;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    const left = a[i] || {};
+    const right = b[i] || {};
+    if ((left.type || "") !== (right.type || "")) return false;
+    if ((left.matchId || "") !== (right.matchId || "")) return false;
+    if ((left.outcome || "") !== (right.outcome || "")) return false;
+    if ((left.playerId || "") !== (right.playerId || "")) return false;
+  }
+  return true;
+}
+
+function buildDependencyMapFromLookup(lookup) {
+  const dependencies = new Map();
+  if (!lookup) return dependencies;
+  for (const match of lookup.values()) {
+    const sources = Array.isArray(match.sources) ? match.sources : [];
+    sources.forEach((src) => {
+      if (src?.type !== "match" || !src.matchId) return;
+      if (!dependencies.has(src.matchId)) {
+        dependencies.set(src.matchId, new Set());
+      }
+      dependencies.get(src.matchId).add(match.id);
+    });
+  }
+  return dependencies;
+}
+
+function collectDependentMatchIdsFromLookup(startIds, lookup) {
+  const dependencies = buildDependencyMapFromLookup(lookup);
+  const visited = new Set();
+  const queue = Array.isArray(startIds) ? [...startIds] : [];
+  while (queue.length) {
+    const sourceId = queue.shift();
+    if (!sourceId || visited.has(sourceId)) continue;
+    visited.add(sourceId);
+    const dependents = dependencies.get(sourceId);
+    if (!dependents) continue;
+    dependents.forEach((depId) => {
+      if (!visited.has(depId)) queue.push(depId);
+    });
+  }
+  return visited;
+}
+
+function getChangedMatchIdsFromMap(prevMap, nextMap) {
+  const prev = prevMap || {};
+  const next = nextMap || {};
+  const ids = new Set([...Object.keys(prev), ...Object.keys(next)]);
+  const changed = new Set();
+  ids.forEach((id) => {
+    if (!safeJsonEqual(prev[id], next[id])) {
+      changed.add(id);
+    }
+  });
+  return changed;
+}
+
+function getBracketMatchIdsForPartial(prevBracket, nextBracket) {
+  if (!prevBracket || !nextBracket) return null;
+  const prevLookup = getMatchLookup(prevBracket);
+  const nextLookup = getMatchLookup(nextBracket);
+  if (!prevLookup || !nextLookup) return null;
+  if (prevLookup.size !== nextLookup.size) return null;
+  for (const id of nextLookup.keys()) {
+    if (!prevLookup.has(id)) return null;
+  }
+  const changed = new Set();
+  for (const [id, nextMatch] of nextLookup.entries()) {
+    const prevMatch = prevLookup.get(id);
+    if (!prevMatch) return null;
+    if (!isSameSources(prevMatch.sources || [], nextMatch.sources || [])) {
+      return null;
+    }
+    const prevScores = prevMatch.scores || [];
+    const nextScores = nextMatch.scores || [];
+    const scoreChanged =
+      (prevScores[0] || 0) !== (nextScores[0] || 0) ||
+      (prevScores[1] || 0) !== (nextScores[1] || 0);
+    const statusChanged =
+      prevMatch.walkover !== nextMatch.walkover ||
+      prevMatch.status !== nextMatch.status ||
+      prevMatch.winnerId !== nextMatch.winnerId ||
+      prevMatch.loserId !== nextMatch.loserId;
+    if (scoreChanged || statusChanged) changed.add(id);
+  }
+  if (!changed.size) return [];
+  return Array.from(collectDependentMatchIdsFromLookup(Array.from(changed), nextLookup));
+}
+
+function shouldUsePartialRender(prevState, nextState, format) {
+  if (!prevState?.bracket || !nextState?.bracket) return false;
+  if (isGroupStageFormat(format)) return false;
+  if (prevState.isLive !== nextState.isLive) return false;
+  if (prevState.hasBeenLive !== nextState.hasBeenLive) return false;
+  if (prevState.disableFinalAutoAdd !== nextState.disableFinalAutoAdd) return false;
+  if (prevState.needsReseed !== nextState.needsReseed) return false;
+  if (prevState.bracketLayoutVersion !== nextState.bracketLayoutVersion) return false;
+  if (!safeJsonEqual(prevState.players || [], nextState.players || [])) return false;
+  if (!safeJsonEqual(prevState.pointsLedger || {}, nextState.pointsLedger || {})) return false;
+  if (!safeJsonEqual(prevState.manualSeedingEnabled, nextState.manualSeedingEnabled)) return false;
+  if (!safeJsonEqual(prevState.manualSeedingOrder || [], nextState.manualSeedingOrder || [])) return false;
+  if (!safeJsonEqual(prevState.matchVetoes || {}, nextState.matchVetoes || {})) return false;
+  if (!safeJsonEqual(prevState.casters || [], nextState.casters || [])) return false;
+  if (!safeJsonEqual(prevState.casterRequests || [], nextState.casterRequests || [])) return false;
+  return true;
+}
+
   function syncFromRemote(incoming) {
   if (!incoming || typeof incoming !== "object") return;
   const incomingPresence = incoming.presence?.matchInfo || null;
@@ -775,15 +904,53 @@ async function loadMapCatalog() {
     }
     return;
   }
-  setStateObj({
+  const prevState = state;
+  const nextPlayers = applyRosterSeedingWithMode(incoming.players || [], incoming);
+  const nextBracket = deserializeBracket(incoming.bracket);
+  const nextState = {
     ...defaultState,
     ...incoming,
-    players: applyRosterSeedingWithMode(incoming.players || [], incoming),
+    players: nextPlayers,
     pointsLedger: incoming.pointsLedger || {},
     activity: incoming.activity || [],
-    bracket: deserializeBracket(incoming.bracket),
-  });
+    bracket: nextBracket,
+  };
+  const activityChanged = !safeJsonEqual(
+    prevState.activity || [],
+    nextState.activity || []
+  );
+  let allowPartial = shouldUsePartialRender(
+    prevState,
+    nextState,
+    currentTournamentMeta?.format
+  );
+  let matchIds = [];
+  if (allowPartial) {
+    const bracketMatchIds = getBracketMatchIdsForPartial(prevState.bracket, nextBracket);
+    if (bracketMatchIds === null) {
+      allowPartial = false;
+    } else {
+      const combined = new Set(bracketMatchIds);
+      getChangedMatchIdsFromMap(prevState.matchCasts, nextState.matchCasts).forEach(
+        (id) => combined.add(id)
+      );
+      getChangedMatchIdsFromMap(prevState.scoreReports, nextState.scoreReports).forEach(
+        (id) => combined.add(id)
+      );
+      matchIds = Array.from(combined).filter(Boolean);
+    }
+  }
+  setStateObj(nextState);
+  if (allowPartial && matchIds.length) {
+    renderAll(matchIds);
+    if (activityChanged) {
+      renderActivityList({ state, escapeHtml, formatTime });
+    }
+  } else if (allowPartial && activityChanged) {
+    renderActivityList({ state, escapeHtml, formatTime });
+  } else {
     renderAll();
+  }
   refreshPlayerDetailModalIfOpen(getPlayersMap);
   refreshMatchInfoModalIfOpen?.();
   refreshVetoModalIfOpen?.();
@@ -1091,7 +1258,63 @@ function handleApplyCircuitPoints(event) {
   });
 }
 
-function renderAll() {
+function updatePlacementsRow() {
+  if (!currentTournamentMeta) return;
+  const placementsRow = document.getElementById("tournamentPlacements");
+  const placementFirst = document.getElementById("placementFirst");
+  const placementSecond = document.getElementById("placementSecond");
+  const placementThirdFourth = document.getElementById("placementThirdFourth");
+  if (!placementsRow || !placementFirst || !placementSecond || !placementThirdFourth) return;
+  const eligiblePlayers = getEligiblePlayers(state.players || []);
+  const placements = computePlacementsForBracket(
+    state.bracket,
+    eligiblePlayers.length || 0
+  );
+  if (!placements) {
+    placementsRow.style.display = "none";
+    return;
+  }
+  const playersById = getPlayersMap();
+  const firstId = Array.from(placements.entries()).find(([, p]) => p === 1)?.[0];
+  const secondId = Array.from(placements.entries()).find(([, p]) => p === 2)?.[0];
+  const thirdIds = Array.from(placements.entries())
+    .filter(([, p]) => p === 3)
+    .map(([id]) => id);
+  placementFirst.textContent = playersById.get(firstId)?.name || "—";
+  placementSecond.textContent = playersById.get(secondId)?.name || "—";
+  placementThirdFourth.textContent = thirdIds.length
+    ? thirdIds.map((id) => playersById.get(id)?.name || "—").join(" · ")
+    : "—";
+  placementsRow.style.display = "flex";
+}
+
+function renderAll(matchIds = null) {
+  const bracketContainer = document.getElementById("bracketGrid");
+  const bracket = state.bracket;
+  const playersArr = state.players || [];
+  const format = currentTournamentMeta?.format || "Tournament";
+  const shouldPartialUpdate =
+    Array.isArray(matchIds) &&
+    matchIds.length &&
+    bracketContainer &&
+    bracket &&
+    !isGroupStageFormat(format);
+
+  if (shouldPartialUpdate) {
+    const lookup = getMatchLookup(bracket);
+    const playersById = getPlayersMap();
+    const didPartialUpdate = updateTreeMatchCards(matchIds, lookup, playersById, {
+      currentUsername: getCurrentUsername?.() || "",
+    });
+    if (didPartialUpdate) {
+      annotateConnectorPlayers(lookup, playersById);
+      clampScoreSelectOptions();
+      updatePlacementsRow();
+      applyBracketReadOnlyState(!state.isLive && !isAdmin);
+      updateTooltips?.();
+      return;
+    }
+  }
   // Update seeding table
   const seedingSnapshot = seedPlayersForState(state.players || [], state);
   const forfeitUndoBlocked = getForfeitUndoBlockedIds();
@@ -1114,10 +1337,6 @@ function renderAll() {
     const descriptionBody = document.getElementById("tournamentDescriptionBody");
     const rulesBody = document.getElementById("tournamentRulesBody");
     const statPlayers = document.getElementById("statPlayers");
-    const placementsRow = document.getElementById("tournamentPlacements");
-    const placementFirst = document.getElementById("placementFirst");
-    const placementSecond = document.getElementById("placementSecond");
-    const placementThirdFourth = document.getElementById("placementThirdFourth");
     const registerBtn = document.getElementById("registerBtn");
     const goLiveBtn = document.getElementById("rebuildBracketBtn");
     const notifyCheckInBtn = document.getElementById("notifyCheckInBtn");
@@ -1229,28 +1448,7 @@ function renderAll() {
       }
     }
 
-    if (placementsRow && placementFirst && placementSecond && placementThirdFourth) {
-      const placements = computePlacementsForBracket(
-        state.bracket,
-        eligiblePlayers.length || 0
-      );
-      if (!placements) {
-        placementsRow.style.display = "none";
-      } else {
-        const playersById = getPlayersMap();
-        const firstId = Array.from(placements.entries()).find(([, p]) => p === 1)?.[0];
-        const secondId = Array.from(placements.entries()).find(([, p]) => p === 2)?.[0];
-        const thirdIds = Array.from(placements.entries())
-          .filter(([, p]) => p === 3)
-          .map(([id]) => id);
-        placementFirst.textContent = playersById.get(firstId)?.name || "—";
-        placementSecond.textContent = playersById.get(secondId)?.name || "—";
-        placementThirdFourth.textContent = thirdIds.length
-          ? thirdIds.map((id) => playersById.get(id)?.name || "—").join(" · ")
-          : "—";
-        placementsRow.style.display = "flex";
-      }
-    }
+    updatePlacementsRow();
 
     if (registerBtn) {
       const isRegisterLoading = registerBtn.classList.contains("is-loading");
@@ -1381,14 +1579,6 @@ function renderAll() {
     getMapByName,
   });
 
-  const bracketContainer = document.getElementById("bracketGrid");
-  const bracket = state.bracket;
-  const playersArr = state.players || [];
-  const format = currentTournamentMeta?.format || "Tournament";
-  const isRoundRobinFormat = (fmt) =>
-    (fmt || "").toLowerCase().includes("round robin");
-  const isGroupStageFormat = (fmt) =>
-    isRoundRobinFormat(fmt) || isDualTournamentFormat(fmt);
   const layoutVersion = state.bracketLayoutVersion || 1;
   const needsLayoutUpgrade =
     bracket &&
@@ -1425,48 +1615,64 @@ function renderAll() {
   if (bracketContainer && bracket) {
     let lookup = getMatchLookup(bracket);
     const playersById = getPlayersMap();
-    if (isGroupStageFormat(format)) {
-      const changed = ensureRoundRobinPlayoffs(bracket, playersById, lookup);
-      if (changed) {
-        lookup = getMatchLookup(bracket);
-        saveState({ bracket });
-      }
-      const html = renderRoundRobinView(
-        { ...bracket },
-        playersById,
-        computeGroupStandings
-      );
-      bracketContainer.innerHTML = DOMPurify.sanitize(html);
-      attachMatchActionHandlers?.();
-    } else {
-      renderBracketView({
-        bracket,
-        players: playersArr,
-        format,
-        ensurePlayoffs: (b) => ensureRoundRobinPlayoffs(b, playersById, lookup),
-        getPlayersMap,
-        attachMatchActionHandlers,
-        computeGroupStandings,
+    const shouldPartialUpdate =
+      Array.isArray(matchIds) &&
+      matchIds.length &&
+      !isGroupStageFormat(format);
+    let didPartialUpdate = false;
+    if (shouldPartialUpdate) {
+      didPartialUpdate = updateTreeMatchCards(matchIds, lookup, playersById, {
         currentUsername: getCurrentUsername?.() || "",
       });
+      if (didPartialUpdate) {
+        annotateConnectorPlayers(lookup, playersById);
+        clampScoreSelectOptions();
+      }
     }
-    attachMatchHoverHandlers();
-    annotateConnectorPlayers(lookup, playersById);
-    clampScoreSelectOptions();
-    const groupScrolls = bracketContainer.querySelectorAll(
-      ".group-stage-scroll, .playoff-scroll"
-    );
-    groupScrolls.forEach((el) => {
-      if (el.dataset.dragScrollBound === "true") return;
-      enableDragScroll(el, {
-        axisLock: true,
-        scrollXElement: el,
-        scrollYElement: el,
-        ignoreSelector:
-          'a, button, input, select, textarea, label, [contenteditable="true"], [data-no-drag]',
+    if (!didPartialUpdate) {
+      if (isGroupStageFormat(format)) {
+        const changed = ensureRoundRobinPlayoffs(bracket, playersById, lookup);
+        if (changed) {
+          lookup = getMatchLookup(bracket);
+          saveState({ bracket });
+        }
+        const html = renderRoundRobinView(
+          { ...bracket },
+          playersById,
+          computeGroupStandings
+        );
+        bracketContainer.innerHTML = DOMPurify.sanitize(html);
+        attachMatchActionHandlers?.();
+      } else {
+        renderBracketView({
+          bracket,
+          players: playersArr,
+          format,
+          ensurePlayoffs: (b) => ensureRoundRobinPlayoffs(b, playersById, lookup),
+          getPlayersMap,
+          attachMatchActionHandlers,
+          computeGroupStandings,
+          currentUsername: getCurrentUsername?.() || "",
+        });
+      }
+      attachMatchHoverHandlers();
+      annotateConnectorPlayers(lookup, playersById);
+      clampScoreSelectOptions();
+      const groupScrolls = bracketContainer.querySelectorAll(
+        ".group-stage-scroll, .playoff-scroll"
+      );
+      groupScrolls.forEach((el) => {
+        if (el.dataset.dragScrollBound === "true") return;
+        enableDragScroll(el, {
+          axisLock: true,
+          scrollXElement: el,
+          scrollYElement: el,
+          ignoreSelector:
+            'a, button, input, select, textarea, label, [contenteditable="true"], [data-no-drag]',
+        });
+        el.dataset.dragScrollBound = "true";
       });
-      el.dataset.dragScrollBound = "true";
-    });
+    }
   }
   applyBracketReadOnlyState(!state.isLive && !isAdmin);
   updateTooltips?.();

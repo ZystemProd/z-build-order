@@ -275,6 +275,7 @@ async function startMatchChat({
   canSend,
   uid,
   displayName,
+  retryCount = 0,
 }) {
   stopMatchChat();
   const historyEl = document.getElementById("matchChatHistory");
@@ -325,6 +326,20 @@ async function startMatchChat({
     },
     (err) => {
       console.warn("Match chat listener error", err);
+      if (err?.code === "permission-denied" && retryCount < 1) {
+        if (status) status.textContent = "Chat reconnecting...";
+        setTimeout(() => {
+          startMatchChat({
+            matchId,
+            participantUids,
+            canSend,
+            uid,
+            displayName,
+            retryCount: retryCount + 1,
+          });
+        }, 600);
+        return;
+      }
       if (status) status.textContent = "Chat disconnected.";
     }
   );

@@ -129,6 +129,129 @@ function displayValueFor(match, idx, participants) {
   return match.scores?.[idx] ?? 0;
 }
 
+function normalizeImageSrc(value) {
+  if (!value || typeof window === "undefined") return value || "";
+  try {
+    return new URL(value, window.location.href).href;
+  } catch (_) {
+    return value || "";
+  }
+}
+
+function updateTreeMatchRow(row, player, match, participantIdx, lookup, bestOf, participants) {
+  if (!row) return;
+  const isPlaceholder = !player;
+  const name = player
+    ? player.name
+    : displayPlaceholderForSource(match, participantIdx, lookup);
+  const raceClass = raceClassName(player?.race);
+  const clanLogo = player?.clanLogoUrl ? sanitizeUrl(player.clanLogoUrl) : "";
+  const clanName = (player?.clan || "").trim();
+  const seedChip = row.querySelector(".seed-chip");
+  const raceStrip = row.querySelector(".race-strip");
+  const clanImg = row.querySelector("img.clan-logo-inline");
+  const nameText = row.querySelector(".name-text");
+  const scoreEl = row.querySelector(".score-display");
+
+  row.dataset.playerId = player?.id || "";
+  row.classList.toggle("winner", match.winnerId === player?.id);
+
+  if (seedChip) {
+    seedChip.classList.toggle("is-placeholder", isPlaceholder);
+    seedChip.textContent = player ? `#${player.seed || "?"}` : "";
+  }
+
+  if (raceStrip) {
+    raceStrip.className = `race-strip ${raceClass}`;
+  }
+
+  if (clanImg) {
+    const nextSrc = clanLogo || "img/clan/logo.webp";
+    const nextAlt = clanLogo ? "Clan logo" : "No clan logo";
+    if (clanLogo) {
+      clanImg.classList.toggle("is-placeholder", false);
+      if (normalizeImageSrc(clanImg.src) !== normalizeImageSrc(nextSrc)) {
+        clanImg.src = nextSrc;
+      }
+      if (clanImg.alt !== nextAlt) {
+        clanImg.alt = nextAlt;
+      }
+      if (clanName) {
+        if (clanImg.dataset.tooltip !== clanName) {
+          clanImg.dataset.tooltip = clanName;
+        }
+      } else {
+        if (clanImg.hasAttribute("data-tooltip")) {
+          clanImg.removeAttribute("data-tooltip");
+        }
+      }
+    } else {
+      clanImg.classList.toggle("is-placeholder", true);
+      if (normalizeImageSrc(clanImg.src) !== normalizeImageSrc(nextSrc)) {
+        clanImg.src = nextSrc;
+      }
+      if (clanImg.alt !== nextAlt) {
+        clanImg.alt = nextAlt;
+      }
+      if (clanImg.hasAttribute("data-tooltip")) {
+        clanImg.removeAttribute("data-tooltip");
+      }
+    }
+  }
+
+  if (nameText) {
+    const autoReveal = shouldRevealParticipant(
+      match?.id,
+      participantIdx,
+      player?.id || null
+    );
+    const reveal = consumeNameReveal(match?.id, participantIdx) || autoReveal;
+    nameText.className = `name-text ${[
+      isPlaceholder ? "is-placeholder" : "",
+      reveal && !isPlaceholder ? "name-reveal" : "",
+    ]
+      .filter(Boolean)
+      .join(" ")}`;
+    nameText.textContent = name;
+  }
+
+  if (scoreEl) {
+    const selectVal = getSelectValue(match, participantIdx, bestOf, participants);
+    const scoreLabel =
+      String(selectVal).toUpperCase() === "W" ? "w/o" : String(selectVal ?? 0);
+    const showScores = Boolean(participants?.[0] && participants?.[1]) ||
+      Boolean(getWalkoverSide(match, participants));
+    scoreEl.textContent = scoreLabel;
+    scoreEl.classList.toggle("winner", match.winnerId === player?.id);
+    scoreEl.style.display = showScores ? "" : "none";
+  }
+}
+
+function updateTreeMatchCastIndicator(card, match) {
+  if (!card || !match) return;
+  const cast = match.status === "complete" ? null : state.matchCasts?.[match.id] || null;
+  const existing = card.querySelector(".cast-indicator-btn");
+  if (!cast) {
+    if (existing) existing.remove();
+    return;
+  }
+  const casterName = String(cast.name || "Caster").trim() || "Caster";
+  if (existing) {
+    existing.dataset.matchId = match.id || "";
+    existing.title = `Casting: ${casterName}`;
+    existing.setAttribute("aria-label", "Casting");
+    return;
+  }
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "cast-indicator cast-indicator-btn";
+  button.dataset.matchId = match.id || "";
+  button.title = `Casting: ${casterName}`;
+  button.setAttribute("aria-label", "Casting");
+  button.innerHTML = CAST_ICON_SVG;
+  card.insertBefore(button, card.firstChild);
+}
+
 let matchLetterMap = new Map();
 
 function indexToLetters(idx) {
@@ -249,6 +372,39 @@ export function renderMatchCard(match, lookup, playersById) {
   </div>`;
 
   return DOMPurify.sanitize(html);
+}
+
+export function updateTreeMatchCards(matchIds, lookup, playersById, { currentUsername } = {}) {
+  if (!Array.isArray(matchIds) || !matchIds.length || !lookup || !playersById) {
+    return false;
+  }
+  if (typeof currentUsername === "string") {
+    setCurrentUsernameHint(currentUsername);
+  }
+  let updated = false;
+  const uniqueIds = Array.from(new Set(matchIds.filter(Boolean)));
+  uniqueIds.forEach((matchId) => {
+    const match = lookup.get(matchId);
+    if (!match) return;
+    const card = document.querySelector(
+      `.match-card.tree[data-match-id="${matchId}"]`
+    );
+    if (!card) return;
+    const participants = resolveParticipants(match, lookup, playersById);
+    const [pA, pB] = participants;
+    const bestOf = getBestOfForMatch(match);
+    const isReady = Boolean(pA && pB && match.status !== "complete");
+    const isUserMatch = Boolean(isCurrentUserPlayer(pA) || isCurrentUserPlayer(pB));
+    const hasScoreReport = Boolean(state?.scoreReports?.[match.id]);
+    card.classList.toggle("ready", isReady && isUserMatch);
+    card.classList.toggle("score-report", hasScoreReport);
+    const rows = card.querySelectorAll(".row");
+    updateTreeMatchRow(rows[0], pA, match, 0, lookup, bestOf, participants);
+    updateTreeMatchRow(rows[1], pB, match, 1, lookup, bestOf, participants);
+    updateTreeMatchCastIndicator(card, match);
+    updated = true;
+  });
+  return updated;
 }
 
 export function renderPlayerRow(player, score, label, bestOf, match, participantIdx, lookup) {
