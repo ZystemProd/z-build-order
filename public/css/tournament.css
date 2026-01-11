@@ -7437,6 +7437,118 @@ select[id^="finalBestOf"] {
 .close-modal:focus {
   color: #fff;
 }
+
+/* Auth modal */
+.auth-modal-content {
+  width: 420px;
+  height: auto;
+  max-height: 85vh;
+  padding: 24px;
+  background-color: rgba(24, 24, 24, 0.92);
+  border: 1px solid #3a3a3a;
+}
+
+.auth-modal-subtext {
+  margin: 0 0 12px;
+  color: #b8b8b8;
+  font-size: 0.95rem;
+}
+
+.auth-provider-button {
+  width: 100%;
+  background: #222;
+  border: 1px solid #444;
+  color: #f5f5f5;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-weight: 600;
+  cursor: pointer;
+  margin: 6px 0 4px;
+}
+
+.auth-provider-button:hover {
+  background: #2b2b2b;
+  transform: none;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #8c8c8c;
+  font-size: 0.85rem;
+  margin: 12px 0;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #343434;
+}
+
+.auth-form {
+  display: grid;
+  gap: 6px;
+}
+
+.auth-form label {
+  font-size: 0.85rem;
+  color: #cfcfcf;
+}
+
+.auth-form input {
+  background: #1b1b1b;
+  color: #f0f0f0;
+  border: 1px solid #3c3c3c;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.auth-form input:focus {
+  outline: none;
+  border-color: #5c8cff;
+}
+
+.auth-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.auth-primary-button {
+  background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-weight: 600;
+  cursor: pointer;
+  margin: 0;
+}
+
+.auth-primary-button:hover {
+  background: linear-gradient(135deg, #0056b3 0%, #003f80 100%);
+  transform: none;
+}
+
+.auth-secondary-button {
+  background: #2a2a2a;
+  color: #e0e0e0;
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-weight: 600;
+  cursor: pointer;
+  margin: 0;
+}
+
+.auth-secondary-button:hover {
+  background: #333;
+  transform: none;
+}
 .tournament-shell {
   max-width: var(--tournament-max-width);
   margin: 0 auto;
