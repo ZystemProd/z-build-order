@@ -209,13 +209,30 @@ export async function hydrateStateFromRemote(
   renderAllFn();
 }
 
-export async function persistTournamentStateRemote(
+const remotePersistState = new Map();
+const REMOTE_PERSIST_DEBOUNCE_MS = 1200;
+
+export function persistTournamentStateRemote(
   snapshot,
   currentSlug,
   serializeBracketFn,
   showToast
 ) {
   if (!currentSlug) return;
+  const entry = remotePersistState.get(currentSlug) || {};
+  entry.pending = { snapshot, serializeBracketFn, showToast };
+  if (entry.timer) clearTimeout(entry.timer);
+  entry.timer = setTimeout(() => {
+    void flushTournamentStateRemote(currentSlug);
+  }, REMOTE_PERSIST_DEBOUNCE_MS);
+  remotePersistState.set(currentSlug, entry);
+}
+
+async function flushTournamentStateRemote(currentSlug) {
+  const entry = remotePersistState.get(currentSlug);
+  if (!entry?.pending) return;
+  const { snapshot, serializeBracketFn, showToast } = entry.pending;
+  entry.pending = null;
   try {
     const ref = doc(collection(db, TOURNAMENT_STATE_COLLECTION), currentSlug);
     const bracket = snapshot.bracket
@@ -226,10 +243,14 @@ export async function persistTournamentStateRemote(
       bracket,
       lastUpdated: snapshot.lastUpdated || Date.now(),
     });
-
+    const comparable = { ...payload };
+    delete comparable.lastUpdated;
+    const hash = stableStringify(comparable);
+    if (entry.lastHash === hash) return;
+    entry.lastHash = hash;
     await setDoc(ref, payload, { merge: true });
-  } catch (_) {
-    console.error("Failed to persist tournament state to Firestore", _);
+  } catch (err) {
+    console.error("Failed to persist tournament state to Firestore", err);
     showToast?.(
       "Could not sync tournament state to Firestore. Changes stay local.",
       "error"
@@ -308,6 +329,18 @@ function stripUndefinedDeep(value) {
     return out;
   }
   return value;
+}
+
+function stableStringify(value) {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableStringify(item)).join(",")}]`;
+  }
+  const keys = Object.keys(value).sort();
+  const body = keys
+    .map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`)
+    .join(",");
+  return `{${body}}`;
 }
 
 

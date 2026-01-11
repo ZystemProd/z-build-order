@@ -35,7 +35,10 @@ import { setupMatchChatUi, teardownMatchChatUi } from "../chat/matchChat.js";
 
 const PRESENCE_COLLECTION = "tournamentPresence";
 const PRESENCE_TTL_MS = 45_000;
-const PRESENCE_HEARTBEAT_MS = 20_000;
+const PRESENCE_HEARTBEAT_MS = 60_000;
+const PRESENCE_MIN_WRITE_MS = 45_000;
+const PRESENCE_IDLE_AFTER_MS = 90_000;
+const PRESENCE_OFFLINE_AFTER_MS = 20 * 60_000;
 let presenceUnsub = null;
 let presenceHeartbeat = null;
 let presenceUiTimer = null;
@@ -44,6 +47,14 @@ let presenceContext = { matchId: null, leftPlayerId: null, rightPlayerId: null }
 let presenceSlug = null;
 let presenceWriteDenied = false;
 let presenceActiveKey = "";
+let presenceLastWriteAt = 0;
+let presenceLastMatchId = null;
+let presenceLastPlayerId = null;
+let presenceUiStatus = "active";
+let presenceLastActivityAt = 0;
+let presenceActivityTimer = null;
+let presenceActivityHandler = null;
+let presenceVisibilityHandler = null;
 const countryFlagCache = new Map();
 const countryUidCache = new Map();
 const COUNTRY_NAME_BY_CODE = new Map(
@@ -429,6 +440,7 @@ export function openVetoModal(matchId, { getPlayersMap, getDefaultMapPoolNames, 
     savedVetoes: saved?.vetoed?.length || 0,
   });
   if (saved) {
+    const savedUpdatedAt = Number(saved.updatedAt) || 0;
     const usedNames = new Set([
       ...(saved.maps || []).map((m) => m.map),
       ...(saved.vetoed || []).map((m) => m.map),
@@ -460,6 +472,7 @@ export function openVetoModal(matchId, { getPlayersMap, getDefaultMapPoolNames, 
       remaining,
       vetoed: savedVetoed,
       picks: savedPicks,
+      updatedAt: savedUpdatedAt,
       lowerName: saved.participants?.lower || lower?.name || "Lower seed",
       higherName: saved.participants?.higher || higher?.name || "Higher seed",
     });
@@ -472,9 +485,13 @@ export function openVetoModal(matchId, { getPlayersMap, getDefaultMapPoolNames, 
       remaining: [...pool],
       vetoed: [],
       picks: [],
+      updatedAt: 0,
       lowerName: lower?.name || "Lower seed",
       higherName: higher?.name || "Higher seed",
     });
+  }
+  if (modal) {
+    modal.dataset.vetoUpdatedAt = String(vetoState?.updatedAt || 0);
   }
 
   if (label) {
@@ -519,7 +536,6 @@ export function openMatchInfoModal(
   const openVetoBtn = document.getElementById("openMapVetoBtn");
   const confirmScoreBtn = document.getElementById("confirmMatchScoreBtn");
   const castBtn = document.getElementById("castMatchBtn");
-  const castStatus = document.getElementById("castMatchStatus");
   const reportBtn = document.getElementById("matchInfoReportBtn");
   const reportSection = document.getElementById("matchInfoReportSection");
   const reportStatus = document.getElementById("matchInfoReportStatus");
@@ -613,6 +629,7 @@ export function openMatchInfoModal(
     const currentCast = state.matchCasts?.[matchId] || null;
     const isCasting = Boolean(currentCast?.uid && currentCast.uid === uid);
     const isTaken = Boolean(currentCast?.uid && currentCast.uid !== uid);
+    let castTooltip = "";
     if (!isCaster) {
       castBtn.style.display = "none";
       castBtn.onclick = null;
@@ -620,6 +637,13 @@ export function openMatchInfoModal(
       castBtn.style.display = "inline-flex";
       castBtn.textContent = isCasting ? "Stop Casting" : "Cast";
       castBtn.disabled = isTaken;
+      if (isCasting) {
+        castTooltip = "You are casting this match.";
+      } else if (currentCast?.uid) {
+        castTooltip = `Casting: ${currentCast.name || "Caster"}.`;
+      } else {
+        castTooltip = "Mark this match as casting to show the stream icon.";
+      }
       castBtn.onclick = () => {
         if (!uid) {
           showToast?.("Sign in to cast a match.", "error");
@@ -644,19 +668,11 @@ export function openMatchInfoModal(
         openMatchInfoModal(matchId, vetoDeps);
       };
     }
-  }
-  if (castStatus) {
-    const currentCast = state.matchCasts?.[matchId] || null;
-    let message = "";
-    if (currentCast?.uid && currentCast.uid === uid) {
-      message = "You are casting this match.";
-    } else if (currentCast?.uid) {
-      message = `Casting: ${currentCast.name || "Caster"}.`;
-    } else if (isCaster) {
-      message = "Mark this match as casting to show the stream icon.";
+    if (castTooltip) {
+      castBtn.setAttribute("data-tooltip", castTooltip);
+    } else {
+      castBtn.removeAttribute("data-tooltip");
     }
-    castStatus.textContent = message;
-    castStatus.style.display = message ? "block" : "none";
   }
   if (leftFlagEl) {
     const flag = countryCodeToFlag(pA?.country || "");
@@ -888,7 +904,7 @@ export function openMatchInfoModal(
   const existingReport = scoreReports[matchId] || null;
   const canReport =
     Boolean(uid && isParticipant && leftPlayerId && rightPlayerId);
-  const shouldShowReport = Boolean(existingReport || canReport);
+  const shouldShowReport = Boolean(existingReport);
   if (reportSection) {
     reportSection.style.display = shouldShowReport ? "grid" : "none";
   }
@@ -1013,6 +1029,7 @@ export function openMatchInfoModal(
       canReport && !existingReport ? "inline-flex" : "none";
     reportBtn.onclick = canReport && !existingReport
       ? () => {
+          if (reportSection) reportSection.style.display = "grid";
           renderReportMaps();
           updateReportScoreLine();
           updateReportSubmitState();
@@ -1025,6 +1042,9 @@ export function openMatchInfoModal(
   if (reportCancelBtn) {
     reportCancelBtn.onclick = () => {
       showReportControls(false);
+      if (!existingReport && reportSection) {
+        reportSection.style.display = "none";
+      }
       if (reportBtn && canReport && !existingReport) {
         reportBtn.style.display = "inline-flex";
       }
@@ -1540,30 +1560,16 @@ function startPresenceTracking(matchId, hint = null) {
   presenceActiveKey = nextPresenceKey;
 
   const write = async () => {
+    if (!isMatchInfoModalVisible()) return;
     const now = Date.now();
-
-    const stateRef = tournamentStateDocRef();
-    if (stateRef && playerId) {
-      try {
-        await setDoc(
-          stateRef,
-          {
-            presence: {
-              matchInfo: {
-                [playerId]: {
-                  matchId: matchId || null,
-                  clientUpdatedAt: now,
-                },
-              },
-            },
-          },
-          { merge: true }
-        );
-      } catch (err) {
-        console.warn("Presence (state doc) write failed", err);
-      }
+    const samePayload =
+      presenceLastMatchId === (matchId || null) &&
+      presenceLastPlayerId === (playerId || null);
+    if (samePayload && now - presenceLastWriteAt < PRESENCE_MIN_WRITE_MS) {
+      return;
     }
 
+    const status = presenceUiStatus || "active";
     if (presenceWriteDenied) return;
     try {
       await setDoc(
@@ -1573,9 +1579,13 @@ function startPresenceTracking(matchId, hint = null) {
           playerId: playerId || null,
           updatedAt: serverTimestamp(),
           clientUpdatedAt: now,
+          status,
         },
         { merge: true }
       );
+      presenceLastWriteAt = now;
+      presenceLastMatchId = matchId || null;
+      presenceLastPlayerId = playerId || null;
     } catch (err) {
       if (err?.code === "permission-denied") {
         presenceWriteDenied = true;
@@ -1585,9 +1595,65 @@ function startPresenceTracking(matchId, hint = null) {
     }
   };
 
+  const scheduleIdleCheck = () => {
+    if (presenceActivityTimer) clearTimeout(presenceActivityTimer);
+    const now = Date.now();
+    const sinceActivity = Math.max(0, now - (presenceLastActivityAt || 0));
+    const remaining = Math.max(5_000, PRESENCE_IDLE_AFTER_MS - sinceActivity);
+    presenceActivityTimer = setTimeout(() => {
+      if (!isMatchInfoModalVisible()) return;
+      const idleNow = Date.now() - (presenceLastActivityAt || 0) >= PRESENCE_IDLE_AFTER_MS;
+      if (idleNow && presenceUiStatus !== "idle") {
+        presenceUiStatus = "idle";
+        void write();
+      }
+      scheduleIdleCheck();
+    }, remaining);
+  };
+
+  const markActive = () => {
+    presenceLastActivityAt = Date.now();
+    if (presenceUiStatus !== "active") {
+      presenceUiStatus = "active";
+      void write();
+    }
+    scheduleIdleCheck();
+  };
+
+  if (presenceLastActivityAt === 0) {
+    presenceLastActivityAt = Date.now();
+  }
+  presenceUiStatus = "active";
+  scheduleIdleCheck();
+
   write();
   if (presenceHeartbeat) clearInterval(presenceHeartbeat);
-  presenceHeartbeat = setInterval(write, PRESENCE_HEARTBEAT_MS);
+  presenceHeartbeat = null;
+
+  const modalEl = document.getElementById("matchInfoModal");
+  if (modalEl) {
+    modalEl.onmousemove = markActive;
+    modalEl.onkeydown = markActive;
+    modalEl.onfocusin = markActive;
+  }
+  if (!presenceActivityHandler) {
+    presenceActivityHandler = () => {
+      if (!isMatchInfoModalVisible()) return;
+      markActive();
+    };
+    window.addEventListener("mousemove", presenceActivityHandler, { passive: true });
+    window.addEventListener("keydown", presenceActivityHandler);
+    window.addEventListener("focus", presenceActivityHandler);
+  }
+  if (!presenceVisibilityHandler) {
+    presenceVisibilityHandler = () => {
+      if (!isMatchInfoModalVisible()) return;
+      if (document.visibilityState === "visible") {
+        markActive();
+      }
+    };
+    document.addEventListener("visibilitychange", presenceVisibilityHandler);
+  }
 }
 
 function stopPresenceTracking() {
@@ -1596,29 +1662,32 @@ function stopPresenceTracking() {
   if (presenceHeartbeat) clearInterval(presenceHeartbeat);
   presenceHeartbeat = null;
   presenceActiveKey = "";
+  presenceLastWriteAt = 0;
+  presenceLastMatchId = null;
+  presenceLastPlayerId = null;
+  presenceUiStatus = "active";
+  presenceLastActivityAt = 0;
+  if (presenceActivityTimer) clearTimeout(presenceActivityTimer);
+  presenceActivityTimer = null;
+  if (presenceActivityHandler) {
+    window.removeEventListener("mousemove", presenceActivityHandler);
+    window.removeEventListener("keydown", presenceActivityHandler);
+    window.removeEventListener("focus", presenceActivityHandler);
+    presenceActivityHandler = null;
+  }
+  if (presenceVisibilityHandler) {
+    document.removeEventListener("visibilitychange", presenceVisibilityHandler);
+    presenceVisibilityHandler = null;
+  }
   if (ref) {
     deleteDoc(ref).catch(() => {});
   }
+}
 
-  const player = resolveCurrentPlayerForPresence();
-  const playerId = player?.id || null;
-  const stateRef = tournamentStateDocRef();
-  if (stateRef && playerId) {
-    setDoc(
-      stateRef,
-      {
-        presence: {
-          matchInfo: {
-            [playerId]: {
-              matchId: null,
-              clientUpdatedAt: Date.now(),
-            },
-          },
-        },
-      },
-      { merge: true }
-    ).catch(() => {});
-  }
+function isMatchInfoModalVisible() {
+  const modal = document.getElementById("matchInfoModal");
+  if (!modal) return false;
+  return modal.style.display && modal.style.display !== "none";
 }
 
 function setPresenceContext({ matchId, leftPlayerId, rightPlayerId }) {
@@ -1635,15 +1704,25 @@ function isPlayerOnlineForMatch(playerId, matchId) {
     if (!entry) continue;
     if (entry.playerId !== playerId) continue;
     if (entry.matchId !== matchId) continue;
-    if (Date.now() - (entry.updatedAtMs || 0) <= PRESENCE_TTL_MS) return true;
+    if (Date.now() - (entry.updatedAtMs || 0) <= PRESENCE_OFFLINE_AFTER_MS) return true;
   }
 
-  const stateEntry = state?.presence?.matchInfo?.[playerId] || null;
-  if (stateEntry && stateEntry.matchId === matchId) {
-    const ts = Number(stateEntry.clientUpdatedAt) || 0;
-    if (Date.now() - ts <= PRESENCE_TTL_MS) return true;
-  }
   return false;
+}
+
+function getPresenceStatusForMatch(playerId, matchId) {
+  if (!playerId || !matchId) return "offline";
+  const now = Date.now();
+  let status = "offline";
+  for (const entry of presenceLatest.values()) {
+    if (!entry) continue;
+    if (entry.playerId !== playerId) continue;
+    if (entry.matchId !== matchId) continue;
+    const age = now - (entry.updatedAtMs || 0);
+    if (age <= PRESENCE_IDLE_AFTER_MS) return entry.status || "active";
+    if (age <= PRESENCE_OFFLINE_AFTER_MS) status = entry.status || "idle";
+  }
+  return status;
 }
 
 function applyPresenceIndicators(override = null) {
@@ -1658,18 +1737,50 @@ function applyPresenceIndicators(override = null) {
     override?.rightPresenceEl || document.getElementById("matchInfoRightPresence");
 
   const matchId = modal.dataset.matchId || presenceContext.matchId;
-  const leftOnline = isPlayerOnlineForMatch(presenceContext.leftPlayerId, matchId);
-  const rightOnline = isPlayerOnlineForMatch(presenceContext.rightPlayerId, matchId);
+  const leftStatus = getPresenceStatusForMatch(presenceContext.leftPlayerId, matchId);
+  const rightStatus = getPresenceStatusForMatch(presenceContext.rightPlayerId, matchId);
 
   if (leftPresenceEl) {
-    leftPresenceEl.classList.toggle("online", leftOnline);
-    leftPresenceEl.classList.toggle("offline", !leftOnline);
-    leftPresenceEl.setAttribute("aria-label", leftOnline ? "Player online" : "Player offline");
+    leftPresenceEl.classList.toggle("online", leftStatus === "active");
+    leftPresenceEl.classList.toggle("idle", leftStatus === "idle");
+    leftPresenceEl.classList.toggle("offline", leftStatus === "offline");
+    leftPresenceEl.setAttribute(
+      "aria-label",
+      leftStatus === "active"
+        ? "Player online"
+        : leftStatus === "idle"
+        ? "Player idle"
+        : "Player offline"
+    );
+    leftPresenceEl.setAttribute(
+      "title",
+      leftStatus === "active"
+        ? "Online"
+        : leftStatus === "idle"
+        ? "Idle"
+        : "Offline"
+    );
   }
   if (rightPresenceEl) {
-    rightPresenceEl.classList.toggle("online", rightOnline);
-    rightPresenceEl.classList.toggle("offline", !rightOnline);
-    rightPresenceEl.setAttribute("aria-label", rightOnline ? "Player online" : "Player offline");
+    rightPresenceEl.classList.toggle("online", rightStatus === "active");
+    rightPresenceEl.classList.toggle("idle", rightStatus === "idle");
+    rightPresenceEl.classList.toggle("offline", rightStatus === "offline");
+    rightPresenceEl.setAttribute(
+      "aria-label",
+      rightStatus === "active"
+        ? "Player online"
+        : rightStatus === "idle"
+        ? "Player idle"
+        : "Player offline"
+    );
+    rightPresenceEl.setAttribute(
+      "title",
+      rightStatus === "active"
+        ? "Online"
+        : rightStatus === "idle"
+        ? "Idle"
+        : "Offline"
+    );
   }
 }
 
@@ -1852,6 +1963,7 @@ function resetVetoSelection() {
     vetoed: [],
     mapResults: [],
     bestOf,
+    updatedAt: Date.now(),
   };
   vetoDeps?.saveState?.({ matchVetoes: state.matchVetoes });
   renderVetoPoolGrid();
@@ -1860,22 +1972,28 @@ function resetVetoSelection() {
 }
 
 function persistLiveVetoState() {
-  if (!currentVetoMatchId || !vetoState) return;
+  const modal = document.getElementById("vetoModal");
+  const fallbackMatchId = modal?.dataset?.matchId || "";
+  const matchId = currentVetoMatchId || fallbackMatchId || "";
+  if (!matchId || !vetoState) return;
   state.matchVetoes = state.matchVetoes || {};
-  const existing = state.matchVetoes[currentVetoMatchId] || {};
-  state.matchVetoes[currentVetoMatchId] = {
+  const existing = state.matchVetoes[matchId] || {};
+  const nextUpdatedAt = Date.now();
+  state.matchVetoes[matchId] = {
     ...existing,
     maps: vetoState.picks || [],
     vetoed: vetoState.vetoed || [],
     bestOf: vetoState.bestOf,
+    updatedAt: nextUpdatedAt,
     participants: {
       lower: vetoState.lowerName,
       higher: vetoState.higherName,
     },
     mapResults: existing.mapResults || [],
   };
+  vetoState.updatedAt = nextUpdatedAt;
   console.debug("[veto] persistLiveVetoState", {
-    matchId: currentVetoMatchId,
+    matchId,
     picks: vetoState.picks?.length || 0,
     vetoed: vetoState.vetoed?.length || 0,
     stage: vetoState.stage,
@@ -1884,6 +2002,28 @@ function persistLiveVetoState() {
     { matchVetoes: state.matchVetoes, lastUpdated: state.lastUpdated },
     { skipRemote: true, keepTimestamp: true }
   );
+  const stateRef = tournamentStateDocRef();
+  if (stateRef) {
+    const record = state.matchVetoes[matchId] || {};
+    updateDoc(stateRef, {
+      [`matchVetoes.${matchId}`]: record,
+      lastUpdated: Date.now(),
+    }).catch((err) => {
+      console.warn("Failed to sync live veto state", err);
+      setDoc(
+        stateRef,
+        {
+          matchVetoes: {
+            [matchId]: record,
+          },
+          lastUpdated: Date.now(),
+        },
+        { merge: true }
+      ).catch((fallbackErr) => {
+        console.warn("Failed to sync live veto state (fallback)", fallbackErr);
+      });
+    });
+  }
 }
 
 export function saveVetoSelection() {
@@ -1896,16 +2036,19 @@ export function saveVetoSelection() {
   const existingMapResults = state.matchVetoes?.[matchId]?.mapResults || [];
   const trimmed = vetoState.picks.slice(0, vetoState.bestOf);
   state.matchVetoes = state.matchVetoes || {};
+  const nextUpdatedAt = Date.now();
   state.matchVetoes[currentVetoMatchId] = {
     maps: trimmed,
     vetoed: vetoState.vetoed || [],
     bestOf: vetoState.bestOf,
+    updatedAt: nextUpdatedAt,
     participants: {
       lower: vetoState.lowerName,
       higher: vetoState.higherName,
     },
     mapResults: existingMapResults,
   };
+  vetoState.updatedAt = nextUpdatedAt;
   console.debug("[veto] saveVetoSelection", {
     matchId,
     picks: trimmed.length,
@@ -1927,6 +2070,10 @@ export function renderVetoPoolGrid(poolOverride = null) {
   const poolEl = document.getElementById("vetoMapPool");
   const pool = poolOverride || vetoState?.pool || vetoState?.remaining || [];
   if (!poolEl) return;
+  const modal = document.getElementById("vetoModal");
+  if (modal && vetoState?.updatedAt) {
+    modal.dataset.vetoUpdatedAt = String(vetoState.updatedAt);
+  }
   const remainingNames = vetoState?.remaining?.map((m) => m.name) || [];
   const html = pool
     .map((map) => {
@@ -2036,5 +2183,69 @@ export function refreshVetoModalIfOpen() {
   if (!matchId) return;
   const visible = modal.style.display && modal.style.display !== "none";
   if (!visible && modal.dataset.forceOpen !== "true") return;
-  openVetoModal(matchId, vetoDeps);
+  const savedUpdatedAt = Number(state.matchVetoes?.[matchId]?.updatedAt) || 0;
+  const localUpdatedAt = Number(vetoState?.updatedAt) || 0;
+  const appliedUpdatedAt = Number(modal.dataset.vetoUpdatedAt || "0");
+  if (savedUpdatedAt <= Math.max(localUpdatedAt, appliedUpdatedAt)) {
+    return;
+  }
+  const saved = state.matchVetoes?.[matchId];
+  if (!saved) return;
+  const lookup = getMatchLookup(state.bracket || {});
+  const match = lookup.get(matchId);
+  const bestOfRaw = getBestOfForMatch(match || { bracket: "winners", round: 1 });
+  const bestOf = Math.max(1, Number(bestOfRaw) || 1);
+  const pool = (
+    currentTournamentMeta?.mapPool && currentTournamentMeta.mapPool.length
+      ? currentTournamentMeta.mapPool
+      : vetoDeps.getDefaultMapPoolNames()
+  ).map(
+    (name) => vetoDeps.getMapByName(name) || { name, folder: "", file: "", mode: "1v1" }
+  );
+  const playersById = vetoDeps.getPlayersMap();
+  const [pA, pB] = resolveParticipants(match, lookup, playersById);
+  const ordered = [pA, pB]
+    .filter(Boolean)
+    .sort((a, b) => (b.seed || 999) - (a.seed || 999));
+  const lower = ordered[0] || null;
+  const higher = ordered[1] || ordered[0] || null;
+  const usedNames = new Set([
+    ...(saved.maps || []).map((m) => m.map),
+    ...(saved.vetoed || []).map((m) => m.map),
+  ]);
+  const remaining = pool.filter((m) => !usedNames.has(m.name));
+  const savedBestOf = Math.max(
+    1,
+    Number(saved.bestOf || saved.maps?.length || bestOf) || 1
+  );
+  const savedPicks = Array.isArray(saved.maps) ? saved.maps : [];
+  const savedVetoed = Array.isArray(saved.vetoed) ? saved.vetoed : [];
+  const stage =
+    savedPicks.length >= savedBestOf
+      ? "done"
+      : remaining.length <= savedBestOf
+      ? "pick"
+      : "veto";
+  const turn =
+    stage === "done"
+      ? "done"
+      : stage === "veto"
+      ? (savedVetoed.length % 2 === 0 ? "low" : "high")
+      : (savedPicks.length % 2 === 0 ? "low" : "high");
+  setVetoStateState({
+    stage,
+    turn,
+    bestOf: savedBestOf,
+    pool: [...pool],
+    remaining,
+    vetoed: savedVetoed,
+    picks: savedPicks,
+    updatedAt: savedUpdatedAt,
+    lowerName: saved.participants?.lower || lower?.name || "Lower seed",
+    higherName: saved.participants?.higher || higher?.name || "Higher seed",
+  });
+  modal.dataset.vetoUpdatedAt = String(savedUpdatedAt);
+  modal.dataset.bestOf = String(savedBestOf);
+  renderVetoPoolGrid(pool);
+  renderVetoStatus();
 }

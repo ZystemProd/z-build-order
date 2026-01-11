@@ -886,6 +886,10 @@ function shouldUsePartialRender(prevState, nextState, format) {
   const presenceChanged =
     incomingPresence &&
     JSON.stringify(incomingPresence) !== JSON.stringify(currentPresence || {});
+  const matchVetoesChangedEarly = !safeJsonEqual(
+    incoming.matchVetoes || {},
+    state.matchVetoes || {}
+  );
   const casterChanged =
     JSON.stringify(incoming.casterRequests || []) !==
       JSON.stringify(state.casterRequests || []) ||
@@ -895,7 +899,8 @@ function shouldUsePartialRender(prevState, nextState, format) {
   if (
     incoming.lastUpdated &&
     incoming.lastUpdated <= state.lastUpdated &&
-    !casterChanged
+    !casterChanged &&
+    !matchVetoesChangedEarly
   ) {
     if (presenceChanged) {
       setStateObj({ ...state, presence: { matchInfo: incomingPresence } });
@@ -910,10 +915,19 @@ function shouldUsePartialRender(prevState, nextState, format) {
     currentVetoMatchId && vetoState && vetoState.stage !== "done"
       ? currentVetoMatchId
       : null;
-  const inProgressVeto =
-    inProgressVetoId && state.matchVetoes
-      ? state.matchVetoes[inProgressVetoId] || null
-      : null;
+  const inProgressVeto = inProgressVetoId
+    ? {
+        maps: vetoState?.picks || [],
+        vetoed: vetoState?.vetoed || [],
+        bestOf: vetoState?.bestOf || 1,
+        updatedAt: vetoState?.updatedAt || Date.now(),
+        participants: {
+          lower: vetoState?.lowerName || "Lower seed",
+          higher: vetoState?.higherName || "Higher seed",
+        },
+        mapResults: state.matchVetoes?.[inProgressVetoId]?.mapResults || [],
+      }
+    : null;
   const nextState = {
     ...defaultState,
     ...incoming,
@@ -922,16 +936,56 @@ function shouldUsePartialRender(prevState, nextState, format) {
     activity: incoming.activity || [],
     bracket: nextBracket,
   };
+  nextState.matchVetoes = mergeMatchVetoes(
+    state.matchVetoes || {},
+    nextState.matchVetoes || {}
+  );
   if (inProgressVetoId && inProgressVeto) {
-    nextState.matchVetoes = {
-      ...(nextState.matchVetoes || {}),
-      [inProgressVetoId]: inProgressVeto,
-    };
+    const incomingEntry = nextState.matchVetoes?.[inProgressVetoId] || null;
+    const incomingUpdated = Number(incomingEntry?.updatedAt) || 0;
+    const localUpdated = Number(inProgressVeto.updatedAt) || 0;
+    if (localUpdated >= incomingUpdated) {
+      nextState.matchVetoes = {
+        ...(nextState.matchVetoes || {}),
+        [inProgressVetoId]: inProgressVeto,
+      };
+    }
   }
   const activityChanged = !safeJsonEqual(
     prevState.activity || [],
     nextState.activity || []
   );
+  const matchVetoesChanged = !safeJsonEqual(
+    prevState.matchVetoes || {},
+    nextState.matchVetoes || {}
+  );
+    const onlyVetoChange =
+      matchVetoesChanged &&
+    !activityChanged &&
+    prevState.isLive === nextState.isLive &&
+    prevState.hasBeenLive === nextState.hasBeenLive &&
+    prevState.disableFinalAutoAdd === nextState.disableFinalAutoAdd &&
+    prevState.needsReseed === nextState.needsReseed &&
+    prevState.bracketLayoutVersion === nextState.bracketLayoutVersion &&
+    safeJsonEqual(prevState.players || [], nextState.players || []) &&
+    safeJsonEqual(prevState.bracket || null, nextState.bracket || null) &&
+    safeJsonEqual(prevState.pointsLedger || {}, nextState.pointsLedger || {}) &&
+    safeJsonEqual(prevState.manualSeedingEnabled, nextState.manualSeedingEnabled) &&
+    safeJsonEqual(prevState.manualSeedingOrder || [], nextState.manualSeedingOrder || []) &&
+    safeJsonEqual(prevState.matchCasts || {}, nextState.matchCasts || {}) &&
+    safeJsonEqual(prevState.scoreReports || {}, nextState.scoreReports || {}) &&
+    safeJsonEqual(prevState.casters || [], nextState.casters || []) &&
+      safeJsonEqual(prevState.casterRequests || [], nextState.casterRequests || []);
+    const stripVetoState = (value) => {
+      const trimmed = { ...(value || {}) };
+      delete trimmed.matchVetoes;
+      delete trimmed.lastUpdated;
+      delete trimmed.presence;
+      return trimmed;
+    };
+    const vetoOnlyChange =
+      matchVetoesChanged &&
+      safeJsonEqual(stripVetoState(prevState), stripVetoState(nextState));
   let allowPartial = shouldUsePartialRender(
     prevState,
     nextState,
@@ -954,6 +1008,21 @@ function shouldUsePartialRender(prevState, nextState, format) {
     }
   }
   setStateObj(nextState);
+    if (onlyVetoChange || vetoOnlyChange) {
+      refreshMatchInfoModalIfOpen?.();
+      refreshVetoModalIfOpen?.();
+      return;
+    }
+  if (
+    allowPartial &&
+    !matchIds.length &&
+    matchVetoesChanged &&
+    !activityChanged
+  ) {
+    refreshMatchInfoModalIfOpen?.();
+    refreshVetoModalIfOpen?.();
+    return;
+  }
   if (allowPartial && matchIds.length) {
     renderAll(matchIds);
     if (activityChanged) {
@@ -966,7 +1035,23 @@ function shouldUsePartialRender(prevState, nextState, format) {
   }
   refreshPlayerDetailModalIfOpen(getPlayersMap);
   refreshMatchInfoModalIfOpen?.();
-  refreshVetoModalIfOpen?.();
+  if (matchVetoesChanged) {
+    refreshVetoModalIfOpen?.();
+  }
+}
+
+function mergeMatchVetoes(local = {}, incoming = {}) {
+  const out = { ...incoming };
+  Object.keys(local || {}).forEach((matchId) => {
+    const localEntry = local[matchId];
+    const incomingEntry = incoming[matchId];
+    const localUpdated = Number(localEntry?.updatedAt) || 0;
+    const incomingUpdated = Number(incomingEntry?.updatedAt) || 0;
+    if (!incomingEntry || localUpdated > incomingUpdated) {
+      out[matchId] = localEntry;
+    }
+  });
+  return out;
 }
 
 let unsubscribeRemoteState = null;
@@ -1313,15 +1398,16 @@ function renderAll(matchIds = null) {
     bracket &&
     !isGroupStageFormat(format);
 
-  if (shouldPartialUpdate) {
-    const lookup = getMatchLookup(bracket);
-    const playersById = getPlayersMap();
-    const didPartialUpdate = updateTreeMatchCards(matchIds, lookup, playersById, {
-      currentUsername: getCurrentUsername?.() || "",
-    });
-    if (didPartialUpdate) {
-      annotateConnectorPlayers(lookup, playersById);
-      clampScoreSelectOptions();
+    if (shouldPartialUpdate) {
+      const lookup = getMatchLookup(bracket);
+      const playersById = getPlayersMap();
+      const didPartialUpdate = updateTreeMatchCards(matchIds, lookup, playersById, {
+        currentUsername: getCurrentUsername?.() || "",
+        currentUid: auth.currentUser?.uid || "",
+      });
+      if (didPartialUpdate) {
+        annotateConnectorPlayers(lookup, playersById);
+        clampScoreSelectOptions();
       updatePlacementsRow();
       applyBracketReadOnlyState(!state.isLive && !isAdmin);
       updateTooltips?.();
@@ -1378,19 +1464,27 @@ function renderAll(matchIds = null) {
       tournamentTitle.textContent = currentTournamentMeta.name || "Tournament";
     }
     const tournamentHero = document.querySelector("#tournamentView .hero");
-    if (tournamentHero) {
-      const coverUrl = sanitizeUrl(currentTournamentMeta.coverImageUrl || "");
-      if (coverUrl) {
-        tournamentHero.classList.add("has-cover");
-        tournamentHero.style.setProperty(
-          "--hero-cover-image",
-          `url("${coverUrl}")`
-        );
-      } else {
-        tournamentHero.classList.remove("has-cover");
-        tournamentHero.style.removeProperty("--hero-cover-image");
+      if (tournamentHero) {
+        const coverUrl = sanitizeUrl(currentTournamentMeta.coverImageUrl || "");
+        if (coverUrl) {
+          if (tournamentHero.dataset.coverUrl !== coverUrl) {
+            tournamentHero.classList.add("has-cover");
+            tournamentHero.style.setProperty(
+              "--hero-cover-image",
+              `url("${coverUrl}")`
+            );
+            tournamentHero.dataset.coverUrl = coverUrl;
+          } else {
+            tournamentHero.classList.add("has-cover");
+          }
+        } else {
+          tournamentHero.classList.remove("has-cover");
+          tournamentHero.style.removeProperty("--hero-cover-image");
+          if (tournamentHero.dataset.coverUrl) {
+            delete tournamentHero.dataset.coverUrl;
+          }
+        }
       }
-    }
     if (tournamentFormat) {
       tournamentFormat.textContent = currentTournamentMeta.format || "Tournament";
     }

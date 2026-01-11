@@ -32,6 +32,31 @@ const REVEAL_WINDOW_MS = 1200;
 const rowElementCache = new WeakMap();
 const cardElementCache = new WeakMap();
 
+function hashLayoutSignature(signature) {
+  let hash = 0;
+  for (let i = 0; i < signature.length; i += 1) {
+    hash = (hash * 31 + signature.charCodeAt(i)) >>> 0;
+  }
+  return hash.toString(36);
+}
+
+function buildBracketLayoutSignature(bracket, isGroupStage) {
+  if (!bracket) return "";
+  if (isGroupStage) {
+    const groups = Array.isArray(bracket.groups) ? bracket.groups : [];
+    const groupIds = groups.map((group) => group?.id || "").join("|");
+    return `group:${groupIds}|playoffs:${Boolean(bracket.finals)}`;
+  }
+  const winners = (bracket.winners || [])
+    .map((round) => (round || []).map((match) => match?.id || "").join(","))
+    .join("|");
+  const losers = (bracket.losers || [])
+    .map((round) => (round || []).map((match) => match?.id || "").join(","))
+    .join("|");
+  const finals = bracket.finals?.id || "";
+  return `tree:w:${winners}|l:${losers}|f:${finals}`;
+}
+
 function getRowRefs(row) {
   if (!row) return {};
   const cached = rowElementCache.get(row);
@@ -1521,6 +1546,9 @@ export function renderBracketView({
     grid.innerHTML = DOMPurify.sanitize(
       `<div class="placeholder">Add players to generate the bracket.</div>`
     );
+    if (grid.dataset.layoutKey) {
+      delete grid.dataset.layoutKey;
+    }
     return;
   }
 
@@ -1540,6 +1568,28 @@ export function renderBracketView({
 
   const lookup = getMatchLookup(bracket);
   const playersById = getPlayersMap();
+  const layoutSignature = buildBracketLayoutSignature(bracket, isGroupStage);
+  const layoutKey = layoutSignature
+    ? hashLayoutSignature(`${format}|${layoutSignature}`)
+    : "";
+  const currentLayoutKey = grid.dataset.layoutKey || "";
+  const hasTreeLayout = Boolean(grid.querySelector(".tree-wrapper"));
+  if (!isGroupStage && layoutKey && currentLayoutKey === layoutKey && hasTreeLayout) {
+    const matchIds = Array.from(lookup.keys());
+    updateTreeMatchCards(matchIds, lookup, playersById, {
+      currentUsername,
+      currentUid,
+    });
+    clampScoreSelectOptions();
+    annotateConnectorPlayers(lookup, playersById);
+    applyNameRevealAnimations(grid);
+    return;
+  }
+  if (layoutKey) {
+    grid.dataset.layoutKey = layoutKey;
+  } else if (grid.dataset.layoutKey) {
+    delete grid.dataset.layoutKey;
+  }
 
     if (isGroupStage) {
       grid.innerHTML = renderRoundRobinView(
