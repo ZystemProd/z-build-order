@@ -10,11 +10,12 @@ import {
   setDoc,
 } from "firebase/firestore";
 import { auth, db, getCurrentUsername } from "../../../../app.js";
-import { currentSlug, currentTournamentMeta, isAdmin } from "../state.js";
+import { currentSlug, currentTournamentMeta, isAdmin, state } from "../state.js";
 
 const MATCH_CHAT_COLLECTION = "tournamentChats";
 const MATCH_CHAT_LIMIT = 50;
 const MATCH_CHAT_MAX_LENGTH = 500;
+const chatParticipantCache = new Map();
 let chatUnsub = null;
 let chatContext = null;
 let chatUnreadEl = null;
@@ -58,54 +59,113 @@ export function setupMatchChatUi({
     return;
   }
 
-  stopMatchChat();
-  historyEl.replaceChildren();
-  input.value = "";
-  panel.style.display = "none";
-  toggle.setAttribute("aria-expanded", "false");
-  labelEl.textContent = "Match chat";
-  status.textContent = "";
-  chatIsOpen = false;
-  lastSeenAtMs = 0;
-  unreadCount = 0;
-  hasInitialized = false;
-  chatMatchId = matchId || "";
-  chatUid = uid || "";
-  chatStorageKey = getChatStorageKey(chatMatchId, chatUid);
-  lastSeenAtMs = loadLastSeenAtMs(chatStorageKey);
-  updateUnreadIndicator(0);
+  const nextMatchId = matchId || "";
+  const nextUid = uid || "";
+  const nextStorageKey = getChatStorageKey(nextMatchId, nextUid);
+  const sameMatch = nextMatchId === chatMatchId;
+  const sameContext =
+    sameMatch &&
+    nextUid === chatUid &&
+    nextStorageKey === chatStorageKey;
+  const needsFullReset = !section.dataset.chatBound || !sameMatch;
 
   const canView = Boolean(uid && (isAdmin || isParticipant));
   if (!canView || !currentSlug || !matchId) {
+    if (sameMatch && section.dataset.chatBound === "true") {
+      stopMatchChat();
+      input.value = "";
+      panel.style.display = chatIsOpen ? "grid" : "none";
+      toggle.setAttribute("aria-expanded", chatIsOpen ? "true" : "false");
+      labelEl.textContent = chatIsOpen ? "Hide chat" : "Match chat";
+      status.textContent = uid
+        ? "Only match players can send messages."
+        : "Sign in to chat.";
+      setFormState(false);
+      return;
+    }
+    stopMatchChat();
+    historyEl.replaceChildren();
+    input.value = "";
+    panel.style.display = "none";
+    toggle.setAttribute("aria-expanded", "false");
+    labelEl.textContent = "Match chat";
+    status.textContent = "";
+    chatIsOpen = false;
+    lastSeenAtMs = 0;
+    unreadCount = 0;
+    hasInitialized = false;
+    chatMatchId = "";
+    chatUid = "";
+    chatStorageKey = "";
+    delete section.dataset.chatBound;
     section.style.display = "none";
     updateUnreadIndicator(0);
     return;
   }
 
   section.style.display = "grid";
+  const uidLookup = buildPlayerUidLookup(state?.players || []);
+
+  if (needsFullReset) {
+    stopMatchChat();
+    historyEl.replaceChildren();
+    input.value = "";
+    panel.style.display = "grid";
+    toggle.setAttribute("aria-expanded", "true");
+    labelEl.textContent = "Hide chat";
+    status.textContent = "";
+    chatIsOpen = true;
+    lastSeenAtMs = 0;
+    unreadCount = 0;
+    hasInitialized = false;
+    chatMatchId = nextMatchId;
+    chatUid = nextUid;
+    chatStorageKey = nextStorageKey;
+    lastSeenAtMs = loadLastSeenAtMs(chatStorageKey);
+    updateUnreadIndicator(0);
+    section.dataset.chatBound = "true";
+  } else {
+    panel.style.display = chatIsOpen ? "grid" : "none";
+    toggle.setAttribute("aria-expanded", chatIsOpen ? "true" : "false");
+    labelEl.textContent = chatIsOpen ? "Hide chat" : "Match chat";
+    if (!sameContext) {
+      chatUid = nextUid;
+      chatStorageKey = nextStorageKey;
+      lastSeenAtMs = loadLastSeenAtMs(chatStorageKey);
+    }
+  }
 
   const adminUids = getTournamentAdminUids(currentTournamentMeta);
+  const leftUid = resolvePlayerUid(leftPlayer, uidLookup);
+  const rightUid = resolvePlayerUid(rightPlayer, uidLookup);
   const participantUids = uniqueUids([
-    leftPlayer?.uid,
-    rightPlayer?.uid,
+    leftUid,
+    rightUid,
     ...adminUids,
     uid,
   ]);
   const canSend = Boolean(participantUids.includes(uid));
-  void startMatchChat({
-    matchId,
-    participantUids,
-    canSend,
-    uid,
-    displayName: getChatDisplayName(),
-  });
+  const displayName = getChatDisplayName();
+  if (chatContext) {
+    chatContext.canSend = canSend;
+    chatContext.displayName = displayName;
+  }
+  if (!sameContext || !chatUnsub) {
+    void startMatchChat({
+      matchId,
+      participantUids,
+      canSend,
+      uid,
+      displayName,
+    });
+  }
 
   const setFormState = (enabled) => {
     input.disabled = !enabled;
     sendBtn.disabled = !enabled;
   };
 
-  const openChat = async () => {
+  const openChat = () => {
     panel.style.display = "grid";
     toggle.setAttribute("aria-expanded", "true");
     labelEl.textContent = "Hide chat";
@@ -114,14 +174,15 @@ export function setupMatchChatUi({
     updateUnreadIndicator(0);
     setFormState(canSend);
     status.textContent = canSend ? "" : "Only match players can send messages.";
-    await startMatchChat({
-      matchId,
-      participantUids,
-      canSend,
-      uid,
-      displayName: getChatDisplayName(),
-    });
   };
+
+  if (chatIsOpen) {
+    setFormState(canSend);
+    status.textContent = canSend ? "" : "Only match players can send messages.";
+  } else {
+    setFormState(false);
+    status.textContent = "";
+  }
 
   const closeChat = () => {
     panel.style.display = "none";
@@ -168,6 +229,38 @@ export function setupMatchChatUi({
       status.textContent = "Message failed to send.";
     }
   };
+}
+
+function buildPlayerUidLookup(players = []) {
+  const byId = new Map();
+  const byName = new Map();
+  players.forEach((player) => {
+    const playerUid = String(player?.uid || "").trim();
+    if (!playerUid) return;
+    if (player?.id) {
+      byId.set(player.id, playerUid);
+    }
+    const name = String(player?.name || "").trim().toLowerCase();
+    if (!name) return;
+    if (!byName.has(name)) byName.set(name, []);
+    byName.get(name).push(playerUid);
+  });
+  return { byId, byName };
+}
+
+function resolvePlayerUid(player, lookup) {
+  if (!player || !lookup) return "";
+  const directUid = String(player?.uid || "").trim();
+  if (directUid) return directUid;
+  if (player?.id && lookup.byId.has(player.id)) {
+    return lookup.byId.get(player.id) || "";
+  }
+  const name = String(player?.name || "").trim().toLowerCase();
+  if (name && lookup.byName.has(name)) {
+    const candidates = lookup.byName.get(name) || [];
+    if (candidates.length === 1) return candidates[0] || "";
+  }
+  return "";
 }
 
 export function teardownMatchChatUi() {
@@ -236,6 +329,7 @@ async function startMatchChat({
   canSend,
   uid,
   displayName,
+  retryCount = 0,
 }) {
   stopMatchChat();
   const historyEl = document.getElementById("matchChatHistory");
@@ -243,9 +337,10 @@ async function startMatchChat({
   if (!currentSlug || !matchId || !historyEl) return;
 
   const docRef = doc(db, MATCH_CHAT_COLLECTION, currentSlug, "matches", matchId);
-  const safeParticipants = uniqueUids(participantUids);
+  const cachedParticipants = chatParticipantCache.get(matchId) || [];
+  const safeParticipants = uniqueUids([...cachedParticipants, ...participantUids]);
   try {
-    if (safeParticipants.length) {
+    if (safeParticipants.length && safeParticipants.length <= 25) {
       await setDoc(
         docRef,
         {
@@ -254,11 +349,15 @@ async function startMatchChat({
         },
         { merge: true }
       );
+      chatParticipantCache.set(matchId, safeParticipants);
+    } else if (safeParticipants.length > 25) {
+      console.warn("Match chat participants exceeded limit, skipping sync.");
     }
   } catch (err) {
     console.warn("Failed to sync match chat participants", err);
-    if (status) status.textContent = "Chat is unavailable right now.";
-    return;
+    if (status && err?.code !== "permission-denied") {
+      status.textContent = "Chat is unavailable right now.";
+    }
   }
 
   const messagesRef = collection(
@@ -286,6 +385,20 @@ async function startMatchChat({
     },
     (err) => {
       console.warn("Match chat listener error", err);
+      if (err?.code === "permission-denied" && retryCount < 1) {
+        if (status) status.textContent = "Chat reconnecting...";
+        setTimeout(() => {
+          startMatchChat({
+            matchId,
+            participantUids,
+            canSend,
+            uid,
+            displayName,
+            retryCount: retryCount + 1,
+          });
+        }, 600);
+        return;
+      }
       if (status) status.textContent = "Chat disconnected.";
     }
   );

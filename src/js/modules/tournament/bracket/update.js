@@ -127,6 +127,23 @@ function buildDependencyMap(lookup) {
   return dependencies;
 }
 
+function collectDependentMatchIds(startMatchId, lookup) {
+  const dependencies = buildDependencyMap(lookup);
+  const visited = new Set();
+  const queue = [startMatchId];
+  while (queue.length) {
+    const sourceId = queue.shift();
+    if (!sourceId || visited.has(sourceId)) continue;
+    visited.add(sourceId);
+    const dependents = dependencies.get(sourceId);
+    if (!dependents) continue;
+    dependents.forEach((depId) => {
+      if (!visited.has(depId)) queue.push(depId);
+    });
+  }
+  return visited;
+}
+
 function cascadeMatchOutcomeUpdates(startMatchId, lookup) {
   const dependencies = buildDependencyMap(lookup);
   const queue = [startMatchId];
@@ -244,6 +261,9 @@ export function updateMatchScore(
     match.status = "pending";
   }
 
+  const affectedMatchIds = finalize
+    ? Array.from(collectDependentMatchIds(matchId, lookup))
+    : [matchId];
   if (finalize) {
     cascadeMatchOutcomeUpdates(matchId, lookup);
   }
@@ -256,7 +276,7 @@ export function updateMatchScore(
   } else {
     saveState?.({ bracket: state.bracket });
   }
-  renderAll?.();
+  renderAll?.(affectedMatchIds);
 }
 
 export function applyForfeitWalkovers({ saveState, renderAll } = {}) {

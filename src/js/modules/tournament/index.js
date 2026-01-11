@@ -8,7 +8,6 @@ import {
   getCurrentUserProfile,
   getPulseState,
   initializeAuthUI,
-  syncPulseNow,
 } from "../../../app.js";
 import { onAuthStateChanged } from "firebase/auth";
 import {
@@ -37,6 +36,7 @@ import { showToast } from "../toastHandler.js";
 import { logAnalyticsEvent } from "../analyticsHelper.js";
 import DOMPurify from "dompurify";
 import { prepareImageForUpload, validateImageFile } from "../imageUtils.js";
+import { buildMmrBadges } from "../settings/pulse.js";
 import {
   TOURNAMENT_COLLECTION,
   TOURNAMENT_STATE_COLLECTION,
@@ -61,7 +61,6 @@ import {
   registryCache,
   currentTournamentMeta,
   requirePulseLinkSetting,
-  requirePulseSyncSetting,
   mapPoolSelection,
   mapCatalog,
   mapCatalogLoaded,
@@ -76,7 +75,6 @@ import {
   setRegistryCacheState,
   setCurrentTournamentMetaState,
   setRequirePulseLinkSettingState,
-  setRequirePulseSyncSettingState,
   setMapPoolSelectionState,
   setMapCatalogState,
   setMapCatalogLoadedState,
@@ -144,6 +142,7 @@ import {
   renderScoreOptions,
   clampScoreSelectOptions,
   renderSimpleMatch,
+  updateTreeMatchCards,
   layoutBracketSection,
   attachMatchHoverHandlers,
   annotateConnectorPlayers,
@@ -258,16 +257,23 @@ const MAX_TOURNAMENT_IMAGE_SIZE = 12 * 1024 * 1024;
 const COVER_TARGET_WIDTH = 1200;
 const COVER_TARGET_HEIGHT = 675;
 const COVER_QUALITY = 0.82;
+const PULSE_ENDPOINTS = (() => {
+  const endpoints = ["/api/pulse-mmr"];
+  if (
+    typeof window !== "undefined" &&
+    window.location.hostname === "localhost"
+  ) {
+    endpoints.push(
+      "http://localhost:5001/z-build-order/us-central1/fetchPulseMmr"
+    );
+  }
+  endpoints.push("https://us-central1-z-build-order.cloudfunctions.net/fetchPulseMmr");
+  return endpoints;
+})();
 const storage = getStorage(app);
 let currentCircuitMeta = null;
 let isCircuitAdmin = false;
 let circuitPointsBtnTemplate = null;
-let pulseSyncSessionCompleted = false;
-let secondaryPulseSyncSessionCompleted = false;
-let pulseSyncRequired = false;
-let secondaryPulseSyncRequired = false;
-let lastPulseUrl = "";
-let lastSecondarySignature = "";
 let circuitFinalMapPoolSelection = new Set();
 let circuitFinalMapPoolMode = "ladder";
 let inviteLinkGate = {
@@ -286,6 +292,14 @@ function normalizeTournamentVisibility(value) {
 
 function normalizeTournamentAccess(value) {
   return String(value || "").toLowerCase() === "closed" ? "closed" : "open";
+}
+
+function isRoundRobinFormat(format) {
+  return String(format || "").toLowerCase().includes("round robin");
+}
+
+function isGroupStageFormat(format) {
+  return isRoundRobinFormat(format) || isDualTournamentFormat(format);
 }
 
 function getInviteTokenStorageKey(slug) {
@@ -746,6 +760,125 @@ async function loadMapCatalog() {
   return mapCatalog;
 }
 
+function safeJsonEqual(a, b) {
+  if (a === b) return true;
+  try {
+    return JSON.stringify(a) === JSON.stringify(b);
+  } catch (_) {
+    return false;
+  }
+}
+
+function isSameSources(a, b) {
+  if (a === b) return true;
+  if (!Array.isArray(a) || !Array.isArray(b)) return false;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    const left = a[i] || {};
+    const right = b[i] || {};
+    if ((left.type || "") !== (right.type || "")) return false;
+    if ((left.matchId || "") !== (right.matchId || "")) return false;
+    if ((left.outcome || "") !== (right.outcome || "")) return false;
+    if ((left.playerId || "") !== (right.playerId || "")) return false;
+  }
+  return true;
+}
+
+function buildDependencyMapFromLookup(lookup) {
+  const dependencies = new Map();
+  if (!lookup) return dependencies;
+  for (const match of lookup.values()) {
+    const sources = Array.isArray(match.sources) ? match.sources : [];
+    sources.forEach((src) => {
+      if (src?.type !== "match" || !src.matchId) return;
+      if (!dependencies.has(src.matchId)) {
+        dependencies.set(src.matchId, new Set());
+      }
+      dependencies.get(src.matchId).add(match.id);
+    });
+  }
+  return dependencies;
+}
+
+function collectDependentMatchIdsFromLookup(startIds, lookup) {
+  const dependencies = buildDependencyMapFromLookup(lookup);
+  const visited = new Set();
+  const queue = Array.isArray(startIds) ? [...startIds] : [];
+  while (queue.length) {
+    const sourceId = queue.shift();
+    if (!sourceId || visited.has(sourceId)) continue;
+    visited.add(sourceId);
+    const dependents = dependencies.get(sourceId);
+    if (!dependents) continue;
+    dependents.forEach((depId) => {
+      if (!visited.has(depId)) queue.push(depId);
+    });
+  }
+  return visited;
+}
+
+function getChangedMatchIdsFromMap(prevMap, nextMap) {
+  const prev = prevMap || {};
+  const next = nextMap || {};
+  const ids = new Set([...Object.keys(prev), ...Object.keys(next)]);
+  const changed = new Set();
+  ids.forEach((id) => {
+    if (!safeJsonEqual(prev[id], next[id])) {
+      changed.add(id);
+    }
+  });
+  return changed;
+}
+
+function getBracketMatchIdsForPartial(prevBracket, nextBracket) {
+  if (!prevBracket || !nextBracket) return null;
+  const prevLookup = getMatchLookup(prevBracket);
+  const nextLookup = getMatchLookup(nextBracket);
+  if (!prevLookup || !nextLookup) return null;
+  if (prevLookup.size !== nextLookup.size) return null;
+  for (const id of nextLookup.keys()) {
+    if (!prevLookup.has(id)) return null;
+  }
+  const changed = new Set();
+  for (const [id, nextMatch] of nextLookup.entries()) {
+    const prevMatch = prevLookup.get(id);
+    if (!prevMatch) return null;
+    if (!isSameSources(prevMatch.sources || [], nextMatch.sources || [])) {
+      return null;
+    }
+    const prevScores = prevMatch.scores || [];
+    const nextScores = nextMatch.scores || [];
+    const scoreChanged =
+      (prevScores[0] || 0) !== (nextScores[0] || 0) ||
+      (prevScores[1] || 0) !== (nextScores[1] || 0);
+    const statusChanged =
+      prevMatch.walkover !== nextMatch.walkover ||
+      prevMatch.status !== nextMatch.status ||
+      prevMatch.winnerId !== nextMatch.winnerId ||
+      prevMatch.loserId !== nextMatch.loserId;
+    if (scoreChanged || statusChanged) changed.add(id);
+  }
+  if (!changed.size) return [];
+  return Array.from(collectDependentMatchIdsFromLookup(Array.from(changed), nextLookup));
+}
+
+function shouldUsePartialRender(prevState, nextState, format) {
+  if (!prevState?.bracket || !nextState?.bracket) return false;
+  if (isGroupStageFormat(format)) return false;
+  if (prevState.isLive !== nextState.isLive) return false;
+  if (prevState.hasBeenLive !== nextState.hasBeenLive) return false;
+  if (prevState.disableFinalAutoAdd !== nextState.disableFinalAutoAdd) return false;
+  if (prevState.needsReseed !== nextState.needsReseed) return false;
+  if (prevState.bracketLayoutVersion !== nextState.bracketLayoutVersion) return false;
+  if (!safeJsonEqual(prevState.players || [], nextState.players || [])) return false;
+  if (!safeJsonEqual(prevState.pointsLedger || {}, nextState.pointsLedger || {})) return false;
+  if (!safeJsonEqual(prevState.manualSeedingEnabled, nextState.manualSeedingEnabled)) return false;
+  if (!safeJsonEqual(prevState.manualSeedingOrder || [], nextState.manualSeedingOrder || [])) return false;
+  if (!safeJsonEqual(prevState.casters || [], nextState.casters || [])) return false;
+  if (!safeJsonEqual(prevState.casterRequests || [], nextState.casterRequests || [])) return false;
+  return true;
+}
+
   function syncFromRemote(incoming) {
   if (!incoming || typeof incoming !== "object") return;
   const incomingPresence = incoming.presence?.matchInfo || null;
@@ -753,6 +886,10 @@ async function loadMapCatalog() {
   const presenceChanged =
     incomingPresence &&
     JSON.stringify(incomingPresence) !== JSON.stringify(currentPresence || {});
+  const matchVetoesChangedEarly = !safeJsonEqual(
+    incoming.matchVetoes || {},
+    state.matchVetoes || {}
+  );
   const casterChanged =
     JSON.stringify(incoming.casterRequests || []) !==
       JSON.stringify(state.casterRequests || []) ||
@@ -762,7 +899,8 @@ async function loadMapCatalog() {
   if (
     incoming.lastUpdated &&
     incoming.lastUpdated <= state.lastUpdated &&
-    !casterChanged
+    !casterChanged &&
+    !matchVetoesChangedEarly
   ) {
     if (presenceChanged) {
       setStateObj({ ...state, presence: { matchInfo: incomingPresence } });
@@ -770,18 +908,150 @@ async function loadMapCatalog() {
     }
     return;
   }
-  setStateObj({
+  const prevState = state;
+  const nextPlayers = applyRosterSeedingWithMode(incoming.players || [], incoming);
+  const nextBracket = deserializeBracket(incoming.bracket);
+  const inProgressVetoId =
+    currentVetoMatchId && vetoState && vetoState.stage !== "done"
+      ? currentVetoMatchId
+      : null;
+  const inProgressVeto = inProgressVetoId
+    ? {
+        maps: vetoState?.picks || [],
+        vetoed: vetoState?.vetoed || [],
+        bestOf: vetoState?.bestOf || 1,
+        updatedAt: vetoState?.updatedAt || Date.now(),
+        participants: {
+          lower: vetoState?.lowerName || "Lower seed",
+          higher: vetoState?.higherName || "Higher seed",
+        },
+        mapResults: state.matchVetoes?.[inProgressVetoId]?.mapResults || [],
+      }
+    : null;
+  const nextState = {
     ...defaultState,
     ...incoming,
-    players: applyRosterSeedingWithMode(incoming.players || [], incoming),
+    players: nextPlayers,
     pointsLedger: incoming.pointsLedger || {},
     activity: incoming.activity || [],
-    bracket: deserializeBracket(incoming.bracket),
-  });
+    bracket: nextBracket,
+  };
+  nextState.matchVetoes = mergeMatchVetoes(
+    state.matchVetoes || {},
+    nextState.matchVetoes || {}
+  );
+  if (inProgressVetoId && inProgressVeto) {
+    const incomingEntry = nextState.matchVetoes?.[inProgressVetoId] || null;
+    const incomingUpdated = Number(incomingEntry?.updatedAt) || 0;
+    const localUpdated = Number(inProgressVeto.updatedAt) || 0;
+    if (localUpdated >= incomingUpdated) {
+      nextState.matchVetoes = {
+        ...(nextState.matchVetoes || {}),
+        [inProgressVetoId]: inProgressVeto,
+      };
+    }
+  }
+  const activityChanged = !safeJsonEqual(
+    prevState.activity || [],
+    nextState.activity || []
+  );
+  const matchVetoesChanged = !safeJsonEqual(
+    prevState.matchVetoes || {},
+    nextState.matchVetoes || {}
+  );
+    const onlyVetoChange =
+      matchVetoesChanged &&
+    !activityChanged &&
+    prevState.isLive === nextState.isLive &&
+    prevState.hasBeenLive === nextState.hasBeenLive &&
+    prevState.disableFinalAutoAdd === nextState.disableFinalAutoAdd &&
+    prevState.needsReseed === nextState.needsReseed &&
+    prevState.bracketLayoutVersion === nextState.bracketLayoutVersion &&
+    safeJsonEqual(prevState.players || [], nextState.players || []) &&
+    safeJsonEqual(prevState.bracket || null, nextState.bracket || null) &&
+    safeJsonEqual(prevState.pointsLedger || {}, nextState.pointsLedger || {}) &&
+    safeJsonEqual(prevState.manualSeedingEnabled, nextState.manualSeedingEnabled) &&
+    safeJsonEqual(prevState.manualSeedingOrder || [], nextState.manualSeedingOrder || []) &&
+    safeJsonEqual(prevState.matchCasts || {}, nextState.matchCasts || {}) &&
+    safeJsonEqual(prevState.scoreReports || {}, nextState.scoreReports || {}) &&
+    safeJsonEqual(prevState.casters || [], nextState.casters || []) &&
+      safeJsonEqual(prevState.casterRequests || [], nextState.casterRequests || []);
+    const stripVetoState = (value) => {
+      const trimmed = { ...(value || {}) };
+      delete trimmed.matchVetoes;
+      delete trimmed.lastUpdated;
+      delete trimmed.presence;
+      return trimmed;
+    };
+    const vetoOnlyChange =
+      matchVetoesChanged &&
+      safeJsonEqual(stripVetoState(prevState), stripVetoState(nextState));
+  let allowPartial = shouldUsePartialRender(
+    prevState,
+    nextState,
+    currentTournamentMeta?.format
+  );
+  let matchIds = [];
+  if (allowPartial) {
+    const bracketMatchIds = getBracketMatchIdsForPartial(prevState.bracket, nextBracket);
+    if (bracketMatchIds === null) {
+      allowPartial = false;
+    } else {
+      const combined = new Set(bracketMatchIds);
+      getChangedMatchIdsFromMap(prevState.matchCasts, nextState.matchCasts).forEach(
+        (id) => combined.add(id)
+      );
+      getChangedMatchIdsFromMap(prevState.scoreReports, nextState.scoreReports).forEach(
+        (id) => combined.add(id)
+      );
+      matchIds = Array.from(combined).filter(Boolean);
+    }
+  }
+  setStateObj(nextState);
+    if (onlyVetoChange || vetoOnlyChange) {
+      refreshMatchInfoModalIfOpen?.();
+      refreshVetoModalIfOpen?.();
+      return;
+    }
+  if (
+    allowPartial &&
+    !matchIds.length &&
+    matchVetoesChanged &&
+    !activityChanged
+  ) {
+    refreshMatchInfoModalIfOpen?.();
+    refreshVetoModalIfOpen?.();
+    return;
+  }
+  if (allowPartial && matchIds.length) {
+    renderAll(matchIds);
+    if (activityChanged) {
+      renderActivityList({ state, escapeHtml, formatTime });
+    }
+  } else if (allowPartial && activityChanged) {
+    renderActivityList({ state, escapeHtml, formatTime });
+  } else {
     renderAll();
+  }
   refreshPlayerDetailModalIfOpen(getPlayersMap);
   refreshMatchInfoModalIfOpen?.();
-  refreshVetoModalIfOpen?.();
+  if (matchVetoesChanged) {
+    refreshVetoModalIfOpen?.();
+  }
+}
+
+function mergeMatchVetoes(local = {}, incoming = {}) {
+  const out = { ...incoming };
+  Object.keys(local || {}).forEach((matchId) => {
+    const localEntry = local[matchId];
+    const incomingEntry = incoming[matchId];
+    const localUpdated = Number(localEntry?.updatedAt) || 0;
+    const incomingUpdated = Number(incomingEntry?.updatedAt) || 0;
+    if (!incomingEntry || localUpdated > incomingUpdated) {
+      out[matchId] = localEntry;
+    }
+  });
+  return out;
 }
 
 let unsubscribeRemoteState = null;
@@ -1086,7 +1356,64 @@ function handleApplyCircuitPoints(event) {
   });
 }
 
-function renderAll() {
+function updatePlacementsRow() {
+  if (!currentTournamentMeta) return;
+  const placementsRow = document.getElementById("tournamentPlacements");
+  const placementFirst = document.getElementById("placementFirst");
+  const placementSecond = document.getElementById("placementSecond");
+  const placementThirdFourth = document.getElementById("placementThirdFourth");
+  if (!placementsRow || !placementFirst || !placementSecond || !placementThirdFourth) return;
+  const eligiblePlayers = getEligiblePlayers(state.players || []);
+  const placements = computePlacementsForBracket(
+    state.bracket,
+    eligiblePlayers.length || 0
+  );
+  if (!placements) {
+    placementsRow.style.display = "none";
+    return;
+  }
+  const playersById = getPlayersMap();
+  const firstId = Array.from(placements.entries()).find(([, p]) => p === 1)?.[0];
+  const secondId = Array.from(placements.entries()).find(([, p]) => p === 2)?.[0];
+  const thirdIds = Array.from(placements.entries())
+    .filter(([, p]) => p === 3)
+    .map(([id]) => id);
+  placementFirst.textContent = playersById.get(firstId)?.name || "—";
+  placementSecond.textContent = playersById.get(secondId)?.name || "—";
+  placementThirdFourth.textContent = thirdIds.length
+    ? thirdIds.map((id) => playersById.get(id)?.name || "—").join(" · ")
+    : "—";
+  placementsRow.style.display = "flex";
+}
+
+function renderAll(matchIds = null) {
+  const bracketContainer = document.getElementById("bracketGrid");
+  const bracket = state.bracket;
+  const playersArr = state.players || [];
+  const format = currentTournamentMeta?.format || "Tournament";
+  const shouldPartialUpdate =
+    Array.isArray(matchIds) &&
+    matchIds.length &&
+    bracketContainer &&
+    bracket &&
+    !isGroupStageFormat(format);
+
+    if (shouldPartialUpdate) {
+      const lookup = getMatchLookup(bracket);
+      const playersById = getPlayersMap();
+      const didPartialUpdate = updateTreeMatchCards(matchIds, lookup, playersById, {
+        currentUsername: getCurrentUsername?.() || "",
+        currentUid: auth.currentUser?.uid || "",
+      });
+      if (didPartialUpdate) {
+        annotateConnectorPlayers(lookup, playersById);
+        clampScoreSelectOptions();
+      updatePlacementsRow();
+      applyBracketReadOnlyState(!state.isLive && !isAdmin);
+      updateTooltips?.();
+      return;
+    }
+  }
   // Update seeding table
   const seedingSnapshot = seedPlayersForState(state.players || [], state);
   const forfeitUndoBlocked = getForfeitUndoBlockedIds();
@@ -1109,10 +1436,6 @@ function renderAll() {
     const descriptionBody = document.getElementById("tournamentDescriptionBody");
     const rulesBody = document.getElementById("tournamentRulesBody");
     const statPlayers = document.getElementById("statPlayers");
-    const placementsRow = document.getElementById("tournamentPlacements");
-    const placementFirst = document.getElementById("placementFirst");
-    const placementSecond = document.getElementById("placementSecond");
-    const placementThirdFourth = document.getElementById("placementThirdFourth");
     const registerBtn = document.getElementById("registerBtn");
     const goLiveBtn = document.getElementById("rebuildBracketBtn");
     const notifyCheckInBtn = document.getElementById("notifyCheckInBtn");
@@ -1134,10 +1457,6 @@ function renderAll() {
     const isInviteOnly = isInviteOnlyTournament(currentTournamentMeta);
     const accessNote = document.getElementById("registrationAccessNote");
     const registrationForm = document.getElementById("registrationForm");
-    const syncPulseBtn = document.getElementById("syncPulseBtn");
-    const syncPulseSpinner = document.getElementById("syncPulseSpinner");
-    const requirePulseSyncEnabled = getRequirePulseSyncEnabled();
-    const pulseGate = getPulseSyncGateStatus();
 
     hydrateCurrentUserClanLogo();
 
@@ -1145,19 +1464,27 @@ function renderAll() {
       tournamentTitle.textContent = currentTournamentMeta.name || "Tournament";
     }
     const tournamentHero = document.querySelector("#tournamentView .hero");
-    if (tournamentHero) {
-      const coverUrl = sanitizeUrl(currentTournamentMeta.coverImageUrl || "");
-      if (coverUrl) {
-        tournamentHero.classList.add("has-cover");
-        tournamentHero.style.setProperty(
-          "--hero-cover-image",
-          `url("${coverUrl}")`
-        );
-      } else {
-        tournamentHero.classList.remove("has-cover");
-        tournamentHero.style.removeProperty("--hero-cover-image");
+      if (tournamentHero) {
+        const coverUrl = sanitizeUrl(currentTournamentMeta.coverImageUrl || "");
+        if (coverUrl) {
+          if (tournamentHero.dataset.coverUrl !== coverUrl) {
+            tournamentHero.classList.add("has-cover");
+            tournamentHero.style.setProperty(
+              "--hero-cover-image",
+              `url("${coverUrl}")`
+            );
+            tournamentHero.dataset.coverUrl = coverUrl;
+          } else {
+            tournamentHero.classList.add("has-cover");
+          }
+        } else {
+          tournamentHero.classList.remove("has-cover");
+          tournamentHero.style.removeProperty("--hero-cover-image");
+          if (tournamentHero.dataset.coverUrl) {
+            delete tournamentHero.dataset.coverUrl;
+          }
+        }
       }
-    }
     if (tournamentFormat) {
       tournamentFormat.textContent = currentTournamentMeta.format || "Tournament";
     }
@@ -1228,30 +1555,10 @@ function renderAll() {
       }
     }
 
-    if (placementsRow && placementFirst && placementSecond && placementThirdFourth) {
-      const placements = computePlacementsForBracket(
-        state.bracket,
-        eligiblePlayers.length || 0
-      );
-      if (!placements) {
-        placementsRow.style.display = "none";
-      } else {
-        const playersById = getPlayersMap();
-        const firstId = Array.from(placements.entries()).find(([, p]) => p === 1)?.[0];
-        const secondId = Array.from(placements.entries()).find(([, p]) => p === 2)?.[0];
-        const thirdIds = Array.from(placements.entries())
-          .filter(([, p]) => p === 3)
-          .map(([id]) => id);
-        placementFirst.textContent = playersById.get(firstId)?.name || "—";
-        placementSecond.textContent = playersById.get(secondId)?.name || "—";
-        placementThirdFourth.textContent = thirdIds.length
-          ? thirdIds.map((id) => playersById.get(id)?.name || "—").join(" · ")
-          : "—";
-        placementsRow.style.display = "flex";
-      }
-    }
+    updatePlacementsRow();
 
     if (registerBtn) {
+      const isRegisterLoading = registerBtn.classList.contains("is-loading");
       if (state.isLive) {
         registerBtn.textContent = "Registration closed";
         registerBtn.disabled = true;
@@ -1276,31 +1583,14 @@ function renderAll() {
         } else if (!inviteLinkGate.ok) {
           registerBtn.textContent = "Invite link invalid";
           registerBtn.disabled = true;
-        } else if (pulseGate.needsSync) {
-          registerBtn.textContent = "Register";
-          registerBtn.disabled = true;
         } else {
           registerBtn.textContent = "Register";
-          registerBtn.disabled = false;
+          registerBtn.disabled = isRegisterLoading ? true : false;
         }
-      } else if (pulseGate.needsSync) {
-        registerBtn.textContent = "Register";
-        registerBtn.disabled = true;
       } else {
         registerBtn.textContent = "Register";
-        registerBtn.disabled = false;
+        registerBtn.disabled = isRegisterLoading ? true : false;
       }
-    }
-
-    if (syncPulseBtn) {
-      const label = syncPulseBtn.querySelector(".sync-label");
-      if (label) label.textContent = "Sync SC2Pulse";
-      const isLoading = syncPulseBtn.classList.contains("is-loading");
-      syncPulseBtn.style.display = requirePulseSyncEnabled ? "" : "none";
-      syncPulseBtn.disabled = !auth.currentUser || isLoading;
-    }
-    if (syncPulseSpinner) {
-      syncPulseSpinner.style.display = requirePulseSyncEnabled ? "" : "none";
     }
 
     if (goLiveBtn) {
@@ -1396,14 +1686,6 @@ function renderAll() {
     getMapByName,
   });
 
-  const bracketContainer = document.getElementById("bracketGrid");
-  const bracket = state.bracket;
-  const playersArr = state.players || [];
-  const format = currentTournamentMeta?.format || "Tournament";
-  const isRoundRobinFormat = (fmt) =>
-    (fmt || "").toLowerCase().includes("round robin");
-  const isGroupStageFormat = (fmt) =>
-    isRoundRobinFormat(fmt) || isDualTournamentFormat(fmt);
   const layoutVersion = state.bracketLayoutVersion || 1;
   const needsLayoutUpgrade =
     bracket &&
@@ -1440,48 +1722,66 @@ function renderAll() {
   if (bracketContainer && bracket) {
     let lookup = getMatchLookup(bracket);
     const playersById = getPlayersMap();
-    if (isGroupStageFormat(format)) {
-      const changed = ensureRoundRobinPlayoffs(bracket, playersById, lookup);
-      if (changed) {
-        lookup = getMatchLookup(bracket);
-        saveState({ bracket });
-      }
-      const html = renderRoundRobinView(
-        { ...bracket },
-        playersById,
-        computeGroupStandings
-      );
-      bracketContainer.innerHTML = DOMPurify.sanitize(html);
-      attachMatchActionHandlers?.();
-    } else {
-      renderBracketView({
-        bracket,
-        players: playersArr,
-        format,
-        ensurePlayoffs: (b) => ensureRoundRobinPlayoffs(b, playersById, lookup),
-        getPlayersMap,
-        attachMatchActionHandlers,
-        computeGroupStandings,
+    const shouldPartialUpdate =
+      Array.isArray(matchIds) &&
+      matchIds.length &&
+      !isGroupStageFormat(format);
+    let didPartialUpdate = false;
+    if (shouldPartialUpdate) {
+      didPartialUpdate = updateTreeMatchCards(matchIds, lookup, playersById, {
         currentUsername: getCurrentUsername?.() || "",
+        currentUid: auth.currentUser?.uid || "",
+      });
+      if (didPartialUpdate) {
+        annotateConnectorPlayers(lookup, playersById);
+        clampScoreSelectOptions();
+      }
+    }
+    if (!didPartialUpdate) {
+      if (isGroupStageFormat(format)) {
+        const changed = ensureRoundRobinPlayoffs(bracket, playersById, lookup);
+        if (changed) {
+          lookup = getMatchLookup(bracket);
+          saveState({ bracket });
+        }
+        const html = renderRoundRobinView(
+          { ...bracket },
+          playersById,
+          computeGroupStandings
+        );
+        bracketContainer.innerHTML = DOMPurify.sanitize(html);
+        attachMatchActionHandlers?.();
+      } else {
+        renderBracketView({
+          bracket,
+          players: playersArr,
+          format,
+          ensurePlayoffs: (b) => ensureRoundRobinPlayoffs(b, playersById, lookup),
+          getPlayersMap,
+          attachMatchActionHandlers,
+          computeGroupStandings,
+          currentUsername: getCurrentUsername?.() || "",
+          currentUid: auth.currentUser?.uid || "",
+        });
+      }
+      attachMatchHoverHandlers();
+      annotateConnectorPlayers(lookup, playersById);
+      clampScoreSelectOptions();
+      const groupScrolls = bracketContainer.querySelectorAll(
+        ".group-stage-scroll, .playoff-scroll"
+      );
+      groupScrolls.forEach((el) => {
+        if (el.dataset.dragScrollBound === "true") return;
+        enableDragScroll(el, {
+          axisLock: true,
+          scrollXElement: el,
+          scrollYElement: el,
+          ignoreSelector:
+            'a, button, input, select, textarea, label, [contenteditable="true"], [data-no-drag]',
+        });
+        el.dataset.dragScrollBound = "true";
       });
     }
-    attachMatchHoverHandlers();
-    annotateConnectorPlayers(lookup, playersById);
-    clampScoreSelectOptions();
-    const groupScrolls = bracketContainer.querySelectorAll(
-      ".group-stage-scroll, .playoff-scroll"
-    );
-    groupScrolls.forEach((el) => {
-      if (el.dataset.dragScrollBound === "true") return;
-      enableDragScroll(el, {
-        axisLock: true,
-        scrollXElement: el,
-        scrollYElement: el,
-        ignoreSelector:
-          'a, button, input, select, textarea, label, [contenteditable="true"], [data-no-drag]',
-      });
-      el.dataset.dragScrollBound = "true";
-    });
   }
   applyBracketReadOnlyState(!state.isLive && !isAdmin);
   updateTooltips?.();
@@ -3023,84 +3323,88 @@ function setStatus(el, message, isError = false) {
   el.classList.toggle("status-ok", !isError);
 }
 
-function getPulseSyncGateStatus() {
-  const requirePulseSyncEnabled = getRequirePulseSyncEnabled();
-  if (!requirePulseSyncEnabled) {
-    return {
-      needsSync: false,
-      needsMain: false,
-      needsSecondary: false,
-      message: "",
-    };
+function setRegisterLoadingState(isLoading) {
+  const registerBtn = document.getElementById("registerBtn");
+  if (!registerBtn) return;
+  const current = Number(registerBtn.dataset.loadingCount || "0");
+  const next = Math.max(0, current + (isLoading ? 1 : -1));
+  registerBtn.dataset.loadingCount = String(next);
+  registerBtn.classList.toggle("is-loading", next > 0);
+  if (next > 0) {
+    if (registerBtn.dataset.prevDisabled === undefined) {
+      registerBtn.dataset.prevDisabled = registerBtn.disabled ? "true" : "false";
+    }
+    registerBtn.disabled = true;
+    registerBtn.setAttribute("aria-busy", "true");
+  } else {
+    if (registerBtn.dataset.prevDisabled !== undefined) {
+      registerBtn.disabled = registerBtn.dataset.prevDisabled === "true";
+      delete registerBtn.dataset.prevDisabled;
+    }
+    registerBtn.removeAttribute("aria-busy");
+    delete registerBtn.dataset.loadingCount;
   }
-  if (!auth.currentUser) {
-    return {
-      needsSync: false,
-      needsMain: false,
-      needsSecondary: false,
-      message: "",
-    };
-  }
-  const needsMain = pulseSyncRequired && !pulseSyncSessionCompleted;
-  const needsSecondary =
-    secondaryPulseSyncRequired && !secondaryPulseSyncSessionCompleted;
-  const needsSync = needsMain || needsSecondary;
-  let message = "";
-  if (needsMain && needsSecondary) {
-    message =
-      "Update your SC2Pulse link and secondary links in Settings before registering.";
-  } else if (needsMain) {
-    message = "Update your SC2Pulse link in Settings before registering.";
-  } else if (needsSecondary) {
-    message =
-      "Update your secondary SC2Pulse links in Settings before registering.";
-  }
-  return { needsSync, needsMain, needsSecondary, message };
 }
 
-function normalizePulseSyncUrl(url = "") {
-  return sanitizeUrl((url || "").trim());
-}
-
-function extractSecondaryPulseUrls(secondary = []) {
-  if (!Array.isArray(secondary)) return [];
-  const urls = secondary
-    .map((entry) => (entry && typeof entry === "object" ? entry.url : entry))
-    .map((url) => normalizePulseSyncUrl(url))
-    .filter(Boolean);
-  return Array.from(new Set(urls));
-}
-
-function computeSecondarySignature(secondary = []) {
-  const urls = extractSecondaryPulseUrls(secondary).sort();
-  return urls.length ? urls.join("|") : "";
-}
-
-function resetPulseSyncSessionState() {
-  pulseSyncSessionCompleted = false;
-  secondaryPulseSyncSessionCompleted = false;
-  pulseSyncRequired = false;
-  secondaryPulseSyncRequired = false;
-  lastPulseUrl = "";
-  lastSecondarySignature = "";
-}
-
-function syncPulseRegistrationRequirements(pulseState = null) {
-  const source = pulseState || getPulseState?.() || {};
-  const url = normalizePulseSyncUrl(source?.url || "");
-  const secondarySignature = computeSecondarySignature(source?.secondary || []);
-
-  if (url !== lastPulseUrl) {
-    pulseSyncSessionCompleted = false;
-    lastPulseUrl = url;
+function normalizeSc2PulseIdUrl(raw = "") {
+  const normalized = sanitizeUrl((raw || "").trim());
+  if (!normalized) return "";
+  try {
+    const url = new URL(normalized);
+    if (url.hostname !== "sc2pulse.nephest.com") return "";
+    const idParam = url.searchParams.get("id");
+    const idNum = Number(idParam);
+    if (!Number.isFinite(idNum) || idNum <= 0) return "";
+    return url.toString();
+  } catch (_) {
+    return "";
   }
-  if (secondarySignature !== lastSecondarySignature) {
-    secondaryPulseSyncSessionCompleted = false;
-    lastSecondarySignature = secondarySignature;
+}
+
+async function fetchPulseMmrFromBackend(url) {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error("Please sign in first.");
   }
 
-  pulseSyncRequired = Boolean(url);
-  secondaryPulseSyncRequired = Boolean(secondarySignature);
+  let lastError = null;
+
+  for (const endpoint of PULSE_ENDPOINTS) {
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uid: user.uid, url }),
+      });
+
+      let payload = {};
+      try {
+        payload = await response.json();
+      } catch (_) {
+        // ignore json parse errors; handled below
+      }
+
+      if (!response.ok) {
+        const message =
+          (payload && payload.error) ||
+          `Failed to fetch MMR (status ${response.status}).`;
+        lastError = new Error(message);
+        continue;
+      }
+
+      if (!Number.isFinite(payload?.mmr)) {
+        lastError = new Error("Could not read MMR from SC2Pulse.");
+        continue;
+      }
+
+      return payload;
+    } catch (err) {
+      lastError = err;
+      continue;
+    }
+  }
+
+  throw lastError || new Error("Failed to fetch MMR from SC2Pulse.");
 }
 
 function isInviteOnlyTournament(meta) {
@@ -3172,13 +3476,6 @@ function getRequirePulseLinkEnabled(meta = currentTournamentMeta) {
   );
 }
 
-function getRequirePulseSyncEnabled(meta = currentTournamentMeta) {
-  return normalizeBooleanSetting(
-    meta?.requirePulseSync,
-    requirePulseSyncSetting
-  );
-}
-
 function normalizeMaxPlayersForFormat(rawValue, format, input = null) {
   if (rawValue === null || rawValue === undefined || rawValue === "") {
     return null;
@@ -3220,7 +3517,8 @@ function updateCheckInUI() {
   if (!currentTournamentMeta) return;
   const checkInBtn = document.getElementById("checkInBtn");
   const checkInStatus = document.getElementById("checkInStatus");
-  if (!checkInBtn || !checkInStatus) return;
+  const checkInCard = document.getElementById("checkInCard");
+  if (!checkInBtn || !checkInStatus || !checkInCard) return;
 
   checkInStatus.classList.remove("is-open", "is-checked", "is-closed");
   const startMs = getStartTimeMs(currentTournamentMeta);
@@ -3235,6 +3533,7 @@ function updateCheckInUI() {
   if (state.isLive || !getCheckInWindowMinutesFromMeta(currentTournamentMeta) || !startMs) {
     checkInBtn.style.display = "none";
     checkInStatus.textContent = "";
+    checkInCard.style.display = "none";
     return;
   }
 
@@ -3245,8 +3544,11 @@ function updateCheckInUI() {
       ? `Check-in opens in ${formatCountdown(timeUntil)}`
       : "Check-in is not open yet.";
     checkInStatus.classList.add("is-closed");
+    checkInCard.style.display = "none";
     return;
   }
+
+  checkInCard.style.display = "flex";
 
   if (!currentPlayer) {
     checkInBtn.style.display = "none";
@@ -3429,7 +3731,6 @@ async function handleSaveSettings(event) {
   const visibilitySelect = document.getElementById("settingsVisibilitySelect");
   const qualifyInput = document.getElementById("settingsCircuitQualifyCount");
   const requirePulseInput = document.getElementById("settingsRequirePulseLink");
-  const requirePulseSyncInput = document.getElementById("settingsRequirePulseSync");
   const imageInput = document.getElementById("settingsImageInput");
   const imagePreview = document.getElementById("settingsImagePreview");
   const imageFile = imageInput?.files?.[0] || null;
@@ -3465,8 +3766,6 @@ async function handleSaveSettings(event) {
     : null;
   const requirePulseLink =
     requirePulseInput?.checked ?? currentTournamentMeta?.requirePulseLink ?? true;
-  const requirePulseSync =
-    requirePulseSyncInput?.checked ?? currentTournamentMeta?.requirePulseSync ?? true;
   let coverImageUrl = currentTournamentMeta?.coverImageUrl || "";
   if (!imageFile && reuseUrl) {
     coverImageUrl = reuseUrl;
@@ -3496,7 +3795,6 @@ async function handleSaveSettings(event) {
     mapPool,
     roundRobin: rrSettings,
     requirePulseLink,
-    requirePulseSync,
     circuitQualifyCount:
       currentTournamentMeta?.isCircuitFinal &&
       Number.isFinite(qualifyCount) &&
@@ -3525,7 +3823,6 @@ async function handleSaveSettings(event) {
   updateAdminVisibility();
   await refreshInviteLinksPanel();
   setRequirePulseLinkSettingState(requirePulseLink);
-  setRequirePulseSyncSettingState(requirePulseSync);
   updateMmrDisplay(document.getElementById("mmrStatus"));
   saveState({ bracket: state.bracket }); // keep bracket but bump timestamp via saveState
   // Reflect slug in the settings input
@@ -3919,25 +4216,7 @@ function getCircuitFinalMapPoolSelection() {
 
 if (typeof window !== "undefined") {
   window.addEventListener("pulse-state-changed", (event) => {
-    syncPulseRegistrationRequirements(event.detail);
     hydratePulseFromState(event.detail);
-    if (currentTournamentMeta) {
-      renderAll();
-    }
-  });
-  window.addEventListener("pulse-sync-complete", (event) => {
-    syncPulseRegistrationRequirements(getPulseState?.());
-    pulseSyncSessionCompleted = true;
-    if (event?.detail?.url) {
-      lastPulseUrl = normalizePulseSyncUrl(event.detail.url);
-    }
-    if (currentTournamentMeta) {
-      renderAll();
-    }
-  });
-  window.addEventListener("pulse-secondary-sync-complete", () => {
-    syncPulseRegistrationRequirements(getPulseState?.());
-    secondaryPulseSyncSessionCompleted = true;
     if (currentTournamentMeta) {
       renderAll();
     }
@@ -3956,10 +4235,6 @@ if (typeof window !== "undefined") {
 onAuthStateChanged?.(auth, (user) => {
   recomputeAdminFromMeta();
   recomputeCircuitAdminFromMeta();
-  resetPulseSyncSessionState();
-  if (user) {
-    syncPulseRegistrationRequirements(getPulseState?.());
-  }
   if (currentTournamentMeta) {
     renderAll();
   }
@@ -4072,6 +4347,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     getManualSeedingActive,
     handleManualSeedingReorder,
     updateMatchScore,
+    updateRegistrationRequirementIcons,
     renderAll,
     saveState,
     handleAddCircuitPointsRow,
@@ -4084,7 +4360,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     checkInCurrentPlayer,
     notifyCheckInPlayers,
     toggleLiveTournament,
-    syncPulseNow,
   });
   initCoverReuseModal();
   initCasterControls({ saveState });
@@ -4373,12 +4648,28 @@ async function maybeAutoAddFinalPlayers({ force = false } = {}) {
   showToast?.(`Auto-added ${added} finalist(s).`, "success");
 }
 
+function renderRegistrationPulseSummary() {
+  const summaryEl = document.getElementById("registrationPulseSummary");
+  if (!summaryEl) return;
+  if (!pulseProfile?.url) {
+    summaryEl.style.display = "none";
+    summaryEl.innerHTML = "";
+    return;
+  }
+  const byRace = pulseProfile?.byRace || null;
+  const overall = Number.isFinite(pulseProfile?.mmr)
+    ? Math.round(pulseProfile.mmr)
+    : null;
+  const updatedAt = pulseProfile?.fetchedAt || null;
+  const badges = buildMmrBadges(byRace, overall, updatedAt);
+  summaryEl.innerHTML = "";
+  summaryEl.style.display = "none";
+}
+
 function hydratePulseFromState(pulseState) {
   const raceSelect = document.getElementById("raceSelect");
-  const mmrDisplay = document.getElementById("mmrDisplay");
   const pulseLinkDisplay = document.getElementById("pulseLinkDisplay");
   const statusEl = document.getElementById("mmrStatus");
-  const requirePulseLinkEnabled = getRequirePulseLinkEnabled();
 
   const byRace =
     pulseState && typeof pulseState.byRace === "object"
@@ -4422,30 +4713,23 @@ function hydratePulseFromState(pulseState) {
 
   const hasProfileUrl = Boolean(pulseProfile?.url);
   if (raceSelect) {
-    const shouldDisable = requirePulseLinkEnabled && !hasProfileUrl;
-    raceSelect.disabled = shouldDisable;
+    raceSelect.disabled = false;
     if (derivedRace) {
       raceSelect.value = derivedRace;
-    } else if (!shouldDisable) {
+    } else {
       raceSelect.value = raceSelect.value || "";
     }
   }
-  if (mmrDisplay) {
-    if (derivedRace) {
-      mmrDisplay.value = Number.isFinite(derivedMmr)
-        ? `${derivedMmr} MMR`
-        : "No rank";
-    } else {
-      mmrDisplay.value = "";
-    }
-  }
   if (pulseLinkDisplay) {
-    if (normalizedUrl) {
+    const manualCleared = pulseLinkDisplay.dataset.manualCleared === "true";
+    if (normalizedUrl && !(manualCleared && !pulseLinkDisplay.value.trim())) {
       pulseLinkDisplay.value = normalizedUrl;
     }
   }
 
   updateMmrDisplay(statusEl);
+  renderRegistrationPulseSummary();
+  updateRegistrationRequirementIcons();
   populatePlayerNameFromProfile();
 }
 
@@ -4479,10 +4763,40 @@ function populatePlayerNameFromProfile() {
     if (username && current === pulseName && current !== username) {
       input.value = username;
     }
+    updateRegistrationRequirementIcons();
     return;
   }
   const candidate = username || pulseName;
   if (candidate) input.value = candidate;
+  updateRegistrationRequirementIcons();
+}
+
+function getPulseRequirementStatus() {
+  const requirePulseLinkEnabled = getRequirePulseLinkEnabled();
+  const manualLink = document.getElementById("pulseLinkDisplay")?.value?.trim() || "";
+  const manualUrl = manualLink ? normalizeSc2PulseIdUrl(manualLink) : "";
+  const settingsUrl = normalizeSc2PulseIdUrl(pulseProfile?.url || "");
+  const hasValid = manualLink ? Boolean(manualUrl) : false;
+  return { requirePulseLinkEnabled, hasValid };
+}
+
+function updateRegistrationRequirementIcons() {
+  const nameInput = document.getElementById("playerNameInput");
+  const nameIcon = document.getElementById("playerNameStatusIcon");
+  const pulseIcon = document.getElementById("pulseLinkStatusIcon");
+
+  if (nameInput && nameIcon) {
+    const name = (nameInput.value || "").trim();
+    const hasLetter = /[A-Za-z]/.test(name);
+    nameIcon.classList.toggle("is-valid", Boolean(name && hasLetter));
+    nameIcon.classList.toggle("is-invalid", !name || (name && !hasLetter));
+  }
+
+  if (pulseIcon) {
+    const { requirePulseLinkEnabled, hasValid } = getPulseRequirementStatus();
+    pulseIcon.classList.toggle("is-valid", hasValid);
+    pulseIcon.classList.toggle("is-invalid", requirePulseLinkEnabled && !hasValid);
+  }
 }
 
 function normalizeRaceLabel(raw) {
@@ -4717,19 +5031,13 @@ async function handleRegistration(event) {
   }
   const name = document.getElementById("playerNameInput")?.value.trim();
   const statusEl = document.getElementById("mmrStatus");
-  const raceSelect = document.getElementById("raceSelect");
-  const selectedRace =
-    normalizeRaceLabel(raceSelect?.value) || derivedRace || "";
-  const race = selectedRace;
-  const sc2Link = pulseProfile?.url ? sanitizeUrl(pulseProfile.url) : "";
-  const mmr = mmrForRace(race);
+  const pulseProfileUrl = normalizeSc2PulseIdUrl(pulseProfile?.url || "");
   const pulseLinkInput = document.getElementById("pulseLinkDisplay");
   const manualPulseLink = pulseLinkInput?.value?.trim() || "";
-  const sc2LinkInput = sc2Link
-    ? sc2Link
-    : manualPulseLink
-    ? sanitizeUrl(manualPulseLink)
+  const manualPulseUrl = manualPulseLink
+    ? normalizeSc2PulseIdUrl(manualPulseLink)
     : "";
+  const sc2LinkInput = pulseProfileUrl || manualPulseUrl || "";
   const requirePulseLinkEnabled = getRequirePulseLinkEnabled();
   const pointsField = document.getElementById("pointsInput");
   const isInviteOnly = isInviteOnlyTournament(currentTournamentMeta);
@@ -4788,14 +5096,16 @@ async function handleRegistration(event) {
     }
   }
 
-  const pulseGate = getPulseSyncGateStatus();
-  if (pulseGate.needsSync) {
-    setStatus(statusEl, pulseGate.message, true);
+  if (!name) {
+    const message = "Player name is required.";
+    setStatus(statusEl, message, true);
+    showToast?.(message, "error");
     return;
   }
-
-  if (!name) {
-    setStatus(statusEl, "Player name is required.", true);
+  if (!/[A-Za-z]/.test(name)) {
+    const message = "Player name must include at least one letter.";
+    setStatus(statusEl, message, true);
+    showToast?.(message, "error");
     return;
   }
 
@@ -4812,111 +5122,157 @@ async function handleRegistration(event) {
       : null;
 
   if (requirePulseLinkEnabled && !sc2LinkInput) {
-    setStatus(
-      statusEl,
-      "This tournament requires your SC2Pulse link.",
-      true
-    );
+    const message = "This tournament requires your SC2Pulse link.";
+    setStatus(statusEl, message, true);
+    showToast?.(message, "error");
+    return;
+  }
+  if (manualPulseLink && !manualPulseUrl) {
+    const message = "SC2Pulse link must include a character id (id=...).";
+    setStatus(statusEl, message, true);
+    if (requirePulseLinkEnabled) {
+      showToast?.(message, "error");
+    }
+    return;
+  }
+  if (!manualPulseLink && pulseProfile?.url && !pulseProfileUrl) {
+    const message =
+      "Update your SC2Pulse link in Settings to include a character id.";
+    setStatus(statusEl, message, true);
+    if (requirePulseLinkEnabled) {
+      showToast?.(message, "error");
+    }
     return;
   }
 
-  const qualification = await enforceCircuitFinalQualification({
-    name,
-    sc2Link: sc2LinkInput,
-    currentTournamentMeta,
-    currentSlug,
-    fetchCircuitMeta,
-    buildCircuitLeaderboard,
-    playerKey,
-  });
-  if (!qualification.ok) {
-    setStatus(statusEl, qualification.message || "Registration is restricted.", true);
-    return;
-  }
+  setRegisterLoadingState(true);
+  try {
+    if (sc2LinkInput) {
+      try {
+        const payload = await fetchPulseMmrFromBackend(sc2LinkInput);
+        const byRace = payload.byRace || null;
+        const overall = Number.isFinite(payload.mmr)
+          ? Math.round(payload.mmr)
+          : null;
+        hydratePulseFromState({
+          url: payload.url || sc2LinkInput,
+          byRace,
+          mmr: overall,
+          fetchedAt: payload.fetchedAt ?? Date.now(),
+          accountName: payload.pulseName || "",
+          secondary: pulseProfile?.secondary || [],
+        });
+        updateMmrDisplay(statusEl);
+      } catch (err) {
+        const message = err?.message || "Failed to fetch MMR from SC2Pulse.";
+        setStatus(statusEl, message, true);
+        return;
+      }
+    }
 
-  if (!race) {
-    setStatus(
-      statusEl,
-      "Could not load your MMR. Refresh SC2Pulse in Settings.",
-      true
-    );
-    return;
-  }
+    const raceSelect = document.getElementById("raceSelect");
+    const selectedRace =
+      normalizeRaceLabel(raceSelect?.value) || derivedRace || "";
+    const race = selectedRace;
+    const mmr = mmrForRace(race);
 
-  if (
-    startingPoints === null &&
-    currentTournamentMeta?.circuitSlug &&
-    name
-  ) {
-    startingPoints = await getCircuitSeedPoints({
+    const qualification = await enforceCircuitFinalQualification({
       name,
       sc2Link: sc2LinkInput,
-      circuitSlug: currentTournamentMeta.circuitSlug,
-      tournamentSlug: currentSlug,
+      currentTournamentMeta,
+      currentSlug,
+      fetchCircuitMeta,
+      buildCircuitLeaderboard,
+      playerKey,
     });
-  }
-
-  if (raceSelect) {
-    raceSelect.value = race;
-  }
-
-  if (Number.isFinite(mmr)) {
-    setStatus(statusEl, `Using ${race} @ ${mmr} MMR from SC2Pulse.`, false);
-  } else {
-    setStatus(statusEl, `No rank found for ${race} — seeding as 0.`, true);
-  }
-
-  const avatarUrl = getCurrentUserAvatarUrl();
-  if (!avatarUrl || isGoogleAvatarUrl(avatarUrl)) {
-    setStatus(
-      statusEl,
-      "Choose your Z-Build Order avatar in Settings before registering (Google profile pictures are not allowed).",
-      true
-    );
-    return;
-  }
-  const profile = getCurrentUserProfile?.() || {};
-  const twitchUrl =
-    document.getElementById("settingsTwitchInput")?.value?.trim() ||
-    profile?.twitchUrl ||
-    "";
-  let secondaryPulseLinks = collectSecondaryPulseLinks();
-  const secondaryPulseProfiles =
-    Array.isArray(pulseProfile?.secondary) && pulseProfile.secondary.length
-      ? pulseProfile.secondary
-      : [];
-  if (!secondaryPulseLinks.length && secondaryPulseProfiles.length) {
-    secondaryPulseLinks = secondaryPulseProfiles
-      .map((entry) => (entry && typeof entry === "object" ? entry.url : ""))
-      .filter(Boolean);
-  }
-  const mmrByRace = pulseProfile?.byRace ? { ...pulseProfile.byRace } : null;
-  const mainClanSelect = document.getElementById("mainClanSelect");
-  const selectedClanOption = mainClanSelect?.selectedOptions?.[0];
-  const selectedClanId = mainClanSelect?.value || "";
-  const profileCountry = profile?.country || "";
-  const profileMainClanId = getCurrentUserProfile?.()?.settings?.mainClanId || "";
-  const effectiveClanId = selectedClanId || profileMainClanId;
-  const countryCode =
-    document.getElementById("settingsCountrySelect")?.value?.trim().toUpperCase() ||
-    String(profileCountry).trim().toUpperCase() ||
-    "";
-  let clanName = selectedClanOption?.textContent || "";
-  let clanAbbreviation = selectedClanOption?.dataset?.abbr || "";
-  let clanLogoUrl = selectedClanOption?.dataset?.logoUrl || "";
-  if (effectiveClanId) {
-    try {
-      const clanDoc = await getDoc(doc(db, "clans", effectiveClanId));
-      if (clanDoc.exists()) {
-        const clanData = clanDoc.data();
-        clanName = clanData?.name || clanName;
-        clanAbbreviation = clanData?.abbreviation || clanAbbreviation;
-        clanLogoUrl = clanData?.logoUrlSmall || clanData?.logoUrl || clanLogoUrl;
-      }
-    } catch (err) {
-      console.warn("Could not fetch clan abbreviation", err);
+    if (!qualification.ok) {
+      setStatus(statusEl, qualification.message || "Registration is restricted.", true);
+      return;
     }
-  }
+
+    if (!race) {
+      setStatus(
+        statusEl,
+        "Could not load your MMR. Refresh SC2Pulse in Settings.",
+        true
+      );
+      return;
+    }
+
+    if (
+      startingPoints === null &&
+      currentTournamentMeta?.circuitSlug &&
+      name
+    ) {
+      startingPoints = await getCircuitSeedPoints({
+        name,
+        sc2Link: sc2LinkInput,
+        circuitSlug: currentTournamentMeta.circuitSlug,
+        tournamentSlug: currentSlug,
+      });
+    }
+
+    if (raceSelect) {
+      raceSelect.value = race;
+    }
+
+    if (Number.isFinite(mmr)) {
+      setStatus(statusEl, `Using ${race} @ ${mmr} MMR from SC2Pulse.`, false);
+    } else {
+      setStatus(statusEl, `No rank found for ${race} - seeding as 0.`, true);
+    }
+
+    const avatarUrl = getCurrentUserAvatarUrl();
+    if (!avatarUrl || isGoogleAvatarUrl(avatarUrl)) {
+      setStatus(
+        statusEl,
+        "Choose your Z-Build Order avatar in Settings before registering (Google profile pictures are not allowed).",
+        true
+      );
+      return;
+    }
+    const profile = getCurrentUserProfile?.() || {};
+    const twitchUrl =
+      document.getElementById("settingsTwitchInput")?.value?.trim() ||
+      profile?.twitchUrl ||
+      "";
+    let secondaryPulseLinks = collectSecondaryPulseLinks();
+    const secondaryPulseProfiles =
+      Array.isArray(pulseProfile?.secondary) && pulseProfile.secondary.length
+        ? pulseProfile.secondary
+        : [];
+    if (!secondaryPulseLinks.length && secondaryPulseProfiles.length) {
+      secondaryPulseLinks = secondaryPulseProfiles
+        .map((entry) => (entry && typeof entry === "object" ? entry.url : ""))
+        .filter(Boolean);
+    }
+    const mmrByRace = pulseProfile?.byRace ? { ...pulseProfile.byRace } : null;
+    const mainClanSelect = document.getElementById("mainClanSelect");
+    const selectedClanOption = mainClanSelect?.selectedOptions?.[0];
+    const selectedClanId = mainClanSelect?.value || "";
+    const profileCountry = profile?.country || "";
+    const profileMainClanId = getCurrentUserProfile?.()?.settings?.mainClanId || "";
+    const effectiveClanId = selectedClanId || profileMainClanId;
+    const countryCode =
+      document.getElementById("settingsCountrySelect")?.value?.trim().toUpperCase() ||
+      String(profileCountry).trim().toUpperCase() ||
+      "";
+    let clanName = selectedClanOption?.textContent || "";
+    let clanAbbreviation = selectedClanOption?.dataset?.abbr || "";
+    let clanLogoUrl = selectedClanOption?.dataset?.logoUrl || "";
+    if (effectiveClanId) {
+      try {
+        const clanDoc = await getDoc(doc(db, "clans", effectiveClanId));
+        if (clanDoc.exists()) {
+          const clanData = clanDoc.data();
+          clanName = clanData?.name || clanName;
+          clanAbbreviation = clanData?.abbreviation || clanAbbreviation;
+          clanLogoUrl = clanData?.logoUrlSmall || clanData?.logoUrl || clanLogoUrl;
+        }
+      } catch (err) {
+        console.warn("Could not fetch clan abbreviation", err);
+      }
+    }
 
   let inviteLinkMeta = null;
   if (needsInviteLink) {
@@ -4984,6 +5340,9 @@ async function handleRegistration(event) {
 
   event.target.reset();
   hydratePulseFromState(pulseProfile);
+  } finally {
+    setRegisterLoadingState(false);
+  }
 }
 
 function setFinalAdminSearchStatus(message) {
@@ -5157,16 +5516,6 @@ function updateMmrDisplay(statusEl, nextRace = null, options = {}) {
     setDerivedRaceState(nextRace || null);
     setDerivedMmrState(nextRace ? mmrForRace(nextRace) : null);
   }
-  const mmrDisplay = document.getElementById("mmrDisplay");
-  if (mmrDisplay) {
-    if (derivedRace) {
-      mmrDisplay.value = Number.isFinite(derivedMmr)
-        ? `${derivedMmr} MMR`
-      : "No rank";
-    } else {
-      mmrDisplay.value = "";
-    }
-  }
 
   if (!statusEl) statusEl = document.getElementById("mmrStatus");
   if (!statusEl) return;
@@ -5176,10 +5525,6 @@ function updateMmrDisplay(statusEl, nextRace = null, options = {}) {
   const requirePulseLinkEnabled = resolveOverride(
     options.requirePulseLinkEnabled,
     getRequirePulseLinkEnabled()
-  );
-  const requirePulseSyncEnabled = resolveOverride(
-    options.requirePulseSyncEnabled,
-    getRequirePulseSyncEnabled()
   );
 
   if (!auth.currentUser) {
@@ -5202,14 +5547,6 @@ function updateMmrDisplay(statusEl, nextRace = null, options = {}) {
       requirePulseLinkEnabled
     );
     return;
-  }
-
-  if (requirePulseSyncEnabled) {
-    const pulseGate = getPulseSyncGateStatus();
-    if (pulseGate.needsSync) {
-      setStatus(statusEl, pulseGate.message, true);
-      return;
-    }
   }
 
   if (derivedRace && Number.isFinite(derivedMmr)) {

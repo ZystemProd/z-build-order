@@ -539,6 +539,10 @@ a {
   border: 1px solid var(--stroke);
 }
 
+#registerBtn {
+  margin-top: 7px;
+}
+
 .cta.pulse-sync {
   background: linear-gradient(135deg, #e6c86a, #d7a62c);
   border: 1px solid rgba(215, 166, 44, 0.9);
@@ -641,6 +645,18 @@ a {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 14px;
+}
+
+.checkin-stat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+}
+
+.checkin-stat .checkin-status {
+  font-size: 12px;
+  color: var(--muted);
 }
 
 .tournament-filter-header {
@@ -831,6 +847,10 @@ a {
   gap: 12px 14px;
 }
 
+#registrationForm.form-grid {
+  grid-template-columns: 1fr;
+}
+
 .form-grid label {
   display: flex;
   flex-direction: column;
@@ -847,6 +867,79 @@ a {
   border-radius: 12px;
   padding: 10px 12px;
   font-size: 14px;
+}
+
+.input-with-status {
+  position: relative;
+  width: 100%;
+}
+
+.input-with-status .status-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  transform: translateY(-50%);
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  color: var(--muted);
+  pointer-events: none;
+  text-transform: uppercase;
+}
+
+.input-with-status .status-icon::before {
+  content: ".";
+}
+
+.input-with-status .status-icon.is-valid {
+  border-color: rgba(74, 222, 128, 0.6);
+  background: rgba(34, 197, 94, 0.2);
+  color: #9ae6b4;
+}
+
+.input-with-status .status-icon.is-valid::before {
+  content: "\2713";
+}
+
+.input-with-status .status-icon.is-invalid {
+  border-color: rgba(255, 107, 107, 0.65);
+  background: rgba(255, 107, 107, 0.18);
+  color: #ff9a9a;
+}
+
+.input-with-status .status-icon.is-invalid::before {
+  content: "x";
+}
+
+.input-with-status input {
+  padding-left: 38px;
+  width: 300px;
+}
+
+.input-with-status input::placeholder {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.form-grid .field-compact {
+  justify-self: start;
+}
+
+.form-grid .field-compact select {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  #registrationForm.form-grid {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
 }
 
 .form-grid select:disabled {
@@ -1046,6 +1139,11 @@ a {
   margin-top: 4px;
 }
 
+#registrationForm .form-actions {
+  justify-self: start;
+  align-self: end;
+}
+
 .settings-actions {
   justify-content: space-between;
   flex-wrap: wrap;
@@ -1063,6 +1161,18 @@ a {
   transform: translateY(1px);
   transition: opacity 0.2s ease;
   animation: sync-spin 0.7s linear infinite;
+}
+
+#registerBtn .sync-spinner {
+  margin-left: 8px;
+}
+
+#registerBtn.is-loading .sync-spinner {
+  opacity: 1;
+}
+
+#registerBtn.is-loading {
+  pointer-events: none;
 }
 
 #syncPulseBtn.is-loading + .sync-spinner {
@@ -2664,6 +2774,11 @@ details.stage-section:not([open]) .stage-toggle::after {
   transition-delay: 0ms;
 }
 
+.match-card.tree.ready .hover-info-container {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .hover-info-container:hover {
   border-color: var(--accent-2);
 }
@@ -3630,6 +3745,23 @@ details.stage-section:not([open]) .stage-toggle::after {
   margin-top: 4px;
 }
 
+.registration-pulse-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.registration-pulse-summary .mmr-badge-list {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.registration-pulse-summary .mmr-badge {
+  white-space: nowrap;
+}
+
 .mmr-badge {
   display: inline-flex;
   align-items: center;
@@ -3916,6 +4048,86 @@ details.stage-section:not([open]) .stage-toggle::after {
   background: rgba(255, 255, 255, 0.04);
   color: var(--text);
   cursor: default;
+}
+
+.readonly-field {
+  position: relative;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 14px;
+  width: 100%;
+}
+
+.form-field .label-text {
+  display: block;
+  margin-bottom: 0;
+}
+
+#playerNameLabel,
+#raceLabel,
+#pulseLinkLabel {
+  display: block;
+  margin-bottom: 3px;
+}
+
+.label-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.label-row .label-action {
+  padding: 5px;
+  font-size: 11px;
+  line-height: 12px;
+}
+
+.label-row .label-separator {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.label-row .label-link {
+  color: var(--accent-2);
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.label-row .label-link:hover {
+  text-decoration: underline;
+}
+
+.registration-header {
+  position: relative;
+}
+
+.registration-header .header-center {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  text-align: center;
+  pointer-events: none;
+}
+
+.readonly-field .sync-spinner {
+  position: absolute;
+  right: 14px;
+  top: 36px;
+  pointer-events: none;
+}
+
+.readonly-field.is-loading .sync-spinner {
+  opacity: 1;
+}
+
+.readonly-field.is-loading input {
+  padding-right: 34px;
 }
 
 .readonly-field input::placeholder {
@@ -5205,7 +5417,7 @@ textarea:focus {
 }
 
 .match-chat-history {
-  max-height: 180px;
+  height: 180px;
   overflow-y: auto;
   display: grid;
   gap: 6px;
@@ -5213,6 +5425,7 @@ textarea:focus {
 }
 
 .match-chat-message {
+  height: 56px;
   display: grid;
   gap: 4px;
   padding: 8px 10px;
@@ -5452,6 +5665,10 @@ textarea:focus {
 
 .match-info-presence.online {
   background: var(--success);
+}
+
+.match-info-presence.idle {
+  background: #f6b846;
 }
 
 .match-info-presence.offline {
@@ -7220,6 +7437,118 @@ select[id^="finalBestOf"] {
 .close-modal:focus {
   color: #fff;
 }
+
+/* Auth modal */
+.auth-modal-content {
+  width: 420px;
+  height: auto;
+  max-height: 85vh;
+  padding: 24px;
+  background-color: rgba(24, 24, 24, 0.92);
+  border: 1px solid #3a3a3a;
+}
+
+.auth-modal-subtext {
+  margin: 0 0 12px;
+  color: #b8b8b8;
+  font-size: 0.95rem;
+}
+
+.auth-provider-button {
+  width: 100%;
+  background: #222;
+  border: 1px solid #444;
+  color: #f5f5f5;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-weight: 600;
+  cursor: pointer;
+  margin: 6px 0 4px;
+}
+
+.auth-provider-button:hover {
+  background: #2b2b2b;
+  transform: none;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #8c8c8c;
+  font-size: 0.85rem;
+  margin: 12px 0;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #343434;
+}
+
+.auth-form {
+  display: grid;
+  gap: 6px;
+}
+
+.auth-form label {
+  font-size: 0.85rem;
+  color: #cfcfcf;
+}
+
+.auth-form input {
+  background: #1b1b1b;
+  color: #f0f0f0;
+  border: 1px solid #3c3c3c;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.auth-form input:focus {
+  outline: none;
+  border-color: #5c8cff;
+}
+
+.auth-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.auth-primary-button {
+  background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-weight: 600;
+  cursor: pointer;
+  margin: 0;
+}
+
+.auth-primary-button:hover {
+  background: linear-gradient(135deg, #0056b3 0%, #003f80 100%);
+  transform: none;
+}
+
+.auth-secondary-button {
+  background: #2a2a2a;
+  color: #e0e0e0;
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-weight: 600;
+  cursor: pointer;
+  margin: 0;
+}
+
+.auth-secondary-button:hover {
+  background: #333;
+  transform: none;
+}
 .tournament-shell {
   max-width: var(--tournament-max-width);
   margin: 0 auto;
@@ -7337,3 +7666,16 @@ select[id^="finalBestOf"] {
 #matchInfoReportBtn svg {
   display: block;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+

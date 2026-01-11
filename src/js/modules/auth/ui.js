@@ -1,7 +1,10 @@
 import {
   getAdditionalUserInfo,
   onAuthStateChanged,
+  createUserWithEmailAndPassword,
+  sendEmailVerification,
   signInWithPopup,
+  signInWithEmailAndPassword,
   signOut,
 } from "firebase/auth";
 import { doc, getDoc, getDocs, query, where, limit, collection } from "firebase/firestore";
@@ -54,6 +57,7 @@ function closeUserMenu() {
 }
 
 let authPopupInProgress = false;
+let authModalReady = false;
 function scheduleAuthPopupReset() {
   const resetIfIdle = () => {
     if (authPopupInProgress && !auth.currentUser) {
@@ -75,6 +79,154 @@ function scheduleAuthPopupReset() {
   setTimeout(resetIfIdle, 4000);
 }
 
+function getAuthModalElements() {
+  return {
+    modal: document.getElementById("signInModal"),
+    closeBtn: document.getElementById("closeSignInModal"),
+    googleButton: document.getElementById("googleSignInButton"),
+    emailInput: document.getElementById("authEmail"),
+    passwordInput: document.getElementById("authPassword"),
+    emailSignInButton: document.getElementById("emailSignInButton"),
+    emailSignUpButton: document.getElementById("emailSignUpButton"),
+  };
+}
+
+function openAuthModal() {
+  const { modal, emailInput } = getAuthModalElements();
+  if (!modal) return;
+  modal.style.display = "block";
+  document.body.classList.add("modal-open");
+  if (emailInput) emailInput.focus();
+}
+
+function closeAuthModal() {
+  const { modal, emailInput, passwordInput } = getAuthModalElements();
+  if (!modal) return;
+  modal.style.display = "none";
+  document.body.classList.remove("modal-open");
+  if (emailInput) emailInput.value = "";
+  if (passwordInput) passwordInput.value = "";
+}
+
+function formatAuthError(error) {
+  switch (error?.code) {
+    case "auth/invalid-email":
+      return "Enter a valid email address.";
+    case "auth/user-not-found":
+    case "auth/wrong-password":
+      return "Invalid email or password.";
+    case "auth/email-already-in-use":
+      return "Email already in use. Try signing in.";
+    case "auth/weak-password":
+      return "Password should be at least 6 characters.";
+    case "auth/operation-not-allowed":
+      return "This sign-in method is disabled.";
+    case "auth/too-many-requests":
+      return "Too many attempts. Please try again later.";
+    default:
+      return "Sign-in failed. Please try again.";
+  }
+}
+
+function initAuthModal() {
+  if (authModalReady) return;
+  const {
+    modal,
+    closeBtn,
+    googleButton,
+    emailInput,
+    passwordInput,
+    emailSignInButton,
+    emailSignUpButton,
+  } = getAuthModalElements();
+  if (!modal) return;
+
+  const handleGoogleSignIn = async () => {
+    if (authPopupInProgress) return;
+    authPopupInProgress = true;
+    scheduleAuthPopupReset();
+    try {
+      const userCredential = await signInWithPopup(auth, provider);
+      trackSignupFromCredential(userCredential);
+      closeAuthModal();
+      initializeAuthUI();
+    } catch (error) {
+      if (error?.code === "auth/cancelled-popup-request") return;
+      if (error?.code === "auth/popup-closed-by-user") return;
+      if (error?.code === "auth/popup-blocked") {
+        showToast("Popup blocked. Allow popups and try again.", "error");
+        return;
+      }
+      console.error("? Sign in error:", error);
+      showToast(formatAuthError(error), "error");
+    } finally {
+      authPopupInProgress = false;
+    }
+  };
+
+  const handleEmailSignIn = async () => {
+    if (authPopupInProgress) return;
+    const email = emailInput?.value.trim() || "";
+    const password = passwordInput?.value || "";
+    if (!email || !password) {
+      showToast("Enter an email and password.", "error");
+      return;
+    }
+    authPopupInProgress = true;
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      closeAuthModal();
+      initializeAuthUI();
+    } catch (error) {
+      console.error("? Email sign in error:", error);
+      showToast(formatAuthError(error), "error");
+    } finally {
+      authPopupInProgress = false;
+    }
+  };
+
+  const handleEmailSignUp = async () => {
+    if (authPopupInProgress) return;
+    const email = emailInput?.value.trim() || "";
+    const password = passwordInput?.value || "";
+    if (!email || !password) {
+      showToast("Enter an email and password.", "error");
+      return;
+    }
+    authPopupInProgress = true;
+    try {
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+      trackSignupFromCredential(userCredential);
+      await sendEmailVerification(userCredential.user);
+      showToast("Verification email sent. Check your inbox.", "info");
+      closeAuthModal();
+      initializeAuthUI();
+    } catch (error) {
+      console.error("? Email sign up error:", error);
+      showToast(formatAuthError(error), "error");
+    } finally {
+      authPopupInProgress = false;
+    }
+  };
+
+  closeBtn?.addEventListener("click", closeAuthModal);
+  modal.addEventListener("click", (event) => {
+    if (event.target === modal) closeAuthModal();
+  });
+  googleButton?.addEventListener("click", handleGoogleSignIn);
+  emailSignInButton?.addEventListener("click", handleEmailSignIn);
+  emailSignUpButton?.addEventListener("click", handleEmailSignUp);
+  passwordInput?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") handleEmailSignIn();
+  });
+
+  authModalReady = true;
+}
+
 function trackSignupFromCredential(userCredential) {
   const info = getAdditionalUserInfo(userCredential);
   if (!info?.isNewUser) return;
@@ -84,6 +236,7 @@ function trackSignupFromCredential(userCredential) {
 }
 
 function initializeAuthUI() {
+  initAuthModal();
   const authLoadingWrapper = document.getElementById("authLoadingWrapper");
   const userName = document.getElementById("userName");
   const userPhoto = document.getElementById("userPhoto");
@@ -254,23 +407,7 @@ function initializeAuthUI() {
 }
 
 function handleSignIn() {
-  if (authPopupInProgress) return;
-  authPopupInProgress = true;
-  scheduleAuthPopupReset();
-  signInWithPopup(auth, provider)
-    .then((userCredential) => {
-      trackSignupFromCredential(userCredential);
-      initializeAuthUI();
-    })
-    .catch((error) => {
-      if (error?.code === "auth/cancelled-popup-request") return;
-      if (error?.code === "auth/popup-closed-by-user") return;
-      console.error("❌ Sign in error:", error);
-      showToast("Sign-in failed. Please try again.", "error");
-    })
-    .finally(() => {
-      authPopupInProgress = false;
-    });
+  openAuthModal();
 }
 
 function handleSignOut() {

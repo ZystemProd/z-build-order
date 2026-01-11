@@ -509,18 +509,18 @@ function openCircuitPointsModal(entries, meta) {
       if (!query) return true;
       return String(entry.name || "").toLowerCase().includes(query);
     });
-    body.innerHTML = rows
-      .map(
-        (entry) => `
+  body.innerHTML = rows
+    .map(
+      (entry, idx) => `
           <tr data-points-edit-row data-player-key="${escapeHtml(entry.key)}">
             <td>${escapeHtml(entry.name || "Unknown")}</td>
             <td>
-              <input type="number" min="0" class="points-input" value="${Number(entry.points) || 0}" />
+              <input type="number" min="0" class="points-input" name="circuit-points-override-${idx}" value="${Number(entry.points) || 0}" />
             </td>
           </tr>
         `
-      )
-      .join("");
+    )
+    .join("");
   };
   if (search) {
     search.value = "";

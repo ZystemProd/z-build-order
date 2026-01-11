@@ -50,6 +50,7 @@ export function renderSeedingTable(
         : `<div class="checkin-editor">
           <select
             class="checkin-select checkin-select-pill ${p.checkedInAt ? "is-checked" : "is-missing"}"
+            name="checkin-${escapeHtml(p.id || "")}"
             data-player-id="${escapeHtml(p.id || "")}"
           >
             <option value="checked" ${p.checkedInAt ? "selected" : ""}>Checked in</option>
@@ -112,6 +113,7 @@ export function renderSeedingTable(
           <input
             type="number"
             class="points-input"
+            name="seed-points-${escapeHtml(p.id || "")}"
             data-player-id="${escapeHtml(p.id || "")}"
             value="${points}"
             min="0"

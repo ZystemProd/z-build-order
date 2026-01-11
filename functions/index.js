@@ -2331,12 +2331,14 @@ exports.cleanupTournamentChatOnComplete = onDocumentWritten(
   async (event) => {
     const slug = event.params.slug;
     const afterSnap = event.data.after;
+    const beforeSnap = event.data.before;
     if (!afterSnap || !afterSnap.exists) return null;
     const data = afterSnap.data() || {};
     const bracket = data.bracket;
     if (!bracket) return null;
     const completed = isTournamentComplete(bracket);
     if (!completed) return null;
+    if (data.chatCleanedUpAt) return null;
 
     if (!data.completedAt) {
       try {
@@ -2355,6 +2357,10 @@ exports.cleanupTournamentChatOnComplete = onDocumentWritten(
         .doc(slug)
         .collection("matches");
       await firestore.recursiveDelete(matchesRef);
+      await afterSnap.ref.set(
+        { chatCleanedUpAt: admin.firestore.FieldValue.serverTimestamp() },
+        { merge: true }
+      );
     } catch (err) {
       console.error("Failed to delete tournament chat", err);
     }

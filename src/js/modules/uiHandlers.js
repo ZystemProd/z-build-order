@@ -1302,7 +1302,7 @@ function openVariationManager() {
     li.className = "zbo-var-item";
     li.draggable = false;
     li.dataset.varId = v.id;
-    li.innerHTML = `\n      <span class="zbo-drag" draggable="true">≡</span>\n      <span class="zbo-color" style="background:${v.color}"></span>\n      <input type="text" class="zbo-name" maxlength="32" value="${v.name}">\n      <button type="button" class="zbo-remove" title="Remove" aria-label="Remove">×</button>\n    `;
+    li.innerHTML = `\n      <span class="zbo-drag" draggable="true">≡</span>\n      <span class="zbo-color" style="background:${v.color}"></span>\n      <input type="text" class="zbo-name" name="zbo-name-${v.id || "var"}" maxlength="32" value="${v.name}">\n      <button type="button" class="zbo-remove" title="Remove" aria-label="Remove">×</button>\n    `;
     list.appendChild(li);
   });
 

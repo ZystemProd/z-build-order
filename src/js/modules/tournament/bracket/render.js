@@ -24,10 +24,62 @@ const CAST_ICON_SVG = `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="fa
 </svg>`;
 
 let currentUsernameHint = "";
+let currentUserUidHint = "";
 const nameRevealQueue = new Set();
 const lastRenderedParticipantIds = new Map();
 const recentNameReveals = new Map();
 const REVEAL_WINDOW_MS = 1200;
+const rowElementCache = new WeakMap();
+const cardElementCache = new WeakMap();
+
+function hashLayoutSignature(signature) {
+  let hash = 0;
+  for (let i = 0; i < signature.length; i += 1) {
+    hash = (hash * 31 + signature.charCodeAt(i)) >>> 0;
+  }
+  return hash.toString(36);
+}
+
+function buildBracketLayoutSignature(bracket, isGroupStage) {
+  if (!bracket) return "";
+  if (isGroupStage) {
+    const groups = Array.isArray(bracket.groups) ? bracket.groups : [];
+    const groupIds = groups.map((group) => group?.id || "").join("|");
+    return `group:${groupIds}|playoffs:${Boolean(bracket.finals)}`;
+  }
+  const winners = (bracket.winners || [])
+    .map((round) => (round || []).map((match) => match?.id || "").join(","))
+    .join("|");
+  const losers = (bracket.losers || [])
+    .map((round) => (round || []).map((match) => match?.id || "").join(","))
+    .join("|");
+  const finals = bracket.finals?.id || "";
+  return `tree:w:${winners}|l:${losers}|f:${finals}`;
+}
+
+function getRowRefs(row) {
+  if (!row) return {};
+  const cached = rowElementCache.get(row);
+  if (cached) return cached;
+  const refs = {
+    seedChip: row.querySelector(".seed-chip"),
+    raceStrip: row.querySelector(".race-strip"),
+    clanImg: row.querySelector("img.clan-logo-inline"),
+    nameText: row.querySelector(".name-text"),
+    scoreEl: row.querySelector(".score-display"),
+  };
+  rowElementCache.set(row, refs);
+  return refs;
+}
+
+function getCardRows(card) {
+  if (!card) return [];
+  const cached = cardElementCache.get(card);
+  if (cached?.rows?.length === 2) return cached.rows;
+  const rows = card.querySelectorAll(".row");
+  cardElementCache.set(card, { rows });
+  return rows;
+}
 
 function nameRevealKey(matchId, participantIdx) {
   return `${matchId || "match"}:${participantIdx ?? "0"}`;
@@ -103,7 +155,14 @@ function setCurrentUsernameHint(username) {
   currentUsernameHint = (username || "").trim().toLowerCase();
 }
 
+function setCurrentUserUidHint(uid) {
+  currentUserUidHint = (uid || "").trim();
+}
+
 function isCurrentUserPlayer(player) {
+  if (currentUserUidHint && player?.uid) {
+    return String(player.uid).trim() === currentUserUidHint;
+  }
   if (!currentUsernameHint) return false;
   const name = (player?.name || "").trim().toLowerCase();
   const pulseName = (player?.pulseName || "").trim().toLowerCase();
@@ -127,6 +186,125 @@ function displayValueFor(match, idx, participants) {
     return idx === 1 ? "w/o" : match.scores?.[0] ?? 0;
   }
   return match.scores?.[idx] ?? 0;
+}
+
+function normalizeImageSrc(value) {
+  if (!value || typeof window === "undefined") return value || "";
+  try {
+    return new URL(value, window.location.href).href;
+  } catch (_) {
+    return value || "";
+  }
+}
+
+function updateTreeMatchRow(row, player, match, participantIdx, lookup, bestOf, participants) {
+  if (!row) return;
+  const isPlaceholder = !player;
+  const name = player
+    ? player.name
+    : displayPlaceholderForSource(match, participantIdx, lookup);
+  const raceClass = raceClassName(player?.race);
+  const clanLogo = player?.clanLogoUrl ? sanitizeUrl(player.clanLogoUrl) : "";
+  const clanName = (player?.clan || "").trim();
+  const { seedChip, raceStrip, clanImg, nameText, scoreEl } = getRowRefs(row);
+
+  row.dataset.playerId = player?.id || "";
+  row.classList.toggle("winner", match.winnerId === player?.id);
+
+  if (seedChip) {
+    seedChip.classList.toggle("is-placeholder", isPlaceholder);
+    seedChip.textContent = player ? `#${player.seed || "?"}` : "";
+  }
+
+  if (raceStrip) {
+    raceStrip.className = `race-strip ${raceClass}`;
+  }
+
+  if (clanImg) {
+    const nextSrc = clanLogo || "img/clan/logo.webp";
+    const nextAlt = clanLogo ? "Clan logo" : "No clan logo";
+    if (clanLogo) {
+      clanImg.classList.toggle("is-placeholder", false);
+      if (normalizeImageSrc(clanImg.src) !== normalizeImageSrc(nextSrc)) {
+        clanImg.src = nextSrc;
+      }
+      if (clanImg.alt !== nextAlt) {
+        clanImg.alt = nextAlt;
+      }
+      if (clanName) {
+        if (clanImg.dataset.tooltip !== clanName) {
+          clanImg.dataset.tooltip = clanName;
+        }
+      } else {
+        if (clanImg.hasAttribute("data-tooltip")) {
+          clanImg.removeAttribute("data-tooltip");
+        }
+      }
+    } else {
+      clanImg.classList.toggle("is-placeholder", true);
+      if (normalizeImageSrc(clanImg.src) !== normalizeImageSrc(nextSrc)) {
+        clanImg.src = nextSrc;
+      }
+      if (clanImg.alt !== nextAlt) {
+        clanImg.alt = nextAlt;
+      }
+      if (clanImg.hasAttribute("data-tooltip")) {
+        clanImg.removeAttribute("data-tooltip");
+      }
+    }
+  }
+
+  if (nameText) {
+    const autoReveal = shouldRevealParticipant(
+      match?.id,
+      participantIdx,
+      player?.id || null
+    );
+    const reveal = consumeNameReveal(match?.id, participantIdx) || autoReveal;
+    nameText.className = `name-text ${[
+      isPlaceholder ? "is-placeholder" : "",
+      reveal && !isPlaceholder ? "name-reveal" : "",
+    ]
+      .filter(Boolean)
+      .join(" ")}`;
+    nameText.textContent = name;
+  }
+
+  if (scoreEl) {
+    const selectVal = getSelectValue(match, participantIdx, bestOf, participants);
+    const scoreLabel =
+      String(selectVal).toUpperCase() === "W" ? "w/o" : String(selectVal ?? 0);
+    const showScores = Boolean(participants?.[0] && participants?.[1]) ||
+      Boolean(getWalkoverSide(match, participants));
+    scoreEl.textContent = scoreLabel;
+    scoreEl.classList.toggle("winner", match.winnerId === player?.id);
+    scoreEl.style.display = showScores ? "" : "none";
+  }
+}
+
+function updateTreeMatchCastIndicator(card, match) {
+  if (!card || !match) return;
+  const cast = match.status === "complete" ? null : state.matchCasts?.[match.id] || null;
+  const existing = card.querySelector(".cast-indicator-btn");
+  if (!cast) {
+    if (existing) existing.remove();
+    return;
+  }
+  const casterName = String(cast.name || "Caster").trim() || "Caster";
+  if (existing) {
+    existing.dataset.matchId = match.id || "";
+    existing.title = `Casting: ${casterName}`;
+    existing.setAttribute("aria-label", "Casting");
+    return;
+  }
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "cast-indicator cast-indicator-btn";
+  button.dataset.matchId = match.id || "";
+  button.title = `Casting: ${casterName}`;
+  button.setAttribute("aria-label", "Casting");
+  button.innerHTML = CAST_ICON_SVG;
+  card.insertBefore(button, card.firstChild);
 }
 
 let matchLetterMap = new Map();
@@ -251,13 +429,54 @@ export function renderMatchCard(match, lookup, playersById) {
   return DOMPurify.sanitize(html);
 }
 
+export function updateTreeMatchCards(
+  matchIds,
+  lookup,
+  playersById,
+  { currentUsername, currentUid } = {}
+) {
+  if (!Array.isArray(matchIds) || !matchIds.length || !lookup || !playersById) {
+    return false;
+  }
+  if (typeof currentUsername === "string") {
+    setCurrentUsernameHint(currentUsername);
+  }
+  if (typeof currentUid === "string") {
+    setCurrentUserUidHint(currentUid);
+  }
+  let updated = false;
+  const uniqueIds = Array.from(new Set(matchIds.filter(Boolean)));
+  uniqueIds.forEach((matchId) => {
+    const match = lookup.get(matchId);
+    if (!match) return;
+    const card = document.querySelector(
+      `.match-card.tree[data-match-id="${matchId}"]`
+    );
+    if (!card) return;
+    const participants = resolveParticipants(match, lookup, playersById);
+    const [pA, pB] = participants;
+    const bestOf = getBestOfForMatch(match);
+    const isReady = Boolean(pA && pB && match.status !== "complete");
+    const isUserMatch = Boolean(isCurrentUserPlayer(pA) || isCurrentUserPlayer(pB));
+    const hasScoreReport = Boolean(state?.scoreReports?.[match.id]);
+    card.classList.toggle("ready", isReady && isUserMatch);
+    card.classList.toggle("score-report", hasScoreReport);
+    const rows = getCardRows(card);
+    updateTreeMatchRow(rows[0], pA, match, 0, lookup, bestOf, participants);
+    updateTreeMatchRow(rows[1], pB, match, 1, lookup, bestOf, participants);
+    updateTreeMatchCastIndicator(card, match);
+    updated = true;
+  });
+  return updated;
+}
+
 export function renderPlayerRow(player, score, label, bestOf, match, participantIdx, lookup) {
   if (!player) {
     shouldRevealParticipant(match?.id, participantIdx, null);
     const placeholderText = displayPlaceholderForSource(match, participantIdx, lookup);
     return `<div class="player-row">
       <div class="player-name placeholder-tag">${escapeHtml(placeholderText)}</div>
-      <select class="result-select score-select" data-match-id="${match.id}" data-player-idx="${participantIdx}" disabled>
+      <select class="result-select score-select" name="score-${match.id}-${participantIdx}" data-match-id="${match.id}" data-player-idx="${participantIdx}" disabled>
         <option value="0">0</option>
       </select>
     </div>`;
@@ -1315,16 +1534,21 @@ export function renderBracketView({
   attachMatchActionHandlers,
   computeGroupStandings,
   currentUsername,
+  currentUid,
 }) {
   const grid = document.getElementById("bracketGrid");
   if (!grid) return;
 
   setCurrentUsernameHint(currentUsername);
+  setCurrentUserUidHint(currentUid);
 
   if (!bracket || !players.length) {
     grid.innerHTML = DOMPurify.sanitize(
       `<div class="placeholder">Add players to generate the bracket.</div>`
     );
+    if (grid.dataset.layoutKey) {
+      delete grid.dataset.layoutKey;
+    }
     return;
   }
 
@@ -1344,6 +1568,28 @@ export function renderBracketView({
 
   const lookup = getMatchLookup(bracket);
   const playersById = getPlayersMap();
+  const layoutSignature = buildBracketLayoutSignature(bracket, isGroupStage);
+  const layoutKey = layoutSignature
+    ? hashLayoutSignature(`${format}|${layoutSignature}`)
+    : "";
+  const currentLayoutKey = grid.dataset.layoutKey || "";
+  const hasTreeLayout = Boolean(grid.querySelector(".tree-wrapper"));
+  if (!isGroupStage && layoutKey && currentLayoutKey === layoutKey && hasTreeLayout) {
+    const matchIds = Array.from(lookup.keys());
+    updateTreeMatchCards(matchIds, lookup, playersById, {
+      currentUsername,
+      currentUid,
+    });
+    clampScoreSelectOptions();
+    annotateConnectorPlayers(lookup, playersById);
+    applyNameRevealAnimations(grid);
+    return;
+  }
+  if (layoutKey) {
+    grid.dataset.layoutKey = layoutKey;
+  } else if (grid.dataset.layoutKey) {
+    delete grid.dataset.layoutKey;
+  }
 
     if (isGroupStage) {
       grid.innerHTML = renderRoundRobinView(

@@ -229,6 +229,35 @@
     </div>
   </div>
 
+  <!-- Sign-in Modal -->
+  <div id="signInModal" class="modal">
+    <div class="modal-content auth-modal-content">
+      <span class="close-modal" id="closeSignInModal">&times;</span>
+      <h3>Sign in</h3>
+      <p class="auth-modal-subtext">
+        Create an account to save builds and sync settings.
+      </p>
+      <button id="googleSignInButton" class="auth-provider-button">
+        Continue with Google
+      </button>
+      <div class="auth-divider"><span>or</span></div>
+      <div class="auth-form">
+        <label for="authEmail">Email</label>
+        <input id="authEmail" type="email" autocomplete="email" />
+        <label for="authPassword">Password</label>
+        <input id="authPassword" type="password" autocomplete="current-password" />
+        <div class="auth-actions">
+          <button id="emailSignInButton" class="auth-primary-button">
+            Sign in
+          </button>
+          <button id="emailSignUpButton" class="auth-secondary-button">
+            Create account
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <main id="mainContent">
     <div class="tournament-shell">
     <!-- Landing: list & create -->
@@ -549,46 +578,52 @@
 
       <section id="registrationTab" class="tab-panel">
         <div class="card" id="registrationCard">
-          <div class="card-header">
+          <div class="card-header registration-header">
             <div>
               <p class="eyebrow">Registration</p>
             </div>
-            <div class="checkin-row">
+            <p id="registrationAccessNote" class="helper header-center" style="display:none;"></p>
+            <div class="stat-card checkin-stat" id="checkInCard" style="display:none;">
               <p id="checkInStatus" class="checkin-status"></p>
-              <button type="button" id="checkInBtn" class="cta ghost" style="display:none;">Check in</button>
+              <button type="button" id="checkInBtn" class="cta ghost small" style="display:none;">Check in</button>
             </div>
           </div>
-          <p id="registrationAccessNote" class="helper" style="display:none;"></p>
+          <div id="registrationPulseSummary" class="registration-pulse-summary" style="display:none;"></div>
           <form id="registrationForm" class="form-grid">
             <label>
-              Player name
-              <input id="playerNameInput" type="text" placeholder="e.g. Hydralisk" required />
+              <span id="playerNameLabel">Player name</span>
+              <div class="input-with-status">
+                <span class="status-icon" id="playerNameStatusIcon" aria-hidden="true"></span>
+                <input id="playerNameInput" type="text" placeholder="e.g. Hydralisk" required />
+              </div>
             </label>
-            <label>
-              Race
-              <select id="raceSelect" disabled>
+            <label class="field-compact">
+              <span id="raceLabel">Race</span>
+              <select id="raceSelect">
                 <option value="Zerg">Zerg</option>
                 <option value="Protoss">Protoss</option>
                 <option value="Terran">Terran</option>
                 <option value="Random">Random</option>
               </select>
             </label>
-            <label class="readonly-field">
-              SC2Pulse profile (set in Settings)
-              <input id="pulseLinkDisplay" type="text" placeholder="Add your SC2Pulse link in Settings" />
-            </label>
-            <label class="readonly-field">
-              MMR (auto)
-              <input id="mmrDisplay" type="text" placeholder="MMR will load from SC2Pulse" readonly />
-            </label>
-            <div class="form-actions">
-              <button type="submit" class="cta primary" id="registerBtn">Register</button>
-              <button type="button" class="cta pulse-sync" id="syncPulseBtn">
-                <span class="sync-label">Sync SC2Pulse</span>
-              </button>
-              <span class="sync-spinner" id="syncPulseSpinner" aria-hidden="true"></span>
+            <div class="form-field readonly-field">
+              <div class="label-row">
+                <label class="label-text" id="pulseLinkLabel" for="pulseLinkDisplay">SC2Pulse URL (auto-set in settings)</label>
+                <button type="button" class="cta ghost small label-action" id="openPulseSettingsBtn">Settings</button>
+                <span class="label-separator">-</span>
+                <a class="label-link" href="https://sc2pulse.nephest.com/sc2/#stats" target="_blank" rel="noopener">SC2Pulse Website</a>
+              </div>
+              <div class="input-with-status">
+                <span class="status-icon" id="pulseLinkStatusIcon" aria-hidden="true"></span>
+                <input id="pulseLinkDisplay" type="text" placeholder="Add your SC2Pulse link in Settings" />
+              </div>
             </div>
-            <p id="mmrStatus" class="helper" style="display:none;"></p>
+            <div class="form-actions">
+              <button type="submit" class="cta primary" id="registerBtn">
+                Register
+                <span class="sync-spinner register-spinner" aria-hidden="true"></span>
+              </button>
+            </div>
           </form>
           <div class="caster-section" id="casterSection">
             <div class="section-title">Caster</div>
@@ -830,20 +865,6 @@
                       </label>
                     </div>
                     <p class="helper">When enabled, players must submit their SC2Pulse link to register.</p>
-                  </div>
-                </div>
-              </div>
-              <div class="settings-row">
-                <div class="settings-row-label">Require SC2Pulse sync before registration</div>
-                <div class="settings-row-control">
-                  <div class="settings-toggle-row">
-                    <div class="checkbox-wrapper-59">
-                      <label class="switch">
-                        <input type="checkbox" id="settingsRequirePulseSync" checked />
-                        <span class="slider"></span>
-                      </label>
-                    </div>
-                    <p class="helper">When enabled, players must sync SC2Pulse before registering.</p>
                   </div>
                 </div>
               </div>
@@ -2597,9 +2618,11 @@
         <button class="cta primary" id="confirmMatchScoreBtn" style="display:none;">
           Confirm score
         </button>
+        <button class="cta ghost" id="matchInfoEditScoreBtn" style="display:none;">
+          Edit score
+        </button>
         <button class="cta ghost" id="castMatchBtn" style="display:none;">Cast</button>
       </div>
-      <p class="helper match-cast-status" id="castMatchStatus" style="display:none;"></p>
       <div class="match-info-report" id="matchInfoReportSection" style="display:none;">
         <div class="match-info-report-header">
           <span class="eyebrow">Report score change</span>

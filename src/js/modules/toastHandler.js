@@ -42,11 +42,8 @@ export function showToast(message, type = "success", duration = 3000) {
 
   const toast = document.createElement("div");
   toast.className = `toast toast-${type}`;
-  toast.innerHTML = `
-  ${type === "error" || type === "warning" ? "⚠ " : ""} ${DOMPurify.sanitize(
-    message
-  )}
-`;
+  const cleaned = String(message || "").replace(/^\?\s*/, "");
+  toast.innerHTML = DOMPurify.sanitize(cleaned);
 
   container.appendChild(toast);
 

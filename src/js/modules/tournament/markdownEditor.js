@@ -21,6 +21,17 @@ export function initQuillEditor({ editorId, textareaId, placeholder = "" }) {
   const textarea = document.getElementById(textareaId);
   if (!editorEl || !textarea || typeof window.Quill !== "function") return null;
 
+  const assignEditorInputNames = () => {
+    const container = editorEl.closest(".markdown-editor") || editorEl;
+    const inputs = container.querySelectorAll("input, select, textarea");
+    let idx = 0;
+    inputs.forEach((input) => {
+      if (input.name) return;
+      const baseName = input.id || `${textareaId}-${idx++}`;
+      input.name = `markdown-${baseName}`;
+    });
+  };
+
   const quill = new window.Quill(editorEl, {
     theme: "snow",
     modules: defaultModules,
@@ -76,6 +87,8 @@ export function initQuillEditor({ editorId, textareaId, placeholder = "" }) {
     }
     focusOrigin = null;
   });
+
+  assignEditorInputNames();
 
   quillRegistry.set(textareaId, quill);
   return quill;
