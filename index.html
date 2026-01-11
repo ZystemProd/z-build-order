@@ -156,20 +156,24 @@
         Continue with Google
       </button>
       <div class="auth-divider"><span>or</span></div>
-      <div class="auth-form">
+      <form id="authForm" class="auth-form" autocomplete="on">
         <label for="authEmail">Email</label>
-        <input id="authEmail" type="email" autocomplete="email" />
+        <input id="authEmail" type="email" autocomplete="email" required />
+
         <label for="authPassword">Password</label>
-        <input id="authPassword" type="password" autocomplete="current-password" />
+        <input id="authPassword" type="password" autocomplete="current-password" required />
+
         <div class="auth-actions">
-          <button id="emailSignInButton" class="auth-primary-button">
+          <button id="emailSignInButton" type="submit" class="auth-primary-button">
             Sign in
           </button>
-          <button id="emailSignUpButton" class="auth-secondary-button">
+
+          <button id="emailSignUpButton" type="button" class="auth-secondary-button">
             Create account
           </button>
         </div>
-      </div>
+      </form>
+
     </div>
   </div>
 
@@ -771,15 +775,8 @@
           <div class="settings-username-section">
             <label for="settingsUsernameInput" class="settings-label">Username</label>
             <div class="settings-username-row">
-              <input
-                id="settingsUsernameInput"
-                class="settings-input"
-                type="text"
-                maxlength="20"
-                placeholder="New username"
-                autocomplete="off"
-                spellcheck="false"
-              />
+              <input id="settingsUsernameInput" class="settings-input" type="text" maxlength="20"
+                placeholder="New username" autocomplete="off" spellcheck="false" />
               <button type="button" class="settings-username-button" id="saveUsernameButton">
                 <img src="img/SVG/pencil.svg" class="menu-icon" alt="" aria-hidden="true" />
                 Update
@@ -825,25 +822,15 @@
           <div class="settings-username-section">
             <div class="settings-label-row">
               <label for="sc2PulseInput" class="settings-label">SC2Pulse Link</label>
-              <button
-                type="button"
-                class="help-circle animated-help"
-                id="pulseHelpBtn"
-                aria-label="How to find your SC2Pulse link"
-                title="How to find your SC2Pulse link"
-              >
+              <button type="button" class="help-circle animated-help" id="pulseHelpBtn"
+                aria-label="How to find your SC2Pulse link" title="How to find your SC2Pulse link">
                 ?
               </button>
             </div>
             <div class="settings-username-row">
-              <input
-                id="sc2PulseInput"
-                class="settings-input"
-                type="url"
-                placeholder="https://sc2pulse.nephest.com/sc2/?type=character&id=..."
-                autocomplete="off"
-                spellcheck="false"
-              />
+              <input id="sc2PulseInput" class="settings-input" type="url"
+                placeholder="https://sc2pulse.nephest.com/sc2/?type=character&id=..." autocomplete="off"
+                spellcheck="false" />
               <button type="button" class="settings-username-button" id="connectPulseBtn">
                 <img src="img/SVG/stats.svg" class="menu-icon" alt="" aria-hidden="true" />
                 Update
@@ -861,12 +848,8 @@
           <div class="settings-username-section">
             <label for="settingsTwitchInput" class="settings-label">Twitch Channel</label>
             <div class="settings-username-row">
-              <input
-                id="settingsTwitchInput"
-                class="settings-input"
-                type="text"
-                placeholder="https://www.twitch.tv/username"
-              />
+              <input id="settingsTwitchInput" class="settings-input" type="text"
+                placeholder="https://www.twitch.tv/username" />
               <button type="button" class="settings-username-button" id="saveTwitchButton">
                 Save
               </button>
@@ -883,160 +866,161 @@
             </p>
           </div>
         </div>
-      <div id="pulseHelpModal" class="modal">
-        <div class="modal-content">
-          <span class="close" id="closePulseHelp">&times;</span>
-          <h3>How to find your SC2Pulse link</h3>
-              <ol>
-                <li>Open your SC2Pulse profile and go to the MMR tab.</li>
-                <li>Copy the URL from the address bar (looks like <code>https://sc2pulse.nephest.com/sc2/?type=character&id=579686&m=1</code>).</li>
-            <li>Paste that URL here and click Update.</li>
-          </ol>
-        </div>
-      </div>
-      <div id="secondaryPulseModal" class="modal">
-        <div class="modal-content small-modal">
-          <span class="close-modal" id="closeSecondaryPulseModal">&times;</span>
-          <h3>Secondary SC2Pulse links</h3>
-          <p class="helper settings-helper-text">Add up to five optional SC2Pulse profiles.</p>
-          <div id="secondaryPulseList" class="secondary-pulse-list"></div>
-          <div class="secondary-actions">
-            <button type="button" class="cta small ghost" id="secondaryAddInputBtn">
-              Add another link
-            </button>
-            <button type="button" class="cta primary" id="saveSecondaryPulseBtn">
-              Save links
-            </button>
+        <div id="pulseHelpModal" class="modal">
+          <div class="modal-content">
+            <span class="close" id="closePulseHelp">&times;</span>
+            <h3>How to find your SC2Pulse link</h3>
+            <ol>
+              <li>Open your SC2Pulse profile and go to the MMR tab.</li>
+              <li>Copy the URL from the address bar (looks like
+                <code>https://sc2pulse.nephest.com/sc2/?type=character&id=579686&m=1</code>).</li>
+              <li>Paste that URL here and click Update.</li>
+            </ol>
           </div>
-          <p id="secondaryPulseHelper" class="settings-helper-text">
-            You can save up to 5 secondary SC2Pulse links.
-          </p>
         </div>
-      </div>
+        <div id="secondaryPulseModal" class="modal">
+          <div class="modal-content small-modal">
+            <span class="close-modal" id="closeSecondaryPulseModal">&times;</span>
+            <h3>Secondary SC2Pulse links</h3>
+            <p class="helper settings-helper-text">Add up to five optional SC2Pulse profiles.</p>
+            <div id="secondaryPulseList" class="secondary-pulse-list"></div>
+            <div class="secondary-actions">
+              <button type="button" class="cta small ghost" id="secondaryAddInputBtn">
+                Add another link
+              </button>
+              <button type="button" class="cta primary" id="saveSecondaryPulseBtn">
+                Save links
+              </button>
+            </div>
+            <p id="secondaryPulseHelper" class="settings-helper-text">
+              You can save up to 5 secondary SC2Pulse links.
+            </p>
+          </div>
         </div>
       </div>
     </div>
+  </div>
 
-    <div id="avatarModal" class="modal" style="display: none;">
-      <div class="modal-content avatar-modal-content">
-        <button id="closeAvatarModal" class="modal-close-button" aria-label="Close avatar selector">&times;</button>
-        <h3>Select an Avatar</h3>
-        <div id="avatarGrid" class="avatar-grid"></div>
+  <div id="avatarModal" class="modal" style="display: none;">
+    <div class="modal-content avatar-modal-content">
+      <button id="closeAvatarModal" class="modal-close-button" aria-label="Close avatar selector">&times;</button>
+      <h3>Select an Avatar</h3>
+      <div id="avatarGrid" class="avatar-grid"></div>
+    </div>
+  </div>
+
+  <div id="userStatsModal" class="modal">
+    <div class="modal-content small-modal">
+      <span class="close-modal" id="closeUserStatsModal">&times;</span>
+      <h3>My Stats</h3>
+      <div id="userStatsContent">Loading...</div>
+    </div>
+  </div>
+
+  <!-- Modal for delete notification -->
+  <div id="deleteConfirmationModal" class="modal">
+    <div class="modal-content">
+      <h3>Confirm Deletion</h3>
+      <p>Are you sure you want to delete this build?</p>
+      <div class="modal-actions">
+        <button id="confirmDeleteButton" class="btn btn-danger">Yes</button>
+        <button id="cancelDeleteButton" class="btn">No</button>
       </div>
     </div>
+  </div>
 
-    <div id="userStatsModal" class="modal">
-      <div class="modal-content small-modal">
-        <span class="close-modal" id="closeUserStatsModal">&times;</span>
-        <h3>My Stats</h3>
-        <div id="userStatsContent">Loading...</div>
-      </div>
-    </div>
-
-    <!-- Modal for delete notification -->
-    <div id="deleteConfirmationModal" class="modal">
-      <div class="modal-content">
-        <h3>Confirm Deletion</h3>
-        <p>Are you sure you want to delete this build?</p>
-        <div class="modal-actions">
-          <button id="confirmDeleteButton" class="btn btn-danger">Yes</button>
-          <button id="cancelDeleteButton" class="btn">No</button>
+  <!-- Delete Account Modal -->
+  <div id="deleteAccountModal" class="modal">
+    <div class="modal-content">
+      <h3>⚠️ Confirm Account Deletion</h3>
+      <p>This will permanently delete your account and personal builds.</p>
+      <div class="publish-checkbox-row">
+        <span>Also delete my published community builds</span>
+        <div class="checkbox-wrapper-59">
+          <label class="switch">
+            <input type="checkbox" id="deleteCommunityBuildsCheckbox" />
+            <span class="slider"></span>
+          </label>
         </div>
       </div>
+      <br /><br />
+      <button id="confirmDeleteAccountButton" class="auth-button">Yes, Delete My Account</button>
+      <button id="cancelDeleteAccountButton" class="auth-button">Cancel</button>
     </div>
+  </div>
 
-    <!-- Delete Account Modal -->
-    <div id="deleteAccountModal" class="modal">
-      <div class="modal-content">
-        <h3>⚠️ Confirm Account Deletion</h3>
-        <p>This will permanently delete your account and personal builds.</p>
-        <div class="publish-checkbox-row">
-          <span>Also delete my published community builds</span>
-          <div class="checkbox-wrapper-59">
-            <label class="switch">
-              <input type="checkbox" id="deleteCommunityBuildsCheckbox" />
-              <span class="slider"></span>
-            </label>
-          </div>
-        </div>
-        <br /><br />
-        <button id="confirmDeleteAccountButton" class="auth-button">Yes, Delete My Account</button>
-        <button id="cancelDeleteAccountButton" class="auth-button">Cancel</button>
+
+  <!-- Replay Options Modal -->
+  <div id="replayOptionsModal" class="modal">
+    <div class="modal-content small-modal">
+      <span class="close-modal" id="closeReplayOptionsModal">&times;</span>
+      <h3 class="replay-options-title">Replay Options</h3>
+      <div class="player-select-container">
+        <label>Select Player</label>
+        <div id="playerToggleWrapper" class="player-toggle-wrapper"></div>
       </div>
-    </div>
-
-
-    <!-- Replay Options Modal -->
-    <div id="replayOptionsModal" class="modal">
-      <div class="modal-content small-modal">
-        <span class="close-modal" id="closeReplayOptionsModal">&times;</span>
-        <h3 class="replay-options-title">Replay Options</h3>
-        <div class="player-select-container">
-          <label>Select Player</label>
-          <div id="playerToggleWrapper" class="player-toggle-wrapper"></div>
-        </div>
-        <div class="publish-checkbox-row">
-          <span>Exclude Workers</span>
-          <div class="checkbox-wrapper-59">
-            <label class="switch">
-              <input type="checkbox" id="excludeWorkersCheckbox" checked />
-              <span class="slider"></span>
-            </label>
-          </div>
-        </div>
-        <div class="publish-checkbox-row">
-          <span>Exclude Units</span>
-          <div class="checkbox-wrapper-59">
-            <label class="switch">
-              <input type="checkbox" id="excludeUnitsCheckbox" />
-              <span class="slider"></span>
-            </label>
-          </div>
-        </div>
-        <hr class="publish-divider" />
-        <div class="publish-checkbox-row">
-          <span>Exclude Supply</span>
-          <div class="checkbox-wrapper-59">
-            <label class="switch">
-              <input type="checkbox" id="excludeSupplyCheckbox" />
-              <span class="slider"></span>
-            </label>
-          </div>
-        </div>
-        <div class="publish-checkbox-row">
-          <span>Exclude Time</span>
-          <div class="checkbox-wrapper-59">
-            <label class="switch">
-              <input type="checkbox" id="excludeTimeCheckbox" checked />
-              <span class="slider"></span>
-            </label>
-          </div>
-        </div>
-        <hr class="publish-divider" />
-        <div class="publish-checkbox-row">
-          <span class="label-with-icon">Compact Mode <span class="info-icon"
-              data-tooltip="Combines actions at same supply. Requires 'Exclude Time' checked">?</span></span>
-          <div class="checkbox-wrapper-59">
-            <label class="switch">
-              <input type="checkbox" id="compactModeCheckbox" />
-              <span class="slider"></span>
-            </label>
-          </div>
-        </div>
-        <div class="stop-limit-row">
-          <label id="stopLimitLabel" for="stopLimitInput">Stop at supply:</label>
-          <input type="number" id="stopLimitInput" min="0" value="50" placeholder="e.g. 50" />
-          <span id="stopUnitLabel">min</span>
-          <button type="button" id="toggleStopTypeBtn" class="btn-small" data-type="supply">Use Time</button>
-        </div>
-        <div class="replay-options-footer">
-          <button id="confirmReplayOptionsButton" class="btn">Parse Replay</button>
-          <span id="chronoBoostWarning" style="display:none; color:orange;">
-            ⚠️ Chrono Boost not auto-detected — adjust Supply/Time manually .
-          </span>
+      <div class="publish-checkbox-row">
+        <span>Exclude Workers</span>
+        <div class="checkbox-wrapper-59">
+          <label class="switch">
+            <input type="checkbox" id="excludeWorkersCheckbox" checked />
+            <span class="slider"></span>
+          </label>
         </div>
       </div>
+      <div class="publish-checkbox-row">
+        <span>Exclude Units</span>
+        <div class="checkbox-wrapper-59">
+          <label class="switch">
+            <input type="checkbox" id="excludeUnitsCheckbox" />
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+      <hr class="publish-divider" />
+      <div class="publish-checkbox-row">
+        <span>Exclude Supply</span>
+        <div class="checkbox-wrapper-59">
+          <label class="switch">
+            <input type="checkbox" id="excludeSupplyCheckbox" />
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+      <div class="publish-checkbox-row">
+        <span>Exclude Time</span>
+        <div class="checkbox-wrapper-59">
+          <label class="switch">
+            <input type="checkbox" id="excludeTimeCheckbox" checked />
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+      <hr class="publish-divider" />
+      <div class="publish-checkbox-row">
+        <span class="label-with-icon">Compact Mode <span class="info-icon"
+            data-tooltip="Combines actions at same supply. Requires 'Exclude Time' checked">?</span></span>
+        <div class="checkbox-wrapper-59">
+          <label class="switch">
+            <input type="checkbox" id="compactModeCheckbox" />
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+      <div class="stop-limit-row">
+        <label id="stopLimitLabel" for="stopLimitInput">Stop at supply:</label>
+        <input type="number" id="stopLimitInput" min="0" value="50" placeholder="e.g. 50" />
+        <span id="stopUnitLabel">min</span>
+        <button type="button" id="toggleStopTypeBtn" class="btn-small" data-type="supply">Use Time</button>
+      </div>
+      <div class="replay-options-footer">
+        <button id="confirmReplayOptionsButton" class="btn">Parse Replay</button>
+        <span id="chronoBoostWarning" style="display:none; color:orange;">
+          ⚠️ Chrono Boost not auto-detected — adjust Supply/Time manually .
+        </span>
+      </div>
     </div>
+  </div>
 
 
 
@@ -1044,15 +1028,15 @@
 
 
 
-    <div id="notification" class="notification">
-      <p>
-        Some image assets are owned by Blizzard Entertainment and are used according to
-        <a href="http://blizzard.com/company/about/legal-faq.html" target="_blank">
-          Blizzard's Legal FAQ
-        </a>.
-      </p>
-      <button id="closeNotification">✖</button>
-    </div>
+  <div id="notification" class="notification">
+    <p>
+      Some image assets are owned by Blizzard Entertainment and are used according to
+      <a href="http://blizzard.com/company/about/legal-faq.html" target="_blank">
+        Blizzard's Legal FAQ
+      </a>.
+    </p>
+    <button id="closeNotification">✖</button>
+  </div>
 
   </div>
   <!-- Footer Section -->

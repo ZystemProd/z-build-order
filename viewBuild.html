@@ -20,7 +20,8 @@
 </head>
 
 <body>
-  <div id="viewLoadingOverlay" class="view-loading-overlay" role="status" aria-live="polite" aria-label="Loading build" aria-busy="true">
+  <div id="viewLoadingOverlay" class="view-loading-overlay" role="status" aria-live="polite" aria-label="Loading build"
+    aria-busy="true">
     <div class="loading-spinner" aria-hidden="true"></div>
     <p>Loading build...</p>
   </div>
@@ -106,20 +107,24 @@
         Continue with Google
       </button>
       <div class="auth-divider"><span>or</span></div>
-      <div class="auth-form">
+      <form id="authForm" class="auth-form" autocomplete="on">
         <label for="authEmail">Email</label>
-        <input id="authEmail" type="email" autocomplete="email" />
+        <input id="authEmail" type="email" autocomplete="email" required />
+
         <label for="authPassword">Password</label>
-        <input id="authPassword" type="password" autocomplete="current-password" />
+        <input id="authPassword" type="password" autocomplete="current-password" required />
+
         <div class="auth-actions">
-          <button id="emailSignInButton" class="auth-primary-button">
+          <button id="emailSignInButton" type="submit" class="auth-primary-button">
             Sign in
           </button>
-          <button id="emailSignUpButton" class="auth-secondary-button">
+
+          <button id="emailSignUpButton" type="button" class="auth-secondary-button">
             Create account
           </button>
         </div>
-      </div>
+      </form>
+
     </div>
   </div>
 
@@ -136,7 +141,8 @@
 
       <h1 id="buildTitle">Loading...</h1>
 
-      <button id="shareBuildButton" class="header-btn" type="button" style="display: none;" data-tooltip="Share build link">
+      <button id="shareBuildButton" class="header-btn" type="button" style="display: none;"
+        data-tooltip="Share build link">
         <img src="./img/SVG/share.svg" alt="Share" class="svg-icon" />
         Share
       </button>
@@ -164,8 +170,8 @@
           <span class="info-label" aria-hidden="true"></span>
           <span class="info-value">
             <span class="meta-chip publisher-chip">
-              <img id="buildPublisherIconMobile" src="./img/SVG/user-svgrepo-com.svg" alt="Publisher"
-                class="meta-icon" width="32" height="32" loading="lazy" decoding="async" />
+              <img id="buildPublisherIconMobile" src="./img/SVG/user-svgrepo-com.svg" alt="Publisher" class="meta-icon"
+                width="32" height="32" loading="lazy" decoding="async" />
               <span id="buildPublisherMobile" data-fade-target>Loading...</span>
             </span>
           </span>
@@ -279,7 +285,8 @@
           <img id="settingsCurrentAvatar" src="img/avatar/marine_avatar_1.webp" alt="Current avatar" />
         </div>
         <button type="button" class="settings-avatar-button" id="changeAvatarBtn">
-          <img id="settingsAvatarButtonImage" src="img/SVG/user-svgrepo-com.svg" class="menu-icon" alt="" aria-hidden="true" />
+          <img id="settingsAvatarButtonImage" src="img/SVG/user-svgrepo-com.svg" class="menu-icon" alt=""
+            aria-hidden="true" />
           Change Avatar
         </button>
       </div>
@@ -309,7 +316,8 @@
         </div>
         <div class="settings-username-row">
           <input id="sc2PulseInput" class="settings-input" type="url"
-            placeholder="https://sc2pulse.nephest.com/sc2/?type=character&id=..." autocomplete="off" spellcheck="false" />
+            placeholder="https://sc2pulse.nephest.com/sc2/?type=character&id=..." autocomplete="off"
+            spellcheck="false" />
           <button type="button" class="settings-username-button" id="connectPulseBtn">
             <img src="img/SVG/stats.svg" class="menu-icon" alt="" aria-hidden="true" />
             Update
@@ -326,12 +334,8 @@
         <div class="settings-username-section">
           <label for="settingsTwitchInput" class="settings-label">Twitch Channel</label>
           <div class="settings-username-row">
-            <input
-              id="settingsTwitchInput"
-              class="settings-input"
-              type="text"
-              placeholder="https://www.twitch.tv/username"
-            />
+            <input id="settingsTwitchInput" class="settings-input" type="text"
+              placeholder="https://www.twitch.tv/username" />
             <button type="button" class="settings-username-button" id="saveTwitchButton">
               <img src="img/SVG/twitch.svg" class="menu-icon" alt="" aria-hidden="true" />
               Save
@@ -354,31 +358,32 @@
             <h3>How to find your SC2Pulse link</h3>
             <ol>
               <li>Open your SC2Pulse profile and go to the MMR tab.</li>
-              <li>Copy the URL from the address bar (looks like <code>https://sc2pulse.nephest.com/sc2/?type=character&id=579686&m=1</code>).
+              <li>Copy the URL from the address bar (looks like
+                <code>https://sc2pulse.nephest.com/sc2/?type=character&id=579686&m=1</code>).
               </li>
-            <li>Paste that URL here and click Update.</li>
-          </ol>
-        </div>
-        <div id="secondaryPulseModal" class="modal">
-          <div class="modal-content small-modal">
-            <span class="close-modal" id="closeSecondaryPulseModal">&times;</span>
-            <h3>Secondary SC2Pulse links</h3>
-            <p class="helper settings-helper-text">Add up to five optional SC2Pulse profiles.</p>
-            <div id="secondaryPulseList" class="secondary-pulse-list"></div>
-            <div class="secondary-actions">
-              <button type="button" class="cta small ghost" id="secondaryAddInputBtn">
-                Add another link
-              </button>
-              <button type="button" class="cta primary" id="saveSecondaryPulseBtn">
-                Save links
-              </button>
+              <li>Paste that URL here and click Update.</li>
+            </ol>
+          </div>
+          <div id="secondaryPulseModal" class="modal">
+            <div class="modal-content small-modal">
+              <span class="close-modal" id="closeSecondaryPulseModal">&times;</span>
+              <h3>Secondary SC2Pulse links</h3>
+              <p class="helper settings-helper-text">Add up to five optional SC2Pulse profiles.</p>
+              <div id="secondaryPulseList" class="secondary-pulse-list"></div>
+              <div class="secondary-actions">
+                <button type="button" class="cta small ghost" id="secondaryAddInputBtn">
+                  Add another link
+                </button>
+                <button type="button" class="cta primary" id="saveSecondaryPulseBtn">
+                  Save links
+                </button>
+              </div>
+              <p id="secondaryPulseHelper" class="settings-helper-text">
+                You can save up to 5 secondary SC2Pulse links.
+              </p>
             </div>
-            <p id="secondaryPulseHelper" class="settings-helper-text">
-              You can save up to 5 secondary SC2Pulse links.
-            </p>
           </div>
         </div>
-      </div>
       </div>
       <hr class="settings-divider" />
       <div class="publish-checkbox-row">
