@@ -2555,23 +2555,11 @@
             <circle cx="12" cy="7" r="0.7" fill="currentColor" />
           </svg>
         </button>
-        <button class="icon-btn match-info-help-btn" id="matchInfoHelpBtn" aria-label="Match help"
-          title="How scoring and map veto works">?</button>
-        <div class="match-info-help-popover" id="matchInfoHelpPopover" aria-live="polite">
-          <div class="match-info-help-title">Scoring</div>
-          <div class="match-info-help-body">
-            Click the left or right pill for each map to mark the winner. Click again to clear.
-          </div>
-          <div class="match-info-help-title">Map veto</div>
-          <div class="match-info-help-body">
-            Use the “Map veto” button to open the veto flow (only match players can change it).
-          </div>
-        </div>
+
         <button class="icon-btn" id="closeMatchInfoModal" aria-label="Close match info modal">x</button>
       </div>
       <div class="match-info-toprow">
         <div class="match-info-meta">
-          <p class="helper" id="matchInfoBestOf"></p>
           <p class="helper" id="matchInfoServer"></p>
         </div>
         <div class="match-info-walkover">
@@ -2598,7 +2586,11 @@
                   </div>
                 </div>
               </th>
-              <th class="match-info-map-col">VS</th>
+              <th class="match-info-map-col">
+                <div class="match-info-vs">VS</div>
+                <div class="match-info-bo" id="matchInfoBoInline"></div>
+              </th>
+
               <th class="match-info-player-col">
                 <div class="match-info-player-head">
                   <div id="matchInfoRightScore" class="match-info-score">0</div>

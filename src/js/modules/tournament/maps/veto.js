@@ -547,6 +547,7 @@ export function openVetoModal(
   const bestOfLabel = document.getElementById("vetoBestOfLabel");
   const resetBtn = document.getElementById("resetVetoBtn");
   const doneBtn = document.getElementById("saveVetoBtn");
+  const closeBtn = document.getElementById("closeVetoModal");
   if (modal) modal.dataset.matchId = matchId || "";
   if (modal) modal.dataset.forceOpen = "true";
   const lookup = getMatchLookup(state.bracket || {});
@@ -675,9 +676,15 @@ export function openVetoModal(
 
   modal.dataset.bestOf = vetoState.bestOf;
   modal.onclick = (e) => {
-    if (e.target === modal) hideVetoModal();
+    if (e.target === modal) hideVetoModal({ reopenMatchInfo: true });
   };
+
+  if (closeBtn) {
+    closeBtn.onclick = () => hideVetoModal({ reopenMatchInfo: true });
+  }
+
   if (resetBtn) resetBtn.onclick = () => showResetVetoModal();
+
   const poolEl = document.getElementById("vetoMapPool");
   if (poolEl) poolEl.onclick = handleVetoPoolClick;
 }
@@ -688,7 +695,7 @@ export function openMatchInfoModal(
 ) {
   const modal = document.getElementById("matchInfoModal");
   const title = document.getElementById("matchInfoTitle");
-  const bestOfEl = document.getElementById("matchInfoBestOf");
+  const boInlineEl = document.getElementById("matchInfoBoInline");
   const leftNameEl = document.getElementById("matchInfoLeftName");
   const rightNameEl = document.getElementById("matchInfoRightName");
   const leftFlagEl = document.getElementById("matchInfoLeftFlag");
@@ -726,7 +733,7 @@ export function openMatchInfoModal(
   const walkoverSelect = document.getElementById("matchInfoWalkoverSelect");
   const editScoreBtn = document.getElementById("matchInfoEditScoreBtn");
   const closeBtn = document.getElementById("closeMatchInfoModal");
-  const helpBtn = document.getElementById("matchInfoHelpBtn");
+
   const helpPopover = document.getElementById("matchInfoHelpPopover");
   if (!modal) return;
   modal.dataset.matchId = matchId || "";
@@ -800,7 +807,10 @@ export function openMatchInfoModal(
         : "Round";
     title.textContent = `${bracketLabel} ${roundLabel}`;
   }
-  if (bestOfEl) bestOfEl.textContent = `Best of ${bestOf}`;
+  if (boInlineEl) {
+    boInlineEl.textContent = `bo${bestOf}`;
+  }
+
   if (leftNameEl) leftNameEl.textContent = aName;
   if (rightNameEl) rightNameEl.textContent = bName;
   if (castBtn) {
@@ -1398,7 +1408,6 @@ export function openMatchInfoModal(
       (e) => {
         if (!helpPopover.classList.contains("is-open")) return;
         if (e.target.closest("#matchInfoHelpPopover")) return;
-        if (e.target.closest("#matchInfoHelpBtn")) return;
         helpPopover.classList.remove("is-open");
       },
       true
@@ -2177,16 +2186,21 @@ function autoPickLastMapIfNeeded() {
   vetoState.stage = "done";
 }
 
-export function hideVetoModal() {
-  clearRemoteBusyTimer(); // IMPORTANT: stop remote busy auto-unlock timer
+export function hideVetoModal({ reopenMatchInfo = true } = {}) {
+  clearRemoteBusyTimer(); // stop remote busy auto-unlock timer
 
   const modal = document.getElementById("vetoModal");
   const poolEl = document.getElementById("vetoMapPool");
 
+  // Capture matchId BEFORE we clear state/datasets
+  const matchId = currentVetoMatchId || modal?.dataset?.matchId || "";
+
+  // If we have local state, persist (non-blocking)
   if (currentVetoMatchId && vetoState) {
     persistLiveVetoStateQueued();
   }
 
+  // Close veto modal
   if (modal) modal.style.display = "none";
   if (modal) delete modal.dataset.matchId;
   if (modal) delete modal.dataset.forceOpen;
@@ -2194,6 +2208,12 @@ export function hideVetoModal() {
 
   setCurrentVetoMatchIdState(null);
   setVetoStateState(null);
+
+  // NEW: return to match info modal instead of dropping to bracket
+  // (only if requested and we have deps/matchId)
+  if (reopenMatchInfo && matchId && vetoDeps) {
+    openMatchInfoModal(matchId, vetoDeps);
+  }
 }
 
 function showResetVetoModal() {
@@ -2369,7 +2389,7 @@ export function saveVetoSelection() {
   renderVetoStatus();
   renderVetoPoolGrid();
   showToast?.("Map veto saved.", "success");
-  hideVetoModal();
+  hideVetoModal({ reopenMatchInfo: false });
   openMatchInfoModal(matchId, vetoDeps);
 }
 
@@ -2442,33 +2462,98 @@ export function renderVetoStatus() {
   const status = document.getElementById("vetoBestOfLabel");
   const turnLabel = document.getElementById("vetoMatchLabel");
   const doneBtn = document.getElementById("saveVetoBtn");
+
   if (!vetoState) {
     if (status) status.textContent = "";
     if (turnLabel) turnLabel.textContent = "";
     if (doneBtn) doneBtn.style.display = "none";
     return;
   }
-  const { stage, turn, bestOf, lowerName, higherName, remaining } = vetoState;
-  const turnName =
-    turn === "low" ? lowerName || "Lower seed" : higherName || "Higher seed";
+
+  const stage = vetoState.stage || "veto";
+  const turn = vetoState.turn || "low";
+  const bestOf = Math.max(1, Number(vetoState.bestOf) || 1);
+
+  const remaining = Array.isArray(vetoState.remaining)
+    ? vetoState.remaining
+    : [];
+  const pool = Array.isArray(vetoState.pool) ? vetoState.pool : remaining;
+
+  const lowerName = vetoState.lowerName || "Lower seed";
+  const higherName = vetoState.higherName || "Higher seed";
+  const turnName = turn === "low" ? lowerName : higherName;
+
+  const vetoedCount = Array.isArray(vetoState.vetoed)
+    ? vetoState.vetoed.length
+    : 0;
+  const pickedCount = Array.isArray(vetoState.picks)
+    ? vetoState.picks.length
+    : 0;
+
+  // total veto actions needed before pick begins: remaining <= bestOf
+  const vetoTotal = Math.max(0, (pool?.length || 0) - bestOf);
+  const pickTotal = Math.max(1, bestOf);
+  const totalSteps = Math.max(1, vetoTotal + pickTotal);
+
+  // Determine current step index in the combined timeline
+  let currentIndex = 0;
+  if (stage === "done") currentIndex = totalSteps;
+  else if (stage === "veto")
+    currentIndex = Math.min(vetoedCount, totalSteps - 1);
+  else currentIndex = Math.min(vetoTotal + pickedCount, totalSteps - 1);
+
   if (doneBtn) doneBtn.style.display = stage === "done" ? "" : "none";
-  if (status) {
-    const remainingLabel =
-      stage === "done"
-        ? "Complete"
-        : `${remaining.length} left · ${
-            stage === "pick" ? "Picking" : "Vetoing"
-          }`;
-    status.textContent = `Best of ${bestOf} · ${remainingLabel}`;
+
+  // Right-side label: ONLY Best-of
+  if (status) status.textContent = `Bo${bestOf}`;
+
+  // Center label
+  if (!turnLabel) return;
+
+  if (stage === "done") {
+    turnLabel.textContent = "Map veto complete.";
+    return;
   }
-  if (turnLabel) {
-    if (stage === "done") {
-      turnLabel.textContent = "Map veto complete.";
-    } else {
-      const actionLabel = stage === "pick" ? "Pick" : "Veto";
-      turnLabel.textContent = `${actionLabel} turn: ${turnName}`;
-    }
+
+  const isPick = stage === "pick";
+  const phaseText = isPick ? "Pick" : "Veto";
+  const phaseClass = isPick ? "is-pick" : "is-veto";
+
+  // Build compact horizontal timeline segments
+  // Completed: index < currentIndex
+  // Current: index === currentIndex
+  // Upcoming: index > currentIndex
+  let segmentsHtml = "";
+
+  for (let i = 0; i < totalSteps; i++) {
+    const type = i < vetoTotal ? "veto" : "pick";
+    const isDone = i < currentIndex;
+    const isCurrent = i === currentIndex;
+
+    segmentsHtml += `
+      <span class="veto-step is-${type}${isDone ? " is-done" : ""}${
+      isCurrent ? " is-current" : ""
+    }"
+            aria-hidden="true"></span>
+    `;
   }
+
+  const html = `
+    <div class="veto-header">
+      <div class="veto-turnline">
+        <span class="veto-phase ${phaseClass}">${escapeHtml(
+    phaseText
+  )} turn:</span>
+        <span class="veto-turnname">${escapeHtml(turnName)}</span>
+      </div>
+
+      <div class="veto-stepbar" role="group" aria-label="Veto and pick progress">
+        ${segmentsHtml}
+      </div>
+    </div>
+  `;
+
+  turnLabel.innerHTML = DOMPurify.sanitize(html);
 }
 
 // Dependencies for veto module that need to be set from index.js

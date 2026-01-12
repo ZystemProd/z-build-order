@@ -5828,6 +5828,21 @@ textarea:focus {
   color: var(--muted);
   font-weight: 600;
   text-align: center;
+  vertical-align: middle;
+}
+
+.match-info-vs {
+  font-weight: 600;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.match-info-bo {
+  margin-top: 4px;
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(231, 233, 243, 0.6);
 }
 
 .match-info-result-col {
@@ -6024,6 +6039,186 @@ textarea:focus {
   color: var(--muted);
   text-align: right;
   grid-column: 3;
+}
+
+/* --- Enhanced veto header UI --- */
+#vetoMatchLabel .veto-turnline {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+  width: 100%;
+}
+
+#vetoMatchLabel .veto-turntext {
+  display: inline-flex;
+  gap: 6px;
+  align-items: baseline;
+}
+
+#vetoMatchLabel .veto-turnprefix {
+  font-weight: 600;
+  opacity: 0.8;
+}
+
+#vetoMatchLabel .veto-turnname {
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+
+.veto-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  white-space: nowrap;
+}
+
+.veto-pill.is-veto {
+  border-color: rgba(255, 107, 107, 0.35);
+  background: rgba(255, 107, 107, 0.12);
+}
+
+.veto-pill.is-pick {
+  border-color: rgba(78, 213, 255, 0.35);
+  background: rgba(78, 213, 255, 0.12);
+}
+
+.veto-pill.is-yourturn {
+  border-color: rgba(255, 211, 77, 0.35);
+  background: rgba(255, 211, 77, 0.14);
+}
+
+#vetoBestOfLabel .veto-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-end;
+  min-width: 220px;
+}
+
+#vetoBestOfLabel .veto-meta-top {
+  display: inline-flex;
+  gap: 6px;
+  align-items: baseline;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+#vetoBestOfLabel .veto-meta-bo {
+  font-weight: 900;
+  color: var(--text);
+}
+
+#vetoBestOfLabel .veto-meta-sub {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+#vetoBestOfLabel .veto-progress {
+  width: 190px;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#vetoBestOfLabel .veto-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+#vetoBestOfLabel .veto-progress-label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+/* --- Compact veto/pick header timeline --- */
+#vetoMatchLabel .veto-header {
+  display: grid;
+  grid-template-rows: auto auto;
+  gap: 8px;
+  width: 100%;
+  justify-items: center; /* centers both rows without coupling widths */
+}
+
+#vetoMatchLabel .veto-turnline {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+#vetoMatchLabel .veto-phase {
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+#vetoMatchLabel .veto-turnname {
+  font-weight: 900;
+  letter-spacing: 0.2px;
+}
+
+#vetoMatchLabel .veto-stepbar {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 6px;
+  width: 360px;
+  max-width: 92%;
+}
+
+#vetoMatchLabel .veto-step {
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* base colors by step type (muted) */
+#vetoMatchLabel .veto-step.is-veto {
+  background: rgba(255, 90, 90, 0.14);
+  border-color: rgba(255, 90, 90, 0.18);
+}
+#vetoMatchLabel .veto-step.is-pick {
+  background: rgba(78, 213, 255, 0.14);
+  border-color: rgba(78, 213, 255, 0.18);
+}
+
+/* completed steps */
+#vetoMatchLabel .veto-step.is-veto.is-done {
+  background: rgba(255, 90, 90, 0.55);
+  border-color: rgba(255, 90, 90, 0.45);
+}
+#vetoMatchLabel .veto-step.is-pick.is-done {
+  background: rgba(78, 213, 255, 0.55);
+  border-color: rgba(78, 213, 255, 0.45);
+}
+
+/* current step highlight */
+#vetoMatchLabel .veto-step.is-current {
+  outline: 2px solid rgba(255, 255, 255, 0.55);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 0 18px rgba(255, 255, 255, 0.18);
+}
+
+#vetoMatchLabel .veto-phase.is-veto {
+  color: rgba(255, 90, 90, 0.95);
+}
+
+#vetoMatchLabel .veto-phase.is-pick {
+  color: rgba(78, 213, 255, 0.95);
 }
 
 @media (max-width: 670px) {
@@ -7666,16 +7861,3 @@ select[id^="finalBestOf"] {
 #matchInfoReportBtn svg {
   display: block;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
