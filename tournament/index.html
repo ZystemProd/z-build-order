@@ -72,7 +72,6 @@
       letter-spacing: 0.04em;
       text-transform: uppercase;
     }
-
   </style>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css" />
   <link rel="stylesheet" href="/public/css/tournament.css" />
@@ -96,8 +95,8 @@
         </button>
         <div class="tournament-search-panel" id="tournamentSearchPanel">
           <div class="tournament-search-field">
-            <input id="tournamentSearchInput" class="tournament-search-input" type="search"
-              placeholder="Search" autocomplete="off" spellcheck="false" />
+            <input id="tournamentSearchInput" class="tournament-search-input" type="search" placeholder="Search"
+              autocomplete="off" spellcheck="false" />
             <button id="tournamentSearchClear" class="tournament-search-clear" type="button"
               aria-label="Clear search">×</button>
           </div>
@@ -241,924 +240,940 @@
         Continue with Google
       </button>
       <div class="auth-divider"><span>or</span></div>
-      <div class="auth-form">
+      <form id="authForm" class="auth-form" autocomplete="on">
         <label for="authEmail">Email</label>
-        <input id="authEmail" type="email" autocomplete="email" />
+        <input id="authEmail" type="email" autocomplete="email" required />
+
         <label for="authPassword">Password</label>
-        <input id="authPassword" type="password" autocomplete="current-password" />
+        <input id="authPassword" type="password" autocomplete="current-password" required />
+
         <div class="auth-actions">
-          <button id="emailSignInButton" class="auth-primary-button">
+          <button id="emailSignInButton" type="submit" class="auth-primary-button">
             Sign in
           </button>
-          <button id="emailSignUpButton" class="auth-secondary-button">
+
+          <button id="emailSignUpButton" type="button" class="auth-secondary-button">
             Create account
           </button>
         </div>
-      </div>
+      </form>
+
     </div>
   </div>
 
   <main id="mainContent">
     <div class="tournament-shell">
-    <!-- Landing: list & create -->
-    <section id="landingView" class="landing" style="display:none;">
-      <div class="hero landing-hero">
-        <div class="hero-main">
-          <a class="ghost-link" href="/index.html">Back to Z-Build Order</a>
-          <p class="eyebrow">Tournament Center</p>
-          <h1>Find or host your SC2 tournament.</h1>
-          <p class="lede">Browse tournaments or spin up a new one with custom links and formats.</p>
-          <div class="hero-actions">
-            <button id="openCreateTournament" class="cta primary">Create a tournament</button>
-            <button id="openCreateCircuit" class="cta ghost">Create a circuit</button>
-          </div>
-        </div>
-      <div class="hero-stats">
-        <div class="stat-card accent">
-          <p>Next start</p>
-          <h2 id="statNextStart">TBD</h2>
-        </div>
-        <div class="stat-card">
-          <p>Active tournaments</p>
-          <h2 id="statTournaments">0</h2>
-        </div>
-      </div>
-      </div>
-
-      <div class="card tournament-list-card is-tournaments">
-        <div class="card-header tournament-filter-header">
-          <div class="tournament-header-left">
-            <div class="list-tabs tournament-type-row" id="tournamentTypeTabs">
-              <button class="list-tab active" data-type-filter="tournaments">Tournaments</button>
-              <button class="list-tab" data-type-filter="circuits">Circuits</button>
+      <!-- Landing: list & create -->
+      <section id="landingView" class="landing" style="display:none;">
+        <div class="hero landing-hero">
+          <div class="hero-main">
+            <a class="ghost-link" href="/index.html">Back to Z-Build Order</a>
+            <p class="eyebrow">Tournament Center</p>
+            <h1>Find or host your SC2 tournament.</h1>
+            <p class="lede">Browse tournaments or spin up a new one with custom links and formats.</p>
+            <div class="hero-actions">
+              <button id="openCreateTournament" class="cta primary">Create a tournament</button>
+              <button id="openCreateCircuit" class="cta ghost">Create a circuit</button>
             </div>
-            <button id="tournamentMyFilterBtn" class="list-tab" type="button" aria-pressed="false">
-              My tournaments
-            </button>
           </div>
-          <div class="tournament-filter-controls" id="tournamentFilterControls">
-            <label class="tournament-filter">
-              <span class="tournament-filter-label">Status</span>
-              <select id="tournamentStatusSelect" class="tournament-filter-select">
-                <option value="all">All</option>
-                <option value="live">Live</option>
-                <option value="upcoming">Upcoming</option>
-                <option value="finished">Finished</option>
-              </select>
-            </label>
-            <label class="tournament-filter">
-              <span class="tournament-filter-label">Role</span>
-              <select id="tournamentRoleSelect" class="tournament-filter-select">
-                <option value="all">All</option>
-                <option value="registered">Registered</option>
-                <option value="casting">Casting</option>
-                <option value="hosting">Hosting</option>
-              </select>
-            </label>
-            <button id="refreshTournaments" class="cta ghost small icon-only" aria-label="Refresh">
+          <div class="hero-stats">
+            <div class="stat-card accent">
+              <p>Next start</p>
+              <h2 id="statNextStart">TBD</h2>
+            </div>
+            <div class="stat-card">
+              <p>Active tournaments</p>
+              <h2 id="statTournaments">0</h2>
+            </div>
+          </div>
+        </div>
+
+        <div class="card tournament-list-card is-tournaments">
+          <div class="card-header tournament-filter-header">
+            <div class="tournament-header-left">
+              <div class="list-tabs tournament-type-row" id="tournamentTypeTabs">
+                <button class="list-tab active" data-type-filter="tournaments">Tournaments</button>
+                <button class="list-tab" data-type-filter="circuits">Circuits</button>
+              </div>
+              <button id="tournamentMyFilterBtn" class="list-tab" type="button" aria-pressed="false">
+                My tournaments
+              </button>
+            </div>
+            <div class="tournament-filter-controls" id="tournamentFilterControls">
+              <label class="tournament-filter">
+                <span class="tournament-filter-label">Status</span>
+                <select id="tournamentStatusSelect" class="tournament-filter-select">
+                  <option value="all">All</option>
+                  <option value="live">Live</option>
+                  <option value="upcoming">Upcoming</option>
+                  <option value="finished">Finished</option>
+                </select>
+              </label>
+              <label class="tournament-filter">
+                <span class="tournament-filter-label">Role</span>
+                <select id="tournamentRoleSelect" class="tournament-filter-select">
+                  <option value="all">All</option>
+                  <option value="registered">Registered</option>
+                  <option value="casting">Casting</option>
+                  <option value="hosting">Hosting</option>
+                </select>
+              </label>
+              <button id="refreshTournaments" class="cta ghost small icon-only" aria-label="Refresh">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M12 6V3L7.5 7.5 12 12V9a5 5 0 1 1-5 5H5a7 7 0 1 0 7-8Z" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div class="tournament-list-slider">
+            <button id="tournamentListPrev" class="slider-btn" type="button" aria-label="Previous tournaments">
               <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path
-                  d="M12 6V3L7.5 7.5 12 12V9a5 5 0 1 1-5 5H5a7 7 0 1 0 7-8Z" />
+                <path d="M15.5 4.5 8 12l7.5 7.5-1.5 1.5L5 12l9-9 1.5 1.5z" />
               </svg>
             </button>
-          </div>
-        </div>
-        <div class="tournament-list-slider">
-          <button id="tournamentListPrev" class="slider-btn" type="button" aria-label="Previous tournaments">
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <path d="M15.5 4.5 8 12l7.5 7.5-1.5 1.5L5 12l9-9 1.5 1.5z" />
-            </svg>
-          </button>
-          <div class="tournament-list-viewport">
-            <ul id="tournamentList" class="tournament-list"></ul>
-          </div>
-          <button id="tournamentListNext" class="slider-btn" type="button" aria-label="Next tournaments">
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <path d="m8.5 4.5 1.5-1.5 9 9-9 9-1.5-1.5L16 12 8.5 4.5z" />
-            </svg>
-          </button>
-          <div class="tournament-list-pagination" aria-hidden="true"></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Circuit detail -->
-    <section id="circuitView" style="display:none;">
-      <header class="hero hero-with-admins">
-        <div class="hero-main">
-          <a class="ghost-link" href="/tournament"><span class="ghost-link-icon">←</span>All tournaments</a>
-          <p class="eyebrow">Circuit</p>
-          <div class="hero-title-row">
-            <h1 id="circuitTitle">Circuit</h1>
-            <button class="hero-admin-toggle" type="button" aria-expanded="false">
-              Admins
+            <div class="tournament-list-viewport">
+              <ul id="tournamentList" class="tournament-list"></ul>
+            </div>
+            <button id="tournamentListNext" class="slider-btn" type="button" aria-label="Next tournaments">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="m8.5 4.5 1.5-1.5 9 9-9 9-1.5-1.5L16 12 8.5 4.5z" />
+              </svg>
             </button>
+            <div class="tournament-list-pagination" aria-hidden="true"></div>
           </div>
-          <p class="lede" id="circuitDescription">Circuit overview.</p>
-          <div class="hero-actions">
-            <button id="openCreateCircuitTournament" class="cta primary small" style="display:none;">
-              Create tournament
-            </button>
-            <button id="openCircuitSettingsBtn" class="cta ghost small" style="display:none;">
-              Settings
-            </button>
-          </div>
-        </div>
-        <div class="hero-stats hero-stats-stacked">
-          <div class="stat-card">
-            <p>Tournaments</p>
-            <h2 id="circuitStatTournaments">0</h2>
-          </div>
-        <div class="stat-card accent">
-          <p>Next tournament starts</p>
-          <h2 id="circuitStatNextStart">TBD</h2>
-        </div>
-        </div>
-        <div class="hero-admin-panel" id="circuitAdminPanel">
-          <div class="hero-admins" id="circuitAdminSection">
-            <div class="hero-admins-header">
-              <span class="eyebrow">Admins</span>
-              <button id="inviteCircuitAdminBtn" class="cta ghost small" type="button" style="display:none;">
-                Manage admins
-              </button>
-            </div>
-            <div class="hero-admins-list" id="circuitAdminList"></div>
-          </div>
-        </div>
-      </header>
-
-      <main class="page-stack">
-        <div class="circuit-grid">
-          <div class="card">
-            <div class="card-header">
-              <div>
-                <p class="eyebrow">Circuit tournaments</p>
-                <h3>Included tournaments</h3>
-              </div>
-              <button id="refreshCircuitBtn" class="cta ghost small">Refresh</button>
-            </div>
-            <ul id="circuitTournamentList" class="tournament-list circuit-tournament-list"></ul>
-          </div>
-          <div class="card">
-            <div class="card-header">
-              <div>
-                <p class="eyebrow">Leaderboard</p>
-                <h3>Points standings</h3>
-              </div>
-              <button id="downloadCircuitLeaderboardBtn" class="cta ghost small" style="display:none;">
-                Download CSV
-              </button>
-              <button id="openCircuitPointsEditBtn" class="cta ghost small" style="display:none;">
-                Edit points
-              </button>
-            </div>
-            <div class="table-wrapper leaderboard-scroll custom-scroll">
-              <table id="circuitLeaderboardTable" class="players-table leaderboard-table">
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Player</th>
-                    <th id="circuitLeaderboardFirstPlaceHeader" class="first-place-cell">1st</th>
-                    <th class="points-cell">Points</th>
-                    <th class="events-cell">Events</th>
-                  </tr>
-                </thead>
-                <tbody id="circuitLeaderboardBody"></tbody>
-              </table>
-            </div>
-            <p id="circuitLeaderboardNote" class="helper"></p>
-          </div>
-        </div>
-      </main>
-    </section>
-
-    <!-- Tournament detail -->
-    <section id="tournamentView" style="display:none;">
-      <header class="hero hero-with-admins">
-        <div class="hero-main">
-          <a class="ghost-link" href="/tournament" id="tournamentBackLink"><span class="ghost-link-icon">←</span>All tournaments</a>
-          <div class="hero-title-row">
-            <h1 id="tournamentTitle">Tournament</h1>
-            <button class="hero-admin-toggle" type="button" aria-expanded="false">
-              Admins
-            </button>
-          </div>
-          <div class="hero-placements hero-placements--stacked" id="tournamentPlacements" style="display:none;">
-            <div class="placement-item" data-place="1">
-              <span class="placement-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" role="img" focusable="false">
-                  <path d="M7 4h10v2h3a1 1 0 0 1 1 1c0 3.866-3.134 7-7 7h-4c-3.866 0-7-3.134-7-7a1 1 0 0 1 1-1h3V4zm-3 4c.47 2.833 2.94 5 5.9 5h4.2c2.96 0 5.43-2.167 5.9-5h-2.9v1a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V8H4zm6 10h4v2h-4v-2zm-2 2h8v2H8v-2z" fill="currentColor"/>
-                </svg>
-              </span>
-              <span class="placement-label">1st</span>
-              <span class="placement-name" id="placementFirst">—</span>
-            </div>
-            <div class="placement-item" data-place="2">
-              <span class="placement-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" role="img" focusable="false">
-                  <path d="M7 4h10v2h3a1 1 0 0 1 1 1c0 3.866-3.134 7-7 7h-4c-3.866 0-7-3.134-7-7a1 1 0 0 1 1-1h3V4zm-3 4c.47 2.833 2.94 5 5.9 5h4.2c2.96 0 5.43-2.167 5.9-5h-2.9v1a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V8H4zm6 10h4v2h-4v-2zm-2 2h8v2H8v-2z" fill="currentColor"/>
-                </svg>
-              </span>
-              <span class="placement-label">2nd</span>
-              <span class="placement-name" id="placementSecond">—</span>
-            </div>
-            <div class="placement-item" data-place="3-4">
-              <span class="placement-icon placement-icon--bronze" aria-hidden="true">
-                <svg viewBox="0 0 24 24" role="img" focusable="false">
-                  <path d="M7 4h10v2h3a1 1 0 0 1 1 1c0 3.866-3.134 7-7 7h-4c-3.866 0-7-3.134-7-7a1 1 0 0 1 1-1h3V4zm-3 4c.47 2.833 2.94 5 5.9 5h4.2c2.96 0 5.43-2.167 5.9-5h-2.9v1a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V8H4zm6 10h4v2h-4v-2zm-2 2h8v2H8v-2z" fill="#cd7f32"/>
-                </svg>
-              </span>
-              <span class="placement-label">3–4</span>
-              <span class="placement-name" id="placementThirdFourth">—</span>
-            </div>
-          </div>
-        </div>
-        <div class="hero-stats">
-        <div class="stat-card">
-          <p>Registered</p>
-          <h2 id="statPlayers">0</h2>
-        </div>
-        <div class="stat-card accent">
-          <p>Start</p>
-          <h2 id="tournamentStart">TBD</h2>
-        </div>
-        </div>
-        <div class="hero-admin-panel" id="tournamentAdminPanel">
-          <div class="hero-admins" id="tournamentAdminSection">
-            <div class="hero-admins-header">
-              <span class="eyebrow">Admins</span>
-              <button id="inviteTournamentAdminBtn" class="cta ghost small" type="button" style="display:none;">
-                Manage admins
-              </button>
-            </div>
-            <div class="hero-admins-list" id="tournamentAdminList"></div>
-          </div>
-        </div>
-      </header>
-
-      <div id="tournamentPlacementsMobileSlot" class="tournament-placements-slot"></div>
-
-    <main class="page-stack">
-      <div class="tab-bar" id="tabBar">
-        <div class="tab-group public-tabs">
-          <button class="tab-btn active" data-tab="bracketTab">Bracket</button>
-          <button class="tab-btn" data-tab="descriptionTab">Description &amp; Rules</button>
-          <button class="tab-btn" data-tab="mapsTab">Maps</button>
-          <button class="tab-btn" data-tab="registrationTab" id="adminTabBtn">Registration</button>
-        </div>
-        <div class="tab-divider" data-admin-only="true" aria-hidden="true"></div>
-        <div class="tab-group admin-tabs" data-admin-only="true">
-          <button class="tab-btn" data-tab="seedingTab" id="seedingTabBtn" style="display:none;">Seeding</button>
-          <button class="tab-btn" data-tab="settingsTab" id="settingsTabBtn" data-admin-only="true"
-            style="display:none;">Settings</button>
-          <button class="tab-btn" data-tab="circuitPointsTab" id="circuitPointsTabBtn" data-admin-only="true"
-            style="display:none;">Circuit points</button>
-        </div>
-      </div>
-
-      <section id="descriptionTab" class="tab-panel">
-        <div class="card">
-          <div class="card-header">
-            <div>
-              <h3>Description</h3>
-            </div>
-          </div>
-          <div id="tournamentDescriptionBody" class="helper"></div>
-        </div>
-        <div class="card">
-          <div class="card-header">
-            <div>
-              <h3>Rules</h3>
-            </div>
-          </div>
-          <div id="tournamentRulesBody" class="helper"></div>
         </div>
       </section>
 
-      <section id="mapsTab" class="tab-panel">
-        <div class="card">
-          <div class="card-header">
-            <div>
-              <h3>Map Pool</h3>
-              <p class="helper">Fixed for this event (non-interactive)</p>
-            </div>
-          </div>
-          <div id="tournamentMapGrid" class="map-pool-grid"></div>
-        </div>
-      </section>
-
-      <section id="bracketTab" class="tab-panel active">
-        <div class="card bracket-card">
-          <div class="card-header">
-            <div>
-              <p class="eyebrow">Bracket</p>
-              <h3 id="bracketTitle">Double elimination</h3>
-            </div>
-            <div class="live-dot not-live" id="liveDot">Not Live</div>
-          </div>
-          <div id="bracketNotLive" class="not-live-panel" style="display:none;">
-            <p class="eyebrow registered-title" id="registeredPlayersTitle">Participent</p>
-            <p class="helper" id="bracketNotLiveMessage">Tournament paused - updates in progress.</p>
-            <ul id="registeredPlayersList" class="registered-list"></ul>
-          </div>
-          <div id="bracketGrid" class="bracket-grid">
-            <div class="placeholder">No players yet. Add players to generate the bracket.</div>
-          </div>
-        </div>
-        <div class="card activity-card" id="activityCard">
-          <div class="card-header">
-            <div>
-              <p class="eyebrow">Stream View</p>
-              <h3>Live updates</h3>
-            </div>
-          </div>
-          <ul id="activityList" class="activity-list"></ul>
-        </div>
-      </section>
-
-      <section id="registrationTab" class="tab-panel">
-        <div class="card" id="registrationCard">
-          <div class="card-header registration-header">
-            <div>
-              <p class="eyebrow">Registration</p>
-            </div>
-            <p id="registrationAccessNote" class="helper header-center" style="display:none;"></p>
-            <div class="stat-card checkin-stat" id="checkInCard" style="display:none;">
-              <p id="checkInStatus" class="checkin-status"></p>
-              <button type="button" id="checkInBtn" class="cta ghost small" style="display:none;">Check in</button>
-            </div>
-          </div>
-          <div id="registrationPulseSummary" class="registration-pulse-summary" style="display:none;"></div>
-          <form id="registrationForm" class="form-grid">
-            <label>
-              <span id="playerNameLabel">Player name</span>
-              <div class="input-with-status">
-                <span class="status-icon" id="playerNameStatusIcon" aria-hidden="true"></span>
-                <input id="playerNameInput" type="text" placeholder="e.g. Hydralisk" required />
-              </div>
-            </label>
-            <label class="field-compact">
-              <span id="raceLabel">Race</span>
-              <select id="raceSelect">
-                <option value="Zerg">Zerg</option>
-                <option value="Protoss">Protoss</option>
-                <option value="Terran">Terran</option>
-                <option value="Random">Random</option>
-              </select>
-            </label>
-            <div class="form-field readonly-field">
-              <div class="label-row">
-                <label class="label-text" id="pulseLinkLabel" for="pulseLinkDisplay">SC2Pulse URL (auto-set in settings)</label>
-                <button type="button" class="cta ghost small label-action" id="openPulseSettingsBtn">Settings</button>
-                <span class="label-separator">-</span>
-                <a class="label-link" href="https://sc2pulse.nephest.com/sc2/#stats" target="_blank" rel="noopener">SC2Pulse Website</a>
-              </div>
-              <div class="input-with-status">
-                <span class="status-icon" id="pulseLinkStatusIcon" aria-hidden="true"></span>
-                <input id="pulseLinkDisplay" type="text" placeholder="Add your SC2Pulse link in Settings" />
-              </div>
-            </div>
-            <div class="form-actions">
-              <button type="submit" class="cta primary" id="registerBtn">
-                Register
-                <span class="sync-spinner register-spinner" aria-hidden="true"></span>
+      <!-- Circuit detail -->
+      <section id="circuitView" style="display:none;">
+        <header class="hero hero-with-admins">
+          <div class="hero-main">
+            <a class="ghost-link" href="/tournament"><span class="ghost-link-icon">←</span>All tournaments</a>
+            <p class="eyebrow">Circuit</p>
+            <div class="hero-title-row">
+              <h1 id="circuitTitle">Circuit</h1>
+              <button class="hero-admin-toggle" type="button" aria-expanded="false">
+                Admins
               </button>
             </div>
-          </form>
-          <div class="caster-section" id="casterSection">
-            <div class="section-title">Caster</div>
-            <p class="helper">
-              Register as a caster to stream the game on Twitch. A host or admin must accept your request.
-            </p>
-            <div class="caster-actions">
-              <button type="button" class="cta ghost" id="requestCasterBtn">Request caster access</button>
-              <p class="helper" id="casterRequestStatus"></p>
+            <p class="lede" id="circuitDescription">Circuit overview.</p>
+            <div class="hero-actions">
+              <button id="openCreateCircuitTournament" class="cta primary small" style="display:none;">
+                Create tournament
+              </button>
+              <button id="openCircuitSettingsBtn" class="cta ghost small" style="display:none;">
+                Settings
+              </button>
             </div>
-            <div class="caster-requests" id="casterRequestPanel" data-admin-only="true" style="display:none;">
-              <div class="section-title">
-                <p class="eyebrow">Caster requests</p>
-                <h4 class="section-subtitle">Awaiting approval</h4>
+          </div>
+          <div class="hero-stats hero-stats-stacked">
+            <div class="stat-card">
+              <p>Tournaments</p>
+              <h2 id="circuitStatTournaments">0</h2>
+            </div>
+            <div class="stat-card accent">
+              <p>Next tournament starts</p>
+              <h2 id="circuitStatNextStart">TBD</h2>
+            </div>
+          </div>
+          <div class="hero-admin-panel" id="circuitAdminPanel">
+            <div class="hero-admins" id="circuitAdminSection">
+              <div class="hero-admins-header">
+                <span class="eyebrow">Admins</span>
+                <button id="inviteCircuitAdminBtn" class="cta ghost small" type="button" style="display:none;">
+                  Manage admins
+                </button>
               </div>
-              <div class="caster-request-list" id="casterRequestList"></div>
-              <p class="helper" id="casterRequestAdminStatus"></p>
+              <div class="hero-admins-list" id="circuitAdminList"></div>
             </div>
           </div>
-          <div class="admin-add-player" data-admin-only="true" id="finalAdminAddPanel" style="display:none;">
-            <div class="section-title">Add player</div>
-            <label>Find player by username
-              <input id="finalAdminSearchInput" class="settings-input" type="text" placeholder="Search username..."
-                autocomplete="off" spellcheck="false" />
-            </label>
-            <div class="admin-search-results" id="finalAdminSearchResults"></div>
-            <p class="helper" id="finalAdminSearchStatus"></p>
+        </header>
+
+        <main class="page-stack">
+          <div class="circuit-grid">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <p class="eyebrow">Circuit tournaments</p>
+                  <h3>Included tournaments</h3>
+                </div>
+                <button id="refreshCircuitBtn" class="cta ghost small">Refresh</button>
+              </div>
+              <ul id="circuitTournamentList" class="tournament-list circuit-tournament-list"></ul>
+            </div>
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <p class="eyebrow">Leaderboard</p>
+                  <h3>Points standings</h3>
+                </div>
+                <button id="downloadCircuitLeaderboardBtn" class="cta ghost small" style="display:none;">
+                  Download CSV
+                </button>
+                <button id="openCircuitPointsEditBtn" class="cta ghost small" style="display:none;">
+                  Edit points
+                </button>
+              </div>
+              <div class="table-wrapper leaderboard-scroll custom-scroll">
+                <table id="circuitLeaderboardTable" class="players-table leaderboard-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Player</th>
+                      <th id="circuitLeaderboardFirstPlaceHeader" class="first-place-cell">1st</th>
+                      <th class="points-cell">Points</th>
+                      <th class="events-cell">Events</th>
+                    </tr>
+                  </thead>
+                  <tbody id="circuitLeaderboardBody"></tbody>
+                </table>
+              </div>
+              <p id="circuitLeaderboardNote" class="helper"></p>
+            </div>
           </div>
-          <div class="admin-add-player" data-admin-only="true" id="inviteLinksPanel" style="display:none;">
-            <div class="section-title">Invite links</div>
-            <div class="form-grid">
-              <label>Name (optional)
-                <input id="inviteLinkNameInput" type="text" placeholder="e.g. Friends" maxlength="60" />
-              </label>
-              <label>Max uses (optional)
-                <input id="inviteLinkMaxUsesInput" type="number" min="1" placeholder="Unlimited" />
-              </label>
-              <label>Expires at (optional)
-                <div class="datetime-row">
-                  <input id="inviteLinkExpiresInput" type="text" class="datetime-input" placeholder="YYYY-MM-DD HH:MM"
-                    autocomplete="off" autocorrect="off" spellcheck="false" />
-                  <button type="button" class="icon-btn datepicker-btn" data-datepicker-for="inviteLinkExpiresInput"
-                    aria-label="Pick expiry time">
-                    <img src="img/SVG/time.svg" alt="" aria-hidden="true" />
+        </main>
+      </section>
+
+      <!-- Tournament detail -->
+      <section id="tournamentView" style="display:none;">
+        <header class="hero hero-with-admins">
+          <div class="hero-main">
+            <a class="ghost-link" href="/tournament" id="tournamentBackLink"><span class="ghost-link-icon">←</span>All
+              tournaments</a>
+            <div class="hero-title-row">
+              <h1 id="tournamentTitle">Tournament</h1>
+              <button class="hero-admin-toggle" type="button" aria-expanded="false">
+                Admins
+              </button>
+            </div>
+            <div class="hero-placements hero-placements--stacked" id="tournamentPlacements" style="display:none;">
+              <div class="placement-item" data-place="1">
+                <span class="placement-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" role="img" focusable="false">
+                    <path
+                      d="M7 4h10v2h3a1 1 0 0 1 1 1c0 3.866-3.134 7-7 7h-4c-3.866 0-7-3.134-7-7a1 1 0 0 1 1-1h3V4zm-3 4c.47 2.833 2.94 5 5.9 5h4.2c2.96 0 5.43-2.167 5.9-5h-2.9v1a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V8H4zm6 10h4v2h-4v-2zm-2 2h8v2H8v-2z"
+                      fill="currentColor" />
+                  </svg>
+                </span>
+                <span class="placement-label">1st</span>
+                <span class="placement-name" id="placementFirst">—</span>
+              </div>
+              <div class="placement-item" data-place="2">
+                <span class="placement-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" role="img" focusable="false">
+                    <path
+                      d="M7 4h10v2h3a1 1 0 0 1 1 1c0 3.866-3.134 7-7 7h-4c-3.866 0-7-3.134-7-7a1 1 0 0 1 1-1h3V4zm-3 4c.47 2.833 2.94 5 5.9 5h4.2c2.96 0 5.43-2.167 5.9-5h-2.9v1a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V8H4zm6 10h4v2h-4v-2zm-2 2h8v2H8v-2z"
+                      fill="currentColor" />
+                  </svg>
+                </span>
+                <span class="placement-label">2nd</span>
+                <span class="placement-name" id="placementSecond">—</span>
+              </div>
+              <div class="placement-item" data-place="3-4">
+                <span class="placement-icon placement-icon--bronze" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" role="img" focusable="false">
+                    <path
+                      d="M7 4h10v2h3a1 1 0 0 1 1 1c0 3.866-3.134 7-7 7h-4c-3.866 0-7-3.134-7-7a1 1 0 0 1 1-1h3V4zm-3 4c.47 2.833 2.94 5 5.9 5h4.2c2.96 0 5.43-2.167 5.9-5h-2.9v1a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V8H4zm6 10h4v2h-4v-2zm-2 2h8v2H8v-2z"
+                      fill="#cd7f32" />
+                  </svg>
+                </span>
+                <span class="placement-label">3–4</span>
+                <span class="placement-name" id="placementThirdFourth">—</span>
+              </div>
+            </div>
+          </div>
+          <div class="hero-stats">
+            <div class="stat-card">
+              <p>Registered</p>
+              <h2 id="statPlayers">0</h2>
+            </div>
+            <div class="stat-card accent">
+              <p>Start</p>
+              <h2 id="tournamentStart">TBD</h2>
+            </div>
+          </div>
+          <div class="hero-admin-panel" id="tournamentAdminPanel">
+            <div class="hero-admins" id="tournamentAdminSection">
+              <div class="hero-admins-header">
+                <span class="eyebrow">Admins</span>
+                <button id="inviteTournamentAdminBtn" class="cta ghost small" type="button" style="display:none;">
+                  Manage admins
+                </button>
+              </div>
+              <div class="hero-admins-list" id="tournamentAdminList"></div>
+            </div>
+          </div>
+        </header>
+
+        <div id="tournamentPlacementsMobileSlot" class="tournament-placements-slot"></div>
+
+        <main class="page-stack">
+          <div class="tab-bar" id="tabBar">
+            <div class="tab-group public-tabs">
+              <button class="tab-btn active" data-tab="bracketTab">Bracket</button>
+              <button class="tab-btn" data-tab="descriptionTab">Description &amp; Rules</button>
+              <button class="tab-btn" data-tab="mapsTab">Maps</button>
+              <button class="tab-btn" data-tab="registrationTab" id="adminTabBtn">Registration</button>
+            </div>
+            <div class="tab-divider" data-admin-only="true" aria-hidden="true"></div>
+            <div class="tab-group admin-tabs" data-admin-only="true">
+              <button class="tab-btn" data-tab="seedingTab" id="seedingTabBtn" style="display:none;">Seeding</button>
+              <button class="tab-btn" data-tab="settingsTab" id="settingsTabBtn" data-admin-only="true"
+                style="display:none;">Settings</button>
+              <button class="tab-btn" data-tab="circuitPointsTab" id="circuitPointsTabBtn" data-admin-only="true"
+                style="display:none;">Circuit points</button>
+            </div>
+          </div>
+
+          <section id="descriptionTab" class="tab-panel">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <h3>Description</h3>
+                </div>
+              </div>
+              <div id="tournamentDescriptionBody" class="helper"></div>
+            </div>
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <h3>Rules</h3>
+                </div>
+              </div>
+              <div id="tournamentRulesBody" class="helper"></div>
+            </div>
+          </section>
+
+          <section id="mapsTab" class="tab-panel">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <h3>Map Pool</h3>
+                  <p class="helper">Fixed for this event (non-interactive)</p>
+                </div>
+              </div>
+              <div id="tournamentMapGrid" class="map-pool-grid"></div>
+            </div>
+          </section>
+
+          <section id="bracketTab" class="tab-panel active">
+            <div class="card bracket-card">
+              <div class="card-header">
+                <div>
+                  <p class="eyebrow">Bracket</p>
+                  <h3 id="bracketTitle">Double elimination</h3>
+                </div>
+                <div class="live-dot not-live" id="liveDot">Not Live</div>
+              </div>
+              <div id="bracketNotLive" class="not-live-panel" style="display:none;">
+                <p class="eyebrow registered-title" id="registeredPlayersTitle">Participent</p>
+                <p class="helper" id="bracketNotLiveMessage">Tournament paused - updates in progress.</p>
+                <ul id="registeredPlayersList" class="registered-list"></ul>
+              </div>
+              <div id="bracketGrid" class="bracket-grid">
+                <div class="placeholder">No players yet. Add players to generate the bracket.</div>
+              </div>
+            </div>
+            <div class="card activity-card" id="activityCard">
+              <div class="card-header">
+                <div>
+                  <p class="eyebrow">Stream View</p>
+                  <h3>Live updates</h3>
+                </div>
+              </div>
+              <ul id="activityList" class="activity-list"></ul>
+            </div>
+          </section>
+
+          <section id="registrationTab" class="tab-panel">
+            <div class="card" id="registrationCard">
+              <div class="card-header registration-header">
+                <div>
+                  <p class="eyebrow">Registration</p>
+                </div>
+                <p id="registrationAccessNote" class="helper header-center" style="display:none;"></p>
+                <div class="stat-card checkin-stat" id="checkInCard" style="display:none;">
+                  <p id="checkInStatus" class="checkin-status"></p>
+                  <button type="button" id="checkInBtn" class="cta ghost small" style="display:none;">Check in</button>
+                </div>
+              </div>
+              <div id="registrationPulseSummary" class="registration-pulse-summary" style="display:none;"></div>
+              <form id="registrationForm" class="form-grid">
+                <label>
+                  <span id="playerNameLabel">Player name</span>
+                  <div class="input-with-status">
+                    <span class="status-icon" id="playerNameStatusIcon" aria-hidden="true"></span>
+                    <input id="playerNameInput" type="text" placeholder="e.g. Hydralisk" required />
+                  </div>
+                </label>
+                <label class="field-compact">
+                  <span id="raceLabel">Race</span>
+                  <select id="raceSelect">
+                    <option value="Zerg">Zerg</option>
+                    <option value="Protoss">Protoss</option>
+                    <option value="Terran">Terran</option>
+                    <option value="Random">Random</option>
+                  </select>
+                </label>
+                <div class="form-field readonly-field">
+                  <div class="label-row">
+                    <label class="label-text" id="pulseLinkLabel" for="pulseLinkDisplay">SC2Pulse URL (auto-set in
+                      settings)</label>
+                    <button type="button" class="cta ghost small label-action"
+                      id="openPulseSettingsBtn">Settings</button>
+                    <span class="label-separator">-</span>
+                    <a class="label-link" href="https://sc2pulse.nephest.com/sc2/#stats" target="_blank"
+                      rel="noopener">SC2Pulse Website</a>
+                  </div>
+                  <div class="input-with-status">
+                    <span class="status-icon" id="pulseLinkStatusIcon" aria-hidden="true"></span>
+                    <input id="pulseLinkDisplay" type="text" placeholder="Add your SC2Pulse link in Settings" />
+                  </div>
+                </div>
+                <div class="form-actions">
+                  <button type="submit" class="cta primary" id="registerBtn">
+                    Register
+                    <span class="sync-spinner register-spinner" aria-hidden="true"></span>
                   </button>
                 </div>
-              </label>
-            </div>
-            <div class="form-actions" style="margin-top:12px;">
-              <button type="button" class="cta primary small" id="createInviteLinkBtn">Create invite link</button>
-            </div>
-            <div class="invite-link-table" id="inviteLinkList">
-              <div class="invite-link-row invite-link-header">
-                <span>Active</span>
-                <span>Name</span>
-                <span>Uses</span>
-                <span>Expires</span>
-                <span></span>
-              </div>
-            </div>
-            <p class="helper" id="inviteLinkStatus"></p>
-          </div>
-          <div class="admin-add-player" data-admin-only="true" id="botManagerPanel" style="display:none;">
-            <div class="section-title">Bots</div>
-            <p class="helper">Add or remove bot players for testing.</p>
-            <p class="helper" id="botCountText">Bots: 0</p>
-            <div class="form-actions">
-              <button type="button" class="cta ghost" id="addBotBtn">Add bot</button>
-              <button type="button" class="cta ghost" id="removeBotBtn">Remove bot</button>
-              <button type="button" class="cta ghost" id="removeBotsBtn">Remove all bots</button>
-            </div>
-          </div>
-        </div>
-
-      </section>
-
-      <section id="seedingTab" class="tab-panel" data-admin-only="true">
-        <div class="card" id="seedingCard">
-          <div class="card-header">
-            <div>
-              <p class="eyebrow">Seeding</p>
-              <h3>Points-first ranking</h3>
-            </div>
-            <div class="seed-actions">
-              <button id="rebuildBracketBtn" class="cta small ghost">Go Live</button>
-              <button id="notifyCheckInBtn" class="cta small ghost">Notify check-in</button>
-              <button id="resetTournamentBtn" class="cta small subtle">Reset tournament</button>
-            </div>
-          </div>
-          <div class="publish-checkbox-row" id="finalAutoAddRow" style="display:none;">
-            <span>Auto-add from Leaderboard</span>
-            <div class="checkbox-wrapper-59 checkbox-wrapper-59--blue">
-              <label class="switch">
-                <input type="checkbox" id="finalAutoAddToggle" />
-                <span class="slider"></span>
-              </label>
-            </div>
-          </div>
-          <p class="helper" id="finalAutoAddStatus"></p>
-          <div class="publish-checkbox-row seeding-mode-row">
-            <span>Manual seeding</span>
-            <div class="checkbox-wrapper-59">
-              <label class="switch">
-                <input type="checkbox" id="manualSeedingToggle" />
-                <span class="slider"></span>
-              </label>
-            </div>
-          </div>
-          <p class="helper" id="manualSeedingHelp">Automatic seeding uses points and MMR.</p>
-          <div class="table-wrapper">
-            <table class="players-table">
-              <thead>
-                <tr>
-                  <th>Seed</th>
-                  <th>Player</th>
-                  <th>Status</th>
-                  <th>Points</th>
-                  <th>MMR</th>
-                  <th>SC2Pulse</th>
-                  <th>Check-in</th>
-                  <th>Forfeit</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody id="playersTableBody"></tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      <section id="settingsTab" class="tab-panel" data-admin-only="true">
-        <div class="card">
-          <div class="card-header">
-            <div>
-              <p class="eyebrow">Admin</p>
-              <h3>Edit tournament settings</h3>
-            </div>
-          </div>
-          <div class="settings-tabs" id="settingsTabs">
-            <button class="settings-tab-btn active" data-settings-tab="settingsGeneral">General</button>
-            <button class="settings-tab-btn" data-settings-tab="settingsDesc">Description &amp; Rules</button>
-            <button class="settings-tab-btn" data-settings-tab="settingsMaps">Maps</button>
-            <button class="settings-tab-btn" data-settings-tab="settingsFormat">Format</button>
-          </div>
-          <div class="settings-panel active" id="settingsGeneral">
-            <div class="admin-settings-grid">
-              <div class="settings-row">
-                <div class="settings-row-label">Tournament name</div>
-                <div class="settings-row-control">
-                  <input type="text" id="settingsNameInput" placeholder="My Weekly Cup" />
+              </form>
+              <div class="caster-section" id="casterSection">
+                <div class="section-title">Caster</div>
+                <p class="helper">
+                  Register as a caster to stream the game on Twitch. A host or admin must accept your request.
+                </p>
+                <div class="caster-actions">
+                  <button type="button" class="cta ghost" id="requestCasterBtn">Request caster access</button>
+                  <p class="helper" id="casterRequestStatus"></p>
+                </div>
+                <div class="caster-requests" id="casterRequestPanel" data-admin-only="true" style="display:none;">
+                  <div class="section-title">
+                    <p class="eyebrow">Caster requests</p>
+                    <h4 class="section-subtitle">Awaiting approval</h4>
+                  </div>
+                  <div class="caster-request-list" id="casterRequestList"></div>
+                  <p class="helper" id="casterRequestAdminStatus"></p>
                 </div>
               </div>
-              <div class="settings-row">
-                <div class="settings-row-label">Custom URL slug</div>
-                <div class="settings-row-control">
-                  <div class="inline-row">
-                    <span class="muted">https://zbuildorder.com/tournament/</span>
-                    <div class="slug-input-wrapper">
-                      <input type="text" id="settingsSlugInput" placeholder="my-weekly-cup" />
+              <div class="admin-add-player" data-admin-only="true" id="finalAdminAddPanel" style="display:none;">
+                <div class="section-title">Add player</div>
+                <label>Find player by username
+                  <input id="finalAdminSearchInput" class="settings-input" type="text" placeholder="Search username..."
+                    autocomplete="off" spellcheck="false" />
+                </label>
+                <div class="admin-search-results" id="finalAdminSearchResults"></div>
+                <p class="helper" id="finalAdminSearchStatus"></p>
+              </div>
+              <div class="admin-add-player" data-admin-only="true" id="inviteLinksPanel" style="display:none;">
+                <div class="section-title">Invite links</div>
+                <div class="form-grid">
+                  <label>Name (optional)
+                    <input id="inviteLinkNameInput" type="text" placeholder="e.g. Friends" maxlength="60" />
+                  </label>
+                  <label>Max uses (optional)
+                    <input id="inviteLinkMaxUsesInput" type="number" min="1" placeholder="Unlimited" />
+                  </label>
+                  <label>Expires at (optional)
+                    <div class="datetime-row">
+                      <input id="inviteLinkExpiresInput" type="text" class="datetime-input"
+                        placeholder="YYYY-MM-DD HH:MM" autocomplete="off" autocorrect="off" spellcheck="false" />
+                      <button type="button" class="icon-btn datepicker-btn" data-datepicker-for="inviteLinkExpiresInput"
+                        aria-label="Pick expiry time">
+                        <img src="img/SVG/time.svg" alt="" aria-hidden="true" />
+                      </button>
+                    </div>
+                  </label>
+                </div>
+                <div class="form-actions" style="margin-top:12px;">
+                  <button type="button" class="cta primary small" id="createInviteLinkBtn">Create invite link</button>
+                </div>
+                <div class="invite-link-table" id="inviteLinkList">
+                  <div class="invite-link-row invite-link-header">
+                    <span>Active</span>
+                    <span>Name</span>
+                    <span>Uses</span>
+                    <span>Expires</span>
+                    <span></span>
+                  </div>
+                </div>
+                <p class="helper" id="inviteLinkStatus"></p>
+              </div>
+              <div class="admin-add-player" data-admin-only="true" id="botManagerPanel" style="display:none;">
+                <div class="section-title">Bots</div>
+                <p class="helper">Add or remove bot players for testing.</p>
+                <p class="helper" id="botCountText">Bots: 0</p>
+                <div class="form-actions">
+                  <button type="button" class="cta ghost" id="addBotBtn">Add bot</button>
+                  <button type="button" class="cta ghost" id="removeBotBtn">Remove bot</button>
+                  <button type="button" class="cta ghost" id="removeBotsBtn">Remove all bots</button>
+                </div>
+              </div>
+            </div>
+
+          </section>
+
+          <section id="seedingTab" class="tab-panel" data-admin-only="true">
+            <div class="card" id="seedingCard">
+              <div class="card-header">
+                <div>
+                  <p class="eyebrow">Seeding</p>
+                  <h3>Points-first ranking</h3>
+                </div>
+                <div class="seed-actions">
+                  <button id="rebuildBracketBtn" class="cta small ghost">Go Live</button>
+                  <button id="notifyCheckInBtn" class="cta small ghost">Notify check-in</button>
+                  <button id="resetTournamentBtn" class="cta small subtle">Reset tournament</button>
+                </div>
+              </div>
+              <div class="publish-checkbox-row" id="finalAutoAddRow" style="display:none;">
+                <span>Auto-add from Leaderboard</span>
+                <div class="checkbox-wrapper-59 checkbox-wrapper-59--blue">
+                  <label class="switch">
+                    <input type="checkbox" id="finalAutoAddToggle" />
+                    <span class="slider"></span>
+                  </label>
+                </div>
+              </div>
+              <p class="helper" id="finalAutoAddStatus"></p>
+              <div class="publish-checkbox-row seeding-mode-row">
+                <span>Manual seeding</span>
+                <div class="checkbox-wrapper-59">
+                  <label class="switch">
+                    <input type="checkbox" id="manualSeedingToggle" />
+                    <span class="slider"></span>
+                  </label>
+                </div>
+              </div>
+              <p class="helper" id="manualSeedingHelp">Automatic seeding uses points and MMR.</p>
+              <div class="table-wrapper">
+                <table class="players-table">
+                  <thead>
+                    <tr>
+                      <th>Seed</th>
+                      <th>Player</th>
+                      <th>Status</th>
+                      <th>Points</th>
+                      <th>MMR</th>
+                      <th>SC2Pulse</th>
+                      <th>Check-in</th>
+                      <th>Forfeit</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="playersTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <section id="settingsTab" class="tab-panel" data-admin-only="true">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <p class="eyebrow">Admin</p>
+                  <h3>Edit tournament settings</h3>
+                </div>
+              </div>
+              <div class="settings-tabs" id="settingsTabs">
+                <button class="settings-tab-btn active" data-settings-tab="settingsGeneral">General</button>
+                <button class="settings-tab-btn" data-settings-tab="settingsDesc">Description &amp; Rules</button>
+                <button class="settings-tab-btn" data-settings-tab="settingsMaps">Maps</button>
+                <button class="settings-tab-btn" data-settings-tab="settingsFormat">Format</button>
+              </div>
+              <div class="settings-panel active" id="settingsGeneral">
+                <div class="admin-settings-grid">
+                  <div class="settings-row">
+                    <div class="settings-row-label">Tournament name</div>
+                    <div class="settings-row-control">
+                      <input type="text" id="settingsNameInput" placeholder="My Weekly Cup" />
                     </div>
                   </div>
-                  <p class="helper">Slug changes are locked for existing tournaments.</p>
-                </div>
-              </div>
-              <div class="settings-row">
-                <div class="settings-row-label">Start time</div>
-                <div class="settings-row-control">
-                  <div class="datetime-row">
-                    <input type="text" id="settingsStartInput" class="datetime-input" placeholder="YYYY-MM-DD HH:MM"
-                      autocomplete="off" autocorrect="off" spellcheck="false" />
-                    <button type="button" class="icon-btn datepicker-btn" data-datepicker-for="settingsStartInput"
-                      aria-label="Pick start time">
-                      <img src="img/SVG/time.svg" alt="" aria-hidden="true" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <div class="settings-row">
-                <div class="settings-row-label">Max players</div>
-                <div class="settings-row-control">
-                  <input type="number" id="settingsMaxPlayersInput" min="2" max="32" value="32" />
-                </div>
-              </div>
-              <div id="settingsCircuitQualifyRow" class="settings-row" style="display:none;">
-                <div class="settings-row-label">Final qualifiers from circuit leaderboard</div>
-                <div class="settings-row-control">
-                  <input type="number" id="settingsCircuitQualifyCount" min="0" placeholder="8" />
-                  <p class="helper">Only the top N on the circuit leaderboard can register for finals.</p>
-                </div>
-              </div>
-              <div class="settings-row">
-                <div class="settings-row-label">Check-in opens (before start)</div>
-                <div class="settings-row-control">
-                  <select id="settingsCheckInSelect">
-                    <option value="0">0 min</option>
-                    <option value="15">15 min</option>
-                    <option value="30">30 min</option>
-                    <option value="45">45 min</option>
-                    <option value="60">1h</option>
-                    <option value="75">1h 15</option>
-                    <option value="90">1h 30</option>
-                    <option value="105">1h 45</option>
-                    <option value="120">2h</option>
-                    <option value="135">2h 15</option>
-                    <option value="150">2h 30</option>
-                    <option value="165">2h 45</option>
-                    <option value="180">3h</option>
-                  </select>
-                </div>
-              </div>
-              <div class="settings-row">
-                <div class="settings-row-label">Tournament visibility</div>
-                <div class="settings-row-control">
-                  <select id="settingsVisibilitySelect">
-                    <option value="public">Public (shown in browse)</option>
-                    <option value="private">Private (link only)</option>
-                  </select>
-                  <p class="helper">Private tournaments are hidden from browse listings.</p>
-                </div>
-              </div>
-              <div class="settings-row">
-                <div class="settings-row-label">Tournament access</div>
-                <div class="settings-row-control">
-                  <select id="settingsAccessSelect">
-                    <option value="open">Open (anyone can register)</option>
-                    <option value="closed">Closed (invite-only)</option>
-                  </select>
-                  <p class="helper">Invite-only tournaments require admins to invite players.</p>
-                </div>
-              </div>
-              <div class="settings-row">
-                <div class="settings-row-label">Require SC2Pulse link for registration</div>
-                <div class="settings-row-control">
-                  <div class="settings-toggle-row">
-                    <div class="checkbox-wrapper-59">
-                      <label class="switch">
-                        <input type="checkbox" id="settingsRequirePulseLink" checked />
-                        <span class="slider"></span>
-                      </label>
+                  <div class="settings-row">
+                    <div class="settings-row-label">Custom URL slug</div>
+                    <div class="settings-row-control">
+                      <div class="inline-row">
+                        <span class="muted">https://zbuildorder.com/tournament/</span>
+                        <div class="slug-input-wrapper">
+                          <input type="text" id="settingsSlugInput" placeholder="my-weekly-cup" />
+                        </div>
+                      </div>
+                      <p class="helper">Slug changes are locked for existing tournaments.</p>
                     </div>
-                    <p class="helper">When enabled, players must submit their SC2Pulse link to register.</p>
+                  </div>
+                  <div class="settings-row">
+                    <div class="settings-row-label">Start time</div>
+                    <div class="settings-row-control">
+                      <div class="datetime-row">
+                        <input type="text" id="settingsStartInput" class="datetime-input" placeholder="YYYY-MM-DD HH:MM"
+                          autocomplete="off" autocorrect="off" spellcheck="false" />
+                        <button type="button" class="icon-btn datepicker-btn" data-datepicker-for="settingsStartInput"
+                          aria-label="Pick start time">
+                          <img src="img/SVG/time.svg" alt="" aria-hidden="true" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="settings-row">
+                    <div class="settings-row-label">Max players</div>
+                    <div class="settings-row-control">
+                      <input type="number" id="settingsMaxPlayersInput" min="2" max="32" value="32" />
+                    </div>
+                  </div>
+                  <div id="settingsCircuitQualifyRow" class="settings-row" style="display:none;">
+                    <div class="settings-row-label">Final qualifiers from circuit leaderboard</div>
+                    <div class="settings-row-control">
+                      <input type="number" id="settingsCircuitQualifyCount" min="0" placeholder="8" />
+                      <p class="helper">Only the top N on the circuit leaderboard can register for finals.</p>
+                    </div>
+                  </div>
+                  <div class="settings-row">
+                    <div class="settings-row-label">Check-in opens (before start)</div>
+                    <div class="settings-row-control">
+                      <select id="settingsCheckInSelect">
+                        <option value="0">0 min</option>
+                        <option value="15">15 min</option>
+                        <option value="30">30 min</option>
+                        <option value="45">45 min</option>
+                        <option value="60">1h</option>
+                        <option value="75">1h 15</option>
+                        <option value="90">1h 30</option>
+                        <option value="105">1h 45</option>
+                        <option value="120">2h</option>
+                        <option value="135">2h 15</option>
+                        <option value="150">2h 30</option>
+                        <option value="165">2h 45</option>
+                        <option value="180">3h</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="settings-row">
+                    <div class="settings-row-label">Tournament visibility</div>
+                    <div class="settings-row-control">
+                      <select id="settingsVisibilitySelect">
+                        <option value="public">Public (shown in browse)</option>
+                        <option value="private">Private (link only)</option>
+                      </select>
+                      <p class="helper">Private tournaments are hidden from browse listings.</p>
+                    </div>
+                  </div>
+                  <div class="settings-row">
+                    <div class="settings-row-label">Tournament access</div>
+                    <div class="settings-row-control">
+                      <select id="settingsAccessSelect">
+                        <option value="open">Open (anyone can register)</option>
+                        <option value="closed">Closed (invite-only)</option>
+                      </select>
+                      <p class="helper">Invite-only tournaments require admins to invite players.</p>
+                    </div>
+                  </div>
+                  <div class="settings-row">
+                    <div class="settings-row-label">Require SC2Pulse link for registration</div>
+                    <div class="settings-row-control">
+                      <div class="settings-toggle-row">
+                        <div class="checkbox-wrapper-59">
+                          <label class="switch">
+                            <input type="checkbox" id="settingsRequirePulseLink" checked />
+                            <span class="slider"></span>
+                          </label>
+                        </div>
+                        <p class="helper">When enabled, players must submit their SC2Pulse link to register.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <label class="settings-cover-row">Cover image
+                  <div class="image-upload">
+                    <div class="image-upload-actions">
+                      <input type="file" id="settingsImageInput" accept="image/*" />
+                      <button type="button" class="cta ghost small cover-reuse-btn"
+                        data-cover-input="settingsImageInput" data-cover-preview="settingsImagePreview">
+                        Reuse cover
+                      </button>
+                    </div>
+                    <div class="image-preview">
+                      <img id="settingsImagePreview" alt="Tournament cover preview" />
+                    </div>
+                    <p class="helper">Recommended 1200x630. JPG/PNG/WebP.</p>
+                  </div>
+                </label>
+              </div>
+              <div class="settings-panel" id="settingsDesc">
+                <div class="markdown-field">
+                  <div class="markdown-label">Description</div>
+                  <div class="markdown-editor">
+                    <div id="settingsDescriptionEditor" class="quill-editor"></div>
+                    <textarea id="settingsDescriptionInput" class="markdown-input" rows="8"
+                      placeholder="Describe the event..." aria-hidden="true" tabindex="-1"
+                      style="display:none;"></textarea>
+                  </div>
+                </div>
+                <div class="markdown-field">
+                  <div class="markdown-label">Rules</div>
+                  <div class="markdown-editor">
+                    <div id="settingsRulesEditor" class="quill-editor"></div>
+                    <textarea id="settingsRulesInput" class="markdown-input" rows="8"
+                      placeholder="Add eligibility, format, communication, and fair play rules..." aria-hidden="true"
+                      tabindex="-1" style="display:none;"></textarea>
                   </div>
                 </div>
               </div>
-            </div>
-            <label class="settings-cover-row">Cover image
-              <div class="image-upload">
-                <div class="image-upload-actions">
-                  <input type="file" id="settingsImageInput" accept="image/*" />
-                  <button type="button" class="cta ghost small cover-reuse-btn" data-cover-input="settingsImageInput"
-                    data-cover-preview="settingsImagePreview">
-                    Reuse cover
-                  </button>
-                </div>
-                <div class="image-preview">
-                  <img id="settingsImagePreview" alt="Tournament cover preview" />
-                </div>
-                <p class="helper">Recommended 1200x630. JPG/PNG/WebP.</p>
-              </div>
-            </label>
-          </div>
-          <div class="settings-panel" id="settingsDesc">
-            <div class="markdown-field">
-              <div class="markdown-label">Description</div>
-              <div class="markdown-editor">
-                <div id="settingsDescriptionEditor" class="quill-editor"></div>
-                <textarea id="settingsDescriptionInput" class="markdown-input" rows="8"
-                  placeholder="Describe the event..." aria-hidden="true" tabindex="-1" style="display:none;"></textarea>
-              </div>
-            </div>
-            <div class="markdown-field">
-              <div class="markdown-label">Rules</div>
-              <div class="markdown-editor">
-                <div id="settingsRulesEditor" class="quill-editor"></div>
-                <textarea id="settingsRulesInput" class="markdown-input" rows="8"
-                  placeholder="Add eligibility, format, communication, and fair play rules..." aria-hidden="true"
-                  tabindex="-1" style="display:none;"></textarea>
-              </div>
-            </div>
-          </div>
-          <div class="settings-panel" id="settingsMaps">
-            <div class="map-pool-picker">
-              <div class="picker-header">
-                <div>
-                  <p class="eyebrow">Maps</p>
-                  <h4>Chosen map pool</h4>
-                </div>
-                <div class="picker-actions">
-                  <button type="button" class="cta small ghost" id="settingsUseLadderMapsBtn">All ladder maps</button>
-                  <button type="button" class="cta small subtle" id="settingsClearMapPoolBtn">Custom</button>
+              <div class="settings-panel" id="settingsMaps">
+                <div class="map-pool-picker">
+                  <div class="picker-header">
+                    <div>
+                      <p class="eyebrow">Maps</p>
+                      <h4>Chosen map pool</h4>
+                    </div>
+                    <div class="picker-actions">
+                      <button type="button" class="cta small ghost" id="settingsUseLadderMapsBtn">All ladder
+                        maps</button>
+                      <button type="button" class="cta small subtle" id="settingsClearMapPoolBtn">Custom</button>
+                    </div>
+                  </div>
+                  <div id="settingsChosenMapList" class="map-pool-grid chosen-grid"></div>
+                  <div class="picker-header" style="margin-top:12px;">
+                    <div>
+                      <h4>All 1v1 maps</h4>
+                      <p class="helper">Click to add/remove. Includes current + archive.</p>
+                    </div>
+                  </div>
+                  <div id="settingsMapPoolPicker" class="map-pool-grid selectable"></div>
                 </div>
               </div>
-              <div id="settingsChosenMapList" class="map-pool-grid chosen-grid"></div>
-              <div class="picker-header" style="margin-top:12px;">
-                <div>
-                  <h4>All 1v1 maps</h4>
-                  <p class="helper">Click to add/remove. Includes current + archive.</p>
-                </div>
-              </div>
-              <div id="settingsMapPoolPicker" class="map-pool-grid selectable"></div>
-            </div>
-          </div>
-          <div class="settings-panel" id="settingsFormat">
-            <label>Format
-              <select id="settingsFormatSelect">
-                <option value="Double Elimination">Double Elimination</option>
-                <option value="Single Elimination">Single Elimination</option>
-                <option value="Round Robin">Round Robin</option>
-                <option value="GSL/Dual Tournament">GSL/Dual Tournament</option>
-                <option value="Swiss">Swiss</option>
-              </select>
-            </label>
-            <div class="format-stage" data-format-scope="settings-roundrobin">
-              <p class="eyebrow">Stage 1</p>
-              <h4 id="settingsGroupStageLabel">Round Robin</h4>
-              <div class="inline-row">
-                <label style="flex:1;">Number of groups
-                  <input type="number" id="settingsRoundRobinGroups" min="1" />
-                </label>
-                <label style="flex:1;">Advance per group
-                  <input type="number" id="settingsRoundRobinAdvance" min="0" />
-                </label>
-                <label style="flex:1;">Group best of
-                  <select id="settingsRoundRobinBestOf">
-                    <option value="1">Bo1</option>
-                    <option value="3">Bo3</option>
-                    <option value="5">Bo5</option>
-                  </select>
-                </label>
-              </div>
-            </div>
-            <div class="format-stage" data-format-scope="settings-roundrobin">
-              <p class="eyebrow">Stage 2</p>
-              <h4>Playoffs</h4>
-              <p class="helper">
-                Optional. Qualifiers advance into the selected playoffs format. Choose None to end after Round Robin.
-              </p>
-              <div class="inline-row">
-                <label style="flex:1;">Playoffs
-                  <select id="settingsRoundRobinPlayoffs">
+              <div class="settings-panel" id="settingsFormat">
+                <label>Format
+                  <select id="settingsFormatSelect">
                     <option value="Double Elimination">Double Elimination</option>
                     <option value="Single Elimination">Single Elimination</option>
-                    <option value="None" selected>None</option>
+                    <option value="Round Robin">Round Robin</option>
+                    <option value="GSL/Dual Tournament">GSL/Dual Tournament</option>
+                    <option value="Swiss">Swiss</option>
                   </select>
                 </label>
+                <div class="format-stage" data-format-scope="settings-roundrobin">
+                  <p class="eyebrow">Stage 1</p>
+                  <h4 id="settingsGroupStageLabel">Round Robin</h4>
+                  <div class="inline-row">
+                    <label style="flex:1;">Number of groups
+                      <input type="number" id="settingsRoundRobinGroups" min="1" />
+                    </label>
+                    <label style="flex:1;">Advance per group
+                      <input type="number" id="settingsRoundRobinAdvance" min="0" />
+                    </label>
+                    <label style="flex:1;">Group best of
+                      <select id="settingsRoundRobinBestOf">
+                        <option value="1">Bo1</option>
+                        <option value="3">Bo3</option>
+                        <option value="5">Bo5</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
+                <div class="format-stage" data-format-scope="settings-roundrobin">
+                  <p class="eyebrow">Stage 2</p>
+                  <h4>Playoffs</h4>
+                  <p class="helper">
+                    Optional. Qualifiers advance into the selected playoffs format. Choose None to end after Round
+                    Robin.
+                  </p>
+                  <div class="inline-row">
+                    <label style="flex:1;">Playoffs
+                      <select id="settingsRoundRobinPlayoffs">
+                        <option value="Double Elimination">Double Elimination</option>
+                        <option value="Single Elimination">Single Elimination</option>
+                        <option value="None" selected>None</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
+
+                <div class="format-diagram">
+
+                  <!-- UPPER ROW -->
+                  <div class="format-row format-row--upper">
+                    <!-- Upper bracket (long box) -->
+                    <div class="format-col format-col--upper-main">
+                      <div class="format-title">Upper bracket</div>
+                      <div class="format-box format-box--big format-box--upper"></div>
+                      <label class="format-input">
+                        Best of
+                        <select id="settingsBestOfUpper">
+                          <option value="1">Bo1</option>
+                          <option value="3">Bo3</option>
+                          <option value="5">Bo5</option>
+                          <option value="7">Bo7</option>
+                          <option value="9">Bo9</option>
+                        </select>
+                      </label>
+
+                    </div>
+
+                    <!-- Quarterfinals (single big box) -->
+                    <div class="format-col format-col--quarter">
+                      <div class="format-title">Quarterfinals</div>
+                      <div class="format-box format-box--big format-box--qf"></div>
+                      <label class="format-input">
+                        Best of
+                        <select id="settingsBestOfQuarter">
+                          <option value="1">Bo1</option>
+                          <option value="3">Bo3</option>
+                          <option value="5">Bo5</option>
+                          <option value="7">Bo7</option>
+                          <option value="9">Bo9</option>
+                        </select>
+                      </label>
+                    </div>
+
+
+                    <!-- Semi-finals -->
+                    <div class="format-col format-col--semi">
+                      <div class="format-title">Semi-finals</div>
+                      <div class="format-box format-box--medium format-box--semi"></div>
+                      <label class="format-input">
+                        Best of
+                        <select id="settingsBestOfSemi">
+                          <option value="1">Bo1</option>
+                          <option value="3">Bo3</option>
+                          <option value="5">Bo5</option>
+                          <option value="7">Bo7</option>
+                          <option value="9">Bo9</option>
+                        </select>
+                      </label>
+
+                    </div>
+
+                    <!-- Upper Final -->
+                    <div class="format-col format-col--upper-final">
+                      <div class="format-title">Upper Final</div>
+                      <div class="format-box format-box--medium format-box--upper-final"></div>
+                      <label class="format-input">
+                        Best of
+                        <select id="settingsBestOfUpperFinal">
+                          <option value="1">Bo1</option>
+                          <option value="3">Bo3</option>
+                          <option value="5">Bo5</option>
+                          <option value="7">Bo7</option>
+                          <option value="9">Bo9</option>
+                        </select>
+                      </label>
+                    </div>
+
+                    <!-- Grand Final -->
+                    <div class="format-col format-col--final">
+                      <div class="format-title">Grand Final</div>
+                      <div class="format-box format-box--medium format-box--final"></div>
+                      <label class="format-input">
+                        Best of
+                        <select id="settingsBestOfFinal">
+                          <option value="1">Bo1</option>
+                          <option value="3">Bo3</option>
+                          <option value="5">Bo5</option>
+                          <option value="7">Bo7</option>
+                          <option value="9">Bo9</option>
+                        </select>
+                      </label>
+
+                    </div>
+                  </div>
+
+                  <!-- LOWER ROW -->
+                  <div class="format-row format-row--lower">
+                    <!-- Lower bracket (long box) -->
+                    <div class="format-col format-col--lower-main">
+                      <div class="format-title">Lower bracket</div>
+                      <div class="format-box format-box--big format-box--lower"></div>
+                      <label class="format-input">
+                        Best of
+                        <select id="settingsBestOfLower">
+                          <option value="1">Bo1</option>
+                          <option value="3">Bo3</option>
+                          <option value="5">Bo5</option>
+                          <option value="7">Bo7</option>
+                          <option value="9">Bo9</option>
+                        </select>
+                      </label>
+
+                    </div>
+
+                    <!-- LB Semi-finals -->
+                    <div class="format-col format-col--lb-extra">
+                      <div class="format-title">LB Semi-finals</div>
+                      <div class="format-box format-box--medium format-box--lb-semi"></div>
+                      <label class="format-input">
+                        Best of
+                        <select id="settingsBestOfLowerSemi">
+                          <option value="1">Bo1</option>
+                          <option value="3">Bo3</option>
+                          <option value="5">Bo5</option>
+                          <option value="7">Bo7</option>
+                          <option value="9">Bo9</option>
+                        </select>
+                      </label>
+                    </div>
+
+                    <!-- LB Finals -->
+                    <div class="format-col format-col--lb-extra">
+                      <div class="format-title">LB Finals</div>
+                      <div class="format-box format-box--medium format-box--lb-final"></div>
+                      <label class="format-input">
+                        Best of
+                        <select id="settingsBestOfLowerFinal">
+                          <option value="1">Bo1</option>
+                          <option value="3">Bo3</option>
+                          <option value="5">Bo5</option>
+                          <option value="7">Bo7</option>
+                          <option value="9">Bo9</option>
+                        </select>
+                      </label>
+                    </div>
+
+                    <!-- spacer no longer needed, but keep hidden by CSS if you want -->
+                    <div class="format-col format-col--spacer"></div>
+
+                  </div>
+
+                </div>
+              </div>
+              <div class="form-actions settings-actions" style="margin-top:16px;">
+                <button class="cta primary" id="saveSettingsBtn">Save settings</button>
+                <button class="cta danger" id="deleteTournamentBtn">Delete tournament</button>
               </div>
             </div>
-
-            <div class="format-diagram">
-
-              <!-- UPPER ROW -->
-              <div class="format-row format-row--upper">
-                <!-- Upper bracket (long box) -->
-                <div class="format-col format-col--upper-main">
-                  <div class="format-title">Upper bracket</div>
-                  <div class="format-box format-box--big format-box--upper"></div>
-                  <label class="format-input">
-                    Best of
-                    <select id="settingsBestOfUpper">
-                      <option value="1">Bo1</option>
-                      <option value="3">Bo3</option>
-                      <option value="5">Bo5</option>
-                      <option value="7">Bo7</option>
-                      <option value="9">Bo9</option>
-                    </select>
-                  </label>
-
+          </section>
+          <section id="circuitPointsTab" class="tab-panel" data-admin-only="true">
+            <div class="card">
+              <div id="circuitPointsPanel" class="circuit-points-panel" style="display:none;">
+                <div>
+                  <p class="eyebrow">Circuit</p>
+                  <h4>Circuit points</h4>
                 </div>
-
-                <!-- Quarterfinals (single big box) -->
-                <div class="format-col format-col--quarter">
-                  <div class="format-title">Quarterfinals</div>
-                  <div class="format-box format-box--big format-box--qf"></div>
-                  <label class="format-input">
-                    Best of
-                    <select id="settingsBestOfQuarter">
-                      <option value="1">Bo1</option>
-                      <option value="3">Bo3</option>
-                      <option value="5">Bo5</option>
-                      <option value="7">Bo7</option>
-                      <option value="9">Bo9</option>
-                    </select>
-                  </label>
+                <p class="helper">Assign points for placements in this tournament. Ties share the same points.</p>
+                <div class="table-wrapper">
+                  <table class="players-table circuit-points-table">
+                    <thead>
+                      <tr>
+                        <th>Place</th>
+                        <th>Points</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody id="circuitPointsBody"></tbody>
+                  </table>
                 </div>
-
-
-                <!-- Semi-finals -->
-                <div class="format-col format-col--semi">
-                  <div class="format-title">Semi-finals</div>
-                  <div class="format-box format-box--medium format-box--semi"></div>
-                  <label class="format-input">
-                    Best of
-                    <select id="settingsBestOfSemi">
-                      <option value="1">Bo1</option>
-                      <option value="3">Bo3</option>
-                      <option value="5">Bo5</option>
-                      <option value="7">Bo7</option>
-                      <option value="9">Bo9</option>
-                    </select>
-                  </label>
-
+                <div class="circuit-points-actions">
+                  <button class="cta small ghost" id="addCircuitPointsRow" type="button">
+                    Add placement
+                  </button>
+                  <button class="cta small primary" id="applyCircuitPointsBtn" type="button">
+                    Apply points to players
+                  </button>
                 </div>
-
-                <!-- Upper Final -->
-                <div class="format-col format-col--upper-final">
-                  <div class="format-title">Upper Final</div>
-                  <div class="format-box format-box--medium format-box--upper-final"></div>
-                  <label class="format-input">
-                    Best of
-                    <select id="settingsBestOfUpperFinal">
-                      <option value="1">Bo1</option>
-                      <option value="3">Bo3</option>
-                      <option value="5">Bo5</option>
-                      <option value="7">Bo7</option>
-                      <option value="9">Bo9</option>
-                    </select>
-                  </label>
-                </div>
-
-                <!-- Grand Final -->
-                <div class="format-col format-col--final">
-                  <div class="format-title">Grand Final</div>
-                  <div class="format-box format-box--medium format-box--final"></div>
-                  <label class="format-input">
-                    Best of
-                    <select id="settingsBestOfFinal">
-                      <option value="1">Bo1</option>
-                      <option value="3">Bo3</option>
-                      <option value="5">Bo5</option>
-                      <option value="7">Bo7</option>
-                      <option value="9">Bo9</option>
-                    </select>
-                  </label>
-
-                </div>
+                <p class="helper" id="circuitPointsStatus"></p>
               </div>
-
-              <!-- LOWER ROW -->
-              <div class="format-row format-row--lower">
-                <!-- Lower bracket (long box) -->
-                <div class="format-col format-col--lower-main">
-                  <div class="format-title">Lower bracket</div>
-                  <div class="format-box format-box--big format-box--lower"></div>
-                  <label class="format-input">
-                    Best of
-                    <select id="settingsBestOfLower">
-                      <option value="1">Bo1</option>
-                      <option value="3">Bo3</option>
-                      <option value="5">Bo5</option>
-                      <option value="7">Bo7</option>
-                      <option value="9">Bo9</option>
-                    </select>
-                  </label>
-
-                </div>
-
-                <!-- LB Semi-finals -->
-                <div class="format-col format-col--lb-extra">
-                  <div class="format-title">LB Semi-finals</div>
-                  <div class="format-box format-box--medium format-box--lb-semi"></div>
-                  <label class="format-input">
-                    Best of
-                    <select id="settingsBestOfLowerSemi">
-                      <option value="1">Bo1</option>
-                      <option value="3">Bo3</option>
-                      <option value="5">Bo5</option>
-                      <option value="7">Bo7</option>
-                      <option value="9">Bo9</option>
-                    </select>
-                  </label>
-                </div>
-
-                <!-- LB Finals -->
-                <div class="format-col format-col--lb-extra">
-                  <div class="format-title">LB Finals</div>
-                  <div class="format-box format-box--medium format-box--lb-final"></div>
-                  <label class="format-input">
-                    Best of
-                    <select id="settingsBestOfLowerFinal">
-                      <option value="1">Bo1</option>
-                      <option value="3">Bo3</option>
-                      <option value="5">Bo5</option>
-                      <option value="7">Bo7</option>
-                      <option value="9">Bo9</option>
-                    </select>
-                  </label>
-                </div>
-
-                <!-- spacer no longer needed, but keep hidden by CSS if you want -->
-                <div class="format-col format-col--spacer"></div>
-
-              </div>
-
             </div>
-          </div>
-          <div class="form-actions settings-actions" style="margin-top:16px;">
-            <button class="cta primary" id="saveSettingsBtn">Save settings</button>
-            <button class="cta danger" id="deleteTournamentBtn">Delete tournament</button>
-          </div>
-        </div>
+          </section>
+        </main>
       </section>
-      <section id="circuitPointsTab" class="tab-panel" data-admin-only="true">
-        <div class="card">
-          <div id="circuitPointsPanel" class="circuit-points-panel" style="display:none;">
-            <div>
-              <p class="eyebrow">Circuit</p>
-              <h4>Circuit points</h4>
-            </div>
-            <p class="helper">Assign points for placements in this tournament. Ties share the same points.</p>
-            <div class="table-wrapper">
-              <table class="players-table circuit-points-table">
-                <thead>
-                  <tr>
-                    <th>Place</th>
-                    <th>Points</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody id="circuitPointsBody"></tbody>
-              </table>
-            </div>
-            <div class="circuit-points-actions">
-              <button class="cta small ghost" id="addCircuitPointsRow" type="button">
-                Add placement
-              </button>
-              <button class="cta small primary" id="applyCircuitPointsBtn" type="button">
-                Apply points to players
-              </button>
-            </div>
-            <p class="helper" id="circuitPointsStatus"></p>
-          </div>
-        </div>
-      </section>
-    </main>
-  </section>
     </div>
   </main>
 
@@ -1350,10 +1365,10 @@
           </div>
         </div>
         <div class="format-diagram">
-            <div class="format-row format-row--upper">
-              <div class="format-col format-col--upper-main">
-                <div class="format-title">Upper bracket</div>
-                <div class="format-box format-box--big format-box--upper"></div>
+          <div class="format-row format-row--upper">
+            <div class="format-col format-col--upper-main">
+              <div class="format-title">Upper bracket</div>
+              <div class="format-box format-box--big format-box--upper"></div>
               <label class="format-input">
                 Best of
                 <select id="bestOfUpperInput">
@@ -1381,10 +1396,10 @@
               </label>
             </div>
 
-              <div class="format-col format-col--semi">
-                <div class="format-title">Semi-finals</div>
-                <div class="format-box format-box--medium format-box--semi"></div>
-                <label class="format-input">
+            <div class="format-col format-col--semi">
+              <div class="format-title">Semi-finals</div>
+              <div class="format-box format-box--medium format-box--semi"></div>
+              <label class="format-input">
                 Best of
                 <select id="bestOfSemiInput">
                   <option value="1">Bo1</option>
@@ -1394,38 +1409,38 @@
                   <option value="9">Bo9</option>
                 </select>
               </label>
-              </div>
-
-              <div class="format-col format-col--upper-final">
-                <div class="format-title">Upper Final</div>
-                <div class="format-box format-box--medium format-box--upper-final"></div>
-                <label class="format-input">
-                  Best of
-                  <select id="bestOfUpperFinalInput">
-                    <option value="1">Bo1</option>
-                    <option value="3">Bo3</option>
-                    <option value="5">Bo5</option>
-                    <option value="7">Bo7</option>
-                    <option value="9">Bo9</option>
-                  </select>
-                </label>
-              </div>
-
-              <div class="format-col format-col--final">
-                <div class="format-title">Grand Final</div>
-                <div class="format-box format-box--medium format-box--final"></div>
-                <label class="format-input">
-                  Best of
-                  <select id="bestOfFinalInput">
-                    <option value="1">Bo1</option>
-                    <option value="3">Bo3</option>
-                    <option value="5">Bo5</option>
-                    <option value="7">Bo7</option>
-                    <option value="9">Bo9</option>
-                  </select>
-                </label>
-              </div>
             </div>
+
+            <div class="format-col format-col--upper-final">
+              <div class="format-title">Upper Final</div>
+              <div class="format-box format-box--medium format-box--upper-final"></div>
+              <label class="format-input">
+                Best of
+                <select id="bestOfUpperFinalInput">
+                  <option value="1">Bo1</option>
+                  <option value="3">Bo3</option>
+                  <option value="5">Bo5</option>
+                  <option value="7">Bo7</option>
+                  <option value="9">Bo9</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="format-col format-col--final">
+              <div class="format-title">Grand Final</div>
+              <div class="format-box format-box--medium format-box--final"></div>
+              <label class="format-input">
+                Best of
+                <select id="bestOfFinalInput">
+                  <option value="1">Bo1</option>
+                  <option value="3">Bo3</option>
+                  <option value="5">Bo5</option>
+                  <option value="7">Bo7</option>
+                  <option value="9">Bo9</option>
+                </select>
+              </label>
+            </div>
+          </div>
 
           <div class="format-row format-row--lower">
             <div class="format-col format-col--lower-main">
@@ -1658,8 +1673,8 @@
             <div class="image-upload">
               <div class="image-upload-actions">
                 <input type="file" id="circuitFinalImageInput" accept="image/*" />
-                <button type="button" class="cta ghost small cover-reuse-btn"
-                  data-cover-input="circuitFinalImageInput" data-cover-preview="circuitFinalImagePreview">
+                <button type="button" class="cta ghost small cover-reuse-btn" data-cover-input="circuitFinalImageInput"
+                  data-cover-preview="circuitFinalImagePreview">
                   Reuse cover
                 </button>
               </div>
@@ -1943,294 +1958,295 @@
           <button class="settings-tab-btn" data-final-create-tab="createFinalFormat">Format</button>
         </div>
         <div class="settings-panel create-final-panel active" id="createFinalGeneral">
-        <label>Final tournament name <span class="required">*</span>
-          <input type="text" id="finalTournamentNameInput" placeholder="Circuit Finals" required />
-        </label>
-         <label>Custom URL slug
-           <div class="inline-row">
-             <span class="muted" id="finalSlugPrefix">https://zbuildorder.com/</span>
-             <div class="slug-input-wrapper">
-               <input type="text" id="finalTournamentSlugInput" placeholder="circuit-finals" />
-             </div>
-           </div>
-           <p class="helper"></p>
-         </label>
-         <label>Visibility
-           <select id="finalTournamentVisibilitySelect">
-             <option value="public" selected>Public (shown in browse)</option>
-             <option value="private">Private (link only)</option>
-           </select>
-         </label>
-         <label>Registration
-           <select id="finalTournamentAccessSelect">
-             <option value="open" selected>Open (anyone can register)</option>
-             <option value="closed">Closed (invite-only)</option>
-           </select>
-         </label>
-         <label>Start time
-           <div class="datetime-row">
-             <input type="text" id="finalTournamentStartInput" class="datetime-input" placeholder="YYYY-MM-DD HH:MM"
-               autocomplete="off" autocorrect="off" spellcheck="false" />
-             <button type="button" class="icon-btn datepicker-btn" data-datepicker-for="finalTournamentStartInput"
-               aria-label="Pick start time">
-              <img src="img/SVG/time.svg" alt="" aria-hidden="true" />
-            </button>
-          </div>
-        </label>
-        <label>Max players
-          <input type="number" id="finalTournamentMaxPlayersInput" min="2" max="32" value="32" />
-        </label>
-        <label>Qualify from leaderboard
-          <input type="number" id="finalQualifyCountInput" min="0" placeholder="8" />
-        </label>
-        <p class="helper">Only the top N on the circuit leaderboard can register for finals.</p>
-        <label>Check-in opens (before start)
-          <select id="finalCheckInSelect">
-            <option value="0">0 min</option>
-            <option value="15">15 min</option>
-            <option value="30">30 min</option>
-            <option value="45">45 min</option>
-            <option value="60">1h</option>
-            <option value="75">1h 15</option>
-            <option value="90">1h 30</option>
-            <option value="105">1h 45</option>
-            <option value="120">2h</option>
-            <option value="135">2h 15</option>
-            <option value="150">2h 30</option>
-            <option value="165">2h 45</option>
-            <option value="180">3h</option>
-          </select>
-        </label>
-        <label>Cover image
-          <div class="image-upload">
-            <div class="image-upload-actions">
-              <input type="file" id="finalTournamentImageInput" accept="image/*" />
-              <button type="button" class="cta ghost small cover-reuse-btn"
-                data-cover-input="finalTournamentImageInput" data-cover-preview="finalTournamentImagePreview">
-                Reuse cover
+          <label>Final tournament name <span class="required">*</span>
+            <input type="text" id="finalTournamentNameInput" placeholder="Circuit Finals" required />
+          </label>
+          <label>Custom URL slug
+            <div class="inline-row">
+              <span class="muted" id="finalSlugPrefix">https://zbuildorder.com/</span>
+              <div class="slug-input-wrapper">
+                <input type="text" id="finalTournamentSlugInput" placeholder="circuit-finals" />
+              </div>
+            </div>
+            <p class="helper"></p>
+          </label>
+          <label>Visibility
+            <select id="finalTournamentVisibilitySelect">
+              <option value="public" selected>Public (shown in browse)</option>
+              <option value="private">Private (link only)</option>
+            </select>
+          </label>
+          <label>Registration
+            <select id="finalTournamentAccessSelect">
+              <option value="open" selected>Open (anyone can register)</option>
+              <option value="closed">Closed (invite-only)</option>
+            </select>
+          </label>
+          <label>Start time
+            <div class="datetime-row">
+              <input type="text" id="finalTournamentStartInput" class="datetime-input" placeholder="YYYY-MM-DD HH:MM"
+                autocomplete="off" autocorrect="off" spellcheck="false" />
+              <button type="button" class="icon-btn datepicker-btn" data-datepicker-for="finalTournamentStartInput"
+                aria-label="Pick start time">
+                <img src="img/SVG/time.svg" alt="" aria-hidden="true" />
               </button>
             </div>
-            <div class="image-preview">
-              <img id="finalTournamentImagePreview" alt="Finals cover preview" />
+          </label>
+          <label>Max players
+            <input type="number" id="finalTournamentMaxPlayersInput" min="2" max="32" value="32" />
+          </label>
+          <label>Qualify from leaderboard
+            <input type="number" id="finalQualifyCountInput" min="0" placeholder="8" />
+          </label>
+          <p class="helper">Only the top N on the circuit leaderboard can register for finals.</p>
+          <label>Check-in opens (before start)
+            <select id="finalCheckInSelect">
+              <option value="0">0 min</option>
+              <option value="15">15 min</option>
+              <option value="30">30 min</option>
+              <option value="45">45 min</option>
+              <option value="60">1h</option>
+              <option value="75">1h 15</option>
+              <option value="90">1h 30</option>
+              <option value="105">1h 45</option>
+              <option value="120">2h</option>
+              <option value="135">2h 15</option>
+              <option value="150">2h 30</option>
+              <option value="165">2h 45</option>
+              <option value="180">3h</option>
+            </select>
+          </label>
+          <label>Cover image
+            <div class="image-upload">
+              <div class="image-upload-actions">
+                <input type="file" id="finalTournamentImageInput" accept="image/*" />
+                <button type="button" class="cta ghost small cover-reuse-btn"
+                  data-cover-input="finalTournamentImageInput" data-cover-preview="finalTournamentImagePreview">
+                  Reuse cover
+                </button>
+              </div>
+              <div class="image-preview">
+                <img id="finalTournamentImagePreview" alt="Finals cover preview" />
+              </div>
+              <p class="helper">Recommended 1200x630. JPG/PNG/WebP.</p>
             </div>
-            <p class="helper">Recommended 1200x630. JPG/PNG/WebP.</p>
+          </label>
+        </div>
+        <div class="settings-panel create-final-panel" id="createFinalDesc">
+          <div class="markdown-field">
+            <div class="markdown-label">Description</div>
+            <div class="markdown-editor">
+              <div id="finalTournamentDescriptionEditor" class="quill-editor"></div>
+              <textarea id="finalTournamentDescriptionInput" class="markdown-input" rows="10"
+                placeholder="Write rules, schedule, map pool..." aria-hidden="true" tabindex="-1"
+                style="display:none;"></textarea>
+            </div>
           </div>
-        </label>
-      </div>
-      <div class="settings-panel create-final-panel" id="createFinalDesc">
-        <div class="markdown-field">
-          <div class="markdown-label">Description</div>
-          <div class="markdown-editor">
-            <div id="finalTournamentDescriptionEditor" class="quill-editor"></div>
-            <textarea id="finalTournamentDescriptionInput" class="markdown-input" rows="10"
-              placeholder="Write rules, schedule, map pool..." aria-hidden="true" tabindex="-1" style="display:none;"></textarea>
+          <div class="markdown-field">
+            <div class="markdown-label">Rules</div>
+            <div class="markdown-editor">
+              <div id="finalTournamentRulesEditor" class="quill-editor"></div>
+              <textarea id="finalTournamentRulesInput" class="markdown-input" rows="10"
+                placeholder="Add eligibility, format, communication, and fair play rules..." aria-hidden="true"
+                tabindex="-1" style="display:none;"></textarea>
+            </div>
           </div>
         </div>
-        <div class="markdown-field">
-          <div class="markdown-label">Rules</div>
-          <div class="markdown-editor">
-            <div id="finalTournamentRulesEditor" class="quill-editor"></div>
-            <textarea id="finalTournamentRulesInput" class="markdown-input" rows="10"
-              placeholder="Add eligibility, format, communication, and fair play rules..." aria-hidden="true"
-              tabindex="-1" style="display:none;"></textarea>
+        <div class="settings-panel create-final-panel" id="createFinalMaps">
+          <div class="map-pool-picker">
+            <div class="picker-header">
+              <div>
+                <p class="eyebrow">Maps</p>
+                <h4>Chosen map pool</h4>
+              </div>
+              <div class="picker-actions">
+                <button type="button" class="cta small ghost" id="finalUseLadderMapsBtn">All ladder maps</button>
+                <button type="button" class="cta small subtle" id="finalClearMapPoolBtn">Custom</button>
+              </div>
+            </div>
+            <div id="finalChosenMapList" class="map-pool-grid chosen-grid"></div>
+            <div class="picker-header" style="margin-top:12px;">
+              <div>
+                <h4>All 1v1 maps</h4>
+                <p class="helper">Click to add/remove. Includes current + archive.</p>
+              </div>
+            </div>
+            <div id="finalMapPoolPicker" class="map-pool-grid selectable"></div>
           </div>
         </div>
-      </div>
-      <div class="settings-panel create-final-panel" id="createFinalMaps">
-        <div class="map-pool-picker">
-          <div class="picker-header">
-            <div>
-              <p class="eyebrow">Maps</p>
-              <h4>Chosen map pool</h4>
-            </div>
-            <div class="picker-actions">
-              <button type="button" class="cta small ghost" id="finalUseLadderMapsBtn">All ladder maps</button>
-              <button type="button" class="cta small subtle" id="finalClearMapPoolBtn">Custom</button>
-            </div>
-          </div>
-          <div id="finalChosenMapList" class="map-pool-grid chosen-grid"></div>
-          <div class="picker-header" style="margin-top:12px;">
-            <div>
-              <h4>All 1v1 maps</h4>
-              <p class="helper">Click to add/remove. Includes current + archive.</p>
-            </div>
-          </div>
-          <div id="finalMapPoolPicker" class="map-pool-grid selectable"></div>
-        </div>
-      </div>
-      <div class="settings-panel create-final-panel" id="createFinalFormat">
-        <label>Format
-          <select id="finalFormatSelect">
-            <option value="Double Elimination">Double Elimination</option>
-            <option value="Single Elimination">Single Elimination</option>
-            <option value="Round Robin">Round Robin</option>
-            <option value="GSL/Dual Tournament">GSL/Dual Tournament</option>
-            <option value="Swiss">Swiss</option>
-          </select>
-        </label>
-        <div class="format-stage" data-format-scope="final-roundrobin">
-          <p class="eyebrow">Stage 1</p>
-          <h4 id="finalGroupStageLabel">Round Robin</h4>
-          <div class="inline-row">
-            <label style="flex:1;">Number of groups
-              <input type="number" id="finalRoundRobinGroupsInput" min="1" />
-            </label>
-            <label style="flex:1;">Advance per group
-              <input type="number" id="finalRoundRobinAdvanceInput" min="0" />
-            </label>
-            <label style="flex:1;">Group best of
-              <select id="finalRoundRobinBestOfInput">
-                <option value="1">Bo1</option>
-                <option value="3">Bo3</option>
-                <option value="5">Bo5</option>
-              </select>
-            </label>
-          </div>
-        </div>
-        <div class="format-stage" data-format-scope="final-roundrobin">
-          <p class="eyebrow">Stage 2</p>
-          <h4>Playoffs</h4>
-          <p class="helper">
-            Optional. Qualifiers advance into the selected playoffs format. Choose None to end after Round Robin.
-          </p>
-          <div class="inline-row">
-            <label style="flex:1;">Playoffs
-              <select id="finalRoundRobinPlayoffsSelect">
-                <option value="Double Elimination">Double Elimination</option>
-                <option value="Single Elimination">Single Elimination</option>
-                <option value="None" selected>None</option>
-              </select>
-            </label>
-          </div>
-        </div>
-        <div class="format-diagram">
-          <div class="format-row format-row--upper">
-            <div class="format-col format-col--upper-main">
-              <div class="format-title">Upper bracket</div>
-              <div class="format-box format-box--big format-box--upper"></div>
-              <label class="format-input">
-                Best of
-                <select id="finalBestOfUpperInput">
-                  <option value="1">Bo1</option>
-                  <option value="3">Bo3</option>
-                  <option value="5">Bo5</option>
-                  <option value="7">Bo7</option>
-                  <option value="9">Bo9</option>
-                </select>
+        <div class="settings-panel create-final-panel" id="createFinalFormat">
+          <label>Format
+            <select id="finalFormatSelect">
+              <option value="Double Elimination">Double Elimination</option>
+              <option value="Single Elimination">Single Elimination</option>
+              <option value="Round Robin">Round Robin</option>
+              <option value="GSL/Dual Tournament">GSL/Dual Tournament</option>
+              <option value="Swiss">Swiss</option>
+            </select>
+          </label>
+          <div class="format-stage" data-format-scope="final-roundrobin">
+            <p class="eyebrow">Stage 1</p>
+            <h4 id="finalGroupStageLabel">Round Robin</h4>
+            <div class="inline-row">
+              <label style="flex:1;">Number of groups
+                <input type="number" id="finalRoundRobinGroupsInput" min="1" />
               </label>
-            </div>
-
-            <div class="format-col format-col--quarter">
-              <div class="format-title">Quarterfinals</div>
-              <div class="format-box format-box--big format-box--qf"></div>
-              <label class="format-input">
-                Best of
-                <select id="finalBestOfQuarterInput">
-                  <option value="1">Bo1</option>
-                  <option value="3">Bo3</option>
-                  <option value="5">Bo5</option>
-                  <option value="7">Bo7</option>
-                  <option value="9">Bo9</option>
-                </select>
+              <label style="flex:1;">Advance per group
+                <input type="number" id="finalRoundRobinAdvanceInput" min="0" />
               </label>
-            </div>
-
-            <div class="format-col format-col--semi">
-              <div class="format-title">Semi-finals</div>
-              <div class="format-box format-box--medium format-box--semi"></div>
-              <label class="format-input">
-                Best of
-                <select id="finalBestOfSemiInput">
+              <label style="flex:1;">Group best of
+                <select id="finalRoundRobinBestOfInput">
                   <option value="1">Bo1</option>
                   <option value="3">Bo3</option>
                   <option value="5">Bo5</option>
-                  <option value="7">Bo7</option>
-                  <option value="9">Bo9</option>
-                </select>
-              </label>
-            </div>
-
-            <div class="format-col format-col--upper-final">
-              <div class="format-title">Upper Final</div>
-              <div class="format-box format-box--medium format-box--upper-final"></div>
-              <label class="format-input">
-                Best of
-                <select id="finalBestOfUpperFinalInput">
-                  <option value="1">Bo1</option>
-                  <option value="3">Bo3</option>
-                  <option value="5">Bo5</option>
-                  <option value="7">Bo7</option>
-                  <option value="9">Bo9</option>
-                </select>
-              </label>
-            </div>
-
-            <div class="format-col format-col--final">
-              <div class="format-title">Grand Final</div>
-              <div class="format-box format-box--medium format-box--final"></div>
-              <label class="format-input">
-                Best of
-                <select id="finalBestOfFinalInput">
-                  <option value="1">Bo1</option>
-                  <option value="3">Bo3</option>
-                  <option value="5">Bo5</option>
-                  <option value="7">Bo7</option>
-                  <option value="9">Bo9</option>
                 </select>
               </label>
             </div>
           </div>
-
-          <div class="format-row format-row--lower">
-            <div class="format-col format-col--lower-main">
-              <div class="format-title">Lower bracket</div>
-              <div class="format-box format-box--big format-box--lower"></div>
-              <label class="format-input">
-                Best of
-                <select id="finalBestOfLowerInput">
-                  <option value="1">Bo1</option>
-                  <option value="3">Bo3</option>
-                  <option value="5">Bo5</option>
-                  <option value="7">Bo7</option>
-                  <option value="9">Bo9</option>
+          <div class="format-stage" data-format-scope="final-roundrobin">
+            <p class="eyebrow">Stage 2</p>
+            <h4>Playoffs</h4>
+            <p class="helper">
+              Optional. Qualifiers advance into the selected playoffs format. Choose None to end after Round Robin.
+            </p>
+            <div class="inline-row">
+              <label style="flex:1;">Playoffs
+                <select id="finalRoundRobinPlayoffsSelect">
+                  <option value="Double Elimination">Double Elimination</option>
+                  <option value="Single Elimination">Single Elimination</option>
+                  <option value="None" selected>None</option>
                 </select>
               </label>
             </div>
+          </div>
+          <div class="format-diagram">
+            <div class="format-row format-row--upper">
+              <div class="format-col format-col--upper-main">
+                <div class="format-title">Upper bracket</div>
+                <div class="format-box format-box--big format-box--upper"></div>
+                <label class="format-input">
+                  Best of
+                  <select id="finalBestOfUpperInput">
+                    <option value="1">Bo1</option>
+                    <option value="3">Bo3</option>
+                    <option value="5">Bo5</option>
+                    <option value="7">Bo7</option>
+                    <option value="9">Bo9</option>
+                  </select>
+                </label>
+              </div>
 
-            <div class="format-col format-col--lb-extra">
-              <div class="format-title">LB Semi-finals</div>
-              <div class="format-box format-box--medium format-box--lb-semi"></div>
-              <label class="format-input">
-                Best of
-                <select id="finalBestOfLowerSemiInput">
-                  <option value="1">Bo1</option>
-                  <option value="3">Bo3</option>
-                  <option value="5">Bo5</option>
-                  <option value="7">Bo7</option>
-                  <option value="9">Bo9</option>
-                </select>
-              </label>
+              <div class="format-col format-col--quarter">
+                <div class="format-title">Quarterfinals</div>
+                <div class="format-box format-box--big format-box--qf"></div>
+                <label class="format-input">
+                  Best of
+                  <select id="finalBestOfQuarterInput">
+                    <option value="1">Bo1</option>
+                    <option value="3">Bo3</option>
+                    <option value="5">Bo5</option>
+                    <option value="7">Bo7</option>
+                    <option value="9">Bo9</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="format-col format-col--semi">
+                <div class="format-title">Semi-finals</div>
+                <div class="format-box format-box--medium format-box--semi"></div>
+                <label class="format-input">
+                  Best of
+                  <select id="finalBestOfSemiInput">
+                    <option value="1">Bo1</option>
+                    <option value="3">Bo3</option>
+                    <option value="5">Bo5</option>
+                    <option value="7">Bo7</option>
+                    <option value="9">Bo9</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="format-col format-col--upper-final">
+                <div class="format-title">Upper Final</div>
+                <div class="format-box format-box--medium format-box--upper-final"></div>
+                <label class="format-input">
+                  Best of
+                  <select id="finalBestOfUpperFinalInput">
+                    <option value="1">Bo1</option>
+                    <option value="3">Bo3</option>
+                    <option value="5">Bo5</option>
+                    <option value="7">Bo7</option>
+                    <option value="9">Bo9</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="format-col format-col--final">
+                <div class="format-title">Grand Final</div>
+                <div class="format-box format-box--medium format-box--final"></div>
+                <label class="format-input">
+                  Best of
+                  <select id="finalBestOfFinalInput">
+                    <option value="1">Bo1</option>
+                    <option value="3">Bo3</option>
+                    <option value="5">Bo5</option>
+                    <option value="7">Bo7</option>
+                    <option value="9">Bo9</option>
+                  </select>
+                </label>
+              </div>
             </div>
 
-            <div class="format-col format-col--lb-extra">
-              <div class="format-title">LB Finals</div>
-              <div class="format-box format-box--medium format-box--lb-final"></div>
-              <label class="format-input">
-                Best of
-                <select id="finalBestOfLowerFinalInput">
-                  <option value="1">Bo1</option>
-                  <option value="3">Bo3</option>
-                  <option value="5">Bo5</option>
-                  <option value="7">Bo7</option>
-                  <option value="9">Bo9</option>
-                </select>
-              </label>
-            </div>
+            <div class="format-row format-row--lower">
+              <div class="format-col format-col--lower-main">
+                <div class="format-title">Lower bracket</div>
+                <div class="format-box format-box--big format-box--lower"></div>
+                <label class="format-input">
+                  Best of
+                  <select id="finalBestOfLowerInput">
+                    <option value="1">Bo1</option>
+                    <option value="3">Bo3</option>
+                    <option value="5">Bo5</option>
+                    <option value="7">Bo7</option>
+                    <option value="9">Bo9</option>
+                  </select>
+                </label>
+              </div>
 
-            <div class="format-col format-col--spacer"></div>
+              <div class="format-col format-col--lb-extra">
+                <div class="format-title">LB Semi-finals</div>
+                <div class="format-box format-box--medium format-box--lb-semi"></div>
+                <label class="format-input">
+                  Best of
+                  <select id="finalBestOfLowerSemiInput">
+                    <option value="1">Bo1</option>
+                    <option value="3">Bo3</option>
+                    <option value="5">Bo5</option>
+                    <option value="7">Bo7</option>
+                    <option value="9">Bo9</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="format-col format-col--lb-extra">
+                <div class="format-title">LB Finals</div>
+                <div class="format-box format-box--medium format-box--lb-final"></div>
+                <label class="format-input">
+                  Best of
+                  <select id="finalBestOfLowerFinalInput">
+                    <option value="1">Bo1</option>
+                    <option value="3">Bo3</option>
+                    <option value="5">Bo5</option>
+                    <option value="7">Bo7</option>
+                    <option value="9">Bo9</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="format-col format-col--spacer"></div>
+            </div>
           </div>
         </div>
-      </div>
       </div>
       <div class="form-actions">
         <button class="cta subtle" id="closeCreateCircuit">Cancel</button>
@@ -2307,8 +2323,8 @@
         <div class="settings-username-section">
           <label for="settingsUsernameInput" class="settings-label">Username</label>
           <div class="settings-username-row">
-            <input id="settingsUsernameInput" class="settings-input" type="text" maxlength="20" placeholder="New username"
-              autocomplete="off" spellcheck="false" />
+            <input id="settingsUsernameInput" class="settings-input" type="text" maxlength="20"
+              placeholder="New username" autocomplete="off" spellcheck="false" />
             <button type="button" class="settings-username-button" id="saveUsernameButton">
               <img src="img/SVG/pencil.svg" class="menu-icon" alt="" aria-hidden="true" />
               Update
@@ -2361,7 +2377,8 @@
           </div>
           <div class="settings-username-row">
             <input id="sc2PulseInput" class="settings-input" type="url"
-              placeholder="https://sc2pulse.nephest.com/sc2/?type=character&id=..." autocomplete="off" spellcheck="false" />
+              placeholder="https://sc2pulse.nephest.com/sc2/?type=character&id=..." autocomplete="off"
+              spellcheck="false" />
             <button type="button" class="settings-username-button" id="connectPulseBtn">
               <img src="img/SVG/stats.svg" class="menu-icon" alt="" aria-hidden="true" />
               Update
@@ -2379,12 +2396,8 @@
         <div class="settings-username-section">
           <label for="settingsTwitchInput" class="settings-label">Twitch Channel</label>
           <div class="settings-username-row">
-            <input
-              id="settingsTwitchInput"
-              class="settings-input"
-              type="text"
-              placeholder="https://www.twitch.tv/username"
-            />
+            <input id="settingsTwitchInput" class="settings-input" type="text"
+              placeholder="https://www.twitch.tv/username" />
             <button type="button" class="settings-username-button" id="saveTwitchButton">
               Save
             </button>
@@ -2401,14 +2414,15 @@
           </p>
         </div>
       </div>
-        <div id="pulseHelpModal" class="modal">
-          <div class="modal-content">
-            <span class="close" id="closePulseHelp">&times;</span>
-            <h3>How to find your SC2Pulse link</h3>
-            <ol>
-              <li>Open your SC2Pulse profile and go to the MMR tab.</li>
-              <li>Copy the URL from the address bar (looks like <code>https://sc2pulse.nephest.com/sc2/?type=character&id=579686&m=1</code>).
-              </li>
+      <div id="pulseHelpModal" class="modal">
+        <div class="modal-content">
+          <span class="close" id="closePulseHelp">&times;</span>
+          <h3>How to find your SC2Pulse link</h3>
+          <ol>
+            <li>Open your SC2Pulse profile and go to the MMR tab.</li>
+            <li>Copy the URL from the address bar (looks like
+              <code>https://sc2pulse.nephest.com/sc2/?type=character&id=579686&m=1</code>).
+            </li>
             <li>Paste that URL here and click Update.</li>
           </ol>
         </div>
@@ -2432,8 +2446,8 @@
           </p>
         </div>
       </div>
-      </div>
     </div>
+  </div>
   </div>
 
   <div id="avatarModal" class="modal" style="display: none;">
@@ -2527,40 +2541,25 @@
   </div>
   <!-- Match Info Modal -->
   <div id="matchInfoModal" class="modal" style="display:none;">
-      <div class="modal-content match-info-modal">
-        <div class="modal-header">
-          <h3 id="matchInfoTitle">Match</h3>
-          <button class="cta ghost" id="matchInfoReportBtn" type="button" style="display:none;"
-            aria-label="Report score" data-tooltip="Report score change">
-            <svg class="match-info-report-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <path d="M7 4h8l4 4v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"
-                fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
-              <path d="M15 4v4h4" fill="none" stroke="currentColor" stroke-width="1.8"
-                stroke-linecap="round" />
-              <path d="M9 12h6M9 16h4" fill="none" stroke="currentColor" stroke-width="1.8"
-                stroke-linecap="round" />
-              <path d="M12 7.5v2" fill="none" stroke="currentColor" stroke-width="1.8"
-                stroke-linecap="round" />
-              <circle cx="12" cy="7" r="0.7" fill="currentColor" />
-            </svg>
-          </button>
-          <button class="icon-btn match-info-help-btn" id="matchInfoHelpBtn" aria-label="Match help"
-            title="How scoring and map veto works">?</button>
-        <div class="match-info-help-popover" id="matchInfoHelpPopover" aria-live="polite">
-          <div class="match-info-help-title">Scoring</div>
-          <div class="match-info-help-body">
-            Click the left or right pill for each map to mark the winner. Click again to clear.
-          </div>
-          <div class="match-info-help-title">Map veto</div>
-          <div class="match-info-help-body">
-            Use the “Map veto” button to open the veto flow (only match players can change it).
-          </div>
-        </div>
+    <div class="modal-content match-info-modal">
+      <div class="modal-header">
+        <h3 id="matchInfoTitle">Match</h3>
+        <button class="cta ghost" id="matchInfoReportBtn" type="button" style="display:none;" aria-label="Report score"
+          data-tooltip="Report score change">
+          <svg class="match-info-report-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M7 4h8l4 4v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" fill="none" stroke="currentColor"
+              stroke-width="1.8" stroke-linejoin="round" />
+            <path d="M15 4v4h4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+            <path d="M9 12h6M9 16h4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+            <path d="M12 7.5v2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+            <circle cx="12" cy="7" r="0.7" fill="currentColor" />
+          </svg>
+        </button>
+
         <button class="icon-btn" id="closeMatchInfoModal" aria-label="Close match info modal">x</button>
       </div>
       <div class="match-info-toprow">
         <div class="match-info-meta">
-          <p class="helper" id="matchInfoBestOf"></p>
           <p class="helper" id="matchInfoServer"></p>
         </div>
         <div class="match-info-walkover">
@@ -2582,18 +2581,24 @@
                   <div class="match-info-player-name">
                     <span id="matchInfoLeftFlag" class="match-info-flag" aria-hidden="true"></span>
                     <span id="matchInfoLeftName"></span>
-                    <span id="matchInfoLeftPresence" class="match-info-presence offline" aria-label="Player offline"></span>
+                    <span id="matchInfoLeftPresence" class="match-info-presence offline"
+                      aria-label="Player offline"></span>
                   </div>
                 </div>
               </th>
-              <th class="match-info-map-col">VS</th>
+              <th class="match-info-map-col">
+                <div class="match-info-vs">VS</div>
+                <div class="match-info-bo" id="matchInfoBoInline"></div>
+              </th>
+
               <th class="match-info-player-col">
                 <div class="match-info-player-head">
                   <div id="matchInfoRightScore" class="match-info-score">0</div>
                   <div class="match-info-player-name">
                     <span id="matchInfoRightFlag" class="match-info-flag" aria-hidden="true"></span>
                     <span id="matchInfoRightName"></span>
-                    <span id="matchInfoRightPresence" class="match-info-presence offline" aria-label="Player offline"></span>
+                    <span id="matchInfoRightPresence" class="match-info-presence offline"
+                      aria-label="Player offline"></span>
                   </div>
                 </div>
               </th>
@@ -2656,8 +2661,8 @@
       </div>
       <div class="match-chat" id="matchChatSection" style="display:none;">
         <div class="match-chat-toggle-row">
-          <button class="cta ghost small match-chat-toggle" id="matchChatToggle" type="button"
-            aria-expanded="false" aria-controls="matchChatPanel">
+          <button class="cta ghost small match-chat-toggle" id="matchChatToggle" type="button" aria-expanded="false"
+            aria-controls="matchChatPanel">
             <span class="match-chat-label" id="matchChatLabel">Match chat</span>
           </button>
           <span class="match-chat-unread" id="matchChatUnread" aria-hidden="true"></span>
@@ -2665,8 +2670,7 @@
         <div class="match-chat-panel" id="matchChatPanel" style="display:none;">
           <div class="match-chat-history custom-scroll" id="matchChatHistory"></div>
           <form class="match-chat-form" id="matchChatForm">
-            <input id="matchChatInput" type="text" maxlength="500" placeholder="Message..."
-              autocomplete="off" />
+            <input id="matchChatInput" type="text" maxlength="500" placeholder="Message..." autocomplete="off" />
             <button class="cta small primary" id="matchChatSendBtn" type="submit">Send</button>
           </form>
           <p class="helper" id="matchChatStatus"></p>
