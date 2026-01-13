@@ -217,22 +217,58 @@ a {
 }
 
 .ghost-link {
-  display: inline-block;
-  color: var(--muted);
-  text-decoration: none;
-  margin-bottom: 4px;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+
+  /* spacing */
+  padding: 8px 12px;
+  margin-bottom: 10px;
+
+  /* shape */
+  border-radius: 999px;
+
+  /* surface */
+  background: rgba(15, 20, 33, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(10px);
+
+  /* text */
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 13px;
+  height: 32px;
+  line-height: 32px;
+
+  /* interaction */
+  transition: transform 120ms ease, box-shadow 120ms ease,
+    border-color 120ms ease, background 120ms ease;
+}
+
+.ghost-link:active {
+  transform: translateY(0px);
+}
+
+.ghost-link:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(78, 213, 255, 0.35),
+    0 10px 24px rgba(0, 0, 0, 0.35);
 }
 
 .ghost-link-icon {
-  font-size: 18px;
+  font-size: 16px;
   line-height: 1;
+  position: relative;
+  top: -1px; /* 👈 optical alignment */
 }
 
 .ghost-link:hover {
-  color: var(--text);
+  transform: translateY(-1px);
+  border-color: rgba(78, 213, 255, 0.45);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35),
+    0 0 0 2px rgba(78, 213, 255, 0.12);
+  background: rgba(15, 20, 33, 0.82);
 }
 
 .eyebrow {
@@ -1351,6 +1387,12 @@ a {
 .custom-scroll::-webkit-scrollbar-track {
   background: rgba(15, 20, 33, 0.85);
   border-radius: 10px;
+}
+
+#notificationModal .modal-content > button,
+#notificationModal .modal-close,
+#notificationModal .close-modal {
+  margin-top: 0;
 }
 
 #circuitPointsModal .modal-content {
@@ -4748,6 +4790,20 @@ details.stage-section:not([open]) .stage-toggle::after {
 .markdown-input:focus {
   outline: 2px solid var(--accent-2);
   border-color: var(--accent-2);
+}
+
+/* Create Circuit modal: description textarea layout override (scoped) */
+#createCircuitModal #circuitDescriptionInput {
+  display: block; /* force it under the Description label */
+  width: 100%;
+  max-width: 520px; /* adjust if you want wider */
+  min-height: 140px; /* less "square" */
+  margin-top: 8px;
+
+  border-radius: 14px; /* more modern shape */
+  padding: 12px 14px;
+
+  resize: vertical; /* allow vertical resize only */
 }
 
 .markdown-editor {

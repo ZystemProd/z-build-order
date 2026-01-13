@@ -153,7 +153,10 @@ import {
 } from "./bracket/render.js";
 import { computeGroupStandings } from "./bracket/standings.js";
 import { ensureRoundRobinPlayoffs } from "./bracket/playoffs.js";
-import { applyForfeitWalkovers, updateMatchScore as updateMatchScoreCore } from "./bracket/update.js";
+import {
+  applyForfeitWalkovers,
+  updateMatchScore as updateMatchScoreCore,
+} from "./bracket/update.js";
 import {
   renderMapsTab as renderMapsTabUI,
   renderChosenMaps as renderChosenMapsUI,
@@ -267,7 +270,9 @@ const PULSE_ENDPOINTS = (() => {
       "http://localhost:5001/z-build-order/us-central1/fetchPulseMmr"
     );
   }
-  endpoints.push("https://us-central1-z-build-order.cloudfunctions.net/fetchPulseMmr");
+  endpoints.push(
+    "https://us-central1-z-build-order.cloudfunctions.net/fetchPulseMmr"
+  );
   return endpoints;
 })();
 const storage = getStorage(app);
@@ -295,7 +300,9 @@ function normalizeTournamentAccess(value) {
 }
 
 function isRoundRobinFormat(format) {
-  return String(format || "").toLowerCase().includes("round robin");
+  return String(format || "")
+    .toLowerCase()
+    .includes("round robin");
 }
 
 function isGroupStageFormat(format) {
@@ -309,7 +316,9 @@ function getInviteTokenStorageKey(slug) {
 function readInviteTokenFromStorage(slug) {
   if (typeof window === "undefined" || !slug) return "";
   try {
-    return String(sessionStorage.getItem(getInviteTokenStorageKey(slug)) || "").trim();
+    return String(
+      sessionStorage.getItem(getInviteTokenStorageKey(slug)) || ""
+    ).trim();
   } catch (_) {
     return "";
   }
@@ -331,7 +340,9 @@ function writeInviteTokenToStorage(slug, token) {
 function getInviteTokenFromUrl(slug = currentSlug) {
   if (typeof window === "undefined") return "";
   try {
-    const token = String(new URLSearchParams(window.location.search).get("invite") || "").trim();
+    const token = String(
+      new URLSearchParams(window.location.search).get("invite") || ""
+    ).trim();
     if (token) return token;
   } catch (_) {
     // ignore
@@ -344,7 +355,9 @@ function getInviteTokenSource(slug = currentSlug) {
     return { token: readInviteTokenFromStorage(slug), fromUrl: false };
   }
   try {
-    const token = String(new URLSearchParams(window.location.search).get("invite") || "").trim();
+    const token = String(
+      new URLSearchParams(window.location.search).get("invite") || ""
+    ).trim();
     if (token) return { token, fromUrl: true };
   } catch (_) {
     // ignore
@@ -418,7 +431,9 @@ async function refreshInviteLinkGate(slug) {
         const url = new URL(window.location.href);
         url.searchParams.delete("invite");
         const next =
-          url.pathname + (url.searchParams.toString() ? `?${url.searchParams}` : "") + url.hash;
+          url.pathname +
+          (url.searchParams.toString() ? `?${url.searchParams}` : "") +
+          url.hash;
         window.history.replaceState({}, "", next);
       }
     } else if (!fromUrl) {
@@ -475,7 +490,9 @@ function generateInviteToken() {
     crypto.getRandomValues(bytes);
     return bytesToBase64Url(bytes);
   } catch (_) {
-    return `inv-${Date.now().toString(36)}-${Math.random().toString(16).slice(2)}`;
+    return `inv-${Date.now().toString(36)}-${Math.random()
+      .toString(16)
+      .slice(2)}`;
   }
 }
 
@@ -521,14 +538,20 @@ function setInviteLinkStatus(message) {
 
 async function loadInviteLinks(slug) {
   if (!slug) return [];
-  const snap = await getDocs(collection(db, TOURNAMENT_INVITE_LINK_COLLECTION, slug, "links"));
+  const snap = await getDocs(
+    collection(db, TOURNAMENT_INVITE_LINK_COLLECTION, slug, "links")
+  );
   return snap.docs.map((d) => {
     const data = d.data() || {};
     return {
       token: d.id,
       ...data,
-      createdAt: data.createdAt?.toMillis ? data.createdAt.toMillis() : data.createdAt || null,
-      lastUsedAt: data.lastUsedAt?.toMillis ? data.lastUsedAt.toMillis() : data.lastUsedAt || null,
+      createdAt: data.createdAt?.toMillis
+        ? data.createdAt.toMillis()
+        : data.createdAt || null,
+      lastUsedAt: data.lastUsedAt?.toMillis
+        ? data.lastUsedAt.toMillis()
+        : data.lastUsedAt || null,
     };
   });
 }
@@ -558,15 +581,13 @@ function renderInviteLinkList(items = [], { slug } = {}) {
       const uses = Number(item.uses || 0);
       const maxUses = Number(item.maxUses);
       const useLabel =
-        Number.isFinite(maxUses) && maxUses > 0 ? `${uses}/${maxUses}` : `${uses}/∞`;
+        Number.isFinite(maxUses) && maxUses > 0
+          ? `${uses}/${maxUses}`
+          : `${uses}/∞`;
       const expiresAt = Number(item.expiresAt);
       const expired =
         Number.isFinite(expiresAt) && expiresAt > 0 && Date.now() >= expiresAt;
-      const status = item.revoked
-        ? "revoked"
-        : expired
-        ? "expired"
-        : "active";
+      const status = item.revoked ? "revoked" : expired ? "expired" : "active";
       statusPill.textContent = status;
       statusPill.classList.toggle("is-active", status === "active");
       statusPill.classList.toggle("is-expired", status === "expired");
@@ -582,15 +603,16 @@ function renderInviteLinkList(items = [], { slug } = {}) {
 
       const expiresEl = document.createElement("span");
       expiresEl.className = "invite-link-expires";
-      expiresEl.textContent = Number.isFinite(expiresAt) && expiresAt > 0
-        ? new Date(expiresAt).toLocaleString([], {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          })
-        : "Never";
+      expiresEl.textContent =
+        Number.isFinite(expiresAt) && expiresAt > 0
+          ? new Date(expiresAt).toLocaleString([], {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : "Never";
 
       const actions = document.createElement("div");
       actions.className = "invite-link-actions";
@@ -631,8 +653,11 @@ function initInviteLinksPanel() {
     createBtn.addEventListener("click", async () => {
       const slug = currentSlug || currentTournamentMeta?.slug || "";
       if (!slug || !isAdmin) return;
-      const name = (document.getElementById("inviteLinkNameInput")?.value || "").trim();
-      const maxUsesRaw = document.getElementById("inviteLinkMaxUsesInput")?.value ?? "";
+      const name = (
+        document.getElementById("inviteLinkNameInput")?.value || ""
+      ).trim();
+      const maxUsesRaw =
+        document.getElementById("inviteLinkMaxUsesInput")?.value ?? "";
       const expiresInput = document.getElementById("inviteLinkExpiresInput");
       const maxUses =
         maxUsesRaw === "" || maxUsesRaw === null || maxUsesRaw === undefined
@@ -649,15 +674,22 @@ function initInviteLinksPanel() {
       try {
         setInviteLinkStatus("Creating invite link...");
         await setDoc(
-          doc(collection(db, TOURNAMENT_INVITE_LINK_COLLECTION, slug, "links"), token),
+          doc(
+            collection(db, TOURNAMENT_INVITE_LINK_COLLECTION, slug, "links"),
+            token
+          ),
           {
             token,
             createdAt: serverTimestamp(),
             createdByUid: auth.currentUser?.uid || "",
             createdByName: getCurrentUsername?.() || "",
             name: name || "",
-            maxUses: Number.isFinite(maxUses) && maxUses > 0 ? Math.floor(maxUses) : null,
-            expiresAt: Number.isFinite(expiresAt) && expiresAt > 0 ? expiresAt : null,
+            maxUses:
+              Number.isFinite(maxUses) && maxUses > 0
+                ? Math.floor(maxUses)
+                : null,
+            expiresAt:
+              Number.isFinite(expiresAt) && expiresAt > 0 ? expiresAt : null,
             uses: 0,
             revoked: false,
           },
@@ -668,7 +700,9 @@ function initInviteLinksPanel() {
         if (url && (await copyToClipboard(url))) {
           setInviteLinkStatus("Invite link copied.");
         } else {
-          setInviteLinkStatus(url ? "Invite link created." : "Invite link created.");
+          setInviteLinkStatus(
+            url ? "Invite link created." : "Invite link created."
+          );
         }
       } catch (err) {
         console.error("Failed to create invite link", err);
@@ -696,7 +730,10 @@ function initInviteLinksPanel() {
         const token = revokeBtn.dataset.inviteRevoke || "";
         try {
           await setDoc(
-            doc(collection(db, TOURNAMENT_INVITE_LINK_COLLECTION, slug, "links"), token),
+            doc(
+              collection(db, TOURNAMENT_INVITE_LINK_COLLECTION, slug, "links"),
+              token
+            ),
             { revoked: true, revokedAt: Date.now() },
             { merge: true }
           );
@@ -859,7 +896,9 @@ function getBracketMatchIdsForPartial(prevBracket, nextBracket) {
     if (scoreChanged || statusChanged) changed.add(id);
   }
   if (!changed.size) return [];
-  return Array.from(collectDependentMatchIdsFromLookup(Array.from(changed), nextLookup));
+  return Array.from(
+    collectDependentMatchIdsFromLookup(Array.from(changed), nextLookup)
+  );
 }
 
 function shouldUsePartialRender(prevState, nextState, format) {
@@ -867,19 +906,44 @@ function shouldUsePartialRender(prevState, nextState, format) {
   if (isGroupStageFormat(format)) return false;
   if (prevState.isLive !== nextState.isLive) return false;
   if (prevState.hasBeenLive !== nextState.hasBeenLive) return false;
-  if (prevState.disableFinalAutoAdd !== nextState.disableFinalAutoAdd) return false;
+  if (prevState.disableFinalAutoAdd !== nextState.disableFinalAutoAdd)
+    return false;
   if (prevState.needsReseed !== nextState.needsReseed) return false;
-  if (prevState.bracketLayoutVersion !== nextState.bracketLayoutVersion) return false;
-  if (!safeJsonEqual(prevState.players || [], nextState.players || [])) return false;
-  if (!safeJsonEqual(prevState.pointsLedger || {}, nextState.pointsLedger || {})) return false;
-  if (!safeJsonEqual(prevState.manualSeedingEnabled, nextState.manualSeedingEnabled)) return false;
-  if (!safeJsonEqual(prevState.manualSeedingOrder || [], nextState.manualSeedingOrder || [])) return false;
-  if (!safeJsonEqual(prevState.casters || [], nextState.casters || [])) return false;
-  if (!safeJsonEqual(prevState.casterRequests || [], nextState.casterRequests || [])) return false;
+  if (prevState.bracketLayoutVersion !== nextState.bracketLayoutVersion)
+    return false;
+  if (!safeJsonEqual(prevState.players || [], nextState.players || []))
+    return false;
+  if (
+    !safeJsonEqual(prevState.pointsLedger || {}, nextState.pointsLedger || {})
+  )
+    return false;
+  if (
+    !safeJsonEqual(
+      prevState.manualSeedingEnabled,
+      nextState.manualSeedingEnabled
+    )
+  )
+    return false;
+  if (
+    !safeJsonEqual(
+      prevState.manualSeedingOrder || [],
+      nextState.manualSeedingOrder || []
+    )
+  )
+    return false;
+  if (!safeJsonEqual(prevState.casters || [], nextState.casters || []))
+    return false;
+  if (
+    !safeJsonEqual(
+      prevState.casterRequests || [],
+      nextState.casterRequests || []
+    )
+  )
+    return false;
   return true;
 }
 
-  function syncFromRemote(incoming) {
+function syncFromRemote(incoming) {
   if (!incoming || typeof incoming !== "object") return;
   const incomingPresence = incoming.presence?.matchInfo || null;
   const currentPresence = state?.presence?.matchInfo || null;
@@ -893,8 +957,10 @@ function shouldUsePartialRender(prevState, nextState, format) {
   const casterChanged =
     JSON.stringify(incoming.casterRequests || []) !==
       JSON.stringify(state.casterRequests || []) ||
-    JSON.stringify(incoming.casters || []) !== JSON.stringify(state.casters || []) ||
-    JSON.stringify(incoming.matchCasts || {}) !== JSON.stringify(state.matchCasts || {});
+    JSON.stringify(incoming.casters || []) !==
+      JSON.stringify(state.casters || []) ||
+    JSON.stringify(incoming.matchCasts || {}) !==
+      JSON.stringify(state.matchCasts || {});
 
   if (
     incoming.lastUpdated &&
@@ -909,7 +975,10 @@ function shouldUsePartialRender(prevState, nextState, format) {
     return;
   }
   const prevState = state;
-  const nextPlayers = applyRosterSeedingWithMode(incoming.players || [], incoming);
+  const nextPlayers = applyRosterSeedingWithMode(
+    incoming.players || [],
+    incoming
+  );
   const nextBracket = deserializeBracket(incoming.bracket);
   const inProgressVetoId =
     currentVetoMatchId && vetoState && vetoState.stage !== "done"
@@ -959,8 +1028,8 @@ function shouldUsePartialRender(prevState, nextState, format) {
     prevState.matchVetoes || {},
     nextState.matchVetoes || {}
   );
-    const onlyVetoChange =
-      matchVetoesChanged &&
+  const onlyVetoChange =
+    matchVetoesChanged &&
     !activityChanged &&
     prevState.isLive === nextState.isLive &&
     prevState.hasBeenLive === nextState.hasBeenLive &&
@@ -970,22 +1039,31 @@ function shouldUsePartialRender(prevState, nextState, format) {
     safeJsonEqual(prevState.players || [], nextState.players || []) &&
     safeJsonEqual(prevState.bracket || null, nextState.bracket || null) &&
     safeJsonEqual(prevState.pointsLedger || {}, nextState.pointsLedger || {}) &&
-    safeJsonEqual(prevState.manualSeedingEnabled, nextState.manualSeedingEnabled) &&
-    safeJsonEqual(prevState.manualSeedingOrder || [], nextState.manualSeedingOrder || []) &&
+    safeJsonEqual(
+      prevState.manualSeedingEnabled,
+      nextState.manualSeedingEnabled
+    ) &&
+    safeJsonEqual(
+      prevState.manualSeedingOrder || [],
+      nextState.manualSeedingOrder || []
+    ) &&
     safeJsonEqual(prevState.matchCasts || {}, nextState.matchCasts || {}) &&
     safeJsonEqual(prevState.scoreReports || {}, nextState.scoreReports || {}) &&
     safeJsonEqual(prevState.casters || [], nextState.casters || []) &&
-      safeJsonEqual(prevState.casterRequests || [], nextState.casterRequests || []);
-    const stripVetoState = (value) => {
-      const trimmed = { ...(value || {}) };
-      delete trimmed.matchVetoes;
-      delete trimmed.lastUpdated;
-      delete trimmed.presence;
-      return trimmed;
-    };
-    const vetoOnlyChange =
-      matchVetoesChanged &&
-      safeJsonEqual(stripVetoState(prevState), stripVetoState(nextState));
+    safeJsonEqual(
+      prevState.casterRequests || [],
+      nextState.casterRequests || []
+    );
+  const stripVetoState = (value) => {
+    const trimmed = { ...(value || {}) };
+    delete trimmed.matchVetoes;
+    delete trimmed.lastUpdated;
+    delete trimmed.presence;
+    return trimmed;
+  };
+  const vetoOnlyChange =
+    matchVetoesChanged &&
+    safeJsonEqual(stripVetoState(prevState), stripVetoState(nextState));
   let allowPartial = shouldUsePartialRender(
     prevState,
     nextState,
@@ -993,26 +1071,31 @@ function shouldUsePartialRender(prevState, nextState, format) {
   );
   let matchIds = [];
   if (allowPartial) {
-    const bracketMatchIds = getBracketMatchIdsForPartial(prevState.bracket, nextBracket);
+    const bracketMatchIds = getBracketMatchIdsForPartial(
+      prevState.bracket,
+      nextBracket
+    );
     if (bracketMatchIds === null) {
       allowPartial = false;
     } else {
       const combined = new Set(bracketMatchIds);
-      getChangedMatchIdsFromMap(prevState.matchCasts, nextState.matchCasts).forEach(
-        (id) => combined.add(id)
-      );
-      getChangedMatchIdsFromMap(prevState.scoreReports, nextState.scoreReports).forEach(
-        (id) => combined.add(id)
-      );
+      getChangedMatchIdsFromMap(
+        prevState.matchCasts,
+        nextState.matchCasts
+      ).forEach((id) => combined.add(id));
+      getChangedMatchIdsFromMap(
+        prevState.scoreReports,
+        nextState.scoreReports
+      ).forEach((id) => combined.add(id));
       matchIds = Array.from(combined).filter(Boolean);
     }
   }
   setStateObj(nextState);
-    if (onlyVetoChange || vetoOnlyChange) {
-      refreshMatchInfoModalIfOpen?.();
-      refreshVetoModalIfOpen?.();
-      return;
-    }
+  if (onlyVetoChange || vetoOnlyChange) {
+    refreshMatchInfoModalIfOpen?.();
+    refreshVetoModalIfOpen?.();
+    return;
+  }
   if (
     allowPartial &&
     !matchIds.length &&
@@ -1072,7 +1155,9 @@ function subscribeTournamentStateRemote(slug) {
       const data = snap.data() || {};
       syncFromRemote({
         ...data,
-        lastUpdated: data.lastUpdated?.toMillis ? data.lastUpdated.toMillis() : data.lastUpdated,
+        lastUpdated: data.lastUpdated?.toMillis
+          ? data.lastUpdated.toMillis()
+          : data.lastUpdated,
       });
     },
     (err) => {
@@ -1236,9 +1321,7 @@ function applyManualSeeding(players = [], manualOrder = []) {
   const clones = (players || []).map((player) => ({ ...player }));
   const byId = new Map(clones.map((player) => [player.id, player]));
   const nextOrder = buildManualOrder(clones, manualOrder);
-  const seeded = nextOrder
-    .map((id) => byId.get(id))
-    .filter(Boolean);
+  const seeded = nextOrder.map((id) => byId.get(id)).filter(Boolean);
   seeded.forEach((player, idx) => {
     player.seed = idx + 1;
   });
@@ -1344,7 +1427,10 @@ function handleManualSeedingReorder(nextOrder = []) {
 function handleApplyCircuitPoints(event) {
   const result = handleApplyCircuitPointsCore(event, { saveState, renderAll });
   if (!result?.applied || !currentTournamentMeta?.slug) return;
-  const updatedMeta = { ...(currentTournamentMeta || {}), circuitPointsApplied: true };
+  const updatedMeta = {
+    ...(currentTournamentMeta || {}),
+    circuitPointsApplied: true,
+  };
   setCurrentTournamentMetaState(updatedMeta);
   renderCircuitPointsSettings();
   setDoc(
@@ -1362,7 +1448,13 @@ function updatePlacementsRow() {
   const placementFirst = document.getElementById("placementFirst");
   const placementSecond = document.getElementById("placementSecond");
   const placementThirdFourth = document.getElementById("placementThirdFourth");
-  if (!placementsRow || !placementFirst || !placementSecond || !placementThirdFourth) return;
+  if (
+    !placementsRow ||
+    !placementFirst ||
+    !placementSecond ||
+    !placementThirdFourth
+  )
+    return;
   const eligiblePlayers = getEligiblePlayers(state.players || []);
   const placements = computePlacementsForBracket(
     state.bracket,
@@ -1373,8 +1465,12 @@ function updatePlacementsRow() {
     return;
   }
   const playersById = getPlayersMap();
-  const firstId = Array.from(placements.entries()).find(([, p]) => p === 1)?.[0];
-  const secondId = Array.from(placements.entries()).find(([, p]) => p === 2)?.[0];
+  const firstId = Array.from(placements.entries()).find(
+    ([, p]) => p === 1
+  )?.[0];
+  const secondId = Array.from(placements.entries()).find(
+    ([, p]) => p === 2
+  )?.[0];
   const thirdIds = Array.from(placements.entries())
     .filter(([, p]) => p === 3)
     .map(([id]) => id);
@@ -1398,16 +1494,21 @@ function renderAll(matchIds = null) {
     bracket &&
     !isGroupStageFormat(format);
 
-    if (shouldPartialUpdate) {
-      const lookup = getMatchLookup(bracket);
-      const playersById = getPlayersMap();
-      const didPartialUpdate = updateTreeMatchCards(matchIds, lookup, playersById, {
+  if (shouldPartialUpdate) {
+    const lookup = getMatchLookup(bracket);
+    const playersById = getPlayersMap();
+    const didPartialUpdate = updateTreeMatchCards(
+      matchIds,
+      lookup,
+      playersById,
+      {
         currentUsername: getCurrentUsername?.() || "",
         currentUid: auth.currentUser?.uid || "",
-      });
-      if (didPartialUpdate) {
-        annotateConnectorPlayers(lookup, playersById);
-        clampScoreSelectOptions();
+      }
+    );
+    if (didPartialUpdate) {
+      annotateConnectorPlayers(lookup, playersById);
+      clampScoreSelectOptions();
       updatePlacementsRow();
       applyBracketReadOnlyState(!state.isLive && !isAdmin);
       updateTooltips?.();
@@ -1433,7 +1534,9 @@ function renderAll(matchIds = null) {
     const tournamentTitle = document.getElementById("tournamentTitle");
     const tournamentFormat = document.getElementById("tournamentFormat");
     const tournamentStart = document.getElementById("tournamentStart");
-    const descriptionBody = document.getElementById("tournamentDescriptionBody");
+    const descriptionBody = document.getElementById(
+      "tournamentDescriptionBody"
+    );
     const rulesBody = document.getElementById("tournamentRulesBody");
     const statPlayers = document.getElementById("statPlayers");
     const registerBtn = document.getElementById("registerBtn");
@@ -1443,15 +1546,21 @@ function renderAll(matchIds = null) {
     const liveDot = document.getElementById("liveDot");
     const bracketGrid = document.getElementById("bracketGrid");
     const bracketNotLive = document.getElementById("bracketNotLive");
-    const bracketNotLiveMessage = document.getElementById("bracketNotLiveMessage");
-    const registeredPlayersList = document.getElementById("registeredPlayersList");
+    const bracketNotLiveMessage = document.getElementById(
+      "bracketNotLiveMessage"
+    );
+    const registeredPlayersList = document.getElementById(
+      "registeredPlayersList"
+    );
     const activityCard = document.getElementById("activityCard");
     const bracketTitle = document.getElementById("bracketTitle");
     const currentUid = auth.currentUser?.uid || null;
     const currentPlayer = currentUid
       ? (state.players || []).find((p) => p.uid === currentUid)
       : null;
-    const currentInviteStatus = normalizeInviteStatus(currentPlayer?.inviteStatus);
+    const currentInviteStatus = normalizeInviteStatus(
+      currentPlayer?.inviteStatus
+    );
     const eligiblePlayers = getEligiblePlayers(state.players || []);
     const hasCheckedIn = eligiblePlayers.some((player) => player.checkedInAt);
     const isInviteOnly = isInviteOnlyTournament(currentTournamentMeta);
@@ -1464,29 +1573,30 @@ function renderAll(matchIds = null) {
       tournamentTitle.textContent = currentTournamentMeta.name || "Tournament";
     }
     const tournamentHero = document.querySelector("#tournamentView .hero");
-      if (tournamentHero) {
-        const coverUrl = sanitizeUrl(currentTournamentMeta.coverImageUrl || "");
-        if (coverUrl) {
-          if (tournamentHero.dataset.coverUrl !== coverUrl) {
-            tournamentHero.classList.add("has-cover");
-            tournamentHero.style.setProperty(
-              "--hero-cover-image",
-              `url("${coverUrl}")`
-            );
-            tournamentHero.dataset.coverUrl = coverUrl;
-          } else {
-            tournamentHero.classList.add("has-cover");
-          }
+    if (tournamentHero) {
+      const coverUrl = sanitizeUrl(currentTournamentMeta.coverImageUrl || "");
+      if (coverUrl) {
+        if (tournamentHero.dataset.coverUrl !== coverUrl) {
+          tournamentHero.classList.add("has-cover");
+          tournamentHero.style.setProperty(
+            "--hero-cover-image",
+            `url("${coverUrl}")`
+          );
+          tournamentHero.dataset.coverUrl = coverUrl;
         } else {
-          tournamentHero.classList.remove("has-cover");
-          tournamentHero.style.removeProperty("--hero-cover-image");
-          if (tournamentHero.dataset.coverUrl) {
-            delete tournamentHero.dataset.coverUrl;
-          }
+          tournamentHero.classList.add("has-cover");
+        }
+      } else {
+        tournamentHero.classList.remove("has-cover");
+        tournamentHero.style.removeProperty("--hero-cover-image");
+        if (tournamentHero.dataset.coverUrl) {
+          delete tournamentHero.dataset.coverUrl;
         }
       }
+    }
     if (tournamentFormat) {
-      tournamentFormat.textContent = currentTournamentMeta.format || "Tournament";
+      tournamentFormat.textContent =
+        currentTournamentMeta.format || "Tournament";
     }
     if (descriptionBody) {
       descriptionBody.innerHTML = renderMarkdown(
@@ -1499,7 +1609,8 @@ function renderAll(matchIds = null) {
     if (bracketTitle) {
       const formatLabel = (currentTournamentMeta.format || "").toLowerCase();
       const isGroupStage =
-        formatLabel.includes("round robin") || isDualTournamentFormat(formatLabel);
+        formatLabel.includes("round robin") ||
+        isDualTournamentFormat(formatLabel);
       bracketTitle.textContent = isGroupStage
         ? "Group Stage"
         : currentTournamentMeta.format || "Bracket";
@@ -1515,7 +1626,8 @@ function renderAll(matchIds = null) {
           })
         : "TBD";
     }
-    if (statPlayers) statPlayers.textContent = String(eligiblePlayers.length || 0);
+    if (statPlayers)
+      statPlayers.textContent = String(eligiblePlayers.length || 0);
 
     const tokenActive =
       isInviteOnly &&
@@ -1535,7 +1647,8 @@ function renderAll(matchIds = null) {
       accessNote.classList.toggle("is-blocking", inviteLinkExhausted);
       if (isInviteOnly && !isAdmin) {
         if (tokenActive) {
-          accessNote.textContent = inviteLinkGate.message || "Invite link detected.";
+          accessNote.textContent =
+            inviteLinkGate.message || "Invite link detected.";
         } else {
           accessNote.textContent =
             "This tournament is invite-only. Ask an admin for an invite.";
@@ -1562,10 +1675,16 @@ function renderAll(matchIds = null) {
       if (state.isLive) {
         registerBtn.textContent = "Registration closed";
         registerBtn.disabled = true;
-      } else if (currentPlayer && currentInviteStatus === INVITE_STATUS.pending) {
+      } else if (
+        currentPlayer &&
+        currentInviteStatus === INVITE_STATUS.pending
+      ) {
         registerBtn.textContent = "Invitation pending";
         registerBtn.disabled = true;
-      } else if (currentPlayer && currentInviteStatus === INVITE_STATUS.denied) {
+      } else if (
+        currentPlayer &&
+        currentInviteStatus === INVITE_STATUS.denied
+      ) {
         registerBtn.textContent = "Invite declined";
         registerBtn.disabled = true;
       } else if (currentPlayer) {
@@ -1573,7 +1692,8 @@ function renderAll(matchIds = null) {
         registerBtn.disabled = false;
       } else if (isInviteOnly && !isAdmin) {
         const tokenActive =
-          inviteLinkGate?.slug === currentSlug && Boolean(inviteLinkGate?.token);
+          inviteLinkGate?.slug === currentSlug &&
+          Boolean(inviteLinkGate?.token);
         if (!tokenActive) {
           registerBtn.textContent = "Invite required";
           registerBtn.disabled = true;
@@ -1604,9 +1724,13 @@ function renderAll(matchIds = null) {
     }
     if (notifyCheckInBtn) {
       const checkInState = getCheckInWindowState(currentTournamentMeta);
-      const eligibleNotCheckedIn = eligiblePlayers.filter((p) => !p.checkedInAt);
+      const eligibleNotCheckedIn = eligiblePlayers.filter(
+        (p) => !p.checkedInAt
+      );
       notifyCheckInBtn.disabled =
-        state.isLive || !checkInState.isOpen || eligibleNotCheckedIn.length === 0;
+        state.isLive ||
+        !checkInState.isOpen ||
+        eligibleNotCheckedIn.length === 0;
     }
 
     updateCheckInUI();
@@ -1634,25 +1758,29 @@ function renderAll(matchIds = null) {
         if (registeredPlayersList) {
           registeredPlayersList.style.display = "";
           const items = eligiblePlayers.map((p) => {
-              const name = escapeHtml(p.name || "Unknown");
-              const race = (p.race || "").trim();
-              const raceClass = raceClassName(race);
-              const raceLabel = race ? escapeHtml(race) : "Race TBD";
-              const mmr = Number.isFinite(p.mmr) ? `${Math.round(p.mmr)} MMR` : "MMR TBD";
-              const clanLogo = p?.clanLogoUrl ? sanitizeUrl(p.clanLogoUrl) : "";
-              const clanName = (p?.clan || "").trim();
-              const clanImg = clanLogo
-                ? `<img class="registered-clan-logo" src="${escapeHtml(clanLogo)}" alt="Clan logo" ${
-                    clanName ? `data-tooltip="${escapeHtml(clanName)}"` : ""
-                  } />`
-                : `<img class="registered-clan-logo is-placeholder" src="img/clan/logo.webp" alt="No clan logo" />`;
-              return `<li data-player-id="${escapeHtml(p.id || "")}">
+            const name = escapeHtml(p.name || "Unknown");
+            const race = (p.race || "").trim();
+            const raceClass = raceClassName(race);
+            const raceLabel = race ? escapeHtml(race) : "Race TBD";
+            const mmr = Number.isFinite(p.mmr)
+              ? `${Math.round(p.mmr)} MMR`
+              : "MMR TBD";
+            const clanLogo = p?.clanLogoUrl ? sanitizeUrl(p.clanLogoUrl) : "";
+            const clanName = (p?.clan || "").trim();
+            const clanImg = clanLogo
+              ? `<img class="registered-clan-logo" src="${escapeHtml(
+                  clanLogo
+                )}" alt="Clan logo" ${
+                  clanName ? `data-tooltip="${escapeHtml(clanName)}"` : ""
+                } />`
+              : `<img class="registered-clan-logo is-placeholder" src="img/clan/logo.webp" alt="No clan logo" />`;
+            return `<li data-player-id="${escapeHtml(p.id || "")}">
                 <span class="race-strip ${raceClass}"></span>
                 ${clanImg}
                 <span class="name-text">${name}</span>
                 <span class="registered-meta">${raceLabel} · ${mmr}</span>
               </li>`;
-            });
+          });
           registeredPlayersList.innerHTML = items.join("");
         }
       } else {
@@ -1699,7 +1827,10 @@ function renderAll(matchIds = null) {
     if (!bracket || !playersArr.length) return false;
     if (bracketHasRecordedResults(bracket)) return false;
     if (isGroupStageFormat(format)) return false;
-    const { seededEligible } = seedEligiblePlayersWithMode(state.players || [], state);
+    const { seededEligible } = seedEligiblePlayersWithMode(
+      state.players || [],
+      state
+    );
     const expected = buildBracket(
       seededEligible,
       currentTournamentMeta || {},
@@ -1723,9 +1854,7 @@ function renderAll(matchIds = null) {
     let lookup = getMatchLookup(bracket);
     const playersById = getPlayersMap();
     const shouldPartialUpdate =
-      Array.isArray(matchIds) &&
-      matchIds.length &&
-      !isGroupStageFormat(format);
+      Array.isArray(matchIds) && matchIds.length && !isGroupStageFormat(format);
     let didPartialUpdate = false;
     if (shouldPartialUpdate) {
       didPartialUpdate = updateTreeMatchCards(matchIds, lookup, playersById, {
@@ -1756,7 +1885,8 @@ function renderAll(matchIds = null) {
           bracket,
           players: playersArr,
           format,
-          ensurePlayoffs: (b) => ensureRoundRobinPlayoffs(b, playersById, lookup),
+          ensurePlayoffs: (b) =>
+            ensureRoundRobinPlayoffs(b, playersById, lookup),
           getPlayersMap,
           attachMatchActionHandlers,
           computeGroupStandings,
@@ -1839,7 +1969,8 @@ async function notifyCheckInPlayers() {
     showToast?.("Tournament is live. Check-in is closed.", "error");
     return;
   }
-  const targetSlug = currentSlug || currentTournamentMeta.slug || currentTournamentMeta.id || "";
+  const targetSlug =
+    currentSlug || currentTournamentMeta.slug || currentTournamentMeta.id || "";
   if (!targetSlug) {
     showToast?.("Missing tournament slug.", "error");
     return;
@@ -2012,7 +2143,6 @@ function applyBracketReadOnlyState(readOnly) {
   });
 }
 
-
 function createOrUpdatePlayer(data) {
   if (!data) return null;
   const id =
@@ -2123,7 +2253,10 @@ function setPlayerForfeit(id, shouldForfeit) {
       const ids = [participants[0]?.id, participants[1]?.id].filter(Boolean);
       if (!ids.includes(id)) continue;
       if (matchHasManualResult(match)) {
-        showToast?.("Cannot undo forfeit after a later match has a recorded score.", "error");
+        showToast?.(
+          "Cannot undo forfeit after a later match has a recorded score.",
+          "error"
+        );
         return;
       }
     }
@@ -2212,24 +2345,25 @@ function updateMatchScore(matchId, scoreA, scoreB, options = {}) {
     !!matchAfter.walkover;
   if ((!changed && !completedNow && !winnerChanged) || !hasScore) return;
   const playersById = getPlayersMap();
-  const participants = resolveParticipants(matchAfter, lookupAfter, playersById);
+  const participants = resolveParticipants(
+    matchAfter,
+    lookupAfter,
+    playersById
+  );
   const nameA = participants[0]?.name || "TBD";
   const nameB = participants[1]?.name || "TBD";
   const scoreAOut = Number.isFinite(nextScores[0]) ? nextScores[0] : 0;
   const scoreBOut = Number.isFinite(nextScores[1]) ? nextScores[1] : 0;
-  addActivity(
-    `Score submitted: ${nameA} ${scoreAOut}-${scoreBOut} ${nameB}`,
-    {
-      type: "score",
-      score: {
-        nameA,
-        nameB,
-        scoreA: scoreAOut,
-        scoreB: scoreBOut,
-      },
-      skipRemote: true,
-    }
-  );
+  addActivity(`Score submitted: ${nameA} ${scoreAOut}-${scoreBOut} ${nameB}`, {
+    type: "score",
+    score: {
+      nameA,
+      nameB,
+      scoreA: scoreAOut,
+      scoreB: scoreBOut,
+    },
+    skipRemote: true,
+  });
   const targetSlug = currentSlug || currentTournamentMeta?.slug || "";
   if (targetSlug) {
     void submitMatchScoreRemote(
@@ -2255,18 +2389,23 @@ function updateMatchScore(matchId, scoreA, scoreB, options = {}) {
 }
 
 function saveState(next = {}, options = {}) {
-    persistState(
-      next,
-      options,
-      state,
-      defaultState,
-      currentSlug,
-      broadcast,
-      setStateObj,
-      (snapshot) =>
-        persistTournamentStateRemote(snapshot, currentSlug, serializeBracket, showToast)
-    );
-  }
+  persistState(
+    next,
+    options,
+    state,
+    defaultState,
+    currentSlug,
+    broadcast,
+    setStateObj,
+    (snapshot) =>
+      persistTournamentStateRemote(
+        snapshot,
+        currentSlug,
+        serializeBracket,
+        showToast
+      )
+  );
+}
 
 function rebuildBracket(force = false, reason = "") {
   const { seededEligible, mergedPlayers } = seedEligiblePlayersWithMode(
@@ -2281,12 +2420,12 @@ function rebuildBracket(force = false, reason = "") {
     currentTournamentMeta || {},
     isRoundRobin
   );
-    saveState({
-      players: mergedPlayers,
-      bracket,
-      needsReseed: false,
-      bracketLayoutVersion: CURRENT_BRACKET_LAYOUT_VERSION,
-    });
+  saveState({
+    players: mergedPlayers,
+    bracket,
+    needsReseed: false,
+    bracketLayoutVersion: CURRENT_BRACKET_LAYOUT_VERSION,
+  });
   if (reason) addActivity(reason);
   renderAll();
 }
@@ -2297,8 +2436,8 @@ async function renderTournamentList() {
   const statNextStart = document.getElementById("statNextStart");
   const listTitle = document.getElementById("tournamentListTitle");
   const typeFilter =
-    document.querySelector("#tournamentTypeTabs .list-tab.active")
-      ?.dataset.typeFilter || "tournaments";
+    document.querySelector("#tournamentTypeTabs .list-tab.active")?.dataset
+      .typeFilter || "tournaments";
   const statusFilter =
     document.getElementById("tournamentStatusSelect")?.value || "all";
   const roleFilter =
@@ -2307,7 +2446,8 @@ async function renderTournamentList() {
   const ownerFilterActive = ownerBtn?.classList.contains("active") || false;
   const filterControls = document.getElementById("tournamentFilterControls");
   if (listTitle) {
-    listTitle.textContent = typeFilter === "circuits" ? "Circuits" : "Tournaments";
+    listTitle.textContent =
+      typeFilter === "circuits" ? "Circuits" : "Tournaments";
   }
   const listCard = listEl?.closest(".tournament-list-card");
   if (listCard) {
@@ -2358,7 +2498,9 @@ async function renderTournamentList() {
                   <h4>${escapeHtml(item.name)}</h4>
                 </div>
                 <div class="meta">
-                  ${metaBits.map((text) => `<span>${escapeHtml(text)}</span>`).join("")}
+                  ${metaBits
+                    .map((text) => `<span>${escapeHtml(text)}</span>`)
+                    .join("")}
                 </div>
               </div>
             `);
@@ -2367,7 +2509,8 @@ async function renderTournamentList() {
           },
         });
       }
-      if (statTournaments) statTournaments.textContent = String(circuitItems.length);
+      if (statTournaments)
+        statTournaments.textContent = String(circuitItems.length);
       if (statNextStart) statNextStart.textContent = "TBD";
       return;
     }
@@ -2380,8 +2523,7 @@ async function renderTournamentList() {
       } else {
         filtered = filtered.filter(
           (item) =>
-            item.createdBy === userId ||
-            registered.has(item.slug || item.id)
+            item.createdBy === userId || registered.has(item.slug || item.id)
         );
       }
     }
@@ -2413,9 +2555,13 @@ async function renderTournamentList() {
 
     const now = Date.now();
     if (statusFilter === "upcoming") {
-      filtered = filtered.filter((item) => item.startTime && item.startTime > now);
+      filtered = filtered.filter(
+        (item) => item.startTime && item.startTime > now
+      );
     } else if (statusFilter === "live" || statusFilter === "finished") {
-      const candidates = filtered.filter((item) => item.startTime && item.startTime <= now);
+      const candidates = filtered.filter(
+        (item) => item.startTime && item.startTime <= now
+      );
       const checks = await Promise.all(
         candidates.map(async (item) => ({
           item,
@@ -2423,7 +2569,9 @@ async function renderTournamentList() {
         }))
       );
       filtered = checks
-        .filter((row) => (statusFilter === "finished" ? row.finished : !row.finished))
+        .filter((row) =>
+          statusFilter === "finished" ? row.finished : !row.finished
+        )
         .map((row) => row.item);
     }
 
@@ -2440,11 +2588,15 @@ async function renderTournamentList() {
     if (!listItems.length) {
       listEl.innerHTML = `<li class="muted">No tournaments found.</li>`;
       setTournamentListItems([], {
-        mode: `${statusFilter}-${roleFilter}-${ownerFilterActive ? "mine" : "all"}`,
+        mode: `${statusFilter}-${roleFilter}-${
+          ownerFilterActive ? "mine" : "all"
+        }`,
       });
     } else {
       setTournamentListItems(listItems, {
-        mode: `${statusFilter}-${roleFilter}-${ownerFilterActive ? "mine" : "all"}`,
+        mode: `${statusFilter}-${roleFilter}-${
+          ownerFilterActive ? "mine" : "all"
+        }`,
         onPageRender: (targetList) => {
           const targets = Array.from(
             targetList.querySelectorAll(".tournament-progress")
@@ -2482,13 +2634,17 @@ async function renderTournamentList() {
             }
           }
           const accessLabel = item.isInviteOnly ? "Closed" : "Open";
-          const accessClass = item.isInviteOnly ? "status-closed" : "status-open";
+          const accessClass = item.isInviteOnly
+            ? "status-closed"
+            : "status-open";
           const overlayChip = `<span class="status-chip ${statusClass} status-chip-overlay">${statusLabel}</span>`;
           const accessChip = `<span class="status-chip ${accessClass} status-chip-access">${accessLabel}</span>`;
           li.innerHTML = DOMPurify.sanitize(`
             <div class="card-cover${coverUrl ? " has-image" : ""}"${
-              coverUrl ? ` style="background-image:url('${escapeHtml(coverUrl)}')"` : ""
-            }>
+            coverUrl
+              ? ` style="background-image:url('${escapeHtml(coverUrl)}')"`
+              : ""
+          }>
               ${overlayChip}
               ${accessChip}
               <div class="time-block time-block-cover">
@@ -2500,9 +2656,13 @@ async function renderTournamentList() {
                 <h4>${escapeHtml(item.name)}</h4>
               </div>
               <div class="meta">
-                <span>Host: ${escapeHtml(item.createdByName || "Unknown")}</span>
+                <span>Host: ${escapeHtml(
+                  item.createdByName || "Unknown"
+                )}</span>
               </div>
-              <div class="tournament-progress" data-slug="${escapeHtml(item.slug)}">
+              <div class="tournament-progress" data-slug="${escapeHtml(
+                item.slug
+              )}">
                 <span class="progress-label">Progress</span>
                 <div class="progress-track">
                   <div class="progress-fill" style="width:0%"></div>
@@ -2548,11 +2708,7 @@ function computeTournamentProgress(bracket) {
   if (!matches.length) return null;
   let completed = 0;
   matches.forEach((match) => {
-    if (
-      match?.status === "complete" ||
-      match?.winnerId ||
-      match?.walkover
-    ) {
+    if (match?.status === "complete" || match?.winnerId || match?.walkover) {
       completed += 1;
     }
   });
@@ -2568,7 +2724,10 @@ function computeTournamentProgress(bracket) {
 const tournamentStateCache = new Map();
 const TOURNAMENT_PROGRESS_TTL_MS = 30000;
 
-async function getTournamentStateCached(slug, { maxAgeMs = TOURNAMENT_PROGRESS_TTL_MS } = {}) {
+async function getTournamentStateCached(
+  slug,
+  { maxAgeMs = TOURNAMENT_PROGRESS_TTL_MS } = {}
+) {
   if (!slug) return null;
   const cached = tournamentStateCache.get(slug);
   const now = Date.now();
@@ -2630,7 +2789,11 @@ function updateTournamentProgress(targets = []) {
         meta.textContent = `${progress.completed}/${progress.total} matches`;
         if (progress.isFinished && statusChip) {
           statusChip.textContent = "Finished";
-          statusChip.classList.remove("status-upcoming", "status-started", "status-tbd");
+          statusChip.classList.remove(
+            "status-upcoming",
+            "status-started",
+            "status-tbd"
+          );
           statusChip.classList.add("status-finished");
         }
       } catch (err) {
@@ -2672,9 +2835,13 @@ async function populateCreateForm() {
   const imagePreview = document.getElementById("tournamentImagePreview");
   const checkInSelect = document.getElementById("checkInSelect");
   const accessSelect = document.getElementById("tournamentAccessSelect");
-  const visibilitySelect = document.getElementById("tournamentVisibilitySelect");
+  const visibilitySelect = document.getElementById(
+    "tournamentVisibilitySelect"
+  );
   const templateSelect = document.getElementById("tournamentTemplateSelect");
-  const templateNameInput = document.getElementById("tournamentTemplateNameInput");
+  const templateNameInput = document.getElementById(
+    "tournamentTemplateNameInput"
+  );
   if (imageInput) imageInput.value = "";
   if (imagePreview) {
     imagePreview.removeAttribute("src");
@@ -2693,16 +2860,23 @@ async function populateCreateForm() {
   const bestOfUpperInput = document.getElementById("bestOfUpperInput");
   const bestOfLowerInput = document.getElementById("bestOfLowerInput");
   const bestOfLowerSemiInput = document.getElementById("bestOfLowerSemiInput");
-  const bestOfLowerFinalInput = document.getElementById("bestOfLowerFinalInput");
+  const bestOfLowerFinalInput = document.getElementById(
+    "bestOfLowerFinalInput"
+  );
   const bestOfQuarterInput = document.getElementById("bestOfQuarterInput");
   const bestOfSemiInput = document.getElementById("bestOfSemiInput");
-  const bestOfUpperFinalInput = document.getElementById("bestOfUpperFinalInput");
+  const bestOfUpperFinalInput = document.getElementById(
+    "bestOfUpperFinalInput"
+  );
   const bestOfFinalInput = document.getElementById("bestOfFinalInput");
   if (bestOfUpperInput) bestOfUpperInput.value = String(defaultBestOf.upper);
   if (bestOfLowerInput) bestOfLowerInput.value = String(defaultBestOf.lower);
-  if (bestOfLowerSemiInput) bestOfLowerSemiInput.value = String(defaultBestOf.lowerSemi);
-  if (bestOfLowerFinalInput) bestOfLowerFinalInput.value = String(defaultBestOf.lowerFinal);
-  if (bestOfQuarterInput) bestOfQuarterInput.value = String(defaultBestOf.quarter);
+  if (bestOfLowerSemiInput)
+    bestOfLowerSemiInput.value = String(defaultBestOf.lowerSemi);
+  if (bestOfLowerFinalInput)
+    bestOfLowerFinalInput.value = String(defaultBestOf.lowerFinal);
+  if (bestOfQuarterInput)
+    bestOfQuarterInput.value = String(defaultBestOf.quarter);
   if (bestOfSemiInput) bestOfSemiInput.value = String(defaultBestOf.semi);
   if (bestOfUpperFinalInput) {
     bestOfUpperFinalInput.value = String(defaultBestOf.upperFinal);
@@ -2710,7 +2884,6 @@ async function populateCreateForm() {
   if (bestOfFinalInput) bestOfFinalInput.value = String(defaultBestOf.final);
   setCreateTournamentCircuitContext("");
 }
-
 
 function setCreateTournamentCircuitContext(circuitSlug) {
   const modal = document.getElementById("createTournamentModal");
@@ -2746,23 +2919,36 @@ function openCircuitSettingsModal() {
   const toggle = document.getElementById("circuitSettingsFirstPlaceSortToggle");
   const nameInput = document.getElementById("circuitSettingsNameInput");
   const slugInput = document.getElementById("circuitSettingsSlugInput");
-  const descriptionInput = document.getElementById("circuitSettingsDescriptionInput");
+  const descriptionInput = document.getElementById(
+    "circuitSettingsDescriptionInput"
+  );
   const finalNameInput = document.getElementById("circuitFinalNameInput");
   const finalSlugInput = document.getElementById("circuitFinalSlugInput");
-  const finalVisibilitySelect = document.getElementById("circuitFinalVisibilitySelect");
+  const finalVisibilitySelect = document.getElementById(
+    "circuitFinalVisibilitySelect"
+  );
   const finalAccessSelect = document.getElementById("circuitFinalAccessSelect");
   const finalStartInput = document.getElementById("circuitFinalStartInput");
-  const finalMaxPlayersInput = document.getElementById("circuitFinalMaxPlayersInput");
-  const finalQualifyInput = document.getElementById("circuitFinalQualifyCountInput");
-  const finalCheckInSelect = document.getElementById("circuitFinalCheckInSelect");
-  const finalDescriptionInput = document.getElementById("circuitFinalDescriptionInput");
+  const finalMaxPlayersInput = document.getElementById(
+    "circuitFinalMaxPlayersInput"
+  );
+  const finalQualifyInput = document.getElementById(
+    "circuitFinalQualifyCountInput"
+  );
+  const finalCheckInSelect = document.getElementById(
+    "circuitFinalCheckInSelect"
+  );
+  const finalDescriptionInput = document.getElementById(
+    "circuitFinalDescriptionInput"
+  );
   const finalRulesInput = document.getElementById("circuitFinalRulesInput");
   const finalFormatSelect = document.getElementById("circuitFinalFormatSelect");
   const finalImagePreview = document.getElementById("circuitFinalImagePreview");
   if (toggle) toggle.checked = Boolean(currentCircuitMeta?.sortByFirstPlace);
   if (nameInput) nameInput.value = currentCircuitMeta?.name || "";
   if (slugInput) slugInput.value = currentCircuitMeta?.slug || "";
-  if (descriptionInput) descriptionInput.value = currentCircuitMeta?.description || "";
+  if (descriptionInput)
+    descriptionInput.value = currentCircuitMeta?.description || "";
   if (finalVisibilitySelect) finalVisibilitySelect.value = "public";
   if (finalAccessSelect) finalAccessSelect.value = "open";
   const finalSlug = currentCircuitMeta?.finalTournamentSlug || "";
@@ -2778,7 +2964,9 @@ function openCircuitSettingsModal() {
       const meta = snap.data() || {};
       if (finalNameInput) finalNameInput.value = meta.name || "";
       if (finalVisibilitySelect) {
-        finalVisibilitySelect.value = normalizeTournamentVisibility(meta.visibility);
+        finalVisibilitySelect.value = normalizeTournamentVisibility(
+          meta.visibility
+        );
       }
       if (finalAccessSelect) {
         finalAccessSelect.value = meta.isInviteOnly ? "closed" : "open";
@@ -2802,23 +2990,41 @@ function openCircuitSettingsModal() {
       if (finalCheckInSelect) {
         finalCheckInSelect.value = String(meta.checkInWindowMinutes || 0);
       }
-      if (finalDescriptionInput) finalDescriptionInput.value = meta.description || "";
+      if (finalDescriptionInput)
+        finalDescriptionInput.value = meta.description || "";
       if (finalRulesInput) finalRulesInput.value = meta.rules || "";
-      syncQuillById?.("circuitFinalDescriptionInput", finalDescriptionInput?.value || "");
+      syncQuillById?.(
+        "circuitFinalDescriptionInput",
+        finalDescriptionInput?.value || ""
+      );
       syncQuillById?.("circuitFinalRulesInput", finalRulesInput?.value || "");
       if (finalFormatSelect) {
         finalFormatSelect.value = meta.format || "Double Elimination";
         syncFormatFieldVisibility("circuitfinal");
       }
       const rr = meta.roundRobin || defaultRoundRobinSettings;
-      const rrGroups = document.getElementById("circuitFinalRoundRobinGroupsInput");
-      const rrAdvance = document.getElementById("circuitFinalRoundRobinAdvanceInput");
-      const rrPlayoffs = document.getElementById("circuitFinalRoundRobinPlayoffsSelect");
-      const rrBestOf = document.getElementById("circuitFinalRoundRobinBestOfInput");
-      if (rrGroups) rrGroups.value = String(rr.groups ?? defaultRoundRobinSettings.groups);
-      if (rrAdvance) rrAdvance.value = String(rr.advancePerGroup ?? defaultRoundRobinSettings.advancePerGroup);
-      if (rrPlayoffs) rrPlayoffs.value = rr.playoffs || defaultRoundRobinSettings.playoffs;
-      if (rrBestOf) rrBestOf.value = String(rr.bestOf ?? defaultRoundRobinSettings.bestOf);
+      const rrGroups = document.getElementById(
+        "circuitFinalRoundRobinGroupsInput"
+      );
+      const rrAdvance = document.getElementById(
+        "circuitFinalRoundRobinAdvanceInput"
+      );
+      const rrPlayoffs = document.getElementById(
+        "circuitFinalRoundRobinPlayoffsSelect"
+      );
+      const rrBestOf = document.getElementById(
+        "circuitFinalRoundRobinBestOfInput"
+      );
+      if (rrGroups)
+        rrGroups.value = String(rr.groups ?? defaultRoundRobinSettings.groups);
+      if (rrAdvance)
+        rrAdvance.value = String(
+          rr.advancePerGroup ?? defaultRoundRobinSettings.advancePerGroup
+        );
+      if (rrPlayoffs)
+        rrPlayoffs.value = rr.playoffs || defaultRoundRobinSettings.playoffs;
+      if (rrBestOf)
+        rrBestOf.value = String(rr.bestOf ?? defaultRoundRobinSettings.bestOf);
       if (finalImagePreview) finalImagePreview.src = meta.coverImageUrl || "";
       setCircuitFinalMapPoolSelection(
         Array.isArray(meta.mapPool) && meta.mapPool.length
@@ -2853,16 +3059,28 @@ async function saveCircuitSettings() {
   if (!currentCircuitMeta?.slug || !isCircuitAdmin) return;
   const toggle = document.getElementById("circuitSettingsFirstPlaceSortToggle");
   const nameInput = document.getElementById("circuitSettingsNameInput");
-  const descriptionInput = document.getElementById("circuitSettingsDescriptionInput");
+  const descriptionInput = document.getElementById(
+    "circuitSettingsDescriptionInput"
+  );
   const finalNameInput = document.getElementById("circuitFinalNameInput");
   const finalSlugInput = document.getElementById("circuitFinalSlugInput");
-  const finalVisibilitySelect = document.getElementById("circuitFinalVisibilitySelect");
+  const finalVisibilitySelect = document.getElementById(
+    "circuitFinalVisibilitySelect"
+  );
   const finalAccessSelect = document.getElementById("circuitFinalAccessSelect");
   const finalStartInput = document.getElementById("circuitFinalStartInput");
-  const finalMaxPlayersInput = document.getElementById("circuitFinalMaxPlayersInput");
-  const finalQualifyInput = document.getElementById("circuitFinalQualifyCountInput");
-  const finalCheckInSelect = document.getElementById("circuitFinalCheckInSelect");
-  const finalDescriptionInput = document.getElementById("circuitFinalDescriptionInput");
+  const finalMaxPlayersInput = document.getElementById(
+    "circuitFinalMaxPlayersInput"
+  );
+  const finalQualifyInput = document.getElementById(
+    "circuitFinalQualifyCountInput"
+  );
+  const finalCheckInSelect = document.getElementById(
+    "circuitFinalCheckInSelect"
+  );
+  const finalDescriptionInput = document.getElementById(
+    "circuitFinalDescriptionInput"
+  );
   const finalRulesInput = document.getElementById("circuitFinalRulesInput");
   const finalFormatSelect = document.getElementById("circuitFinalFormatSelect");
   const finalImageInput = document.getElementById("circuitFinalImageInput");
@@ -2888,9 +3106,13 @@ async function saveCircuitSettings() {
     };
     const finalSlug = (finalSlugInput?.value || "").trim();
     if (finalSlug) {
-      const finalVisibility = normalizeTournamentVisibility(finalVisibilitySelect?.value);
+      const finalVisibility = normalizeTournamentVisibility(
+        finalVisibilitySelect?.value
+      );
       const finalAccess = normalizeTournamentAccess(finalAccessSelect?.value);
-      const finalStartTime = finalStartInput?.value ? new Date(finalStartInput.value) : null;
+      const finalStartTime = finalStartInput?.value
+        ? new Date(finalStartInput.value)
+        : null;
       const finalMaxPlayers = normalizeMaxPlayersForFormat(
         finalMaxPlayersInput?.value,
         finalFormatSelect?.value || "Double Elimination",
@@ -2901,7 +3123,9 @@ async function saveCircuitSettings() {
       }
       const finalQualifyRaw = finalQualifyInput?.value ?? "";
       const finalQualifyCount =
-        finalQualifyRaw === "" || finalQualifyRaw === null || finalQualifyRaw === undefined
+        finalQualifyRaw === "" ||
+        finalQualifyRaw === null ||
+        finalQualifyRaw === undefined
           ? null
           : Number(finalQualifyRaw);
       const finalPayload = buildFinalTournamentPayload({
@@ -2918,7 +3142,10 @@ async function saveCircuitSettings() {
         mapPool: getCircuitFinalMapPoolSelection(),
         createdBy: auth.currentUser?.uid || null,
         createdByName: getCurrentUsername() || "Unknown host",
-        roundRobin: extractRoundRobinSettingsUI("circuitfinal", defaultRoundRobinSettings),
+        roundRobin: extractRoundRobinSettingsUI(
+          "circuitfinal",
+          defaultRoundRobinSettings
+        ),
         bestOf: readBestOf("circuitfinal", defaultBestOf),
         circuitSlug: currentCircuitMeta.slug,
         circuitQualifyCount: finalQualifyCount,
@@ -2932,14 +3159,20 @@ async function saveCircuitSettings() {
       const reuseUrl = finalImagePreview?.dataset?.reuseUrl || "";
       if (imageFile) {
         try {
-          const coverImageUrl = await uploadTournamentCover(imageFile, finalSlug);
+          const coverImageUrl = await uploadTournamentCover(
+            imageFile,
+            finalSlug
+          );
           await setDoc(
             doc(collection(db, TOURNAMENT_COLLECTION), finalSlug),
             { coverImageUrl },
             { merge: true }
           );
         } catch (err) {
-          showToast?.(err?.message || "Failed to upload final cover image.", "error");
+          showToast?.(
+            err?.message || "Failed to upload final cover image.",
+            "error"
+          );
         }
       } else if (reuseUrl) {
         await setDoc(
@@ -2997,8 +3230,12 @@ async function getTournamentCoverUrlForDelete(slug) {
     return currentTournamentMeta?.coverImageUrl || "";
   }
   try {
-    const tournamentSnap = await getDoc(doc(collection(db, TOURNAMENT_COLLECTION), slug));
-    return tournamentSnap.exists() ? tournamentSnap.data()?.coverImageUrl || "" : "";
+    const tournamentSnap = await getDoc(
+      doc(collection(db, TOURNAMENT_COLLECTION), slug)
+    );
+    return tournamentSnap.exists()
+      ? tournamentSnap.data()?.coverImageUrl || ""
+      : "";
   } catch (err) {
     console.warn("Failed to load tournament cover image", err);
     return "";
@@ -3025,7 +3262,8 @@ async function confirmDeleteTournament() {
   const modal = document.getElementById("confirmDeleteTournamentModal");
   if (!modal?.dataset.slug) return;
   const slug = modal.dataset.slug;
-  const circuitSlug = modal.dataset.circuitSlug || currentTournamentMeta?.circuitSlug || "";
+  const circuitSlug =
+    modal.dataset.circuitSlug || currentTournamentMeta?.circuitSlug || "";
   try {
     const coverImageUrl = await getTournamentCoverUrlForDelete(slug);
     await deleteTournamentBundle(slug, coverImageUrl);
@@ -3034,9 +3272,13 @@ async function confirmDeleteTournament() {
       if (currentCircuitMeta?.finalTournamentSlug === slug) {
         updates.finalTournamentSlug = "";
       }
-      await setDoc(doc(collection(db, CIRCUIT_COLLECTION), circuitSlug), updates, {
-        merge: true,
-      });
+      await setDoc(
+        doc(collection(db, CIRCUIT_COLLECTION), circuitSlug),
+        updates,
+        {
+          merge: true,
+        }
+      );
       if (currentCircuitMeta?.slug === circuitSlug) {
         currentCircuitMeta = {
           ...currentCircuitMeta,
@@ -3052,7 +3294,9 @@ async function confirmDeleteTournament() {
     }
     showToast?.("Tournament deleted.", "success");
     closeDeleteTournamentModal();
-    const redirectTarget = circuitSlug ? `/tournament/${circuitSlug}` : "/tournament/";
+    const redirectTarget = circuitSlug
+      ? `/tournament/${circuitSlug}`
+      : "/tournament/";
     if (typeof window !== "undefined") {
       window.location.href = redirectTarget;
     }
@@ -3072,7 +3316,9 @@ function openDeleteCircuitModal() {
     const tournamentSlugs = normalizeCircuitTournamentSlugs(currentCircuitMeta);
     const count = tournamentSlugs.length;
     if (message) {
-      message.textContent = `Are you sure you want to delete "${circuitSlug}"? This will delete ${count} tournament${count === 1 ? "" : "s"} and all related data.`;
+      message.textContent = `Are you sure you want to delete "${circuitSlug}"? This will delete ${count} tournament${
+        count === 1 ? "" : "s"
+      } and all related data.`;
     }
     modal.style.display = "flex";
     lockBodyScroll();
@@ -3167,7 +3413,9 @@ async function handleRouteChange() {
       return;
     }
     try {
-      const snap = await getDoc(doc(collection(db, TOURNAMENT_COLLECTION), route.slug));
+      const snap = await getDoc(
+        doc(collection(db, TOURNAMENT_COLLECTION), route.slug)
+      );
       if (snap.exists()) {
         const tournamentMeta = snap.data() || {};
         const circuitSlug = String(tournamentMeta?.circuitSlug || "").trim();
@@ -3189,18 +3437,26 @@ async function enterTournament(slug, options = {}) {
   const { circuitSlug = "" } = options;
   setCurrentSlugState(slug || null);
   if (slug) {
-    const target = circuitSlug ? `/tournament/${circuitSlug}/${slug}` : `/tournament/${slug}`;
+    const target = circuitSlug
+      ? `/tournament/${circuitSlug}/${slug}`
+      : `/tournament/${slug}`;
     if (window.location.pathname !== target) {
       window.history.pushState({}, "", target);
     }
   }
   const backLink = document.getElementById("tournamentBackLink");
   if (backLink) {
+    const label = backLink.querySelector("span:last-child"); // safer than lastChild
     backLink.href = circuitSlug ? `/tournament/${circuitSlug}` : "/tournament";
-    backLink.lastChild.textContent = circuitSlug ? "Circuit page" : "All tournaments";
+    if (label)
+      label.textContent = circuitSlug ? "Circuit page" : "All tournaments";
   }
   // Load local state for this slug
-  const local = loadLocalState(slug, applyRosterSeedingWithMode, deserializeBracket);
+  const local = loadLocalState(
+    slug,
+    applyRosterSeedingWithMode,
+    deserializeBracket
+  );
   setStateObj(local);
   // Try remote meta first
   try {
@@ -3220,9 +3476,16 @@ async function enterTournament(slug, options = {}) {
       }
       const backLink = document.getElementById("tournamentBackLink");
       if (backLink) {
-        backLink.href = metaCircuitSlug ? `/tournament/${metaCircuitSlug}` : "/tournament";
-        backLink.lastChild.textContent = metaCircuitSlug ? "Circuit page" : "All tournaments";
+        const label = backLink.querySelector("span:last-child");
+        backLink.href = metaCircuitSlug
+          ? `/tournament/${metaCircuitSlug}`
+          : "/tournament";
+        if (label)
+          label.textContent = metaCircuitSlug
+            ? "Circuit page"
+            : "All tournaments";
       }
+
       await refreshInviteLinkGate(slug);
     } else {
       if (typeof window !== "undefined") {
@@ -3332,7 +3595,9 @@ function setRegisterLoadingState(isLoading) {
   registerBtn.classList.toggle("is-loading", next > 0);
   if (next > 0) {
     if (registerBtn.dataset.prevDisabled === undefined) {
-      registerBtn.dataset.prevDisabled = registerBtn.disabled ? "true" : "false";
+      registerBtn.dataset.prevDisabled = registerBtn.disabled
+        ? "true"
+        : "false";
     }
     registerBtn.disabled = true;
     registerBtn.setAttribute("aria-busy", "true");
@@ -3410,7 +3675,9 @@ async function fetchPulseMmrFromBackend(url) {
 function isInviteOnlyTournament(meta) {
   if (!meta) return false;
   if (typeof meta.isInviteOnly === "boolean") return meta.isInviteOnly;
-  const access = String(meta.accessType || meta.registrationType || "").toLowerCase();
+  const access = String(
+    meta.accessType || meta.registrationType || ""
+  ).toLowerCase();
   return access === "closed" || access === "invite-only" || access === "invite";
 }
 
@@ -3483,7 +3750,9 @@ function normalizeMaxPlayersForFormat(rawValue, format, input = null) {
   const parsed = Number(rawValue);
   if (!Number.isFinite(parsed)) return null;
   const maxCap = Number(input?.max || 0) || 32;
-  const minCap = isDualTournamentFormat(format) ? 4 : Number(input?.min || 0) || 2;
+  const minCap = isDualTournamentFormat(format)
+    ? 4
+    : Number(input?.min || 0) || 2;
   if (!isDualTournamentFormat(format)) {
     return Math.min(maxCap, Math.max(minCap, parsed));
   }
@@ -3530,7 +3799,11 @@ function updateCheckInUI() {
   const inviteStatus = normalizeInviteStatus(currentPlayer?.inviteStatus);
   const isInviteOnly = isInviteOnlyTournament(currentTournamentMeta);
 
-  if (state.isLive || !getCheckInWindowMinutesFromMeta(currentTournamentMeta) || !startMs) {
+  if (
+    state.isLive ||
+    !getCheckInWindowMinutesFromMeta(currentTournamentMeta) ||
+    !startMs
+  ) {
     checkInBtn.style.display = "none";
     checkInStatus.textContent = "";
     checkInCard.style.display = "none";
@@ -3539,7 +3812,9 @@ function updateCheckInUI() {
 
   if (!checkInState.isOpen) {
     checkInBtn.style.display = "none";
-    const timeUntil = checkInState.opensAt ? checkInState.opensAt - Date.now() : 0;
+    const timeUntil = checkInState.opensAt
+      ? checkInState.opensAt - Date.now()
+      : 0;
     checkInStatus.textContent = checkInState.opensAt
       ? `Check-in opens in ${formatCountdown(timeUntil)}`
       : "Check-in is not open yet.";
@@ -3552,9 +3827,10 @@ function updateCheckInUI() {
 
   if (!currentPlayer) {
     checkInBtn.style.display = "none";
-    checkInStatus.textContent = isInviteOnly && !isAdmin
-      ? "Invite required to check in."
-      : "Register to check in.";
+    checkInStatus.textContent =
+      isInviteOnly && !isAdmin
+        ? "Invite required to check in."
+        : "Register to check in.";
     checkInStatus.classList.add("is-open");
     return;
   }
@@ -3575,9 +3851,13 @@ function updateCheckInUI() {
     return;
   }
 
-  const closesIn = checkInState.closesAt ? checkInState.closesAt - Date.now() : 0;
+  const closesIn = checkInState.closesAt
+    ? checkInState.closesAt - Date.now()
+    : 0;
   checkInBtn.style.display = "inline-flex";
-  checkInStatus.textContent = `Check-in open · closes in ${formatCountdown(closesIn)}`;
+  checkInStatus.textContent = `Check-in open · closes in ${formatCountdown(
+    closesIn
+  )}`;
   checkInStatus.classList.add("is-open");
 }
 
@@ -3624,7 +3904,12 @@ async function deleteTournamentChatHistory(slug) {
 async function deleteTournamentInviteLinks(slug) {
   if (!slug) return;
   try {
-    const linksRef = collection(db, TOURNAMENT_INVITE_LINK_COLLECTION, slug, "links");
+    const linksRef = collection(
+      db,
+      TOURNAMENT_INVITE_LINK_COLLECTION,
+      slug,
+      "links"
+    );
     const snap = await getDocs(linksRef);
     await Promise.all(snap.docs.map((docSnap) => deleteDoc(docSnap.ref)));
   } catch (err) {
@@ -3666,7 +3951,10 @@ async function isCoverFolderUsedElsewhere(slug, excludeSlug) {
     const registry = await loadTournamentRegistry(true);
     return (registry || []).some((item) => {
       if (!item || item.slug === excludeSlug) return false;
-      return isCoverUrlInSlugFolder(String(item.coverImageUrl || "").trim(), slug);
+      return isCoverUrlInSlugFolder(
+        String(item.coverImageUrl || "").trim(),
+        slug
+      );
     });
   } catch (err) {
     console.warn("Failed to verify cover folder usage", err);
@@ -3714,7 +4002,9 @@ async function uploadTournamentCover(file, slug) {
   });
   const path = `tournamentCovers/${slug}/cover-${Date.now()}.webp`;
   const ref = storageRef(storage, path);
-  await uploadBytes(ref, processed.blob, { contentType: processed.contentType });
+  await uploadBytes(ref, processed.blob, {
+    contentType: processed.contentType,
+  });
   return getDownloadURL(ref);
 }
 
@@ -3739,7 +4029,11 @@ async function handleSaveSettings(event) {
   const newSlug = newSlugRaw || currentSlug || "";
   const slugChanged = newSlug && newSlug !== currentSlug;
   const bestOf = readBestOf("settings", defaultBestOf);
-  const format = (formatSelect?.value || currentTournamentMeta?.format || "Tournament").trim();
+  const format = (
+    formatSelect?.value ||
+    currentTournamentMeta?.format ||
+    "Tournament"
+  ).trim();
   const description = descInput?.value || "";
   const rules = rulesInput?.value || "";
   const startTime = startInput?.value ? new Date(startInput.value) : null;
@@ -3760,12 +4054,17 @@ async function handleSaveSettings(event) {
   const isInviteOnly = accessSelect?.value === "closed";
   const visibility = normalizeTournamentVisibility(visibilitySelect?.value);
   const mapPool = Array.from(mapPoolSelection || []);
-  const rrSettings = extractRoundRobinSettingsUI("settings", defaultRoundRobinSettings);
+  const rrSettings = extractRoundRobinSettingsUI(
+    "settings",
+    defaultRoundRobinSettings
+  );
   const circuitPoints = currentTournamentMeta?.circuitSlug
     ? readCircuitPointsTable()
     : null;
   const requirePulseLink =
-    requirePulseInput?.checked ?? currentTournamentMeta?.requirePulseLink ?? true;
+    requirePulseInput?.checked ??
+    currentTournamentMeta?.requirePulseLink ??
+    true;
   let coverImageUrl = currentTournamentMeta?.coverImageUrl || "";
   if (!imageFile && reuseUrl) {
     coverImageUrl = reuseUrl;
@@ -3815,7 +4114,9 @@ async function handleSaveSettings(event) {
       // ignore storage removal errors
     }
     const circuitSlug = meta?.circuitSlug || "";
-    const target = circuitSlug ? `/tournament/${circuitSlug}/${newSlug}` : `/tournament/${newSlug}`;
+    const target = circuitSlug
+      ? `/tournament/${circuitSlug}/${newSlug}`
+      : `/tournament/${newSlug}`;
     window.history.pushState({}, "", target);
   }
 
@@ -3853,19 +4154,31 @@ async function handleCreateCircuit(event) {
   const nameInput = document.getElementById("circuitNameInput");
   const slugInput = document.getElementById("circuitSlugInput");
   const descriptionInput = document.getElementById("circuitDescriptionInput");
-  const firstPlaceToggle = document.getElementById("circuitFirstPlaceSortToggle");
+  const firstPlaceToggle = document.getElementById(
+    "circuitFirstPlaceSortToggle"
+  );
   const finalNameInput = document.getElementById("finalTournamentNameInput");
   const finalSlugInput = document.getElementById("finalTournamentSlugInput");
-  const finalVisibilitySelect = document.getElementById("finalTournamentVisibilitySelect");
-  const finalAccessSelect = document.getElementById("finalTournamentAccessSelect");
+  const finalVisibilitySelect = document.getElementById(
+    "finalTournamentVisibilitySelect"
+  );
+  const finalAccessSelect = document.getElementById(
+    "finalTournamentAccessSelect"
+  );
   const finalFormatSelect = document.getElementById("finalFormatSelect");
   const finalStartInput = document.getElementById("finalTournamentStartInput");
-  const finalMaxPlayersInput = document.getElementById("finalTournamentMaxPlayersInput");
+  const finalMaxPlayersInput = document.getElementById(
+    "finalTournamentMaxPlayersInput"
+  );
   const finalCheckInSelect = document.getElementById("finalCheckInSelect");
-  const finalDescriptionInput = document.getElementById("finalTournamentDescriptionInput");
+  const finalDescriptionInput = document.getElementById(
+    "finalTournamentDescriptionInput"
+  );
   const finalRulesInput = document.getElementById("finalTournamentRulesInput");
   const finalImageInput = document.getElementById("finalTournamentImageInput");
-  const finalImagePreview = document.getElementById("finalTournamentImagePreview");
+  const finalImagePreview = document.getElementById(
+    "finalTournamentImagePreview"
+  );
   const finalQualifyInput = document.getElementById("finalQualifyCountInput");
   const modal = document.getElementById("createCircuitModal");
   const name = (nameInput?.value || "").trim();
@@ -3874,7 +4187,9 @@ async function handleCreateCircuit(event) {
     (await generateCircuitSlug());
   const description = descriptionInput?.value || "";
   const sortByFirstPlace = Boolean(firstPlaceToggle?.checked);
-  const finalVisibility = normalizeTournamentVisibility(finalVisibilitySelect?.value);
+  const finalVisibility = normalizeTournamentVisibility(
+    finalVisibilitySelect?.value
+  );
   const finalAccess = normalizeTournamentAccess(finalAccessSelect?.value);
   const finalName =
     (finalNameInput?.value || "").trim() || (name ? `${name} Finals` : "");
@@ -3883,7 +4198,9 @@ async function handleCreateCircuit(event) {
     finalSlug = slug ? `${slug}-final` : await generateUniqueSlug();
   }
   const finalFormat = (finalFormatSelect?.value || "Double Elimination").trim();
-  const finalStartTime = finalStartInput?.value ? new Date(finalStartInput.value) : null;
+  const finalStartTime = finalStartInput?.value
+    ? new Date(finalStartInput.value)
+    : null;
   const finalMaxPlayers = normalizeMaxPlayersForFormat(
     finalMaxPlayersInput?.value,
     finalFormat,
@@ -3899,10 +4216,15 @@ async function handleCreateCircuit(event) {
   const finalReuseUrl = finalImagePreview?.dataset.reuseUrl || "";
   const finalQualifyRaw = finalQualifyInput?.value ?? "";
   const finalQualifyCount =
-    finalQualifyRaw === "" || finalQualifyRaw === null || finalQualifyRaw === undefined
+    finalQualifyRaw === "" ||
+    finalQualifyRaw === null ||
+    finalQualifyRaw === undefined
       ? null
       : Number(finalQualifyRaw);
-  const rrSettings = extractRoundRobinSettingsUI("final", defaultRoundRobinSettings);
+  const rrSettings = extractRoundRobinSettingsUI(
+    "final",
+    defaultRoundRobinSettings
+  );
   if (!name) {
     showToast?.("Circuit name is required.", "error");
     return;
@@ -3956,11 +4278,9 @@ async function handleCreateCircuit(event) {
     circuitQualifyCount: finalQualifyCount,
   });
   try {
-    await setDoc(
-      doc(collection(db, CIRCUIT_COLLECTION), slug),
-      payload,
-      { merge: true }
-    );
+    await setDoc(doc(collection(db, CIRCUIT_COLLECTION), slug), payload, {
+      merge: true,
+    });
     let finalCreated = false;
     try {
       await createFinalTournamentForCircuit({
@@ -4012,8 +4332,12 @@ async function handleCreateTournament(event) {
   const maxPlayersInput = document.getElementById("tournamentMaxPlayersInput");
   const checkInSelect = document.getElementById("checkInSelect");
   const accessSelect = document.getElementById("tournamentAccessSelect");
-  const visibilitySelect = document.getElementById("tournamentVisibilitySelect");
-  const descriptionInput = document.getElementById("tournamentDescriptionInput");
+  const visibilitySelect = document.getElementById(
+    "tournamentVisibilitySelect"
+  );
+  const descriptionInput = document.getElementById(
+    "tournamentDescriptionInput"
+  );
   const rulesInput = document.getElementById("tournamentRulesInput");
   const imageInput = document.getElementById("tournamentImageInput");
   const imagePreview = document.getElementById("tournamentImagePreview");
@@ -4052,7 +4376,10 @@ async function handleCreateTournament(event) {
   const visibility = normalizeTournamentVisibility(visibilitySelect?.value);
   const description = descriptionInput?.value || "";
   const rules = rulesInput?.value || "";
-  const rrSettings = extractRoundRobinSettingsUI("create", defaultRoundRobinSettings);
+  const rrSettings = extractRoundRobinSettingsUI(
+    "create",
+    defaultRoundRobinSettings
+  );
   try {
     const payload = buildCreateTournamentPayload({
       slug,
@@ -4436,9 +4763,7 @@ function updateAdminVisibility() {
     }
   } else if (!circuitPointsBtn && circuitPointsBtnTemplate && adminTabs) {
     const restored = circuitPointsBtnTemplate.cloneNode(true);
-    restored.addEventListener("click", () =>
-      switchTab(restored.dataset.tab)
-    );
+    restored.addEventListener("click", () => switchTab(restored.dataset.tab));
     adminTabs.append(restored);
   }
   const liveCircuitPointsBtn = document.getElementById("circuitPointsTabBtn");
@@ -4453,7 +4778,6 @@ function updateAdminVisibility() {
     window.__tournamentIsAdmin = isAdmin;
   }
 }
-
 
 function updateFinalAutoAddRow() {
   const row = document.getElementById("finalAutoAddRow");
@@ -4546,8 +4870,7 @@ async function maybeAutoAddFinalPlayers({ force = false } = {}) {
     const name = (entry?.name || "").trim();
     if (!name) continue;
     const existing = (state.players || []).some(
-      (player) =>
-        (player.name || "").toLowerCase() === name.toLowerCase()
+      (player) => (player.name || "").toLowerCase() === name.toLowerCase()
     );
     if (existing) continue;
     let userId = "";
@@ -4687,8 +5010,7 @@ function hydratePulseFromState(pulseState) {
       : [];
 
   setPulseProfileState(
-    pulseState &&
-      (normalizedUrl || overallMmr || bestRace || secondary.length)
+    pulseState && (normalizedUrl || overallMmr || bestRace || secondary.length)
       ? {
           ...pulseState,
           url: normalizedUrl,
@@ -4757,7 +5079,8 @@ function populatePlayerNameFromProfile() {
   const input = document.getElementById("playerNameInput");
   if (!input) return;
   const current = (input.value || "").trim();
-  const username = getCurrentUsername() || getCurrentUserProfile?.()?.username || "";
+  const username =
+    getCurrentUsername() || getCurrentUserProfile?.()?.username || "";
   const pulseName = pulseProfile?.accountName || "";
   if (current) {
     if (username && current === pulseName && current !== username) {
@@ -4773,7 +5096,8 @@ function populatePlayerNameFromProfile() {
 
 function getPulseRequirementStatus() {
   const requirePulseLinkEnabled = getRequirePulseLinkEnabled();
-  const manualLink = document.getElementById("pulseLinkDisplay")?.value?.trim() || "";
+  const manualLink =
+    document.getElementById("pulseLinkDisplay")?.value?.trim() || "";
   const manualUrl = manualLink ? normalizeSc2PulseIdUrl(manualLink) : "";
   const settingsUrl = normalizeSc2PulseIdUrl(pulseProfile?.url || "");
   const hasValid = manualLink ? Boolean(manualUrl) : false;
@@ -4795,7 +5119,10 @@ function updateRegistrationRequirementIcons() {
   if (pulseIcon) {
     const { requirePulseLinkEnabled, hasValid } = getPulseRequirementStatus();
     pulseIcon.classList.toggle("is-valid", hasValid);
-    pulseIcon.classList.toggle("is-invalid", requirePulseLinkEnabled && !hasValid);
+    pulseIcon.classList.toggle(
+      "is-invalid",
+      requirePulseLinkEnabled && !hasValid
+    );
   }
 }
 
@@ -4957,7 +5284,9 @@ function addBotPlayer() {
   const name = pickBotName(existingNames);
   const createdAt = Date.now();
   const bot = {
-    id: `bot-${createdAt.toString(36)}-${Math.random().toString(16).slice(2, 6)}`,
+    id: `bot-${createdAt.toString(36)}-${Math.random()
+      .toString(16)
+      .slice(2, 6)}`,
     name,
     race: BOT_RACES[Math.floor(Math.random() * BOT_RACES.length)],
     sc2Link: "",
@@ -5089,9 +5418,18 @@ async function handleRegistration(event) {
       return;
     }
     const gateMatches =
-      inviteLinkGate?.slug === currentSlug && inviteLinkGate?.token === inviteToken;
-    if (gateMatches && inviteLinkGate.status === "ready" && !inviteLinkGate.ok) {
-      setStatus(statusEl, inviteLinkGate.message || "Invite link invalid.", true);
+      inviteLinkGate?.slug === currentSlug &&
+      inviteLinkGate?.token === inviteToken;
+    if (
+      gateMatches &&
+      inviteLinkGate.status === "ready" &&
+      !inviteLinkGate.ok
+    ) {
+      setStatus(
+        statusEl,
+        inviteLinkGate.message || "Invite link invalid.",
+        true
+      );
       return;
     }
   }
@@ -5186,7 +5524,11 @@ async function handleRegistration(event) {
       playerKey,
     });
     if (!qualification.ok) {
-      setStatus(statusEl, qualification.message || "Registration is restricted.", true);
+      setStatus(
+        statusEl,
+        qualification.message || "Registration is restricted.",
+        true
+      );
       return;
     }
 
@@ -5199,11 +5541,7 @@ async function handleRegistration(event) {
       return;
     }
 
-    if (
-      startingPoints === null &&
-      currentTournamentMeta?.circuitSlug &&
-      name
-    ) {
+    if (startingPoints === null && currentTournamentMeta?.circuitSlug && name) {
       startingPoints = await getCircuitSeedPoints({
         name,
         sc2Link: sc2LinkInput,
@@ -5251,10 +5589,14 @@ async function handleRegistration(event) {
     const selectedClanOption = mainClanSelect?.selectedOptions?.[0];
     const selectedClanId = mainClanSelect?.value || "";
     const profileCountry = profile?.country || "";
-    const profileMainClanId = getCurrentUserProfile?.()?.settings?.mainClanId || "";
+    const profileMainClanId =
+      getCurrentUserProfile?.()?.settings?.mainClanId || "";
     const effectiveClanId = selectedClanId || profileMainClanId;
     const countryCode =
-      document.getElementById("settingsCountrySelect")?.value?.trim().toUpperCase() ||
+      document
+        .getElementById("settingsCountrySelect")
+        ?.value?.trim()
+        .toUpperCase() ||
       String(profileCountry).trim().toUpperCase() ||
       "";
     let clanName = selectedClanOption?.textContent || "";
@@ -5267,79 +5609,83 @@ async function handleRegistration(event) {
           const clanData = clanDoc.data();
           clanName = clanData?.name || clanName;
           clanAbbreviation = clanData?.abbreviation || clanAbbreviation;
-          clanLogoUrl = clanData?.logoUrlSmall || clanData?.logoUrl || clanLogoUrl;
+          clanLogoUrl =
+            clanData?.logoUrlSmall || clanData?.logoUrl || clanLogoUrl;
         }
       } catch (err) {
         console.warn("Could not fetch clan abbreviation", err);
       }
     }
 
-  let inviteLinkMeta = null;
-  if (needsInviteLink) {
-    const claim = await claimInviteLinkUse({ slug: currentSlug, token: inviteToken });
-    if (!claim.ok) {
-      setStatus(statusEl, claim.message || "Invite link invalid.", true);
-      await refreshInviteLinkGate(currentSlug);
-      renderAll();
-      return;
+    let inviteLinkMeta = null;
+    if (needsInviteLink) {
+      const claim = await claimInviteLinkUse({
+        slug: currentSlug,
+        token: inviteToken,
+      });
+      if (!claim.ok) {
+        setStatus(statusEl, claim.message || "Invite link invalid.", true);
+        await refreshInviteLinkGate(currentSlug);
+        renderAll();
+        return;
+      }
+      inviteLinkMeta = {
+        invitedAt: Date.now(),
+        invitedByName: "Invite link",
+      };
     }
-    inviteLinkMeta = {
-      invitedAt: Date.now(),
-      invitedByName: "Invite link",
+
+    const newPlayer = createOrUpdatePlayer({
+      name,
+      race,
+      sc2Link: sc2LinkInput,
+      mmr: Number.isFinite(mmr) ? mmr : 0,
+      points: startingPoints,
+      inviteStatus: INVITE_STATUS.accepted,
+      ...(inviteLinkMeta || {}),
+      avatarUrl,
+      twitchUrl,
+      secondaryPulseLinks,
+      secondaryPulseProfiles,
+      mmrByRace,
+      country: countryCode || "",
+      clan: clanName === "None" ? "" : clanName,
+      clanAbbreviation: clanAbbreviation || "",
+      clanLogoUrl: clanLogoUrl || "",
+      pulseName: pulseProfile?.accountName || "",
+      uid: auth.currentUser?.uid || null,
+    });
+
+    const hasCompletedMatches = bracketHasResults();
+    const { mergedPlayers } = seedEligiblePlayersWithMode(state.players, state);
+    const nextState = {
+      players: mergedPlayers,
+      needsReseed: hasCompletedMatches,
     };
-  }
 
-  const newPlayer = createOrUpdatePlayer({
-    name,
-    race,
-    sc2Link: sc2LinkInput,
-    mmr: Number.isFinite(mmr) ? mmr : 0,
-    points: startingPoints,
-    inviteStatus: INVITE_STATUS.accepted,
-    ...(inviteLinkMeta || {}),
-    avatarUrl,
-    twitchUrl,
-    secondaryPulseLinks,
-    secondaryPulseProfiles,
-    mmrByRace,
-    country: countryCode || "",
-    clan: clanName === "None" ? "" : clanName,
-    clanAbbreviation: clanAbbreviation || "",
-    clanLogoUrl: clanLogoUrl || "",
-    pulseName: pulseProfile?.accountName || "",
-    uid: auth.currentUser?.uid || null,
-  });
+    saveState(nextState);
+    addActivity(
+      `${newPlayer.name} saved (${newPlayer.mmr || "MMR?"} MMR, ${
+        newPlayer.points
+      } pts)`
+    );
 
-  const hasCompletedMatches = bracketHasResults();
-  const { mergedPlayers } = seedEligiblePlayersWithMode(state.players, state);
-  const nextState = {
-    players: mergedPlayers,
-    needsReseed: hasCompletedMatches,
-  };
+    markRegisteredTournament(currentSlug);
 
-  saveState(nextState);
-  addActivity(
-    `${newPlayer.name} saved (${newPlayer.mmr || "MMR?"} MMR, ${
-      newPlayer.points
-    } pts)`
-  );
-
-  markRegisteredTournament(currentSlug);
-
-  const shouldAutoRebuild = !hasCompletedMatches;
-  if (shouldAutoRebuild) {
-    rebuildBracket(true, "Roster updated");
-  } else {
-    if (!state.bracket || !state.bracket.winners?.length) {
-      rebuildBracket(true, "Initial bracket");
+    const shouldAutoRebuild = !hasCompletedMatches;
+    if (shouldAutoRebuild) {
+      rebuildBracket(true, "Roster updated");
     } else {
-      renderAll();
+      if (!state.bracket || !state.bracket.winners?.length) {
+        rebuildBracket(true, "Initial bracket");
+      } else {
+        renderAll();
+      }
     }
-  }
-  showToast?.(`${newPlayer.name} added to the bracket`, "success");
+    showToast?.(`${newPlayer.name} added to the bracket`, "success");
 
-  event.target.reset();
-  hydratePulseFromState(pulseProfile);
+    event.target.reset();
+    hydratePulseFromState(pulseProfile);
   } finally {
     setRegisterLoadingState(false);
   }
@@ -5467,7 +5813,10 @@ function initFinalAdminSearch() {
         pulseName: pulse.name || pulse.accountName || "",
         uid: userId,
       });
-      const { mergedPlayers } = seedEligiblePlayersWithMode(state.players, state);
+      const { mergedPlayers } = seedEligiblePlayersWithMode(
+        state.players,
+        state
+      );
       saveState({ players: mergedPlayers });
       addActivity(`Admin invited ${newPlayer.name}.`);
       try {
@@ -5482,7 +5831,10 @@ function initFinalAdminSearch() {
         });
       } catch (err) {
         console.error("Failed to send invite notification", err);
-        showToast?.("Invite created, but notification failed to send.", "error");
+        showToast?.(
+          "Invite created, but notification failed to send.",
+          "error"
+        );
       }
       renderAll();
       showToast?.(`Invite sent to ${newPlayer.name}.`, "success");
@@ -5500,7 +5852,6 @@ function initFinalAdminSearch() {
     search.addByUsername(username, userId);
   });
 }
-
 
 function mmrForRace(raceLabel) {
   const key = normalizeRaceKey(raceLabel);
@@ -5607,49 +5958,49 @@ function syncCurrentPlayerAvatar(avatarUrl) {
   refreshPlayerDetailModalIfOpen(getPlayersMap);
 }
 
-  function serializeBracket(bracket) {
-    if (!bracket || typeof bracket !== "object") return bracket;
-    const toArr = (obj) =>
-      Array.isArray(obj)
-        ? obj
-        : obj && typeof obj === "object"
-        ? Object.keys(obj)
-            .sort((a, b) => Number(a) - Number(b))
-            .map((key) => obj[key])
-        : [];
-    const normalizeRounds = (rounds) =>
-      toArr(rounds)
-        .map((round) => toArr(round))
-        .filter((round) => round.length);
-    const toObj = (arr) =>
-      Array.isArray(arr)
-        ? arr.reduce((acc, round, idx) => {
-            acc[idx] = round;
-            return acc;
-          }, {})
-        : arr || {};
-    const winnersRounds = normalizeRounds(bracket.winners);
-    const losersRounds = normalizeRounds(bracket.losers);
-    return {
-      ...bracket,
-      winners: toObj(winnersRounds),
-      losers: toObj(losersRounds),
-      groups: toArr(bracket.groups),
-      winnersRoundCount: winnersRounds.length,
-      losersRoundCount: losersRounds.length,
-    };
-  }
+function serializeBracket(bracket) {
+  if (!bracket || typeof bracket !== "object") return bracket;
+  const toArr = (obj) =>
+    Array.isArray(obj)
+      ? obj
+      : obj && typeof obj === "object"
+      ? Object.keys(obj)
+          .sort((a, b) => Number(a) - Number(b))
+          .map((key) => obj[key])
+      : [];
+  const normalizeRounds = (rounds) =>
+    toArr(rounds)
+      .map((round) => toArr(round))
+      .filter((round) => round.length);
+  const toObj = (arr) =>
+    Array.isArray(arr)
+      ? arr.reduce((acc, round, idx) => {
+          acc[idx] = round;
+          return acc;
+        }, {})
+      : arr || {};
+  const winnersRounds = normalizeRounds(bracket.winners);
+  const losersRounds = normalizeRounds(bracket.losers);
+  return {
+    ...bracket,
+    winners: toObj(winnersRounds),
+    losers: toObj(losersRounds),
+    groups: toArr(bracket.groups),
+    winnersRoundCount: winnersRounds.length,
+    losersRoundCount: losersRounds.length,
+  };
+}
 
-  function deserializeBracket(bracket) {
-    if (!bracket || typeof bracket !== "object") return bracket || null;
-    const toArr = (obj) =>
-      Array.isArray(obj)
-        ? obj
-        : obj && typeof obj === "object"
-        ? Object.keys(obj)
-            .sort((a, b) => Number(a) - Number(b))
-            .map((key) => obj[key])
-        : [];
+function deserializeBracket(bracket) {
+  if (!bracket || typeof bracket !== "object") return bracket || null;
+  const toArr = (obj) =>
+    Array.isArray(obj)
+      ? obj
+      : obj && typeof obj === "object"
+      ? Object.keys(obj)
+          .sort((a, b) => Number(a) - Number(b))
+          .map((key) => obj[key])
+      : [];
   const normalizeRounds = (rounds) =>
     toArr(rounds)
       .map((round) => toArr(round))
@@ -5908,7 +6259,12 @@ function sortRoundsByParents(rounds) {
 }
 
 // Helper: pretty round titles (Final / Semi-final / Lower Final, etc.)
-function getRoundLabel(titlePrefix, idx, totalRounds, { hasGrandFinal = false } = {}) {
+function getRoundLabel(
+  titlePrefix,
+  idx,
+  totalRounds,
+  { hasGrandFinal = false } = {}
+) {
   // idx is 0-based, totalRounds is the number of columns in this section
   const fromEnd = totalRounds - idx; // 1 = last round, 2 = second last, ...
 
@@ -5916,7 +6272,8 @@ function getRoundLabel(titlePrefix, idx, totalRounds, { hasGrandFinal = false } 
     if (fromEnd === 1) return hasGrandFinal ? "Grand Final" : "Final";
     if (fromEnd === 2) return hasGrandFinal ? "Upper Final" : "Semi-final";
     if (fromEnd === 3) return hasGrandFinal ? "Semi-final" : "Quarterfinal";
-    if (fromEnd === 4) return hasGrandFinal ? "Quarterfinal" : `Upper Round ${idx + 1}`;
+    if (fromEnd === 4)
+      return hasGrandFinal ? "Quarterfinal" : `Upper Round ${idx + 1}`;
     return `Upper Round ${idx + 1}`;
   }
 
