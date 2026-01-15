@@ -3508,8 +3508,10 @@ async function enterTournament(slug, options = {}) {
     () => {
       renderAll();
       refreshPlayerDetailModalIfOpen(getPlayersMap);
-    }
+    },
+    state?.lastUpdated || 0
   );
+
   await maybeAutoAddFinalPlayers();
   subscribeTournamentStateRemote(slug);
   const landingView = document.getElementById("landingView");
