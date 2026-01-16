@@ -4620,6 +4620,12 @@ details.stage-section:not([open]) .stage-toggle::after {
   width: 100%;
 }
 
+.leaderboard-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+
 .leaderboard-table thead tr,
 .leaderboard-table tbody tr {
   display: grid;
@@ -4644,7 +4650,10 @@ details.stage-section:not([open]) .stage-toggle::after {
 .leaderboard-table thead th {
   font-weight: 600;
   color: var(--text);
-  background: rgba(255, 255, 255, 0.03);
+  background: #1e222f;
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
 
 .leaderboard-table tbody tr:nth-child(even) td {

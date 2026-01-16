@@ -9,9 +9,12 @@ import {
   loadTournamentStateRemote,
 } from "./sync/persistence.js";
 import { computePlacementsForBracket } from "./bracket/placements.js";
+import { getAllMatches } from "./bracket/lookup.js";
 import { sanitizeUrl, escapeHtml } from "./bracket/renderUtils.js";
 import { playerKey } from "./playerKey.js";
 import { syncMarkdownSurfaceForInput } from "./markdownEditor.js";
+
+const DEBUG_CIRCUIT_LEADERBOARD = false;
 
 function normalizeRaceLabel(raw) {
   const val = (raw || "").toString().toLowerCase();
@@ -98,6 +101,31 @@ function normalizeBracketForPlacements(bracket) {
     losers,
     groups: toArr(bracket.groups),
   };
+}
+
+function isBracketFinished(bracket) {
+  if (!bracket) return false;
+  const matches = getAllMatches(bracket);
+  if (!matches.length) return false;
+  return matches.every(
+    (match) => match?.status === "complete" || match?.winnerId || match?.walkover
+  );
+}
+
+function getLeaderboardKey(player) {
+  const uid = String(player?.uid || "").trim();
+  const nameKey = String(player?.name || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-");
+  const legacyKey = playerKey(player?.name, player?.sc2Link);
+  if (uid) {
+    return {
+      key: `uid:${uid}`,
+      legacyKey: legacyKey && legacyKey !== `uid:${uid}` ? legacyKey : "",
+    };
+  }
+  return { key: nameKey ? `name:${nameKey}` : legacyKey, legacyKey };
 }
 
 function buildCircuitLeaderboardCsv(leaderboard = [], { includeFirstPlaces = false } = {}) {
@@ -544,8 +572,15 @@ export async function buildCircuitLeaderboard(meta, slugs = [], { excludeSlug } 
   states.forEach((snapshot, idx) => {
     if (!snapshot) return;
     const tournamentSlug = filtered[idx];
+    if (!snapshot?.circuitPointsApplied) {
+      return;
+    }
     const players = Array.isArray(snapshot.players) ? snapshot.players : [];
     const bracket = normalizeBracketForPlacements(snapshot.bracket);
+    const isFinished = isBracketFinished(bracket);
+    if (!isFinished) {
+      return;
+    }
     const placements = computePlacementsForBracket(bracket, players.length || 0);
     const winnerId = placements
       ? Array.from(placements.entries()).find(([, place]) => place === 1)?.[0]
@@ -555,18 +590,35 @@ export async function buildCircuitLeaderboard(meta, slugs = [], { excludeSlug } 
       : null;
     const winnerKey = winner ? playerKey(winner.name, winner.sc2Link) : "";
     players.forEach((player) => {
-      const key = playerKey(player.name, player.sc2Link);
+      const { key, legacyKey } = getLeaderboardKey(player);
       if (!key) return;
+      if (DEBUG_CIRCUIT_LEADERBOARD) {
+        console.log("[circuit-leaderboard] entry", {
+          tournament: tournamentSlug,
+          uid: player?.uid || "",
+          name: player?.name || "",
+          sc2Link: player?.sc2Link || "",
+          key,
+          legacyKey,
+        });
+      }
       const playerPoints = Number(player.points);
       const ledgerPoints = Number(snapshot.pointsLedger?.[key]);
+      const legacyLedgerPoints = Number(snapshot.pointsLedger?.[legacyKey]);
       const useLedger = Number.isFinite(ledgerPoints);
-      const rawPoints = useLedger ? ledgerPoints : playerPoints;
+      const useLegacyLedger = !useLedger && Number.isFinite(legacyLedgerPoints);
+      const rawPoints = useLedger
+        ? ledgerPoints
+        : useLegacyLedger
+        ? legacyLedgerPoints
+        : playerPoints;
       const points = Number.isFinite(rawPoints) ? rawPoints : 0;
       const entry = totals.get(key) || {
         name: player.name || "Unknown",
         points: 0,
         firstPlaces: 0,
         tournaments: new Set(),
+        legacyKeys: new Set(),
         sc2Link: player.sc2Link || "",
         pulseName: "",
         race: "",
@@ -575,7 +627,8 @@ export async function buildCircuitLeaderboard(meta, slugs = [], { excludeSlug } 
         secondaryPulseProfiles: [],
       };
       entry.points += points;
-      if (tournamentSlug) entry.tournaments.add(tournamentSlug);
+      if (legacyKey) entry.legacyKeys.add(legacyKey);
+      if (tournamentSlug && isFinished) entry.tournaments.add(tournamentSlug);
       if (!entry.name && player.name) entry.name = player.name;
       if (!entry.sc2Link && player.sc2Link) entry.sc2Link = player.sc2Link;
       if (!entry.pulseName && player.pulseName) entry.pulseName = player.pulseName;
@@ -601,7 +654,7 @@ export async function buildCircuitLeaderboard(meta, slugs = [], { excludeSlug } 
       ) {
         entry.secondaryPulseLinks = player.secondaryPulseLinks;
       }
-      if (winnerKey && key === winnerKey) {
+      if (winnerKey && key === winnerKey && isFinished) {
         entry.firstPlaces += 1;
       }
       totals.set(key, entry);
@@ -610,11 +663,19 @@ export async function buildCircuitLeaderboard(meta, slugs = [], { excludeSlug } 
   const useFirstPlaceSort = Boolean(meta?.sortByFirstPlace);
   const leaderboard = Array.from(totals.entries())
     .map(([key, entry]) => {
+      const legacyKeys = Array.from(entry.legacyKeys || []);
       const override = Number(meta?.pointsOverrides?.[key]);
+      const legacyOverride = legacyKeys.length
+        ? Number(meta?.pointsOverrides?.[legacyKeys[0]])
+        : NaN;
       return {
         key,
         name: entry.name,
-        points: Number.isFinite(override) ? override : entry.points,
+        points: Number.isFinite(override)
+          ? override
+          : Number.isFinite(legacyOverride)
+          ? legacyOverride
+          : entry.points,
         firstPlaces: entry.firstPlaces || 0,
         tournaments: entry.tournaments.size,
         sc2Link: entry.sc2Link || "",
