@@ -734,7 +734,6 @@ export function openMatchInfoModal(
   const editScoreBtn = document.getElementById("matchInfoEditScoreBtn");
   const closeBtn = document.getElementById("closeMatchInfoModal");
 
-  const helpPopover = document.getElementById("matchInfoHelpPopover");
   if (!modal) return;
   modal.dataset.matchId = matchId || "";
 
@@ -1393,26 +1392,6 @@ export function openMatchInfoModal(
   modal.onclick = (e) => {
     if (e.target === modal) hideMatchInfoModal();
   };
-
-  if (!modal.dataset.helpBound && helpBtn && helpPopover) {
-    modal.dataset.helpBound = "true";
-
-    helpBtn.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      helpPopover.classList.toggle("is-open");
-    });
-
-    modal.addEventListener(
-      "click",
-      (e) => {
-        if (!helpPopover.classList.contains("is-open")) return;
-        if (e.target.closest("#matchInfoHelpPopover")) return;
-        helpPopover.classList.remove("is-open");
-      },
-      true
-    );
-  }
 
   startPresenceTracking(matchId, { leftPlayerId, rightPlayerId, aName, bName });
   applyPresenceIndicators({ leftPresenceEl, rightPresenceEl });

@@ -85,6 +85,9 @@ export function initTournamentPage({
   saveState,
   handleAddCircuitPointsRow,
   handleRemoveCircuitPointsRow,
+  handleCircuitPointsChange,
+  handleEditCircuitPoints,
+  handleSaveCircuitPoints,
   handleApplyCircuitPoints,
   addBotPlayer,
   removeBotPlayer,
@@ -922,6 +925,10 @@ export function initTournamentPage({
     handleSaveSettings,
     handleAddCircuitPointsRow,
     handleRemoveCircuitPointsRow,
+    handleCircuitPointsChange,
+    handleEditCircuitPoints,
+    handleSaveCircuitPoints: (event) =>
+      handleSaveCircuitPoints?.(event, { handleSaveSettings }),
     handleApplyCircuitPoints,
   });
   const updateMmrStatusPreview = () => {

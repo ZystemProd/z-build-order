@@ -1495,7 +1495,8 @@ a {
   gap: 8px;
 }
 
-.circuit-points-table input {
+.circuit-points-table input,
+.circuit-points-table select {
   width: 90px;
   text-align: right;
   padding: 6px 8px;
@@ -1506,9 +1507,23 @@ a {
   font-size: 13px;
 }
 
-.circuit-points-table input:focus {
+.circuit-points-table input:focus,
+.circuit-points-table select:focus {
   outline: 2px solid var(--accent-2);
   border-color: var(--accent-2);
+}
+
+.circuit-points-divider td {
+  border-top: 1px solid var(--stroke);
+  padding-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.circuit-points-below-row td {
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .circuit-points-table th:last-child,
