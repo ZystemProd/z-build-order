@@ -566,6 +566,17 @@ a {
   box-shadow: 0 10px 30px rgba(78, 213, 255, 0.35);
 }
 
+.cta.success {
+  border-color: rgba(74, 222, 128, 0.6);
+  background: rgba(74, 222, 128, 0.18);
+  color: #d7ffe6;
+}
+
+.cta.success:hover {
+  border-color: rgba(74, 222, 128, 0.85);
+  box-shadow: 0 8px 24px rgba(74, 222, 128, 0.25);
+}
+
 .cta:disabled,
 .cta[disabled] {
   cursor: not-allowed;
@@ -1872,6 +1883,23 @@ a {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.seed-actions::after {
+  content: "";
+  flex-basis: 100%;
+  order: 2;
+}
+
+#rebuildBracketBtn,
+#resetTournamentBtn {
+  order: 1;
+}
+
+#checkInToggleBtn,
+#notifyCheckInBtn {
+  order: 3;
 }
 
 .bracket-grid {

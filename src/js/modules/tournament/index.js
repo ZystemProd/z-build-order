@@ -1633,6 +1633,7 @@ function renderAll(matchIds = null) {
     const registerBtn = document.getElementById("registerBtn");
     const goLiveBtn = document.getElementById("rebuildBracketBtn");
     const notifyCheckInBtn = document.getElementById("notifyCheckInBtn");
+    const resetTournamentBtn = document.getElementById("resetTournamentBtn");
     const startMs = getStartTimeMs(currentTournamentMeta);
     const liveDot = document.getElementById("liveDot");
     const bracketGrid = document.getElementById("bracketGrid");
@@ -1805,13 +1806,23 @@ function renderAll(matchIds = null) {
     }
 
     if (goLiveBtn) {
+      const checkInState = getCheckInWindowState(currentTournamentMeta);
+      const requiresManualClose =
+        checkInState.allowAfterStart && checkInState.isOpen;
       if (state.isLive) {
         goLiveBtn.disabled = false;
         goLiveBtn.textContent = "Set Not Live";
+        goLiveBtn.classList.add("danger");
+        goLiveBtn.classList.remove("success");
       } else {
-        goLiveBtn.disabled = !hasCheckedIn;
+        goLiveBtn.disabled = !hasCheckedIn || requiresManualClose;
         goLiveBtn.textContent = "Go Live";
+        goLiveBtn.classList.add("success");
+        goLiveBtn.classList.remove("danger");
       }
+    }
+    if (resetTournamentBtn) {
+      resetTournamentBtn.classList.add("danger");
     }
     if (notifyCheckInBtn) {
       const checkInState = getCheckInWindowState(currentTournamentMeta);
@@ -2093,9 +2104,69 @@ async function notifyCheckInPlayers() {
   }
 }
 
+async function toggleCheckInManualClose() {
+  if (!isAdmin) {
+    showToast?.("Only admins can update check-in.", "error");
+    return;
+  }
+  if (!currentTournamentMeta) {
+    showToast?.("Tournament data not loaded yet.", "error");
+    return;
+  }
+  if (state.isLive) {
+    showToast?.("Tournament is live. Check-in is closed.", "error");
+    return;
+  }
+  const checkInState = getCheckInWindowState(currentTournamentMeta);
+  if (!checkInState.allowAfterStart) {
+    showToast?.("Manual check-in close is disabled in settings.", "error");
+    return;
+  }
+  if (!checkInState.hasOpened) {
+    showToast?.("Check-in has not opened yet.", "error");
+    return;
+  }
+  const targetSlug =
+    currentSlug || currentTournamentMeta.slug || currentTournamentMeta.id || "";
+  if (!targetSlug) {
+    showToast?.("Missing tournament slug.", "error");
+    return;
+  }
+
+  const previousMeta = currentTournamentMeta;
+  const nextClosed = !Boolean(previousMeta?.checkInManuallyClosed);
+  const nextMeta = {
+    ...previousMeta,
+    checkInManuallyClosed: nextClosed,
+  };
+  setCurrentTournamentMetaState(nextMeta);
+  renderAll();
+  try {
+    await setDoc(
+      doc(collection(db, TOURNAMENT_COLLECTION), targetSlug),
+      { checkInManuallyClosed: nextClosed },
+      { merge: true }
+    );
+    showToast?.(
+      nextClosed ? "Check-in closed." : "Check-in opened.",
+      "success"
+    );
+  } catch (err) {
+    console.error("Failed to toggle check-in", err);
+    setCurrentTournamentMetaState(previousMeta);
+    renderAll();
+    showToast?.("Failed to update check-in.", "error");
+  }
+}
+
 function goLiveTournament() {
   if (state.isLive) {
     showToast?.("Tournament is already live.", "success");
+    return;
+  }
+  const checkInState = getCheckInWindowState(currentTournamentMeta);
+  if (checkInState.allowAfterStart && checkInState.isOpen) {
+    showToast?.("Close check-in before going live.", "error");
     return;
   }
   const checkedInPlayers = getEligiblePlayers(state.players || []).filter(
@@ -3655,10 +3726,10 @@ async function enterTournament(slug, options = {}) {
   }
   const backLink = document.getElementById("tournamentBackLink");
   if (backLink) {
-    const label = backLink.querySelector("span:last-child"); // safer than lastChild
+    const label = backLink.querySelector("[data-back-label]");
     backLink.href = circuitSlug ? `/tournament/${circuitSlug}` : "/tournament";
     if (label)
-      label.textContent = circuitSlug ? "Circuit page" : "All tournaments";
+      label.textContent = circuitSlug ? "Circuit Page" : "Tournament Center";
   }
   // Load local state for this slug
   const local = loadLocalState(
@@ -3685,14 +3756,14 @@ async function enterTournament(slug, options = {}) {
       }
       const backLink = document.getElementById("tournamentBackLink");
       if (backLink) {
-        const label = backLink.querySelector("span:last-child");
+        const label = backLink.querySelector("[data-back-label]");
         backLink.href = metaCircuitSlug
           ? `/tournament/${metaCircuitSlug}`
           : "/tournament";
         if (label)
           label.textContent = metaCircuitSlug
-            ? "Circuit page"
-            : "All tournaments";
+            ? "Circuit Page"
+            : "Tournament Center";
       }
 
       await refreshInviteLinkGate(slug);
@@ -3974,13 +4045,54 @@ function normalizeMaxPlayersForFormat(rawValue, format, input = null) {
 function getCheckInWindowState(meta) {
   const startMs = getStartTimeMs(meta);
   const windowMinutes = getCheckInWindowMinutesFromMeta(meta);
+  const allowAfterStart = normalizeBooleanSetting(
+    meta?.allowCheckInAfterStart,
+    false
+  );
+  const isManuallyClosed = Boolean(meta?.checkInManuallyClosed);
   if (!startMs || !windowMinutes) {
-    return { isOpen: false, opensAt: null, closesAt: null };
+    return {
+      isOpen: false,
+      opensAt: null,
+      closesAt: null,
+      hasOpened: false,
+      allowAfterStart,
+      isManuallyClosed,
+    };
   }
   const now = Date.now();
   const opensAt = startMs - windowMinutes * 60 * 1000;
-  const closesAt = startMs;
-  return { isOpen: now >= opensAt && now < closesAt, opensAt, closesAt };
+  const hasOpened = now >= opensAt;
+  const closesAt = allowAfterStart ? null : startMs;
+  if (!hasOpened) {
+    return {
+      isOpen: false,
+      opensAt,
+      closesAt,
+      hasOpened,
+      allowAfterStart,
+      isManuallyClosed,
+    };
+  }
+  if (allowAfterStart) {
+    return {
+      isOpen: !isManuallyClosed,
+      opensAt,
+      closesAt,
+      hasOpened,
+      allowAfterStart,
+      isManuallyClosed,
+    };
+  }
+  const beforeStart = now < startMs;
+  return {
+    isOpen: beforeStart && !isManuallyClosed,
+    opensAt,
+    closesAt: startMs,
+    hasOpened,
+    allowAfterStart,
+    isManuallyClosed,
+  };
 }
 
 function formatCountdown(ms) {
@@ -3998,6 +4110,7 @@ function updateCheckInUI() {
   const checkInBtn = document.getElementById("checkInBtn");
   const checkInStatus = document.getElementById("checkInStatus");
   const checkInCard = document.getElementById("checkInCard");
+  const checkInToggleBtn = document.getElementById("checkInToggleBtn");
   if (!checkInBtn || !checkInStatus || !checkInCard) return;
 
   checkInStatus.classList.remove("is-open", "is-checked", "is-closed");
@@ -4009,6 +4122,17 @@ function updateCheckInUI() {
     : null;
   const inviteStatus = normalizeInviteStatus(currentPlayer?.inviteStatus);
   const isInviteOnly = isInviteOnlyTournament(currentTournamentMeta);
+
+  if (checkInToggleBtn) {
+    const shouldShowToggle = isAdmin && checkInState.allowAfterStart;
+    checkInToggleBtn.style.display = shouldShowToggle ? "" : "none";
+    if (shouldShowToggle) {
+      checkInToggleBtn.disabled = !checkInState.hasOpened || state.isLive;
+      checkInToggleBtn.textContent = checkInState.isManuallyClosed
+        ? "Open check-in"
+        : "Close check-in";
+    }
+  }
 
   if (
     state.isLive ||
@@ -4026,11 +4150,17 @@ function updateCheckInUI() {
     const timeUntil = checkInState.opensAt
       ? checkInState.opensAt - Date.now()
       : 0;
-    checkInStatus.textContent = checkInState.opensAt
-      ? `Check-in opens in ${formatCountdown(timeUntil)}`
-      : "Check-in is not open yet.";
-    checkInStatus.classList.add("is-closed");
-    checkInCard.style.display = "none";
+    if (checkInState.hasOpened && checkInState.isManuallyClosed) {
+      checkInStatus.textContent = "Check-in closed by admin.";
+      checkInStatus.classList.add("is-closed");
+      checkInCard.style.display = "flex";
+    } else {
+      checkInStatus.textContent = checkInState.opensAt
+        ? `Check-in opens in ${formatCountdown(timeUntil)}`
+        : "Check-in is not open yet.";
+      checkInStatus.classList.add("is-closed");
+      checkInCard.style.display = "none";
+    }
     return;
   }
 
@@ -4066,9 +4196,9 @@ function updateCheckInUI() {
     ? checkInState.closesAt - Date.now()
     : 0;
   checkInBtn.style.display = "inline-flex";
-  checkInStatus.textContent = `Check-in open · closes in ${formatCountdown(
-    closesIn
-  )}`;
+  checkInStatus.textContent = checkInState.closesAt
+    ? `Check-in open · closes in ${formatCountdown(closesIn)}`
+    : "Check-in open · close manually.";
   checkInStatus.classList.add("is-open");
 }
 
@@ -4228,6 +4358,9 @@ async function handleSaveSettings(event) {
   const startInput = document.getElementById("settingsStartInput");
   const maxPlayersInput = document.getElementById("settingsMaxPlayersInput");
   const checkInSelect = document.getElementById("settingsCheckInSelect");
+  const checkInAfterStartToggle = document.getElementById(
+    "settingsCheckInAfterStartToggle"
+  );
   const accessSelect = document.getElementById("settingsAccessSelect");
   const visibilitySelect = document.getElementById("settingsVisibilitySelect");
   const qualifyInput = document.getElementById("settingsCircuitQualifyCount");
@@ -4262,6 +4395,10 @@ async function handleSaveSettings(event) {
       ? null
       : Number(qualifyRaw);
   const checkInWindowMinutes = getCheckInWindowMinutes(checkInSelect);
+  const allowCheckInAfterStart = Boolean(checkInAfterStartToggle?.checked);
+  const checkInManuallyClosed = allowCheckInAfterStart
+    ? Boolean(currentTournamentMeta?.checkInManuallyClosed)
+    : false;
   const isInviteOnly = accessSelect?.value === "closed";
   const visibility = normalizeTournamentVisibility(visibilitySelect?.value);
   const mapPool = Array.from(mapPoolSelection || []);
@@ -4299,6 +4436,8 @@ async function handleSaveSettings(event) {
     maxPlayers,
     startTime,
     checkInWindowMinutes,
+    allowCheckInAfterStart,
+    checkInManuallyClosed,
     isInviteOnly,
     visibility,
     bestOf,
@@ -4382,6 +4521,9 @@ async function handleCreateCircuit(event) {
     "finalTournamentMaxPlayersInput"
   );
   const finalCheckInSelect = document.getElementById("finalCheckInSelect");
+  const finalCheckInAfterStartToggle = document.getElementById(
+    "finalCheckInAfterStartToggle"
+  );
   const finalDescriptionInput = document.getElementById(
     "finalTournamentDescriptionInput"
   );
@@ -4421,6 +4563,9 @@ async function handleCreateCircuit(event) {
     finalMaxPlayersInput.value = String(finalMaxPlayers);
   }
   const finalCheckInWindowMinutes = getCheckInWindowMinutes(finalCheckInSelect);
+  const finalAllowCheckInAfterStart = Boolean(
+    finalCheckInAfterStartToggle?.checked
+  );
   const finalDescription = finalDescriptionInput?.value || "";
   const finalRules = finalRulesInput?.value || "";
   const finalImageFile = finalImageInput?.files?.[0] || null;
@@ -4478,6 +4623,7 @@ async function handleCreateCircuit(event) {
     maxPlayers: finalMaxPlayers,
     startTime: finalStartTime,
     checkInWindowMinutes: finalCheckInWindowMinutes,
+    allowCheckInAfterStart: finalAllowCheckInAfterStart,
     isInviteOnly: finalAccess === "closed",
     visibility: finalVisibility,
     mapPool: getFinalMapPoolSelection(),
@@ -4542,6 +4688,9 @@ async function handleCreateTournament(event) {
   const startInput = document.getElementById("tournamentStartInput");
   const maxPlayersInput = document.getElementById("tournamentMaxPlayersInput");
   const checkInSelect = document.getElementById("checkInSelect");
+  const checkInAfterStartToggle = document.getElementById(
+    "checkInAfterStartToggle"
+  );
   const accessSelect = document.getElementById("tournamentAccessSelect");
   const visibilitySelect = document.getElementById(
     "tournamentVisibilitySelect"
@@ -4583,6 +4732,7 @@ async function handleCreateTournament(event) {
     maxPlayersInput.value = String(maxPlayers);
   }
   const checkInWindowMinutes = getCheckInWindowMinutes(checkInSelect);
+  const allowCheckInAfterStart = Boolean(checkInAfterStartToggle?.checked);
   const isInviteOnly = accessSelect?.value === "closed";
   const visibility = normalizeTournamentVisibility(visibilitySelect?.value);
   const description = descriptionInput?.value || "";
@@ -4601,6 +4751,7 @@ async function handleCreateTournament(event) {
       maxPlayers,
       startTime,
       checkInWindowMinutes,
+      allowCheckInAfterStart,
       isInviteOnly,
       visibility,
       mapPool: Array.from(mapPoolSelection || []),
@@ -4900,6 +5051,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     resetTournament,
     checkInCurrentPlayer,
     notifyCheckInPlayers,
+    toggleCheckInManualClose,
     toggleLiveTournament,
   });
   initCoverReuseModal();
@@ -5871,6 +6023,8 @@ async function handleRegistration(event) {
       };
     }
 
+    const checkInState = getCheckInWindowState(currentTournamentMeta);
+    const autoCheckedInAt = checkInState.isOpen ? Date.now() : null;
     const newPlayer = buildPlayerFromData({
       name,
       race,
@@ -5878,6 +6032,7 @@ async function handleRegistration(event) {
       mmr: Number.isFinite(mmr) ? mmr : 0,
       points: startingPoints,
       inviteStatus: INVITE_STATUS.accepted,
+      ...(autoCheckedInAt ? { checkedInAt: autoCheckedInAt } : {}),
       ...(inviteLinkMeta || {}),
       avatarUrl,
       twitchUrl,

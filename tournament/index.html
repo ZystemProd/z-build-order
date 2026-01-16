@@ -348,7 +348,10 @@
       <section id="circuitView" style="display:none;">
         <header class="hero hero-with-admins">
           <div class="hero-main">
-            <a class="ghost-link" href="/tournament"><span class="ghost-link-icon">←</span>All tournaments</a>
+            <a class="ghost-link" href="/tournament">
+              <span class="ghost-link-icon">&larr;</span>
+              <span class="ghost-link-label" data-back-label>Tournament Center</span>
+            </a>
             <p class="eyebrow">Circuit</p>
             <div class="hero-title-row">
               <h1 id="circuitTitle">Circuit</h1>
@@ -438,8 +441,10 @@
       <section id="tournamentView" style="display:none;">
         <header class="hero hero-with-admins">
           <div class="hero-main">
-            <a class="ghost-link" href="/tournament" id="tournamentBackLink"><span class="ghost-link-icon">←</span>All
-              tournaments</a>
+            <a class="ghost-link" href="/tournament" id="tournamentBackLink">
+              <span class="ghost-link-icon">&larr;</span>
+              <span class="ghost-link-label" data-back-label>Tournament Center</span>
+            </a>
             <div class="hero-title-row">
               <h1 id="tournamentTitle">Tournament</h1>
               <button class="hero-admin-toggle" type="button" aria-expanded="false">
@@ -721,8 +726,8 @@
                 </div>
                 <div class="seed-actions">
                   <button id="rebuildBracketBtn" class="cta small ghost">Go Live</button>
+                  <button id="checkInToggleBtn" class="cta small ghost" style="display:none;">Close check-in</button>
                   <button id="notifyCheckInBtn" class="cta small ghost">Notify check-in</button>
-                  <button id="resetTournamentBtn" class="cta small subtle">Reset tournament</button>
                 </div>
               </div>
               <div class="publish-checkbox-row" id="finalAutoAddRow" style="display:none;">
@@ -762,6 +767,9 @@
                   </thead>
                   <tbody id="playersTableBody"></tbody>
                 </table>
+              </div>
+              <div class="form-actions" style="margin-top:12px; justify-content:flex-end;">
+                <button id="resetTournamentBtn" class="cta small subtle">Reset tournament</button>
               </div>
             </div>
           </section>
@@ -844,6 +852,15 @@
                         <option value="165">2h 45</option>
                         <option value="180">3h</option>
                       </select>
+                    </div>
+                  </div>
+                  <div class="settings-row">
+                    <div class="settings-row-label">Allow check-in after start</div>
+                    <div class="settings-row-control">
+                      <label class="checkbox-row">
+                        <input type="checkbox" id="settingsCheckInAfterStartToggle" />
+                        <span>Manual close required</span>
+                      </label>
                     </div>
                   </div>
                   <div class="settings-row">
@@ -1253,6 +1270,10 @@
             <option value="165">2h 45</option>
             <option value="180">3h</option>
           </select>
+        </label>
+        <label class="checkbox-row">
+          <input type="checkbox" id="checkInAfterStartToggle" />
+          <span>Allow check-in after start (manual close)</span>
         </label>
         <label>Tournament visibility
           <select id="tournamentVisibilitySelect">
@@ -2021,6 +2042,10 @@
               <option value="165">2h 45</option>
               <option value="180">3h</option>
             </select>
+          </label>
+          <label class="checkbox-row">
+            <input type="checkbox" id="finalCheckInAfterStartToggle" />
+            <span>Allow check-in after start (manual close)</span>
           </label>
           <label>Cover image
             <div class="image-upload">

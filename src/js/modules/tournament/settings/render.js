@@ -61,6 +61,9 @@ export function populateSettingsPanel({
   const maxInput = document.getElementById("settingsMaxPlayersInput");
   const startInput = document.getElementById("settingsStartInput");
   const checkInSelect = document.getElementById("settingsCheckInSelect");
+  const checkInAfterStartToggle = document.getElementById(
+    "settingsCheckInAfterStartToggle"
+  );
   const accessSelect = document.getElementById("settingsAccessSelect");
   const visibilitySelect = document.getElementById("settingsVisibilitySelect");
   const imageInput = document.getElementById("settingsImageInput");
@@ -109,6 +112,12 @@ export function populateSettingsPanel({
     const total = Number(tournament.checkInWindowMinutes || 0);
     const normalized = Math.max(0, Math.min(180, Math.round(total / 15) * 15));
     checkInSelect.value = String(normalized);
+  }
+  if (checkInAfterStartToggle) {
+    checkInAfterStartToggle.checked = normalizeBooleanSetting(
+      tournament.allowCheckInAfterStart,
+      false
+    );
   }
   if (accessSelect) {
     accessSelect.value = tournament.isInviteOnly ? "closed" : "open";

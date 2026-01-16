@@ -95,6 +95,9 @@ function readTournamentTemplateForm(mapPoolSelection) {
   const formatSelect = document.getElementById("tournamentFormatSelect");
   const maxPlayersInput = document.getElementById("tournamentMaxPlayersInput");
   const checkInSelect = document.getElementById("checkInSelect");
+  const checkInAfterStartToggle = document.getElementById(
+    "checkInAfterStartToggle"
+  );
   const accessSelect = document.getElementById("tournamentAccessSelect");
   const descriptionInput = document.getElementById("tournamentDescriptionInput");
   const rulesInput = document.getElementById("tournamentRulesInput");
@@ -109,6 +112,7 @@ function readTournamentTemplateForm(mapPoolSelection) {
     ? Number(maxPlayersInput.value)
     : null;
   const checkInWindowMinutes = getCheckInWindowMinutes(checkInSelect);
+  const allowCheckInAfterStart = Boolean(checkInAfterStartToggle?.checked);
   const isInviteOnly = accessSelect?.value === "closed";
   const description = descriptionInput?.value || "";
   const rules = rulesInput?.value || "";
@@ -125,6 +129,7 @@ function readTournamentTemplateForm(mapPoolSelection) {
       format,
       maxPlayers,
       checkInWindowMinutes,
+      allowCheckInAfterStart,
       isInviteOnly,
       description,
       rules,
@@ -141,6 +146,9 @@ function applyTournamentTemplate(template, setMapPoolSelection) {
   const formatSelect = document.getElementById("tournamentFormatSelect");
   const maxPlayersInput = document.getElementById("tournamentMaxPlayersInput");
   const checkInSelect = document.getElementById("checkInSelect");
+  const checkInAfterStartToggle = document.getElementById(
+    "checkInAfterStartToggle"
+  );
   const accessSelect = document.getElementById("tournamentAccessSelect");
   const descriptionInput = document.getElementById("tournamentDescriptionInput");
   const rulesInput = document.getElementById("tournamentRulesInput");
@@ -158,6 +166,11 @@ function applyTournamentTemplate(template, setMapPoolSelection) {
   }
   if (checkInSelect) {
     checkInSelect.value = String(settings.checkInWindowMinutes || 0);
+  }
+  if (checkInAfterStartToggle) {
+    checkInAfterStartToggle.checked = Boolean(
+      settings.allowCheckInAfterStart
+    );
   }
   if (accessSelect) {
     accessSelect.value = settings.isInviteOnly ? "closed" : "open";
