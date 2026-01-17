@@ -99,6 +99,8 @@ export async function loadTournamentRegistry(force = false) {
         mapPool: data.mapPool?.length ? data.mapPool : [],
         format: data.format || "Tournament",
         coverImageUrl: data.coverImageUrl || "",
+        sponsors: Array.isArray(data.sponsors) ? data.sponsors : [],
+        socials: Array.isArray(data.socials) ? data.socials : [],
         maxPlayers: data.maxPlayers || null,
         startTime: startTime || null,
         createdBy: data.createdBy || null,

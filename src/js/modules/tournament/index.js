@@ -139,6 +139,28 @@ import {
   updateCircuitSlugPreview,
   populateCreateCircuitForm,
 } from "./circuit.js";
+import {
+  bindCircuitFinalSocialControls,
+  bindCircuitFinalSponsorControls,
+  bindTournamentPromoSettingsControls,
+  bindTournamentSocialControls,
+  bindTournamentSponsorControls,
+  getCopyFromCircuitPromos,
+  readCircuitFinalSocials,
+  readCircuitFinalSponsors,
+  readTournamentSocials,
+  readTournamentSponsors,
+  refreshTournamentPromoSettings,
+  refreshTournamentPromoStrip,
+  renderCircuitFinalSocials,
+  renderCircuitFinalSponsors,
+} from "./promos.js";
+import {
+  getSocialLabelForType,
+  normalizeSocialEntry,
+  normalizeSponsorEntry,
+  validateSocialUrl,
+} from "./promosShared.js";
 import { renderActivityList } from "./activity.js";
 import {
   renderPlayerRow,
@@ -263,6 +285,7 @@ const CURRENT_BRACKET_LAYOUT_VERSION = 54;
 const MAX_TOURNAMENT_IMAGE_SIZE = 12 * 1024 * 1024;
 const COVER_TARGET_WIDTH = 1200;
 const COVER_TARGET_HEIGHT = 675;
+const SPONSOR_LOGO_SIZE = 256;
 const COVER_QUALITY = 0.82;
 const PULSE_ENDPOINTS = (() => {
   const endpoints = ["/api/pulse-mmr"];
@@ -1645,6 +1668,7 @@ function renderAll(matchIds = null) {
       "registeredPlayersList"
     );
     const activityCard = document.getElementById("activityCard");
+    const casterLiveCard = document.getElementById("casterLiveCard");
     const bracketTitle = document.getElementById("bracketTitle");
     const currentUid = auth.currentUser?.uid || null;
     const currentPlayer = currentUid
@@ -1658,8 +1682,20 @@ function renderAll(matchIds = null) {
     const isInviteOnly = isInviteOnlyTournament(currentTournamentMeta);
     const accessNote = document.getElementById("registrationAccessNote");
     const registrationForm = document.getElementById("registrationForm");
+    const registrationCard = document.getElementById("registrationCard");
+    const registrationGuestMessage = document.getElementById(
+      "registrationGuestMessage"
+    );
+    const isGuest = !auth.currentUser;
 
     hydrateCurrentUserClanLogo();
+
+    if (registrationGuestMessage) {
+      registrationGuestMessage.style.display = isGuest ? "block" : "none";
+    }
+    if (registrationCard) {
+      registrationCard.style.display = isGuest ? "none" : "";
+    }
 
     if (tournamentTitle) {
       tournamentTitle.textContent = currentTournamentMeta.name || "Tournament";
@@ -1897,6 +1933,9 @@ function renderAll(matchIds = null) {
     if (activityCard) {
       activityCard.style.display = state.isLive ? "" : "none";
     }
+    if (casterLiveCard) {
+      casterLiveCard.style.display = state.isLive ? "" : "none";
+    }
     renderActivityList({ state, escapeHtml, formatTime });
     populateSettingsPanelUI({
       tournament: currentTournamentMeta,
@@ -1906,6 +1945,8 @@ function renderAll(matchIds = null) {
       updateSettingsRulesPreview,
       syncFormatFieldVisibility,
     });
+    void refreshTournamentPromoStrip(currentTournamentMeta);
+    void refreshTournamentPromoSettings(currentTournamentMeta);
     renderCircuitPointsSettings();
   }
 
@@ -3224,6 +3265,8 @@ function openCircuitSettingsModal() {
   const finalRulesInput = document.getElementById("circuitFinalRulesInput");
   const finalFormatSelect = document.getElementById("circuitFinalFormatSelect");
   const finalImagePreview = document.getElementById("circuitFinalImagePreview");
+  const sponsorsList = document.getElementById("circuitFinalSponsorsList");
+  const socialsList = document.getElementById("circuitFinalSocialsList");
   if (toggle) toggle.checked = Boolean(currentCircuitMeta?.sortByFirstPlace);
   if (nameInput) nameInput.value = currentCircuitMeta?.name || "";
   if (slugInput) slugInput.value = currentCircuitMeta?.slug || "";
@@ -3237,6 +3280,14 @@ function openCircuitSettingsModal() {
     modal.style.display = "flex";
     lockBodyScroll();
   }
+  if (sponsorsList) {
+    renderCircuitFinalSponsors([]);
+  }
+  if (socialsList) {
+    renderCircuitFinalSocials([]);
+  }
+  bindCircuitFinalSponsorControls();
+  bindCircuitFinalSocialControls();
   if (!finalSlug) return;
   getDoc(doc(collection(db, TOURNAMENT_COLLECTION), finalSlug))
     .then((snap) => {
@@ -3324,6 +3375,8 @@ function openCircuitSettingsModal() {
       assignBestOf("circuitFinalBestOfSemiInput", bestOf.semi);
       assignBestOf("circuitFinalBestOfUpperFinalInput", bestOf.upperFinal);
       assignBestOf("circuitFinalBestOfFinalInput", bestOf.final);
+      renderCircuitFinalSponsors(meta.sponsors || []);
+      renderCircuitFinalSocials(meta.socials || []);
     })
     .catch(() => {});
 }
@@ -3365,6 +3418,8 @@ async function saveCircuitSettings() {
   const finalFormatSelect = document.getElementById("circuitFinalFormatSelect");
   const finalImageInput = document.getElementById("circuitFinalImageInput");
   const finalImagePreview = document.getElementById("circuitFinalImagePreview");
+  const sponsors = readCircuitFinalSponsors();
+  const socials = readCircuitFinalSocials();
   const sortByFirstPlace = Boolean(toggle?.checked);
   const circuitName = (nameInput?.value || "").trim();
   const circuitDescription = descriptionInput?.value || "";
@@ -3430,6 +3485,44 @@ async function saveCircuitSettings() {
         circuitSlug: currentCircuitMeta.slug,
         circuitQualifyCount: finalQualifyCount,
       });
+      const processedSponsors = [];
+      for (const sponsor of sponsors) {
+        if (!sponsor) continue;
+        let imageUrl = sponsor.imageUrl || "";
+        if (sponsor.file) {
+          try {
+            imageUrl = await uploadSponsorLogo(sponsor.file, finalSlug);
+          } catch (err) {
+            showToast?.(
+              err?.message || "Failed to upload sponsor logo.",
+              "error"
+            );
+            return;
+          }
+        }
+        const entry = normalizeSponsorEntry(
+          { name: sponsor.name, imageUrl, linkUrl: sponsor.linkUrl },
+          { allowEmpty: false }
+        );
+        if (entry) processedSponsors.push(entry);
+      }
+      finalPayload.sponsors = processedSponsors;
+      const processedSocials = socials
+        .map((entry) =>
+          normalizeSocialEntry(
+            { type: entry.type, label: entry.label, url: entry.url },
+            { allowEmpty: false }
+          )
+        )
+        .filter(Boolean);
+      for (const entry of processedSocials) {
+        const error = validateSocialUrl(entry.type, entry.url);
+        if (error) {
+          showToast?.(`Invalid ${getSocialLabelForType(entry.type)} URL. ${error}`, "error");
+          return;
+        }
+      }
+      finalPayload.socials = processedSocials;
       await setDoc(
         doc(collection(db, TOURNAMENT_COLLECTION), finalSlug),
         finalPayload,
@@ -3531,6 +3624,7 @@ async function deleteTournamentBundle(slug, coverImageUrl = "") {
   await deleteDoc(doc(collection(db, TOURNAMENT_STATE_COLLECTION), slug));
   await deleteTournamentCoverByUrl(coverImageUrl, slug);
   await deleteTournamentCoverFolder(slug);
+  await deleteTournamentSponsorFolder(slug);
   try {
     localStorage.removeItem(getPersistStorageKey(slug));
   } catch (_) {
@@ -4330,6 +4424,17 @@ async function deleteTournamentCoverFolder(slug) {
   }
 }
 
+async function deleteTournamentSponsorFolder(slug) {
+  if (!slug) return;
+  try {
+    const folderRef = storageRef(storage, `tournamentSponsors/${slug}`);
+    const list = await listAll(folderRef);
+    await Promise.all(list.items.map((item) => deleteObject(item)));
+  } catch (err) {
+    console.warn("Failed to delete tournament sponsor folder", err);
+  }
+}
+
 async function uploadTournamentCover(file, slug) {
   const error = validateTournamentImage(file);
   if (error) throw new Error(error);
@@ -4342,6 +4447,25 @@ async function uploadTournamentCover(file, slug) {
     fallbackType: "image/jpeg",
   });
   const path = `tournamentCovers/${slug}/cover-${Date.now()}.webp`;
+  const ref = storageRef(storage, path);
+  await uploadBytes(ref, processed.blob, {
+    contentType: processed.contentType,
+  });
+  return getDownloadURL(ref);
+}
+
+async function uploadSponsorLogo(file, slug) {
+  const error = validateTournamentImage(file);
+  if (error) throw new Error(error);
+  if (!slug) throw new Error("Missing tournament slug.");
+  const processed = await prepareImageForUpload(file, {
+    targetWidth: SPONSOR_LOGO_SIZE,
+    targetHeight: SPONSOR_LOGO_SIZE,
+    quality: COVER_QUALITY,
+    outputType: "image/webp",
+    fallbackType: "image/jpeg",
+  });
+  const path = `tournamentSponsors/${slug}/logo-${Date.now()}.webp`;
   const ref = storageRef(storage, path);
   await uploadBytes(ref, processed.blob, {
     contentType: processed.contentType,
@@ -4367,6 +4491,9 @@ async function handleSaveSettings(event) {
   const requirePulseInput = document.getElementById("settingsRequirePulseLink");
   const imageInput = document.getElementById("settingsImageInput");
   const imagePreview = document.getElementById("settingsImagePreview");
+  const copySponsorsToggle = document.getElementById(
+    "settingsCopyCircuitSponsorsToggle"
+  );
   const imageFile = imageInput?.files?.[0] || null;
   const reuseUrl = imagePreview?.dataset.reuseUrl || "";
   const newSlugRaw = (slugInput?.value || "").trim();
@@ -4413,6 +4540,9 @@ async function handleSaveSettings(event) {
     requirePulseInput?.checked ??
     currentTournamentMeta?.requirePulseLink ??
     true;
+  const copyFromCircuitPromos = currentTournamentMeta?.circuitSlug
+    ? Boolean(copySponsorsToggle?.checked ?? getCopyFromCircuitPromos(currentTournamentMeta))
+    : false;
   let coverImageUrl = currentTournamentMeta?.coverImageUrl || "";
   if (!imageFile && reuseUrl) {
     coverImageUrl = reuseUrl;
@@ -4451,6 +4581,51 @@ async function handleSaveSettings(event) {
         ? qualifyCount
         : null,
   });
+  if (currentTournamentMeta?.circuitSlug) {
+    meta.copyFromCircuitPromos = copyFromCircuitPromos;
+  }
+  if (!copyFromCircuitPromos) {
+    const sponsors = readTournamentSponsors();
+    const processedSponsors = [];
+    for (const sponsor of sponsors) {
+      if (!sponsor) continue;
+      let imageUrl = sponsor.imageUrl || "";
+      if (sponsor.file) {
+        try {
+          imageUrl = await uploadSponsorLogo(sponsor.file, newSlug);
+        } catch (err) {
+          showToast?.(err?.message || "Failed to upload sponsor logo.", "error");
+          return;
+        }
+      }
+      const entry = normalizeSponsorEntry(
+        { name: sponsor.name, imageUrl, linkUrl: sponsor.linkUrl },
+        { allowEmpty: false }
+      );
+      if (entry) processedSponsors.push(entry);
+    }
+    meta.sponsors = processedSponsors;
+    const socials = readTournamentSocials();
+    const processedSocials = socials
+      .map((entry) =>
+        normalizeSocialEntry(
+          { type: entry.type, label: entry.label, url: entry.url },
+          { allowEmpty: false }
+        )
+      )
+      .filter(Boolean);
+    for (const entry of processedSocials) {
+      const error = validateSocialUrl(entry.type, entry.url);
+      if (error) {
+        showToast?.(
+          `Invalid ${getSocialLabelForType(entry.type)} URL. ${error}`,
+          "error"
+        );
+        return;
+      }
+    }
+    meta.socials = processedSocials;
+  }
   if (currentTournamentMeta?.circuitSlug) {
     meta.circuitPoints = circuitPoints || [];
   }
@@ -5057,6 +5232,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   initCoverReuseModal();
   initCasterControls({ saveState });
   initFinalAdminSearch();
+  bindTournamentSponsorControls();
+  bindTournamentSocialControls();
+  bindTournamentPromoSettingsControls(() => currentTournamentMeta);
   initInviteLinksPanel();
   initAdminInviteModal();
   initFinalAutoAddToggle();

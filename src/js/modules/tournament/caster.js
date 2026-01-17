@@ -1,13 +1,19 @@
-import { auth, db, getCurrentUsername } from "../../../app.js";
+import { auth, db, functions, getCurrentUsername } from "../../../app.js";
 import { showToast } from "../toastHandler.js";
-import { state, isAdmin } from "./state.js";
+import { state, isAdmin, currentSlug, currentTournamentMeta } from "./state.js";
 import { escapeHtml, sanitizeUrl } from "./bracket/renderUtils.js";
+import { createAdminPlayerSearch } from "./admin/addSearchPlayer.js";
+import { httpsCallable } from "firebase/functions";
 import { doc, getDoc } from "firebase/firestore";
 
 let casterDeps = null;
 let castPopover = null;
 let castPopoverMatchId = null;
 const casterStreamCache = new Map();
+let casterManageSearch = null;
+let lastCasterSearchResults = [];
+let activeCasterManageTab = "registered";
+let sendCasterInviteCallable = null;
 
 export function getCasterEntryByUid(uid) {
   if (!uid) return null;
@@ -30,16 +36,195 @@ function getCasterProfileFromUser(uid) {
   };
 }
 
+function setCasterManageActiveTab(tab) {
+  const next = tab === "unregistered" ? "unregistered" : "registered";
+  activeCasterManageTab = next;
+  const tabs = document.querySelectorAll("[data-caster-manage-tab]");
+  tabs.forEach((button) => {
+    button.classList.toggle("active", button.dataset.casterManageTab === next);
+  });
+  const panels = document.querySelectorAll("[data-caster-manage-panel]");
+  panels.forEach((panel) => {
+    panel.classList.toggle("active", panel.dataset.casterManagePanel === next);
+  });
+  if (next === "unregistered") {
+    document.getElementById("casterManageSearchInput")?.focus();
+  }
+}
+
+function getCasterSets() {
+  const casters = Array.isArray(state.casters) ? state.casters : [];
+  const casterUids = new Set(casters.map((entry) => entry?.uid).filter(Boolean));
+  const casterRequests = Array.isArray(state.casterRequests) ? state.casterRequests : [];
+  const requestUids = new Set(casterRequests.map((entry) => entry?.uid).filter(Boolean));
+  return { casters, casterUids, casterRequests, requestUids };
+}
+
+function renderCasterManageRegisteredList() {
+  const listEl = document.getElementById("casterManageRegisteredList");
+  if (!listEl) return;
+  const players = Array.isArray(state.players) ? state.players : [];
+  const { casterUids } = getCasterSets();
+  if (!players.length) {
+    listEl.innerHTML = `<div class="caster-manage-empty">No registered players yet.</div>`;
+    return;
+  }
+  const rows = players
+    .slice()
+    .sort((a, b) => (a?.name || "").localeCompare(b?.name || ""))
+    .map((player) => {
+      const name = escapeHtml(player?.name || "Player");
+      const uid = player?.uid || "";
+      const hasUid = Boolean(uid);
+      const isCaster = hasUid && casterUids.has(uid);
+      const buttonText = !hasUid
+        ? "No account"
+        : isCaster
+        ? "Caster"
+        : "Add caster";
+      const disabledAttr = !hasUid || isCaster ? "disabled" : "";
+      return `<div class="caster-manage-row">
+        <div class="caster-manage-meta">
+          <span>${name}</span>
+        </div>
+        <button type="button" class="cta small primary" data-caster-add-uid="${escapeHtml(
+          uid
+        )}" ${disabledAttr}>${buttonText}</button>
+      </div>`;
+    });
+  listEl.innerHTML = rows.join("");
+}
+
+function setCasterManageSearchStatus(message) {
+  const statusEl = document.getElementById("casterManageSearchStatus");
+  if (statusEl) statusEl.textContent = message || "";
+}
+
+function renderCasterManageUnregisteredResults(results = []) {
+  const listEl = document.getElementById("casterManageSearchResults");
+  if (!listEl) return;
+  const items = Array.isArray(results) ? results : [];
+  lastCasterSearchResults = items;
+  const players = Array.isArray(state.players) ? state.players : [];
+  const registeredUids = new Set(players.map((player) => player?.uid).filter(Boolean));
+  const registeredNames = new Set(
+    players.map((player) => (player?.name || "").toLowerCase()).filter(Boolean)
+  );
+  const { casterUids, requestUids } = getCasterSets();
+  const filtered = items.filter((entry) => {
+    const uid = entry?.userId || "";
+    const nameLower = (entry?.username || "").toLowerCase();
+    if (uid && registeredUids.has(uid)) return false;
+    if (nameLower && registeredNames.has(nameLower)) return false;
+    if (uid && casterUids.has(uid)) return false;
+    if (uid && requestUids.has(uid)) return false;
+    return true;
+  });
+  listEl.replaceChildren();
+  if (!filtered.length) {
+    const inputValue =
+      document.getElementById("casterManageSearchInput")?.value || "";
+    if (!inputValue.trim()) {
+      setCasterManageSearchStatus("Type to search users.");
+    } else if (inputValue.trim().length < 2) {
+      setCasterManageSearchStatus("Type at least 2 characters to search.");
+    } else {
+      setCasterManageSearchStatus(
+        items.length ? "No unregistered users found." : "No matches found."
+      );
+    }
+    return;
+  }
+  setCasterManageSearchStatus(`Found ${filtered.length} match(es).`);
+  filtered.forEach((entry) => {
+    const row = document.createElement("div");
+    row.className = "admin-search-item";
+    const label = document.createElement("span");
+    label.textContent = entry.username;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "cta small primary";
+    button.textContent = "Invite";
+    button.dataset.casterInviteUid = entry.userId || "";
+    button.dataset.casterInviteUsername = entry.username || "";
+    if (!entry.userId) {
+      button.disabled = true;
+      button.textContent = "Unavailable";
+    }
+    row.append(label, button);
+    listEl.appendChild(row);
+  });
+}
+
+async function addCasterFromRoster(uid) {
+  if (!isAdmin) {
+    showToast?.("Only admins can add casters.", "error");
+    return;
+  }
+  if (!uid) return;
+  const player = (state.players || []).find((entry) => entry?.uid === uid);
+  if (!player) {
+    showToast?.("Player not found.", "error");
+    return;
+  }
+  const { casters, casterUids, casterRequests } = getCasterSets();
+  if (casterUids.has(uid)) {
+    showToast?.("Player is already a caster.", "info");
+    return;
+  }
+  const entry = {
+    uid,
+    name: player.name || "Caster",
+    twitchUrl: player.twitchUrl || "",
+    approvedAt: Date.now(),
+  };
+  const nextRequests = casterRequests.filter((req) => req?.uid !== uid);
+  const nextCasters = [...casters, entry];
+  casterDeps?.saveState?.({ casters: nextCasters, casterRequests: nextRequests });
+  showToast?.(`${player.name || "Player"} added as caster.`, "success");
+  renderCasterSection();
+}
+
+async function sendCasterInviteNotification({ userId, username }) {
+  if (!userId) return;
+  const tournamentSlug =
+    currentSlug || currentTournamentMeta?.slug || currentTournamentMeta?.id || "";
+  const senderName = getCurrentUsername?.() || "Tournament admin";
+  try {
+    if (!sendCasterInviteCallable) {
+      sendCasterInviteCallable = httpsCallable(functions, "sendCasterInvite");
+    }
+    await sendCasterInviteCallable({
+      userId,
+      username,
+      tournamentSlug,
+      senderName,
+    });
+    if (username) {
+      showToast?.(`Caster invite sent to ${username}.`, "success");
+    } else {
+      showToast?.("Caster invite sent.", "success");
+    }
+  } catch (err) {
+    console.error("Failed to send caster invite", err);
+    showToast?.("Could not send caster invite.", "error");
+  }
+}
+
 export function renderCasterSection() {
   const requestBtn = document.getElementById("requestCasterBtn");
   const statusEl = document.getElementById("casterRequestStatus");
-  const adminPanel = document.getElementById("casterRequestPanel");
+  const adminPanel = document.getElementById("casterAdminPanel");
+  const requestPanel = document.getElementById("casterRequestPanel");
   const requestList = document.getElementById("casterRequestList");
   const adminStatus = document.getElementById("casterRequestAdminStatus");
+  const casterListNotLive = document.getElementById("casterListNotLive");
+  const casterListLive = document.getElementById("casterListLive");
   const uid = auth.currentUser?.uid || null;
   const casterEntry = getCasterEntryByUid(uid);
   const requestEntry = getCasterRequestByUid(uid);
   const isCaster = Boolean(casterEntry || isAdmin);
+  const { casters } = getCasterSets();
 
   if (requestBtn) {
     if (!uid) {
@@ -67,6 +252,9 @@ export function renderCasterSection() {
 
   if (adminPanel) {
     adminPanel.style.display = isAdmin ? "grid" : "none";
+  }
+  if (requestPanel) {
+    requestPanel.style.display = "";
   }
 
   if (requestList) {
@@ -106,6 +294,60 @@ export function renderCasterSection() {
   if (adminStatus) {
     const pending = Array.isArray(state.casterRequests) ? state.casterRequests.length : 0;
     adminStatus.textContent = pending ? "" : "No pending caster requests.";
+  }
+
+  const casterListMarkup = casters.length
+    ? casters
+        .map((entry) => {
+          const safeUrl = sanitizeUrl(entry.twitchUrl || "");
+          const twitchLabel = safeUrl
+            ? `<a class="caster-link" href="${escapeHtml(
+                safeUrl
+              )}" target="_blank" rel="noopener">Twitch</a>`
+            : `<span class="helper">No Twitch</span>`;
+          const name = escapeHtml(entry.name || "Caster");
+          return `<li>
+            <span class="caster-name">${name}</span>
+            ${twitchLabel}
+          </li>`;
+        })
+        .join("")
+    : `<li class="caster-empty">No casters registered.</li>`;
+
+  if (casterListNotLive) {
+    casterListNotLive.innerHTML = casterListMarkup;
+  }
+
+  if (casterListLive) {
+    casterListLive.innerHTML = casterListMarkup;
+  }
+
+  renderCasterManageRegisteredList();
+  renderCasterManageUnregisteredResults(lastCasterSearchResults);
+}
+
+function handleCasterManageTabClick(event) {
+  const button = event.target.closest("[data-caster-manage-tab]");
+  if (!button) return;
+  event.preventDefault();
+  setCasterManageActiveTab(button.dataset.casterManageTab);
+}
+
+function handleCasterManageClick(event) {
+  const addButton = event.target.closest("[data-caster-add-uid]");
+  if (addButton) {
+    event.preventDefault();
+    addCasterFromRoster(addButton.dataset.casterAddUid || "");
+    return;
+  }
+  const inviteButton = event.target.closest("[data-caster-invite-username]");
+  if (inviteButton) {
+    event.preventDefault();
+    if (inviteButton.disabled) return;
+    inviteButton.disabled = true;
+    const username = inviteButton.dataset.casterInviteUsername || "";
+    const userId = inviteButton.dataset.casterInviteUid || "";
+    casterManageSearch?.addByUsername(username, userId);
   }
 }
 
@@ -322,11 +564,46 @@ export function initCasterControls(deps = {}) {
   if (requestBtn) requestBtn.addEventListener("click", handleCasterRequest);
   const requestList = document.getElementById("casterRequestList");
   if (requestList) requestList.addEventListener("click", handleCasterAdminAction);
+  const managePanel = document.getElementById("casterManagePanel");
+  if (managePanel) managePanel.addEventListener("click", handleCasterManageClick);
+  document
+    .querySelectorAll("[data-caster-manage-tab]")
+    .forEach((button) => button.addEventListener("click", handleCasterManageTabClick));
+  const searchInput = document.getElementById("casterManageSearchInput");
+  const resultsEl = document.getElementById("casterManageSearchResults");
+  if (searchInput && resultsEl && !casterManageSearch) {
+    casterManageSearch = createAdminPlayerSearch({
+      db,
+      getIsEnabled: () => isAdmin,
+      getPlayers: () => [
+        ...(state.players || []),
+        ...(state.casters || []),
+        ...(state.casterRequests || []),
+      ],
+      onStatus: setCasterManageSearchStatus,
+      onResults: renderCasterManageUnregisteredResults,
+      onError: (err) => {
+        if (err?.message) showToast?.(err.message, "error");
+      },
+      onSuccess: () => {
+        searchInput.value = "";
+        renderCasterManageUnregisteredResults([]);
+        setCasterManageSearchStatus("");
+      },
+      addPlayer: async ({ userId, username }) => {
+        await sendCasterInviteNotification({ userId, username });
+      },
+    });
+    searchInput.addEventListener("input", () => {
+      casterManageSearch.debouncedSearch(searchInput.value);
+    });
+  }
   document.addEventListener("click", handleCasterRequestClick);
   document.addEventListener("click", handleCastIndicatorClick);
   document.addEventListener("click", handleGlobalCastDismiss);
   document.addEventListener("keydown", handleGlobalCastKey);
   window.addEventListener("resize", handleGlobalCastReposition);
   window.addEventListener("scroll", handleGlobalCastReposition, { passive: true });
+  setCasterManageActiveTab(activeCasterManageTab);
   renderCasterSection();
 }

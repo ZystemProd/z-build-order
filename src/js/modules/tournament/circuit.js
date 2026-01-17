@@ -11,6 +11,7 @@ import {
 import { computePlacementsForBracket } from "./bracket/placements.js";
 import { getAllMatches } from "./bracket/lookup.js";
 import { sanitizeUrl, escapeHtml } from "./bracket/renderUtils.js";
+import { buildSocialIconSvg } from "./promosShared.js";
 import { playerKey } from "./playerKey.js";
 import { syncMarkdownSurfaceForInput } from "./markdownEditor.js";
 
@@ -397,8 +398,32 @@ export async function renderCircuitTournamentList(
   { onEnterTournament, onDeleteTournament, showDelete = false } = {}
 ) {
   const listEl = document.getElementById("circuitTournamentList");
+  const finalListEl = document.getElementById("circuitFinalTournamentList");
+  const finalCard = document.getElementById("circuitFinalCard");
+  const sponsorCard = document.getElementById("circuitSponsorCard");
+  const sponsorList = document.getElementById("circuitSponsorList");
+  const socialCard = document.getElementById("circuitSocialCard");
+  const socialList = document.getElementById("circuitSocialList");
   if (!listEl) return;
   listEl.innerHTML = `<li class="muted">Loading tournaments...</li>`;
+  if (finalListEl) {
+    finalListEl.replaceChildren();
+  }
+  if (finalCard) {
+    finalCard.style.display = "none";
+  }
+  if (sponsorList) {
+    sponsorList.replaceChildren();
+  }
+  if (sponsorCard) {
+    sponsorCard.style.display = "none";
+  }
+  if (socialList) {
+    socialList.replaceChildren();
+  }
+  if (socialCard) {
+    socialCard.style.display = "none";
+  }
   if (!slugs.length) {
     listEl.innerHTML = `<li class="muted">No tournaments added yet.</li>`;
     return;
@@ -407,16 +432,8 @@ export async function renderCircuitTournamentList(
     const registry = await loadTournamentRegistry(true);
     const bySlug = new Map((registry || []).map((item) => [item.slug, item]));
     listEl.innerHTML = "";
-    slugs.forEach((slug) => {
-      const item = bySlug.get(slug) || {
-        slug,
-        name: slug,
-        format: "Tournament",
-        startTime: null,
-        maxPlayers: null,
-        coverImageUrl: "",
-        createdByName: null,
-      };
+    const finalSlug = String(meta?.finalTournamentSlug || "").trim();
+    const renderCard = (item, slug) => {
       const li = document.createElement("li");
       li.className = "tournament-card";
       const coverUrl = sanitizeUrl(item.coverImageUrl || "");
@@ -442,9 +459,6 @@ export async function renderCircuitTournamentList(
         playerLabel,
         `Host: ${item.createdByName || "Unknown"}`,
       ];
-      if (meta?.finalTournamentSlug && slug === meta.finalTournamentSlug) {
-        metaBits.unshift("Finals event");
-      }
       li.innerHTML = DOMPurify.sanitize(`
         <div class="card-cover${coverUrl ? " has-image" : ""}"${
           coverUrl ? ` style="background-image:url('${escapeHtml(coverUrl)}')"` : ""
@@ -465,8 +479,108 @@ export async function renderCircuitTournamentList(
       if (onEnterTournament) {
         li.addEventListener("click", () => onEnterTournament(item.slug, meta?.slug || ""));
       }
-      listEl.appendChild(li);
+      return li;
+    };
+
+    const renderSponsors = (sponsors = []) => {
+      if (!sponsorList || !sponsorCard) return;
+      const normalized = (sponsors || [])
+        .map((entry) => {
+          if (!entry || typeof entry !== "object") return null;
+          const name = String(entry.name || "").trim();
+          const imageUrl = sanitizeUrl(entry.imageUrl || "");
+          const linkUrl = sanitizeUrl(entry.linkUrl || "");
+          if (!name && !imageUrl && !linkUrl) return null;
+          return { name, imageUrl, linkUrl };
+        })
+        .filter(Boolean);
+      sponsorList.replaceChildren();
+      if (!normalized.length) {
+        sponsorCard.style.display = "grid";
+        return;
+      }
+      normalized.forEach((entry) => {
+        const anchor = document.createElement("a");
+        anchor.className = "sponsor-item";
+        anchor.href = entry.linkUrl || "#";
+        anchor.target = entry.linkUrl ? "_blank" : "";
+        anchor.rel = entry.linkUrl ? "noopener" : "";
+        if (!entry.linkUrl) {
+          anchor.removeAttribute("href");
+        }
+        const img = document.createElement("img");
+        img.className = "sponsor-logo";
+        img.alt = entry.name || "Sponsor";
+        img.src = entry.imageUrl || "";
+        const name = document.createElement("span");
+        name.className = "sponsor-name";
+        name.textContent = entry.name || "Sponsor";
+        anchor.append(img, name);
+        sponsorList.appendChild(anchor);
+      });
+      sponsorCard.style.display = "grid";
+    };
+
+    const renderSocials = (socials = []) => {
+      if (!socialList || !socialCard) return;
+      const normalized = (socials || [])
+        .map((entry) => {
+          if (!entry || typeof entry !== "object") return null;
+          const type = String(entry.type || "custom").trim().toLowerCase();
+          const label = String(entry.label || "").trim();
+          const url = sanitizeUrl(entry.url || "");
+          if (!label && !url) return null;
+          return { type, label: label || url, url };
+        })
+        .filter(Boolean);
+      socialList.replaceChildren();
+      if (!normalized.length) {
+        socialCard.style.display = "grid";
+        return;
+      }
+      normalized.forEach((entry) => {
+        const anchor = document.createElement("a");
+        anchor.className = "social-item";
+        anchor.href = entry.url || "#";
+        anchor.target = entry.url ? "_blank" : "";
+        anchor.rel = entry.url ? "noopener" : "";
+        if (!entry.url) {
+          anchor.removeAttribute("href");
+        }
+        const icon = document.createElement("span");
+        icon.className = "social-icon";
+        icon.innerHTML = buildSocialIconSvg(entry.type);
+        const label = document.createElement("span");
+        label.className = "social-label";
+        label.textContent = entry.label;
+        anchor.append(icon, label);
+        socialList.appendChild(anchor);
+      });
+      socialCard.style.display = "grid";
+    };
+
+    slugs.forEach((slug) => {
+      const item = bySlug.get(slug) || {
+        slug,
+        name: slug,
+        format: "Tournament",
+        startTime: null,
+        maxPlayers: null,
+        coverImageUrl: "",
+        createdByName: null,
+      };
+      if (finalSlug && slug === finalSlug && finalListEl && finalCard) {
+        finalListEl.appendChild(renderCard(item, slug));
+        finalCard.style.display = "block";
+        renderSponsors(item.sponsors || []);
+        renderSocials(item.socials || []);
+      } else {
+        listEl.appendChild(renderCard(item, slug));
+      }
     });
+    if (!listEl.children.length) {
+      listEl.innerHTML = `<li class="muted">No tournaments added yet.</li>`;
+    }
   } catch (err) {
     console.error("Failed to load circuit tournaments", err);
     listEl.innerHTML = `<li class="muted error">Failed to load tournaments.</li>`;

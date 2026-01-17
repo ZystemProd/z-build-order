@@ -36,6 +36,21 @@ service firebase.storage {
       );
     }
 
+    // ? Allow uploading tournament sponsor logos
+    match /tournamentSponsors/{slug}/{fileName} {
+      allow read: if true;
+      allow write: if request.auth != null && (
+        firestore.get(
+          /databases/(default)/documents/tournaments/$(slug)
+        ).data.createdBy == request.auth.uid ||
+        firestore.get(
+          /databases/(default)/documents/tournamentCircuits/$(
+            firestore.get(/databases/(default)/documents/tournaments/$(slug)).data.circuitSlug
+          )
+        ).data.createdBy == request.auth.uid
+      );
+    }
+
     // ❌ Deny everything else
     match /{allPaths=**} {
       allow read, write: if false;
