@@ -75,6 +75,11 @@ export function initTournamentNotifications() {
       preview = `${senderName} invited you to ${tournamentName}.`;
       body = `${senderName} invited you to ${tournamentName}.\n\nAccept to join the tournament.`;
       typeLabel = "Invite";
+    } else if (type === "caster-invite") {
+      title = `Caster invite: ${tournamentName}`;
+      preview = `${senderName} invited you to cast ${tournamentName}.`;
+      body = `${senderName} invited you to register as a caster for ${tournamentName}.`;
+      typeLabel = "Caster invite";
     } else if (type === "tournament-checkin") {
       title = `Check-in for ${tournamentName}`;
       preview = `Check-in is open for ${tournamentName}.`;
@@ -208,7 +213,9 @@ export function initTournamentNotifications() {
     activeId = note.id;
     detailTitle.textContent = "";
     if (
-      (note.type === "tournament-invite" || note.type === "tournament-checkin") &&
+      (note.type === "tournament-invite" ||
+        note.type === "tournament-checkin" ||
+        note.type === "caster-invite") &&
       (note.tournamentUrl || note.tournamentSlug)
     ) {
       const titleLink = document.createElement("a");
@@ -246,6 +253,28 @@ export function initTournamentNotifications() {
       const prompt = document.createElement("p");
       prompt.className = "notification-message";
       prompt.textContent = "Accept to join the tournament.";
+      detailBody.append(message, prompt);
+    } else if (note.type === "caster-invite") {
+      const message = document.createElement("p");
+      message.className = "notification-message";
+      message.append(`${note.senderName} invited you to cast `);
+      const href = getTournamentHref(note);
+      if (href) {
+        const link = document.createElement("a");
+        link.className = "notification-inline-link";
+        link.href = href;
+        link.textContent = note.tournamentName;
+        link.rel = "noopener";
+        link.target = "_blank";
+        message.appendChild(link);
+      } else {
+        message.append(note.tournamentName);
+      }
+      message.append(".");
+      const prompt = document.createElement("p");
+      prompt.className = "notification-message";
+      prompt.textContent =
+        "Open the tournament page and request caster access.";
       detailBody.append(message, prompt);
     } else if (note.type === "tournament-checkin") {
       const message = document.createElement("p");
@@ -483,6 +512,8 @@ export function initTournamentNotifications() {
   let retryTimer = null;
   let retryCount = 0;
   const MAX_RETRIES = 3;
+  const TOKEN_REFRESH_COOLDOWN_MS = 60000;
+  let lastTokenRefreshAt = 0;
 
   const clearRetry = () => {
     if (retryTimer) {
@@ -546,10 +577,14 @@ export function initTournamentNotifications() {
           resetListenerState("Unable to load notifications (retrying...)");
           clearRetry();
           retryTimer = setTimeout(async () => {
-            try {
-              await user.getIdToken(true);
-            } catch (_) {
-              // ignore token refresh errors; we'll still retry subscribe
+            const now = Date.now();
+            if (now - lastTokenRefreshAt >= TOKEN_REFRESH_COOLDOWN_MS) {
+              lastTokenRefreshAt = now;
+              try {
+                await user.getIdToken(true);
+              } catch (_) {
+                // ignore token refresh errors; we'll still retry subscribe
+              }
             }
             if (!auth.currentUser || auth.currentUser.uid !== user.uid) return;
             subscribeToNotifications(user);

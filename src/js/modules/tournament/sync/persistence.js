@@ -1,4 +1,11 @@
-import { doc, getDoc, getDocs, setDoc, collection } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  getDocs,
+  setDoc,
+  collection,
+  runTransaction,
+} from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import {
   TOURNAMENT_COLLECTION,
@@ -10,6 +17,18 @@ import {
   defaultState,
 } from "../state.js";
 import { db, functions } from "../../../../app.js";
+
+const DEBUG_TOURNAMENT_SYNC = true;
+
+function dbg(label, payload) {
+  if (!DEBUG_TOURNAMENT_SYNC) return;
+  console.groupCollapsed(`🧪 [tournament-sync] ${label}`);
+  try {
+    console.log(payload);
+  } finally {
+    console.groupEnd();
+  }
+}
 
 // Local storage helpers
 export function cacheTournamentRegistry(registry) {
@@ -61,13 +80,16 @@ export function setRegisteredTournament(slug) {
 
 // Registry (Firestore + cache)
 export async function loadTournamentRegistry(force = false) {
-  if (!force && loadTournamentRegistry.cached) return loadTournamentRegistry.cached;
+  if (!force && loadTournamentRegistry.cached)
+    return loadTournamentRegistry.cached;
   const fallback = loadTournamentRegistryCache();
   try {
     const snap = await getDocs(collection(db, TOURNAMENT_COLLECTION));
     const list = snap.docs.map((d) => {
       const data = d.data() || {};
-      const startTime = data.startTime?.toMillis ? data.startTime.toMillis() : data.startTime;
+      const startTime = data.startTime?.toMillis
+        ? data.startTime.toMillis()
+        : data.startTime;
       return {
         id: d.id,
         slug: data.slug || d.id,
@@ -77,13 +99,18 @@ export async function loadTournamentRegistry(force = false) {
         mapPool: data.mapPool?.length ? data.mapPool : [],
         format: data.format || "Tournament",
         coverImageUrl: data.coverImageUrl || "",
+        sponsors: Array.isArray(data.sponsors) ? data.sponsors : [],
+        socials: Array.isArray(data.socials) ? data.socials : [],
         maxPlayers: data.maxPlayers || null,
         startTime: startTime || null,
         createdBy: data.createdBy || null,
         createdByName: data.createdByName || data.hostName || null,
         circuitSlug: data.circuitSlug || null,
         isInviteOnly: Boolean(data.isInviteOnly),
-        visibility: String(data.visibility || "public").toLowerCase() === "private" ? "private" : "public",
+        visibility:
+          String(data.visibility || "public").toLowerCase() === "private"
+            ? "private"
+            : "public",
         bestOf: data.bestOf || defaultState.bestOf || null,
       };
     });
@@ -126,8 +153,12 @@ export async function loadCircuitRegistry(force = false) {
     const snap = await getDocs(collection(db, CIRCUIT_COLLECTION));
     const list = snap.docs.map((d) => {
       const data = d.data() || {};
-      const createdAt = data.createdAt?.toMillis ? data.createdAt.toMillis() : data.createdAt;
-      const tournaments = Array.isArray(data.tournaments) ? data.tournaments : [];
+      const createdAt = data.createdAt?.toMillis
+        ? data.createdAt.toMillis()
+        : data.createdAt;
+      const tournaments = Array.isArray(data.tournaments)
+        ? data.tournaments
+        : [];
       const slugs = tournaments
         .map((entry) => (typeof entry === "string" ? entry : entry?.slug))
         .filter(Boolean);
@@ -136,7 +167,8 @@ export async function loadCircuitRegistry(force = false) {
         slug: data.slug || d.id,
         name: data.name || d.id,
         description: data.description || "",
-        coverImageUrl: data.coverImageUrl || data.coverUrl || data.coverImage || "",
+        coverImageUrl:
+          data.coverImageUrl || data.coverUrl || data.coverImage || "",
         tournaments: Array.from(new Set(slugs)),
         finalTournamentSlug: data.finalTournamentSlug || "",
         createdBy: data.createdBy || null,
@@ -156,13 +188,32 @@ export async function loadCircuitRegistry(force = false) {
 // State (local + Firestore)
 export function loadState(currentSlug, applySeedingFn, deserializeBracketFn) {
   if (!currentSlug) return { ...defaultState };
+
   try {
-    const raw = localStorage.getItem(getStorageKey(currentSlug));
-    if (!raw) return { ...defaultState };
+    const key = getStorageKey(currentSlug);
+    const raw = localStorage.getItem(key);
+
+    if (!raw) {
+      dbg("loadState: localStorage MISS", { slug: currentSlug, key });
+      return { ...defaultState };
+    }
+
     const parsed = JSON.parse(raw);
+
+    dbg("loadState: localStorage HIT", {
+      slug: currentSlug,
+      key,
+      lastUpdated: parsed?.lastUpdated || 0,
+      playersCount: Array.isArray(parsed?.players) ? parsed.players.length : 0,
+      playerUids: Array.isArray(parsed?.players)
+        ? parsed.players.map((p) => p?.uid).filter(Boolean)
+        : [],
+    });
+
     const bracket = deserializeBracketFn
       ? deserializeBracketFn(parsed.bracket)
       : parsed.bracket;
+
     return {
       ...defaultState,
       ...parsed,
@@ -170,7 +221,8 @@ export function loadState(currentSlug, applySeedingFn, deserializeBracketFn) {
       activity: parsed.activity || [],
       bracket,
     };
-  } catch (_) {
+  } catch (err) {
+    dbg("loadState: localStorage ERROR", { slug: currentSlug, err });
     return { ...defaultState };
   }
 }
@@ -178,10 +230,14 @@ export function loadState(currentSlug, applySeedingFn, deserializeBracketFn) {
 export async function loadTournamentStateRemote(slug) {
   if (!slug) return null;
   try {
-    const snap = await getDoc(doc(collection(db, TOURNAMENT_STATE_COLLECTION), slug));
+    const snap = await getDoc(
+      doc(collection(db, TOURNAMENT_STATE_COLLECTION), slug)
+    );
     if (!snap.exists()) return null;
     const data = snap.data() || {};
-    const lastUpdated = data.lastUpdated?.toMillis ? data.lastUpdated.toMillis() : data.lastUpdated;
+    const lastUpdated = data.lastUpdated?.toMillis
+      ? data.lastUpdated.toMillis()
+      : data.lastUpdated;
     return { ...data, lastUpdated: lastUpdated || Date.now() };
   } catch (_) {
     return null;
@@ -193,11 +249,23 @@ export async function hydrateStateFromRemote(
   applySeedingFn,
   deserializeBracketFn,
   saveStateFn,
-  renderAllFn
+  renderAllFn,
+  localLastUpdated = 0
 ) {
   if (!slug) return;
+
   const remote = await loadTournamentStateRemote(slug);
   if (!remote) return;
+
+  const remoteUpdated = Number(remote.lastUpdated) || 0;
+  const localUpdated = Number(localLastUpdated) || 0;
+
+  // If local is newer, do NOT overwrite it with stale remote data.
+  // This prevents “new player disappears on reload”.
+  if (localUpdated && remoteUpdated && remoteUpdated < localUpdated) {
+    return;
+  }
+
   const merged = {
     ...defaultState,
     ...remote,
@@ -205,7 +273,22 @@ export async function hydrateStateFromRemote(
     activity: remote.activity || [],
     bracket: deserializeBracketFn(remote.bracket),
   };
+
+  // Save ONLY locally (do not bounce back to remote)
   saveStateFn(merged, { skipRemote: true, keepTimestamp: true });
+
+  // Debug (must use `slug`, not `currentSlug`, and no `options` here)
+  dbg("hydrateStateFromRemote: applied", {
+    slug,
+    lastUpdated: merged.lastUpdated,
+    playersCount: Array.isArray(merged.players) ? merged.players.length : 0,
+    playerUids: Array.isArray(merged.players)
+      ? merged.players.map((p) => p?.uid).filter(Boolean)
+      : [],
+    localLastUpdated: localUpdated,
+    remoteLastUpdated: remoteUpdated,
+  });
+
   renderAllFn();
 }
 
@@ -216,11 +299,12 @@ export function persistTournamentStateRemote(
   snapshot,
   currentSlug,
   serializeBracketFn,
-  showToast
+  showToast,
+  options = {}
 ) {
   if (!currentSlug) return;
   const entry = remotePersistState.get(currentSlug) || {};
-  entry.pending = { snapshot, serializeBracketFn, showToast };
+  entry.pending = { snapshot, serializeBracketFn, showToast, options };
   if (entry.timer) clearTimeout(entry.timer);
   entry.timer = setTimeout(() => {
     void flushTournamentStateRemote(currentSlug);
@@ -231,7 +315,7 @@ export function persistTournamentStateRemote(
 async function flushTournamentStateRemote(currentSlug) {
   const entry = remotePersistState.get(currentSlug);
   if (!entry?.pending) return;
-  const { snapshot, serializeBracketFn, showToast } = entry.pending;
+  const { snapshot, serializeBracketFn, showToast, options } = entry.pending;
   entry.pending = null;
   try {
     const ref = doc(collection(db, TOURNAMENT_STATE_COLLECTION), currentSlug);
@@ -243,6 +327,9 @@ async function flushTournamentStateRemote(currentSlug) {
       bracket,
       lastUpdated: snapshot.lastUpdated || Date.now(),
     });
+    if (options?.skipRoster) {
+      delete payload.players;
+    }
     const comparable = { ...payload };
     delete comparable.lastUpdated;
     const hash = stableStringify(comparable);
@@ -273,14 +360,10 @@ export async function submitMatchScoreRemote(payload, showToast) {
     return response.data || null;
   } catch (err) {
     console.error("Failed to submit match score via Cloud Function", err);
-    showToast?.(
-      "Could not submit match score. Changes stay local.",
-      "error"
-    );
+    showToast?.("Could not submit match score. Changes stay local.", "error");
     return null;
   }
 }
-
 
 export function saveState(
   next,
@@ -305,12 +388,51 @@ export function saveState(
   }
   broadcast?.postMessage({ slug: currentSlug, payload: merged });
   if (!options.skipRemote) {
-    persistFn(merged);
+    persistFn(merged, options);
   }
 }
 
 export function getStorageKey(currentSlug) {
   return `${currentSlug || "tournament"}:${STORAGE_KEY}`;
+}
+
+export async function updateTournamentRosterRemote(
+  slug,
+  updater,
+  patch = {}
+) {
+  if (!slug || typeof updater !== "function") return null;
+  try {
+    const ref = doc(collection(db, TOURNAMENT_STATE_COLLECTION), slug);
+    const result = await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      const data = snap.exists() ? snap.data() || {} : {};
+      const currentPlayers = Array.isArray(data.players) ? data.players : [];
+      const updateResult = updater(currentPlayers, data);
+      const nextPlayers = Array.isArray(updateResult?.players)
+        ? updateResult.players
+        : Array.isArray(updateResult)
+        ? updateResult
+        : currentPlayers;
+      const updatePatch =
+        updateResult && typeof updateResult === "object"
+          ? updateResult.patch
+          : null;
+      const lastUpdated = Date.now();
+      const payload = stripUndefinedDeep({
+        players: nextPlayers,
+        ...(updatePatch && typeof updatePatch === "object" ? updatePatch : {}),
+        ...(patch && typeof patch === "object" ? patch : {}),
+        lastUpdated,
+      });
+      tx.set(ref, payload, { merge: true });
+      return { players: nextPlayers, lastUpdated, patch: payload, data };
+    });
+    return result;
+  } catch (err) {
+    console.error("Failed to update tournament roster", err);
+    return null;
+  }
 }
 
 // Local helper to strip undefined values deeply
@@ -342,6 +464,3 @@ function stableStringify(value) {
     .join(",");
   return `{${body}}`;
 }
-
-
-

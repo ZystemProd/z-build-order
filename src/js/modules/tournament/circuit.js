@@ -9,9 +9,13 @@ import {
   loadTournamentStateRemote,
 } from "./sync/persistence.js";
 import { computePlacementsForBracket } from "./bracket/placements.js";
+import { getAllMatches } from "./bracket/lookup.js";
 import { sanitizeUrl, escapeHtml } from "./bracket/renderUtils.js";
+import { buildSocialIconSvg } from "./promosShared.js";
 import { playerKey } from "./playerKey.js";
 import { syncMarkdownSurfaceForInput } from "./markdownEditor.js";
+
+const DEBUG_CIRCUIT_LEADERBOARD = false;
 
 function normalizeRaceLabel(raw) {
   const val = (raw || "").toString().toLowerCase();
@@ -98,6 +102,31 @@ function normalizeBracketForPlacements(bracket) {
     losers,
     groups: toArr(bracket.groups),
   };
+}
+
+function isBracketFinished(bracket) {
+  if (!bracket) return false;
+  const matches = getAllMatches(bracket);
+  if (!matches.length) return false;
+  return matches.every(
+    (match) => match?.status === "complete" || match?.winnerId || match?.walkover
+  );
+}
+
+function getLeaderboardKey(player) {
+  const uid = String(player?.uid || "").trim();
+  const nameKey = String(player?.name || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-");
+  const legacyKey = playerKey(player?.name, player?.sc2Link);
+  if (uid) {
+    return {
+      key: `uid:${uid}`,
+      legacyKey: legacyKey && legacyKey !== `uid:${uid}` ? legacyKey : "",
+    };
+  }
+  return { key: nameKey ? `name:${nameKey}` : legacyKey, legacyKey };
 }
 
 function buildCircuitLeaderboardCsv(leaderboard = [], { includeFirstPlaces = false } = {}) {
@@ -369,8 +398,32 @@ export async function renderCircuitTournamentList(
   { onEnterTournament, onDeleteTournament, showDelete = false } = {}
 ) {
   const listEl = document.getElementById("circuitTournamentList");
+  const finalListEl = document.getElementById("circuitFinalTournamentList");
+  const finalCard = document.getElementById("circuitFinalCard");
+  const sponsorCard = document.getElementById("circuitSponsorCard");
+  const sponsorList = document.getElementById("circuitSponsorList");
+  const socialCard = document.getElementById("circuitSocialCard");
+  const socialList = document.getElementById("circuitSocialList");
   if (!listEl) return;
   listEl.innerHTML = `<li class="muted">Loading tournaments...</li>`;
+  if (finalListEl) {
+    finalListEl.replaceChildren();
+  }
+  if (finalCard) {
+    finalCard.style.display = "none";
+  }
+  if (sponsorList) {
+    sponsorList.replaceChildren();
+  }
+  if (sponsorCard) {
+    sponsorCard.style.display = "none";
+  }
+  if (socialList) {
+    socialList.replaceChildren();
+  }
+  if (socialCard) {
+    socialCard.style.display = "none";
+  }
   if (!slugs.length) {
     listEl.innerHTML = `<li class="muted">No tournaments added yet.</li>`;
     return;
@@ -379,16 +432,8 @@ export async function renderCircuitTournamentList(
     const registry = await loadTournamentRegistry(true);
     const bySlug = new Map((registry || []).map((item) => [item.slug, item]));
     listEl.innerHTML = "";
-    slugs.forEach((slug) => {
-      const item = bySlug.get(slug) || {
-        slug,
-        name: slug,
-        format: "Tournament",
-        startTime: null,
-        maxPlayers: null,
-        coverImageUrl: "",
-        createdByName: null,
-      };
+    const finalSlug = String(meta?.finalTournamentSlug || "").trim();
+    const renderCard = (item, slug) => {
       const li = document.createElement("li");
       li.className = "tournament-card";
       const coverUrl = sanitizeUrl(item.coverImageUrl || "");
@@ -414,9 +459,6 @@ export async function renderCircuitTournamentList(
         playerLabel,
         `Host: ${item.createdByName || "Unknown"}`,
       ];
-      if (meta?.finalTournamentSlug && slug === meta.finalTournamentSlug) {
-        metaBits.unshift("Finals event");
-      }
       li.innerHTML = DOMPurify.sanitize(`
         <div class="card-cover${coverUrl ? " has-image" : ""}"${
           coverUrl ? ` style="background-image:url('${escapeHtml(coverUrl)}')"` : ""
@@ -437,8 +479,108 @@ export async function renderCircuitTournamentList(
       if (onEnterTournament) {
         li.addEventListener("click", () => onEnterTournament(item.slug, meta?.slug || ""));
       }
-      listEl.appendChild(li);
+      return li;
+    };
+
+    const renderSponsors = (sponsors = []) => {
+      if (!sponsorList || !sponsorCard) return;
+      const normalized = (sponsors || [])
+        .map((entry) => {
+          if (!entry || typeof entry !== "object") return null;
+          const name = String(entry.name || "").trim();
+          const imageUrl = sanitizeUrl(entry.imageUrl || "");
+          const linkUrl = sanitizeUrl(entry.linkUrl || "");
+          if (!name && !imageUrl && !linkUrl) return null;
+          return { name, imageUrl, linkUrl };
+        })
+        .filter(Boolean);
+      sponsorList.replaceChildren();
+      if (!normalized.length) {
+        sponsorCard.style.display = "grid";
+        return;
+      }
+      normalized.forEach((entry) => {
+        const anchor = document.createElement("a");
+        anchor.className = "sponsor-item";
+        anchor.href = entry.linkUrl || "#";
+        anchor.target = entry.linkUrl ? "_blank" : "";
+        anchor.rel = entry.linkUrl ? "noopener" : "";
+        if (!entry.linkUrl) {
+          anchor.removeAttribute("href");
+        }
+        const img = document.createElement("img");
+        img.className = "sponsor-logo";
+        img.alt = entry.name || "Sponsor";
+        img.src = entry.imageUrl || "";
+        const name = document.createElement("span");
+        name.className = "sponsor-name";
+        name.textContent = entry.name || "Sponsor";
+        anchor.append(img, name);
+        sponsorList.appendChild(anchor);
+      });
+      sponsorCard.style.display = "grid";
+    };
+
+    const renderSocials = (socials = []) => {
+      if (!socialList || !socialCard) return;
+      const normalized = (socials || [])
+        .map((entry) => {
+          if (!entry || typeof entry !== "object") return null;
+          const type = String(entry.type || "custom").trim().toLowerCase();
+          const label = String(entry.label || "").trim();
+          const url = sanitizeUrl(entry.url || "");
+          if (!label && !url) return null;
+          return { type, label: label || url, url };
+        })
+        .filter(Boolean);
+      socialList.replaceChildren();
+      if (!normalized.length) {
+        socialCard.style.display = "grid";
+        return;
+      }
+      normalized.forEach((entry) => {
+        const anchor = document.createElement("a");
+        anchor.className = "social-item";
+        anchor.href = entry.url || "#";
+        anchor.target = entry.url ? "_blank" : "";
+        anchor.rel = entry.url ? "noopener" : "";
+        if (!entry.url) {
+          anchor.removeAttribute("href");
+        }
+        const icon = document.createElement("span");
+        icon.className = "social-icon";
+        icon.innerHTML = buildSocialIconSvg(entry.type);
+        const label = document.createElement("span");
+        label.className = "social-label";
+        label.textContent = entry.label;
+        anchor.append(icon, label);
+        socialList.appendChild(anchor);
+      });
+      socialCard.style.display = "grid";
+    };
+
+    slugs.forEach((slug) => {
+      const item = bySlug.get(slug) || {
+        slug,
+        name: slug,
+        format: "Tournament",
+        startTime: null,
+        maxPlayers: null,
+        coverImageUrl: "",
+        createdByName: null,
+      };
+      if (finalSlug && slug === finalSlug && finalListEl && finalCard) {
+        finalListEl.appendChild(renderCard(item, slug));
+        finalCard.style.display = "block";
+        renderSponsors(item.sponsors || []);
+        renderSocials(item.socials || []);
+      } else {
+        listEl.appendChild(renderCard(item, slug));
+      }
     });
+    if (!listEl.children.length) {
+      listEl.innerHTML = `<li class="muted">No tournaments added yet.</li>`;
+    }
   } catch (err) {
     console.error("Failed to load circuit tournaments", err);
     listEl.innerHTML = `<li class="muted error">Failed to load tournaments.</li>`;
@@ -544,8 +686,15 @@ export async function buildCircuitLeaderboard(meta, slugs = [], { excludeSlug } 
   states.forEach((snapshot, idx) => {
     if (!snapshot) return;
     const tournamentSlug = filtered[idx];
+    if (!snapshot?.circuitPointsApplied) {
+      return;
+    }
     const players = Array.isArray(snapshot.players) ? snapshot.players : [];
     const bracket = normalizeBracketForPlacements(snapshot.bracket);
+    const isFinished = isBracketFinished(bracket);
+    if (!isFinished) {
+      return;
+    }
     const placements = computePlacementsForBracket(bracket, players.length || 0);
     const winnerId = placements
       ? Array.from(placements.entries()).find(([, place]) => place === 1)?.[0]
@@ -555,18 +704,35 @@ export async function buildCircuitLeaderboard(meta, slugs = [], { excludeSlug } 
       : null;
     const winnerKey = winner ? playerKey(winner.name, winner.sc2Link) : "";
     players.forEach((player) => {
-      const key = playerKey(player.name, player.sc2Link);
+      const { key, legacyKey } = getLeaderboardKey(player);
       if (!key) return;
+      if (DEBUG_CIRCUIT_LEADERBOARD) {
+        console.log("[circuit-leaderboard] entry", {
+          tournament: tournamentSlug,
+          uid: player?.uid || "",
+          name: player?.name || "",
+          sc2Link: player?.sc2Link || "",
+          key,
+          legacyKey,
+        });
+      }
       const playerPoints = Number(player.points);
       const ledgerPoints = Number(snapshot.pointsLedger?.[key]);
+      const legacyLedgerPoints = Number(snapshot.pointsLedger?.[legacyKey]);
       const useLedger = Number.isFinite(ledgerPoints);
-      const rawPoints = useLedger ? ledgerPoints : playerPoints;
+      const useLegacyLedger = !useLedger && Number.isFinite(legacyLedgerPoints);
+      const rawPoints = useLedger
+        ? ledgerPoints
+        : useLegacyLedger
+        ? legacyLedgerPoints
+        : playerPoints;
       const points = Number.isFinite(rawPoints) ? rawPoints : 0;
       const entry = totals.get(key) || {
         name: player.name || "Unknown",
         points: 0,
         firstPlaces: 0,
         tournaments: new Set(),
+        legacyKeys: new Set(),
         sc2Link: player.sc2Link || "",
         pulseName: "",
         race: "",
@@ -575,7 +741,8 @@ export async function buildCircuitLeaderboard(meta, slugs = [], { excludeSlug } 
         secondaryPulseProfiles: [],
       };
       entry.points += points;
-      if (tournamentSlug) entry.tournaments.add(tournamentSlug);
+      if (legacyKey) entry.legacyKeys.add(legacyKey);
+      if (tournamentSlug && isFinished) entry.tournaments.add(tournamentSlug);
       if (!entry.name && player.name) entry.name = player.name;
       if (!entry.sc2Link && player.sc2Link) entry.sc2Link = player.sc2Link;
       if (!entry.pulseName && player.pulseName) entry.pulseName = player.pulseName;
@@ -601,7 +768,7 @@ export async function buildCircuitLeaderboard(meta, slugs = [], { excludeSlug } 
       ) {
         entry.secondaryPulseLinks = player.secondaryPulseLinks;
       }
-      if (winnerKey && key === winnerKey) {
+      if (winnerKey && key === winnerKey && isFinished) {
         entry.firstPlaces += 1;
       }
       totals.set(key, entry);
@@ -610,11 +777,19 @@ export async function buildCircuitLeaderboard(meta, slugs = [], { excludeSlug } 
   const useFirstPlaceSort = Boolean(meta?.sortByFirstPlace);
   const leaderboard = Array.from(totals.entries())
     .map(([key, entry]) => {
+      const legacyKeys = Array.from(entry.legacyKeys || []);
       const override = Number(meta?.pointsOverrides?.[key]);
+      const legacyOverride = legacyKeys.length
+        ? Number(meta?.pointsOverrides?.[legacyKeys[0]])
+        : NaN;
       return {
         key,
         name: entry.name,
-        points: Number.isFinite(override) ? override : entry.points,
+        points: Number.isFinite(override)
+          ? override
+          : Number.isFinite(legacyOverride)
+          ? legacyOverride
+          : entry.points,
         firstPlaces: entry.firstPlaces || 0,
         tournaments: entry.tournaments.size,
         sc2Link: entry.sc2Link || "",

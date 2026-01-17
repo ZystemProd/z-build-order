@@ -121,6 +121,9 @@ import {
   renderCircuitPointsSettings,
   handleAddCircuitPointsRow,
   handleRemoveCircuitPointsRow,
+  handleCircuitPointsChange,
+  handleEditCircuitPoints,
+  handleSaveCircuitPoints,
   handleApplyCircuitPoints as handleApplyCircuitPointsCore,
   getCircuitSeedPoints,
 } from "./circuitPoints.js";
@@ -136,6 +139,28 @@ import {
   updateCircuitSlugPreview,
   populateCreateCircuitForm,
 } from "./circuit.js";
+import {
+  bindCircuitFinalSocialControls,
+  bindCircuitFinalSponsorControls,
+  bindTournamentPromoSettingsControls,
+  bindTournamentSocialControls,
+  bindTournamentSponsorControls,
+  getCopyFromCircuitPromos,
+  readCircuitFinalSocials,
+  readCircuitFinalSponsors,
+  readTournamentSocials,
+  readTournamentSponsors,
+  refreshTournamentPromoSettings,
+  refreshTournamentPromoStrip,
+  renderCircuitFinalSocials,
+  renderCircuitFinalSponsors,
+} from "./promos.js";
+import {
+  getSocialLabelForType,
+  normalizeSocialEntry,
+  normalizeSponsorEntry,
+  validateSocialUrl,
+} from "./promosShared.js";
 import { renderActivityList } from "./activity.js";
 import {
   renderPlayerRow,
@@ -213,6 +238,7 @@ import {
   setRegisteredTournament,
   loadTournamentRegistry,
   loadCircuitRegistry,
+  updateTournamentRosterRemote,
 } from "./sync/persistence.js";
 import { createFinalTournamentForCircuit } from "./finalsCreate.js";
 import { initCoverReuseModal } from "./reuseImage.js";
@@ -259,6 +285,7 @@ const CURRENT_BRACKET_LAYOUT_VERSION = 54;
 const MAX_TOURNAMENT_IMAGE_SIZE = 12 * 1024 * 1024;
 const COVER_TARGET_WIDTH = 1200;
 const COVER_TARGET_HEIGHT = 675;
+const SPONSOR_LOGO_SIZE = 256;
 const COVER_QUALITY = 0.82;
 const PULSE_ENDPOINTS = (() => {
   const endpoints = ["/api/pulse-mmr"];
@@ -945,6 +972,50 @@ function shouldUsePartialRender(prevState, nextState, format) {
 
 function syncFromRemote(incoming) {
   if (!incoming || typeof incoming !== "object") return;
+  const incomingPlayersArr = Array.isArray(incoming?.players)
+    ? incoming.players
+    : [];
+  const localPlayersArr = Array.isArray(state?.players) ? state.players : [];
+
+  const incomingUids = incomingPlayersArr.map((p) => p?.uid).filter(Boolean);
+  const localUids = localPlayersArr.map((p) => p?.uid).filter(Boolean);
+
+  const incomingNames = incomingPlayersArr.map((p) => p?.name).filter(Boolean);
+  const localNames = localPlayersArr.map((p) => p?.name).filter(Boolean);
+
+  const localOnly = localUids.filter((uid) => !incomingUids.includes(uid));
+  const incomingOnly = incomingUids.filter((uid) => !localUids.includes(uid));
+
+  console.log("🧪 [tournament-sync] syncFromRemote INPUT", {
+    slug: currentSlug,
+    incomingLastUpdated: Number(incoming?.lastUpdated) || 0,
+    localLastUpdated: Number(state?.lastUpdated) || 0,
+    incomingPlayersCount: incomingPlayersArr.length,
+    localPlayersCount: localPlayersArr.length,
+    incomingUids,
+    localUids,
+    incomingNames,
+    localNames,
+    localOnly,
+    incomingOnly,
+  });
+
+  if (
+    incomingPlayersArr.length === 0 &&
+    Array.isArray(state?.players) &&
+    state.players.length > 0
+  ) {
+    console.warn(
+      "🛑 [tournament-sync] syncFromRemote ignored empty incoming.players",
+      {
+        slug: currentSlug,
+        incomingLastUpdated: Number(incoming?.lastUpdated) || 0,
+        localPlayersCount: state.players.length,
+      }
+    );
+    return;
+  }
+
   const incomingPresence = incoming.presence?.matchInfo || null;
   const currentPresence = state?.presence?.matchInfo || null;
   const presenceChanged =
@@ -1091,11 +1162,25 @@ function syncFromRemote(incoming) {
     }
   }
   setStateObj(nextState);
+
+  console.log("🧪 [tournament-sync] state applied", {
+    slug: currentSlug,
+    lastUpdated: Number(nextState?.lastUpdated) || 0,
+    playersCount: Array.isArray(nextState?.players)
+      ? nextState.players.length
+      : 0,
+    playerUids: Array.isArray(nextState?.players)
+      ? nextState.players.map((p) => p?.uid).filter(Boolean)
+      : [],
+    fromCache: Boolean(nextState?._fromCache), // if you ever add metadata
+  });
+
   if (onlyVetoChange || vetoOnlyChange) {
     refreshMatchInfoModalIfOpen?.();
     refreshVetoModalIfOpen?.();
     return;
   }
+
   if (
     allowPartial &&
     !matchIds.length &&
@@ -1138,6 +1223,7 @@ function mergeMatchVetoes(local = {}, incoming = {}) {
 }
 
 let unsubscribeRemoteState = null;
+
 function subscribeTournamentStateRemote(slug) {
   try {
     unsubscribeRemoteState?.();
@@ -1148,16 +1234,44 @@ function subscribeTournamentStateRemote(slug) {
   if (!slug) return;
 
   const ref = doc(collection(db, TOURNAMENT_STATE_COLLECTION), slug);
+
   unsubscribeRemoteState = onSnapshot(
     ref,
     (snap) => {
       if (!snap.exists()) return;
+
       const data = snap.data() || {};
+      const lastUpdated = data.lastUpdated?.toMillis
+        ? data.lastUpdated.toMillis()
+        : Number(data.lastUpdated) || 0;
+
+      const incomingPlayers = Array.isArray(data.players) ? data.players : [];
+
+      console.groupCollapsed("🧪 [tournament-sync] RAW SNAPSHOT PLAYERS");
+      incomingPlayers.forEach((p, i) => {
+        console.log(`#${i + 1}`, {
+          id: p?.id,
+          uid: p?.uid,
+          name: p?.name,
+          inviteStatus: p?.inviteStatus,
+          checkedInAt: p?.checkedInAt,
+        });
+      });
+      console.groupEnd();
+
+      // Guard: don't let an "empty players" snapshot overwrite a non-empty local state.
+      if (incomingPlayers.length === 0 && state?.players?.length) {
+        console.warn("🛑 [tournament-sync] Ignoring empty players snapshot", {
+          slug,
+          lastUpdated,
+          localPlayersCount: state.players.length,
+        });
+        return;
+      }
+
       syncFromRemote({
         ...data,
-        lastUpdated: data.lastUpdated?.toMillis
-          ? data.lastUpdated.toMillis()
-          : data.lastUpdated,
+        lastUpdated,
       });
     },
     (err) => {
@@ -1381,7 +1495,7 @@ function applySeedingStateUpdate(nextSnapshot, reason) {
     manualSeedingOrder: nextSnapshot.manualSeedingOrder,
     players: mergedPlayers,
     needsReseed: hasCompletedMatches,
-  });
+  }, { skipRoster: true });
   renderAll();
 }
 
@@ -1542,6 +1656,7 @@ function renderAll(matchIds = null) {
     const registerBtn = document.getElementById("registerBtn");
     const goLiveBtn = document.getElementById("rebuildBracketBtn");
     const notifyCheckInBtn = document.getElementById("notifyCheckInBtn");
+    const resetTournamentBtn = document.getElementById("resetTournamentBtn");
     const startMs = getStartTimeMs(currentTournamentMeta);
     const liveDot = document.getElementById("liveDot");
     const bracketGrid = document.getElementById("bracketGrid");
@@ -1553,6 +1668,7 @@ function renderAll(matchIds = null) {
       "registeredPlayersList"
     );
     const activityCard = document.getElementById("activityCard");
+    const casterLiveCard = document.getElementById("casterLiveCard");
     const bracketTitle = document.getElementById("bracketTitle");
     const currentUid = auth.currentUser?.uid || null;
     const currentPlayer = currentUid
@@ -1566,8 +1682,20 @@ function renderAll(matchIds = null) {
     const isInviteOnly = isInviteOnlyTournament(currentTournamentMeta);
     const accessNote = document.getElementById("registrationAccessNote");
     const registrationForm = document.getElementById("registrationForm");
+    const registrationCard = document.getElementById("registrationCard");
+    const registrationGuestMessage = document.getElementById(
+      "registrationGuestMessage"
+    );
+    const isGuest = !auth.currentUser;
 
     hydrateCurrentUserClanLogo();
+
+    if (registrationGuestMessage) {
+      registrationGuestMessage.style.display = isGuest ? "block" : "none";
+    }
+    if (registrationCard) {
+      registrationCard.style.display = isGuest ? "none" : "";
+    }
 
     if (tournamentTitle) {
       tournamentTitle.textContent = currentTournamentMeta.name || "Tournament";
@@ -1714,13 +1842,23 @@ function renderAll(matchIds = null) {
     }
 
     if (goLiveBtn) {
+      const checkInState = getCheckInWindowState(currentTournamentMeta);
+      const requiresManualClose =
+        checkInState.allowAfterStart && checkInState.isOpen;
       if (state.isLive) {
         goLiveBtn.disabled = false;
         goLiveBtn.textContent = "Set Not Live";
+        goLiveBtn.classList.add("danger");
+        goLiveBtn.classList.remove("success");
       } else {
-        goLiveBtn.disabled = !hasCheckedIn;
+        goLiveBtn.disabled = !hasCheckedIn || requiresManualClose;
         goLiveBtn.textContent = "Go Live";
+        goLiveBtn.classList.add("success");
+        goLiveBtn.classList.remove("danger");
       }
+    }
+    if (resetTournamentBtn) {
+      resetTournamentBtn.classList.add("danger");
     }
     if (notifyCheckInBtn) {
       const checkInState = getCheckInWindowState(currentTournamentMeta);
@@ -1795,6 +1933,9 @@ function renderAll(matchIds = null) {
     if (activityCard) {
       activityCard.style.display = state.isLive ? "" : "none";
     }
+    if (casterLiveCard) {
+      casterLiveCard.style.display = state.isLive ? "" : "none";
+    }
     renderActivityList({ state, escapeHtml, formatTime });
     populateSettingsPanelUI({
       tournament: currentTournamentMeta,
@@ -1804,6 +1945,8 @@ function renderAll(matchIds = null) {
       updateSettingsRulesPreview,
       syncFormatFieldVisibility,
     });
+    void refreshTournamentPromoStrip(currentTournamentMeta);
+    void refreshTournamentPromoSettings(currentTournamentMeta);
     renderCircuitPointsSettings();
   }
 
@@ -1871,7 +2014,7 @@ function renderAll(matchIds = null) {
         const changed = ensureRoundRobinPlayoffs(bracket, playersById, lookup);
         if (changed) {
           lookup = getMatchLookup(bracket);
-          saveState({ bracket });
+          saveState({ bracket }, { skipRoster: true });
         }
         const html = renderRoundRobinView(
           { ...bracket },
@@ -1917,7 +2060,7 @@ function renderAll(matchIds = null) {
   updateTooltips?.();
 }
 
-function checkInCurrentPlayer() {
+async function checkInCurrentPlayer() {
   const meta = currentTournamentMeta || {};
   const { isOpen } = getCheckInWindowState(meta);
   if (!isOpen) {
@@ -1943,10 +2086,14 @@ function checkInCurrentPlayer() {
     showToast?.("You are already checked in.", "success");
     return;
   }
-  const updated = players.map((p, i) =>
-    i === idx ? { ...p, checkedInAt: Date.now() } : p
+  const checkedInAt = Date.now();
+  await updateRosterWithTransaction((roster) =>
+    roster.map((player) => {
+      if (player?.uid !== uid) return player;
+      if (!isInviteAccepted(player)) return player;
+      return { ...player, checkedInAt: player.checkedInAt || checkedInAt };
+    })
   );
-  saveState({ players: updated });
   addActivity(`${players[idx].name || "Player"} checked in.`);
   renderAll();
 }
@@ -1998,9 +2145,69 @@ async function notifyCheckInPlayers() {
   }
 }
 
+async function toggleCheckInManualClose() {
+  if (!isAdmin) {
+    showToast?.("Only admins can update check-in.", "error");
+    return;
+  }
+  if (!currentTournamentMeta) {
+    showToast?.("Tournament data not loaded yet.", "error");
+    return;
+  }
+  if (state.isLive) {
+    showToast?.("Tournament is live. Check-in is closed.", "error");
+    return;
+  }
+  const checkInState = getCheckInWindowState(currentTournamentMeta);
+  if (!checkInState.allowAfterStart) {
+    showToast?.("Manual check-in close is disabled in settings.", "error");
+    return;
+  }
+  if (!checkInState.hasOpened) {
+    showToast?.("Check-in has not opened yet.", "error");
+    return;
+  }
+  const targetSlug =
+    currentSlug || currentTournamentMeta.slug || currentTournamentMeta.id || "";
+  if (!targetSlug) {
+    showToast?.("Missing tournament slug.", "error");
+    return;
+  }
+
+  const previousMeta = currentTournamentMeta;
+  const nextClosed = !Boolean(previousMeta?.checkInManuallyClosed);
+  const nextMeta = {
+    ...previousMeta,
+    checkInManuallyClosed: nextClosed,
+  };
+  setCurrentTournamentMetaState(nextMeta);
+  renderAll();
+  try {
+    await setDoc(
+      doc(collection(db, TOURNAMENT_COLLECTION), targetSlug),
+      { checkInManuallyClosed: nextClosed },
+      { merge: true }
+    );
+    showToast?.(
+      nextClosed ? "Check-in closed." : "Check-in opened.",
+      "success"
+    );
+  } catch (err) {
+    console.error("Failed to toggle check-in", err);
+    setCurrentTournamentMetaState(previousMeta);
+    renderAll();
+    showToast?.("Failed to update check-in.", "error");
+  }
+}
+
 function goLiveTournament() {
   if (state.isLive) {
     showToast?.("Tournament is already live.", "success");
+    return;
+  }
+  const checkInState = getCheckInWindowState(currentTournamentMeta);
+  if (checkInState.allowAfterStart && checkInState.isOpen) {
+    showToast?.("Close check-in before going live.", "error");
     return;
   }
   const checkedInPlayers = getEligiblePlayers(state.players || []).filter(
@@ -2027,7 +2234,7 @@ function goLiveTournament() {
     bracketLayoutVersion: CURRENT_BRACKET_LAYOUT_VERSION,
     isLive: true,
     hasBeenLive: true,
-  });
+  }, { skipRoster: true });
   addActivity("Tournament went live.");
   renderAll();
 }
@@ -2037,7 +2244,7 @@ function setTournamentNotLive() {
     showToast?.("Tournament is already not live.", "success");
     return;
   }
-  saveState({ isLive: false, hasBeenLive: true });
+  saveState({ isLive: false, hasBeenLive: true }, { skipRoster: true });
   addActivity("Tournament set to not live.");
   renderAll();
 }
@@ -2060,7 +2267,10 @@ function addActivity(message, options = {}) {
   const next = {
     activity: [entry, ...(state.activity || [])].slice(0, 50),
   };
-  saveState(next, { skipRemote: Boolean(options.skipRemote) });
+  saveState(next, {
+    skipRemote: Boolean(options.skipRemote),
+    skipRoster: true,
+  });
   renderActivityList({ state, escapeHtml, formatTime });
 }
 
@@ -2143,15 +2353,22 @@ function applyBracketReadOnlyState(readOnly) {
   });
 }
 
-function createOrUpdatePlayer(data) {
+function buildPlayerFromData(data, players = state.players || []) {
   if (!data) return null;
   const id =
     data.id ||
     `p-${Date.now().toString(36)}-${Math.random().toString(16).slice(2)}`;
-  const existing = (state.players || []).find(
+  const existing = (players || []).find(
     (p) => p.id === id || (data.name && p.name === data.name)
   );
-  const merged = existing ? { ...existing, ...data, id } : { ...data, id };
+  if (existing) return { ...existing, ...data, id: existing.id || id };
+  return { ...data, id };
+}
+
+function createOrUpdatePlayer(data) {
+  const merged = buildPlayerFromData(data);
+  if (!merged) return null;
+  const existing = (state.players || []).find((p) => p.id === merged.id);
   const players = existing
     ? state.players.map((p) => (p.id === merged.id ? merged : p))
     : [...(state.players || []), merged];
@@ -2182,13 +2399,14 @@ async function hydrateCurrentUserClanLogo() {
     }
     const clanData = clanDoc.data() || {};
     const clanLogoUrl = clanData?.logoUrlSmall || clanData?.logoUrl || "";
-    createOrUpdatePlayer({
-      id: target.id,
-      clan: clanData?.name || target.clan || "",
-      clanAbbreviation: clanData?.abbreviation || target.clanAbbreviation || "",
-      clanLogoUrl,
-    });
-    saveState({ players: state.players, needsReseed: state.needsReseed });
+    await updateRosterWithTransaction((players) =>
+      updateRosterById(players, target.id, {
+        clan: clanData?.name || target.clan || "",
+        clanAbbreviation:
+          clanData?.abbreviation || target.clanAbbreviation || "",
+        clanLogoUrl,
+      })
+    );
     selfClanHydrated = true;
   } catch (_) {
     // ignore hydration errors
@@ -2197,21 +2415,22 @@ async function hydrateCurrentUserClanLogo() {
   }
 }
 
-function removePlayer(id) {
+async function removePlayer(id) {
   if (state.isLive) return;
   if (!id) return;
-  const players = (state.players || []).filter((p) => p.id !== id);
-  saveState({ players, needsReseed: true });
+  await updateRosterWithTransaction((players) => removeRosterById(players, id), {
+    needsReseed: true,
+  });
   rebuildBracket(true, "Player removed");
 }
 
-function updatePlayerPoints(id, points) {
+async function updatePlayerPoints(id, points) {
   if (state.isLive) return;
   if (!id) return;
-  const players = (state.players || []).map((p) =>
-    p.id === id ? { ...p, points } : p
+  await updateRosterWithTransaction(
+    (players) => updateRosterById(players, id, { points }),
+    { needsReseed: true }
   );
-  saveState({ players, needsReseed: true });
   rebuildBracket(true, "Points updated");
 }
 
@@ -2242,7 +2461,7 @@ function getForfeitUndoBlockedIds() {
   return blocked;
 }
 
-function setPlayerForfeit(id, shouldForfeit) {
+async function setPlayerForfeit(id, shouldForfeit) {
   if (!id) return;
   if (!shouldForfeit && state?.bracket) {
     const lookup = getMatchLookup(state.bracket);
@@ -2261,13 +2480,12 @@ function setPlayerForfeit(id, shouldForfeit) {
       }
     }
   }
-  const players = (state.players || []).map((p) =>
-    p.id === id ? { ...p, forfeit: shouldForfeit } : p
+  await updateRosterWithTransaction((players) =>
+    updateRosterById(players, id, { forfeit: shouldForfeit })
   );
-  saveState({ players });
   renderAll();
   applyForfeitWalkovers({ saveState, renderAll });
-  const changed = players.find((p) => p.id === id);
+  const changed = (state.players || []).find((p) => p.id === id);
   if (changed) {
     addActivity(
       `${changed.name || "Player"} ${
@@ -2277,18 +2495,20 @@ function setPlayerForfeit(id, shouldForfeit) {
   }
 }
 
-function setPlayerCheckIn(id, shouldCheckIn) {
+async function setPlayerCheckIn(id, shouldCheckIn) {
   if (!id) return;
-  const players = (state.players || []).map((p) => {
-    if (p.id !== id) return p;
-    if (!isInviteAccepted(p)) return p;
-    if (shouldCheckIn) {
-      return { ...p, checkedInAt: p.checkedInAt || Date.now() };
-    }
-    return { ...p, checkedInAt: null };
-  });
-  saveState({ players });
-  const changed = players.find((p) => p.id === id);
+  const checkedInAt = Date.now();
+  await updateRosterWithTransaction((players) =>
+    players.map((p) => {
+      if (p.id !== id) return p;
+      if (!isInviteAccepted(p)) return p;
+      if (shouldCheckIn) {
+        return { ...p, checkedInAt: p.checkedInAt || checkedInAt };
+      }
+      return { ...p, checkedInAt: null };
+    })
+  );
+  const changed = (state.players || []).find((p) => p.id === id);
   if (changed) {
     addActivity(
       `${changed.name || "Player"} marked ${
@@ -2388,6 +2608,106 @@ function updateMatchScore(matchId, scoreA, scoreB, options = {}) {
   }
 }
 
+function normalizePlayerName(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function upsertRosterPlayer(players, incoming) {
+  if (!incoming) return players;
+  const uid = incoming.uid || null;
+  const nameKey = normalizePlayerName(incoming.name);
+  const idx = players.findIndex((player) => {
+    if (uid && player?.uid === uid) return true;
+    if (nameKey && normalizePlayerName(player?.name) === nameKey) return true;
+    return false;
+  });
+  if (idx < 0) return [...players, incoming];
+  const existing = players[idx] || {};
+  const merged = { ...existing, ...incoming, id: existing.id || incoming.id };
+  const next = [...players];
+  next[idx] = merged;
+  return next;
+}
+
+function updateRosterById(players, id, patch) {
+  if (!id) return players;
+  return players.map((player) =>
+    player?.id === id ? { ...player, ...(patch || {}) } : player
+  );
+}
+
+function updateRosterByUid(players, uid, patch) {
+  if (!uid) return players;
+  return players.map((player) =>
+    player?.uid === uid ? { ...player, ...(patch || {}) } : player
+  );
+}
+
+function removeRosterById(players, id) {
+  if (!id) return players;
+  return players.filter((player) => player?.id !== id);
+}
+
+function removeRosterByUid(players, uid) {
+  if (!uid) return players;
+  return players.filter((player) => player?.uid !== uid);
+}
+
+async function updateRosterWithTransaction(updater, patch = {}, options = {}) {
+  const slug = currentSlug || currentTournamentMeta?.slug || "";
+  const optimisticEnabled = options.optimistic !== false;
+  const applyLocal = (players, localPatch = {}) => {
+    const snapshot = { ...state, ...patch, ...localPatch, players };
+    const mergedPlayers = applyRosterSeedingWithMode(players, snapshot);
+    const nextState = {
+      ...patch,
+      ...localPatch,
+      players: mergedPlayers,
+    };
+    if (typeof localPatch.lastUpdated === "number") {
+      nextState.lastUpdated = localPatch.lastUpdated;
+    }
+    saveState(nextState, {
+      skipRemote: true,
+      keepTimestamp: typeof localPatch.lastUpdated === "number",
+    });
+    return mergedPlayers;
+  };
+
+  if (optimisticEnabled) {
+    const optimistic = updater(state.players || [], state);
+    const optimisticPlayers = Array.isArray(optimistic?.players)
+      ? optimistic.players
+      : Array.isArray(optimistic)
+      ? optimistic
+      : state.players || [];
+    applyLocal(optimisticPlayers);
+  }
+
+  if (!slug) return null;
+
+  const result = await updateTournamentRosterRemote(slug, updater, patch);
+  if (!result?.players) {
+    if (optimisticEnabled) {
+      await hydrateStateFromRemote(
+        slug,
+        applyRosterSeedingWithMode,
+        deserializeBracket,
+        saveState,
+        renderAll,
+        state.lastUpdated
+      );
+    }
+    showToast?.(
+      "Roster update failed. Changes may not have been saved.",
+      "error"
+    );
+    return null;
+  }
+  applyLocal(result.players, { lastUpdated: result.lastUpdated });
+  return result;
+}
+
 function saveState(next = {}, options = {}) {
   persistState(
     next,
@@ -2397,12 +2717,13 @@ function saveState(next = {}, options = {}) {
     currentSlug,
     broadcast,
     setStateObj,
-    (snapshot) =>
+    (snapshot, persistOptions) =>
       persistTournamentStateRemote(
         snapshot,
         currentSlug,
         serializeBracket,
-        showToast
+        showToast,
+        persistOptions
       )
   );
 }
@@ -2425,7 +2746,7 @@ function rebuildBracket(force = false, reason = "") {
     bracket,
     needsReseed: false,
     bracketLayoutVersion: CURRENT_BRACKET_LAYOUT_VERSION,
-  });
+  }, { skipRoster: true });
   if (reason) addActivity(reason);
   renderAll();
 }
@@ -2944,6 +3265,8 @@ function openCircuitSettingsModal() {
   const finalRulesInput = document.getElementById("circuitFinalRulesInput");
   const finalFormatSelect = document.getElementById("circuitFinalFormatSelect");
   const finalImagePreview = document.getElementById("circuitFinalImagePreview");
+  const sponsorsList = document.getElementById("circuitFinalSponsorsList");
+  const socialsList = document.getElementById("circuitFinalSocialsList");
   if (toggle) toggle.checked = Boolean(currentCircuitMeta?.sortByFirstPlace);
   if (nameInput) nameInput.value = currentCircuitMeta?.name || "";
   if (slugInput) slugInput.value = currentCircuitMeta?.slug || "";
@@ -2957,6 +3280,14 @@ function openCircuitSettingsModal() {
     modal.style.display = "flex";
     lockBodyScroll();
   }
+  if (sponsorsList) {
+    renderCircuitFinalSponsors([]);
+  }
+  if (socialsList) {
+    renderCircuitFinalSocials([]);
+  }
+  bindCircuitFinalSponsorControls();
+  bindCircuitFinalSocialControls();
   if (!finalSlug) return;
   getDoc(doc(collection(db, TOURNAMENT_COLLECTION), finalSlug))
     .then((snap) => {
@@ -3044,6 +3375,8 @@ function openCircuitSettingsModal() {
       assignBestOf("circuitFinalBestOfSemiInput", bestOf.semi);
       assignBestOf("circuitFinalBestOfUpperFinalInput", bestOf.upperFinal);
       assignBestOf("circuitFinalBestOfFinalInput", bestOf.final);
+      renderCircuitFinalSponsors(meta.sponsors || []);
+      renderCircuitFinalSocials(meta.socials || []);
     })
     .catch(() => {});
 }
@@ -3085,6 +3418,8 @@ async function saveCircuitSettings() {
   const finalFormatSelect = document.getElementById("circuitFinalFormatSelect");
   const finalImageInput = document.getElementById("circuitFinalImageInput");
   const finalImagePreview = document.getElementById("circuitFinalImagePreview");
+  const sponsors = readCircuitFinalSponsors();
+  const socials = readCircuitFinalSocials();
   const sortByFirstPlace = Boolean(toggle?.checked);
   const circuitName = (nameInput?.value || "").trim();
   const circuitDescription = descriptionInput?.value || "";
@@ -3150,6 +3485,44 @@ async function saveCircuitSettings() {
         circuitSlug: currentCircuitMeta.slug,
         circuitQualifyCount: finalQualifyCount,
       });
+      const processedSponsors = [];
+      for (const sponsor of sponsors) {
+        if (!sponsor) continue;
+        let imageUrl = sponsor.imageUrl || "";
+        if (sponsor.file) {
+          try {
+            imageUrl = await uploadSponsorLogo(sponsor.file, finalSlug);
+          } catch (err) {
+            showToast?.(
+              err?.message || "Failed to upload sponsor logo.",
+              "error"
+            );
+            return;
+          }
+        }
+        const entry = normalizeSponsorEntry(
+          { name: sponsor.name, imageUrl, linkUrl: sponsor.linkUrl },
+          { allowEmpty: false }
+        );
+        if (entry) processedSponsors.push(entry);
+      }
+      finalPayload.sponsors = processedSponsors;
+      const processedSocials = socials
+        .map((entry) =>
+          normalizeSocialEntry(
+            { type: entry.type, label: entry.label, url: entry.url },
+            { allowEmpty: false }
+          )
+        )
+        .filter(Boolean);
+      for (const entry of processedSocials) {
+        const error = validateSocialUrl(entry.type, entry.url);
+        if (error) {
+          showToast?.(`Invalid ${getSocialLabelForType(entry.type)} URL. ${error}`, "error");
+          return;
+        }
+      }
+      finalPayload.socials = processedSocials;
       await setDoc(
         doc(collection(db, TOURNAMENT_COLLECTION), finalSlug),
         finalPayload,
@@ -3251,6 +3624,7 @@ async function deleteTournamentBundle(slug, coverImageUrl = "") {
   await deleteDoc(doc(collection(db, TOURNAMENT_STATE_COLLECTION), slug));
   await deleteTournamentCoverByUrl(coverImageUrl, slug);
   await deleteTournamentCoverFolder(slug);
+  await deleteTournamentSponsorFolder(slug);
   try {
     localStorage.removeItem(getPersistStorageKey(slug));
   } catch (_) {
@@ -3446,10 +3820,10 @@ async function enterTournament(slug, options = {}) {
   }
   const backLink = document.getElementById("tournamentBackLink");
   if (backLink) {
-    const label = backLink.querySelector("span:last-child"); // safer than lastChild
+    const label = backLink.querySelector("[data-back-label]");
     backLink.href = circuitSlug ? `/tournament/${circuitSlug}` : "/tournament";
     if (label)
-      label.textContent = circuitSlug ? "Circuit page" : "All tournaments";
+      label.textContent = circuitSlug ? "Circuit Page" : "Tournament Center";
   }
   // Load local state for this slug
   const local = loadLocalState(
@@ -3476,14 +3850,14 @@ async function enterTournament(slug, options = {}) {
       }
       const backLink = document.getElementById("tournamentBackLink");
       if (backLink) {
-        const label = backLink.querySelector("span:last-child");
+        const label = backLink.querySelector("[data-back-label]");
         backLink.href = metaCircuitSlug
           ? `/tournament/${metaCircuitSlug}`
           : "/tournament";
         if (label)
           label.textContent = metaCircuitSlug
-            ? "Circuit page"
-            : "All tournaments";
+            ? "Circuit Page"
+            : "Tournament Center";
       }
 
       await refreshInviteLinkGate(slug);
@@ -3508,8 +3882,10 @@ async function enterTournament(slug, options = {}) {
     () => {
       renderAll();
       refreshPlayerDetailModalIfOpen(getPlayersMap);
-    }
+    },
+    state?.lastUpdated || 0
   );
+
   await maybeAutoAddFinalPlayers();
   subscribeTournamentStateRemote(slug);
   const landingView = document.getElementById("landingView");
@@ -3763,13 +4139,54 @@ function normalizeMaxPlayersForFormat(rawValue, format, input = null) {
 function getCheckInWindowState(meta) {
   const startMs = getStartTimeMs(meta);
   const windowMinutes = getCheckInWindowMinutesFromMeta(meta);
+  const allowAfterStart = normalizeBooleanSetting(
+    meta?.allowCheckInAfterStart,
+    false
+  );
+  const isManuallyClosed = Boolean(meta?.checkInManuallyClosed);
   if (!startMs || !windowMinutes) {
-    return { isOpen: false, opensAt: null, closesAt: null };
+    return {
+      isOpen: false,
+      opensAt: null,
+      closesAt: null,
+      hasOpened: false,
+      allowAfterStart,
+      isManuallyClosed,
+    };
   }
   const now = Date.now();
   const opensAt = startMs - windowMinutes * 60 * 1000;
-  const closesAt = startMs;
-  return { isOpen: now >= opensAt && now < closesAt, opensAt, closesAt };
+  const hasOpened = now >= opensAt;
+  const closesAt = allowAfterStart ? null : startMs;
+  if (!hasOpened) {
+    return {
+      isOpen: false,
+      opensAt,
+      closesAt,
+      hasOpened,
+      allowAfterStart,
+      isManuallyClosed,
+    };
+  }
+  if (allowAfterStart) {
+    return {
+      isOpen: !isManuallyClosed,
+      opensAt,
+      closesAt,
+      hasOpened,
+      allowAfterStart,
+      isManuallyClosed,
+    };
+  }
+  const beforeStart = now < startMs;
+  return {
+    isOpen: beforeStart && !isManuallyClosed,
+    opensAt,
+    closesAt: startMs,
+    hasOpened,
+    allowAfterStart,
+    isManuallyClosed,
+  };
 }
 
 function formatCountdown(ms) {
@@ -3787,6 +4204,7 @@ function updateCheckInUI() {
   const checkInBtn = document.getElementById("checkInBtn");
   const checkInStatus = document.getElementById("checkInStatus");
   const checkInCard = document.getElementById("checkInCard");
+  const checkInToggleBtn = document.getElementById("checkInToggleBtn");
   if (!checkInBtn || !checkInStatus || !checkInCard) return;
 
   checkInStatus.classList.remove("is-open", "is-checked", "is-closed");
@@ -3798,6 +4216,17 @@ function updateCheckInUI() {
     : null;
   const inviteStatus = normalizeInviteStatus(currentPlayer?.inviteStatus);
   const isInviteOnly = isInviteOnlyTournament(currentTournamentMeta);
+
+  if (checkInToggleBtn) {
+    const shouldShowToggle = isAdmin && checkInState.allowAfterStart;
+    checkInToggleBtn.style.display = shouldShowToggle ? "" : "none";
+    if (shouldShowToggle) {
+      checkInToggleBtn.disabled = !checkInState.hasOpened || state.isLive;
+      checkInToggleBtn.textContent = checkInState.isManuallyClosed
+        ? "Open check-in"
+        : "Close check-in";
+    }
+  }
 
   if (
     state.isLive ||
@@ -3815,11 +4244,17 @@ function updateCheckInUI() {
     const timeUntil = checkInState.opensAt
       ? checkInState.opensAt - Date.now()
       : 0;
-    checkInStatus.textContent = checkInState.opensAt
-      ? `Check-in opens in ${formatCountdown(timeUntil)}`
-      : "Check-in is not open yet.";
-    checkInStatus.classList.add("is-closed");
-    checkInCard.style.display = "none";
+    if (checkInState.hasOpened && checkInState.isManuallyClosed) {
+      checkInStatus.textContent = "Check-in closed by admin.";
+      checkInStatus.classList.add("is-closed");
+      checkInCard.style.display = "flex";
+    } else {
+      checkInStatus.textContent = checkInState.opensAt
+        ? `Check-in opens in ${formatCountdown(timeUntil)}`
+        : "Check-in is not open yet.";
+      checkInStatus.classList.add("is-closed");
+      checkInCard.style.display = "none";
+    }
     return;
   }
 
@@ -3855,9 +4290,9 @@ function updateCheckInUI() {
     ? checkInState.closesAt - Date.now()
     : 0;
   checkInBtn.style.display = "inline-flex";
-  checkInStatus.textContent = `Check-in open · closes in ${formatCountdown(
-    closesIn
-  )}`;
+  checkInStatus.textContent = checkInState.closesAt
+    ? `Check-in open · closes in ${formatCountdown(closesIn)}`
+    : "Check-in open · close manually.";
   checkInStatus.classList.add("is-open");
 }
 
@@ -3989,6 +4424,17 @@ async function deleteTournamentCoverFolder(slug) {
   }
 }
 
+async function deleteTournamentSponsorFolder(slug) {
+  if (!slug) return;
+  try {
+    const folderRef = storageRef(storage, `tournamentSponsors/${slug}`);
+    const list = await listAll(folderRef);
+    await Promise.all(list.items.map((item) => deleteObject(item)));
+  } catch (err) {
+    console.warn("Failed to delete tournament sponsor folder", err);
+  }
+}
+
 async function uploadTournamentCover(file, slug) {
   const error = validateTournamentImage(file);
   if (error) throw new Error(error);
@@ -4008,6 +4454,25 @@ async function uploadTournamentCover(file, slug) {
   return getDownloadURL(ref);
 }
 
+async function uploadSponsorLogo(file, slug) {
+  const error = validateTournamentImage(file);
+  if (error) throw new Error(error);
+  if (!slug) throw new Error("Missing tournament slug.");
+  const processed = await prepareImageForUpload(file, {
+    targetWidth: SPONSOR_LOGO_SIZE,
+    targetHeight: SPONSOR_LOGO_SIZE,
+    quality: COVER_QUALITY,
+    outputType: "image/webp",
+    fallbackType: "image/jpeg",
+  });
+  const path = `tournamentSponsors/${slug}/logo-${Date.now()}.webp`;
+  const ref = storageRef(storage, path);
+  await uploadBytes(ref, processed.blob, {
+    contentType: processed.contentType,
+  });
+  return getDownloadURL(ref);
+}
+
 async function handleSaveSettings(event) {
   event?.preventDefault?.();
   const formatSelect = document.getElementById("settingsFormatSelect");
@@ -4017,12 +4482,18 @@ async function handleSaveSettings(event) {
   const startInput = document.getElementById("settingsStartInput");
   const maxPlayersInput = document.getElementById("settingsMaxPlayersInput");
   const checkInSelect = document.getElementById("settingsCheckInSelect");
+  const checkInAfterStartToggle = document.getElementById(
+    "settingsCheckInAfterStartToggle"
+  );
   const accessSelect = document.getElementById("settingsAccessSelect");
   const visibilitySelect = document.getElementById("settingsVisibilitySelect");
   const qualifyInput = document.getElementById("settingsCircuitQualifyCount");
   const requirePulseInput = document.getElementById("settingsRequirePulseLink");
   const imageInput = document.getElementById("settingsImageInput");
   const imagePreview = document.getElementById("settingsImagePreview");
+  const copySponsorsToggle = document.getElementById(
+    "settingsCopyCircuitSponsorsToggle"
+  );
   const imageFile = imageInput?.files?.[0] || null;
   const reuseUrl = imagePreview?.dataset.reuseUrl || "";
   const newSlugRaw = (slugInput?.value || "").trim();
@@ -4051,6 +4522,10 @@ async function handleSaveSettings(event) {
       ? null
       : Number(qualifyRaw);
   const checkInWindowMinutes = getCheckInWindowMinutes(checkInSelect);
+  const allowCheckInAfterStart = Boolean(checkInAfterStartToggle?.checked);
+  const checkInManuallyClosed = allowCheckInAfterStart
+    ? Boolean(currentTournamentMeta?.checkInManuallyClosed)
+    : false;
   const isInviteOnly = accessSelect?.value === "closed";
   const visibility = normalizeTournamentVisibility(visibilitySelect?.value);
   const mapPool = Array.from(mapPoolSelection || []);
@@ -4065,6 +4540,9 @@ async function handleSaveSettings(event) {
     requirePulseInput?.checked ??
     currentTournamentMeta?.requirePulseLink ??
     true;
+  const copyFromCircuitPromos = currentTournamentMeta?.circuitSlug
+    ? Boolean(copySponsorsToggle?.checked ?? getCopyFromCircuitPromos(currentTournamentMeta))
+    : false;
   let coverImageUrl = currentTournamentMeta?.coverImageUrl || "";
   if (!imageFile && reuseUrl) {
     coverImageUrl = reuseUrl;
@@ -4088,6 +4566,8 @@ async function handleSaveSettings(event) {
     maxPlayers,
     startTime,
     checkInWindowMinutes,
+    allowCheckInAfterStart,
+    checkInManuallyClosed,
     isInviteOnly,
     visibility,
     bestOf,
@@ -4101,6 +4581,51 @@ async function handleSaveSettings(event) {
         ? qualifyCount
         : null,
   });
+  if (currentTournamentMeta?.circuitSlug) {
+    meta.copyFromCircuitPromos = copyFromCircuitPromos;
+  }
+  if (!copyFromCircuitPromos) {
+    const sponsors = readTournamentSponsors();
+    const processedSponsors = [];
+    for (const sponsor of sponsors) {
+      if (!sponsor) continue;
+      let imageUrl = sponsor.imageUrl || "";
+      if (sponsor.file) {
+        try {
+          imageUrl = await uploadSponsorLogo(sponsor.file, newSlug);
+        } catch (err) {
+          showToast?.(err?.message || "Failed to upload sponsor logo.", "error");
+          return;
+        }
+      }
+      const entry = normalizeSponsorEntry(
+        { name: sponsor.name, imageUrl, linkUrl: sponsor.linkUrl },
+        { allowEmpty: false }
+      );
+      if (entry) processedSponsors.push(entry);
+    }
+    meta.sponsors = processedSponsors;
+    const socials = readTournamentSocials();
+    const processedSocials = socials
+      .map((entry) =>
+        normalizeSocialEntry(
+          { type: entry.type, label: entry.label, url: entry.url },
+          { allowEmpty: false }
+        )
+      )
+      .filter(Boolean);
+    for (const entry of processedSocials) {
+      const error = validateSocialUrl(entry.type, entry.url);
+      if (error) {
+        showToast?.(
+          `Invalid ${getSocialLabelForType(entry.type)} URL. ${error}`,
+          "error"
+        );
+        return;
+      }
+    }
+    meta.socials = processedSocials;
+  }
   if (currentTournamentMeta?.circuitSlug) {
     meta.circuitPoints = circuitPoints || [];
   }
@@ -4125,7 +4650,7 @@ async function handleSaveSettings(event) {
   await refreshInviteLinksPanel();
   setRequirePulseLinkSettingState(requirePulseLink);
   updateMmrDisplay(document.getElementById("mmrStatus"));
-  saveState({ bracket: state.bracket }); // keep bracket but bump timestamp via saveState
+          saveState({ bracket: state.bracket }, { skipRoster: true }); // keep bracket but bump timestamp via saveState
   // Reflect slug in the settings input
   const settingsSlugInput = document.getElementById("settingsSlugInput");
   if (settingsSlugInput) settingsSlugInput.value = newSlug;
@@ -4171,6 +4696,9 @@ async function handleCreateCircuit(event) {
     "finalTournamentMaxPlayersInput"
   );
   const finalCheckInSelect = document.getElementById("finalCheckInSelect");
+  const finalCheckInAfterStartToggle = document.getElementById(
+    "finalCheckInAfterStartToggle"
+  );
   const finalDescriptionInput = document.getElementById(
     "finalTournamentDescriptionInput"
   );
@@ -4210,6 +4738,9 @@ async function handleCreateCircuit(event) {
     finalMaxPlayersInput.value = String(finalMaxPlayers);
   }
   const finalCheckInWindowMinutes = getCheckInWindowMinutes(finalCheckInSelect);
+  const finalAllowCheckInAfterStart = Boolean(
+    finalCheckInAfterStartToggle?.checked
+  );
   const finalDescription = finalDescriptionInput?.value || "";
   const finalRules = finalRulesInput?.value || "";
   const finalImageFile = finalImageInput?.files?.[0] || null;
@@ -4267,6 +4798,7 @@ async function handleCreateCircuit(event) {
     maxPlayers: finalMaxPlayers,
     startTime: finalStartTime,
     checkInWindowMinutes: finalCheckInWindowMinutes,
+    allowCheckInAfterStart: finalAllowCheckInAfterStart,
     isInviteOnly: finalAccess === "closed",
     visibility: finalVisibility,
     mapPool: getFinalMapPoolSelection(),
@@ -4331,6 +4863,9 @@ async function handleCreateTournament(event) {
   const startInput = document.getElementById("tournamentStartInput");
   const maxPlayersInput = document.getElementById("tournamentMaxPlayersInput");
   const checkInSelect = document.getElementById("checkInSelect");
+  const checkInAfterStartToggle = document.getElementById(
+    "checkInAfterStartToggle"
+  );
   const accessSelect = document.getElementById("tournamentAccessSelect");
   const visibilitySelect = document.getElementById(
     "tournamentVisibilitySelect"
@@ -4372,6 +4907,7 @@ async function handleCreateTournament(event) {
     maxPlayersInput.value = String(maxPlayers);
   }
   const checkInWindowMinutes = getCheckInWindowMinutes(checkInSelect);
+  const allowCheckInAfterStart = Boolean(checkInAfterStartToggle?.checked);
   const isInviteOnly = accessSelect?.value === "closed";
   const visibility = normalizeTournamentVisibility(visibilitySelect?.value);
   const description = descriptionInput?.value || "";
@@ -4390,6 +4926,7 @@ async function handleCreateTournament(event) {
       maxPlayers,
       startTime,
       checkInWindowMinutes,
+      allowCheckInAfterStart,
       isInviteOnly,
       visibility,
       mapPool: Array.from(mapPoolSelection || []),
@@ -4679,6 +5216,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     saveState,
     handleAddCircuitPointsRow,
     handleRemoveCircuitPointsRow,
+    handleCircuitPointsChange,
+    handleEditCircuitPoints,
+    handleSaveCircuitPoints,
     handleApplyCircuitPoints,
     addBotPlayer,
     removeBotPlayer,
@@ -4686,11 +5226,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     resetTournament,
     checkInCurrentPlayer,
     notifyCheckInPlayers,
+    toggleCheckInManualClose,
     toggleLiveTournament,
   });
   initCoverReuseModal();
   initCasterControls({ saveState });
   initFinalAdminSearch();
+  bindTournamentSponsorControls();
+  bindTournamentSocialControls();
+  bindTournamentPromoSettingsControls(() => currentTournamentMeta);
   initInviteLinksPanel();
   initAdminInviteModal();
   initFinalAutoAddToggle();
@@ -4822,7 +5366,7 @@ function initFinalAutoAddToggle() {
   if (!toggle) return;
   toggle.addEventListener("change", () => {
     const enabled = Boolean(toggle.checked);
-    saveState({ disableFinalAutoAdd: !enabled });
+    saveState({ disableFinalAutoAdd: !enabled }, { skipRoster: true });
     if (enabled) {
       maybeAutoAddFinalPlayers({ force: true });
     } else {
@@ -4866,6 +5410,7 @@ async function maybeAutoAddFinalPlayers({ force = false } = {}) {
   }
   const finalists = leaderboard.slice(0, qualifyCount);
   let added = 0;
+  const createdPlayers = [];
   for (const entry of finalists) {
     const name = (entry?.name || "").trim();
     if (!name) continue;
@@ -4932,7 +5477,7 @@ async function maybeAutoAddFinalPlayers({ force = false } = {}) {
         console.warn("Could not fetch clan data", err);
       }
     }
-    createOrUpdatePlayer({
+    const created = buildPlayerFromData({
       name: displayName,
       race,
       sc2Link,
@@ -4950,6 +5495,7 @@ async function maybeAutoAddFinalPlayers({ force = false } = {}) {
       pulseName: pulse.name || pulse.accountName || "",
       uid: userId || null,
     });
+    if (created) createdPlayers.push(created);
     added += 1;
   }
   if (!added) {
@@ -4957,11 +5503,15 @@ async function maybeAutoAddFinalPlayers({ force = false } = {}) {
     return;
   }
   const hasCompletedMatches = bracketHasResults();
-  const { mergedPlayers } = seedEligiblePlayersWithMode(state.players, state);
-  saveState({
-    players: mergedPlayers,
-    needsReseed: hasCompletedMatches,
-  });
+  await updateRosterWithTransaction(
+    (roster) =>
+      createdPlayers.reduce(
+        (acc, player) => upsertRosterPlayer(acc, player),
+        roster
+      ),
+    { needsReseed: hasCompletedMatches },
+    { optimistic: false }
+  );
   if (!hasCompletedMatches) {
     rebuildBracket(true, "Auto-added leaderboard finalists");
   } else {
@@ -5144,7 +5694,7 @@ function normalizeRaceKey(raw) {
   return "";
 }
 
-function autoFillPlayers() {
+async function autoFillPlayers() {
   // 32 clean names (no numbers)
   const names = [
     "Zephyr",
@@ -5192,18 +5742,27 @@ function autoFillPlayers() {
     return { name, race, mmr, points: 0 };
   });
 
+  const createdPlayers = [];
   picks.forEach((p) => {
-    createOrUpdatePlayer({
+    const created = buildPlayerFromData({
       name: p.name,
       race: p.race,
       sc2Link: "",
       mmr: p.mmr,
       points: p.points,
     });
+    if (created) createdPlayers.push(created);
   });
 
-  const seededPlayers = seedPlayersForState(state.players, state);
-  saveState({ players: seededPlayers, needsReseed: false });
+  await updateRosterWithTransaction(
+    (roster) =>
+      createdPlayers.reduce(
+        (acc, player) => upsertRosterPlayer(acc, player),
+        roster
+      ),
+    { needsReseed: false },
+    { optimistic: true }
+  );
   rebuildBracket(true, "Dev auto-fill");
   addActivity("Auto-filled 32 players for testing.");
   showToast?.("Auto-filled 32 players.", "success");
@@ -5266,7 +5825,7 @@ function pickBotName(existingNames) {
   return name;
 }
 
-function addBotPlayer() {
+async function addBotPlayer() {
   if (state.isLive) {
     showToast?.("Tournament is live. Registration is closed.", "error");
     return;
@@ -5296,13 +5855,15 @@ function addBotPlayer() {
     createdAt,
     isBot: true,
   };
-  players.push(bot);
-  saveState({ players, needsReseed: true });
+  await updateRosterWithTransaction(
+    (roster) => upsertRosterPlayer(roster, bot),
+    { needsReseed: true }
+  );
   rebuildBracket(true, `${name} added`);
   addActivity(`${name} added.`);
 }
 
-function removeAllBots() {
+async function removeAllBots() {
   if (state.isLive) {
     showToast?.("Tournament is live. Registration is closed.", "error");
     return;
@@ -5317,7 +5878,10 @@ function removeAllBots() {
     showToast?.("No bots to remove.", "success");
     return;
   }
-  saveState({ players: remaining, needsReseed: true });
+  await updateRosterWithTransaction(
+    (roster) => roster.filter((player) => !isBotPlayer(player)),
+    { needsReseed: true }
+  );
   rebuildBracket(true, "Bots removed");
   addActivity("All bots removed.");
 }
@@ -5330,7 +5894,7 @@ function updateBotManagerCount() {
   label.textContent = `Bots: ${count}`;
 }
 
-function removeBotPlayer() {
+async function removeBotPlayer() {
   if (state.isLive) {
     showToast?.("Tournament is live. Registration is closed.", "error");
     return;
@@ -5346,8 +5910,10 @@ function removeBotPlayer() {
     return;
   }
   const removed = players[idx];
-  const next = [...players.slice(0, idx), ...players.slice(idx + 1)];
-  saveState({ players: next, needsReseed: true });
+  await updateRosterWithTransaction(
+    (roster) => removeRosterById(roster, removed.id),
+    { needsReseed: true }
+  );
   rebuildBracket(true, "Bot removed");
   addActivity(`${removed?.name || "Bot"} removed.`);
 }
@@ -5395,10 +5961,10 @@ async function handleRegistration(event) {
       setStatus(statusEl, "Your invite was declined.", true);
       return;
     }
-    const remaining = (state.players || []).filter(
-      (p) => p.uid !== auth.currentUser?.uid
+    await updateRosterWithTransaction(
+      (players) => removeRosterByUid(players, auth.currentUser?.uid),
+      { needsReseed: true }
     );
-    saveState({ players: remaining, needsReseed: true });
     rebuildBracket(true, "Player removed");
     addActivity(`${existingPlayer.name} unregistered.`);
     showToast?.("You have been unregistered.", "success");
@@ -5635,13 +6201,16 @@ async function handleRegistration(event) {
       };
     }
 
-    const newPlayer = createOrUpdatePlayer({
+    const checkInState = getCheckInWindowState(currentTournamentMeta);
+    const autoCheckedInAt = checkInState.isOpen ? Date.now() : null;
+    const newPlayer = buildPlayerFromData({
       name,
       race,
       sc2Link: sc2LinkInput,
       mmr: Number.isFinite(mmr) ? mmr : 0,
       points: startingPoints,
       inviteStatus: INVITE_STATUS.accepted,
+      ...(autoCheckedInAt ? { checkedInAt: autoCheckedInAt } : {}),
       ...(inviteLinkMeta || {}),
       avatarUrl,
       twitchUrl,
@@ -5657,13 +6226,11 @@ async function handleRegistration(event) {
     });
 
     const hasCompletedMatches = bracketHasResults();
-    const { mergedPlayers } = seedEligiblePlayersWithMode(state.players, state);
-    const nextState = {
-      players: mergedPlayers,
-      needsReseed: hasCompletedMatches,
-    };
-
-    saveState(nextState);
+    await updateRosterWithTransaction(
+      (players) => upsertRosterPlayer(players, newPlayer),
+      { needsReseed: hasCompletedMatches },
+      { optimistic: true }
+    );
     addActivity(
       `${newPlayer.name} saved (${newPlayer.mmr || "MMR?"} MMR, ${
         newPlayer.points
@@ -5791,7 +6358,7 @@ function initFinalAdminSearch() {
         }
       }
       const inviterName = getCurrentUsername?.() || "Tournament admin";
-      const newPlayer = createOrUpdatePlayer({
+      const newPlayer = buildPlayerFromData({
         name: displayName,
         race,
         sc2Link,
@@ -5813,11 +6380,11 @@ function initFinalAdminSearch() {
         pulseName: pulse.name || pulse.accountName || "",
         uid: userId,
       });
-      const { mergedPlayers } = seedEligiblePlayersWithMode(
-        state.players,
-        state
+      await updateRosterWithTransaction(
+        (players) => upsertRosterPlayer(players, newPlayer),
+        {},
+        { optimistic: true }
       );
-      saveState({ players: mergedPlayers });
       addActivity(`Admin invited ${newPlayer.name}.`);
       try {
         await sendTournamentInviteNotification({
@@ -5941,7 +6508,7 @@ function resolvePlayerAvatar(player) {
   return player?.avatarUrl || userPhoto || DEFAULT_PLAYER_AVATAR;
 }
 
-function syncCurrentPlayerAvatar(avatarUrl) {
+async function syncCurrentPlayerAvatar(avatarUrl) {
   const uid = auth?.currentUser?.uid || null;
   if (!uid) return;
   const normalized = String(avatarUrl || "").trim();
@@ -5951,9 +6518,9 @@ function syncCurrentPlayerAvatar(avatarUrl) {
   if (idx < 0) return;
   const existing = players[idx] || {};
   if (existing.avatarUrl === normalized) return;
-  const next = [...players];
-  next[idx] = { ...existing, avatarUrl: normalized };
-  saveState({ players: next });
+  await updateRosterWithTransaction((roster) =>
+    updateRosterByUid(roster, uid, { avatarUrl: normalized })
+  );
   renderAll();
   refreshPlayerDetailModalIfOpen(getPlayersMap);
 }

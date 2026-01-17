@@ -2323,6 +2323,67 @@ exports.submitMatchScore = onCall(
   }
 );
 
+exports.sendCasterInvite = onCall(
+  { region: "us-central1", enforceAppCheck: true },
+  async (request) => {
+    const uid = request.auth?.uid;
+    if (!uid) {
+      throw new HttpsError("unauthenticated", "Sign in to invite casters.");
+    }
+
+    const payload = request.data || {};
+    const targetUid = String(payload.userId || "").trim();
+    const slug = String(payload.tournamentSlug || payload.slug || "").trim();
+    if (!targetUid || !slug) {
+      throw new HttpsError("invalid-argument", "Missing userId or slug.");
+    }
+
+    const metaSnap = await firestore.collection("tournaments").doc(slug).get();
+    if (!metaSnap.exists) {
+      throw new HttpsError("not-found", "Tournament not found.");
+    }
+    const meta = metaSnap.data() || {};
+    if (!isAdminForMeta(meta, uid)) {
+      throw new HttpsError(
+        "permission-denied",
+        "Only tournament admins can invite casters."
+      );
+    }
+
+    const senderNameRaw = sanitizeText(payload.senderName || "", "");
+    const senderName = senderNameRaw || "Tournament admin";
+    const tournamentName = sanitizeText(meta.name || slug, "Tournament");
+    const tournamentUrl = buildTournamentUrl(meta, slug);
+    const username = sanitizeText(payload.username || "", "");
+
+    const notification = {
+      userId: targetUid,
+      type: "caster-invite",
+      tournamentSlug: slug,
+      circuitSlug: meta.circuitSlug || "",
+      tournamentName,
+      tournamentUrl,
+      senderUid: uid,
+      senderName,
+      senderUsername: senderNameRaw,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      title: `Caster invite: ${tournamentName}`,
+      preview: `${senderName} invited you to cast ${tournamentName}.`,
+      body: `${senderName} invited you to register as a caster for ${tournamentName}. Open the tournament page and request caster access.`,
+      typeLabel: "Caster invite",
+      username,
+    };
+
+    await firestore
+      .collection("users")
+      .doc(targetUid)
+      .collection("notifications")
+      .add(notification);
+
+    return { ok: true };
+  }
+);
+
 exports.cleanupTournamentChatOnComplete = onDocumentWritten(
   {
     document: "tournamentStates/{slug}",

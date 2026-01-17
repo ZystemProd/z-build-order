@@ -29,7 +29,9 @@ export function getEligiblePlayers(players = []) {
 export function seedEligiblePlayers(players = []) {
   const eligible = getEligiblePlayers(players);
   const seededEligible = applySeeding(eligible);
-  const seedById = new Map(seededEligible.map((player) => [player.id, player.seed]));
+  const seedById = new Map(
+    seededEligible.map((player) => [player.id, player.seed])
+  );
   const mergedPlayers = (players || []).map((player) => {
     const inviteStatus = normalizeInviteStatus(player.inviteStatus);
     const seed = seedById.get(player.id);
@@ -46,6 +48,17 @@ export function seedEligiblePlayers(players = []) {
 }
 
 export function applyRosterSeeding(players = []) {
-  return seedEligiblePlayers(players).mergedPlayers;
-}
+  const inputCount = Array.isArray(players) ? players.length : 0;
+  const out = seedEligiblePlayers(players).mergedPlayers;
+  const outputCount = Array.isArray(out) ? out.length : 0;
 
+  console.log("🧪 [tournament-sync] applyRosterSeeding", {
+    inputCount,
+    outputCount,
+    removed: inputCount - outputCount,
+    inputUids: (players || []).map((p) => p?.uid).filter(Boolean),
+    outputUids: (out || []).map((p) => p?.uid).filter(Boolean),
+  });
+
+  return out;
+}

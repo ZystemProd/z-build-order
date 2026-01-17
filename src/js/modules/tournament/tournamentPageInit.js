@@ -85,6 +85,9 @@ export function initTournamentPage({
   saveState,
   handleAddCircuitPointsRow,
   handleRemoveCircuitPointsRow,
+  handleCircuitPointsChange,
+  handleEditCircuitPoints,
+  handleSaveCircuitPoints,
   handleApplyCircuitPoints,
   addBotPlayer,
   removeBotPlayer,
@@ -92,6 +95,7 @@ export function initTournamentPage({
   resetTournament,
   checkInCurrentPlayer,
   notifyCheckInPlayers,
+  toggleCheckInManualClose,
   toggleLiveTournament,
 }) {
   initTournamentNotifications();
@@ -102,6 +106,7 @@ export function initTournamentPage({
   const rebuildBtn = document.getElementById("rebuildBracketBtn");
   const resetBtn = document.getElementById("resetTournamentBtn");
   const notifyCheckInBtn = document.getElementById("notifyCheckInBtn");
+  const checkInToggleBtn = document.getElementById("checkInToggleBtn");
   const jumpToRegistration = document.getElementById("jumpToRegistration");
   const jumpToBracket = document.getElementById("jumpToBracket");
   const bracketGrid = document.getElementById("bracketGrid");
@@ -577,6 +582,9 @@ export function initTournamentPage({
   });
   autoFillBtn?.addEventListener("click", autoFillPlayers);
   checkInBtn?.addEventListener("click", () => checkInCurrentPlayer?.());
+  checkInToggleBtn?.addEventListener("click", () =>
+    toggleCheckInManualClose?.()
+  );
   notifyCheckInBtn?.addEventListener("click", () => notifyCheckInPlayers?.());
 
   signInBtn?.addEventListener("click", () => window.handleSignIn?.());
@@ -922,6 +930,10 @@ export function initTournamentPage({
     handleSaveSettings,
     handleAddCircuitPointsRow,
     handleRemoveCircuitPointsRow,
+    handleCircuitPointsChange,
+    handleEditCircuitPoints,
+    handleSaveCircuitPoints: (event) =>
+      handleSaveCircuitPoints?.(event, { handleSaveSettings }),
     handleApplyCircuitPoints,
   });
   const updateMmrStatusPreview = () => {

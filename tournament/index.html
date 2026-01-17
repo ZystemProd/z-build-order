@@ -348,7 +348,10 @@
       <section id="circuitView" style="display:none;">
         <header class="hero hero-with-admins">
           <div class="hero-main">
-            <a class="ghost-link" href="/tournament"><span class="ghost-link-icon">←</span>All tournaments</a>
+            <a class="ghost-link" href="/tournament">
+              <span class="ghost-link-icon">&larr;</span>
+              <span class="ghost-link-label" data-back-label>Tournament Center</span>
+            </a>
             <p class="eyebrow">Circuit</p>
             <div class="hero-title-row">
               <h1 id="circuitTitle">Circuit</h1>
@@ -392,6 +395,21 @@
         <main class="page-stack">
           <div class="circuit-grid">
             <div class="card">
+              <div class="circuit-final-grid">
+                <div class="circuit-final-card" id="circuitFinalCard" style="display:none;">
+                  <p class="eyebrow">Circuit Final</p>
+                  <ul id="circuitFinalTournamentList" class="tournament-list circuit-tournament-list"></ul>
+                </div>
+                <div class="circuit-sponsor-card" id="circuitSponsorCard" style="display:none;">
+                  <p class="eyebrow">Sponsors</p>
+                  <div class="sponsor-list" id="circuitSponsorList"></div>
+                </div>
+                <div class="circuit-social-card" id="circuitSocialCard" style="display:none;">
+                  <p class="eyebrow">Socials</p>
+                  <div class="social-list" id="circuitSocialList"></div>
+                </div>
+              </div>
+              <div class="circuit-section-divider"></div>
               <div class="card-header">
                 <div>
                   <p class="eyebrow">Circuit tournaments</p>
@@ -438,8 +456,10 @@
       <section id="tournamentView" style="display:none;">
         <header class="hero hero-with-admins">
           <div class="hero-main">
-            <a class="ghost-link" href="/tournament" id="tournamentBackLink"><span class="ghost-link-icon">←</span>All
-              tournaments</a>
+            <a class="ghost-link" href="/tournament" id="tournamentBackLink">
+              <span class="ghost-link-icon">&larr;</span>
+              <span class="ghost-link-label" data-back-label>Tournament Center</span>
+            </a>
             <div class="hero-title-row">
               <h1 id="tournamentTitle">Tournament</h1>
               <button class="hero-admin-toggle" type="button" aria-expanded="false">
@@ -508,6 +528,16 @@
         <div id="tournamentPlacementsMobileSlot" class="tournament-placements-slot"></div>
 
         <main class="page-stack">
+          <div class="tournament-promo-strip" id="tournamentPromoStrip" style="display:none;">
+            <div class="tournament-promo-card">
+              <p class="eyebrow">Sponsors</p>
+              <div class="tournament-sponsor-list" id="tournamentSponsorList"></div>
+            </div>
+            <div class="tournament-promo-card">
+              <p class="eyebrow">Socials</p>
+              <div class="tournament-social-list" id="tournamentSocialList"></div>
+            </div>
+          </div>
           <div class="tab-bar" id="tabBar">
             <div class="tab-group public-tabs">
               <button class="tab-btn active" data-tab="bracketTab">Bracket</button>
@@ -566,13 +596,30 @@
                 <div class="live-dot not-live" id="liveDot">Not Live</div>
               </div>
               <div id="bracketNotLive" class="not-live-panel" style="display:none;">
-                <p class="eyebrow registered-title" id="registeredPlayersTitle">Participent</p>
-                <p class="helper" id="bracketNotLiveMessage">Tournament paused - updates in progress.</p>
-                <ul id="registeredPlayersList" class="registered-list"></ul>
+                <div class="not-live-grid">
+                  <div class="not-live-main">
+                <p class="eyebrow registered-title" id="registeredPlayersTitle">participant</p>
+                    <p class="helper" id="bracketNotLiveMessage">Tournament paused - updates in progress.</p>
+                    <ul id="registeredPlayersList" class="registered-list"></ul>
+                  </div>
+                  <aside class="not-live-casters">
+                    <p class="eyebrow">Casters</p>
+                    <ul id="casterListNotLive" class="caster-list caster-list--column"></ul>
+                  </aside>
+                </div>
               </div>
               <div id="bracketGrid" class="bracket-grid">
                 <div class="placeholder">No players yet. Add players to generate the bracket.</div>
               </div>
+            </div>
+            <div class="card caster-live-card" id="casterLiveCard" style="display:none;">
+              <div class="card-header">
+                <div>
+                  <p class="eyebrow">Casters</p>
+                  <h3>Registered casters</h3>
+                </div>
+              </div>
+              <ul id="casterListLive" class="caster-list caster-list--grid"></ul>
             </div>
             <div class="card activity-card" id="activityCard">
               <div class="card-header">
@@ -586,6 +633,15 @@
           </section>
 
           <section id="registrationTab" class="tab-panel">
+            <div class="card" id="registrationGuestMessage" style="display:none;">
+              <div class="card-header">
+                <div>
+                  <p class="eyebrow">Registration</p>
+                  <h3>Sign in required</h3>
+                </div>
+              </div>
+              <p class="helper">You need to be signed in to view registration.</p>
+            </div>
             <div class="card" id="registrationCard">
               <div class="card-header registration-header">
                 <div>
@@ -646,13 +702,42 @@
                   <button type="button" class="cta ghost" id="requestCasterBtn">Request caster access</button>
                   <p class="helper" id="casterRequestStatus"></p>
                 </div>
-                <div class="caster-requests" id="casterRequestPanel" data-admin-only="true" style="display:none;">
-                  <div class="section-title">
-                    <p class="eyebrow">Caster requests</p>
-                    <h4 class="section-subtitle">Awaiting approval</h4>
+                <div class="caster-admin-grid" id="casterAdminPanel" data-admin-only="true" style="display:none;">
+                  <div class="caster-requests" id="casterRequestPanel">
+                    <div class="section-title">
+                      <p class="eyebrow">Caster requests</p>
+                      <h4 class="section-subtitle">Awaiting approval</h4>
+                    </div>
+                    <div class="caster-request-list" id="casterRequestList"></div>
+                    <p class="helper" id="casterRequestAdminStatus"></p>
                   </div>
-                  <div class="caster-request-list" id="casterRequestList"></div>
-                  <p class="helper" id="casterRequestAdminStatus"></p>
+                  <div class="caster-manage" id="casterManagePanel">
+                    <div class="section-title">
+                      <p class="eyebrow">Caster roles</p>
+                      <h4 class="section-subtitle">Assign casters</h4>
+                    </div>
+                    <div class="caster-manage-tabs" role="tablist">
+                      <button type="button" class="caster-manage-tab active" data-caster-manage-tab="registered">
+                        Registered
+                      </button>
+                      <button type="button" class="caster-manage-tab" data-caster-manage-tab="unregistered">
+                        Unregistered
+                      </button>
+                    </div>
+                    <div class="caster-manage-panel active" data-caster-manage-panel="registered"
+                      id="casterManageRegisteredPanel">
+                      <div class="caster-manage-list" id="casterManageRegisteredList"></div>
+                    </div>
+                    <div class="caster-manage-panel" data-caster-manage-panel="unregistered"
+                      id="casterManageUnregisteredPanel">
+                      <label>Find user by username
+                        <input id="casterManageSearchInput" class="settings-input" type="text"
+                          placeholder="Search username..." autocomplete="off" spellcheck="false" />
+                      </label>
+                      <div class="admin-search-results" id="casterManageSearchResults"></div>
+                      <p class="helper" id="casterManageSearchStatus"></p>
+                    </div>
+                  </div>
                 </div>
               </div>
               <div class="admin-add-player" data-admin-only="true" id="finalAdminAddPanel" style="display:none;">
@@ -721,8 +806,8 @@
                 </div>
                 <div class="seed-actions">
                   <button id="rebuildBracketBtn" class="cta small ghost">Go Live</button>
+                  <button id="checkInToggleBtn" class="cta small ghost" style="display:none;">Close check-in</button>
                   <button id="notifyCheckInBtn" class="cta small ghost">Notify check-in</button>
-                  <button id="resetTournamentBtn" class="cta small subtle">Reset tournament</button>
                 </div>
               </div>
               <div class="publish-checkbox-row" id="finalAutoAddRow" style="display:none;">
@@ -763,6 +848,9 @@
                   <tbody id="playersTableBody"></tbody>
                 </table>
               </div>
+              <div class="form-actions" style="margin-top:12px; justify-content:flex-end;">
+                <button id="resetTournamentBtn" class="cta small subtle">Reset tournament</button>
+              </div>
             </div>
           </section>
 
@@ -779,6 +867,8 @@
                 <button class="settings-tab-btn" data-settings-tab="settingsDesc">Description &amp; Rules</button>
                 <button class="settings-tab-btn" data-settings-tab="settingsMaps">Maps</button>
                 <button class="settings-tab-btn" data-settings-tab="settingsFormat">Format</button>
+                <button class="settings-tab-btn" data-settings-tab="settingsSponsors">Sponsors</button>
+                <button class="settings-tab-btn" data-settings-tab="settingsSocials">Socials</button>
               </div>
               <div class="settings-panel active" id="settingsGeneral">
                 <div class="admin-settings-grid">
@@ -844,6 +934,15 @@
                         <option value="165">2h 45</option>
                         <option value="180">3h</option>
                       </select>
+                    </div>
+                  </div>
+                  <div class="settings-row">
+                    <div class="settings-row-label">Allow check-in after start</div>
+                    <div class="settings-row-control">
+                      <label class="checkbox-row">
+                        <input type="checkbox" id="settingsCheckInAfterStartToggle" />
+                        <span>Manual close required</span>
+                      </label>
                     </div>
                   </div>
                   <div class="settings-row">
@@ -1134,6 +1233,56 @@
 
                 </div>
               </div>
+              <div class="settings-panel" id="settingsSponsors">
+                <div class="settings-row" id="settingsCopyCircuitSponsorsRow" style="display:none;">
+                  <div class="settings-row-label">Copy from circuit</div>
+                  <div class="settings-row-control copy-toggle-row">
+                    <div class="checkbox-wrapper-59 checkbox-wrapper-59--blue">
+                      <label class="switch">
+                        <input type="checkbox" id="settingsCopyCircuitSponsorsToggle"
+                          aria-label="Copy sponsors from circuit" />
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                <p class="helper copy-circuit-note" id="settingsSponsorsCopyNote" style="display:none;">
+                  Using sponsors from the circuit.
+                </p>
+                <div class="settings-row" style="align-items:center;">
+                  <div class="settings-row-label">Sponsors</div>
+                  <div class="settings-row-control">
+                    <button type="button" class="cta ghost small" id="tournamentAddSponsorBtn">Add sponsor</button>
+                  </div>
+                </div>
+                <div class="sponsor-settings-list" id="tournamentSponsorsList"></div>
+                <p class="helper">Sponsors show between the hero and tabs on the tournament page.</p>
+              </div>
+              <div class="settings-panel" id="settingsSocials">
+                <div class="settings-row" id="settingsCopyCircuitSocialsRow" style="display:none;">
+                  <div class="settings-row-label">Copy from circuit</div>
+                  <div class="settings-row-control copy-toggle-row">
+                    <div class="checkbox-wrapper-59 checkbox-wrapper-59--blue">
+                      <label class="switch">
+                        <input type="checkbox" id="settingsCopyCircuitSocialsToggle"
+                          aria-label="Copy socials from circuit" />
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                <p class="helper copy-circuit-note" id="settingsSocialsCopyNote" style="display:none;">
+                  Using socials from the circuit.
+                </p>
+                <div class="settings-row" style="align-items:center;">
+                  <div class="settings-row-label">Socials</div>
+                  <div class="settings-row-control">
+                    <button type="button" class="cta ghost small" id="tournamentAddSocialBtn">Add social link</button>
+                  </div>
+                </div>
+                <div class="sponsor-settings-list" id="tournamentSocialsList"></div>
+                <p class="helper">Social links show between the hero and tabs on the tournament page.</p>
+              </div>
               <div class="form-actions settings-actions" style="margin-top:16px;">
                 <button class="cta primary" id="saveSettingsBtn">Save settings</button>
                 <button class="cta danger" id="deleteTournamentBtn">Delete tournament</button>
@@ -1161,6 +1310,12 @@
                   </table>
                 </div>
                 <div class="circuit-points-actions">
+                  <button class="cta small ghost" id="editCircuitPointsBtn" type="button">
+                    Edit points
+                  </button>
+                  <button class="cta small primary" id="saveTournamentCircuitPointsBtn" type="button">
+                    Save points
+                  </button>
                   <button class="cta small ghost" id="addCircuitPointsRow" type="button">
                     Add placement
                   </button>
@@ -1247,6 +1402,10 @@
             <option value="165">2h 45</option>
             <option value="180">3h</option>
           </select>
+        </label>
+        <label class="checkbox-row">
+          <input type="checkbox" id="checkInAfterStartToggle" />
+          <span>Allow check-in after start (manual close)</span>
         </label>
         <label>Tournament visibility
           <select id="tournamentVisibilitySelect">
@@ -1571,6 +1730,8 @@
       <div class="settings-tabs" id="circuitSettingsTabs">
         <button class="settings-tab-btn active" data-circuit-settings-tab="circuitSettingsGeneral">Circuit</button>
         <button class="settings-tab-btn" data-circuit-settings-tab="circuitSettingsFinal">Final tournament</button>
+        <button class="settings-tab-btn" data-circuit-settings-tab="circuitSettingsSponsors">Sponsors</button>
+        <button class="settings-tab-btn" data-circuit-settings-tab="circuitSettingsSocials">Socials</button>
       </div>
       <div class="settings-panel circuit-settings-panel active" id="circuitSettingsGeneral">
         <label>Circuit name <span class="required">*</span>
@@ -1901,6 +2062,26 @@
           </div>
         </div>
       </div>
+      <div class="settings-panel circuit-settings-panel" id="circuitSettingsSponsors">
+        <div class="settings-row">
+          <div class="settings-row-label">Sponsors</div>
+          <div class="settings-row-control">
+            <button type="button" class="cta ghost small" id="circuitFinalAddSponsorBtn">Add sponsor</button>
+          </div>
+        </div>
+        <div class="sponsor-settings-list" id="circuitFinalSponsorsList"></div>
+        <p class="helper">Sponsors show next to the finals card on the circuit page.</p>
+      </div>
+      <div class="settings-panel circuit-settings-panel" id="circuitSettingsSocials">
+        <div class="settings-row">
+          <div class="settings-row-label">Socials</div>
+          <div class="settings-row-control">
+            <button type="button" class="cta ghost small" id="circuitFinalAddSocialBtn">Add social link</button>
+          </div>
+        </div>
+        <div class="sponsor-settings-list" id="circuitFinalSocialsList"></div>
+        <p class="helper">Social links show next to the finals card on the circuit page.</p>
+      </div>
       <div class="form-actions">
         <button class="cta subtle" id="closeCircuitSettingsModal">Close</button>
         <button class="cta primary" id="saveCircuitSettingsBtn">Save</button>
@@ -2015,6 +2196,10 @@
               <option value="165">2h 45</option>
               <option value="180">3h</option>
             </select>
+          </label>
+          <label class="checkbox-row">
+            <input type="checkbox" id="finalCheckInAfterStartToggle" />
+            <span>Allow check-in after start (manual close)</span>
           </label>
           <label>Cover image
             <div class="image-upload">
