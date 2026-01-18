@@ -99,6 +99,7 @@ export async function loadTournamentRegistry(force = false) {
         mapPool: data.mapPool?.length ? data.mapPool : [],
         format: data.format || "Tournament",
         coverImageUrl: data.coverImageUrl || "",
+        coverImageUrlSmall: data.coverImageUrlSmall || "",
         sponsors: Array.isArray(data.sponsors) ? data.sponsors : [],
         socials: Array.isArray(data.socials) ? data.socials : [],
         maxPlayers: data.maxPlayers || null,
@@ -333,9 +334,29 @@ async function flushTournamentStateRemote(currentSlug) {
     const comparable = { ...payload };
     delete comparable.lastUpdated;
     const hash = stableStringify(comparable);
-    if (entry.lastHash === hash) return;
-    entry.lastHash = hash;
-    await setDoc(ref, payload, { merge: true });
+    const writePayload = async (force = false) => {
+      if (!force && entry.lastHash === hash) return true;
+      entry.lastHash = hash;
+      await setDoc(ref, payload, { merge: true });
+      return true;
+    };
+    try {
+      await writePayload(false);
+    } catch (err) {
+      const code = err?.code || "";
+      const msg = String(err?.message || "");
+      const isPrecondition =
+        code === "failed-precondition" ||
+        msg.includes("FAILED_PRECONDITION") ||
+        msg.includes("base version");
+      if (!isPrecondition) throw err;
+      try {
+        await getDoc(ref);
+      } catch (_) {
+        // ignore refresh errors, still retry the write
+      }
+      await writePayload(true);
+    }
   } catch (err) {
     console.error("Failed to persist tournament state to Firestore", err);
     showToast?.(

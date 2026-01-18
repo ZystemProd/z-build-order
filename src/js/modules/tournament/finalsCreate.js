@@ -29,10 +29,13 @@ export async function createFinalTournamentForCircuit({
 
   if (finalImageFile) {
     try {
-      const coverImageUrl = await uploadTournamentCover(finalImageFile, finalSlug);
+      const uploaded = await uploadTournamentCover(finalImageFile, finalSlug);
       await setDoc(
         doc(collection(db, tournamentCollection), finalSlug),
-        { coverImageUrl },
+        {
+          coverImageUrl: uploaded.coverImageUrl,
+          coverImageUrlSmall: uploaded.coverImageUrlSmall,
+        },
         { merge: true }
       );
     } catch (err) {
@@ -41,7 +44,7 @@ export async function createFinalTournamentForCircuit({
   } else if (finalCoverUrl) {
     await setDoc(
       doc(collection(db, tournamentCollection), finalSlug),
-      { coverImageUrl: finalCoverUrl },
+      { coverImageUrl: finalCoverUrl, coverImageUrlSmall: "" },
       { merge: true }
     );
   }

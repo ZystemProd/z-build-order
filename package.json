@@ -11,7 +11,9 @@
     "preview-deploy": "npm run clean-dist && npm run build && firebase hosting:channel:deploy dev",
     "clean-dist": "npx rimraf dist",
     "clean": "rimraf node_modules/.vite dist",
-    "minify-firebase": "node scripts/minify-firebase.js"
+    "minify-firebase": "node scripts/minify-firebase.js",
+    "cleanup-covers": "cd functions && node scripts/cleanupTournamentCovers.js",
+    "cleanup-covers:apply": "cd functions && node scripts/cleanupTournamentCovers.js --apply"
   },
   "devDependencies": {
     "firebase-tools": "^14.5.1",

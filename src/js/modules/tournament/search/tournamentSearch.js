@@ -1,3 +1,14 @@
+
+function resolveCoverUrlSmall(item = {}) {
+  const small = item.coverImageUrlSmall || "";
+  if (small) return small;
+  const large = item.coverImageUrl || "";
+  if (large.includes("/tournamentCovers/") && large.includes("-1200.")) {
+    return large.replace("-1200.", "-320.");
+  }
+  return large;
+}
+
 import { loadCircuitRegistry, loadTournamentRegistry } from "../sync/persistence.js";
 
 function scoreSearchMatch(term, value) {
@@ -45,7 +56,7 @@ async function searchTournamentDirectory(query, { limit = 10 } = {}) {
       slug: item.slug || item.id || "",
       meta: `Host: ${item.createdByName || "Unknown"}`,
       startTime: item.startTime || null,
-      coverImageUrl: item.coverImageUrl || "",
+      coverImageUrl: resolveCoverUrlSmall(item),
       url: `/tournament/${item.slug || item.id || ""}`,
       score,
     });

@@ -1018,7 +1018,7 @@ function renderCommunityBuildBatch(builds) {
         ? `<span class="meta-chip clan-chip"><img src="${
             build.clanInfo.logoUrlSmall ||
             build.clanInfo.logoUrl ||
-            "./img/clan/logo.webp"
+            "./img/clan/logo-18px.webp"
           }" alt="${DOMPurify.sanitize(
             build.clanInfo.name
           )}" class="meta-icon" width="16" height="16" loading="lazy" decoding="async">${
