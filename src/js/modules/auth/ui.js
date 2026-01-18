@@ -84,6 +84,7 @@ function getAuthModalElements() {
     modal: document.getElementById("signInModal"),
     closeBtn: document.getElementById("closeSignInModal"),
     googleButton: document.getElementById("googleSignInButton"),
+    authForm: document.getElementById("authForm"),
     emailInput: document.getElementById("authEmail"),
     passwordInput: document.getElementById("authPassword"),
     emailSignInButton: document.getElementById("emailSignInButton"),
@@ -123,6 +124,8 @@ function formatAuthError(error) {
       return "This sign-in method is disabled.";
     case "auth/too-many-requests":
       return "Too many attempts. Please try again later.";
+    case "auth/network-request-failed":
+      return "Network blocked. Try a VPN or different network.";
     default:
       return "Sign-in failed. Please try again.";
   }
@@ -134,6 +137,7 @@ function initAuthModal() {
     modal,
     closeBtn,
     googleButton,
+    authForm,
     emailInput,
     passwordInput,
     emailSignInButton,
@@ -218,10 +222,20 @@ function initAuthModal() {
     if (event.target === modal) closeAuthModal();
   });
   googleButton?.addEventListener("click", handleGoogleSignIn);
-  emailSignInButton?.addEventListener("click", handleEmailSignIn);
+  authForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    handleEmailSignIn();
+  });
+  emailSignInButton?.addEventListener("click", (event) => {
+    event.preventDefault();
+    handleEmailSignIn();
+  });
   emailSignUpButton?.addEventListener("click", handleEmailSignUp);
   passwordInput?.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") handleEmailSignIn();
+    if (event.key === "Enter") {
+      event.preventDefault();
+      handleEmailSignIn();
+    }
   });
 
   authModalReady = true;

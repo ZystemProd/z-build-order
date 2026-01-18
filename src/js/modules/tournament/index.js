@@ -311,6 +311,7 @@ let circuitPointsBtnTemplate = null;
 let circuitFinalMapPoolSelection = new Set();
 let circuitFinalMapPoolMode = "ladder";
 let mapCatalogPromise = null;
+let promoStripRenderKey = "";
 let inviteLinkGate = {
   slug: "",
   token: "",
@@ -1247,6 +1248,16 @@ function syncFromRemote(incoming) {
   }
 }
 
+function getPromoStripRenderKey(meta) {
+  if (!meta) return "";
+  return JSON.stringify({
+    sponsors: meta.sponsors || [],
+    socials: meta.socials || [],
+    circuitSlug: meta.circuitSlug || "",
+    copyFromCircuitPromos: getCopyFromCircuitPromos(meta),
+  });
+}
+
 function mergeMatchVetoes(local = {}, incoming = {}) {
   const out = { ...incoming };
   Object.keys(local || {}).forEach((matchId) => {
@@ -2057,7 +2068,11 @@ function renderAll(matchIds = null) {
       updateSettingsRulesPreview,
       syncFormatFieldVisibility,
     });
-    void refreshTournamentPromoStrip(currentTournamentMeta);
+    const nextPromoKey = getPromoStripRenderKey(currentTournamentMeta);
+    if (nextPromoKey && nextPromoKey !== promoStripRenderKey) {
+      promoStripRenderKey = nextPromoKey;
+      void refreshTournamentPromoStrip(currentTournamentMeta);
+    }
     void refreshTournamentPromoSettings(currentTournamentMeta);
     renderCircuitPointsSettings();
   }
