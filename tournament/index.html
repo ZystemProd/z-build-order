@@ -798,15 +798,39 @@
 
           <section id="seedingTab" class="tab-panel" data-admin-only="true">
             <div class="card" id="seedingCard">
-              <div class="card-header">
-                <div>
+              <div class="card-header seeding-header">
+                <div class="seeding-header-row">
                   <p class="eyebrow">Seeding</p>
-                  <h3>Points-first ranking</h3>
                 </div>
-                <div class="seed-actions">
-                  <button id="rebuildBracketBtn" class="cta small ghost">Go Live</button>
-                  <button id="checkInToggleBtn" class="cta small ghost" style="display:none;">Close check-in</button>
-                  <button id="notifyCheckInBtn" class="cta small ghost">Notify check-in</button>
+                <div class="seeding-header-row seeding-header-row-actions">
+                  <div class="seeding-left-group">
+                    <div class="publish-checkbox-row seeding-mode-row seeding-mode-row-dual">
+                      <div class="seeding-toggle-group">
+                        <span>Manual seeding</span>
+                        <div class="checkbox-wrapper-59">
+                          <label class="switch">
+                            <input type="checkbox" id="manualSeedingToggle" />
+                            <span class="slider"></span>
+                          </label>
+                        </div>
+                      </div>
+                      <div class="seeding-toggle-group">
+                        <span>Seed by current MMR</span>
+                        <div class="checkbox-wrapper-59">
+                          <label class="switch">
+                            <input type="checkbox" id="mmrSeedingToggle" />
+                            <span class="slider"></span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                    <button id="checkInToggleBtn" class="cta small ghost" style="display:none;">Close check-in</button>
+                    <button id="refreshMmrBtn" class="cta small ghost">Refresh MMR</button>
+                  </div>
+                  <div class="seeding-right-actions">
+                    <button id="notifyCheckInBtn" class="cta small ghost">Notify check-in</button>
+                    <button id="rebuildBracketBtn" class="cta small ghost">Go Live</button>
+                  </div>
                 </div>
               </div>
               <div class="publish-checkbox-row" id="finalAutoAddRow" style="display:none;">
@@ -819,16 +843,13 @@
                 </div>
               </div>
               <p class="helper" id="finalAutoAddStatus"></p>
-              <div class="publish-checkbox-row seeding-mode-row">
-                <span>Manual seeding</span>
-                <div class="checkbox-wrapper-59">
-                  <label class="switch">
-                    <input type="checkbox" id="manualSeedingToggle" />
-                    <span class="slider"></span>
-                  </label>
+              <p class="helper" id="seedingModeHelp">Automatic seeding uses points and MMR.</p>
+              <div class="mmr-refresh-status" id="mmrRefreshStatus" style="display:none;">
+                <span id="mmrRefreshText">Refreshing MMR...</span>
+                <div class="mmr-refresh-bar">
+                  <span id="mmrRefreshFill"></span>
                 </div>
               </div>
-              <p class="helper" id="manualSeedingHelp">Automatic seeding uses points and MMR.</p>
               <div class="table-wrapper">
                 <table class="players-table">
                   <thead>
@@ -837,7 +858,8 @@
                       <th>Player</th>
                       <th>Status</th>
                       <th>Points</th>
-                      <th>MMR</th>
+                      <th>Registered MMR</th>
+                      <th>Current MMR</th>
                       <th>SC2Pulse</th>
                       <th>Check-in</th>
                       <th>Forfeit</th>

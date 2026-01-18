@@ -79,6 +79,7 @@ export function initTournamentPage({
   setManualSeedingEnabled,
   getManualSeedingActive,
   handleManualSeedingReorder,
+  setMmrSeedingMode,
   updateMatchScore,
   updateRegistrationRequirementIcons,
   renderAll,
@@ -97,6 +98,7 @@ export function initTournamentPage({
   notifyCheckInPlayers,
   toggleCheckInManualClose,
   toggleLiveTournament,
+  refreshRosterMmrFromPulse,
 }) {
   const runAfterFirstPaint = (fn) => {
     if (typeof window === "undefined") return fn?.();
@@ -114,11 +116,13 @@ export function initTournamentPage({
   const resetBtn = document.getElementById("resetTournamentBtn");
   const notifyCheckInBtn = document.getElementById("notifyCheckInBtn");
   const checkInToggleBtn = document.getElementById("checkInToggleBtn");
+  const refreshMmrBtn = document.getElementById("refreshMmrBtn");
   const jumpToRegistration = document.getElementById("jumpToRegistration");
   const jumpToBracket = document.getElementById("jumpToBracket");
   const bracketGrid = document.getElementById("bracketGrid");
   const playersTable = document.getElementById("playersTableBody");
   const manualSeedingToggle = document.getElementById("manualSeedingToggle");
+  const mmrSeedingToggle = document.getElementById("mmrSeedingToggle");
   const autoFillBtn = document.getElementById("autoFillBtn");
   const checkInBtn = document.getElementById("checkInBtn");
   const signInBtn = document.getElementById("signInBtn");
@@ -771,6 +775,9 @@ export function initTournamentPage({
     toggleCheckInManualClose?.()
   );
   notifyCheckInBtn?.addEventListener("click", () => notifyCheckInPlayers?.());
+  refreshMmrBtn?.addEventListener("click", () =>
+    refreshRosterMmrFromPulse?.()
+  );
 
   signInBtn?.addEventListener("click", () => window.handleSignIn?.());
   signOutBtn?.addEventListener("click", () => window.handleSignOut?.());
@@ -1306,6 +1313,11 @@ export function initTournamentPage({
     const target = event.target;
     if (!(target instanceof HTMLInputElement)) return;
     setManualSeedingEnabled?.(target.checked);
+  });
+  mmrSeedingToggle?.addEventListener("change", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) return;
+    setMmrSeedingMode?.(target.checked ? "current" : "registered");
   });
 
   let draggedRow = null;

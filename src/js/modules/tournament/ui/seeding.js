@@ -29,7 +29,10 @@ export function renderSeedingTable(
         ? "Denied"
         : "Accepted";
     const points = Number.isFinite(p.points) ? p.points : 0;
-    const mmr = Number.isFinite(p.mmr) ? Math.round(p.mmr) : null;
+    const registeredMmr = Number.isFinite(p.mmr) ? Math.round(p.mmr) : null;
+    const currentMmr = Number.isFinite(p.currentMmr)
+      ? Math.round(p.currentMmr)
+      : null;
     const pulseLink = p.sc2Link || "";
     const raceTag =
       inviteStatus === "pending"
@@ -120,7 +123,8 @@ export function renderSeedingTable(
             ${isLive || isInviteLocked ? "disabled" : ""}
           />
         </td>
-        <td>${mmr ?? "-"}</td>
+        <td>${registeredMmr ?? "-"}</td>
+        <td>${currentMmr ?? "-"}</td>
         <td>${pulseHtml}</td>
         <td>
           <div class="checkin-cell">
