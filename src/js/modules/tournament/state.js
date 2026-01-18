@@ -35,6 +35,7 @@ export const defaultState = {
   casters: [],
   casterRequests: [],
   matchCasts: {},
+  mmrSeedingMode: "current",
   isLive: false,
   hasBeenLive: false,
   disableFinalAutoAdd: false,

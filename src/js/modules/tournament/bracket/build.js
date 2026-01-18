@@ -15,7 +15,17 @@ import { WINNERS_TEMPLATES, LOSERS_TEMPLATES } from "../../bracketTemplates.js";
 export function applySeeding(players) {
   const seeded = [...players].sort((a, b) => {
     if (b.points !== a.points) return b.points - a.points;
-    if (b.mmr !== a.mmr) return b.mmr - a.mmr;
+    const mmrA = Number.isFinite(a.seedMmr)
+      ? a.seedMmr
+      : Number.isFinite(a.currentMmr)
+      ? a.currentMmr
+      : a.mmr;
+    const mmrB = Number.isFinite(b.seedMmr)
+      ? b.seedMmr
+      : Number.isFinite(b.currentMmr)
+      ? b.currentMmr
+      : b.mmr;
+    if (mmrB !== mmrA) return (mmrB || 0) - (mmrA || 0);
     return a.name.localeCompare(b.name);
   });
   seeded.forEach((p, idx) => (p.seed = idx + 1));

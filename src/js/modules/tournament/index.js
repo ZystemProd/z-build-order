@@ -1446,7 +1446,23 @@ function getManualSeedingSettings(snapshot = state) {
   };
 }
 
-function buildManualOrder(players = [], manualOrder = []) {
+function getMmrSeedingMode(snapshot = state) {
+  return snapshot?.mmrSeedingMode === "registered" ? "registered" : "current";
+}
+
+function applySeedingMmr(players = [], mode = "current") {
+  return (players || []).map((player) => {
+    const base =
+      mode === "registered"
+        ? player?.mmr
+        : Number.isFinite(player?.currentMmr)
+        ? player.currentMmr
+        : player?.mmr;
+    return { ...player, seedMmr: Number.isFinite(base) ? base : null };
+  });
+}
+
+function buildManualOrder(players = [], manualOrder = [], seedMode = "current") {
   const byId = new Map((players || []).map((player) => [player.id, player]));
   const nextOrder = [];
   const used = new Set();
@@ -1460,7 +1476,10 @@ function buildManualOrder(players = [], manualOrder = []) {
   );
   if (!remaining.length) return nextOrder;
   const seededRemaining = applySeeding(
-    remaining.map((player) => ({ ...player }))
+    applySeedingMmr(
+      remaining.map((player) => ({ ...player })),
+      seedMode
+    )
   );
   seededRemaining.forEach((player) => {
     if (!player?.id || used.has(player.id)) return;
@@ -1470,10 +1489,10 @@ function buildManualOrder(players = [], manualOrder = []) {
   return nextOrder;
 }
 
-function applyManualSeeding(players = [], manualOrder = []) {
+function applyManualSeeding(players = [], manualOrder = [], seedMode = "current") {
   const clones = (players || []).map((player) => ({ ...player }));
   const byId = new Map(clones.map((player) => [player.id, player]));
-  const nextOrder = buildManualOrder(clones, manualOrder);
+  const nextOrder = buildManualOrder(clones, manualOrder, seedMode);
   const seeded = nextOrder.map((id) => byId.get(id)).filter(Boolean);
   seeded.forEach((player, idx) => {
     player.seed = idx + 1;
@@ -1483,10 +1502,16 @@ function applyManualSeeding(players = [], manualOrder = []) {
 
 function seedPlayersForState(players = [], snapshot = state) {
   const { enabled, order } = getManualSeedingSettings(snapshot);
+  const seedMode = getMmrSeedingMode(snapshot);
   if (enabled) {
-    return applyManualSeeding(players, order);
+    return applyManualSeeding(players, order, seedMode);
   }
-  return applySeeding((players || []).map((player) => ({ ...player })));
+  return applySeeding(
+    applySeedingMmr(
+      (players || []).map((player) => ({ ...player })),
+      seedMode
+    )
+  );
 }
 
 function seedEligiblePlayersWithMode(players = [], snapshot = state) {
@@ -1546,8 +1571,9 @@ function setManualSeedingEnabled(nextEnabled) {
   }
   const enabled = Boolean(nextEnabled);
   const current = getManualSeedingSettings(state);
+  const seedMode = getMmrSeedingMode(state);
   const nextOrder = enabled
-    ? buildManualOrder(state.players || [], current.order)
+    ? buildManualOrder(state.players || [], current.order, seedMode)
     : current.order;
   const nextSnapshot = {
     ...state,
@@ -1560,10 +1586,36 @@ function setManualSeedingEnabled(nextEnabled) {
   );
 }
 
+function setMmrSeedingMode(nextMode) {
+  if (state.isLive) {
+    showToast?.("Tournament is live. Seeding is locked.", "error");
+    renderAll();
+    return;
+  }
+  const mode = nextMode === "registered" ? "registered" : "current";
+  if (getMmrSeedingMode(state) === mode) {
+    updateMmrSeedingUi();
+    return;
+  }
+  const nextSnapshot = {
+    ...state,
+    mmrSeedingMode: mode,
+  };
+  applySeedingStateUpdate(
+    nextSnapshot,
+    `Seeding uses ${mode === "current" ? "current" : "registered"} MMR`
+  );
+}
+
 function handleManualSeedingReorder(nextOrder = []) {
   if (!Array.isArray(nextOrder) || !nextOrder.length) return;
   if (state.isLive) return;
-  const normalizedOrder = buildManualOrder(state.players || [], nextOrder);
+  const seedMode = getMmrSeedingMode(state);
+  const normalizedOrder = buildManualOrder(
+    state.players || [],
+    nextOrder,
+    seedMode
+  );
   const currentOrder = getManualSeedingSettings(state).order;
   const isSame =
     normalizedOrder.length === currentOrder.length &&
@@ -1681,6 +1733,7 @@ function renderAll(matchIds = null) {
     manualSeeding: state.manualSeedingEnabled,
   });
   updateManualSeedingUi();
+  updateMmrSeedingUi();
   updateBotManagerCount();
 
   if (currentTournamentMeta) {
@@ -1695,6 +1748,7 @@ function renderAll(matchIds = null) {
     const registerBtn = document.getElementById("registerBtn");
     const goLiveBtn = document.getElementById("rebuildBracketBtn");
     const notifyCheckInBtn = document.getElementById("notifyCheckInBtn");
+    const refreshMmrBtn = document.getElementById("refreshMmrBtn");
     const resetTournamentBtn = document.getElementById("resetTournamentBtn");
     const startMs = getStartTimeMs(currentTournamentMeta);
     const liveDot = document.getElementById("liveDot");
@@ -1908,6 +1962,12 @@ function renderAll(matchIds = null) {
         state.isLive ||
         !checkInState.isOpen ||
         eligibleNotCheckedIn.length === 0;
+    }
+    if (refreshMmrBtn) {
+      const refreshable = eligiblePlayers.some((player) =>
+        normalizeSc2PulseIdUrl(player?.sc2Link || "")
+      );
+      refreshMmrBtn.disabled = state.isLive || !refreshable;
     }
 
     updateCheckInUI();
@@ -2197,6 +2257,121 @@ async function notifyCheckInPlayers() {
   }
 }
 
+async function refreshRosterMmrFromPulse() {
+  if (!isAdmin) {
+    showToast?.("Only admins can refresh MMR.", "error");
+    return;
+  }
+  if (state.isLive) {
+    showToast?.("Tournament is live. MMR refresh is locked.", "error");
+    return;
+  }
+  const eligiblePlayers = getEligiblePlayers(state.players || []);
+  const targets = eligiblePlayers.filter((player) =>
+    normalizeSc2PulseIdUrl(player?.sc2Link || "")
+  );
+  if (!targets.length) {
+    showToast?.("No SC2Pulse links to refresh.", "error");
+    return;
+  }
+
+  const refreshBtn = document.getElementById("refreshMmrBtn");
+  const originalLabel = refreshBtn?.textContent;
+  const statusWrap = document.getElementById("mmrRefreshStatus");
+  const statusText = document.getElementById("mmrRefreshText");
+  const statusFill = document.getElementById("mmrRefreshFill");
+  const total = targets.length;
+  let completed = 0;
+  const updateProgress = () => {
+    if (!statusText || !statusFill) return;
+    const percent = total ? Math.round((completed / total) * 100) : 0;
+    statusText.textContent = `Refreshing MMR... ${completed} of ${total}`;
+    statusFill.style.width = `${percent}%`;
+  };
+  if (refreshBtn) {
+    refreshBtn.disabled = true;
+    refreshBtn.textContent = "Refreshing...";
+  }
+  if (statusWrap) {
+    statusWrap.style.display = "flex";
+  }
+  updateProgress();
+
+  const updatesById = new Map();
+  let updatedCount = 0;
+  let failedCount = 0;
+
+  try {
+    for (const player of targets) {
+      const url = normalizeSc2PulseIdUrl(player?.sc2Link || "");
+      if (!url) {
+        failedCount += 1;
+        completed += 1;
+        updateProgress();
+        continue;
+      }
+      try {
+        const payload = await fetchPulseMmrFromBackend(url);
+        const byRace = payload.byRace || null;
+        const nextMmr = resolveRaceMmr(byRace, player?.race || "", payload.mmr);
+        if (!Number.isFinite(nextMmr)) {
+          failedCount += 1;
+          completed += 1;
+          updateProgress();
+          continue;
+        }
+        updatesById.set(player.id, {
+          currentMmr: nextMmr,
+          mmrByRace: byRace || null,
+          pulseName: payload.pulseName || player?.pulseName || "",
+          sc2Link: url,
+        });
+        updatedCount += 1;
+      } catch (_) {
+        failedCount += 1;
+      }
+      completed += 1;
+      updateProgress();
+    }
+
+    if (!updatesById.size) {
+      showToast?.("No MMR updates found.", "error");
+      return;
+    }
+
+    await updateRosterWithTransaction(
+      (players) =>
+        (players || []).map((player) => {
+          const patch = updatesById.get(player?.id);
+          return patch ? { ...player, ...patch } : player;
+        }),
+      { needsReseed: true }
+    );
+
+    const failedSuffix = failedCount ? ` (${failedCount} failed)` : "";
+    showToast?.(
+      `Updated ${updatedCount} player${
+        updatedCount === 1 ? "" : "s"
+      }${failedSuffix}.`,
+      "success"
+    );
+  } finally {
+    if (statusText && statusFill) {
+      statusText.textContent = "MMR refresh complete.";
+      statusFill.style.width = "100%";
+    }
+    if (statusWrap) {
+      setTimeout(() => {
+        statusWrap.style.display = "none";
+      }, 1200);
+    }
+    if (refreshBtn) {
+      refreshBtn.disabled = false;
+      refreshBtn.textContent = originalLabel || "Refresh MMR";
+    }
+  }
+}
+
 async function toggleCheckInManualClose() {
   if (!isAdmin) {
     showToast?.("Only admins can update check-in.", "error");
@@ -2328,7 +2503,7 @@ function addActivity(message, options = {}) {
 
 function updateManualSeedingUi() {
   const toggle = document.getElementById("manualSeedingToggle");
-  const help = document.getElementById("manualSeedingHelp");
+  const help = document.getElementById("seedingModeHelp");
   const enabled = Boolean(state.manualSeedingEnabled);
   const locked = state.isLive;
   if (toggle) {
@@ -2341,8 +2516,23 @@ function updateManualSeedingUi() {
         ? "Manual seeding is locked while live."
         : "Drag rows to set manual seed order.";
     } else {
-      help.textContent = "Automatic seeding uses points and MMR.";
+      const mode = getMmrSeedingMode(state);
+      help.textContent = locked
+        ? "Seeding is locked while live."
+        : mode === "current"
+        ? "Sorting uses current MMR."
+        : "Sorting uses registered MMR.";
     }
+  }
+}
+
+function updateMmrSeedingUi() {
+  const toggle = document.getElementById("mmrSeedingToggle");
+  const mode = getMmrSeedingMode(state);
+  const locked = state.isLive || state.manualSeedingEnabled;
+  if (toggle) {
+    toggle.checked = mode === "current";
+    toggle.disabled = locked;
   }
 }
 
@@ -2414,7 +2604,11 @@ function buildPlayerFromData(data, players = state.players || []) {
     (p) => p.id === id || (data.name && p.name === data.name)
   );
   if (existing) return { ...existing, ...data, id: existing.id || id };
-  return { ...data, id };
+  const created = { ...data, id };
+  if (created.currentMmr === undefined && Number.isFinite(created.mmr)) {
+    created.currentMmr = created.mmr;
+  }
+  return created;
 }
 
 function createOrUpdatePlayer(data) {
@@ -5327,6 +5521,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     setManualSeedingEnabled,
     getManualSeedingActive,
     handleManualSeedingReorder,
+    setMmrSeedingMode,
     updateMatchScore,
     updateRegistrationRequirementIcons,
     renderAll,
@@ -5345,6 +5540,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     notifyCheckInPlayers,
     toggleCheckInManualClose,
     toggleLiveTournament,
+    refreshRosterMmrFromPulse,
   });
   document.addEventListener("click", (event) => {
     const target = event.target;
@@ -5820,6 +6016,17 @@ function normalizeRaceKey(raw) {
   if (val.startsWith("t")) return "terran";
   if (val.startsWith("r")) return "random";
   return "";
+}
+
+function resolveRaceMmr(byRace, raceLabel, fallbackMmr) {
+  const key = normalizeRaceKey(raceLabel);
+  if (key && byRace && Number.isFinite(byRace[key])) {
+    return Math.round(byRace[key]);
+  }
+  if (Number.isFinite(fallbackMmr)) {
+    return Math.round(fallbackMmr);
+  }
+  return null;
 }
 
 async function autoFillPlayers() {
