@@ -1,6 +1,10 @@
 import DOMPurify from "dompurify";
 import { state, currentTournamentMeta, defaultBestOf } from "../state.js";
-import { getAllMatches, getMatchLookup, resolveParticipants } from "./lookup.js";
+import {
+  getAllMatches,
+  getMatchLookup,
+  resolveParticipants,
+} from "./lookup.js";
 import { generateSeedPositions } from "./build.js";
 import {
   escapeHtml,
@@ -166,7 +170,10 @@ function isCurrentUserPlayer(player) {
   if (!currentUsernameHint) return false;
   const name = (player?.name || "").trim().toLowerCase();
   const pulseName = (player?.pulseName || "").trim().toLowerCase();
-  return Boolean(currentUsernameHint && (name === currentUsernameHint || pulseName === currentUsernameHint));
+  return Boolean(
+    currentUsernameHint &&
+    (name === currentUsernameHint || pulseName === currentUsernameHint),
+  );
 }
 
 function getWalkoverSide(match, participants) {
@@ -180,10 +187,10 @@ function getWalkoverSide(match, participants) {
 function displayValueFor(match, idx, participants) {
   const walkover = getWalkoverSide(match, participants);
   if (walkover === "a") {
-    return idx === 0 ? "w/o" : match.scores?.[1] ?? 0;
+    return idx === 0 ? "w/o" : (match.scores?.[1] ?? 0);
   }
   if (walkover === "b") {
-    return idx === 1 ? "w/o" : match.scores?.[0] ?? 0;
+    return idx === 1 ? "w/o" : (match.scores?.[0] ?? 0);
   }
   return match.scores?.[idx] ?? 0;
 }
@@ -197,7 +204,15 @@ function normalizeImageSrc(value) {
   }
 }
 
-function updateTreeMatchRow(row, player, match, participantIdx, lookup, bestOf, participants) {
+function updateTreeMatchRow(
+  row,
+  player,
+  match,
+  participantIdx,
+  lookup,
+  bestOf,
+  participants,
+) {
   if (!row) return;
   const isPlaceholder = !player;
   const name = player
@@ -221,7 +236,7 @@ function updateTreeMatchRow(row, player, match, participantIdx, lookup, bestOf, 
   }
 
   if (clanImg) {
-    const nextSrc = clanLogo || "img/clan/logo.webp";
+    const nextSrc = clanLogo || "img/clan/logo-18px.webp";
     const nextAlt = clanLogo ? "Clan logo" : "No clan logo";
     if (clanLogo) {
       clanImg.classList.toggle("is-placeholder", false);
@@ -258,7 +273,7 @@ function updateTreeMatchRow(row, player, match, participantIdx, lookup, bestOf, 
     const autoReveal = shouldRevealParticipant(
       match?.id,
       participantIdx,
-      player?.id || null
+      player?.id || null,
     );
     const reveal = consumeNameReveal(match?.id, participantIdx) || autoReveal;
     nameText.className = `name-text ${[
@@ -271,10 +286,16 @@ function updateTreeMatchRow(row, player, match, participantIdx, lookup, bestOf, 
   }
 
   if (scoreEl) {
-    const selectVal = getSelectValue(match, participantIdx, bestOf, participants);
+    const selectVal = getSelectValue(
+      match,
+      participantIdx,
+      bestOf,
+      participants,
+    );
     const scoreLabel =
       String(selectVal).toUpperCase() === "W" ? "w/o" : String(selectVal ?? 0);
-    const showScores = Boolean(participants?.[0] && participants?.[1]) ||
+    const showScores =
+      Boolean(participants?.[0] && participants?.[1]) ||
       Boolean(getWalkoverSide(match, participants));
     scoreEl.textContent = scoreLabel;
     scoreEl.classList.toggle("winner", match.winnerId === player?.id);
@@ -284,7 +305,8 @@ function updateTreeMatchRow(row, player, match, participantIdx, lookup, bestOf, 
 
 function updateTreeMatchCastIndicator(card, match) {
   if (!card || !match) return;
-  const cast = match.status === "complete" ? null : state.matchCasts?.[match.id] || null;
+  const cast =
+    match.status === "complete" ? null : state.matchCasts?.[match.id] || null;
   const existing = card.querySelector(".cast-indicator-btn");
   if (!cast) {
     if (existing) existing.remove();
@@ -365,7 +387,7 @@ function renderCastIndicator(match) {
   if (!cast) return "";
   const casterName = escapeHtml(cast.name || "Caster");
   return `<button class="cast-indicator cast-indicator-btn" type="button" data-match-id="${escapeHtml(
-    match.id || ""
+    match.id || "",
   )}" title="Casting: ${casterName}" aria-label="Casting">
     ${CAST_ICON_SVG}
   </button>`;
@@ -379,17 +401,19 @@ export function renderMatchCard(match, lookup, playersById) {
     match.walkover === "a"
       ? "Walkover (Player A)"
       : match.walkover === "b"
-      ? "Walkover (Player B)"
-      : match.status === "complete"
-      ? "Completed"
-      : "Pending";
+        ? "Walkover (Player B)"
+        : match.status === "complete"
+          ? "Completed"
+          : "Pending";
 
   const cls = ["match-card"];
   if (hasScoreReport) cls.push("score-report");
   if (match.status === "complete") cls.push("complete");
   if (match.walkover) cls.push("walkover");
   const isReady = Boolean(pA && pB && match.status !== "complete");
-  const isUserMatch = Boolean(isCurrentUserPlayer(pA) || isCurrentUserPlayer(pB));
+  const isUserMatch = Boolean(
+    isCurrentUserPlayer(pA) || isCurrentUserPlayer(pB),
+  );
   if (isReady && isUserMatch) cls.push("ready");
 
   const valA = displayValueFor(match, 0, participants);
@@ -415,10 +439,10 @@ export function renderMatchCard(match, lookup, playersById) {
         canVeto
           ? `<button class="cta small ghost veto-btn" data-match-id="${match.id}">Veto / pick maps</button>`
           : match.status === "complete"
-          ? `<span class="helper">Match complete</span>`
-          : hasPlayers
-          ? `<span class="helper">In progress</span>`
-          : `<span class="helper">Waiting for players</span>`
+            ? `<span class="helper">Match complete</span>`
+            : hasPlayers
+              ? `<span class="helper">In progress</span>`
+              : `<span class="helper">Waiting for players</span>`
       }
     </div>
     <button class="hover-info-container info-btn" data-match-id="${
@@ -433,7 +457,7 @@ export function updateTreeMatchCards(
   matchIds,
   lookup,
   playersById,
-  { currentUsername, currentUid } = {}
+  { currentUsername, currentUid } = {},
 ) {
   if (!Array.isArray(matchIds) || !matchIds.length || !lookup || !playersById) {
     return false;
@@ -450,14 +474,16 @@ export function updateTreeMatchCards(
     const match = lookup.get(matchId);
     if (!match) return;
     const card = document.querySelector(
-      `.match-card.tree[data-match-id="${matchId}"]`
+      `.match-card.tree[data-match-id="${matchId}"]`,
     );
     if (!card) return;
     const participants = resolveParticipants(match, lookup, playersById);
     const [pA, pB] = participants;
     const bestOf = getBestOfForMatch(match);
     const isReady = Boolean(pA && pB && match.status !== "complete");
-    const isUserMatch = Boolean(isCurrentUserPlayer(pA) || isCurrentUserPlayer(pB));
+    const isUserMatch = Boolean(
+      isCurrentUserPlayer(pA) || isCurrentUserPlayer(pB),
+    );
     const hasScoreReport = Boolean(state?.scoreReports?.[match.id]);
     card.classList.toggle("ready", isReady && isUserMatch);
     card.classList.toggle("score-report", hasScoreReport);
@@ -470,10 +496,22 @@ export function updateTreeMatchCards(
   return updated;
 }
 
-export function renderPlayerRow(player, score, label, bestOf, match, participantIdx, lookup) {
+export function renderPlayerRow(
+  player,
+  score,
+  label,
+  bestOf,
+  match,
+  participantIdx,
+  lookup,
+) {
   if (!player) {
     shouldRevealParticipant(match?.id, participantIdx, null);
-    const placeholderText = displayPlaceholderForSource(match, participantIdx, lookup);
+    const placeholderText = displayPlaceholderForSource(
+      match,
+      participantIdx,
+      lookup,
+    );
     return `<div class="player-row">
       <div class="player-name placeholder-tag">${escapeHtml(placeholderText)}</div>
       <select class="result-select score-select" name="score-${match.id}-${participantIdx}" data-match-id="${match.id}" data-player-idx="${participantIdx}" disabled>
@@ -484,10 +522,9 @@ export function renderPlayerRow(player, score, label, bestOf, match, participant
   const autoReveal = shouldRevealParticipant(
     match?.id,
     participantIdx,
-    player.id || null
+    player.id || null,
   );
-  const revealName =
-    consumeNameReveal(match?.id, participantIdx) || autoReveal;
+  const revealName = consumeNameReveal(match?.id, participantIdx) || autoReveal;
   const nameClass = ["player-name", "player-detail-trigger"];
   if (revealName) nameClass.push("name-reveal");
   return `<div class="player-row" data-participant-idx="${participantIdx}">
@@ -495,9 +532,9 @@ export function renderPlayerRow(player, score, label, bestOf, match, participant
       <span class="seed-chip">#${player.seed || "?"}</span>
       <div>
         <strong>${escapeHtml(player.name)}</strong>
-        <div class="helper">${player.points || 0} pts  ${
-    player.mmr || 0
-  } MMR</div>
+        <div class="helper">${player.points || 0} pts ${
+          player.mmr || 0
+        } MMR</div>
       </div>
     </div>
     <select class="result-select score-select" name="score-${label}" data-player="${label}" data-match-id="${match.id}" data-player-idx="${participantIdx}">
@@ -513,10 +550,10 @@ export function renderScoreOptions(current, bestOf = 3) {
     (_, val) =>
       `<option value="${val}" ${
         Number(current) === val ? "selected" : ""
-      }>${val}</option>`
+      }>${val}</option>`,
   );
   options.push(
-    `<option value="W" ${isWalkover ? "selected" : ""}>w/o</option>`
+    `<option value="W" ${isWalkover ? "selected" : ""}>w/o</option>`,
   );
   return options.join("");
 }
@@ -524,41 +561,48 @@ export function renderScoreOptions(current, bestOf = 3) {
 export function clampScoreSelectOptions() {
   if (!state?.bracket) return;
   const lookup = getMatchLookup(state.bracket);
-  const playersById = new Map((state.players || []).map((player) => [player.id, player]));
-  document.querySelectorAll("select.result-select, select.score-select").forEach((sel) => {
-    const matchId = sel.dataset.matchId || sel.closest(".match-card")?.dataset?.matchId;
-    const match = lookup.get(matchId);
-    const bestOf = getBestOfForMatch(match || { bracket: "winners", round: 1 });
-    const maxWins = Math.max(1, Math.ceil((bestOf || 1) / 2));
-    const prev = sel.value;
-    sel.innerHTML = Array.from({ length: maxWins + 1 })
-      .map((_, val) => `<option value="${val}">${val}</option>`)
-      .join("")
-      .concat(`<option value="W">w/o</option>`);
-    const forIdx = Number(sel.dataset.playerIdx || "0");
-    const needed = maxWins;
-    if (match?.walkover === "a") {
-      sel.value = forIdx === 0 ? "W" : String(needed);
-    } else if (match?.walkover === "b") {
-      sel.value = forIdx === 1 ? "W" : String(needed);
-    } else if (match) {
-      const participants = resolveParticipants(match, lookup, playersById);
-      const previewWalkover = getWalkoverSide(match, participants);
-      if (previewWalkover === "a") {
-        sel.value = forIdx === 0 ? "W" : "0";
-      } else if (previewWalkover === "b") {
-        sel.value = forIdx === 1 ? "W" : "0";
+  const playersById = new Map(
+    (state.players || []).map((player) => [player.id, player]),
+  );
+  document
+    .querySelectorAll("select.result-select, select.score-select")
+    .forEach((sel) => {
+      const matchId =
+        sel.dataset.matchId || sel.closest(".match-card")?.dataset?.matchId;
+      const match = lookup.get(matchId);
+      const bestOf = getBestOfForMatch(
+        match || { bracket: "winners", round: 1 },
+      );
+      const maxWins = Math.max(1, Math.ceil((bestOf || 1) / 2));
+      const prev = sel.value;
+      sel.innerHTML = Array.from({ length: maxWins + 1 })
+        .map((_, val) => `<option value="${val}">${val}</option>`)
+        .join("")
+        .concat(`<option value="W">w/o</option>`);
+      const forIdx = Number(sel.dataset.playerIdx || "0");
+      const needed = maxWins;
+      if (match?.walkover === "a") {
+        sel.value = forIdx === 0 ? "W" : String(needed);
+      } else if (match?.walkover === "b") {
+        sel.value = forIdx === 1 ? "W" : String(needed);
+      } else if (match) {
+        const participants = resolveParticipants(match, lookup, playersById);
+        const previewWalkover = getWalkoverSide(match, participants);
+        if (previewWalkover === "a") {
+          sel.value = forIdx === 0 ? "W" : "0";
+        } else if (previewWalkover === "b") {
+          sel.value = forIdx === 1 ? "W" : "0";
+        } else if ([...sel.options].some((o) => o.value === prev)) {
+          sel.value = prev;
+        } else {
+          sel.value = "0";
+        }
       } else if ([...sel.options].some((o) => o.value === prev)) {
         sel.value = prev;
       } else {
         sel.value = "0";
       }
-    } else if ([...sel.options].some((o) => o.value === prev)) {
-      sel.value = prev;
-    } else {
-      sel.value = "0";
-    }
-  });
+    });
 }
 
 export function renderSimpleMatch(
@@ -572,23 +616,25 @@ export function renderSimpleMatch(
   prefix = "",
   extraStyle = "",
   layout = "tree",
-  lookup = null
+  lookup = null,
 ) {
   const isTreeLayout = layout === "tree";
   const isReady = Boolean(pA && pB && match?.status !== "complete");
-  const isUserMatch = Boolean(isCurrentUserPlayer(pA) || isCurrentUserPlayer(pB));
+  const isUserMatch = Boolean(
+    isCurrentUserPlayer(pA) || isCurrentUserPlayer(pB),
+  );
   const shouldHighlightReady = isReady && isUserMatch;
   const hasScoreReport = Boolean(state?.scoreReports?.[match.id]);
   const cardClass = isTreeLayout
     ? `match-card tree${shouldHighlightReady ? " ready" : ""}`
     : `match-card group${shouldHighlightReady ? " ready" : ""}`;
   const scoreReportClass = hasScoreReport ? " score-report" : "";
-    const aIsPlaceholder = !pA;
-    const bIsPlaceholder = !pB;
-    const autoRevealA = shouldRevealParticipant(match?.id, 0, pA?.id || null);
-    const autoRevealB = shouldRevealParticipant(match?.id, 1, pB?.id || null);
-    const revealA = consumeNameReveal(match?.id, 0) || autoRevealA;
-    const revealB = consumeNameReveal(match?.id, 1) || autoRevealB;
+  const aIsPlaceholder = !pA;
+  const bIsPlaceholder = !pB;
+  const autoRevealA = shouldRevealParticipant(match?.id, 0, pA?.id || null);
+  const autoRevealB = shouldRevealParticipant(match?.id, 1, pB?.id || null);
+  const revealA = consumeNameReveal(match?.id, 0) || autoRevealA;
+  const revealB = consumeNameReveal(match?.id, 1) || autoRevealB;
   const aName = pA ? pA.name : displayPlaceholderForSource(match, 0, lookup);
   const bName = pB ? pB.name : displayPlaceholderForSource(match, 1, lookup);
   const raceClassA = raceClassName(pA?.race);
@@ -631,23 +677,24 @@ export function renderSimpleMatch(
         pA ? "" : "is-placeholder"
       }">${pA ? `#${pA.seed || "?"}` : ""}</span><span class="race-strip ${raceClassA}"></span>${
         clanLogoA
-            ? `<img class="clan-logo-inline" src="${escapeHtml(
-                clanLogoA
-              )}" alt="Clan logo" loading="eager" decoding="sync" ${
-                clanNameA ? `data-tooltip="${escapeHtml(clanNameA)}"` : ""
-              } />`
-            : `<img class="clan-logo-inline is-placeholder" src="img/clan/logo.webp" alt="No clan logo" loading="eager" decoding="sync" />`
-        }<span class="name-text ${
-      [aIsPlaceholder ? "is-placeholder" : "", revealA && !aIsPlaceholder ? "name-reveal" : ""]
+          ? `<img class="clan-logo-inline" src="${escapeHtml(
+              clanLogoA,
+            )}" alt="Clan logo" loading="eager" decoding="sync" ${
+              clanNameA ? `data-tooltip="${escapeHtml(clanNameA)}"` : ""
+            } />`
+          : `<img class="clan-logo-inline is-placeholder" src="img/clan/logo-18px.webp" alt="No clan logo" loading="eager" decoding="sync" />`
+      }<span class="name-text ${[
+        aIsPlaceholder ? "is-placeholder" : "",
+        revealA && !aIsPlaceholder ? "name-reveal" : "",
+      ]
         .filter(Boolean)
-        .join(" ")
-    }">${escapeHtml(aName)}</span></span>
+        .join(" ")}">${escapeHtml(aName)}</span></span>
       <div class="row-actions">
         <div class="score-select score-display ${
           match.winnerId === pA?.id ? "winner" : ""
         }" data-match-id="${match.id}" data-player-idx="0" ${
-    showScores ? "" : 'style="display:none;"'
-  }>${escapeHtml(scoreLabelA)}</div>
+          showScores ? "" : 'style="display:none;"'
+        }>${escapeHtml(scoreLabelA)}</div>
       </div>
     </div>
     <div class="row ${
@@ -657,23 +704,24 @@ export function renderSimpleMatch(
         pB ? "" : "is-placeholder"
       }">${pB ? `#${pB.seed || "?"}` : ""}</span><span class="race-strip ${raceClassB}"></span>${
         clanLogoB
-            ? `<img class="clan-logo-inline" src="${escapeHtml(
-                clanLogoB
-              )}" alt="Clan logo" loading="eager" decoding="sync" ${
-                clanNameB ? `data-tooltip="${escapeHtml(clanNameB)}"` : ""
-              } />`
-            : `<img class="clan-logo-inline is-placeholder" src="img/clan/logo.webp" alt="No clan logo" loading="eager" decoding="sync" />`
-        }<span class="name-text ${
-      [bIsPlaceholder ? "is-placeholder" : "", revealB && !bIsPlaceholder ? "name-reveal" : ""]
+          ? `<img class="clan-logo-inline" src="${escapeHtml(
+              clanLogoB,
+            )}" alt="Clan logo" loading="eager" decoding="sync" ${
+              clanNameB ? `data-tooltip="${escapeHtml(clanNameB)}"` : ""
+            } />`
+          : `<img class="clan-logo-inline is-placeholder" src="img/clan/logo-18px.webp" alt="No clan logo" loading="eager" decoding="sync" />`
+      }<span class="name-text ${[
+        bIsPlaceholder ? "is-placeholder" : "",
+        revealB && !bIsPlaceholder ? "name-reveal" : "",
+      ]
         .filter(Boolean)
-        .join(" ")
-    }">${escapeHtml(bName)}</span></span>
+        .join(" ")}">${escapeHtml(bName)}</span></span>
       <div class="row-actions">
         <div class="score-select score-display ${
           match.winnerId === pB?.id ? "winner" : ""
         }" data-match-id="${match.id}" data-player-idx="1" ${
-    showScores ? "" : 'style="display:none;"'
-  }>${escapeHtml(scoreLabelB)}</div>
+          showScores ? "" : 'style="display:none;"'
+        }>${escapeHtml(scoreLabelB)}</div>
       </div>
     </div>
     <button class="hover-info-container info-btn" data-match-id="${
@@ -697,7 +745,7 @@ export function layoutBracketSection(
   playersById,
   offsetX,
   matchLayerOffset = 0,
-  roundLabelOptions = {}
+  roundLabelOptions = {},
 ) {
   if (!rounds?.length) {
     return { html: "", height: 0 };
@@ -737,7 +785,7 @@ export function layoutBracketSection(
       if (!children.length) {
         groupKey = `z-${String(rIdx).padStart(2, "0")}-${String(mIdx).padStart(
           2,
-          "0"
+          "0",
         )}`;
       } else {
         let best = children[0];
@@ -751,7 +799,7 @@ export function layoutBracketSection(
           }
         }
         groupKey = `${String(best.roundIndex).padStart(2, "0")}-${String(
-          best.matchIndex
+          best.matchIndex,
         ).padStart(2, "0")}`;
       }
 
@@ -775,11 +823,13 @@ export function layoutBracketSection(
   const baseStep = CARD_HEIGHT + V_GAP;
 
   const matchById = new Map();
-  orderedRounds.forEach((round) => round.forEach((m) => matchById.set(m.id, m)));
+  orderedRounds.forEach((round) =>
+    round.forEach((m) => matchById.set(m.id, m)),
+  );
 
   const maxMatches = orderedRounds.reduce(
     (acc, round) => Math.max(acc, round.length || 0),
-    0
+    0,
   );
   const baseSize = Math.max(2, maxMatches * 2);
   const seedOrder = generateSeedPositions(baseSize);
@@ -797,9 +847,10 @@ export function layoutBracketSection(
     if (src.type === "player") {
       const player = playersById.get(src.playerId || "");
       const seed = player?.seed;
-      const leaf = Number.isFinite(seed) && seedToLeafIdx.has(seed)
-        ? seedToLeafIdx.get(seed)
-        : fallbackLeaf++;
+      const leaf =
+        Number.isFinite(seed) && seedToLeafIdx.has(seed)
+          ? seedToLeafIdx.get(seed)
+          : fallbackLeaf++;
       return { min: leaf, max: leaf };
     }
     return null;
@@ -848,7 +899,9 @@ export function layoutBracketSection(
 
   // For lower bracket layouts, remap slots densely to remove large vertical gaps.
   if (titlePrefix === "Lower" && slotMap.size) {
-    const uniqueSlots = Array.from(new Set(slotMap.values())).sort((a, b) => a - b);
+    const uniqueSlots = Array.from(new Set(slotMap.values())).sort(
+      (a, b) => a - b,
+    );
     const remap = new Map(uniqueSlots.map((s, idx) => [s, idx]));
     slotMap.forEach((slot, id) => {
       slotMap.set(id, remap.get(slot) ?? slot);
@@ -860,17 +913,17 @@ export function layoutBracketSection(
       // Preserve legacy spacing for smaller brackets to avoid overlaps.
       // (21-23 entrants are handled via template slot tweaks.)
     } else {
-    const slots = Array.from(slotMap.values());
-    const minSlot = Math.min(...slots);
-    const maxSlot = Math.max(...slots);
-    const targetRange = Math.max(1, maxMatches - 1);
-    const currentRange = maxSlot - minSlot;
-    if (currentRange > targetRange) {
-      const scale = currentRange / targetRange;
-      slotMap.forEach((slot, id) => {
-        slotMap.set(id, (slot - minSlot) / scale);
-      });
-    }
+      const slots = Array.from(slotMap.values());
+      const minSlot = Math.min(...slots);
+      const maxSlot = Math.max(...slots);
+      const targetRange = Math.max(1, maxMatches - 1);
+      const currentRange = maxSlot - minSlot;
+      if (currentRange > targetRange) {
+        const scale = currentRange / targetRange;
+        slotMap.forEach((slot, id) => {
+          slotMap.set(id, (slot - minSlot) / scale);
+        });
+      }
     }
   }
 
@@ -895,9 +948,9 @@ export function layoutBracketSection(
       // Finals: lock to the first parent’s vertical position for a straight connector
       if (match.bracket === "finals") {
         const parentId =
-          (match.sources || [])
-            .find((src) => src && src.type === "match" && src.matchId)?.matchId ||
-          null;
+          (match.sources || []).find(
+            (src) => src && src.type === "match" && src.matchId,
+          )?.matchId || null;
         const parentPos = parentId ? positions.get(parentId) : null;
         const y = parentPos ? parentPos.y : 0;
         positions.set(match.id, { x, y });
@@ -953,8 +1006,8 @@ export function layoutBracketSection(
           "",
           "",
           "tree",
-          lookup
-        )
+          lookup,
+        ),
       );
     });
   });
@@ -996,8 +1049,8 @@ export function layoutBracketSection(
             {
               from: parentIds[0],
               to: match.id,
-            }
-          )
+            },
+          ),
         );
         connectors.push(
           makeConnector(
@@ -1008,27 +1061,27 @@ export function layoutBracketSection(
             {
               from: parentIds[1],
               to: match.id,
-            }
-          )
+            },
+          ),
         );
         connectors.push(
           makeVConnector(junctionX, midY1, childMidY, {
             from: parentIds[0],
             to: match.id,
-          })
+          }),
         );
         connectors.push(
           makeVConnector(junctionX, midY2, childMidY, {
             from: parentIds[1],
             to: match.id,
-          })
+          }),
         );
         connectors.push(
           makeConnector(junctionX, childMidY, pos.x, childMidY, {
             from: match.id,
             to: match.id,
             parents: parentIds.join(","),
-          })
+          }),
         );
       } else if (renderedParents.length === 1) {
         const parent = renderedParents[0];
@@ -1042,7 +1095,7 @@ export function layoutBracketSection(
               from: parent.id,
               to: match.id,
               parents: parent.id,
-            })
+            }),
           );
         } else {
           const junctionX = pos.x - 30;
@@ -1050,20 +1103,20 @@ export function layoutBracketSection(
             makeConnector(parentEndX, midY, junctionX, midY, {
               from: parent.id,
               to: match.id,
-            })
+            }),
           );
           connectors.push(
             makeVConnector(junctionX, midY, childMidY, {
               from: parent.id,
               to: match.id,
-            })
+            }),
           );
           connectors.push(
             makeConnector(junctionX, childMidY, pos.x, childMidY, {
               from: match.id,
               to: match.id,
               parents: parent.id,
-            })
+            }),
           );
         }
       }
@@ -1079,7 +1132,12 @@ export function layoutBracketSection(
         ? `<span class="round-bo">Bo${bestOfLabel}</span>`
         : "";
 
-      const label = getRoundLabel(titlePrefix, idx, totalRounds, roundLabelOptions);
+      const label = getRoundLabel(
+        titlePrefix,
+        idx,
+        totalRounds,
+        roundLabelOptions,
+      );
 
       return `<div class="round-title row-title" style="left:${
         offsetX + idx * (CARD_WIDTH + H_GAP)
@@ -1112,7 +1170,7 @@ export function makeConnector(x1, y1, x2, y2, meta = {}) {
   const attr = formatConnectorMeta(meta);
   return `<div class="connector h" ${attr} style="left:${Math.min(
     x1,
-    x2
+    x2,
   )}px; top:${y1}px; width:${Math.abs(x2 - x1)}px;"></div>`;
 }
 
@@ -1120,11 +1178,16 @@ export function makeVConnector(x, y1, y2, meta = {}) {
   const attr = formatConnectorMeta(meta);
   return `<div class="connector v" ${attr} style="left:${x}px; top:${Math.min(
     y1,
-    y2
+    y2,
   )}px; height:${Math.abs(y2 - y1)}px;"></div>`;
 }
 
-function getRoundLabel(titlePrefix, idx, totalRounds, { hasGrandFinal = false } = {}) {
+function getRoundLabel(
+  titlePrefix,
+  idx,
+  totalRounds,
+  { hasGrandFinal = false } = {},
+) {
   const fromEnd = totalRounds - idx;
 
   if (titlePrefix === "Playoffs") {
@@ -1137,7 +1200,8 @@ function getRoundLabel(titlePrefix, idx, totalRounds, { hasGrandFinal = false } 
     if (fromEnd === 1) return hasGrandFinal ? "Grand Final" : "Final";
     if (fromEnd === 2) return hasGrandFinal ? "Upper Final" : "Semi-final";
     if (fromEnd === 3) return hasGrandFinal ? "Semi-final" : "Quarterfinal";
-    if (fromEnd === 4) return hasGrandFinal ? "Quarterfinal" : `Upper Round ${idx + 1}`;
+    if (fromEnd === 4)
+      return hasGrandFinal ? "Quarterfinal" : `Upper Round ${idx + 1}`;
     return `Upper Round ${idx + 1}`;
   }
 
@@ -1288,7 +1352,7 @@ export function renderRoundRobinPlayoffs(bracket, lookup, playersById) {
     lookup,
     playersById,
     0,
-    ROUND_TITLE_BAND
+    ROUND_TITLE_BAND,
   );
 
   let lower = { html: "", height: 0 };
@@ -1299,7 +1363,7 @@ export function renderRoundRobinPlayoffs(bracket, lookup, playersById) {
       lookup,
       playersById,
       0,
-      ROUND_TITLE_BAND
+      ROUND_TITLE_BAND,
     );
   }
 
@@ -1321,10 +1385,10 @@ export function renderGroupBlock(group, bracket, lookup, playersById) {
     : [];
   const advanceCount = Math.max(
     0,
-    Number(bracket?.roundRobin?.advancePerGroup || 0)
+    Number(bracket?.roundRobin?.advancePerGroup || 0),
   );
   const winsByPlayer = new Map(
-    standings.map((row) => [row.playerId, row.wins || 0])
+    standings.map((row) => [row.playerId, row.wins || 0]),
   );
   const remainingByPlayer = new Map();
   const countRemaining = (pid) => {
@@ -1367,8 +1431,7 @@ export function renderGroupBlock(group, bracket, lookup, playersById) {
     let ties = 0;
     standings.forEach((row) => {
       if (row.playerId === playerId) return;
-      const otherMax =
-        maxWinsByPlayer.get(row.playerId) ?? (row.wins || 0);
+      const otherMax = maxWinsByPlayer.get(row.playerId) ?? (row.wins || 0);
       if (otherMax > minWins) {
         ahead += 1;
       } else if (otherMax === minWins) {
@@ -1389,7 +1452,7 @@ export function renderGroupBlock(group, bracket, lookup, playersById) {
     const cutoffRow = standings[cutoffIndex];
     const cutoffKey = `${cutoffRow.wins || 0}|${cutoffRow.mapDiff || 0}`;
     const tiedRows = standings.filter(
-      (row) => `${row.wins || 0}|${row.mapDiff || 0}` === cutoffKey
+      (row) => `${row.wins || 0}|${row.mapDiff || 0}` === cutoffKey,
     );
     if (tiedRows.length > 1) {
       tiedRows.forEach((row) => tieCandidates.add(row.playerId));
@@ -1405,14 +1468,10 @@ export function renderGroupBlock(group, bracket, lookup, playersById) {
         const pid = player?.id || "";
         const qualified = qualifiedSet.has(row.playerId);
         const tied = !qualified && isTied(row.playerId);
-        const rowClass = qualified
-          ? "is-qualified"
-          : tied
-          ? "is-tied"
-          : "";
+        const rowClass = qualified ? "is-qualified" : tied ? "is-tied" : "";
         const nameCell = player
           ? `<span class="player-detail-trigger name-text" data-player-id="${pid}">${escapeHtml(
-              player.name
+              player.name,
             )}</span>`
           : "TBD";
         return `<tr class="${rowClass}">
@@ -1441,7 +1500,7 @@ export function renderGroupBlock(group, bracket, lookup, playersById) {
           "",
           "",
           "group",
-          lookup
+          lookup,
         );
       })
       .join("") || `<div class="helper">No matches yet.</div>`;
@@ -1474,11 +1533,11 @@ export function renderGroupBlock(group, bracket, lookup, playersById) {
 export function renderRoundRobinView(
   bracket,
   playersById,
-  computeGroupStandings
+  computeGroupStandings,
 ) {
   if (!bracket || !(bracket.groups || []).length) {
     return DOMPurify.sanitize(
-      `<div class="placeholder">Add players to generate the bracket.</div>`
+      `<div class="placeholder">Add players to generate the bracket.</div>`,
     );
   }
   buildMatchLetters(bracket);
@@ -1486,7 +1545,12 @@ export function renderRoundRobinView(
   const groups = bracket.groups || [];
   const groupHtml = groups
     .map((group) =>
-      renderGroupBlock(group, { ...bracket, computeGroupStandings }, lookup, playersById)
+      renderGroupBlock(
+        group,
+        { ...bracket, computeGroupStandings },
+        lookup,
+        playersById,
+      ),
     )
     .join("");
 
@@ -1544,7 +1608,7 @@ export function renderBracketView({
 
   if (!bracket || !players.length) {
     grid.innerHTML = DOMPurify.sanitize(
-      `<div class="placeholder">Add players to generate the bracket.</div>`
+      `<div class="placeholder">Add players to generate the bracket.</div>`,
     );
     if (grid.dataset.layoutKey) {
       delete grid.dataset.layoutKey;
@@ -1574,7 +1638,12 @@ export function renderBracketView({
     : "";
   const currentLayoutKey = grid.dataset.layoutKey || "";
   const hasTreeLayout = Boolean(grid.querySelector(".tree-wrapper"));
-  if (!isGroupStage && layoutKey && currentLayoutKey === layoutKey && hasTreeLayout) {
+  if (
+    !isGroupStage &&
+    layoutKey &&
+    currentLayoutKey === layoutKey &&
+    hasTreeLayout
+  ) {
     const matchIds = Array.from(lookup.keys());
     updateTreeMatchCards(matchIds, lookup, playersById, {
       currentUsername,
@@ -1591,19 +1660,19 @@ export function renderBracketView({
     delete grid.dataset.layoutKey;
   }
 
-    if (isGroupStage) {
-      grid.innerHTML = renderRoundRobinView(
-        { ...bracket, computeGroupStandings },
-        playersById,
-        computeGroupStandings
-      );
-      attachMatchHoverHandlers();
-      attachMatchActionHandlers?.();
-      clampScoreSelectOptions();
-      annotateConnectorPlayers(lookup, playersById);
-      applyNameRevealAnimations(grid);
-      return;
-    }
+  if (isGroupStage) {
+    grid.innerHTML = renderRoundRobinView(
+      { ...bracket, computeGroupStandings },
+      playersById,
+      computeGroupStandings,
+    );
+    attachMatchHoverHandlers();
+    attachMatchActionHandlers?.();
+    clampScoreSelectOptions();
+    annotateConnectorPlayers(lookup, playersById);
+    applyNameRevealAnimations(grid);
+    return;
+  }
 
   const upperRounds = [...(bracket.winners || [])];
 
@@ -1619,7 +1688,10 @@ export function renderBracketView({
     playersById,
     0,
     ROUND_TITLE_BAND,
-    { hasGrandFinal: Boolean(bracket.finals), playerCount: bracket.seedOrder?.length || 0 }
+    {
+      hasGrandFinal: Boolean(bracket.finals),
+      playerCount: bracket.seedOrder?.length || 0,
+    },
   );
 
   let lower = { html: "", height: 0 };
@@ -1633,19 +1705,19 @@ export function renderBracketView({
           lookup,
           playersById,
           0,
-          ROUND_TITLE_BAND
+          ROUND_TITLE_BAND,
         )
       : { html: "", height: 0 };
   }
 
-    grid.innerHTML = DOMPurify.sanitize(`<div class="tree-wrapper">
+  grid.innerHTML = DOMPurify.sanitize(`<div class="tree-wrapper">
       ${upper.html}
       ${lower.html}
     </div>`);
 
-    attachMatchHoverHandlers();
-    attachMatchActionHandlers?.();
-    clampScoreSelectOptions();
-    annotateConnectorPlayers(lookup, playersById);
-    applyNameRevealAnimations(grid);
-  }
+  attachMatchHoverHandlers();
+  attachMatchActionHandlers?.();
+  clampScoreSelectOptions();
+  annotateConnectorPlayers(lookup, playersById);
+  applyNameRevealAnimations(grid);
+}

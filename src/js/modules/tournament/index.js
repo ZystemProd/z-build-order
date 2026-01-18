@@ -285,6 +285,8 @@ const CURRENT_BRACKET_LAYOUT_VERSION = 54;
 const MAX_TOURNAMENT_IMAGE_SIZE = 12 * 1024 * 1024;
 const COVER_TARGET_WIDTH = 1200;
 const COVER_TARGET_HEIGHT = 675;
+const COVER_CARD_WIDTH = 320;
+const COVER_CARD_HEIGHT = 180;
 const SPONSOR_LOGO_SIZE = 256;
 const COVER_QUALITY = 0.82;
 const PULSE_ENDPOINTS = (() => {
@@ -308,6 +310,7 @@ let isCircuitAdmin = false;
 let circuitPointsBtnTemplate = null;
 let circuitFinalMapPoolSelection = new Set();
 let circuitFinalMapPoolMode = "ladder";
+let mapCatalogPromise = null;
 let inviteLinkGate = {
   slug: "",
   token: "",
@@ -808,6 +811,8 @@ function renderMarkdown(text = "") {
 }
 async function loadMapCatalog() {
   if (mapCatalogLoaded) return mapCatalog;
+  if (mapCatalogPromise) return mapCatalogPromise;
+  mapCatalogPromise = (async () => {
   try {
     const resp = await fetch(MAPS_JSON_URL, { cache: "no-cache" });
     const data = await resp.json();
@@ -822,6 +827,40 @@ async function loadMapCatalog() {
   setMapCatalogState([]);
   setMapCatalogLoadedState(true);
   return mapCatalog;
+  })();
+  return mapCatalogPromise;
+}
+
+function refreshMapCatalogUi() {
+  renderMapPoolPickerUI("mapPoolPicker", { mapPoolSelection, getAll1v1Maps });
+  renderMapPoolPickerUI("settingsMapPoolPicker", {
+    mapPoolSelection,
+    getAll1v1Maps,
+  });
+  renderChosenMapsUI("chosenMapList", { mapPoolSelection, getMapByName });
+  renderChosenMapsUI("settingsChosenMapList", {
+    mapPoolSelection,
+    getMapByName,
+  });
+  updateMapButtonsUI(currentMapPoolMode);
+  renderMapsTabUI(currentTournamentMeta, {
+    mapPoolSelection,
+    getDefaultMapPoolNames,
+    getMapByName,
+  });
+  renderCircuitFinalMapPoolSelection();
+  if (typeof getFinalMapPoolSelection === "function") {
+    setFinalMapPoolSelection(Array.from(getFinalMapPoolSelection()));
+  }
+}
+
+function ensureMapCatalogLoadedForUi() {
+  if (mapCatalogLoaded) return;
+  void loadMapCatalog()
+    .then(() => refreshMapCatalogUi())
+    .catch((err) => {
+      console.warn("Failed to load map catalog", err);
+    });
 }
 
 function safeJsonEqual(a, b) {
@@ -1895,31 +1934,44 @@ function renderAll(matchIds = null) {
         bracketNotLive.style.display = "block";
         if (registeredPlayersList) {
           registeredPlayersList.style.display = "";
-          const items = eligiblePlayers.map((p) => {
-            const name = escapeHtml(p.name || "Unknown");
-            const race = (p.race || "").trim();
-            const raceClass = raceClassName(race);
-            const raceLabel = race ? escapeHtml(race) : "Race TBD";
-            const mmr = Number.isFinite(p.mmr)
-              ? `${Math.round(p.mmr)} MMR`
-              : "MMR TBD";
-            const clanLogo = p?.clanLogoUrl ? sanitizeUrl(p.clanLogoUrl) : "";
-            const clanName = (p?.clan || "").trim();
-            const clanImg = clanLogo
-              ? `<img class="registered-clan-logo" src="${escapeHtml(
-                  clanLogo
-                )}" alt="Clan logo" ${
-                  clanName ? `data-tooltip="${escapeHtml(clanName)}"` : ""
-                } />`
-              : `<img class="registered-clan-logo is-placeholder" src="img/clan/logo.webp" alt="No clan logo" />`;
-            return `<li data-player-id="${escapeHtml(p.id || "")}">
-                <span class="race-strip ${raceClass}"></span>
-                ${clanImg}
-                <span class="name-text">${name}</span>
-                <span class="registered-meta">${raceLabel} · ${mmr}</span>
-              </li>`;
-          });
-          registeredPlayersList.innerHTML = items.join("");
+          const listKey = JSON.stringify(
+            eligiblePlayers.map((p) => ({
+              id: p.id || "",
+              name: p.name || "",
+              race: p.race || "",
+              mmr: Number.isFinite(p.mmr) ? Math.round(p.mmr) : "",
+              clan: p.clan || "",
+              clanLogoUrl: p.clanLogoUrl || "",
+            }))
+          );
+          if (registeredPlayersList.dataset.listKey !== listKey) {
+            registeredPlayersList.dataset.listKey = listKey;
+            const items = eligiblePlayers.map((p) => {
+              const name = escapeHtml(p.name || "Unknown");
+              const race = (p.race || "").trim();
+              const raceClass = raceClassName(race);
+              const raceLabel = race ? escapeHtml(race) : "Race TBD";
+              const mmr = Number.isFinite(p.mmr)
+                ? `${Math.round(p.mmr)} MMR`
+                : "MMR TBD";
+              const clanLogo = p?.clanLogoUrl ? sanitizeUrl(p.clanLogoUrl) : "";
+              const clanName = (p?.clan || "").trim();
+              const clanImg = clanLogo
+                ? `<img class="registered-clan-logo" src="${escapeHtml(
+                    clanLogo
+                  )}" alt="Clan logo" ${
+                    clanName ? `data-tooltip="${escapeHtml(clanName)}"` : ""
+                  } />`
+                : `<img class="registered-clan-logo is-placeholder" src="img/clan/logo-18px.webp" alt="No clan logo" />`;
+              return `<li data-player-id="${escapeHtml(p.id || "")}">
+                        <span class="race-strip ${raceClass}"></span>
+                        ${clanImg}
+                        <span class="name-text">${name}</span>
+                        <span class="registered-meta">${raceLabel} - ${mmr}</span>
+                      </li>`;
+            });
+            registeredPlayersList.innerHTML = items.join("");
+          }
         }
       } else {
         if (bracketNotLiveMessage) {
@@ -2751,6 +2803,17 @@ function rebuildBracket(force = false, reason = "") {
   renderAll();
 }
 
+
+function resolveCoverUrlSmall(item = {}) {
+  const small = item.coverImageUrlSmall || "";
+  if (small) return small;
+  const large = item.coverImageUrl || "";
+  if (large.includes("/tournamentCovers/") && large.includes("-1200.")) {
+    return large.replace("-1200.", "-320.");
+  }
+  return large;
+}
+
 async function renderTournamentList() {
   const listEl = document.getElementById("tournamentList");
   const statTournaments = document.getElementById("statTournaments");
@@ -2942,7 +3005,7 @@ async function renderTournamentList() {
                 minute: "2-digit",
               }).format(new Date(item.startTime))
             : "TBD";
-          const coverUrl = sanitizeUrl(item.coverImageUrl || "");
+    const coverUrl = sanitizeUrl(resolveCoverUrlSmall(item));
           let statusLabel = "TBD";
           let statusClass = "status-tbd";
           if (item.startTime) {
@@ -3532,27 +3595,30 @@ async function saveCircuitSettings() {
       const reuseUrl = finalImagePreview?.dataset?.reuseUrl || "";
       if (imageFile) {
         try {
-          const coverImageUrl = await uploadTournamentCover(
-            imageFile,
-            finalSlug
-          );
+          const uploaded = await uploadTournamentCover(imageFile, finalSlug);
+          finalPayload.coverImageUrl = uploaded.coverImageUrl;
+          finalPayload.coverImageUrlSmall = uploaded.coverImageUrlSmall;
           await setDoc(
             doc(collection(db, TOURNAMENT_COLLECTION), finalSlug),
-            { coverImageUrl },
+            {
+              coverImageUrl: uploaded.coverImageUrl,
+              coverImageUrlSmall: uploaded.coverImageUrlSmall,
+            },
             { merge: true }
           );
         } catch (err) {
-          showToast?.(
-            err?.message || "Failed to upload final cover image.",
-            "error"
-          );
+          showToast?.(err?.message || "Failed to upload cover image.", "error");
         }
       } else if (reuseUrl) {
-        await setDoc(
-          doc(collection(db, TOURNAMENT_COLLECTION), finalSlug),
-          { coverImageUrl: reuseUrl },
-          { merge: true }
-        );
+        try {
+          await setDoc(
+            doc(collection(db, TOURNAMENT_COLLECTION), finalSlug),
+            { coverImageUrl: reuseUrl, coverImageUrlSmall: "" },
+            { merge: true }
+          );
+        } catch (err) {
+          console.error("Failed to reuse cover image", err);
+        }
       }
     }
     await renderCircuitLeaderboard(
@@ -3597,33 +3663,49 @@ function closeDeleteTournamentModal() {
   unlockBodyScroll();
 }
 
-async function getTournamentCoverUrlForDelete(slug) {
+async function getTournamentCoverUrlsForDelete(slug) {
   if (!slug) return "";
   if (currentTournamentMeta?.slug === slug) {
-    return currentTournamentMeta?.coverImageUrl || "";
+    return {
+      coverImageUrl: currentTournamentMeta?.coverImageUrl || "",
+      coverImageUrlSmall: currentTournamentMeta?.coverImageUrlSmall || "",
+    };
   }
   try {
     const tournamentSnap = await getDoc(
       doc(collection(db, TOURNAMENT_COLLECTION), slug)
     );
-    return tournamentSnap.exists()
-      ? tournamentSnap.data()?.coverImageUrl || ""
-      : "";
+    if (!tournamentSnap.exists()) {
+      return { coverImageUrl: "", coverImageUrlSmall: "" };
+    }
+    const data = tournamentSnap.data() || {};
+    return {
+      coverImageUrl: data.coverImageUrl || "",
+      coverImageUrlSmall: data.coverImageUrlSmall || "",
+    };
   } catch (err) {
     console.warn("Failed to load tournament cover image", err);
-    return "";
+    return { coverImageUrl: "", coverImageUrlSmall: "" };
   }
 }
 
-async function deleteTournamentBundle(slug, coverImageUrl = "") {
+async function deleteTournamentBundle(
+  slug,
+  { coverImageUrl = "", coverImageUrlSmall = "" } = {}
+) {
   if (!slug) return;
   await deleteTournamentChatHistory(slug);
   await deleteTournamentPresence(slug);
   await deleteTournamentInviteLinks(slug);
+  if (coverImageUrl) {
+    await deleteTournamentCoverByUrl(coverImageUrl, slug);
+  }
+  if (coverImageUrlSmall) {
+    await deleteTournamentCoverByUrl(coverImageUrlSmall, slug);
+  }
+  await deleteTournamentCoverFolder(slug);
   await deleteDoc(doc(collection(db, TOURNAMENT_COLLECTION), slug));
   await deleteDoc(doc(collection(db, TOURNAMENT_STATE_COLLECTION), slug));
-  await deleteTournamentCoverByUrl(coverImageUrl, slug);
-  await deleteTournamentCoverFolder(slug);
   await deleteTournamentSponsorFolder(slug);
   try {
     localStorage.removeItem(getPersistStorageKey(slug));
@@ -3639,8 +3721,8 @@ async function confirmDeleteTournament() {
   const circuitSlug =
     modal.dataset.circuitSlug || currentTournamentMeta?.circuitSlug || "";
   try {
-    const coverImageUrl = await getTournamentCoverUrlForDelete(slug);
-    await deleteTournamentBundle(slug, coverImageUrl);
+    const coverUrls = await getTournamentCoverUrlsForDelete(slug);
+    await deleteTournamentBundle(slug, coverUrls);
     if (circuitSlug) {
       const updates = { tournaments: arrayRemove(slug) };
       if (currentCircuitMeta?.finalTournamentSlug === slug) {
@@ -4372,7 +4454,10 @@ async function isCoverUrlUsedElsewhere(coverImageUrl, excludeSlug) {
     const registry = await loadTournamentRegistry(true);
     return (registry || []).some((item) => {
       if (!item || item.slug === excludeSlug) return false;
-      return String(item.coverImageUrl || "").trim() === trimmed;
+      return (
+        String(item.coverImageUrl || "").trim() === trimmed ||
+        String(item.coverImageUrlSmall || "").trim() === trimmed
+      );
     });
   } catch (err) {
     console.warn("Failed to verify cover image usage", err);
@@ -4386,9 +4471,12 @@ async function isCoverFolderUsedElsewhere(slug, excludeSlug) {
     const registry = await loadTournamentRegistry(true);
     return (registry || []).some((item) => {
       if (!item || item.slug === excludeSlug) return false;
-      return isCoverUrlInSlugFolder(
-        String(item.coverImageUrl || "").trim(),
-        slug
+      return (
+        isCoverUrlInSlugFolder(String(item.coverImageUrl || "").trim(), slug) ||
+        isCoverUrlInSlugFolder(
+          String(item.coverImageUrlSmall || "").trim(),
+          slug
+        )
       );
     });
   } catch (err) {
@@ -4439,19 +4527,38 @@ async function uploadTournamentCover(file, slug) {
   const error = validateTournamentImage(file);
   if (error) throw new Error(error);
   if (!slug) throw new Error("Missing tournament slug.");
-  const processed = await prepareImageForUpload(file, {
+  const processedLarge = await prepareImageForUpload(file, {
     targetWidth: COVER_TARGET_WIDTH,
     targetHeight: COVER_TARGET_HEIGHT,
     quality: COVER_QUALITY,
     outputType: "image/webp",
     fallbackType: "image/jpeg",
   });
-  const path = `tournamentCovers/${slug}/cover-${Date.now()}.webp`;
-  const ref = storageRef(storage, path);
-  await uploadBytes(ref, processed.blob, {
-    contentType: processed.contentType,
+  const processedSmall = await prepareImageForUpload(file, {
+    targetWidth: COVER_CARD_WIDTH,
+    targetHeight: COVER_CARD_HEIGHT,
+    quality: COVER_QUALITY,
+    outputType: "image/webp",
+    fallbackType: "image/jpeg",
   });
-  return getDownloadURL(ref);
+  const stamp = Date.now();
+  const largePath = `tournamentCovers/${slug}/cover-${stamp}-1200.webp`;
+  const smallPath = `tournamentCovers/${slug}/cover-${stamp}-320.webp`;
+  const largeRef = storageRef(storage, largePath);
+  const smallRef = storageRef(storage, smallPath);
+  await Promise.all([
+    uploadBytes(largeRef, processedLarge.blob, {
+      contentType: processedLarge.contentType,
+    }),
+    uploadBytes(smallRef, processedSmall.blob, {
+      contentType: processedSmall.contentType,
+    }),
+  ]);
+  const [coverImageUrl, coverImageUrlSmall] = await Promise.all([
+    getDownloadURL(largeRef),
+    getDownloadURL(smallRef),
+  ]);
+  return { coverImageUrl, coverImageUrlSmall };
 }
 
 async function uploadSponsorLogo(file, slug) {
@@ -4544,12 +4651,15 @@ async function handleSaveSettings(event) {
     ? Boolean(copySponsorsToggle?.checked ?? getCopyFromCircuitPromos(currentTournamentMeta))
     : false;
   let coverImageUrl = currentTournamentMeta?.coverImageUrl || "";
+  let coverImageUrlSmall = currentTournamentMeta?.coverImageUrlSmall || "";
   if (!imageFile && reuseUrl) {
     coverImageUrl = reuseUrl;
   }
   if (imageFile) {
     try {
-      coverImageUrl = await uploadTournamentCover(imageFile, newSlug);
+      const uploaded = await uploadTournamentCover(imageFile, newSlug);
+      coverImageUrl = uploaded.coverImageUrl;
+      coverImageUrlSmall = uploaded.coverImageUrlSmall;
     } catch (err) {
       showToast?.(err?.message || "Failed to upload cover image.", "error");
       return;
@@ -4563,6 +4673,7 @@ async function handleSaveSettings(event) {
     description,
     rules,
     coverImageUrl,
+    coverImageUrlSmall,
     maxPlayers,
     startTime,
     checkInWindowMinutes,
@@ -4942,11 +5053,15 @@ async function handleCreateTournament(event) {
     });
     if (imageFile) {
       try {
-        const coverImageUrl = await uploadTournamentCover(imageFile, slug);
-        payload.coverImageUrl = coverImageUrl;
+        const uploaded = await uploadTournamentCover(imageFile, slug);
+        payload.coverImageUrl = uploaded.coverImageUrl;
+        payload.coverImageUrlSmall = uploaded.coverImageUrlSmall;
         await setDoc(
           doc(collection(db, TOURNAMENT_COLLECTION), slug),
-          { coverImageUrl },
+          {
+            coverImageUrl: uploaded.coverImageUrl,
+            coverImageUrlSmall: uploaded.coverImageUrlSmall,
+          },
           { merge: true }
         );
       } catch (err) {
@@ -4954,9 +5069,11 @@ async function handleCreateTournament(event) {
       }
     } else if (reuseUrl) {
       try {
+        payload.coverImageUrl = reuseUrl;
+        payload.coverImageUrlSmall = "";
         await setDoc(
           doc(collection(db, TOURNAMENT_COLLECTION), slug),
-          { coverImageUrl: reuseUrl },
+          { coverImageUrl: reuseUrl, coverImageUrlSmall: "" },
           { merge: true }
         );
       } catch (err) {
@@ -5229,6 +5346,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     toggleCheckInManualClose,
     toggleLiveTournament,
   });
+  document.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const mapSelector =
+      "#mapPoolPicker, #settingsMapPoolPicker, #finalMapPoolPicker, #circuitFinalMapPoolPicker";
+    if (target.closest(mapSelector)) {
+      ensureMapCatalogLoadedForUi();
+    }
+  });
   initCoverReuseModal();
   initCasterControls({ saveState });
   initFinalAdminSearch();
@@ -5248,7 +5374,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   try {
-    await loadMapCatalog();
     setMapPoolSelection(getDefaultMapPoolNames());
     resetFinalMapPoolSelection();
     ensureSettingsUiReady();
@@ -5266,6 +5391,9 @@ function switchTab(targetId) {
   const targetPanel = document.getElementById(targetId);
   if (targetPanel && targetPanel.dataset.adminOnly === "true" && !isAdmin) {
     return;
+  }
+  if (targetId === "mapsTab" || targetId === "settingsTab") {
+    ensureMapCatalogLoadedForUi();
   }
   document.querySelectorAll(".tab-btn").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.tab === targetId);

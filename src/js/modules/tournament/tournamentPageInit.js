@@ -98,9 +98,16 @@ export function initTournamentPage({
   toggleCheckInManualClose,
   toggleLiveTournament,
 }) {
-  initTournamentNotifications();
-  initTournamentSearch();
-  initTournamentListSlider();
+  const runAfterFirstPaint = (fn) => {
+    if (typeof window === "undefined") return fn?.();
+    requestAnimationFrame(() => {
+      if ("requestIdleCallback" in window) {
+        window.requestIdleCallback(fn, { timeout: 1200 });
+      } else {
+        setTimeout(fn, 0);
+      }
+    });
+  };
 
   const registrationForm = document.getElementById("registrationForm");
   const rebuildBtn = document.getElementById("rebuildBracketBtn");
@@ -273,7 +280,135 @@ export function initTournamentPage({
       placeholder: "Add eligibility, format, communication, and fair play rules...",
     },
   ];
-  initQuillEditors(quillConfigs);
+  const QUILL_SCRIPT_SRC =
+    "https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js";
+  const QUILL_CSS_SRC =
+    "https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css";
+  const FLATPICKR_SCRIPT_SRC = "/vendor/flatpickr/flatpickr.min.js";
+  const FLATPICKR_CSS_SRC = "/vendor/flatpickr/flatpickr.min.css";
+  const FLATPICKR_DARK_CSS_SRC = "/vendor/flatpickr/flatpickr-dark.min.css";
+  let quillLoadPromise = null;
+  let quillCssPromise = null;
+  let quillInitialized = false;
+  let flatpickrLoadPromise = null;
+  let flatpickrCssPromise = null;
+  let datePickersInitialized = false;
+
+  const loadQuillCss = () => {
+    if (typeof window === "undefined") return Promise.resolve();
+    const existing = document.querySelector(`link[href="${QUILL_CSS_SRC}"]`);
+    if (existing) return Promise.resolve();
+    if (quillCssPromise) return quillCssPromise;
+    quillCssPromise = new Promise((resolve, reject) => {
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = QUILL_CSS_SRC;
+      link.onload = () => resolve();
+      link.onerror = () => reject(new Error("Quill CSS load failed"));
+      document.head.appendChild(link);
+    });
+    return quillCssPromise;
+  };
+
+  const loadQuillScript = () => {
+    if (typeof window === "undefined") return Promise.resolve();
+    if (window.Quill) return Promise.resolve();
+    if (quillLoadPromise) return quillLoadPromise;
+    quillLoadPromise = new Promise((resolve, reject) => {
+      const existing = document.querySelector(`script[src="${QUILL_SCRIPT_SRC}"]`);
+      if (existing) {
+        existing.addEventListener("load", () => resolve());
+        existing.addEventListener("error", () => reject(new Error("Quill load failed")));
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = QUILL_SCRIPT_SRC;
+      script.async = true;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error("Quill load failed"));
+      document.head.appendChild(script);
+    });
+    return quillLoadPromise;
+  };
+
+  const ensureQuillInitialized = () => {
+    if (quillInitialized) return Promise.resolve();
+    return loadQuillCss()
+      .then(() => loadQuillScript())
+      .then(() => {
+      if (quillInitialized) return;
+      initQuillEditors(quillConfigs);
+      syncQuillFromInputs();
+      quillInitialized = true;
+      });
+  };
+
+  const loadFlatpickrCss = () => {
+    if (typeof window === "undefined") return Promise.resolve();
+    const hasBase = document.querySelector(`link[href="${FLATPICKR_CSS_SRC}"]`);
+    const hasDark = document.querySelector(
+      `link[href="${FLATPICKR_DARK_CSS_SRC}"]`
+    );
+    if (hasBase && hasDark) return Promise.resolve();
+    if (flatpickrCssPromise) return flatpickrCssPromise;
+    flatpickrCssPromise = new Promise((resolve, reject) => {
+      const linkBase = document.createElement("link");
+      linkBase.rel = "stylesheet";
+      linkBase.href = FLATPICKR_CSS_SRC;
+      const linkDark = document.createElement("link");
+      linkDark.rel = "stylesheet";
+      linkDark.href = FLATPICKR_DARK_CSS_SRC;
+      let loaded = 0;
+      const onLoad = () => {
+        loaded += 1;
+        if (loaded === 2) resolve();
+      };
+      const onError = () => reject(new Error("Flatpickr CSS load failed"));
+      linkBase.onload = onLoad;
+      linkDark.onload = onLoad;
+      linkBase.onerror = onError;
+      linkDark.onerror = onError;
+      document.head.appendChild(linkBase);
+      document.head.appendChild(linkDark);
+    });
+    return flatpickrCssPromise;
+  };
+
+  const loadFlatpickrScript = () => {
+    if (typeof window === "undefined") return Promise.resolve();
+    if (window.flatpickr) return Promise.resolve();
+    if (flatpickrLoadPromise) return flatpickrLoadPromise;
+    flatpickrLoadPromise = new Promise((resolve, reject) => {
+      const existing = document.querySelector(
+        `script[src="${FLATPICKR_SCRIPT_SRC}"]`
+      );
+      if (existing) {
+        existing.addEventListener("load", () => resolve());
+        existing.addEventListener("error", () =>
+          reject(new Error("Flatpickr load failed"))
+        );
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = FLATPICKR_SCRIPT_SRC;
+      script.async = true;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error("Flatpickr load failed"));
+      document.head.appendChild(script);
+    });
+    return flatpickrLoadPromise;
+  };
+
+  const ensureDatePickersInitialized = () => {
+    if (datePickersInitialized) return Promise.resolve();
+    return loadFlatpickrCss()
+      .then(() => loadFlatpickrScript())
+      .then(() => {
+        if (datePickersInitialized) return;
+        initDatePickers();
+        datePickersInitialized = true;
+      });
+  };
 
   const isDualTournamentFormat = (value) => {
     const normalized = (value || "").toLowerCase();
@@ -310,7 +445,57 @@ export function initTournamentPage({
       input.value = String(clamped);
     }
   };
-  syncQuillFromInputs();
+  runAfterFirstPaint(() => {
+    initTournamentNotifications();
+    initTournamentSearch();
+    initTournamentListSlider();
+  });
+
+  const quillTriggerSelector = [
+    "[data-settings-tab]",
+    "[data-create-tab]",
+    "[data-final-create-tab]",
+    "[data-circuit-settings-tab]",
+    "[data-final-settings-tab]",
+  ].join(",");
+
+  const maybeInitQuillFromEvent = (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (
+      target.closest(quillTriggerSelector) ||
+      target.closest(".quill-editor") ||
+      target.matches(
+        "#settingsDescriptionInput, #settingsRulesInput, #tournamentDescriptionInput, #tournamentRulesInput, #finalTournamentDescriptionInput, #finalTournamentRulesInput, #circuitFinalDescriptionInput, #circuitFinalRulesInput"
+      )
+    ) {
+      ensureQuillInitialized();
+    }
+  };
+
+  document.addEventListener("click", maybeInitQuillFromEvent, { capture: true });
+  document.addEventListener("focusin", maybeInitQuillFromEvent, { capture: true });
+
+  const dateTriggerSelector = "[data-datepicker-for]";
+  const dateInputSelector =
+    "#tournamentStartInput, #finalTournamentStartInput, #settingsStartInput";
+  const maybeInitDatePickersFromEvent = (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (
+      target.closest(dateTriggerSelector) ||
+      target.matches(dateInputSelector)
+    ) {
+      ensureDatePickersInitialized();
+    }
+  };
+
+  document.addEventListener("click", maybeInitDatePickersFromEvent, {
+    capture: true,
+  });
+  document.addEventListener("focusin", maybeInitDatePickersFromEvent, {
+    capture: true,
+  });
 
   const preventLabelFocus = (root) => {
     if (!root) return;
@@ -575,7 +760,7 @@ export function initTournamentPage({
 
   registrationForm?.addEventListener("submit", handleRegistration);
 
-  initDatePickers();
+  // Lazy-load flatpickr on first interaction.
   rebuildBtn?.addEventListener("click", () => toggleLiveTournament?.());
   resetBtn?.addEventListener("click", () => {
     setModalVisible(resetTournamentModal, true);
@@ -601,6 +786,7 @@ export function initTournamentPage({
       const modal = document.getElementById("settingsModal");
       if (modal) modal.style.display = "block";
     }
+    ensureDatePickersInitialized();
   });
   const openPulseSettings = async () => {
     const mod = await import("../settingsModalInit.js");
@@ -1302,30 +1488,31 @@ export function initTournamentPage({
     ownerBtn.setAttribute("aria-pressed", next ? "true" : "false");
     renderTournamentList();
   });
-  renderTournamentList();
-
   attachPlayerDetailHandlers({ getPlayersMap });
-  renderMapPoolPickerUI("mapPoolPicker", {
-    mapPoolSelection: mapPoolSelection || new Set(),
-    getAll1v1Maps: getAll1v1Maps || (() => []),
-  });
-  renderMapPoolPickerUI("settingsMapPoolPicker", {
-    mapPoolSelection: mapPoolSelection || new Set(),
-    getAll1v1Maps: getAll1v1Maps || (() => []),
-  });
-  renderChosenMapsUI("chosenMapList", { mapPoolSelection, getMapByName });
-  renderChosenMapsUI("settingsChosenMapList", {
-    mapPoolSelection: mapPoolSelection,
-    getMapByName,
-  });
-  updateMapButtonsUI(currentMapPoolMode);
-  setVetoDependencies({
-    getPlayersMap,
-    getDefaultMapPoolNames,
-    getMapByName,
-    updateMatchScore,
-    saveState,
-    renderAll,
+  runAfterFirstPaint(() => {
+    renderTournamentList();
+    renderMapPoolPickerUI("mapPoolPicker", {
+      mapPoolSelection: mapPoolSelection || new Set(),
+      getAll1v1Maps: getAll1v1Maps || (() => []),
+    });
+    renderMapPoolPickerUI("settingsMapPoolPicker", {
+      mapPoolSelection: mapPoolSelection || new Set(),
+      getAll1v1Maps: getAll1v1Maps || (() => []),
+    });
+    renderChosenMapsUI("chosenMapList", { mapPoolSelection, getMapByName });
+    renderChosenMapsUI("settingsChosenMapList", {
+      mapPoolSelection: mapPoolSelection,
+      getMapByName,
+    });
+    updateMapButtonsUI(currentMapPoolMode);
+    setVetoDependencies({
+      getPlayersMap,
+      getDefaultMapPoolNames,
+      getMapByName,
+      updateMatchScore,
+      saveState,
+      renderAll,
+    });
   });
 
   const formatDiagrams = [
