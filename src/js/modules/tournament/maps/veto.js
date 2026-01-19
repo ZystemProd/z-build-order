@@ -1192,7 +1192,7 @@ export function openMatchInfoModal(
           )}</option>`,
         ].join("");
         return `<div class="match-info-report-map-row">
-          <div class="match-info-report-map-name">${mapLabel}</div>
+          <div class="match-info-report-map-name" translate="no">${mapLabel}</div>
           <select class="match-info-report-select" data-map-idx="${idx}" name="match-info-report-${idx}">
             ${options}
           </select>
@@ -1209,7 +1209,7 @@ export function openMatchInfoModal(
         const winnerLabel =
           winner === "A" ? aName : winner === "B" ? bName : "Unreported";
         return `<div class="match-info-report-summary-row">
-          <span>${mapLabel}</span>
+          <span translate="no">${mapLabel}</span>
           <span>${escapeHtml(winnerLabel)}</span>
         </div>`;
       })
@@ -2413,7 +2413,7 @@ export function renderVetoPoolGrid(poolOverride = null) {
           imgPath ? ` style="background-image:url('${imgPath}')"` : ""
         }></div>
         <div class="map-meta">
-          <div class="map-name">${escapeHtml(map.name)}</div>
+          <div class="map-name" translate="no">${escapeHtml(map.name)}</div>
         </div>
         <div class="helper">${helper}</div>
       </div>`;

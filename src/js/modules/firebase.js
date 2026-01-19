@@ -37,15 +37,22 @@ switchAccountProvider.setCustomParameters({ prompt: "select_account" });
 
 let appCheck;
 if (typeof window !== "undefined") {
+  const params = new URLSearchParams(window.location.search);
+  const disableAppCheck =
+    params.has("noappcheck") || localStorage.getItem("disableAppCheck") === "1";
   appCheck = window.__appCheckInstance;
-  if (!appCheck) {
-    appCheck = initializeAppCheck(app, {
-      provider: new ReCaptchaV3Provider(
-        "6LcBBWsrAAAAALLmBNIhl-zKPa8KRj8mXMldoKbN"
-      ),
-      isTokenAutoRefreshEnabled: true,
-    });
-    window.__appCheckInstance = appCheck;
+  if (!appCheck && !disableAppCheck) {
+    try {
+      appCheck = initializeAppCheck(app, {
+        provider: new ReCaptchaV3Provider(
+          "6LcBBWsrAAAAALLmBNIhl-zKPa8KRj8mXMldoKbN"
+        ),
+        isTokenAutoRefreshEnabled: true,
+      });
+      window.__appCheckInstance = appCheck;
+    } catch (err) {
+      console.warn("App Check init failed; continuing without it.", err);
+    }
   }
 } else {
   appCheck = initializeAppCheck(app, {

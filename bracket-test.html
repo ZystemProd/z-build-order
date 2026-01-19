@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bracket UI Test Harness</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <link rel="stylesheet" href="/css/tournament.css" />
+    <style>
+      body {
+        min-height: 100vh;
+        margin: 0;
+        padding: 16px;
+        background: #0f1421;
+      }
+      #bracketGrid {
+        height: 80vh;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="bracketGrid" class="bracket-grid"></div>
+    <script type="module">
+      import { buildBracket } from "/src/js/modules/tournament/bracket/build.js";
+      import { getAllMatches } from "/src/js/modules/tournament/bracket/lookup.js";
+      import { renderBracketView } from "/src/js/modules/tournament/bracket/render.js";
+      import { setStateObj, defaultState } from "/src/js/modules/tournament/state.js";
+
+      function makePlayers(count) {
+        return Array.from({ length: count }, (_, idx) => ({
+          id: `P${idx + 1}`,
+          name: `Player ${idx + 1}`,
+          points: 0,
+          mmr: 1000,
+          seed: idx + 1,
+        }));
+      }
+
+      window.renderBracketTest = (playerCount, format) => {
+        const players = makePlayers(playerCount);
+        const bracket = buildBracket(players, { format });
+        setStateObj({
+          ...defaultState,
+          players,
+          bracket,
+          bracketLayoutVersion: 1,
+          bracketRepairVersion: 1,
+        });
+        renderBracketView({
+          bracket,
+          players,
+          format,
+          ensurePlayoffs: () => {},
+          getPlayersMap: () => new Map(players.map((p) => [p.id, p])),
+          attachMatchActionHandlers: () => {},
+          computeGroupStandings: () => [],
+        });
+        return { matchCount: getAllMatches(bracket).length };
+      };
+    </script>
+  </body>
+</html>

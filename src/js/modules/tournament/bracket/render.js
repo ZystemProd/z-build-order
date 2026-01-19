@@ -276,12 +276,21 @@ function updateTreeMatchRow(
       player?.id || null,
     );
     const reveal = consumeNameReveal(match?.id, participantIdx) || autoReveal;
+    const sourceMatchId = isPlaceholder
+      ? sourceMatchIdFor(match, participantIdx)
+      : "";
     nameText.className = `name-text ${[
       isPlaceholder ? "is-placeholder" : "",
       reveal && !isPlaceholder ? "name-reveal" : "",
     ]
       .filter(Boolean)
       .join(" ")}`;
+    nameText.setAttribute("translate", "no");
+    if (sourceMatchId) {
+      nameText.dataset.sourceMatchId = sourceMatchId;
+    } else if (nameText.dataset.sourceMatchId) {
+      delete nameText.dataset.sourceMatchId;
+    }
     nameText.textContent = name;
   }
 
@@ -379,6 +388,12 @@ function displayPlaceholderForSource(match, participantIdx, lookup) {
   }
 
   return "Awaiting player";
+}
+
+function sourceMatchIdFor(match, participantIdx) {
+  const src = match?.sources?.[participantIdx];
+  if (!src || src.type !== "match") return "";
+  return src.matchId || "";
 }
 
 function renderCastIndicator(match) {
@@ -531,7 +546,7 @@ export function renderPlayerRow(
     <div class="${nameClass.join(" ")}" data-player-id="${player.id || ""}">
       <span class="seed-chip">#${player.seed || "?"}</span>
       <div>
-        <strong>${escapeHtml(player.name)}</strong>
+        <strong translate="no">${escapeHtml(player.name)}</strong>
         <div class="helper">${player.points || 0} pts ${
           player.mmr || 0
         } MMR</div>
@@ -637,6 +652,8 @@ export function renderSimpleMatch(
   const revealB = consumeNameReveal(match?.id, 1) || autoRevealB;
   const aName = pA ? pA.name : displayPlaceholderForSource(match, 0, lookup);
   const bName = pB ? pB.name : displayPlaceholderForSource(match, 1, lookup);
+  const aSourceMatchId = aIsPlaceholder ? sourceMatchIdFor(match, 0) : "";
+  const bSourceMatchId = bIsPlaceholder ? sourceMatchIdFor(match, 1) : "";
   const raceClassA = raceClassName(pA?.race);
   const raceClassB = raceClassName(pB?.race);
   const clanLogoA = pA?.clanLogoUrl ? sanitizeUrl(pA.clanLogoUrl) : "";
@@ -669,7 +686,7 @@ export function renderSimpleMatch(
     match.id
   }" style="${baseStyle}">
     ${castIndicator}
-    <span class="match-number">${matchNumberLabel}</span>
+    <span class="match-number" translate="no">${matchNumberLabel}</span>
     <div class="row ${
       match.winnerId === pA?.id ? "winner" : ""
     }" data-player-id="${pA?.id || ""}">
@@ -688,7 +705,9 @@ export function renderSimpleMatch(
         revealA && !aIsPlaceholder ? "name-reveal" : "",
       ]
         .filter(Boolean)
-        .join(" ")}">${escapeHtml(aName)}</span></span>
+        .join(" ")}" translate="no" ${
+          aSourceMatchId ? `data-source-match-id="${aSourceMatchId}"` : ""
+        }>${escapeHtml(aName)}</span></span>
       <div class="row-actions">
         <div class="score-select score-display ${
           match.winnerId === pA?.id ? "winner" : ""
@@ -715,7 +734,9 @@ export function renderSimpleMatch(
         revealB && !bIsPlaceholder ? "name-reveal" : "",
       ]
         .filter(Boolean)
-        .join(" ")}">${escapeHtml(bName)}</span></span>
+        .join(" ")}" translate="no" ${
+          bSourceMatchId ? `data-source-match-id="${bSourceMatchId}"` : ""
+        }>${escapeHtml(bName)}</span></span>
       <div class="row-actions">
         <div class="score-select score-display ${
           match.winnerId === pB?.id ? "winner" : ""
@@ -1250,6 +1271,12 @@ export function attachMatchHoverHandlers() {
   const grid = document.getElementById("bracketGrid");
   if (!grid) return;
 
+  const clearSourceHighlights = () => {
+    grid
+      .querySelectorAll(".match-card.source-highlight")
+      .forEach((card) => card.classList.remove("source-highlight"));
+  };
+
   grid.addEventListener("mouseover", (e) => {
     const target = e.target.closest(".row[data-player-id]");
     if (!target) return;
@@ -1267,6 +1294,25 @@ export function attachMatchHoverHandlers() {
       document
         .querySelectorAll(".connector.highlight")
         .forEach((c) => c.classList.remove("highlight"));
+    }
+  });
+
+  grid.addEventListener("mouseover", (e) => {
+    const target = e.target.closest(
+      ".name-text.is-placeholder[data-source-match-id]",
+    );
+    if (!target) return;
+    const sourceMatchId = target.dataset.sourceMatchId;
+    if (!sourceMatchId) return;
+    const sourceCard = grid.querySelector(
+      `.match-card[data-match-id="${sourceMatchId}"]`,
+    );
+    if (sourceCard) sourceCard.classList.add("source-highlight");
+  });
+
+  grid.addEventListener("mouseout", (e) => {
+    if (e.target.closest(".name-text.is-placeholder[data-source-match-id]")) {
+      clearSourceHighlights();
     }
   });
 }
@@ -1470,7 +1516,7 @@ export function renderGroupBlock(group, bracket, lookup, playersById) {
         const tied = !qualified && isTied(row.playerId);
         const rowClass = qualified ? "is-qualified" : tied ? "is-tied" : "";
         const nameCell = player
-          ? `<span class="player-detail-trigger name-text" data-player-id="${pid}">${escapeHtml(
+          ? `<span class="player-detail-trigger name-text" data-player-id="${pid}" translate="no">${escapeHtml(
               player.name,
             )}</span>`
           : "TBD";

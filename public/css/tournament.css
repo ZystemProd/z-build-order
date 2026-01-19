@@ -1080,7 +1080,7 @@ a {
 .admin-settings-grid {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 30px;
 }
 
 .admin-settings-grid .settings-row {
@@ -1423,7 +1423,7 @@ a {
 }
 
 .leaderboard-scroll {
-  max-height: 320px;
+  max-height: 100%;
   overflow-y: auto;
 }
 
@@ -2992,6 +2992,20 @@ details.stage-section:not([open]) .stage-toggle::after {
 .match-card.group .name-text.is-placeholder {
   font-style: italic;
   color: var(--muted);
+}
+
+.match-card.tree .name-text.is-placeholder[data-source-match-id],
+.match-card.group .name-text.is-placeholder[data-source-match-id] {
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+
+.match-card.source-highlight {
+  border-color: var(--accent-2);
+  box-shadow:
+    0 0 0 2px rgba(78, 213, 255, 0.4),
+    0 8px 24px rgba(0, 0, 0, 0.5);
 }
 
 .score-select.score-display {
@@ -4856,7 +4870,7 @@ details.stage-section:not([open]) .stage-toggle::after {
 
 .circuit-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
   gap: 16px;
 }
 
@@ -5494,6 +5508,7 @@ details.stage-section:not([open]) .stage-toggle::after {
   font-family: "Inter", system-ui, sans-serif;
   color: var(--text);
   line-height: 1.5;
+  padding-top: 14px;
 }
 
 .markdown-editor .ql-toolbar .ql-picker,
@@ -5593,6 +5608,7 @@ details.stage-section:not([open]) .stage-toggle::after {
 .markdown-editor .ql-editor.ql-blank::before {
   color: var(--quill-toolbar-muted);
   font-style: normal;
+  top: 14px;
 }
 
 .markdown-editor,
@@ -5801,8 +5817,7 @@ details.stage-section:not([open]) .stage-toggle::after {
   overflow-y: auto;
   overflow-x: visible;
   flex: 1 1 auto;
-  padding: 20px;
-  max-width: 600px;
+  padding: 30px;
 }
 
 .create-modal .settings-panel input,
@@ -7343,6 +7358,53 @@ label {
   flex-wrap: wrap;
 }
 
+#settingsTab .settings-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+#settingsTab .settings-tabs {
+  background: rgba(10, 14, 26, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0;
+  padding: 12px;
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.25);
+  flex-direction: column;
+  flex-wrap: nowrap;
+  margin-bottom: 0;
+  height: 100%;
+}
+
+#settingsTab .settings-tab-btn {
+  border-color: transparent;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.72);
+  padding: 10px 12px;
+  border-radius: 10px;
+  width: 100%;
+  text-align: left;
+}
+
+#settingsTab .settings-tab-btn:hover {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+#settingsTab .settings-tab-btn.active {
+  border-color: rgba(78, 213, 255, 0.4);
+  background: rgba(78, 213, 255, 0.18);
+  color: #fff;
+}
+
+#settingsTab .settings-panels {
+  min-width: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 12px 0px 40px;
+}
+
 .settings-tab-btn {
   border: 1px solid var(--stroke);
   background: var(--panel-2);
@@ -7375,6 +7437,22 @@ label {
   width: auto;
   max-width: 260px;
   align-self: flex-start;
+}
+
+@media (max-width: 900px) {
+  #settingsTab .settings-layout {
+    grid-template-columns: 1fr;
+  }
+
+  #settingsTab .settings-tabs {
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+
+  #settingsTab .settings-tab-btn {
+    width: auto;
+  }
 }
 
 .format-stage {
@@ -7523,16 +7601,17 @@ label {
 
 /* Narrow BoX dropdowns */
 .format-input select {
-  max-width: 70px;
-  padding-inline: 6px;
-  font-size: 12px;
+  max-width: 80px;
+  padding: 4px 6px;
+  font-size: 13px;
+  line-height: 1.2;
 }
 
 select[id^="bestOf"],
 select[id^="settingsBestOf"],
 select[id^="finalBestOf"] {
-  width: 70px;
-  max-width: 70px;
+  width: 80px;
+  max-width: 80px;
 }
 
 .create-modal .settings-panel select[id^="bestOf"],
@@ -7541,8 +7620,8 @@ select[id^="finalBestOf"] {
 #settingsTab select[id^="bestOf"],
 #settingsTab select[id^="settingsBestOf"],
 #settingsTab select[id^="finalBestOf"] {
-  width: 70px !important;
-  max-width: 70px !important;
+  width: 80px !important;
+  max-width: 80px !important;
 }
 
 /* Optional spacer – no longer needed visually, keep hidden if present */
@@ -8712,4 +8791,11 @@ select[id^="finalBestOf"] {
 
 #matchInfoReportBtn svg {
   display: block;
+}
+#settingsTab .card {
+  padding: 0;
+}
+
+#settingsTab .card-header {
+  padding: 16px 20px 12px;
 }

@@ -105,7 +105,7 @@ export function renderSeedingTable(
         </td>
         <td>
           <div class="player-line">
-            <span class="player-name">${name}</span>
+            <span class="player-name" translate="no">${name}</span>
             ${raceTag}
           </div>
         </td>

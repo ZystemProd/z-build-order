@@ -247,7 +247,7 @@
         <input id="authPassword" type="password" autocomplete="current-password" required />
 
         <div class="auth-actions">
-          <button id="emailSignInButton" type="submit" class="auth-primary-button">
+          <button id="emailSignInButton" type="button" class="auth-primary-button">
             Sign in
           </button>
 
@@ -833,16 +833,6 @@
                   </div>
                 </div>
               </div>
-              <div class="publish-checkbox-row" id="finalAutoAddRow" style="display:none;">
-                <span>Auto-add from Leaderboard</span>
-                <div class="checkbox-wrapper-59 checkbox-wrapper-59--blue">
-                  <label class="switch">
-                    <input type="checkbox" id="finalAutoAddToggle" />
-                    <span class="slider"></span>
-                  </label>
-                </div>
-              </div>
-              <p class="helper" id="finalAutoAddStatus"></p>
               <p class="helper" id="seedingModeHelp">Automatic seeding uses points and MMR.</p>
               <div class="mmr-refresh-status" id="mmrRefreshStatus" style="display:none;">
                 <span id="mmrRefreshText">Refreshing MMR...</span>
@@ -869,9 +859,11 @@
                   <tbody id="playersTableBody"></tbody>
                 </table>
               </div>
-              <div class="form-actions" style="margin-top:12px; justify-content:flex-end;">
-                <button id="resetTournamentBtn" class="cta small subtle">Reset tournament</button>
-              </div>
+                <div class="form-actions" style="margin-top:12px; justify-content:flex-end; gap:8px;">
+                  <button id="resetVetoScoreChatBtn" class="cta small subtle">Reset veto, score &amp; chat</button>
+                  <button id="resetScoresBtn" class="cta small subtle">Reset scores</button>
+                  <button id="resetTournamentBtn" class="cta small subtle">Reset tournament</button>
+                </div>
             </div>
           </section>
 
@@ -879,19 +871,20 @@
             <div class="card">
               <div class="card-header">
                 <div>
-                  <p class="eyebrow">Admin</p>
-                  <h3>Edit tournament settings</h3>
+                  <p class="eyebrow">Settings</p>
                 </div>
               </div>
-              <div class="settings-tabs" id="settingsTabs">
-                <button class="settings-tab-btn active" data-settings-tab="settingsGeneral">General</button>
-                <button class="settings-tab-btn" data-settings-tab="settingsDesc">Description &amp; Rules</button>
-                <button class="settings-tab-btn" data-settings-tab="settingsMaps">Maps</button>
-                <button class="settings-tab-btn" data-settings-tab="settingsFormat">Format</button>
-                <button class="settings-tab-btn" data-settings-tab="settingsSponsors">Sponsors</button>
-                <button class="settings-tab-btn" data-settings-tab="settingsSocials">Socials</button>
-              </div>
-              <div class="settings-panel active" id="settingsGeneral">
+              <div class="settings-layout">
+                <div class="settings-tabs" id="settingsTabs">
+                  <button class="settings-tab-btn active" data-settings-tab="settingsGeneral">General</button>
+                  <button class="settings-tab-btn" data-settings-tab="settingsDesc">Description &amp; Rules</button>
+                  <button class="settings-tab-btn" data-settings-tab="settingsMaps">Maps</button>
+                  <button class="settings-tab-btn" data-settings-tab="settingsFormat">Format</button>
+                  <button class="settings-tab-btn" data-settings-tab="settingsSponsors">Sponsors</button>
+                  <button class="settings-tab-btn" data-settings-tab="settingsSocials">Socials</button>
+                </div>
+                <div class="settings-panels">
+                  <div class="settings-panel active" id="settingsGeneral">
                 <div class="admin-settings-grid">
                   <div class="settings-row">
                     <div class="settings-row-label">Tournament name</div>
@@ -1017,7 +1010,7 @@
                   </div>
                 </label>
               </div>
-              <div class="settings-panel" id="settingsDesc">
+                  <div class="settings-panel" id="settingsDesc">
                 <div class="markdown-field">
                   <div class="markdown-label">Description</div>
                   <div class="markdown-editor">
@@ -1037,7 +1030,7 @@
                   </div>
                 </div>
               </div>
-              <div class="settings-panel" id="settingsMaps">
+                  <div class="settings-panel" id="settingsMaps">
                 <div class="map-pool-picker">
                   <div class="picker-header">
                     <div>
@@ -1060,7 +1053,7 @@
                   <div id="settingsMapPoolPicker" class="map-pool-grid selectable"></div>
                 </div>
               </div>
-              <div class="settings-panel" id="settingsFormat">
+                  <div class="settings-panel" id="settingsFormat">
                 <label>Format
                   <select id="settingsFormatSelect">
                     <option value="Double Elimination">Double Elimination</option>
@@ -1254,7 +1247,7 @@
 
                 </div>
               </div>
-              <div class="settings-panel" id="settingsSponsors">
+                  <div class="settings-panel" id="settingsSponsors">
                 <div class="settings-row" id="settingsCopyCircuitSponsorsRow" style="display:none;">
                   <div class="settings-row-label">Copy from circuit</div>
                   <div class="settings-row-control copy-toggle-row">
@@ -1279,7 +1272,7 @@
                 <div class="sponsor-settings-list" id="tournamentSponsorsList"></div>
                 <p class="helper">Sponsors show between the hero and tabs on the tournament page.</p>
               </div>
-              <div class="settings-panel" id="settingsSocials">
+                  <div class="settings-panel" id="settingsSocials">
                 <div class="settings-row" id="settingsCopyCircuitSocialsRow" style="display:none;">
                   <div class="settings-row-label">Copy from circuit</div>
                   <div class="settings-row-control copy-toggle-row">
@@ -1304,9 +1297,11 @@
                 <div class="sponsor-settings-list" id="tournamentSocialsList"></div>
                 <p class="helper">Social links show between the hero and tabs on the tournament page.</p>
               </div>
-              <div class="form-actions settings-actions" style="margin-top:16px;">
-                <button class="cta primary" id="saveSettingsBtn">Save settings</button>
-                <button class="cta danger" id="deleteTournamentBtn">Delete tournament</button>
+                  <div class="form-actions settings-actions" style="margin-top:16px;">
+                    <button class="cta primary" id="saveSettingsBtn">Save settings</button>
+                    <button class="cta danger" id="deleteTournamentBtn">Delete tournament</button>
+                  </div>
+                </div>
               </div>
             </div>
           </section>
@@ -2499,6 +2494,34 @@
       <div class="form-actions">
         <button class="cta danger" id="confirmResetTournamentBtn">Yes, reset</button>
         <button class="cta ghost" id="cancelResetTournamentBtn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reset scores modal -->
+  <div id="confirmResetScoresModal" class="modal">
+    <div class="modal-content small-modal">
+      <h3>Reset scores</h3>
+      <p class="helper">
+        This will clear all match scores and results, keeping the player list.
+      </p>
+      <div class="form-actions">
+        <button class="cta danger" id="confirmResetScoresBtn">Yes, reset scores</button>
+        <button class="cta ghost" id="cancelResetScoresBtn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reset veto, score, and chat modal -->
+  <div id="confirmResetVetoScoreChatModal" class="modal">
+    <div class="modal-content small-modal">
+      <h3>Reset veto, score &amp; chat</h3>
+      <p class="helper">
+        This will clear veto data, match scores, results, and match chat history.
+      </p>
+      <div class="form-actions">
+        <button class="cta danger" id="confirmResetVetoScoreChatBtn">Yes, reset all</button>
+        <button class="cta ghost" id="cancelResetVetoScoreChatBtn">Cancel</button>
       </div>
     </div>
   </div>

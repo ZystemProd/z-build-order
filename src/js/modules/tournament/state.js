@@ -30,6 +30,7 @@ export const defaultState = {
   activity: [],
   lastUpdated: Date.now(),
   bracketLayoutVersion: 1,
+  bracketRepairVersion: 0,
   matchVetoes: {},
   scoreReports: {},
   casters: [],

@@ -4936,126 +4936,138 @@ export const LOSERS_TEMPLATES = {
     ],
     // 20 players (4 play-ins, total = 20)
     4: [
-      // Round 0 (L0): pair play-in losers so we have 8 advancing
+      // Round 0 (L0): play-in losers meet specific WB R1 losers to reduce to 8
       [
         {
-          // Q = loser(A) vs loser(C)
+          // Q = loser(A) vs loser(L)
           a: { from: "W", r: 0, m: 0, res: "L" }, // A (play-in 16v17)
-          b: { from: "W", r: 0, m: 2, res: "L" }, // C (play-in 15v18)
+          b: { from: "W", r: 1, m: 7, res: "L" }, // L (6 vs 11)
           slot: 0,
         },
         {
-          // R = loser(B) vs loser(D)
+          // R = loser(B) vs loser(J)
           a: { from: "W", r: 0, m: 1, res: "L" }, // B (play-in 13v20)
-          b: { from: "W", r: 0, m: 3, res: "L" }, // D (play-in 14v19)
+          b: { from: "W", r: 1, m: 5, res: "L" }, // J (7 vs 10)
           slot: 1,
+        },
+        {
+          // S = loser(C) vs loser(H)
+          a: { from: "W", r: 0, m: 2, res: "L" }, // C (play-in 15v18)
+          b: { from: "W", r: 1, m: 3, res: "L" }, // H (5 vs 12)
+          slot: 2,
+        },
+        {
+          // T = loser(D) vs loser(F)
+          a: { from: "W", r: 0, m: 3, res: "L" }, // D (play-in 14v19)
+          b: { from: "W", r: 1, m: 1, res: "L" }, // F (8 vs 9)
+          slot: 3,
         },
       ],
 
-      // Round 1 (L1): S, T, U, V (first wave of WB R1 losers join L0 winners)
+      // Round 1 (L1): U, V, W, X (remaining WB R1 losers join L0 winners)
       [
         {
-          // S = winner(Q) vs loser(G)
+          // U = winner(Q) vs loser(K)
           a: { from: "L", r: 0, m: 0, res: "W" }, // Q
-          b: { from: "W", r: 1, m: 2, res: "L" }, // G
+          b: { from: "W", r: 1, m: 6, res: "L" }, // K (3 vs 14)
           slot: 0,
         },
         {
-          // T = winner(R) vs loser(H)
+          // V = winner(R) vs loser(I)
           a: { from: "L", r: 0, m: 1, res: "W" }, // R
-          b: { from: "W", r: 1, m: 3, res: "L" }, // H
+          b: { from: "W", r: 1, m: 4, res: "L" }, // I (2 vs 15)
           slot: 1,
         },
         {
-          // U = loser(I) vs loser(J)
-          a: { from: "W", r: 1, m: 4, res: "L" }, // I
-          b: { from: "W", r: 1, m: 5, res: "L" }, // J
+          // W = winner(S) vs loser(G)
+          a: { from: "L", r: 0, m: 2, res: "W" }, // S
+          b: { from: "W", r: 1, m: 2, res: "L" }, // G (4 vs 13)
           slot: 2,
         },
         {
-          // V = loser(E) vs loser(F)
-          a: { from: "W", r: 1, m: 0, res: "L" }, // E
-          b: { from: "W", r: 1, m: 1, res: "L" }, // F
+          // X = winner(T) vs loser(E)
+          a: { from: "L", r: 0, m: 3, res: "W" }, // T
+          b: { from: "W", r: 1, m: 0, res: "L" }, // E (1 vs 17)
           slot: 3,
         },
       ],
 
-      // Round 2 (L2): W, X, Y, Z (WB R2 losers drop)
+      // Round 2 (L2): Y, Z, AA, AB (WB R2 losers drop)
       [
         {
-          // W = loser(M) vs winner(S)
-          a: { from: "W", r: 2, m: 0, res: "L" }, // M
-          b: { from: "L", r: 1, m: 0, res: "W" }, // S
-          slot: 0,
-        },
-        {
-          // X = loser(N) vs winner(T)
+          // Y = loser(N) vs winner(U)
           a: { from: "W", r: 2, m: 1, res: "L" }, // N
-          b: { from: "L", r: 1, m: 1, res: "W" }, // T
+          b: { from: "L", r: 1, m: 0, res: "W" }, // U
+          slot: 0,
+        },
+        {
+          // Z = loser(M) vs winner(V)
+          a: { from: "W", r: 2, m: 0, res: "L" }, // M
+          b: { from: "L", r: 1, m: 1, res: "W" }, // V
           slot: 1,
         },
         {
-          // Y = loser(O) vs winner(U)
-          a: { from: "W", r: 2, m: 2, res: "L" }, // O
-          b: { from: "L", r: 1, m: 2, res: "W" }, // U
+          // AA = loser(P) vs winner(W)
+          a: { from: "W", r: 2, m: 3, res: "L" }, // P
+          b: { from: "L", r: 1, m: 2, res: "W" }, // W
           slot: 2,
         },
         {
-          // Z = loser(P) vs winner(V)
-          a: { from: "W", r: 2, m: 3, res: "L" }, // P
-          b: { from: "L", r: 1, m: 3, res: "W" }, // V
+          // AB = loser(O) vs winner(X)
+          a: { from: "W", r: 2, m: 2, res: "L" }, // O
+          b: { from: "L", r: 1, m: 3, res: "W" }, // X
           slot: 3,
         },
       ],
 
-      // Round 3 (LQF): AA, AB
+      // Round 3 (LQF): AC, AD
       [
         {
-          // AA = winner(W) vs winner(X)
-          a: { from: "L", r: 2, m: 0, res: "W" },
-          b: { from: "L", r: 2, m: 1, res: "W" },
+          // AC = winner(Y) vs winner(Z)
+          a: { from: "L", r: 2, m: 0, res: "W" }, // Y
+          b: { from: "L", r: 2, m: 1, res: "W" }, // Z
           slot: 0,
         },
         {
-          // AB = winner(Y) vs winner(Z)
-          a: { from: "L", r: 2, m: 2, res: "W" },
-          b: { from: "L", r: 2, m: 3, res: "W" },
+          // AD = winner(AA) vs winner(AB)
+          a: { from: "L", r: 2, m: 2, res: "W" }, // AA
+          b: { from: "L", r: 2, m: 3, res: "W" }, // AB
           slot: 1,
         },
       ],
 
-      // Round 4 (LSF): AC
+      // Round 4 (LSF): AE, AF
       [
         {
-          // AC = loser(Q) vs winner(AA)
-          a: { from: "W", r: 3, m: 0, res: "L" }, // Q (WB round 3)
-          b: { from: "L", r: 3, m: 0, res: "W" }, // AA
-          slot: 0,
-        },
-        {
-          // AD = loser(R) vs winner(AB)
+          // AE = loser(R) vs winner(AC)
           a: { from: "W", r: 3, m: 1, res: "L" }, // R (WB round 3)
-          b: { from: "L", r: 3, m: 1, res: "W" }, // AB
+          b: { from: "L", r: 3, m: 0, res: "W" }, // AC
+          slot: 0,
+        },
+        {
+          // AF = loser(Q) vs winner(AD)
+          a: { from: "W", r: 3, m: 0, res: "L" }, // Q (WB round 3)
+          b: { from: "L", r: 3, m: 1, res: "W" }, // AD
           slot: 1,
         },
       ],
 
-      // Round 5 (LQF2): AE
+      // Round 5 (LQF2): AG
       [
         {
-          // AE = winner(AC) vs winner(AD)
-          a: { from: "L", r: 4, m: 0, res: "W" },
-          b: { from: "L", r: 4, m: 1, res: "W" },
+          // AG = winner(AE) vs winner(AF)
+          a: { from: "L", r: 4, m: 0, res: "W" }, // AE
+          b: { from: "L", r: 4, m: 1, res: "W" }, // AF
           slot: 0,
         },
       ],
 
-      // Round 6 (LFinal): AF
+      // Round 6 (LFinal): AH
       [
         {
-          // AF = loser(S) vs winner(AE)
+          // AH = loser(S) vs winner(AG)
           a: { from: "W", r: 4, m: 0, res: "L" }, // S (WB final)
-          b: { from: "L", r: 5, m: 0, res: "W" }, // AE
+          b: { from: "L", r: 5, m: 0, res: "W" }, // AG
           slot: 0,
         },
       ],
