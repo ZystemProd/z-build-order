@@ -280,12 +280,15 @@ export async function renderCircuitList({ onEnterCircuit } = {}) {
           li.className = "tournament-card circuit-card";
           const tournamentCount = item.tournaments.length;
           const description = item.description || "Circuit points race.";
+          const hostName = escapeHtml(item.createdByName || "Unknown");
           const metaBits = [
-            `${tournamentCount} tournaments`,
-            `Host: ${item.createdByName || "Unknown"}`,
+            `<span>${escapeHtml(`${tournamentCount} tournaments`)}</span>`,
+            `<span>Host: <span translate="no">${hostName}</span></span>`,
           ];
           if (item.finalTournamentSlug) {
-            metaBits.unshift(`Finals: ${item.finalTournamentSlug}`);
+            metaBits.unshift(
+              `<span>${escapeHtml(`Finals: ${item.finalTournamentSlug}`)}</span>`,
+            );
           }
           li.innerHTML = DOMPurify.sanitize(`
             <div class="card-cover"></div>
@@ -299,7 +302,7 @@ export async function renderCircuitList({ onEnterCircuit } = {}) {
             <h4>${escapeHtml(item.name)}</h4>
             <p class="tournament-format">${escapeHtml(description)}</p>
             <div class="meta">
-              ${metaBits.map((text) => `<span>${escapeHtml(text)}</span>`).join("")}
+              ${metaBits.join("")}
             </div>
           `);
           if (onEnterCircuit) {
@@ -455,9 +458,10 @@ export async function renderCircuitTournamentList(
           statusClass = "status-upcoming";
         }
       }
+      const hostName = escapeHtml(item.createdByName || "Unknown");
       const metaBits = [
-        playerLabel,
-        `Host: ${item.createdByName || "Unknown"}`,
+        `<span>${escapeHtml(playerLabel)}</span>`,
+        `<span>Host: <span translate="no">${hostName}</span></span>`,
       ];
       li.innerHTML = DOMPurify.sanitize(`
         <div class="card-cover${coverUrl ? " has-image" : ""}"${
@@ -473,9 +477,10 @@ export async function renderCircuitTournamentList(
         </div>
         <p class="tournament-format">${escapeHtml(item.format || "Tournament")}</p>
         <div class="meta">
-          ${metaBits.map((text) => `<span>${escapeHtml(text)}</span>`).join("")}
+          ${metaBits.join("")}
         </div>
       `);
+      void updateCircuitTournamentStatus(li, slug);
       if (onEnterTournament) {
         li.addEventListener("click", () => onEnterTournament(item.slug, meta?.slug || ""));
       }
@@ -584,6 +589,40 @@ export async function renderCircuitTournamentList(
   } catch (err) {
     console.error("Failed to load circuit tournaments", err);
     listEl.innerHTML = `<li class="muted error">Failed to load tournaments.</li>`;
+  }
+}
+
+function isMatchCompleteBasic(match) {
+  if (!match) return false;
+  return Boolean(match.status === "complete" || match.winnerId || match.walkover);
+}
+
+function isBracketFinishedBasic(bracket) {
+  if (!bracket || typeof bracket !== "object") return false;
+  if (isMatchCompleteBasic(bracket.finals)) return true;
+  const winners = Array.isArray(bracket.winners) ? bracket.winners : [];
+  if (winners.length) {
+    const lastRound = winners[winners.length - 1] || [];
+    if (isMatchCompleteBasic(lastRound[0])) return true;
+  }
+  const matches = getAllMatches(bracket);
+  if (!matches.length) return false;
+  return matches.every(isMatchCompleteBasic);
+}
+
+async function updateCircuitTournamentStatus(cardEl, slug) {
+  if (!cardEl || !slug) return;
+  try {
+    const state = await loadTournamentStateRemote(slug);
+    const finished = isBracketFinishedBasic(state?.bracket);
+    if (!finished) return;
+    const statusChip = cardEl.querySelector(".status-chip");
+    if (!statusChip) return;
+    statusChip.textContent = "Finished";
+    statusChip.classList.remove("status-upcoming", "status-started", "status-tbd");
+    statusChip.classList.add("status-finished");
+  } catch (_) {
+    // ignore status updates on errors
   }
 }
 

@@ -117,7 +117,7 @@ export function createAdminPlayerSearch({
     }, 250);
   };
 
-  const addByUsername = async (username, userIdOverride = "") => {
+  const addByUsername = async (username, userIdOverride = "", options = {}) => {
     if (typeof getIsEnabled === "function" && !getIsEnabled()) {
       onError?.(new Error("Search disabled."));
       return;
@@ -167,7 +167,7 @@ export function createAdminPlayerSearch({
     }
     try {
       const userData = {};
-      await addPlayer({ userId, username: cleaned, userData });
+      await addPlayer({ userId, username: cleaned, userData, options });
       onSuccess?.(cleaned);
     } catch (err) {
       console.error("Failed to add player from search", err);

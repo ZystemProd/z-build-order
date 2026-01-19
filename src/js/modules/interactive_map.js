@@ -499,7 +499,7 @@ export async function renderMapCards(folder = "current") {
         mapCard.setAttribute("data-map", dataMapPath);
 
         mapCard.innerHTML = `
-          <div class="map-card-title">${map.name || ""}</div>
+          <div class="map-card-title" translate="no">${map.name || ""}</div>
           <img class="map-image" data-src="${dataMapPath}" alt="${
           map.name || ""
         }">

@@ -28,6 +28,14 @@ service firebase.storage {
         firestore.get(
           /databases/(default)/documents/tournaments/$(slug)
         ).data.createdBy == request.auth.uid ||
+        (
+          firestore.get(
+            /databases/(default)/documents/tournaments/$(slug)
+          ).data.adminUids is list &&
+          request.auth.uid in firestore.get(
+            /databases/(default)/documents/tournaments/$(slug)
+          ).data.adminUids
+        ) ||
         firestore.get(
           /databases/(default)/documents/tournamentCircuits/$(
             firestore.get(/databases/(default)/documents/tournaments/$(slug)).data.circuitSlug
@@ -43,6 +51,14 @@ service firebase.storage {
         firestore.get(
           /databases/(default)/documents/tournaments/$(slug)
         ).data.createdBy == request.auth.uid ||
+        (
+          firestore.get(
+            /databases/(default)/documents/tournaments/$(slug)
+          ).data.adminUids is list &&
+          request.auth.uid in firestore.get(
+            /databases/(default)/documents/tournaments/$(slug)
+          ).data.adminUids
+        ) ||
         firestore.get(
           /databases/(default)/documents/tournamentCircuits/$(
             firestore.get(/databases/(default)/documents/tournaments/$(slug)).data.circuitSlug

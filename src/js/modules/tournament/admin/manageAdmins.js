@@ -55,6 +55,7 @@ export function createAdminManager({
       const chip = document.createElement("div");
       chip.className = "hero-admin-chip";
       const name = document.createElement("span");
+      name.setAttribute("translate", "no");
       name.textContent = entry.name || "Admin";
       const role = document.createElement("span");
       role.className = "hero-admin-role";
@@ -136,6 +137,7 @@ export function createAdminManager({
       const row = document.createElement("div");
       row.className = "admin-search-item";
       const label = document.createElement("span");
+      label.setAttribute("translate", "no");
       label.textContent = entry.username;
       const button = document.createElement("button");
       button.type = "button";
@@ -170,6 +172,7 @@ export function createAdminManager({
       const labelWrap = document.createElement("div");
       labelWrap.className = "admin-invite-row-label";
       const name = document.createElement("span");
+      name.setAttribute("translate", "no");
       name.textContent = entry.name || "Admin";
       const role = document.createElement("span");
       role.className = "admin-invite-role";
@@ -203,9 +206,17 @@ export function createAdminManager({
     if (!meta?.slug) return false;
     const collectionName =
       scope === "circuit" ? CIRCUIT_COLLECTION : TOURNAMENT_COLLECTION;
+    const adminUids = Array.from(
+      new Set(
+        (nextAdmins || [])
+          .map((entry) => entry?.uid)
+          .filter((uid) => typeof uid === "string" && uid.trim())
+          .map((uid) => uid.trim())
+      )
+    );
     await setDoc(
       doc(collection(db, collectionName), meta.slug),
-      { admins: nextAdmins },
+      { admins: nextAdmins, adminUids },
       { merge: true }
     );
     if (scope === "circuit") {

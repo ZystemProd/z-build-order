@@ -13,9 +13,12 @@
     "clean": "rimraf node_modules/.vite dist",
     "minify-firebase": "node scripts/minify-firebase.js",
     "cleanup-covers": "cd functions && node scripts/cleanupTournamentCovers.js",
-    "cleanup-covers:apply": "cd functions && node scripts/cleanupTournamentCovers.js --apply"
+    "cleanup-covers:apply": "cd functions && node scripts/cleanupTournamentCovers.js --apply",
+    "bracket-sim": "node scripts/bracket-sim.js",
+    "test:ui": "playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "^1.55.0",
     "firebase-tools": "^14.5.1",
     "rimraf": "^6.0.1",
     "vite": "^6.4.1"

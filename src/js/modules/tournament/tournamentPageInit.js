@@ -94,6 +94,8 @@ export function initTournamentPage({
   removeBotPlayer,
   removeAllBots,
   resetTournament,
+  resetScores,
+  resetVetoScoreChat,
   checkInCurrentPlayer,
   notifyCheckInPlayers,
   toggleCheckInManualClose,
@@ -114,6 +116,8 @@ export function initTournamentPage({
   const registrationForm = document.getElementById("registrationForm");
   const rebuildBtn = document.getElementById("rebuildBracketBtn");
   const resetBtn = document.getElementById("resetTournamentBtn");
+  const resetScoresBtn = document.getElementById("resetScoresBtn");
+  const resetVetoScoreChatBtn = document.getElementById("resetVetoScoreChatBtn");
   const notifyCheckInBtn = document.getElementById("notifyCheckInBtn");
   const checkInToggleBtn = document.getElementById("checkInToggleBtn");
   const refreshMmrBtn = document.getElementById("refreshMmrBtn");
@@ -145,8 +149,14 @@ export function initTournamentPage({
   const cancelDeleteTournamentBtn = document.getElementById("cancelDeleteTournamentBtn");
   const deleteTournamentModal = document.getElementById("confirmDeleteTournamentModal");
   const resetTournamentModal = document.getElementById("confirmResetTournamentModal");
+  const resetScoresModal = document.getElementById("confirmResetScoresModal");
+  const resetVetoScoreChatModal = document.getElementById("confirmResetVetoScoreChatModal");
   const confirmResetTournamentBtn = document.getElementById("confirmResetTournamentBtn");
   const cancelResetTournamentBtn = document.getElementById("cancelResetTournamentBtn");
+  const confirmResetScoresBtn = document.getElementById("confirmResetScoresBtn");
+  const cancelResetScoresBtn = document.getElementById("cancelResetScoresBtn");
+  const confirmResetVetoScoreChatBtn = document.getElementById("confirmResetVetoScoreChatBtn");
+  const cancelResetVetoScoreChatBtn = document.getElementById("cancelResetVetoScoreChatBtn");
   const openCreateCircuit = document.getElementById("openCreateCircuit");
   const createCircuitModal = document.getElementById("createCircuitModal");
   const circuitSettingsModal = document.getElementById("circuitSettingsModal");
@@ -769,6 +779,12 @@ export function initTournamentPage({
   resetBtn?.addEventListener("click", () => {
     setModalVisible(resetTournamentModal, true);
   });
+  resetScoresBtn?.addEventListener("click", () => {
+    setModalVisible(resetScoresModal, true);
+  });
+  resetVetoScoreChatBtn?.addEventListener("click", () => {
+    setModalVisible(resetVetoScoreChatModal, true);
+  });
   autoFillBtn?.addEventListener("click", autoFillPlayers);
   checkInBtn?.addEventListener("click", () => checkInCurrentPlayer?.());
   checkInToggleBtn?.addEventListener("click", () =>
@@ -940,6 +956,20 @@ export function initTournamentPage({
   cancelResetTournamentBtn?.addEventListener("click", () => {
     setModalVisible(resetTournamentModal, false);
   });
+  confirmResetScoresBtn?.addEventListener("click", () => {
+    resetScores?.();
+    setModalVisible(resetScoresModal, false);
+  });
+  cancelResetScoresBtn?.addEventListener("click", () => {
+    setModalVisible(resetScoresModal, false);
+  });
+  confirmResetVetoScoreChatBtn?.addEventListener("click", () => {
+    resetVetoScoreChat?.();
+    setModalVisible(resetVetoScoreChatModal, false);
+  });
+  cancelResetVetoScoreChatBtn?.addEventListener("click", () => {
+    setModalVisible(resetVetoScoreChatModal, false);
+  });
   window.addEventListener("mousedown", (e) => {
     if (
       deleteTournamentModal &&
@@ -965,6 +995,24 @@ export function initTournamentPage({
       e.target === resetTournamentModal
     ) {
       setModalVisible(resetTournamentModal, false);
+    }
+  });
+  window.addEventListener("mousedown", (e) => {
+    if (
+      resetScoresModal &&
+      resetScoresModal.style.display === "flex" &&
+      e.target === resetScoresModal
+    ) {
+      setModalVisible(resetScoresModal, false);
+    }
+  });
+  window.addEventListener("mousedown", (e) => {
+    if (
+      resetVetoScoreChatModal &&
+      resetVetoScoreChatModal.style.display === "flex" &&
+      e.target === resetVetoScoreChatModal
+    ) {
+      setModalVisible(resetVetoScoreChatModal, false);
     }
   });
   window.addEventListener("mousedown", (e) => {

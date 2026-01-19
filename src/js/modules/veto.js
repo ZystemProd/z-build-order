@@ -268,12 +268,17 @@ let currentIndex = 0;
 
 function updateDisplayedMap() {
   const mapTextEl = document.getElementById("selectedMapText");
+  const mapNameEl = mapTextEl?.querySelector(".selected-map-name");
   const currentMap = mapData[currentIndex];
 
-  if (mapTextEl && currentMap) {
-    mapTextEl.textContent = `Selected Map: ${currentMap.name}`;
-  } else if (mapTextEl) {
-    mapTextEl.textContent = "No map selected";
+  if (mapNameEl) {
+    mapNameEl.textContent = currentMap ? currentMap.name : "No map selected";
+    return;
+  }
+  if (mapTextEl) {
+    mapTextEl.textContent = currentMap
+      ? `Selected Map: ${currentMap.name}`
+      : "No map selected";
   }
 }
 
@@ -683,6 +688,7 @@ function renderAdvancedMapList() {
 
     const span = document.createElement("span");
     span.className = "adv-map-label";
+    span.setAttribute("translate", "no");
     span.textContent = map.name;
 
     li.appendChild(img);
@@ -755,9 +761,10 @@ function pickMap(mapId, player) {
   num.textContent = pickOrder;
   pickOrder++;
 
-  const labelSpan = document.createElement("span");
-  labelSpan.className = "pick-label";
-  labelSpan.textContent = label;
+    const labelSpan = document.createElement("span");
+    labelSpan.className = "pick-label";
+    labelSpan.setAttribute("translate", "no");
+    labelSpan.textContent = label;
 
   const p1Input = document.getElementById("player1NameInput");
   const p2Input = document.getElementById("player2NameInput");
@@ -953,6 +960,7 @@ function renderMapList() {
     // Map name
     const labelSpan = document.createElement("span");
     labelSpan.id = `label${map.id}`;
+    labelSpan.setAttribute("translate", "no");
     labelSpan.textContent = map.name;
 
     // Order indicator

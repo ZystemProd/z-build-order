@@ -281,7 +281,7 @@ import {
   sendTournamentInviteNotification,
 } from "./invites.js";
 const renderMapPoolPicker = renderMapPoolPickerUI;
-const CURRENT_BRACKET_LAYOUT_VERSION = 54;
+const CURRENT_BRACKET_LAYOUT_VERSION = 55;
 const MAX_TOURNAMENT_IMAGE_SIZE = 12 * 1024 * 1024;
 const COVER_TARGET_WIDTH = 1200;
 const COVER_TARGET_HEIGHT = 675;
@@ -1580,6 +1580,11 @@ function setManualSeedingEnabled(nextEnabled) {
     renderAll();
     return;
   }
+  if (bracketHasRecordedResults(state.bracket)) {
+    showToast?.("Seeding is locked once scores are recorded.", "error");
+    renderAll();
+    return;
+  }
   const enabled = Boolean(nextEnabled);
   const current = getManualSeedingSettings(state);
   const seedMode = getMmrSeedingMode(state);
@@ -1603,6 +1608,11 @@ function setMmrSeedingMode(nextMode) {
     renderAll();
     return;
   }
+  if (bracketHasRecordedResults(state.bracket)) {
+    showToast?.("Seeding is locked once scores are recorded.", "error");
+    renderAll();
+    return;
+  }
   const mode = nextMode === "registered" ? "registered" : "current";
   if (getMmrSeedingMode(state) === mode) {
     updateMmrSeedingUi();
@@ -1621,6 +1631,11 @@ function setMmrSeedingMode(nextMode) {
 function handleManualSeedingReorder(nextOrder = []) {
   if (!Array.isArray(nextOrder) || !nextOrder.length) return;
   if (state.isLive) return;
+  if (bracketHasRecordedResults(state.bracket)) {
+    showToast?.("Seeding is locked once scores are recorded.", "error");
+    renderAll();
+    return;
+  }
   const seedMode = getMmrSeedingMode(state);
   const normalizedOrder = buildManualOrder(
     state.players || [],
@@ -1655,6 +1670,13 @@ function handleApplyCircuitPoints(event) {
     { merge: true }
   ).catch((err) => {
     console.error("Failed to store circuit points applied flag", err);
+  });
+  setDoc(
+    doc(collection(db, TOURNAMENT_STATE_COLLECTION), currentTournamentMeta.slug),
+    { circuitPointsApplied: true },
+    { merge: true }
+  ).catch((err) => {
+    console.error("Failed to store circuit points applied flag in state", err);
   });
 }
 
@@ -1760,7 +1782,11 @@ function renderAll(matchIds = null) {
     const goLiveBtn = document.getElementById("rebuildBracketBtn");
     const notifyCheckInBtn = document.getElementById("notifyCheckInBtn");
     const refreshMmrBtn = document.getElementById("refreshMmrBtn");
-    const resetTournamentBtn = document.getElementById("resetTournamentBtn");
+      const resetTournamentBtn = document.getElementById("resetTournamentBtn");
+      const resetScoresBtn = document.getElementById("resetScoresBtn");
+      const resetVetoScoreChatBtn = document.getElementById(
+        "resetVetoScoreChatBtn"
+      );
     const startMs = getStartTimeMs(currentTournamentMeta);
     const liveDot = document.getElementById("liveDot");
     const bracketGrid = document.getElementById("bracketGrid");
@@ -1961,9 +1987,15 @@ function renderAll(matchIds = null) {
         goLiveBtn.classList.remove("danger");
       }
     }
-    if (resetTournamentBtn) {
-      resetTournamentBtn.classList.add("danger");
-    }
+      if (resetTournamentBtn) {
+        resetTournamentBtn.classList.add("danger");
+      }
+      if (resetScoresBtn) {
+        resetScoresBtn.classList.add("danger");
+      }
+      if (resetVetoScoreChatBtn) {
+        resetVetoScoreChatBtn.classList.add("danger");
+      }
     if (notifyCheckInBtn) {
       const checkInState = getCheckInWindowState(currentTournamentMeta);
       const eligibleNotCheckedIn = eligiblePlayers.filter(
@@ -2037,7 +2069,7 @@ function renderAll(matchIds = null) {
               return `<li data-player-id="${escapeHtml(p.id || "")}">
                         <span class="race-strip ${raceClass}"></span>
                         ${clanImg}
-                        <span class="name-text">${name}</span>
+                        <span class="name-text" translate="no">${name}</span>
                         <span class="registered-meta">${raceLabel} - ${mmr}</span>
                       </li>`;
             });
@@ -2068,6 +2100,7 @@ function renderAll(matchIds = null) {
       updateSettingsRulesPreview,
       syncFormatFieldVisibility,
     });
+    updateSettingsScoreLocks();
     const nextPromoKey = getPromoStripRenderKey(currentTournamentMeta);
     if (nextPromoKey && nextPromoKey !== promoStripRenderKey) {
       promoStripRenderKey = nextPromoKey;
@@ -2085,17 +2118,23 @@ function renderAll(matchIds = null) {
   });
 
   const layoutVersion = state.bracketLayoutVersion || 1;
+  const repairVersion = Number(state.bracketRepairVersion) || 0;
+  const hasScoreReports = Object.keys(state.scoreReports || {}).length > 0;
+  const canAutoRebuild =
+    !hasScoreReports && !bracketHasRecordedResults(bracket);
+  const canAutoRepair =
+    canAutoRebuild && repairVersion < CURRENT_BRACKET_LAYOUT_VERSION;
   const needsLayoutUpgrade =
     bracket &&
     layoutVersion < CURRENT_BRACKET_LAYOUT_VERSION &&
-    !bracketHasRecordedResults(bracket);
+    canAutoRepair;
   if (needsLayoutUpgrade) {
     rebuildBracket(true, "Updated bracket layout");
     return;
   }
   const needsBracketRepair = (() => {
     if (!bracket || !playersArr.length) return false;
-    if (bracketHasRecordedResults(bracket)) return false;
+    if (!canAutoRepair) return false;
     if (isGroupStageFormat(format)) return false;
     const { seededEligible } = seedEligiblePlayersWithMode(
       state.players || [],
@@ -2469,14 +2508,15 @@ function goLiveTournament() {
     currentTournamentMeta || {},
     (fmt) => (fmt || "").toLowerCase().includes("round robin")
   );
-  saveState({
-    players: mergedPlayers,
-    bracket,
-    needsReseed: false,
-    bracketLayoutVersion: CURRENT_BRACKET_LAYOUT_VERSION,
-    isLive: true,
-    hasBeenLive: true,
-  }, { skipRoster: true });
+    saveState({
+      players: mergedPlayers,
+      bracket,
+      needsReseed: false,
+      bracketLayoutVersion: CURRENT_BRACKET_LAYOUT_VERSION,
+      bracketRepairVersion: CURRENT_BRACKET_LAYOUT_VERSION,
+      isLive: true,
+      hasBeenLive: true,
+    }, { skipRoster: true });
   addActivity("Tournament went live.");
   renderAll();
 }
@@ -2520,7 +2560,7 @@ function updateManualSeedingUi() {
   const toggle = document.getElementById("manualSeedingToggle");
   const help = document.getElementById("seedingModeHelp");
   const enabled = Boolean(state.manualSeedingEnabled);
-  const locked = state.isLive;
+  const locked = state.isLive || bracketHasRecordedResults(state.bracket);
   if (toggle) {
     toggle.checked = enabled;
     toggle.disabled = locked;
@@ -2544,11 +2584,49 @@ function updateManualSeedingUi() {
 function updateMmrSeedingUi() {
   const toggle = document.getElementById("mmrSeedingToggle");
   const mode = getMmrSeedingMode(state);
-  const locked = state.isLive || state.manualSeedingEnabled;
+  const locked =
+    state.isLive ||
+    state.manualSeedingEnabled ||
+    bracketHasRecordedResults(state.bracket);
   if (toggle) {
     toggle.checked = mode === "current";
     toggle.disabled = locked;
   }
+}
+
+function updateSettingsScoreLocks() {
+  const hasScores = bracketHasRecordedResults(state.bracket);
+  const locks = getBracketScoreLocks(state.bracket);
+  const formatSelect = document.getElementById("settingsFormatSelect");
+  const rrGroups = document.getElementById("settingsRoundRobinGroups");
+  const rrAdvance = document.getElementById("settingsRoundRobinAdvance");
+  const rrPlayoffs = document.getElementById("settingsRoundRobinPlayoffs");
+  const rrBestOf = document.getElementById("settingsRoundRobinBestOf");
+  const upperInput = document.getElementById("settingsBestOfUpper");
+  const lowerInput = document.getElementById("settingsBestOfLower");
+  const quarterInput = document.getElementById("settingsBestOfQuarter");
+  const semiInput = document.getElementById("settingsBestOfSemi");
+  const upperFinalInput = document.getElementById("settingsBestOfUpperFinal");
+  const finalInput = document.getElementById("settingsBestOfFinal");
+  const lbSemiInput = document.getElementById("settingsBestOfLowerSemi");
+  const lbFinalInput = document.getElementById("settingsBestOfLowerFinal");
+
+  if (formatSelect) formatSelect.disabled = hasScores;
+
+  if (rrGroups) rrGroups.disabled = hasScores || locks.roundRobin;
+  if (rrAdvance) rrAdvance.disabled = hasScores || locks.roundRobin;
+  if (rrPlayoffs) rrPlayoffs.disabled = hasScores || locks.roundRobin;
+  if (rrBestOf) rrBestOf.disabled = hasScores || locks.roundRobin;
+
+  if (upperInput) upperInput.disabled = locks.upper;
+  if (quarterInput) quarterInput.disabled = locks.quarter;
+  if (semiInput) semiInput.disabled = locks.semi;
+  if (upperFinalInput) upperFinalInput.disabled = locks.upperFinal;
+  if (finalInput) finalInput.disabled = locks.final;
+
+  if (lowerInput) lowerInput.disabled = locks.lower;
+  if (lbSemiInput) lbSemiInput.disabled = locks.lowerSemi;
+  if (lbFinalInput) lbFinalInput.disabled = locks.lowerFinal;
 }
 
 function bracketHasResults() {
@@ -2576,6 +2654,82 @@ function bracketHasRecordedResults(bracket) {
     return false;
   }
   return false;
+}
+
+function matchHasRecordedScore(match) {
+  if (!match) return false;
+  if (match.status === "complete") return true;
+  if (match.winnerId || match.walkover) return true;
+  const scores = match.scores || [];
+  return (scores[0] || 0) + (scores[1] || 0) > 0;
+}
+
+function getBracketScoreLocks(bracket) {
+  const locks = {
+    upper: false,
+    quarter: false,
+    semi: false,
+    upperFinal: false,
+    final: false,
+    lower: false,
+    lowerSemi: false,
+    lowerFinal: false,
+    roundRobin: false,
+  };
+  if (!bracket) return locks;
+  const winners = Array.isArray(bracket.winners) ? bracket.winners : [];
+  const losers = Array.isArray(bracket.losers) ? bracket.losers : [];
+  const winnersRounds = winners.length;
+  const losersRounds = losers.length;
+
+  winners.forEach((round, idx) => {
+    const roundNum = idx + 1;
+    (round || []).forEach((match) => {
+      if (!matchHasRecordedScore(match)) return;
+      if (roundNum === winnersRounds) {
+        if (bracket.finals) {
+          locks.upperFinal = true;
+        } else {
+          locks.final = true;
+        }
+      } else if (roundNum === winnersRounds - 1) {
+        locks.semi = true;
+      } else if (roundNum === winnersRounds - 2) {
+        locks.quarter = true;
+      } else {
+        locks.upper = true;
+      }
+    });
+  });
+
+  losers.forEach((round, idx) => {
+    const roundNum = idx + 1;
+    (round || []).forEach((match) => {
+      if (!matchHasRecordedScore(match)) return;
+      if (roundNum === losersRounds) {
+        locks.lowerFinal = true;
+      } else if (roundNum === losersRounds - 1) {
+        locks.lowerSemi = true;
+      } else {
+        locks.lower = true;
+      }
+    });
+  });
+
+  if (bracket.finals && matchHasRecordedScore(bracket.finals)) {
+    locks.final = true;
+  }
+
+  const groups = Array.isArray(bracket.groups) ? bracket.groups : [];
+  groups.forEach((group) => {
+    (group?.matches || []).forEach((match) => {
+      if (matchHasRecordedScore(match)) {
+        locks.roundRobin = true;
+      }
+    });
+  });
+
+  return locks;
 }
 
 function applyBracketReadOnlyState(readOnly) {
@@ -2780,13 +2934,75 @@ async function setPlayerCheckIn(id, shouldCheckIn) {
   renderAll();
 }
 
-function resetTournament() {
-  const empty = { ...defaultState, lastUpdated: Date.now() };
-  setStateObj(empty);
-  saveState(empty);
-  rebuildBracket(true, "Tournament reset");
-  addActivity("Tournament reset.");
-}
+  function resetTournament() {
+    const empty = { ...defaultState, lastUpdated: Date.now() };
+    setStateObj(empty);
+    saveState(empty);
+    rebuildBracket(true, "Tournament reset");
+    addActivity("Tournament reset.");
+  }
+
+  function resetScores() {
+    if (!state?.bracket) return;
+    const { seededEligible, mergedPlayers } = seedEligiblePlayersWithMode(
+      state.players || [],
+      state
+    );
+    const isRoundRobin = (fmt) =>
+      (fmt || "").toLowerCase().includes("round robin");
+    const bracket = buildBracket(
+      seededEligible,
+      currentTournamentMeta || {},
+      isRoundRobin
+    );
+    saveState({
+      players: mergedPlayers,
+      bracket,
+      needsReseed: false,
+      scoreReports: {},
+      matchCasts: {},
+      bracketLayoutVersion: CURRENT_BRACKET_LAYOUT_VERSION,
+      bracketRepairVersion: CURRENT_BRACKET_LAYOUT_VERSION,
+    }, { skipRoster: true });
+    addActivity("Scores reset.");
+    renderAll();
+  }
+
+  function resetVetoScoreChat() {
+    if (!state?.bracket) return;
+    const { seededEligible, mergedPlayers } = seedEligiblePlayersWithMode(
+      state.players || [],
+      state
+    );
+    const isRoundRobin = (fmt) =>
+      (fmt || "").toLowerCase().includes("round robin");
+    const bracket = buildBracket(
+      seededEligible,
+      currentTournamentMeta || {},
+      isRoundRobin
+    );
+    setCurrentVetoMatchIdState(null);
+    setVetoStateState(null);
+    saveState(
+      {
+        players: mergedPlayers,
+        bracket,
+        needsReseed: false,
+        scoreReports: {},
+        matchCasts: {},
+        matchVetoes: {},
+        bracketLayoutVersion: CURRENT_BRACKET_LAYOUT_VERSION,
+        bracketRepairVersion: CURRENT_BRACKET_LAYOUT_VERSION,
+      },
+      { skipRoster: true }
+    );
+    const targetSlug = currentSlug || currentTournamentMeta?.slug || "";
+    if (targetSlug) {
+      void deleteTournamentChatHistory(targetSlug);
+    }
+    addActivity("Scores, veto, and chat reset.");
+    renderAll();
+  }
 function updateMatchScore(matchId, scoreA, scoreB, options = {}) {
   if (!state.isLive && !isAdmin) {
     showToast?.("Tournament is not live. Bracket is read-only.", "error");
@@ -3002,12 +3218,13 @@ function rebuildBracket(force = false, reason = "") {
     currentTournamentMeta || {},
     isRoundRobin
   );
-  saveState({
-    players: mergedPlayers,
-    bracket,
-    needsReseed: false,
-    bracketLayoutVersion: CURRENT_BRACKET_LAYOUT_VERSION,
-  }, { skipRoster: true });
+    saveState({
+      players: mergedPlayers,
+      bracket,
+      needsReseed: false,
+      bracketLayoutVersion: CURRENT_BRACKET_LAYOUT_VERSION,
+      bracketRepairVersion: CURRENT_BRACKET_LAYOUT_VERSION,
+    }, { skipRoster: true });
   if (reason) addActivity(reason);
   renderAll();
 }
@@ -3075,12 +3292,15 @@ async function renderTournamentList() {
             li.className = "tournament-card circuit-card";
             const tournamentCount = item.tournaments?.length || 0;
             const description = item.description || "Circuit points race.";
+            const hostName = escapeHtml(item.createdByName || "Unknown");
             const metaBits = [
-              `${tournamentCount} tournaments`,
-              `Host: ${item.createdByName || "Unknown"}`,
+              `<span>${escapeHtml(`${tournamentCount} tournaments`)}</span>`,
+              `<span>Host: <span translate="no">${hostName}</span></span>`,
             ];
             if (item.finalTournamentSlug) {
-              metaBits.unshift(`Finals: ${item.finalTournamentSlug}`);
+              metaBits.unshift(
+                `<span>${escapeHtml(`Finals: ${item.finalTournamentSlug}`)}</span>`,
+              );
             }
             li.innerHTML = DOMPurify.sanitize(`
               <div class="card-cover">
@@ -3091,9 +3311,7 @@ async function renderTournamentList() {
                   <h4>${escapeHtml(item.name)}</h4>
                 </div>
                 <div class="meta">
-                  ${metaBits
-                    .map((text) => `<span>${escapeHtml(text)}</span>`)
-                    .join("")}
+                  ${metaBits.join("")}
                 </div>
               </div>
             `);
@@ -3249,9 +3467,9 @@ async function renderTournamentList() {
                 <h4>${escapeHtml(item.name)}</h4>
               </div>
               <div class="meta">
-                <span>Host: ${escapeHtml(
+                <span>Host: <span translate="no">${escapeHtml(
                   item.createdByName || "Unknown"
-                )}</span>
+                )}</span></span>
               </div>
               <div class="tournament-progress" data-slug="${escapeHtml(
                 item.slug
@@ -3300,17 +3518,55 @@ function computeTournamentProgress(bracket) {
   const matches = getAllMatches(bracket);
   if (!matches.length) return null;
   let completed = 0;
+  const isWalkoverScore = (value) => {
+    if (typeof value !== "string") return false;
+    const normalized = value.trim().toLowerCase();
+    return normalized === "w" || normalized === "wo" || normalized === "w/o";
+  };
+  const isMatchComplete = (match) => {
+    if (!match) return false;
+    if (match.status === "complete" || match.winnerId || match.walkover) {
+      return true;
+    }
+    const aRaw = match?.scores?.[0];
+    const bRaw = match?.scores?.[1];
+    if (isWalkoverScore(aRaw) || isWalkoverScore(bRaw)) return true;
+    const a = Number(aRaw);
+    const b = Number(bRaw);
+    const validA = Number.isFinite(a) ? a : 0;
+    const validB = Number.isFinite(b) ? b : 0;
+    if (!Number.isFinite(a) && !Number.isFinite(b)) return false;
+    const bestOf = getBestOfForMatch(match) || 1;
+    const needed = Math.max(1, Math.ceil(bestOf / 2));
+    return Math.max(validA, validB) >= needed;
+  };
   matches.forEach((match) => {
-    if (match?.status === "complete" || match?.winnerId || match?.walkover) {
+    if (isMatchComplete(match)) {
       completed += 1;
     }
   });
   const percent = Math.round((completed / matches.length) * 100);
+  const finalsComplete = isMatchComplete(bracket.finals);
+  let winnersFinalComplete = false;
+  const winners = Array.isArray(bracket.winners) ? bracket.winners : [];
+  if (winners.length) {
+    const lastRound = winners[winners.length - 1] || [];
+    const finalMatch = lastRound[0];
+    winnersFinalComplete = isMatchComplete(finalMatch);
+  }
+  const groups = Array.isArray(bracket.groups) ? bracket.groups : [];
+  const hasPlayoffs = winners.flat().length || (Array.isArray(bracket.losers) ? bracket.losers.flat().length : 0) || bracket.finals;
+  let groupsComplete = false;
+  if (groups.length && !hasPlayoffs) {
+    const groupMatches = groups.flatMap((group) => (group?.matches || []));
+    groupsComplete = groupMatches.length > 0 && groupMatches.every(isMatchComplete);
+  }
+  const isFinished = finalsComplete || winnersFinalComplete || groupsComplete || completed === matches.length;
   return {
     completed,
     total: matches.length,
     percent,
-    isFinished: completed === matches.length,
+    isFinished,
   };
 }
 
@@ -4012,8 +4268,8 @@ async function confirmDeleteCircuit() {
         : await fetchCircuitMeta(circuitSlug);
     const tournamentSlugs = normalizeCircuitTournamentSlugs(meta || {});
     for (const slug of tournamentSlugs) {
-      const coverImageUrl = await getTournamentCoverUrlForDelete(slug);
-      await deleteTournamentBundle(slug, coverImageUrl);
+      const coverUrls = await getTournamentCoverUrlsForDelete(slug);
+      await deleteTournamentBundle(slug, coverUrls);
     }
     await deleteDoc(doc(collection(db, CIRCUIT_COLLECTION), circuitSlug));
     if (currentCircuitMeta?.slug === circuitSlug) {
@@ -4177,7 +4433,6 @@ async function enterTournament(slug, options = {}) {
     state?.lastUpdated || 0
   );
 
-  await maybeAutoAddFinalPlayers();
   subscribeTournamentStateRemote(slug);
   const landingView = document.getElementById("landingView");
   const tournamentView = document.getElementById("tournamentView");
@@ -4791,6 +5046,20 @@ async function uploadSponsorLogo(file, slug) {
 
 async function handleSaveSettings(event) {
   event?.preventDefault?.();
+  const activeSettingsTab =
+    document.querySelector("#settingsTab .settings-panel.active")?.id ||
+    "settingsGeneral";
+  const isGeneralTab = activeSettingsTab === "settingsGeneral";
+  const isDescTab = activeSettingsTab === "settingsDesc";
+  const isMapsTab = activeSettingsTab === "settingsMaps";
+  const isFormatTab = activeSettingsTab === "settingsFormat";
+  const isSponsorsTab = activeSettingsTab === "settingsSponsors";
+  const isSocialsTab = activeSettingsTab === "settingsSocials";
+  const isPromosTab = isSponsorsTab || isSocialsTab;
+  if (state.isLive && !isDescTab) {
+    showToast?.("Set the tournament to Not Live before saving settings.", "error");
+    return;
+  }
   const formatSelect = document.getElementById("settingsFormatSelect");
   const descInput = document.getElementById("settingsDescriptionInput");
   const rulesInput = document.getElementById("settingsRulesInput");
@@ -4810,54 +5079,95 @@ async function handleSaveSettings(event) {
   const copySponsorsToggle = document.getElementById(
     "settingsCopyCircuitSponsorsToggle"
   );
-  const imageFile = imageInput?.files?.[0] || null;
-  const reuseUrl = imagePreview?.dataset.reuseUrl || "";
-  const newSlugRaw = (slugInput?.value || "").trim();
+  const imageFile = isGeneralTab ? imageInput?.files?.[0] || null : null;
+  const reuseUrl = isGeneralTab ? imagePreview?.dataset.reuseUrl || "" : "";
+  const newSlugRaw = isGeneralTab ? (slugInput?.value || "").trim() : "";
   const newSlug = newSlugRaw || currentSlug || "";
   const slugChanged = newSlug && newSlug !== currentSlug;
-  const bestOf = readBestOf("settings", defaultBestOf);
+  const bestOf = isFormatTab
+    ? readBestOf("settings", defaultBestOf)
+    : { ...defaultBestOf, ...(currentTournamentMeta?.bestOf || {}) };
   const format = (
-    formatSelect?.value ||
+    (isFormatTab ? formatSelect?.value : "") ||
     currentTournamentMeta?.format ||
     "Tournament"
   ).trim();
-  const description = descInput?.value || "";
-  const rules = rulesInput?.value || "";
-  const startTime = startInput?.value ? new Date(startInput.value) : null;
-  const maxPlayers = normalizeMaxPlayersForFormat(
-    maxPlayersInput?.value,
-    format,
-    maxPlayersInput
-  );
-  if (maxPlayersInput && Number.isFinite(maxPlayers)) {
+  const description = isDescTab
+    ? descInput?.value || ""
+    : currentTournamentMeta?.description || "";
+  const rules = isDescTab
+    ? rulesInput?.value || ""
+    : currentTournamentMeta?.rules || "";
+  const startTime = isGeneralTab
+    ? startInput?.value
+      ? new Date(startInput.value)
+      : null
+    : Number.isFinite(currentTournamentMeta?.startTime)
+    ? new Date(currentTournamentMeta.startTime)
+    : null;
+  const maxPlayers = isGeneralTab
+    ? normalizeMaxPlayersForFormat(
+        maxPlayersInput?.value,
+        format,
+        maxPlayersInput
+      )
+    : Number.isFinite(currentTournamentMeta?.maxPlayers)
+    ? currentTournamentMeta.maxPlayers
+    : null;
+  if (isGeneralTab && maxPlayersInput && Number.isFinite(maxPlayers)) {
     maxPlayersInput.value = String(maxPlayers);
   }
-  const qualifyRaw = qualifyInput?.value ?? "";
+  const qualifyRaw = isGeneralTab
+    ? qualifyInput?.value ?? ""
+    : currentTournamentMeta?.circuitQualifyCount ?? "";
   const qualifyCount =
     qualifyRaw === "" || qualifyRaw === null || qualifyRaw === undefined
       ? null
       : Number(qualifyRaw);
-  const checkInWindowMinutes = getCheckInWindowMinutes(checkInSelect);
-  const allowCheckInAfterStart = Boolean(checkInAfterStartToggle?.checked);
+  const checkInWindowMinutes = isGeneralTab
+    ? getCheckInWindowMinutes(checkInSelect)
+    : currentTournamentMeta?.checkInWindowMinutes ?? 0;
+  const allowCheckInAfterStart = isGeneralTab
+    ? Boolean(checkInAfterStartToggle?.checked)
+    : Boolean(currentTournamentMeta?.allowCheckInAfterStart);
   const checkInManuallyClosed = allowCheckInAfterStart
     ? Boolean(currentTournamentMeta?.checkInManuallyClosed)
     : false;
-  const isInviteOnly = accessSelect?.value === "closed";
-  const visibility = normalizeTournamentVisibility(visibilitySelect?.value);
-  const mapPool = Array.from(mapPoolSelection || []);
-  const rrSettings = extractRoundRobinSettingsUI(
-    "settings",
-    defaultRoundRobinSettings
+  const isInviteOnly = isGeneralTab
+    ? accessSelect?.value === "closed"
+    : Boolean(currentTournamentMeta?.isInviteOnly);
+  const visibility = isGeneralTab
+    ? normalizeTournamentVisibility(visibilitySelect?.value)
+    : normalizeTournamentVisibility(currentTournamentMeta?.visibility);
+  const mapPool = isMapsTab
+    ? Array.from(mapPoolSelection || [])
+    : currentTournamentMeta?.mapPool || [];
+  const rrSettings = isFormatTab
+    ? extractRoundRobinSettingsUI("settings", defaultRoundRobinSettings)
+    : normalizeRoundRobinSettings(currentTournamentMeta?.roundRobin || {});
+  const hasScores = bracketHasRecordedResults(state.bracket);
+  const scoreLocks = getBracketScoreLocks(state.bracket);
+  const currentFormat = (currentTournamentMeta?.format || "Tournament").trim();
+  const currentRoundRobin = normalizeRoundRobinSettings(
+    currentTournamentMeta?.roundRobin || {}
   );
+  const nextRoundRobin = normalizeRoundRobinSettings(rrSettings);
+  const currentBestOf = {
+    ...defaultBestOf,
+    ...(currentTournamentMeta?.bestOf || {}),
+  };
   const circuitPoints = currentTournamentMeta?.circuitSlug
     ? readCircuitPointsTable()
     : null;
   const requirePulseLink =
-    requirePulseInput?.checked ??
+    (isGeneralTab ? requirePulseInput?.checked : undefined) ??
     currentTournamentMeta?.requirePulseLink ??
     true;
   const copyFromCircuitPromos = currentTournamentMeta?.circuitSlug
-    ? Boolean(copySponsorsToggle?.checked ?? getCopyFromCircuitPromos(currentTournamentMeta))
+    ? Boolean(
+        (isPromosTab ? copySponsorsToggle?.checked : undefined) ??
+          getCopyFromCircuitPromos(currentTournamentMeta)
+      )
     : false;
   let coverImageUrl = currentTournamentMeta?.coverImageUrl || "";
   let coverImageUrlSmall = currentTournamentMeta?.coverImageUrlSmall || "";
@@ -4871,6 +5181,51 @@ async function handleSaveSettings(event) {
       coverImageUrlSmall = uploaded.coverImageUrlSmall;
     } catch (err) {
       showToast?.(err?.message || "Failed to upload cover image.", "error");
+      return;
+    }
+  }
+
+  if (hasScores) {
+    if (format !== currentFormat) {
+      showToast?.(
+        "Format is locked once scores are recorded. Reset scores to change it.",
+        "error"
+      );
+      return;
+    }
+    if (JSON.stringify(nextRoundRobin) !== JSON.stringify(currentRoundRobin)) {
+      showToast?.(
+        "Round robin settings are locked once scores are recorded.",
+        "error"
+      );
+      return;
+    }
+    const lockedBestOf = [];
+    if (bestOf.upper !== currentBestOf.upper && scoreLocks.upper)
+      lockedBestOf.push("Upper");
+    if (bestOf.quarter !== currentBestOf.quarter && scoreLocks.quarter)
+      lockedBestOf.push("Quarter");
+    if (bestOf.semi !== currentBestOf.semi && scoreLocks.semi)
+      lockedBestOf.push("Semi");
+    if (bestOf.upperFinal !== currentBestOf.upperFinal && scoreLocks.upperFinal)
+      lockedBestOf.push("Upper Final");
+    if (bestOf.final !== currentBestOf.final && scoreLocks.final)
+      lockedBestOf.push("Final");
+    if (bestOf.lower !== currentBestOf.lower && scoreLocks.lower)
+      lockedBestOf.push("Lower");
+    if (bestOf.lowerSemi !== currentBestOf.lowerSemi && scoreLocks.lowerSemi)
+      lockedBestOf.push("Lower Semi");
+    if (bestOf.lowerFinal !== currentBestOf.lowerFinal && scoreLocks.lowerFinal)
+      lockedBestOf.push("Lower Final");
+    if (nextRoundRobin.bestOf !== currentRoundRobin.bestOf && scoreLocks.roundRobin)
+      lockedBestOf.push("Round Robin");
+    if (lockedBestOf.length) {
+      showToast?.(
+        `Best-of is locked for rounds with recorded scores: ${lockedBestOf.join(
+          ", "
+        )}.`,
+        "error"
+      );
       return;
     }
   }
@@ -4901,50 +5256,57 @@ async function handleSaveSettings(event) {
         ? qualifyCount
         : null,
   });
-  if (currentTournamentMeta?.circuitSlug) {
+  if (currentTournamentMeta?.circuitSlug && isPromosTab) {
     meta.copyFromCircuitPromos = copyFromCircuitPromos;
   }
-  if (!copyFromCircuitPromos) {
-    const sponsors = readTournamentSponsors();
-    const processedSponsors = [];
-    for (const sponsor of sponsors) {
-      if (!sponsor) continue;
-      let imageUrl = sponsor.imageUrl || "";
-      if (sponsor.file) {
-        try {
-          imageUrl = await uploadSponsorLogo(sponsor.file, newSlug);
-        } catch (err) {
-          showToast?.(err?.message || "Failed to upload sponsor logo.", "error");
+  if (isPromosTab && !copyFromCircuitPromos) {
+    if (isSponsorsTab) {
+      const sponsors = readTournamentSponsors();
+      const processedSponsors = [];
+      for (const sponsor of sponsors) {
+        if (!sponsor) continue;
+        let imageUrl = sponsor.imageUrl || "";
+        if (sponsor.file) {
+          try {
+            imageUrl = await uploadSponsorLogo(sponsor.file, newSlug);
+          } catch (err) {
+            showToast?.(
+              err?.message || "Failed to upload sponsor logo.",
+              "error"
+            );
+            return;
+          }
+        }
+        const entry = normalizeSponsorEntry(
+          { name: sponsor.name, imageUrl, linkUrl: sponsor.linkUrl },
+          { allowEmpty: false }
+        );
+        if (entry) processedSponsors.push(entry);
+      }
+      meta.sponsors = processedSponsors;
+    }
+    if (isSocialsTab) {
+      const socials = readTournamentSocials();
+      const processedSocials = socials
+        .map((entry) =>
+          normalizeSocialEntry(
+            { type: entry.type, label: entry.label, url: entry.url },
+            { allowEmpty: false }
+          )
+        )
+        .filter(Boolean);
+      for (const entry of processedSocials) {
+        const error = validateSocialUrl(entry.type, entry.url);
+        if (error) {
+          showToast?.(
+            `Invalid ${getSocialLabelForType(entry.type)} URL. ${error}`,
+            "error"
+          );
           return;
         }
       }
-      const entry = normalizeSponsorEntry(
-        { name: sponsor.name, imageUrl, linkUrl: sponsor.linkUrl },
-        { allowEmpty: false }
-      );
-      if (entry) processedSponsors.push(entry);
+      meta.socials = processedSocials;
     }
-    meta.sponsors = processedSponsors;
-    const socials = readTournamentSocials();
-    const processedSocials = socials
-      .map((entry) =>
-        normalizeSocialEntry(
-          { type: entry.type, label: entry.label, url: entry.url },
-          { allowEmpty: false }
-        )
-      )
-      .filter(Boolean);
-    for (const entry of processedSocials) {
-      const error = validateSocialUrl(entry.type, entry.url);
-      if (error) {
-        showToast?.(
-          `Invalid ${getSocialLabelForType(entry.type)} URL. ${error}`,
-          "error"
-        );
-        return;
-      }
-    }
-    meta.socials = processedSocials;
   }
   if (currentTournamentMeta?.circuitSlug) {
     meta.circuitPoints = circuitPoints || [];
@@ -4991,7 +5353,13 @@ async function handleSaveSettings(event) {
   } else {
     showToast?.("Settings saved locally.", "success");
   }
-  rebuildBracket(true, "Settings updated");
+  const shouldRebuild =
+    isFormatTab && format !== currentFormat && !bracketHasRecordedResults(state.bracket);
+  if (shouldRebuild) {
+    rebuildBracket(true, "Settings updated");
+  } else {
+    renderAll();
+  }
 }
 
 async function handleCreateCircuit(event) {
@@ -5104,6 +5472,7 @@ async function handleCreateCircuit(event) {
     tournaments: [],
     finalTournamentSlug: "",
     admins: [],
+    adminUids: [],
     createdBy: auth.currentUser.uid,
     createdByName:
       getCurrentUsername?.() || auth.currentUser.displayName || "Unknown",
@@ -5551,6 +5920,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     removeBotPlayer,
     removeAllBots,
     resetTournament,
+    resetScores,
+    resetVetoScoreChat,
     checkInCurrentPlayer,
     notifyCheckInPlayers,
     toggleCheckInManualClose,
@@ -5574,7 +5945,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   bindTournamentPromoSettingsControls(() => currentTournamentMeta);
   initInviteLinksPanel();
   initAdminInviteModal();
-  initFinalAutoAddToggle();
 
   if (typeof window !== "undefined") {
     setInterval(() => {
@@ -5625,6 +5995,13 @@ function updateAdminVisibility() {
   adminEls.forEach((el) => {
     el.style.display = isAdmin ? "" : "none";
   });
+  const deleteTournamentBtn = document.getElementById("deleteTournamentBtn");
+  const hostUid = currentTournamentMeta?.createdBy || "";
+  const currentUid = auth?.currentUser?.uid || "";
+  const isHost = Boolean(hostUid && currentUid && hostUid === currentUid);
+  if (deleteTournamentBtn) {
+    deleteTournamentBtn.style.display = isHost ? "" : "none";
+  }
   const seedingBtn = document.getElementById("seedingTabBtn");
   const settingsBtn = document.getElementById("settingsTabBtn");
   const circuitPointsBtn = document.getElementById("circuitPointsTabBtn");
@@ -5656,25 +6033,11 @@ function updateAdminVisibility() {
   }
   updateFinalAdminAddVisibility();
   updateInviteLinksPanelVisibility();
-  updateFinalAutoAddRow();
   if (typeof window !== "undefined") {
     window.__tournamentIsAdmin = isAdmin;
   }
 }
 
-function updateFinalAutoAddRow() {
-  const row = document.getElementById("finalAutoAddRow");
-  const toggle = document.getElementById("finalAutoAddToggle");
-  if (!row || !toggle) return;
-  const show = isAdmin && currentTournamentMeta?.isCircuitFinal;
-  row.style.display = show ? "flex" : "none";
-  toggle.checked = !state.disableFinalAutoAdd;
-}
-
-function setFinalAutoAddStatus(message) {
-  const statusEl = document.getElementById("finalAutoAddStatus");
-  if (statusEl) statusEl.textContent = message || "";
-}
 
 function updateFinalAdminAddVisibility() {
   const panel = document.getElementById("finalAdminAddPanel");
@@ -5700,165 +6063,6 @@ function recomputeAdminFromMeta() {
   renderTournamentAdmins(currentTournamentMeta);
 }
 
-function initFinalAutoAddToggle() {
-  const toggle = document.getElementById("finalAutoAddToggle");
-  if (!toggle) return;
-  toggle.addEventListener("change", () => {
-    const enabled = Boolean(toggle.checked);
-    saveState({ disableFinalAutoAdd: !enabled }, { skipRoster: true });
-    if (enabled) {
-      maybeAutoAddFinalPlayers({ force: true });
-    } else {
-      showToast?.("Auto add from leaderboard disabled.", "info");
-    }
-  });
-}
-
-async function maybeAutoAddFinalPlayers({ force = false } = {}) {
-  if (!currentTournamentMeta?.isCircuitFinal) return;
-  if (!isAdmin) return;
-  if (state.disableFinalAutoAdd && !force) {
-    setFinalAutoAddStatus("Auto add is disabled.");
-    return;
-  }
-  const circuitSlug = currentTournamentMeta?.circuitSlug || "";
-  const qualifyCount = Number(currentTournamentMeta?.circuitQualifyCount);
-  if (!circuitSlug) {
-    setFinalAutoAddStatus("Circuit link is missing.");
-    return;
-  }
-  if (!Number.isFinite(qualifyCount) || qualifyCount <= 0) {
-    setFinalAutoAddStatus("Set a qualify count to auto add players.");
-    return;
-  }
-  if (!force && (state.players || []).length >= qualifyCount) {
-    setFinalAutoAddStatus("Auto add already applied.");
-    return;
-  }
-  const circuitMeta = await fetchCircuitMeta(circuitSlug);
-  if (!circuitMeta) {
-    setFinalAutoAddStatus("Circuit not found.");
-    return;
-  }
-  const { leaderboard } = await buildCircuitLeaderboard(circuitMeta, [], {
-    excludeSlug: currentSlug,
-  });
-  if (!leaderboard?.length) {
-    setFinalAutoAddStatus("Circuit leaderboard has no players yet.");
-    return;
-  }
-  const finalists = leaderboard.slice(0, qualifyCount);
-  let added = 0;
-  const createdPlayers = [];
-  for (const entry of finalists) {
-    const name = (entry?.name || "").trim();
-    if (!name) continue;
-    const existing = (state.players || []).some(
-      (player) => (player.name || "").toLowerCase() === name.toLowerCase()
-    );
-    if (existing) continue;
-    let userId = "";
-    try {
-      const lowerName = name.toLowerCase();
-      let usernameSnap = await getDoc(doc(db, "usernames", name));
-      if (!usernameSnap.exists() && lowerName !== name) {
-        usernameSnap = await getDoc(doc(db, "usernames", lowerName));
-      }
-      if (usernameSnap.exists()) {
-        userId = usernameSnap.data()?.userId || usernameSnap.data()?.uid || "";
-      }
-    } catch (err) {
-      console.warn("Failed to resolve username", err);
-    }
-    let userData = {};
-    if (userId) {
-      try {
-        const userSnap = await getDoc(doc(db, "users", userId));
-        userData = userSnap.exists() ? userSnap.data() || {} : {};
-      } catch (err) {
-        console.warn("Failed to load user profile", err);
-      }
-    }
-    const displayName = userData.username || name;
-    const pulse = userData?.pulse || {};
-    const byRace = pulse.lastMmrByRace || pulse.byRace || null;
-    const fallbackMmr = Number(pulse.lastMmr ?? pulse.mmr);
-    const pick = pickBestRace(byRace, fallbackMmr);
-    const race = pick.race || "Random";
-    const mmr = Number.isFinite(pick.mmr) ? pick.mmr : 0;
-    const sc2Link = sanitizeUrl(
-      userData.sc2PulseUrl || pulse.url || entry.sc2Link || ""
-    );
-    const avatarUrl =
-      userData?.profile?.avatarUrl ||
-      userData?.avatarUrl ||
-      DEFAULT_PLAYER_AVATAR;
-    const secondaryPulseProfiles = Array.isArray(pulse.secondary)
-      ? pulse.secondary
-      : [];
-    const secondaryPulseLinks = secondaryPulseProfiles
-      .map((entry) => (entry && typeof entry === "object" ? entry.url : ""))
-      .filter(Boolean);
-    let clanName = "";
-    let clanAbbreviation = "";
-    let clanLogoUrl = "";
-    const mainClanId = userData?.settings?.mainClanId || "";
-    if (mainClanId) {
-      try {
-        const clanDoc = await getDoc(doc(db, "clans", mainClanId));
-        if (clanDoc.exists()) {
-          const clanData = clanDoc.data() || {};
-          clanName = clanData?.name || "";
-          clanAbbreviation = clanData?.abbreviation || "";
-          clanLogoUrl = clanData?.logoUrlSmall || clanData?.logoUrl || "";
-        }
-      } catch (err) {
-        console.warn("Could not fetch clan data", err);
-      }
-    }
-    const created = buildPlayerFromData({
-      name: displayName,
-      race,
-      sc2Link,
-      mmr,
-      points: Number.isFinite(entry.points) ? entry.points : 0,
-      avatarUrl,
-      twitchUrl: userData?.twitchUrl || "",
-      secondaryPulseLinks,
-      secondaryPulseProfiles,
-      mmrByRace: byRace || null,
-      country: (userData?.country || "").toUpperCase(),
-      clan: clanName,
-      clanAbbreviation,
-      clanLogoUrl,
-      pulseName: pulse.name || pulse.accountName || "",
-      uid: userId || null,
-    });
-    if (created) createdPlayers.push(created);
-    added += 1;
-  }
-  if (!added) {
-    setFinalAutoAddStatus("All qualifying players are already added.");
-    return;
-  }
-  const hasCompletedMatches = bracketHasResults();
-  await updateRosterWithTransaction(
-    (roster) =>
-      createdPlayers.reduce(
-        (acc, player) => upsertRosterPlayer(acc, player),
-        roster
-      ),
-    { needsReseed: hasCompletedMatches },
-    { optimistic: false }
-  );
-  if (!hasCompletedMatches) {
-    rebuildBracket(true, "Auto-added leaderboard finalists");
-  } else {
-    renderAll();
-  }
-  setFinalAutoAddStatus(`Auto-added ${added} player(s).`);
-  showToast?.(`Auto-added ${added} finalist(s).`, "success");
-}
 
 function renderRegistrationPulseSummary() {
   const summaryEl = document.getElementById("registrationPulseSummary");
@@ -5979,7 +6183,9 @@ function populatePlayerNameFromProfile() {
     return;
   }
   const candidate = username || pulseName;
-  if (candidate) input.value = candidate;
+  if (candidate && candidate.toLowerCase() !== "guest") {
+    input.value = candidate;
+  }
   updateRegistrationRequirementIcons();
 }
 
@@ -6045,6 +6251,10 @@ function resolveRaceMmr(byRace, raceLabel, fallbackMmr) {
 }
 
 async function autoFillPlayers() {
+  if (bracketHasRecordedResults(state.bracket)) {
+    showToast?.("Cannot add players after scores are recorded.", "error");
+    return;
+  }
   // 32 clean names (no numbers)
   const names = [
     "Zephyr",
@@ -6182,6 +6392,10 @@ async function addBotPlayer() {
   }
   if (!isAdmin) {
     showToast?.("Only admins can add bots.", "error");
+    return;
+  }
+  if (bracketHasRecordedResults(state.bracket)) {
+    showToast?.("Cannot add bots after scores are recorded.", "error");
     return;
   }
   const players = Array.isArray(state.players) ? [...state.players] : [];
@@ -6352,6 +6566,21 @@ async function handleRegistration(event) {
 
   if (!name) {
     const message = "Player name is required.";
+    setStatus(statusEl, message, true);
+    showToast?.(message, "error");
+    return;
+  }
+  if (bracketHasRecordedResults(state.bracket)) {
+    setStatus(
+      statusEl,
+      "Registration is locked once scores are recorded.",
+      true
+    );
+    showToast?.("Registration is locked once scores are recorded.", "error");
+    return;
+  }
+  if (name.toLowerCase() === "guest") {
+    const message = 'Player name cannot be "Guest".';
     setStatus(statusEl, message, true);
     showToast?.(message, "error");
     return;
@@ -6621,14 +6850,16 @@ function renderFinalAdminSearchResults(results = []) {
     const row = document.createElement("div");
     row.className = "admin-search-item";
     const label = document.createElement("span");
+    label.setAttribute("translate", "no");
     label.textContent = entry.username;
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "cta small primary";
-    button.textContent = "Invite";
-    button.dataset.adminAddUsername = entry.username;
+    const inviteBtn = document.createElement("button");
+    inviteBtn.type = "button";
+    inviteBtn.className = "cta small ghost";
+    inviteBtn.textContent = "Invite";
+    inviteBtn.dataset.adminAddUsername = entry.username;
+    inviteBtn.dataset.adminAddMode = "invite";
     if (entry.userId) {
-      button.dataset.adminUserId = entry.userId;
+      inviteBtn.dataset.adminUserId = entry.userId;
     }
     const alreadyAdded = (state.players || []).some(
       (player) =>
@@ -6636,10 +6867,10 @@ function renderFinalAdminSearchResults(results = []) {
         (player.name || "").toLowerCase() === entry.username.toLowerCase()
     );
     if (alreadyAdded) {
-      button.disabled = true;
-      button.textContent = "Invited";
+      inviteBtn.disabled = true;
+      inviteBtn.textContent = "Added";
     }
-    row.append(label, button);
+    row.append(label, inviteBtn);
     resultsEl.append(row);
   });
 }
@@ -6662,7 +6893,11 @@ function initFinalAdminSearch() {
       renderFinalAdminSearchResults([]);
       setFinalAdminSearchStatus("");
     },
-    addPlayer: async ({ userId, username, userData }) => {
+    addPlayer: async ({ userId, username, userData, options }) => {
+      if (bracketHasRecordedResults(state.bracket)) {
+        showToast?.("Cannot add players after scores are recorded.", "error");
+        return;
+      }
       const displayName = userData.username || username;
       const pulse = userData?.pulse || {};
       const byRace = pulse.lastMmrByRace || pulse.byRace || null;
@@ -6707,6 +6942,7 @@ function initFinalAdminSearch() {
           console.warn("Could not fetch clan data", err);
         }
       }
+      const addMode = options?.mode === "super" ? "super" : "invite";
       const inviterName = getCurrentUsername?.() || "Tournament admin";
       const newPlayer = buildPlayerFromData({
         name: displayName,
@@ -6714,10 +6950,15 @@ function initFinalAdminSearch() {
         sc2Link,
         mmr,
         points: Number.isFinite(startingPoints) ? startingPoints : 0,
-        inviteStatus: INVITE_STATUS.pending,
-        invitedAt: Date.now(),
-        invitedByUid: auth.currentUser?.uid || "",
-        invitedByName: inviterName,
+        inviteStatus:
+          addMode === "super" ? INVITE_STATUS.accepted : INVITE_STATUS.pending,
+        ...(addMode === "super"
+          ? {}
+          : {
+              invitedAt: Date.now(),
+              invitedByUid: auth.currentUser?.uid || "",
+              invitedByName: inviterName,
+            }),
         avatarUrl,
         twitchUrl: userData?.twitchUrl || "",
         secondaryPulseLinks,
@@ -6735,26 +6976,34 @@ function initFinalAdminSearch() {
         {},
         { optimistic: true }
       );
-      addActivity(`Admin invited ${newPlayer.name}.`);
-      try {
-        await sendTournamentInviteNotification({
-          db,
-          auth,
-          getCurrentUsername,
-          userId,
-          playerName: newPlayer.name,
-          tournamentMeta: currentTournamentMeta,
-          slug: currentSlug,
-        });
-      } catch (err) {
-        console.error("Failed to send invite notification", err);
-        showToast?.(
-          "Invite created, but notification failed to send.",
-          "error"
-        );
+      if (addMode === "super") {
+        addActivity(`Admin added ${newPlayer.name}.`);
+      } else {
+        addActivity(`Admin invited ${newPlayer.name}.`);
+        try {
+          await sendTournamentInviteNotification({
+            db,
+            auth,
+            getCurrentUsername,
+            userId,
+            playerName: newPlayer.name,
+            tournamentMeta: currentTournamentMeta,
+            slug: currentSlug,
+          });
+        } catch (err) {
+          console.error("Failed to send invite notification", err);
+          showToast?.(
+            "Invite created, but notification failed to send.",
+            "error"
+          );
+        }
       }
       renderAll();
-      showToast?.(`Invite sent to ${newPlayer.name}.`, "success");
+      if (addMode === "super") {
+        showToast?.(`${newPlayer.name} added to player list.`, "success");
+      } else {
+        showToast?.(`Invite sent to ${newPlayer.name}.`, "success");
+      }
     },
   });
 
@@ -6766,7 +7015,8 @@ function initFinalAdminSearch() {
     if (!target) return;
     const username = target.dataset.adminAddUsername || "";
     const userId = target.dataset.adminUserId || "";
-    search.addByUsername(username, userId);
+    const mode = target.dataset.adminAddMode || "invite";
+    search.addByUsername(username, userId, { mode });
   });
 }
 

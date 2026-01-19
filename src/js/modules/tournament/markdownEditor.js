@@ -21,6 +21,14 @@ export function initQuillEditor({ editorId, textareaId, placeholder = "" }) {
   const textarea = document.getElementById(textareaId);
   if (!editorEl || !textarea || typeof window.Quill !== "function") return null;
 
+  const stripImageOps = (delta) => {
+    const Delta = window.Quill.import("delta");
+    const ops = (delta?.ops || []).filter(
+      (op) => !(op.insert && typeof op.insert === "object" && op.insert.image)
+    );
+    return new Delta(ops);
+  };
+
   const assignEditorInputNames = () => {
     const container = editorEl.closest(".markdown-editor") || editorEl;
     const inputs = container.querySelectorAll("input, select, textarea");
@@ -37,6 +45,9 @@ export function initQuillEditor({ editorId, textareaId, placeholder = "" }) {
     modules: defaultModules,
     placeholder,
   });
+  const clipboard = quill.getModule("clipboard");
+  clipboard?.addMatcher("IMG", () => stripImageOps());
+  clipboard?.addMatcher(Node.ELEMENT_NODE, (_node, delta) => stripImageOps(delta));
   const toolbar = quill.getModule("toolbar");
   const toolbarContainer = toolbar?.container || null;
   let focusOrigin = null;

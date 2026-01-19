@@ -128,7 +128,16 @@ function renderTournamentSearchResults(items, query, { listEl, statusEl, append 
     meta.className = "tournament-search-meta";
     if (item.meta) {
       const extra = document.createElement("span");
-      extra.textContent = item.meta;
+      const match = item.meta.match(/^Host:\s*(.*)$/i);
+      if (match) {
+        extra.append("Host: ");
+        const host = document.createElement("span");
+        host.setAttribute("translate", "no");
+        host.textContent = match[1] || "Unknown";
+        extra.append(host);
+      } else {
+        extra.textContent = item.meta;
+      }
       meta.appendChild(extra);
     }
     if (item.startTime) {

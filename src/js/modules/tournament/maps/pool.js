@@ -18,7 +18,7 @@ export function renderMapPoolPicker(
     }" data-map-name="${escapeHtml(map.name)}">
       <div class="map-thumb" style="background-image:url('${imgPath}')"></div>
       <div class="map-meta">
-        <div class="map-name">${escapeHtml(map.name)}</div>
+        <div class="map-name" translate="no">${escapeHtml(map.name)}</div>
         <span class="map-mode">${map.mode || "1v1"}</span>
       </div>
     </div>`;
