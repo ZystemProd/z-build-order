@@ -1,16 +1,23 @@
 import DOMPurify from "dompurify";
 import { showToast } from "../../toastHandler.js";
-import { auth, db, getCurrentUsername } from "../../../../app.js";
+import { auth, db, functions, getCurrentUsername, rtdb } from "../../../../app.js";
+import { httpsCallable } from "firebase/functions";
+import { onAuthStateChanged } from "firebase/auth";
 import {
   collection,
-  deleteDoc,
   deleteField,
   doc,
   onSnapshot,
-  serverTimestamp,
   setDoc,
   updateDoc,
 } from "firebase/firestore";
+import {
+  onDisconnect,
+  onValue,
+  ref as rtdbRef,
+  serverTimestamp as rtdbServerTimestamp,
+  set as rtdbSet,
+} from "firebase/database";
 import { getPreferredServerLabel } from "../../../data/countryRegions.js";
 import countries from "../../../data/countries.json" assert { type: "json" };
 import { updateTooltips } from "../../tooltip.js";
@@ -39,16 +46,21 @@ const PRESENCE_HEARTBEAT_MS = 60_000;
 const PRESENCE_MIN_WRITE_MS = 45_000;
 const PRESENCE_IDLE_AFTER_MS = 90_000;
 const PRESENCE_OFFLINE_AFTER_MS = 20 * 60_000;
+const ensureMatchPresenceAccessCallable = httpsCallable(
+  functions,
+  "ensureMatchPresenceAccess"
+);
 let presenceUnsub = null;
 let presenceHeartbeat = null;
 let presenceUiTimer = null;
-let presenceLatest = new Map(); // uid -> { matchId, updatedAtMs, playerId }
+let presenceLatest = new Map(); // uid -> { updatedAtMs, playerId, status }
 let presenceContext = {
   matchId: null,
   leftPlayerId: null,
   rightPlayerId: null,
 };
 let presenceSlug = null;
+let presenceMatchId = null;
 let presenceWriteDenied = false;
 let presenceActiveKey = "";
 let presenceLastWriteAt = 0;
@@ -59,6 +71,8 @@ let presenceLastActivityAt = 0;
 let presenceActivityTimer = null;
 let presenceActivityHandler = null;
 let presenceVisibilityHandler = null;
+const presenceAccessCache = new Set();
+let presenceAuthBound = false;
 const countryFlagCache = new Map();
 const countryUidCache = new Map();
 const COUNTRY_NAME_BY_CODE = new Map(
@@ -416,6 +430,15 @@ function applyRemoteBusyIfAny(matchId) {
   return false;
 }
 
+function ensurePresenceAuthCleanupBound() {
+  if (presenceAuthBound) return;
+  presenceAuthBound = true;
+  onAuthStateChanged(auth, (user) => {
+    if (user) return;
+    stopPresenceTracking();
+  });
+}
+
 // ---- Veto persist serialization + UI lock (prevents fast-click desync) ----
 let vetoUiBusy = false;
 let vetoLocalBusy = false;
@@ -693,6 +716,7 @@ export function openMatchInfoModal(
   matchId,
   { getPlayersMap, getDefaultMapPoolNames, getMapByName }
 ) {
+  ensurePresenceAuthCleanupBound();
   const modal = document.getElementById("matchInfoModal");
   const title = document.getElementById("matchInfoTitle");
   const boInlineEl = document.getElementById("matchInfoBoInline");
@@ -762,6 +786,7 @@ export function openMatchInfoModal(
   const isParticipant =
     (me?.id && (me.id === leftPlayerId || me.id === rightPlayerId)) ||
     (uid && (uid === pA?.uid || uid === pB?.uid));
+  const showPresence = Boolean(isParticipant);
   const allowScoreEditToggle = Boolean(isAdmin && match?.status === "complete");
   if (allowScoreEditToggle) {
     if (modal.dataset.scoreEdit !== "true") {
@@ -898,6 +923,9 @@ export function openMatchInfoModal(
     bName,
   });
   setPresenceContext({ matchId, leftPlayerId, rightPlayerId });
+  if (leftPresenceEl) leftPresenceEl.style.display = showPresence ? "" : "none";
+  if (rightPresenceEl)
+    rightPresenceEl.style.display = showPresence ? "" : "none";
 
   const saveMatchVetoesLocal = () => {
     vetoDeps?.saveState?.(
@@ -1393,11 +1421,21 @@ export function openMatchInfoModal(
     if (e.target === modal) hideMatchInfoModal();
   };
 
-  startPresenceTracking(matchId, { leftPlayerId, rightPlayerId, aName, bName });
-  applyPresenceIndicators({ leftPresenceEl, rightPresenceEl });
-  if (!presenceUiTimer) {
-    presenceUiTimer = setInterval(() => applyPresenceIndicators(), 5_000);
+  if (showPresence) {
+    startPresenceTracking(matchId, {
+      leftPlayerId,
+      rightPlayerId,
+      aName,
+      bName,
+    });
+    applyPresenceIndicators({ leftPresenceEl, rightPresenceEl });
+    if (!presenceUiTimer) {
+      presenceUiTimer = setInterval(() => applyPresenceIndicators(), 5_000);
+    }
+  } else {
+    stopPresenceTracking();
   }
+
 }
 
 function updateMatchInfoHeaderScores({
@@ -1690,9 +1728,12 @@ export function refreshMatchInfoPresenceIfOpen() {
   applyPresenceIndicators();
 }
 
-function presenceDocRef(uid) {
-  if (!uid || !currentSlug) return null;
-  return doc(db, PRESENCE_COLLECTION, currentSlug, "matchInfo", uid);
+function presenceDocRef(matchId, uid) {
+  if (!uid || !currentSlug || !matchId) return null;
+  return rtdbRef(
+    rtdb,
+    `${PRESENCE_COLLECTION}/${currentSlug}/matchInfo/${matchId}/${uid}`
+  );
 }
 
 function tournamentStateDocRef() {
@@ -1710,7 +1751,7 @@ async function clearScoreReportRemote(matchId) {
   }
 }
 
-function startPresenceTracking(matchId, hint = null) {
+async function startPresenceTracking(matchId, hint = null) {
   if (presenceSlug && presenceSlug !== currentSlug) {
     try {
       presenceUnsub?.();
@@ -1720,40 +1761,56 @@ function startPresenceTracking(matchId, hint = null) {
     presenceUnsub = null;
     presenceLatest = new Map();
     presenceSlug = null;
+    presenceMatchId = null;
   }
 
-  if (!presenceUnsub && currentSlug) {
-    const colRef = collection(
-      db,
-      PRESENCE_COLLECTION,
-      currentSlug,
-      "matchInfo"
+  if (presenceMatchId && presenceMatchId !== matchId) {
+    try {
+      presenceUnsub?.();
+    } catch (_) {
+      // ignore
+    }
+    presenceUnsub = null;
+    presenceLatest = new Map();
+    presenceMatchId = null;
+  }
+
+  if (!presenceUnsub && currentSlug && matchId) {
+    const colRef = rtdbRef(
+      rtdb,
+      `${PRESENCE_COLLECTION}/${currentSlug}/matchInfo/${matchId}`
     );
-    presenceUnsub = onSnapshot(
+    presenceUnsub = onValue(
       colRef,
       (snap) => {
+        const data = snap.val() || {};
         const next = new Map();
-        for (const d of snap.docs) {
-          const data = d.data() || {};
-          const updatedAtMs = data.updatedAt?.toMillis
-            ? data.updatedAt.toMillis()
-            : Number(data.clientUpdatedAt) || Number(data.updatedAt) || 0;
-          next.set(d.id, {
-            matchId: data.matchId || null,
+        Object.entries(data).forEach(([key, entry]) => {
+          const payload = entry || {};
+          const updatedAtMs =
+            Number(payload.updatedAt) ||
+            Number(payload.clientUpdatedAt) ||
+            0;
+          next.set(key, {
             updatedAtMs,
-            playerId: data.playerId || null,
+            playerId: payload.playerId || null,
+            status: payload.status || "active",
           });
-        }
+        });
         presenceLatest = next;
         applyPresenceIndicators();
       },
       () => {}
     );
     presenceSlug = currentSlug;
+    presenceMatchId = matchId;
   }
 
   const uid = auth?.currentUser?.uid || null;
-  const ref = presenceDocRef(uid);
+  if (!uid) return;
+  const accessOk = await ensureMatchPresenceAccess(matchId, uid);
+  if (!accessOk) return;
+  const ref = presenceDocRef(matchId, uid);
   if (!ref) return;
 
   const player = resolveCurrentPlayerForPresence();
@@ -1792,22 +1849,19 @@ function startPresenceTracking(matchId, hint = null) {
     const status = presenceUiStatus || "active";
     if (presenceWriteDenied) return;
     try {
-      await setDoc(
-        ref,
-        {
-          matchId: matchId || null,
-          playerId: playerId || null,
-          updatedAt: serverTimestamp(),
-          clientUpdatedAt: now,
-          status,
-        },
-        { merge: true }
-      );
+      await rtdbSet(ref, {
+        matchId: matchId || null,
+        playerId: playerId || null,
+        updatedAt: rtdbServerTimestamp(),
+        clientUpdatedAt: now,
+        status,
+      });
       presenceLastWriteAt = now;
       presenceLastMatchId = matchId || null;
       presenceLastPlayerId = playerId || null;
     } catch (err) {
-      if (err?.code === "permission-denied") {
+      const code = String(err?.code || "");
+      if (code === "permission-denied" || code === "PERMISSION_DENIED") {
         presenceWriteDenied = true;
         return;
       }
@@ -1857,6 +1911,11 @@ function startPresenceTracking(matchId, hint = null) {
     modalEl.onkeydown = markActive;
     modalEl.onfocusin = markActive;
   }
+  if (ref) {
+    onDisconnect(ref)
+      .remove()
+      .catch(() => {});
+  }
   if (!presenceActivityHandler) {
     presenceActivityHandler = () => {
       if (!isMatchInfoModalVisible()) return;
@@ -1881,7 +1940,7 @@ function startPresenceTracking(matchId, hint = null) {
 
 function stopPresenceTracking() {
   const uid = auth?.currentUser?.uid || null;
-  const ref = presenceDocRef(uid);
+  const ref = presenceDocRef(presenceContext.matchId, uid);
   if (presenceHeartbeat) clearInterval(presenceHeartbeat);
   presenceHeartbeat = null;
   presenceActiveKey = "";
@@ -1903,7 +1962,29 @@ function stopPresenceTracking() {
     presenceVisibilityHandler = null;
   }
   if (ref) {
-    deleteDoc(ref).catch(() => {});
+    onDisconnect(ref)
+      .cancel()
+      .catch(() => {});
+    rtdbSet(ref, null).catch(() => {});
+  }
+}
+
+async function ensureMatchPresenceAccess(matchId, uid) {
+  if (!currentSlug || !matchId || !uid) return false;
+  const key = `${currentSlug}:${matchId}:${uid}`;
+  if (presenceAccessCache.has(key)) return true;
+  try {
+    await ensureMatchPresenceAccessCallable({ slug: currentSlug, matchId });
+    presenceAccessCache.add(key);
+    return true;
+  } catch (err) {
+    const code = String(err?.code || "");
+    if (code === "permission-denied" || code === "PERMISSION_DENIED") {
+      presenceWriteDenied = true;
+      return false;
+    }
+    console.warn("Presence access check failed", err);
+    return false;
   }
 }
 
@@ -1926,7 +2007,6 @@ function isPlayerOnlineForMatch(playerId, matchId) {
   for (const entry of presenceLatest.values()) {
     if (!entry) continue;
     if (entry.playerId !== playerId) continue;
-    if (entry.matchId !== matchId) continue;
     if (Date.now() - (entry.updatedAtMs || 0) <= PRESENCE_OFFLINE_AFTER_MS)
       return true;
   }
@@ -1941,7 +2021,6 @@ function getPresenceStatusForMatch(playerId, matchId) {
   for (const entry of presenceLatest.values()) {
     if (!entry) continue;
     if (entry.playerId !== playerId) continue;
-    if (entry.matchId !== matchId) continue;
     const age = now - (entry.updatedAtMs || 0);
     if (age <= PRESENCE_IDLE_AFTER_MS) return entry.status || "active";
     if (age <= PRESENCE_OFFLINE_AFTER_MS) status = entry.status || "idle";

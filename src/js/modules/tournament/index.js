@@ -8,6 +8,7 @@ import {
   getCurrentUserProfile,
   getPulseState,
   initializeAuthUI,
+  rtdb,
 } from "../../../app.js";
 import { onAuthStateChanged } from "firebase/auth";
 import {
@@ -32,6 +33,7 @@ import {
   deleteObject,
   listAll,
 } from "firebase/storage";
+import { ref as rtdbRef, remove as rtdbRemove } from "firebase/database";
 import { showToast } from "../toastHandler.js";
 import { logAnalyticsEvent } from "../analyticsHelper.js";
 import DOMPurify from "dompurify";
@@ -307,6 +309,7 @@ const PULSE_ENDPOINTS = (() => {
 const storage = getStorage(app);
 let currentCircuitMeta = null;
 let isCircuitAdmin = false;
+const chatCleanupDone = new Set();
 let circuitPointsBtnTemplate = null;
 let circuitFinalMapPoolSelection = new Set();
 let circuitFinalMapPoolMode = "ladder";
@@ -1026,19 +1029,7 @@ function syncFromRemote(incoming) {
   const localOnly = localUids.filter((uid) => !incomingUids.includes(uid));
   const incomingOnly = incomingUids.filter((uid) => !localUids.includes(uid));
 
-  console.log("🧪 [tournament-sync] syncFromRemote INPUT", {
-    slug: currentSlug,
-    incomingLastUpdated: Number(incoming?.lastUpdated) || 0,
-    localLastUpdated: Number(state?.lastUpdated) || 0,
-    incomingPlayersCount: incomingPlayersArr.length,
-    localPlayersCount: localPlayersArr.length,
-    incomingUids,
-    localUids,
-    incomingNames,
-    localNames,
-    localOnly,
-    incomingOnly,
-  });
+  // debug logging removed
 
   if (
     incomingPlayersArr.length === 0 &&
@@ -1203,17 +1194,7 @@ function syncFromRemote(incoming) {
   }
   setStateObj(nextState);
 
-  console.log("🧪 [tournament-sync] state applied", {
-    slug: currentSlug,
-    lastUpdated: Number(nextState?.lastUpdated) || 0,
-    playersCount: Array.isArray(nextState?.players)
-      ? nextState.players.length
-      : 0,
-    playerUids: Array.isArray(nextState?.players)
-      ? nextState.players.map((p) => p?.uid).filter(Boolean)
-      : [],
-    fromCache: Boolean(nextState?._fromCache), // if you ever add metadata
-  });
+  // debug logging removed
 
   if (onlyVetoChange || vetoOnlyChange) {
     refreshMatchInfoModalIfOpen?.();
@@ -1297,17 +1278,7 @@ function subscribeTournamentStateRemote(slug) {
 
       const incomingPlayers = Array.isArray(data.players) ? data.players : [];
 
-      console.groupCollapsed("🧪 [tournament-sync] RAW SNAPSHOT PLAYERS");
-      incomingPlayers.forEach((p, i) => {
-        console.log(`#${i + 1}`, {
-          id: p?.id,
-          uid: p?.uid,
-          name: p?.name,
-          inviteStatus: p?.inviteStatus,
-          checkedInAt: p?.checkedInAt,
-        });
-      });
-      console.groupEnd();
+      // debug logging removed
 
       // Guard: don't let an "empty players" snapshot overwrite a non-empty local state.
       if (incomingPlayers.length === 0 && state?.players?.length) {
@@ -2309,6 +2280,7 @@ async function notifyCheckInPlayers() {
     console.error("Failed to send check-in notifications", err);
     showToast?.("Failed to send check-in notifications.", "error");
   }
+
 }
 
 async function refreshRosterMmrFromPulse() {
@@ -3062,6 +3034,17 @@ function updateMatchScore(matchId, scoreA, scoreB, options = {}) {
     skipRemote: true,
   });
   const targetSlug = currentSlug || currentTournamentMeta?.slug || "";
+  if (isAdmin && state?.bracket) {
+    const progress = computeTournamentProgress(state.bracket);
+    if (
+      progress?.isFinished &&
+      targetSlug &&
+      !chatCleanupDone.has(targetSlug)
+    ) {
+      chatCleanupDone.add(targetSlug);
+      void deleteTournamentChatHistory(targetSlug);
+    }
+  }
   if (targetSlug) {
     void submitMatchScoreRemote(
       {
@@ -4850,9 +4833,7 @@ function getCheckInWindowMinutes(selectInput) {
 async function deleteTournamentPresence(slug) {
   if (!slug) return;
   try {
-    const colRef = collection(db, "tournamentPresence", slug, "matchInfo");
-    const snap = await getDocs(colRef);
-    await Promise.all(snap.docs.map((docSnap) => deleteDoc(docSnap.ref)));
+    await rtdbRemove(rtdbRef(rtdb, `tournamentPresence/${slug}`));
   } catch (err) {
     console.warn("Failed to delete tournament presence data", err);
   }
@@ -4861,22 +4842,7 @@ async function deleteTournamentPresence(slug) {
 async function deleteTournamentChatHistory(slug) {
   if (!slug) return;
   try {
-    const matchesRef = collection(db, "tournamentChats", slug, "matches");
-    const matchesSnap = await getDocs(matchesRef);
-    for (const matchDoc of matchesSnap.docs) {
-      try {
-        const messagesRef = collection(matchDoc.ref, "messages");
-        const messagesSnap = await getDocs(messagesRef);
-        await Promise.all(messagesSnap.docs.map((msg) => deleteDoc(msg.ref)));
-      } catch (err) {
-        console.warn("Failed to delete match chat messages", err);
-      }
-      try {
-        await deleteDoc(matchDoc.ref);
-      } catch (err) {
-        console.warn("Failed to delete match chat doc", err);
-      }
-    }
+    await rtdbRemove(rtdbRef(rtdb, `tournamentChats/${slug}`));
   } catch (err) {
     console.warn("Failed to delete tournament chat history", err);
   }

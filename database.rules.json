@@ -1,0 +1,42 @@
+{
+  "rules": {
+    "tournamentPresence": {
+      "$slug": {
+        "matchInfo": {
+          "_allow": {
+            "$matchId": {
+              "$uid": {
+                ".read": false,
+                ".write": false
+              }
+            }
+          },
+          "$matchId": {
+            ".read": "auth != null && root.child('tournamentPresence/'+$slug+'/matchInfo/_allow/'+$matchId+'/'+auth.uid).val() === true",
+            "$uid": {
+              ".read": "auth != null && root.child('tournamentPresence/'+$slug+'/matchInfo/_allow/'+$matchId+'/'+auth.uid).val() === true",
+              ".write": "auth != null && auth.uid === $uid && (!newData.exists() || root.child('tournamentPresence/'+$slug+'/matchInfo/_allow/'+$matchId+'/'+auth.uid).val() === true)"
+            }
+          }
+        }
+      }
+    },
+    "tournamentChats": {
+      "$slug": {
+        "matches": {
+          "$matchId": {
+            "messages": {
+              ".read": "auth != null && root.child('tournamentPresence/'+$slug+'/matchInfo/_allow/'+$matchId+'/'+auth.uid).val() === true",
+              ".write": "auth != null && root.child('tournamentPresence/'+$slug+'/matchInfo/_allow/'+$matchId+'/'+auth.uid).val() === true",
+              ".indexOn": ["createdAt"],
+              "$msgId": {
+                ".read": "auth != null && root.child('tournamentPresence/'+$slug+'/matchInfo/_allow/'+$matchId+'/'+auth.uid).val() === true",
+                ".write": "auth != null && root.child('tournamentPresence/'+$slug+'/matchInfo/_allow/'+$matchId+'/'+auth.uid).val() === true"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,4 +1,4 @@
-import { app, auth, db, functions } from "./js/modules/firebase.js";
+import { app, auth, db, functions, rtdb } from "./js/modules/firebase.js";
 import { initCookieConsent } from "./js/modules/cookieConsent.js";
 import {
   deferSvgImagesIn,
@@ -149,6 +149,7 @@ export {
   auth,
   db,
   functions,
+  rtdb,
   initializeAuthUI,
   getPulseState,
   getCurrentUserProfile,

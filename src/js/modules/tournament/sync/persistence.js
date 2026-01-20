@@ -18,7 +18,7 @@ import {
 } from "../state.js";
 import { db, functions } from "../../../../app.js";
 
-const DEBUG_TOURNAMENT_SYNC = true;
+const DEBUG_TOURNAMENT_SYNC = false;
 
 function dbg(label, payload) {
   if (!DEBUG_TOURNAMENT_SYNC) return;

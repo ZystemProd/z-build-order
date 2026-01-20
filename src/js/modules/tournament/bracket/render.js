@@ -295,12 +295,7 @@ function updateTreeMatchRow(
   }
 
   if (scoreEl) {
-    const selectVal = getSelectValue(
-      match,
-      participantIdx,
-      bestOf,
-      participants,
-    );
+    const selectVal = getSelectValue(match, participantIdx, bestOf, participants);
     const scoreLabel =
       String(selectVal).toUpperCase() === "W" ? "w/o" : String(selectVal ?? 0);
     const showScores =

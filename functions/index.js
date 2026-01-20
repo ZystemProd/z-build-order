@@ -2323,6 +2323,75 @@ exports.submitMatchScore = onCall(
   }
 );
 
+exports.ensureMatchPresenceAccess = onCall(
+  { region: "us-central1", enforceAppCheck: true },
+  async (request) => {
+    const uid = request.auth?.uid;
+    if (!uid) {
+      throw new HttpsError("unauthenticated", "Sign in to view presence.");
+    }
+
+    const payload = request.data || {};
+    const slug = String(payload.slug || "").trim();
+    const matchId = String(payload.matchId || "").trim();
+    if (!slug || !matchId) {
+      throw new HttpsError("invalid-argument", "Missing slug or matchId.");
+    }
+
+    const stateRef = firestore.collection("tournamentStates").doc(slug);
+    const metaRef = firestore.collection("tournaments").doc(slug);
+
+    const [stateSnap, metaSnap] = await Promise.all([
+      stateRef.get(),
+      metaRef.get(),
+    ]);
+
+    if (!stateSnap.exists) {
+      throw new HttpsError("not-found", "Tournament state not found.");
+    }
+
+    const stateData = stateSnap.data() || {};
+    if (!stateData.bracket) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Tournament bracket is not ready."
+      );
+    }
+
+    const meta = metaSnap.exists ? metaSnap.data() || {} : {};
+    const bracket = deserializeBracketState(stateData.bracket);
+    const lookup = getMatchLookup(bracket);
+    const match = lookup.get(matchId);
+    if (!match) {
+      throw new HttpsError("not-found", "Match not found.");
+    }
+
+    const players = Array.isArray(stateData.players) ? stateData.players : [];
+    const playersById = new Map(
+      players.filter(Boolean).map((player) => [player.id, player])
+    );
+    const participants = resolveParticipants(match, lookup, playersById);
+    const participantUids = participants
+      .map((player) => player?.uid)
+      .filter(Boolean);
+
+    if (!participantUids.includes(uid)) {
+      throw new HttpsError(
+        "permission-denied",
+        "You cannot view presence for this match."
+      );
+    }
+
+    const allowRef = admin
+      .database()
+      .ref(`tournamentPresence/${slug}/matchInfo/_allow/${matchId}/${uid}`);
+
+    await allowRef.set(true);
+
+    return { ok: true };
+  }
+);
+
 exports.sendCasterInvite = onCall(
   { region: "us-central1", enforceAppCheck: true },
   async (request) => {

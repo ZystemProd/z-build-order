@@ -2,6 +2,7 @@ import { initializeApp } from "firebase/app";
 import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFunctions } from "firebase/functions";
+import { getDatabase } from "firebase/database";
 import {
   initializeFirestore,
   persistentLocalCache,
@@ -12,6 +13,7 @@ import {
 const firebaseConfig = {
   apiKey: "AIzaSyBBLnneYwLDfIp-Oep2MvExGnVk_EvDQoo",
   authDomain: "z-build-order.firebaseapp.com",
+  databaseURL: "https://z-build-order-default-rtdb.firebaseio.com",
   projectId: "z-build-order",
   storageBucket: "z-build-order.firebasestorage.app",
   messagingSenderId: "22023941178",
@@ -22,6 +24,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const functions = getFunctions(app, "us-central1");
+const rtdb = getDatabase(app);
 const db = initializeFirestore(app, {
   localCache:
     typeof window === "undefined"
@@ -63,4 +66,4 @@ if (typeof window !== "undefined") {
   });
 }
 
-export { app, auth, db, functions, provider, switchAccountProvider };
+export { app, auth, db, functions, rtdb, provider, switchAccountProvider };
