@@ -11,7 +11,10 @@ import {
   attachMatchActionHandlers,
   setVetoDependencies,
 } from "./maps/veto.js";
-import { renderChosenMaps as renderChosenMapsUI, updateMapButtons as updateMapButtonsUI } from "./maps/render.js";
+import {
+  renderChosenMaps as renderChosenMapsUI,
+  updateMapButtons as updateMapButtonsUI,
+} from "./maps/render.js";
 import { renderMapPoolPicker as renderMapPoolPickerUI } from "./maps/pool.js";
 import { attachPlayerDetailHandlers } from "./playerDetail.js";
 import { enableDragScroll } from "./ui/dragScroll.js";
@@ -19,7 +22,11 @@ import { lockBodyScroll, unlockBodyScroll } from "./modalLock.js";
 import { initTournamentNotifications } from "./notifications.js";
 import { initTournamentTemplateManager } from "./templateManager.js";
 import { initTournamentSearch } from "./search/tournamentSearch.js";
-import { initTournamentListSlider, refreshTournamentListLayout, loadMoreTournamentListItems } from "./listSlider.js";
+import {
+  initTournamentListSlider,
+  refreshTournamentListLayout,
+  loadMoreTournamentListItems,
+} from "./listSlider.js";
 import { initQuillEditors, syncQuillById } from "./markdownEditor.js";
 
 export function initTournamentPage({
@@ -117,7 +124,9 @@ export function initTournamentPage({
   const rebuildBtn = document.getElementById("rebuildBracketBtn");
   const resetBtn = document.getElementById("resetTournamentBtn");
   const resetScoresBtn = document.getElementById("resetScoresBtn");
-  const resetVetoScoreChatBtn = document.getElementById("resetVetoScoreChatBtn");
+  const resetVetoScoreChatBtn = document.getElementById(
+    "resetVetoScoreChatBtn",
+  );
   const notifyCheckInBtn = document.getElementById("notifyCheckInBtn");
   const checkInToggleBtn = document.getElementById("checkInToggleBtn");
   const refreshMmrBtn = document.getElementById("refreshMmrBtn");
@@ -140,77 +149,161 @@ export function initTournamentPage({
   const openRegisterBtn = document.getElementById("openRegisterBtn");
   const openCreateTournament = document.getElementById("openCreateTournament");
   const createModal = document.getElementById("createTournamentModal");
-  const closeCreateTournament = document.getElementById("closeCreateTournament");
+  const closeCreateTournament = document.getElementById(
+    "closeCreateTournament",
+  );
   const saveTournamentBtn = document.getElementById("saveTournamentBtn");
-  const openCreateCircuitTournament = document.getElementById("openCreateCircuitTournament");
-  const openCircuitSettingsBtn = document.getElementById("openCircuitSettingsBtn");
+  const openCreateCircuitTournament = document.getElementById(
+    "openCreateCircuitTournament",
+  );
+  const openCircuitSettingsBtn = document.getElementById(
+    "openCircuitSettingsBtn",
+  );
   const deleteTournamentBtn = document.getElementById("deleteTournamentBtn");
-  const confirmDeleteTournamentBtn = document.getElementById("confirmDeleteTournamentBtn");
-  const cancelDeleteTournamentBtn = document.getElementById("cancelDeleteTournamentBtn");
-  const deleteTournamentModal = document.getElementById("confirmDeleteTournamentModal");
-  const resetTournamentModal = document.getElementById("confirmResetTournamentModal");
+  const confirmDeleteTournamentBtn = document.getElementById(
+    "confirmDeleteTournamentBtn",
+  );
+  const cancelDeleteTournamentBtn = document.getElementById(
+    "cancelDeleteTournamentBtn",
+  );
+  const deleteTournamentModal = document.getElementById(
+    "confirmDeleteTournamentModal",
+  );
+  const resetTournamentModal = document.getElementById(
+    "confirmResetTournamentModal",
+  );
   const resetScoresModal = document.getElementById("confirmResetScoresModal");
-  const resetVetoScoreChatModal = document.getElementById("confirmResetVetoScoreChatModal");
-  const confirmResetTournamentBtn = document.getElementById("confirmResetTournamentBtn");
-  const cancelResetTournamentBtn = document.getElementById("cancelResetTournamentBtn");
-  const confirmResetScoresBtn = document.getElementById("confirmResetScoresBtn");
+  const resetVetoScoreChatModal = document.getElementById(
+    "confirmResetVetoScoreChatModal",
+  );
+  const confirmResetTournamentBtn = document.getElementById(
+    "confirmResetTournamentBtn",
+  );
+  const cancelResetTournamentBtn = document.getElementById(
+    "cancelResetTournamentBtn",
+  );
+  const confirmResetScoresBtn = document.getElementById(
+    "confirmResetScoresBtn",
+  );
   const cancelResetScoresBtn = document.getElementById("cancelResetScoresBtn");
-  const confirmResetVetoScoreChatBtn = document.getElementById("confirmResetVetoScoreChatBtn");
-  const cancelResetVetoScoreChatBtn = document.getElementById("cancelResetVetoScoreChatBtn");
+  const confirmResetVetoScoreChatBtn = document.getElementById(
+    "confirmResetVetoScoreChatBtn",
+  );
+  const cancelResetVetoScoreChatBtn = document.getElementById(
+    "cancelResetVetoScoreChatBtn",
+  );
   const openCreateCircuit = document.getElementById("openCreateCircuit");
   const createCircuitModal = document.getElementById("createCircuitModal");
   const circuitSettingsModal = document.getElementById("circuitSettingsModal");
-  const closeCircuitSettingsBtn = document.getElementById("closeCircuitSettingsModal");
-  const saveCircuitSettingsBtn = document.getElementById("saveCircuitSettingsBtn");
+  const closeCircuitSettingsBtn = document.getElementById(
+    "closeCircuitSettingsModal",
+  );
+  const saveCircuitSettingsBtn = document.getElementById(
+    "saveCircuitSettingsBtn",
+  );
   const deleteCircuitBtn = document.getElementById("deleteCircuitBtn");
-  const deleteCircuitModal = document.getElementById("confirmDeleteCircuitModal");
-  const confirmDeleteCircuitBtn = document.getElementById("confirmDeleteCircuitBtn");
-  const cancelDeleteCircuitBtn = document.getElementById("cancelDeleteCircuitBtn");
+  const deleteCircuitModal = document.getElementById(
+    "confirmDeleteCircuitModal",
+  );
+  const confirmDeleteCircuitBtn = document.getElementById(
+    "confirmDeleteCircuitBtn",
+  );
+  const cancelDeleteCircuitBtn = document.getElementById(
+    "cancelDeleteCircuitBtn",
+  );
   const closeCreateCircuit = document.getElementById("closeCreateCircuit");
   const saveCircuitBtn = document.getElementById("saveCircuitBtn");
-  const nextCreateCircuitStep = document.getElementById("nextCreateCircuitStep");
-  const backCreateCircuitStep = document.getElementById("backCreateCircuitStep");
+  const nextCreateCircuitStep = document.getElementById(
+    "nextCreateCircuitStep",
+  );
+  const backCreateCircuitStep = document.getElementById(
+    "backCreateCircuitStep",
+  );
   const refreshTournaments = document.getElementById("refreshTournaments");
   const addBotBtn = document.getElementById("addBotBtn");
   const removeBotBtn = document.getElementById("removeBotBtn");
   const removeBotsBtn = document.getElementById("removeBotsBtn");
-  const descriptionInput = document.getElementById("tournamentDescriptionInput");
+  const descriptionInput = document.getElementById(
+    "tournamentDescriptionInput",
+  );
   const rulesInput = document.getElementById("tournamentRulesInput");
-  const finalDescriptionInput = document.getElementById("finalTournamentDescriptionInput");
+  const finalDescriptionInput = document.getElementById(
+    "finalTournamentDescriptionInput",
+  );
   const finalRulesInput = document.getElementById("finalTournamentRulesInput");
   const mapPoolPicker = document.getElementById("mapPoolPicker");
   const useLadderMapsBtn = document.getElementById("useLadderMapsBtn");
   const clearMapPoolBtn = document.getElementById("clearMapPoolBtn");
   const finalMapPoolPicker = document.getElementById("finalMapPoolPicker");
-  const finalUseLadderMapsBtn = document.getElementById("finalUseLadderMapsBtn");
+  const finalUseLadderMapsBtn = document.getElementById(
+    "finalUseLadderMapsBtn",
+  );
   const finalClearMapPoolBtn = document.getElementById("finalClearMapPoolBtn");
-  const circuitFinalMapPoolPicker = document.getElementById("circuitFinalMapPoolPicker");
-  const circuitFinalUseLadderMapsBtn = document.getElementById("circuitFinalUseLadderMapsBtn");
-  const circuitFinalClearMapPoolBtn = document.getElementById("circuitFinalClearMapPoolBtn");
+  const circuitFinalMapPoolPicker = document.getElementById(
+    "circuitFinalMapPoolPicker",
+  );
+  const circuitFinalUseLadderMapsBtn = document.getElementById(
+    "circuitFinalUseLadderMapsBtn",
+  );
+  const circuitFinalClearMapPoolBtn = document.getElementById(
+    "circuitFinalClearMapPoolBtn",
+  );
   const settingsTabBtns = document.querySelectorAll("[data-settings-tab]");
-  const settingsPanels = document.querySelectorAll("#settingsTab .settings-panel");
+  const settingsPanels = document.querySelectorAll(
+    "#settingsTab .settings-panel",
+  );
   const createTabBtns = document.querySelectorAll("[data-create-tab]");
-  const createPanels = document.querySelectorAll("#createTournamentModal .settings-panel");
-  const createFinalTabBtns = document.querySelectorAll("[data-final-create-tab]");
-  const createFinalPanels = document.querySelectorAll("#createFinalPanel .create-final-panel");
-  const circuitSettingsTabBtns = document.querySelectorAll("[data-circuit-settings-tab]");
-  const circuitSettingsPanels = document.querySelectorAll(".circuit-settings-panel");
-  const circuitFinalTabBtns = document.querySelectorAll("[data-final-settings-tab]");
-  const circuitFinalPanels = document.querySelectorAll("#circuitSettingsFinal .circuit-final-panel");
+  const createPanels = document.querySelectorAll(
+    "#createTournamentModal .settings-panel",
+  );
+  const createFinalTabBtns = document.querySelectorAll(
+    "[data-final-create-tab]",
+  );
+  const createFinalPanels = document.querySelectorAll(
+    "#createFinalPanel .create-final-panel",
+  );
+  const circuitSettingsTabBtns = document.querySelectorAll(
+    "[data-circuit-settings-tab]",
+  );
+  const circuitSettingsPanels = document.querySelectorAll(
+    ".circuit-settings-panel",
+  );
+  const circuitFinalTabBtns = document.querySelectorAll(
+    "[data-final-settings-tab]",
+  );
+  const circuitFinalPanels = document.querySelectorAll(
+    "#circuitSettingsFinal .circuit-final-panel",
+  );
   const saveSettingsBtn = document.getElementById("saveSettingsBtn");
   const createImageInput = document.getElementById("tournamentImageInput");
   const createImagePreview = document.getElementById("tournamentImagePreview");
   const finalImageInput = document.getElementById("finalTournamentImageInput");
-  const finalImagePreview = document.getElementById("finalTournamentImagePreview");
-  const circuitFinalImageInput = document.getElementById("circuitFinalImageInput");
-  const circuitFinalImagePreview = document.getElementById("circuitFinalImagePreview");
+  const finalImagePreview = document.getElementById(
+    "finalTournamentImagePreview",
+  );
+  const circuitFinalImageInput = document.getElementById(
+    "circuitFinalImageInput",
+  );
+  const circuitFinalImagePreview = document.getElementById(
+    "circuitFinalImagePreview",
+  );
   const settingsImageInput = document.getElementById("settingsImageInput");
   const settingsImagePreview = document.getElementById("settingsImagePreview");
-  const settingsRequirePulseLink = document.getElementById("settingsRequirePulseLink");
-  const tournamentMaxPlayersInput = document.getElementById("tournamentMaxPlayersInput");
-  const settingsMaxPlayersInput = document.getElementById("settingsMaxPlayersInput");
-  const finalMaxPlayersInput = document.getElementById("finalTournamentMaxPlayersInput");
-  const circuitFinalMaxPlayersInput = document.getElementById("circuitFinalMaxPlayersInput");
+  const settingsRequirePulseLink = document.getElementById(
+    "settingsRequirePulseLink",
+  );
+  const tournamentMaxPlayersInput = document.getElementById(
+    "tournamentMaxPlayersInput",
+  );
+  const settingsMaxPlayersInput = document.getElementById(
+    "settingsMaxPlayersInput",
+  );
+  const finalMaxPlayersInput = document.getElementById(
+    "finalTournamentMaxPlayersInput",
+  );
+  const circuitFinalMaxPlayersInput = document.getElementById(
+    "circuitFinalMaxPlayersInput",
+  );
   const nameInput = document.getElementById("tournamentNameInput");
   const slugInput = document.getElementById("tournamentSlugInput");
   const circuitSlugInput = document.getElementById("circuitSlugInput");
@@ -219,16 +312,22 @@ export function initTournamentPage({
   const bestOfUpperInput = document.getElementById("bestOfUpperInput");
   const bestOfLowerInput = document.getElementById("bestOfLowerInput");
   const bestOfLowerSemiInput = document.getElementById("bestOfLowerSemiInput");
-  const bestOfLowerFinalInput = document.getElementById("bestOfLowerFinalInput");
+  const bestOfLowerFinalInput = document.getElementById(
+    "bestOfLowerFinalInput",
+  );
   const bestOfQuarterInput = document.getElementById("bestOfQuarterInput");
   const bestOfSemiInput = document.getElementById("bestOfSemiInput");
   const bestOfFinalInput = document.getElementById("bestOfFinalInput");
   const createFormatSelect = document.getElementById("tournamentFormatSelect");
   const finalFormatSelect = document.getElementById("finalFormatSelect");
-  const circuitFinalFormatSelect = document.getElementById("circuitFinalFormatSelect");
+  const circuitFinalFormatSelect = document.getElementById(
+    "circuitFinalFormatSelect",
+  );
   const settingsBestOfUpper = document.getElementById("settingsBestOfUpper");
   const settingsBestOfLower = document.getElementById("settingsBestOfLower");
-  const settingsBestOfQuarter = document.getElementById("settingsBestOfQuarter");
+  const settingsBestOfQuarter = document.getElementById(
+    "settingsBestOfQuarter",
+  );
   const settingsBestOfSemi = document.getElementById("settingsBestOfSemi");
   const settingsBestOfFinal = document.getElementById("settingsBestOfFinal");
   const settingsFormatSelect = document.getElementById("settingsFormatSelect");
@@ -261,7 +360,8 @@ export function initTournamentPage({
     {
       editorId: "settingsRulesEditor",
       textareaId: "settingsRulesInput",
-      placeholder: "Add eligibility, format, communication, and fair play rules...",
+      placeholder:
+        "Add eligibility, format, communication, and fair play rules...",
     },
     {
       editorId: "tournamentDescriptionEditor",
@@ -271,7 +371,8 @@ export function initTournamentPage({
     {
       editorId: "tournamentRulesEditor",
       textareaId: "tournamentRulesInput",
-      placeholder: "Add eligibility, format, communication, and fair play rules...",
+      placeholder:
+        "Add eligibility, format, communication, and fair play rules...",
     },
     {
       editorId: "finalTournamentDescriptionEditor",
@@ -281,7 +382,8 @@ export function initTournamentPage({
     {
       editorId: "finalTournamentRulesEditor",
       textareaId: "finalTournamentRulesInput",
-      placeholder: "Add eligibility, format, communication, and fair play rules...",
+      placeholder:
+        "Add eligibility, format, communication, and fair play rules...",
     },
     {
       editorId: "circuitFinalDescriptionEditor",
@@ -291,7 +393,8 @@ export function initTournamentPage({
     {
       editorId: "circuitFinalRulesEditor",
       textareaId: "circuitFinalRulesInput",
-      placeholder: "Add eligibility, format, communication, and fair play rules...",
+      placeholder:
+        "Add eligibility, format, communication, and fair play rules...",
     },
   ];
   const QUILL_SCRIPT_SRC =
@@ -329,10 +432,14 @@ export function initTournamentPage({
     if (window.Quill) return Promise.resolve();
     if (quillLoadPromise) return quillLoadPromise;
     quillLoadPromise = new Promise((resolve, reject) => {
-      const existing = document.querySelector(`script[src="${QUILL_SCRIPT_SRC}"]`);
+      const existing = document.querySelector(
+        `script[src="${QUILL_SCRIPT_SRC}"]`,
+      );
       if (existing) {
         existing.addEventListener("load", () => resolve());
-        existing.addEventListener("error", () => reject(new Error("Quill load failed")));
+        existing.addEventListener("error", () =>
+          reject(new Error("Quill load failed")),
+        );
         return;
       }
       const script = document.createElement("script");
@@ -350,10 +457,10 @@ export function initTournamentPage({
     return loadQuillCss()
       .then(() => loadQuillScript())
       .then(() => {
-      if (quillInitialized) return;
-      initQuillEditors(quillConfigs);
-      syncQuillFromInputs();
-      quillInitialized = true;
+        if (quillInitialized) return;
+        initQuillEditors(quillConfigs);
+        syncQuillFromInputs();
+        quillInitialized = true;
       });
   };
 
@@ -361,7 +468,7 @@ export function initTournamentPage({
     if (typeof window === "undefined") return Promise.resolve();
     const hasBase = document.querySelector(`link[href="${FLATPICKR_CSS_SRC}"]`);
     const hasDark = document.querySelector(
-      `link[href="${FLATPICKR_DARK_CSS_SRC}"]`
+      `link[href="${FLATPICKR_DARK_CSS_SRC}"]`,
     );
     if (hasBase && hasDark) return Promise.resolve();
     if (flatpickrCssPromise) return flatpickrCssPromise;
@@ -394,12 +501,12 @@ export function initTournamentPage({
     if (flatpickrLoadPromise) return flatpickrLoadPromise;
     flatpickrLoadPromise = new Promise((resolve, reject) => {
       const existing = document.querySelector(
-        `script[src="${FLATPICKR_SCRIPT_SRC}"]`
+        `script[src="${FLATPICKR_SCRIPT_SRC}"]`,
       );
       if (existing) {
         existing.addEventListener("load", () => resolve());
         existing.addEventListener("error", () =>
-          reject(new Error("Flatpickr load failed"))
+          reject(new Error("Flatpickr load failed")),
         );
         return;
       }
@@ -480,15 +587,19 @@ export function initTournamentPage({
       target.closest(quillTriggerSelector) ||
       target.closest(".quill-editor") ||
       target.matches(
-        "#settingsDescriptionInput, #settingsRulesInput, #tournamentDescriptionInput, #tournamentRulesInput, #finalTournamentDescriptionInput, #finalTournamentRulesInput, #circuitFinalDescriptionInput, #circuitFinalRulesInput"
+        "#settingsDescriptionInput, #settingsRulesInput, #tournamentDescriptionInput, #tournamentRulesInput, #finalTournamentDescriptionInput, #finalTournamentRulesInput, #circuitFinalDescriptionInput, #circuitFinalRulesInput",
       )
     ) {
       ensureQuillInitialized();
     }
   };
 
-  document.addEventListener("click", maybeInitQuillFromEvent, { capture: true });
-  document.addEventListener("focusin", maybeInitQuillFromEvent, { capture: true });
+  document.addEventListener("click", maybeInitQuillFromEvent, {
+    capture: true,
+  });
+  document.addEventListener("focusin", maybeInitQuillFromEvent, {
+    capture: true,
+  });
 
   const dateTriggerSelector = "[data-datepicker-for]";
   const dateInputSelector =
@@ -518,7 +629,7 @@ export function initTournamentPage({
       if (!label) return;
       if (
         event.target.closest(
-          "input, select, textarea, button, .quill-editor, .ql-toolbar, .ql-container, .ql-editor, .ql-picker"
+          "input, select, textarea, button, .quill-editor, .ql-toolbar, .ql-container, .ql-editor, .ql-picker",
         )
       ) {
         return;
@@ -527,7 +638,9 @@ export function initTournamentPage({
     });
   };
 
-  preventLabelFocus(document.querySelector("#createTournamentModal .settings-panel"));
+  preventLabelFocus(
+    document.querySelector("#createTournamentModal .settings-panel"),
+  );
   preventLabelFocus(document.querySelector("#settingsTab .settings-panel"));
   preventLabelFocus(document.querySelector("#createFinalPanel"));
 
@@ -543,15 +656,16 @@ export function initTournamentPage({
 
   const resetMarkdownToolState = (root) => {
     if (!root) return;
-    root.querySelectorAll(".markdown-surface[data-editor-for]").forEach((surface) => {
-      delete surface.dataset.pendingActions;
-      delete surface.dataset.pendingDisplay;
-      delete surface.dataset.lastFormatAction;
-      delete surface.dataset.preservePendingTs;
-      delete surface.dataset.activeStyles;
-    });
+    root
+      .querySelectorAll(".markdown-surface[data-editor-for]")
+      .forEach((surface) => {
+        delete surface.dataset.pendingActions;
+        delete surface.dataset.pendingDisplay;
+        delete surface.dataset.lastFormatAction;
+        delete surface.dataset.preservePendingTs;
+        delete surface.dataset.activeStyles;
+      });
   };
-
 
   const initDatePickers = () => {
     if (typeof window.flatpickr !== "function") return;
@@ -564,7 +678,8 @@ export function initTournamentPage({
     };
     const assignPickerNames = (picker) => {
       if (!picker?.input) return;
-      const baseName = picker.input.name || picker.input.id || "tournament-date";
+      const baseName =
+        picker.input.name || picker.input.id || "tournament-date";
       if (!picker.input.name) picker.input.name = baseName;
       const setName = (el, suffix) => {
         if (!el || el.name || el.id) return;
@@ -666,7 +781,11 @@ export function initTournamentPage({
     return playoffsSelect?.value || "None";
   };
 
-  const updateFormatDiagramTitles = ({ root, maxPlayersInput, formatSelect }) => {
+  const updateFormatDiagramTitles = ({
+    root,
+    maxPlayersInput,
+    formatSelect,
+  }) => {
     if (!root) return;
     const formatValue = formatSelect?.value || "";
     const format = formatValue.toLowerCase();
@@ -683,10 +802,16 @@ export function initTournamentPage({
     const maxPlayers = resolveMaxPlayers(maxPlayersInput);
     const totalRounds = Math.max(1, Math.log2(nextPowerOfTwo(maxPlayers)));
     const earlyRounds = Math.max(0, totalRounds - (isDoubleElim ? 3 : 2));
-    const upperTitle = root.querySelector(".format-col--upper-main .format-title");
-    const quarterTitle = root.querySelector(".format-col--quarter .format-title");
+    const upperTitle = root.querySelector(
+      ".format-col--upper-main .format-title",
+    );
+    const quarterTitle = root.querySelector(
+      ".format-col--quarter .format-title",
+    );
     const semiTitle = root.querySelector(".format-col--semi .format-title");
-    const upperFinalTitle = root.querySelector(".format-col--upper-final .format-title");
+    const upperFinalTitle = root.querySelector(
+      ".format-col--upper-final .format-title",
+    );
     const finalTitle = root.querySelector(".format-col--final .format-title");
     const upperFinalCol = root.querySelector(".format-col--upper-final");
 
@@ -704,14 +829,14 @@ export function initTournamentPage({
       quarterTitle.textContent = getUpperLabelForSettings(
         Math.max(1, totalRounds - 2),
         totalRounds,
-        isDoubleElim
+        isDoubleElim,
       );
     }
     if (semiTitle) {
       semiTitle.textContent = getUpperLabelForSettings(
         Math.max(1, totalRounds - 1),
         totalRounds,
-        isDoubleElim
+        isDoubleElim,
       );
     }
     if (upperFinalTitle) {
@@ -788,16 +913,16 @@ export function initTournamentPage({
   autoFillBtn?.addEventListener("click", autoFillPlayers);
   checkInBtn?.addEventListener("click", () => checkInCurrentPlayer?.());
   checkInToggleBtn?.addEventListener("click", () =>
-    toggleCheckInManualClose?.()
+    toggleCheckInManualClose?.(),
   );
   notifyCheckInBtn?.addEventListener("click", () => notifyCheckInPlayers?.());
-  refreshMmrBtn?.addEventListener("click", () =>
-    refreshRosterMmrFromPulse?.()
-  );
+  refreshMmrBtn?.addEventListener("click", () => refreshRosterMmrFromPulse?.());
 
   signInBtn?.addEventListener("click", () => window.handleSignIn?.());
   signOutBtn?.addEventListener("click", () => window.handleSignOut?.());
-  switchAccountBtn?.addEventListener("click", () => window.handleSwitchAccount?.());
+  switchAccountBtn?.addEventListener("click", () =>
+    window.handleSwitchAccount?.(),
+  );
   settingsBtn?.addEventListener("click", async () => {
     const userMenu = document.getElementById("userMenu");
     if (userMenu) userMenu.style.display = "none";
@@ -827,7 +952,7 @@ export function initTournamentPage({
       tabButtons.forEach((btn) => {
         btn.classList.toggle(
           "active",
-          btn.dataset.userSettingsTab === "settingsTournament"
+          btn.dataset.userSettingsTab === "settingsTournament",
         );
       });
       tabPanels.forEach((panel) => {
@@ -865,7 +990,9 @@ export function initTournamentPage({
   });
   openRegisterBtn?.addEventListener("click", () => {
     switchTab("registrationTab");
-    document.getElementById("registrationCard")?.scrollIntoView({ behavior: "smooth" });
+    document
+      .getElementById("registrationCard")
+      ?.scrollIntoView({ behavior: "smooth" });
   });
 
   openCreateTournament?.addEventListener("click", async () => {
@@ -886,17 +1013,23 @@ export function initTournamentPage({
     setModalVisible(createModal, false);
   });
   window.addEventListener("mousedown", (e) => {
-    if (createModal && createModal.style.display === "flex" && e.target === createModal) {
+    if (
+      createModal &&
+      createModal.style.display === "flex" &&
+      e.target === createModal
+    ) {
       setModalVisible(createModal, false);
     }
   });
-  saveTournamentBtn?.addEventListener("click", handleCreateTournament || handleRegistration);
+  saveTournamentBtn?.addEventListener(
+    "click",
+    handleCreateTournament || handleRegistration,
+  );
   refreshTournaments?.addEventListener("click", () => renderTournamentList());
   let slugAutoTimer = null;
   const queueSlugFromName = () => {
     if (!nameInput || !slugInput || !generateUniqueSlug) return;
-    const shouldAuto =
-      !slugInput.value || slugInput.dataset.auto === "true";
+    const shouldAuto = !slugInput.value || slugInput.dataset.auto === "true";
     if (!shouldAuto) return;
     const nameValue = nameInput.value || "";
     if (!nameValue.trim()) {
@@ -1034,13 +1167,17 @@ export function initTournamentPage({
       nextCreateCircuitStep.style.display = isFinal ? "none" : "inline-flex";
     if (backCreateCircuitStep)
       backCreateCircuitStep.style.display = isFinal ? "inline-flex" : "none";
-    if (saveCircuitBtn) saveCircuitBtn.style.display = isFinal ? "inline-flex" : "none";
+    if (saveCircuitBtn)
+      saveCircuitBtn.style.display = isFinal ? "inline-flex" : "none";
     if (isFinal && createFinalTabBtns.length) {
       createFinalTabBtns.forEach((b) =>
-        b.classList.toggle("active", b.dataset.finalCreateTab === "createFinalGeneral")
+        b.classList.toggle(
+          "active",
+          b.dataset.finalCreateTab === "createFinalGeneral",
+        ),
       );
       createFinalPanels.forEach((panel) =>
-        panel.classList.toggle("active", panel.id === "createFinalGeneral")
+        panel.classList.toggle("active", panel.id === "createFinalGeneral"),
       );
     }
   };
@@ -1078,28 +1215,36 @@ export function initTournamentPage({
       const target = btn.dataset.createTab;
       if (!target) return;
       createTabBtns.forEach((b) => b.classList.toggle("active", b === btn));
-      createPanels.forEach((panel) => panel.classList.toggle("active", panel.id === target));
+      createPanels.forEach((panel) =>
+        panel.classList.toggle("active", panel.id === target),
+      );
     });
   });
-  nextCreateCircuitStep?.addEventListener("click", () => setCreateCircuitStep("final"));
-  backCreateCircuitStep?.addEventListener("click", () => setCreateCircuitStep("circuit"));
+  nextCreateCircuitStep?.addEventListener("click", () =>
+    setCreateCircuitStep("final"),
+  );
+  backCreateCircuitStep?.addEventListener("click", () =>
+    setCreateCircuitStep("circuit"),
+  );
   createFinalTabBtns.forEach((btn) => {
     btn.addEventListener("click", () => {
       const target = btn.dataset.finalCreateTab;
       if (!target) return;
-      createFinalTabBtns.forEach((b) => b.classList.toggle("active", b === btn));
+      createFinalTabBtns.forEach((b) =>
+        b.classList.toggle("active", b === btn),
+      );
       createFinalPanels.forEach((panel) =>
-        panel.classList.toggle("active", panel.id === target)
+        panel.classList.toggle("active", panel.id === target),
       );
     });
   });
   const switchCircuitSettingsTab = (targetId) => {
     if (!targetId) return;
     circuitSettingsTabBtns.forEach((b) =>
-      b.classList.toggle("active", b.dataset.circuitSettingsTab === targetId)
+      b.classList.toggle("active", b.dataset.circuitSettingsTab === targetId),
     );
     circuitSettingsPanels.forEach((panel) =>
-      panel.classList.toggle("active", panel.id === targetId)
+      panel.classList.toggle("active", panel.id === targetId),
     );
   };
   circuitSettingsTabBtns.forEach((btn) => {
@@ -1111,16 +1256,22 @@ export function initTournamentPage({
     btn.addEventListener("click", () => {
       const target = btn.dataset.finalSettingsTab;
       if (!target) return;
-      circuitFinalTabBtns.forEach((b) => b.classList.toggle("active", b === btn));
+      circuitFinalTabBtns.forEach((b) =>
+        b.classList.toggle("active", b === btn),
+      );
       circuitFinalPanels.forEach((panel) =>
-        panel.classList.toggle("active", panel.id === target)
+        panel.classList.toggle("active", panel.id === target),
       );
     });
   });
   const switchSettingsTab = (targetId) => {
     if (!targetId) return;
-    settingsTabBtns.forEach((b) => b.classList.toggle("active", b.dataset.settingsTab === targetId));
-    settingsPanels.forEach((panel) => panel.classList.toggle("active", panel.id === targetId));
+    settingsTabBtns.forEach((b) =>
+      b.classList.toggle("active", b.dataset.settingsTab === targetId),
+    );
+    settingsPanels.forEach((panel) =>
+      panel.classList.toggle("active", panel.id === targetId),
+    );
   };
   settingsTabBtns.forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -1142,19 +1293,21 @@ export function initTournamentPage({
     toggleMapSelection,
   });
   finalUseLadderMapsBtn?.addEventListener("click", () =>
-    setFinalMapPoolSelection?.(getDefaultMapPoolNames())
+    setFinalMapPoolSelection?.(getDefaultMapPoolNames()),
   );
-  finalClearMapPoolBtn?.addEventListener("click", () => setFinalMapPoolSelection?.([]));
+  finalClearMapPoolBtn?.addEventListener("click", () =>
+    setFinalMapPoolSelection?.([]),
+  );
   finalMapPoolPicker?.addEventListener("click", (e) => {
     const card = e.target.closest(".tournament-map-card");
     if (!card) return;
     toggleFinalMapSelection?.(card.dataset.mapName);
   });
   circuitFinalUseLadderMapsBtn?.addEventListener("click", () =>
-    setCircuitFinalMapPoolSelection?.(getDefaultMapPoolNames())
+    setCircuitFinalMapPoolSelection?.(getDefaultMapPoolNames()),
   );
   circuitFinalClearMapPoolBtn?.addEventListener("click", () =>
-    setCircuitFinalMapPoolSelection?.([])
+    setCircuitFinalMapPoolSelection?.([]),
   );
   circuitFinalMapPoolPicker?.addEventListener("click", (e) => {
     const card = e.target.closest(".tournament-map-card");
@@ -1269,11 +1422,15 @@ export function initTournamentPage({
 
   jumpToRegistration?.addEventListener("click", () => {
     switchTab("registrationTab");
-    document.getElementById("registrationCard")?.scrollIntoView({ behavior: "smooth" });
+    document
+      .getElementById("registrationCard")
+      ?.scrollIntoView({ behavior: "smooth" });
   });
   jumpToBracket?.addEventListener("click", () => {
     switchTab("bracketTab");
-    document.getElementById("bracketGrid")?.scrollIntoView({ behavior: "smooth" });
+    document
+      .getElementById("bracketGrid")
+      ?.scrollIntoView({ behavior: "smooth" });
   });
 
   enableDragScroll(bracketGrid, {
@@ -1350,8 +1507,10 @@ export function initTournamentPage({
       const matchId = e.target.dataset.matchId || card?.dataset?.matchId;
       if (!matchId) return;
       const selects = card
-        ? card.querySelectorAll('select.result-select, select.score-select')
-        : document.querySelectorAll(`select.result-select[data-match-id="${matchId}"], select.score-select[data-match-id="${matchId}"]`);
+        ? card.querySelectorAll("select.result-select, select.score-select")
+        : document.querySelectorAll(
+            `select.result-select[data-match-id="${matchId}"], select.score-select[data-match-id="${matchId}"]`,
+          );
       const vals = Array.from(selects).map((s) => s.value || "0");
       updateMatchScore?.(matchId, vals[0], vals[1]);
     }
@@ -1456,7 +1615,9 @@ export function initTournamentPage({
   const closeAdminPanels = () => {
     document.querySelectorAll(".hero-admin-panel.is-open").forEach((panel) => {
       panel.classList.remove("is-open");
-      const toggle = panel.closest(".hero")?.querySelector(".hero-admin-toggle");
+      const toggle = panel
+        .closest(".hero")
+        ?.querySelector(".hero-admin-toggle");
       if (toggle) toggle.setAttribute("aria-expanded", "false");
     });
   };
@@ -1473,14 +1634,20 @@ export function initTournamentPage({
   document.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof Element)) return;
-    if (target.closest(".hero-admin-panel") || target.closest(".hero-admin-toggle")) return;
+    if (
+      target.closest(".hero-admin-panel") ||
+      target.closest(".hero-admin-toggle")
+    )
+      return;
     closeAdminPanels();
   });
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") closeAdminPanels();
   });
   const placements = document.getElementById("tournamentPlacements");
-  const placementsSlot = document.getElementById("tournamentPlacementsMobileSlot");
+  const placementsSlot = document.getElementById(
+    "tournamentPlacementsMobileSlot",
+  );
   const placementsHome = placements?.parentElement || null;
   const placementsHomeNext = placements?.nextSibling || null;
   const updatePlacementsLocation = () => {
@@ -1494,7 +1661,10 @@ export function initTournamentPage({
       return;
     }
     if (placements.parentElement === placementsHome) return;
-    if (placementsHomeNext && placementsHomeNext.parentNode === placementsHome) {
+    if (
+      placementsHomeNext &&
+      placementsHomeNext.parentNode === placementsHome
+    ) {
       placementsHome.insertBefore(placements, placementsHomeNext);
     } else {
       placementsHome.appendChild(placements);
@@ -1524,7 +1694,7 @@ export function initTournamentPage({
           }
         });
       },
-      { root: listViewport, rootMargin: "120px 0px", threshold: 0 }
+      { root: listViewport, rootMargin: "120px 0px", threshold: 0 },
     );
     observer.observe(sentinel);
   }
@@ -1588,7 +1758,9 @@ export function initTournamentPage({
     },
     {
       root: document.querySelector("#createFinalPanel .format-diagram"),
-      maxPlayersInput: document.getElementById("finalTournamentMaxPlayersInput"),
+      maxPlayersInput: document.getElementById(
+        "finalTournamentMaxPlayersInput",
+      ),
       formatSelect: document.getElementById("finalFormatSelect"),
     },
   ];
@@ -1620,9 +1792,13 @@ export function initTournamentPage({
         updateFormatDiagramTitles(entry);
       }
     });
-    entry.formatSelect?.addEventListener("change", () => updateFormatDiagramTitles(entry));
+    entry.formatSelect?.addEventListener("change", () =>
+      updateFormatDiagramTitles(entry),
+    );
     const playoffsSelect = getPlayoffsSelectForRoot(entry.root);
-    playoffsSelect?.addEventListener("change", () => updateFormatDiagramTitles(entry));
+    playoffsSelect?.addEventListener("change", () =>
+      updateFormatDiagramTitles(entry),
+    );
   });
 
   addBotBtn?.addEventListener("click", () => addBotPlayer?.());
@@ -1632,4 +1808,31 @@ export function initTournamentPage({
   syncFormatFieldVisibility("create");
   syncFormatFieldVisibility("settings");
   syncFormatFieldVisibility("final");
+
+  const matchInspector = document.getElementById("matchInfoModal");
+  const bracketLayout = document.getElementById("bracketLayout");
+  const railBtn = document.getElementById("matchInfoRailBtn");
+
+  const setMatchInspectorOpen = (open) => {
+    if (!matchInspector) return;
+
+    const isOpen = !!open;
+
+    matchInspector.classList.toggle("is-open", isOpen);
+    matchInspector.setAttribute("aria-hidden", isOpen ? "false" : "true");
+
+    if (bracketLayout) {
+      bracketLayout.classList.toggle("inspector-collapsed", !isOpen);
+    }
+  };
+
+  railBtn?.addEventListener("click", () => {
+    const isOpen = matchInspector?.classList.contains("is-open");
+    setMatchInspectorOpen(!isOpen);
+  });
+
+  window.setMatchInspectorOpen = setMatchInspectorOpen;
+
+  // Default: collapsed (rail visible)
+  setMatchInspectorOpen(false);
 }

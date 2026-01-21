@@ -71,7 +71,7 @@ export function setRegisteredTournament(slug) {
     existing.add(slug);
     localStorage.setItem(
       "registeredTournaments",
-      JSON.stringify(Array.from(existing))
+      JSON.stringify(Array.from(existing)),
     );
   } catch (_) {
     // ignore storage errors
@@ -232,7 +232,7 @@ export async function loadTournamentStateRemote(slug) {
   if (!slug) return null;
   try {
     const snap = await getDoc(
-      doc(collection(db, TOURNAMENT_STATE_COLLECTION), slug)
+      doc(collection(db, TOURNAMENT_STATE_COLLECTION), slug),
     );
     if (!snap.exists()) return null;
     const data = snap.data() || {};
@@ -251,7 +251,7 @@ export async function hydrateStateFromRemote(
   deserializeBracketFn,
   saveStateFn,
   renderAllFn,
-  localLastUpdated = 0
+  localLastUpdated = 0,
 ) {
   if (!slug) return;
 
@@ -301,7 +301,7 @@ export function persistTournamentStateRemote(
   currentSlug,
   serializeBracketFn,
   showToast,
-  options = {}
+  options = {},
 ) {
   if (!currentSlug) return;
   const entry = remotePersistState.get(currentSlug) || {};
@@ -361,7 +361,7 @@ async function flushTournamentStateRemote(currentSlug) {
     console.error("Failed to persist tournament state to Firestore", err);
     showToast?.(
       "Could not sync tournament state to Firestore. Changes stay local.",
-      "error"
+      "error",
     );
   }
 }
@@ -394,22 +394,40 @@ export function saveState(
   currentSlug,
   broadcast,
   saveStateFn,
-  persistFn
+  persistFn,
 ) {
+  const safeOptions = options && typeof options === "object" ? options : {};
   const timestamp =
-    options.keepTimestamp && typeof next?.lastUpdated === "number"
+    safeOptions.keepTimestamp && typeof (next && next.lastUpdated) === "number"
       ? next.lastUpdated
       : Date.now();
-  const merged = { ...state, ...next, lastUpdated: timestamp };
-  saveStateFn(merged);
+
+  const merged = {
+    ...(state || defaultState || {}),
+    ...(next || {}),
+    lastUpdated: timestamp,
+  };
+
+  // Apply to in-memory state
+  if (typeof saveStateFn === "function") {
+    saveStateFn(merged);
+  }
+
+  // Persist locally
   try {
     localStorage.setItem(getStorageKey(currentSlug), JSON.stringify(merged));
   } catch (_) {
-    // storage may be unavailable
+    // ignore storage errors
   }
-  broadcast?.postMessage({ slug: currentSlug, payload: merged });
-  if (!options.skipRemote) {
-    persistFn(merged, options);
+
+  // Notify other tabs
+  if (broadcast && typeof broadcast.postMessage === "function") {
+    broadcast.postMessage({ slug: currentSlug, payload: merged });
+  }
+
+  // Persist remotely (Firestore) unless skipped
+  if (!safeOptions.skipRemote && typeof persistFn === "function") {
+    persistFn(merged, safeOptions);
   }
 }
 
@@ -417,11 +435,7 @@ export function getStorageKey(currentSlug) {
   return `${currentSlug || "tournament"}:${STORAGE_KEY}`;
 }
 
-export async function updateTournamentRosterRemote(
-  slug,
-  updater,
-  patch = {}
-) {
+export async function updateTournamentRosterRemote(slug, updater, patch = {}) {
   if (!slug || typeof updater !== "function") return null;
   try {
     const ref = doc(collection(db, TOURNAMENT_STATE_COLLECTION), slug);
@@ -433,8 +447,8 @@ export async function updateTournamentRosterRemote(
       const nextPlayers = Array.isArray(updateResult?.players)
         ? updateResult.players
         : Array.isArray(updateResult)
-        ? updateResult
-        : currentPlayers;
+          ? updateResult
+          : currentPlayers;
       const updatePatch =
         updateResult && typeof updateResult === "object"
           ? updateResult.patch

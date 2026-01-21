@@ -13,6 +13,9 @@
   --danger: #ff6b6b;
   --tournament-max-width: 1900px;
   --tournament-gutter: clamp(20px, 6vw, 220px);
+  --inspector-width: 420px;
+  --inspector-rail-width: 30px;
+  --tournament-header-height: 64px;
 }
 
 *,
@@ -707,7 +710,7 @@ a {
   background: var(--panel);
   border: 1px solid var(--stroke);
   border-radius: 18px;
-  padding: 18px;
+  padding: 18px 0px 18px 18px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
 }
 
@@ -944,6 +947,7 @@ a {
   gap: 8px;
   color: var(--success);
   font-weight: 700;
+  margin-right: 40px;
 }
 
 .live-dot::before {
@@ -2383,6 +2387,7 @@ a {
 /* Bracket tree layout */
 .tree-wrapper {
   position: relative;
+  min-height: 700px;
 }
 
 .tree-bracket {
@@ -8798,4 +8803,169 @@ select[id^="finalBestOf"] {
 
 #settingsTab .card-header {
   padding: 16px 20px 12px;
+}
+
+/* =========================
+   Docked bracket + inspector (Option A + Always-visible rail)
+   ========================= */
+
+.bracket-layout {
+  display: grid;
+  grid-template-columns: 1fr var(--inspector-width);
+  gap: 12px;
+  align-items: start; /* important: do NOT stretch the inspector to full page height */
+}
+
+/* Closed = only the rail column visible */
+.bracket-layout.inspector-collapsed {
+  grid-template-columns: 1fr var(--inspector-rail-width);
+}
+
+/* Inspector shell: height should be driven by content (no forced 100vh box) */
+.match-inspector {
+  position: sticky;
+  top: var(--tournament-header-height);
+
+  /* Content-driven height (prevents huge empty space) */
+  height: 100%;
+  max-height: calc(100vh - var(--tournament-header-height));
+
+  overflow: hidden;
+
+  background: rgba(10, 14, 24, 0.92);
+  backdrop-filter: blur(10px);
+  border-left: 1px solid var(--stroke);
+
+  display: flex;
+  flex-direction: row;
+  align-self: start; /* ensures the grid row doesn't stretch it */
+}
+
+/* Rail: ALWAYS visible, styled like your "round-title row-title" pill vibe */
+.match-inspector__rail {
+  width: 30px;
+  min-width: 30px;
+  max-width: 30px;
+  flex: 0 0 30px;
+
+  min-height: 64px; /* prevents “broken thin line” look when content is short */
+  align-self: stretch; /* rail matches inspector height */
+
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.08),
+    rgba(255, 255, 255, 0.02)
+  );
+  border-right: 1px solid var(--stroke);
+
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.25);
+
+  transition:
+    filter 160ms ease,
+    opacity 160ms ease;
+
+  box-sizing: border-box;
+}
+
+.match-inspector__rail:hover {
+  filter: brightness(1.08);
+}
+
+/* Arrow icon */
+.match-inspector__rail-icon {
+  display: inline-block;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--muted);
+  opacity: 0.95;
+  transform: rotate(0deg);
+}
+
+/* When inspector is open */
+#matchInfoModal.is-open .match-inspector__rail-icon {
+  transform: rotate(180deg);
+}
+
+/* Content area */
+.match-inspector__content {
+  flex: 1;
+  max-height: calc(100vh - var(--tournament-header-height));
+  overflow: auto;
+  padding: 12px;
+
+  opacity: 1;
+  pointer-events: auto;
+  transition: opacity 160ms ease;
+  min-height: 700px;
+}
+
+/* Closed state: hide ONLY the content (rail stays clickable) */
+.bracket-layout.inspector-collapsed .match-inspector__content {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Mobile fallback */
+@media (max-width: 900px) {
+  .bracket-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .match-inspector {
+    position: fixed;
+    right: 0;
+    top: var(--tournament-header-height);
+    width: 100vw;
+    max-height: calc(100vh - var(--tournament-header-height));
+    z-index: 1200;
+  }
+}
+
+.toast--action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(20, 24, 40, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+  margin: 10px 0;
+}
+
+.toast__text {
+  font-size: 0.95rem;
+  line-height: 1.2;
+}
+
+.toast__actions {
+  display: inline-flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.toast__btn {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: #e7e9f3;
+  border-radius: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.toast__btn--primary {
+  border-color: rgba(120, 200, 255, 0.35);
+  background: rgba(80, 160, 255, 0.22);
 }

@@ -1,6 +1,12 @@
 import DOMPurify from "dompurify";
 import { showToast } from "../../toastHandler.js";
-import { auth, db, functions, getCurrentUsername, rtdb } from "../../../../app.js";
+import {
+  auth,
+  db,
+  functions,
+  getCurrentUsername,
+  rtdb,
+} from "../../../../app.js";
 import { httpsCallable } from "firebase/functions";
 import { onAuthStateChanged } from "firebase/auth";
 import {
@@ -48,7 +54,7 @@ const PRESENCE_IDLE_AFTER_MS = 90_000;
 const PRESENCE_OFFLINE_AFTER_MS = 20 * 60_000;
 const ensureMatchPresenceAccessCallable = httpsCallable(
   functions,
-  "ensureMatchPresenceAccess"
+  "ensureMatchPresenceAccess",
 );
 let presenceUnsub = null;
 let presenceHeartbeat = null;
@@ -79,7 +85,7 @@ const COUNTRY_NAME_BY_CODE = new Map(
   (Array.isArray(countries) ? countries : []).map((entry) => [
     String(entry?.code || "").toUpperCase(),
     String(entry?.name || ""),
-  ])
+  ]),
 );
 const ISO3_TO_ISO2 = {
   ABW: "AW",
@@ -345,7 +351,7 @@ const COUNTRY_CODE_BY_NAME = new Map(
       normalizeCountryName(entry?.name || ""),
       String(entry?.code || "").toUpperCase(),
     ])
-    .filter(([key, code]) => key && code)
+    .filter(([key, code]) => key && code),
 );
 
 function emojiToTwemojiUrl(emoji) {
@@ -357,7 +363,7 @@ function emojiToTwemojiUrl(emoji) {
   }
   if (!codepoints.length) return "";
   return `https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/${codepoints.join(
-    "-"
+    "-",
   )}.svg`;
 }
 
@@ -555,7 +561,7 @@ function persistLiveVetoStateQueued() {
 
 export function openVetoModal(
   matchId,
-  { getPlayersMap, getDefaultMapPoolNames, getMapByName }
+  { getPlayersMap, getDefaultMapPoolNames, getMapByName },
 ) {
   vetoUiReady = false;
   setVetoUiBusy(true);
@@ -576,7 +582,7 @@ export function openVetoModal(
   const lookup = getMatchLookup(state.bracket || {});
   const match = lookup.get(matchId);
   const bestOfRaw = getBestOfForMatch(
-    match || { bracket: "winners", round: 1 }
+    match || { bracket: "winners", round: 1 },
   );
   const bestOf = Math.max(1, Number(bestOfRaw) || 1);
   const pool = (
@@ -584,7 +590,7 @@ export function openVetoModal(
       ? currentTournamentMeta.mapPool
       : getDefaultMapPoolNames()
   ).map(
-    (name) => getMapByName(name) || { name, folder: "", file: "", mode: "1v1" }
+    (name) => getMapByName(name) || { name, folder: "", file: "", mode: "1v1" },
   );
 
   const playersById = getPlayersMap();
@@ -628,7 +634,7 @@ export function openVetoModal(
     const remaining = pool.filter((m) => !usedNames.has(m.name));
     const savedBestOf = Math.max(
       1,
-      Number(saved.bestOf || saved.maps?.length || bestOf) || 1
+      Number(saved.bestOf || saved.maps?.length || bestOf) || 1,
     );
     const savedPicks = Array.isArray(saved.maps) ? saved.maps : [];
     const savedVetoed = Array.isArray(saved.vetoed) ? saved.vetoed : [];
@@ -636,18 +642,18 @@ export function openVetoModal(
       savedPicks.length >= savedBestOf
         ? "done"
         : remaining.length <= savedBestOf
-        ? "pick"
-        : "veto";
+          ? "pick"
+          : "veto";
     const turn =
       stage === "done"
         ? "done"
         : stage === "veto"
-        ? savedVetoed.length % 2 === 0
-          ? "low"
-          : "high"
-        : savedPicks.length % 2 === 0
-        ? "low"
-        : "high";
+          ? savedVetoed.length % 2 === 0
+            ? "low"
+            : "high"
+          : savedPicks.length % 2 === 0
+            ? "low"
+            : "high";
     setVetoStateState({
       stage,
       turn,
@@ -714,7 +720,7 @@ export function openVetoModal(
 
 export function openMatchInfoModal(
   matchId,
-  { getPlayersMap, getDefaultMapPoolNames, getMapByName }
+  { getPlayersMap, getDefaultMapPoolNames, getMapByName },
 ) {
   ensurePresenceAuthCleanupBound();
   const modal = document.getElementById("matchInfoModal");
@@ -745,12 +751,12 @@ export function openMatchInfoModal(
   const reportCancelBtn = document.getElementById("matchInfoReportCancelBtn");
   const reportSummary = document.getElementById("matchInfoReportSummary");
   const reportSummaryText = document.getElementById(
-    "matchInfoReportSummaryText"
+    "matchInfoReportSummaryText",
   );
   const reportMapSummary = document.getElementById("matchInfoReportMapSummary");
   const reportSummaryBy = document.getElementById("matchInfoReportSummaryBy");
   const reportAdminActions = document.getElementById(
-    "matchInfoReportAdminActions"
+    "matchInfoReportAdminActions",
   );
   const reportApproveBtn = document.getElementById("matchInfoReportApproveBtn");
   const reportRejectBtn = document.getElementById("matchInfoReportRejectBtn");
@@ -759,17 +765,21 @@ export function openMatchInfoModal(
   const closeBtn = document.getElementById("closeMatchInfoModal");
 
   if (!modal) return;
+
+  // Always open the docked inspector (sidebar mode)
+  window.setMatchInspectorOpen?.(true);
+
   modal.dataset.matchId = matchId || "";
 
   const lookup = getMatchLookup(state.bracket || {});
   const match = lookup.get(matchId);
   const bestOfComputed = getBestOfForMatch(
-    match || { bracket: "winners", round: 1 }
+    match || { bracket: "winners", round: 1 },
   );
   const saved = state.matchVetoes?.[matchId] || null;
   const bestOf = Math.max(
     1,
-    Number(saved?.bestOf || match?.bestOf || bestOfComputed) || 1
+    Number(saved?.bestOf || match?.bestOf || bestOfComputed) || 1,
   );
   const pickedMaps = Array.isArray(saved?.maps) ? saved.maps : [];
   const vetoedMaps = Array.isArray(saved?.vetoed) ? saved.vetoed : [];
@@ -817,18 +827,18 @@ export function openMatchInfoModal(
       match?.bracket === "winners"
         ? "Upper"
         : match?.bracket === "losers"
-        ? "Lower"
-        : match?.bracket === "finals"
-        ? "Finals"
-        : match?.bracket === "group"
-        ? "Group"
-        : "Match";
+          ? "Lower"
+          : match?.bracket === "finals"
+            ? "Finals"
+            : match?.bracket === "group"
+              ? "Group"
+              : "Match";
     const roundLabel =
       match?.bracket === "finals"
         ? "Final"
         : Number.isFinite(match?.round)
-        ? `Round ${match.round}`
-        : "Round";
+          ? `Round ${match.round}`
+          : "Round";
     title.textContent = `${bracketLabel} ${roundLabel}`;
   }
   if (boInlineEl) {
@@ -930,7 +940,7 @@ export function openMatchInfoModal(
   const saveMatchVetoesLocal = () => {
     vetoDeps?.saveState?.(
       { matchVetoes: state.matchVetoes, lastUpdated: state.lastUpdated },
-      { skipRemote: true, keepTimestamp: true }
+      { skipRemote: true, keepTimestamp: true },
     );
   };
 
@@ -987,7 +997,12 @@ export function openMatchInfoModal(
             });
           }
           clearMatchCast();
-          hideMatchInfoModal();
+          // Keep the inspector open after confirming; just refresh it
+          if (vetoDeps) {
+            openMatchInfoModal(matchId, vetoDeps);
+          } else {
+            refreshMatchInfoModalIfOpen?.();
+          }
         }
       : null;
   };
@@ -1138,7 +1153,7 @@ export function openMatchInfoModal(
   const scoreReports = state.scoreReports || {};
   const existingReport = scoreReports[matchId] || null;
   const canReport = Boolean(
-    uid && isParticipant && leftPlayerId && rightPlayerId
+    uid && isParticipant && leftPlayerId && rightPlayerId,
   );
   const shouldShowReport = Boolean(existingReport);
   if (reportSection) {
@@ -1162,12 +1177,12 @@ export function openMatchInfoModal(
     return Math.max(0, Math.min(num, maxWins));
   };
   const mapNames = Array.from({ length: bestOf }).map(
-    (_, idx) => pickedMaps?.[idx]?.map || `Map ${idx + 1}`
+    (_, idx) => pickedMaps?.[idx]?.map || `Map ${idx + 1}`,
   );
   const normalizeReportResults = (results) => {
     const normalized = normalizeMapResults(results, bestOf);
     return normalized.map((entry) =>
-      entry === "A" || entry === "B" ? entry : null
+      entry === "A" || entry === "B" ? entry : null,
     );
   };
   const deriveResultsFromScores = (scoreA, scoreB) => {
@@ -1190,7 +1205,7 @@ export function openMatchInfoModal(
   ) {
     reportResults = deriveResultsFromScores(
       existingReport?.scoreA || 0,
-      existingReport?.scoreB || 0
+      existingReport?.scoreB || 0,
     );
   } else {
     reportResults = normalizeReportResults(winners);
@@ -1213,10 +1228,10 @@ export function openMatchInfoModal(
         const options = [
           `<option value="">-</option>`,
           `<option value="A" ${winner === "A" ? "selected" : ""}>${escapeHtml(
-            aName
+            aName,
           )}</option>`,
           `<option value="B" ${winner === "B" ? "selected" : ""}>${escapeHtml(
-            bName
+            bName,
           )}</option>`,
         ].join("");
         return `<div class="match-info-report-map-row">
@@ -1416,11 +1431,6 @@ export function openMatchInfoModal(
 
   if (closeBtn) closeBtn.onclick = () => hideMatchInfoModal();
 
-  modal.style.display = "flex";
-  modal.onclick = (e) => {
-    if (e.target === modal) hideMatchInfoModal();
-  };
-
   if (showPresence) {
     startPresenceTracking(matchId, {
       leftPlayerId,
@@ -1435,7 +1445,6 @@ export function openMatchInfoModal(
   } else {
     stopPresenceTracking();
   }
-
 }
 
 function updateMatchInfoHeaderScores({
@@ -1477,14 +1486,14 @@ function renderMatchInfoVetoes({
   if (leftVetoesEl) {
     leftVetoesEl.innerHTML = left.length
       ? DOMPurify.sanitize(
-          left.map((v) => `<li>${escapeHtml(v.map)}</li>`).join("")
+          left.map((v) => `<li>${escapeHtml(v.map)}</li>`).join(""),
         )
       : `<li class="helper">None</li>`;
   }
   if (rightVetoesEl) {
     rightVetoesEl.innerHTML = right.length
       ? DOMPurify.sanitize(
-          right.map((v) => `<li>${escapeHtml(v.map)}</li>`).join("")
+          right.map((v) => `<li>${escapeHtml(v.map)}</li>`).join(""),
         )
       : `<li class="helper">None</li>`;
   }
@@ -1538,12 +1547,12 @@ async function hydrateCountryFlag(player, flagEl) {
           let usernameSnap = await getDoc(doc(db, "usernames", candidate));
           if (!usernameSnap.exists() && candidate.toLowerCase() !== candidate) {
             usernameSnap = await getDoc(
-              doc(db, "usernames", candidate.toLowerCase())
+              doc(db, "usernames", candidate.toLowerCase()),
             );
           }
           if (!usernameSnap.exists()) continue;
           const resolved = String(
-            usernameSnap.data()?.userId || usernameSnap.data()?.uid || ""
+            usernameSnap.data()?.userId || usernameSnap.data()?.uid || "",
           ).trim();
           if (resolved) {
             uid = resolved;
@@ -1695,9 +1704,12 @@ function renderMatchInfoRows(rowsEl, { bestOf, pickedMaps, winners }) {
 }
 
 export function hideMatchInfoModal() {
+  window.setMatchInspectorOpen?.(false);
+
   const modal = document.getElementById("matchInfoModal");
   if (modal) {
-    modal.style.display = "none";
+    modal.classList.remove("is-open");
+    modal.setAttribute("aria-hidden", "true");
     delete modal.dataset.matchId;
   }
   teardownMatchChatUi();
@@ -1710,8 +1722,7 @@ export function refreshMatchInfoModalIfOpen() {
   if (!vetoDeps) return;
   const modal = document.getElementById("matchInfoModal");
   if (!modal) return;
-  const cs = window.getComputedStyle(modal);
-  const visible = cs.display !== "none" && cs.visibility !== "hidden";
+  const visible = modal.classList.contains("is-open");
   if (!visible) return;
 
   const matchId = modal.dataset.matchId;
@@ -1722,9 +1733,10 @@ export function refreshMatchInfoModalIfOpen() {
 export function refreshMatchInfoPresenceIfOpen() {
   const modal = document.getElementById("matchInfoModal");
   if (!modal) return;
-  const cs = window.getComputedStyle(modal);
-  const visible = cs.display !== "none" && cs.visibility !== "hidden";
+
+  const visible = modal.classList.contains("is-open");
   if (!visible) return;
+
   applyPresenceIndicators();
 }
 
@@ -1732,7 +1744,7 @@ function presenceDocRef(matchId, uid) {
   if (!uid || !currentSlug || !matchId) return null;
   return rtdbRef(
     rtdb,
-    `${PRESENCE_COLLECTION}/${currentSlug}/matchInfo/${matchId}/${uid}`
+    `${PRESENCE_COLLECTION}/${currentSlug}/matchInfo/${matchId}/${uid}`,
   );
 }
 
@@ -1778,7 +1790,7 @@ async function startPresenceTracking(matchId, hint = null) {
   if (!presenceUnsub && currentSlug && matchId) {
     const colRef = rtdbRef(
       rtdb,
-      `${PRESENCE_COLLECTION}/${currentSlug}/matchInfo/${matchId}`
+      `${PRESENCE_COLLECTION}/${currentSlug}/matchInfo/${matchId}`,
     );
     presenceUnsub = onValue(
       colRef,
@@ -1788,9 +1800,7 @@ async function startPresenceTracking(matchId, hint = null) {
         Object.entries(data).forEach(([key, entry]) => {
           const payload = entry || {};
           const updatedAtMs =
-            Number(payload.updatedAt) ||
-            Number(payload.clientUpdatedAt) ||
-            0;
+            Number(payload.updatedAt) || Number(payload.clientUpdatedAt) || 0;
           next.set(key, {
             updatedAtMs,
             playerId: payload.playerId || null,
@@ -1800,7 +1810,7 @@ async function startPresenceTracking(matchId, hint = null) {
         presenceLatest = next;
         applyPresenceIndicators();
       },
-      () => {}
+      () => {},
     );
     presenceSlug = currentSlug;
     presenceMatchId = matchId;
@@ -1991,7 +2001,7 @@ async function ensureMatchPresenceAccess(matchId, uid) {
 function isMatchInfoModalVisible() {
   const modal = document.getElementById("matchInfoModal");
   if (!modal) return false;
-  return modal.style.display && modal.style.display !== "none";
+  return modal.classList.contains("is-open");
 }
 
 function setPresenceContext({ matchId, leftPlayerId, rightPlayerId }) {
@@ -2031,7 +2041,7 @@ function getPresenceStatusForMatch(playerId, matchId) {
 function applyPresenceIndicators(override = null) {
   const modal = document.getElementById("matchInfoModal");
   if (!modal) return;
-  const visible = modal.style.display && modal.style.display !== "none";
+  const visible = modal.classList.contains("is-open");
   if (!visible) return;
 
   const leftPresenceEl =
@@ -2044,11 +2054,11 @@ function applyPresenceIndicators(override = null) {
   const matchId = modal.dataset.matchId || presenceContext.matchId;
   const leftStatus = getPresenceStatusForMatch(
     presenceContext.leftPlayerId,
-    matchId
+    matchId,
   );
   const rightStatus = getPresenceStatusForMatch(
     presenceContext.rightPlayerId,
-    matchId
+    matchId,
   );
 
   if (leftPresenceEl) {
@@ -2060,16 +2070,16 @@ function applyPresenceIndicators(override = null) {
       leftStatus === "active"
         ? "Player online"
         : leftStatus === "idle"
-        ? "Player idle"
-        : "Player offline"
+          ? "Player idle"
+          : "Player offline",
     );
     leftPresenceEl.setAttribute(
       "title",
       leftStatus === "active"
         ? "Online"
         : leftStatus === "idle"
-        ? "Idle"
-        : "Offline"
+          ? "Idle"
+          : "Offline",
     );
   }
   if (rightPresenceEl) {
@@ -2081,16 +2091,16 @@ function applyPresenceIndicators(override = null) {
       rightStatus === "active"
         ? "Player online"
         : rightStatus === "idle"
-        ? "Player idle"
-        : "Player offline"
+          ? "Player idle"
+          : "Player offline",
     );
     rightPresenceEl.setAttribute(
       "title",
       rightStatus === "active"
         ? "Online"
         : rightStatus === "idle"
-        ? "Idle"
-        : "Offline"
+          ? "Idle"
+          : "Offline",
     );
   }
 }
@@ -2375,7 +2385,7 @@ async function persistLiveVetoState() {
   // Keep local state in sync, but do not broadcast again from here
   vetoDeps?.saveState?.(
     { matchVetoes: state.matchVetoes, lastUpdated: state.lastUpdated },
-    { skipRemote: true, keepTimestamp: true }
+    { skipRemote: true, keepTimestamp: true },
   );
 
   const stateRef = tournamentStateDocRef();
@@ -2399,7 +2409,7 @@ async function persistLiveVetoState() {
           },
           lastUpdated: nextUpdatedAt,
         },
-        { merge: true }
+        { merge: true },
       );
     } catch (fallbackErr) {
       console.warn("Failed to sync live veto state (fallback)", fallbackErr);
@@ -2467,10 +2477,10 @@ export function renderVetoPoolGrid(poolOverride = null) {
       const vetoEntry =
         vetoState?.vetoed?.find((m) => m.map === map.name) || null;
       const pickedIdx = pickEntry
-        ? vetoState?.picks?.findIndex((m) => m.map === map.name) ?? -1
+        ? (vetoState?.picks?.findIndex((m) => m.map === map.name) ?? -1)
         : -1;
       const vetoIdx = vetoEntry
-        ? vetoState?.vetoed?.findIndex((m) => m.map === map.name) ?? -1
+        ? (vetoState?.vetoed?.findIndex((m) => m.map === map.name) ?? -1)
         : -1;
       const imgPath = map.folder ? `img/maps/${map.folder}/${map.file}` : "";
       const stateClass =
@@ -2478,15 +2488,15 @@ export function renderVetoPoolGrid(poolOverride = null) {
       const helper =
         pickedIdx !== -1
           ? `Pick ${pickedIdx + 1} · ${escapeHtml(
-              pickEntry?.picker || "Player"
+              pickEntry?.picker || "Player",
             )}`
           : vetoIdx !== -1
-          ? `Veto · ${escapeHtml(vetoEntry?.picker || "Player")}`
-          : remainingNames.includes(map.name)
-          ? ""
-          : "Unavailable";
+            ? `Veto · ${escapeHtml(vetoEntry?.picker || "Player")}`
+            : remainingNames.includes(map.name)
+              ? ""
+              : "Unavailable";
       return `<div class="tournament-map-card ${stateClass}" data-map-name="${escapeHtml(
-        encodeURIComponent(map.name)
+        encodeURIComponent(map.name),
       )}">
         <div class="map-thumb"${
           imgPath ? ` style="background-image:url('${imgPath}')"` : ""
@@ -2509,10 +2519,10 @@ export function showVetoInfo(matchId) {
     return;
   }
   const lines = data.maps.map(
-    (m, idx) => `${idx + 1}. ${m.map} (${m.picker || "Player"})`
+    (m, idx) => `${idx + 1}. ${m.map} (${m.picker || "Player"})`,
   );
   alert(
-    `Picked maps (Bo${data.bestOf || data.maps.length}):\n${lines.join("\n")}`
+    `Picked maps (Bo${data.bestOf || data.maps.length}):\n${lines.join("\n")}`,
   );
 }
 
@@ -2590,8 +2600,8 @@ export function renderVetoStatus() {
 
     segmentsHtml += `
       <span class="veto-step is-${type}${isDone ? " is-done" : ""}${
-      isCurrent ? " is-current" : ""
-    }"
+        isCurrent ? " is-current" : ""
+      }"
             aria-hidden="true"></span>
     `;
   }
@@ -2600,8 +2610,8 @@ export function renderVetoStatus() {
     <div class="veto-header">
       <div class="veto-turnline">
         <span class="veto-phase ${phaseClass}">${escapeHtml(
-    phaseText
-  )} turn:</span>
+          phaseText,
+        )} turn:</span>
         <span class="veto-turnname">${escapeHtml(turnName)}</span>
       </div>
 
@@ -2689,7 +2699,7 @@ function ensureTournamentStateSubscription() {
     },
     (err) => {
       console.warn("[veto] tournament state onSnapshot failed", err);
-    }
+    },
   );
 }
 
@@ -2699,6 +2709,12 @@ export function setVetoDependencies(deps) {
 
   // Fix 2: Keep veto UI in sync without requiring modal reopen
   ensureTournamentStateSubscription();
+}
+
+// Convenience: open match info using the deps that were injected via setVetoDependencies(...)
+export function openMatchInfoModalUsingDeps(matchId) {
+  if (!vetoDeps) return;
+  openMatchInfoModal(matchId, vetoDeps);
 }
 
 export function teardownVetoSubscriptions() {
@@ -2737,7 +2753,7 @@ export function refreshVetoModalIfOpen() {
   const lookup = getMatchLookup(state.bracket || {});
   const match = lookup.get(matchId);
   const bestOfRaw = getBestOfForMatch(
-    match || { bracket: "winners", round: 1 }
+    match || { bracket: "winners", round: 1 },
   );
   const bestOf = Math.max(1, Number(bestOfRaw) || 1);
   const pool = (
@@ -2746,7 +2762,12 @@ export function refreshVetoModalIfOpen() {
       : vetoDeps.getDefaultMapPoolNames()
   ).map(
     (name) =>
-      vetoDeps.getMapByName(name) || { name, folder: "", file: "", mode: "1v1" }
+      vetoDeps.getMapByName(name) || {
+        name,
+        folder: "",
+        file: "",
+        mode: "1v1",
+      },
   );
   const playersById = vetoDeps.getPlayersMap();
   const [pA, pB] = resolveParticipants(match, lookup, playersById);
@@ -2762,7 +2783,7 @@ export function refreshVetoModalIfOpen() {
   const remaining = pool.filter((m) => !usedNames.has(m.name));
   const savedBestOf = Math.max(
     1,
-    Number(saved.bestOf || saved.maps?.length || bestOf) || 1
+    Number(saved.bestOf || saved.maps?.length || bestOf) || 1,
   );
   const savedPicks = Array.isArray(saved.maps) ? saved.maps : [];
   const savedVetoed = Array.isArray(saved.vetoed) ? saved.vetoed : [];
@@ -2770,18 +2791,18 @@ export function refreshVetoModalIfOpen() {
     savedPicks.length >= savedBestOf
       ? "done"
       : remaining.length <= savedBestOf
-      ? "pick"
-      : "veto";
+        ? "pick"
+        : "veto";
   const turn =
     stage === "done"
       ? "done"
       : stage === "veto"
-      ? savedVetoed.length % 2 === 0
-        ? "low"
-        : "high"
-      : savedPicks.length % 2 === 0
-      ? "low"
-      : "high";
+        ? savedVetoed.length % 2 === 0
+          ? "low"
+          : "high"
+        : savedPicks.length % 2 === 0
+          ? "low"
+          : "high";
   setVetoStateState({
     stage,
     turn,
