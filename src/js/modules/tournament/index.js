@@ -3402,6 +3402,7 @@ function resolveOpponentInfoForMatch(snapshot, matchId) {
 }
 
 function maybeToastMyMatchReady(prevSnapshot, nextSnapshot) {
+  if (!nextSnapshot?.isLive) return;
   const prevReady = collectReadyMatchIdsForCurrentUser(prevSnapshot);
   const nextReady = collectReadyMatchIdsForCurrentUser(nextSnapshot);
 

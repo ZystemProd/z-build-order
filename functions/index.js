@@ -2375,7 +2375,8 @@ exports.ensureMatchPresenceAccess = onCall(
       .map((player) => player?.uid)
       .filter(Boolean);
 
-    if (!participantUids.includes(uid)) {
+    const isAdmin = isAdminForMeta(meta, uid);
+    if (!participantUids.includes(uid) && !isAdmin) {
       throw new HttpsError(
         "permission-denied",
         "You cannot view presence for this match."

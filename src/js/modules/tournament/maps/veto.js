@@ -14,7 +14,6 @@ import {
   deleteField,
   doc,
   onSnapshot,
-  setDoc,
   updateDoc,
 } from "firebase/firestore";
 import {
@@ -52,6 +51,11 @@ const PRESENCE_HEARTBEAT_MS = 60_000;
 const PRESENCE_MIN_WRITE_MS = 45_000;
 const PRESENCE_IDLE_AFTER_MS = 90_000;
 const PRESENCE_OFFLINE_AFTER_MS = 20 * 60_000;
+const VETO_LIVE_COLLECTION = "tournamentVetoes";
+const VETO_BUSY_MIN_MS = 200;
+const VETO_BUSY_MAX_MS = 900;
+const VETO_BUSY_JITTER_MS = 150;
+const VETO_RTT_SMOOTHING = 0.2;
 const ensureMatchPresenceAccessCallable = httpsCallable(
   functions,
   "ensureMatchPresenceAccess",
@@ -78,6 +82,7 @@ let presenceActivityTimer = null;
 let presenceActivityHandler = null;
 let presenceVisibilityHandler = null;
 const presenceAccessCache = new Set();
+const vetoAccessCache = new Set();
 let presenceAuthBound = false;
 let vetoChatHome = null;
 const countryFlagCache = new Map();
@@ -477,6 +482,11 @@ function restoreMatchChatFromVetoModal() {
 let vetoUiBusy = false;
 let vetoLocalBusy = false;
 let vetoUiReady = false;
+let vetoLiveUnsub = null;
+let vetoLiveSlug = null;
+let vetoLiveMatchId = null;
+let vetoLiveEnsureToken = 0;
+let vetoRttMs = 450;
 
 // Promise chain to serialize ALL veto persists (prevents out-of-order writes)
 let vetoPersistChain = Promise.resolve();
@@ -753,6 +763,8 @@ export function openVetoModal(
 
   const poolEl = document.getElementById("vetoMapPool");
   if (poolEl) poolEl.onclick = handleVetoPoolClick;
+
+  void refreshLiveVetoSubscription();
 }
 
 export function openMatchInfoModal(
@@ -1482,6 +1494,8 @@ export function openMatchInfoModal(
   } else {
     stopPresenceTracking();
   }
+
+  void refreshLiveVetoSubscription();
 }
 
 function updateMatchInfoHeaderScores({
@@ -1753,6 +1767,8 @@ export function hideMatchInfoModal() {
   stopPresenceTracking();
   if (presenceUiTimer) clearInterval(presenceUiTimer);
   presenceUiTimer = null;
+
+  void refreshLiveVetoSubscription();
 }
 
 export function refreshMatchInfoModalIfOpen() {
@@ -1782,6 +1798,172 @@ function presenceDocRef(matchId, uid) {
   return rtdbRef(
     rtdb,
     `${PRESENCE_COLLECTION}/${currentSlug}/matchInfo/${matchId}/${uid}`,
+  );
+}
+
+function liveVetoDocRef(matchId) {
+  if (!currentSlug || !matchId) return null;
+  return rtdbRef(
+    rtdb,
+    `${VETO_LIVE_COLLECTION}/${currentSlug}/matchVetoes/${matchId}`,
+  );
+}
+
+async function ensureMatchVetoAccess(matchId) {
+  const uid = auth?.currentUser?.uid || null;
+  if (!uid || !currentSlug || !matchId) return false;
+  const key = `${currentSlug}:${matchId}:${uid}:veto`;
+  if (vetoAccessCache.has(key)) return true;
+  try {
+    await ensureMatchPresenceAccessCallable({ slug: currentSlug, matchId });
+    vetoAccessCache.add(key);
+    return true;
+  } catch (err) {
+    const code = String(err?.code || "");
+    if (code === "permission-denied" || code === "PERMISSION_DENIED") {
+      return false;
+    }
+    console.warn("Veto access check failed", err);
+    return false;
+  }
+}
+
+function updateVetoRttSample(sampleMs) {
+  if (!Number.isFinite(sampleMs) || sampleMs <= 0) return;
+  if (!Number.isFinite(vetoRttMs) || vetoRttMs <= 0) {
+    vetoRttMs = sampleMs;
+    return;
+  }
+  vetoRttMs =
+    vetoRttMs * (1 - VETO_RTT_SMOOTHING) + sampleMs * VETO_RTT_SMOOTHING;
+}
+
+function getVetoBusyWindowMs() {
+  const estimate = Math.round(vetoRttMs * 1.5 + VETO_BUSY_JITTER_MS);
+  return Math.min(VETO_BUSY_MAX_MS, Math.max(VETO_BUSY_MIN_MS, estimate));
+}
+
+function getActiveLiveVetoMatchId() {
+  const vetoModal = document.getElementById("vetoModal");
+  if (vetoModal && vetoModal.dataset.forceOpen === "true") {
+    return vetoModal.dataset.matchId || currentVetoMatchId || "";
+  }
+  const matchInfoModal = document.getElementById("matchInfoModal");
+  if (matchInfoModal && matchInfoModal.classList.contains("is-open")) {
+    return matchInfoModal.dataset.matchId || "";
+  }
+  return "";
+}
+
+function stopLiveVetoSubscription() {
+  try {
+    vetoLiveUnsub?.();
+  } catch (_) {
+    // ignore
+  }
+  vetoLiveUnsub = null;
+  vetoLiveSlug = null;
+  vetoLiveMatchId = null;
+}
+
+async function clearLiveVetoEntry(matchId) {
+  if (!matchId) return;
+  const ref = liveVetoDocRef(matchId);
+  if (!ref) return;
+  const ok = await ensureMatchVetoAccess(matchId);
+  if (!ok) return;
+  rtdbSet(ref, null).catch(() => {});
+}
+
+function applyLiveVetoUpdate(matchId, incoming) {
+  if (!incoming || !matchId) return;
+  const localEntry = state.matchVetoes?.[matchId] || null;
+  const incomingUpdated = getVetoUpdatedAt(incoming);
+  const localUpdated = getVetoUpdatedAt(localEntry);
+  const localFingerprint = vetoEntryFingerprint(localEntry);
+  const incomingFingerprint = vetoEntryFingerprint(incoming);
+  const differs = localFingerprint !== incomingFingerprint;
+  if (localEntry && incomingUpdated <= localUpdated && !differs) return;
+
+  const merged = {
+    ...(localEntry || {}),
+    ...(incoming || {}),
+  };
+
+  if (!Array.isArray(merged.maps)) merged.maps = localEntry?.maps || [];
+  if (!Array.isArray(merged.vetoed)) merged.vetoed = localEntry?.vetoed || [];
+  if (!Array.isArray(merged.mapResults))
+    merged.mapResults = localEntry?.mapResults || [];
+  merged.updatedAt = incomingUpdated || localUpdated || Date.now();
+
+  state.matchVetoes = state.matchVetoes || {};
+  state.matchVetoes[matchId] = merged;
+  state.lastUpdated = Math.max(state.lastUpdated || 0, merged.updatedAt || 0);
+
+  refreshMatchInfoModalIfOpen();
+  refreshVetoModalIfOpen();
+}
+
+function vetoEntryFingerprint(entry) {
+  if (!entry || typeof entry !== "object") return "";
+  return JSON.stringify({
+    maps: Array.isArray(entry.maps) ? entry.maps : [],
+    vetoed: Array.isArray(entry.vetoed) ? entry.vetoed : [],
+    bestOf: Number(entry.bestOf) || 0,
+    mapResults: Array.isArray(entry.mapResults) ? entry.mapResults : [],
+    participants: {
+      lower: entry.participants?.lower || "",
+      higher: entry.participants?.higher || "",
+    },
+  });
+}
+
+function getVetoUpdatedAt(entry) {
+  if (!entry || typeof entry !== "object") return 0;
+  const server = Number(entry.updatedAt) || 0;
+  if (server) return server;
+  return Number(entry.clientUpdatedAt) || 0;
+}
+
+async function refreshLiveVetoSubscription() {
+  if (!currentSlug) return;
+  const matchId = getActiveLiveVetoMatchId();
+  if (!matchId) {
+    stopLiveVetoSubscription();
+    return;
+  }
+
+  if (
+    vetoLiveUnsub &&
+    vetoLiveSlug === currentSlug &&
+    vetoLiveMatchId === matchId
+  ) {
+    return;
+  }
+
+  stopLiveVetoSubscription();
+
+  const ref = liveVetoDocRef(matchId);
+  if (!ref) return;
+
+  vetoLiveSlug = currentSlug;
+  vetoLiveMatchId = matchId;
+  const token = (vetoLiveEnsureToken += 1);
+
+  const ok = await ensureMatchVetoAccess(matchId);
+  if (!ok || token !== vetoLiveEnsureToken) return;
+
+  vetoLiveUnsub = onValue(
+    ref,
+    (snap) => {
+      const data = snap.val();
+      if (!data) return;
+      applyLiveVetoUpdate(matchId, data);
+    },
+    (err) => {
+      console.warn("Live veto listener error", err);
+      stopLiveVetoSubscription();
+    },
   );
 }
 
@@ -2320,6 +2502,8 @@ export function hideVetoModal({ reopenMatchInfo = true } = {}) {
   if (reopenMatchInfo && matchId && vetoDeps) {
     openMatchInfoModal(matchId, vetoDeps);
   }
+
+  void refreshLiveVetoSubscription();
 }
 
 function showResetVetoModal() {
@@ -2358,15 +2542,19 @@ function resetVetoSelection() {
 
   state.matchVetoes = state.matchVetoes || {};
   const existing = state.matchVetoes[currentVetoMatchId] || {};
+  const resetUpdatedAt = Date.now();
   state.matchVetoes[currentVetoMatchId] = {
     ...existing,
     maps: [],
     vetoed: [],
     mapResults: [],
     bestOf,
-    updatedAt: Date.now(),
+    updatedAt: resetUpdatedAt,
+    clientUpdatedAt: resetUpdatedAt,
   };
   vetoDeps?.saveState?.({ matchVetoes: state.matchVetoes });
+  void clearLiveVetoEntry(currentVetoMatchId);
+  void persistLiveVetoStateQueued();
   renderVetoPoolGrid();
   renderVetoStatus();
   hideResetVetoModal();
@@ -2381,14 +2569,14 @@ async function persistLiveVetoState() {
   state.matchVetoes = state.matchVetoes || {};
   const existing = state.matchVetoes[matchId] || {};
 
-  // Single authoritative timestamp for this persist
+  // Client timestamp used for local UI + RTT window; RTDB gets server timestamp.
   const nextUpdatedAt = Date.now();
 
   const uid = auth?.currentUser?.uid || null;
 
   // Short-lived “busy” window so the other client disables UI during sync.
   // Keep it short; this is UX-only.
-  const busyUntil = nextUpdatedAt + 1200;
+  const busyUntil = nextUpdatedAt + getVetoBusyWindowMs();
 
   state.matchVetoes[matchId] = {
     ...existing,
@@ -2396,6 +2584,7 @@ async function persistLiveVetoState() {
     vetoed: vetoState.vetoed || [],
     bestOf: vetoState.bestOf,
     updatedAt: nextUpdatedAt,
+    clientUpdatedAt: nextUpdatedAt,
     participants: {
       lower: vetoState.lowerName,
       higher: vetoState.higherName,
@@ -2426,32 +2615,31 @@ async function persistLiveVetoState() {
     { skipRemote: true, keepTimestamp: true },
   );
 
-  const stateRef = tournamentStateDocRef();
-  if (!stateRef) return;
-
   const record = state.matchVetoes[matchId] || {};
+  const liveRef = liveVetoDocRef(matchId);
+  if (!liveRef) return;
+
+  const canWrite = await ensureMatchVetoAccess(matchId);
+  if (!canWrite) return;
 
   try {
-    await updateDoc(stateRef, {
-      [`matchVetoes.${matchId}`]: record,
-      lastUpdated: nextUpdatedAt,
-    });
+    const startedAt =
+      typeof performance !== "undefined" && performance.now
+        ? performance.now()
+        : Date.now();
+    const rtdbRecord = {
+      ...record,
+      updatedAt: rtdbServerTimestamp(),
+      clientUpdatedAt: nextUpdatedAt,
+    };
+    await rtdbSet(liveRef, rtdbRecord);
+    const finishedAt =
+      typeof performance !== "undefined" && performance.now
+        ? performance.now()
+        : Date.now();
+    updateVetoRttSample(finishedAt - startedAt);
   } catch (err) {
-    console.warn("Failed to sync live veto state", err);
-    try {
-      await setDoc(
-        stateRef,
-        {
-          matchVetoes: {
-            [matchId]: record,
-          },
-          lastUpdated: nextUpdatedAt,
-        },
-        { merge: true },
-      );
-    } catch (fallbackErr) {
-      console.warn("Failed to sync live veto state (fallback)", fallbackErr);
-    }
+    console.warn("Failed to sync live veto state (rtdb)", err);
   }
 }
 
@@ -2471,6 +2659,7 @@ export function saveVetoSelection() {
     vetoed: vetoState.vetoed || [],
     bestOf: vetoState.bestOf,
     updatedAt: nextUpdatedAt,
+    clientUpdatedAt: nextUpdatedAt,
     participants: {
       lower: vetoState.lowerName,
       higher: vetoState.higherName,
@@ -2492,6 +2681,7 @@ export function saveVetoSelection() {
     matchVetoes: state.matchVetoes,
     bracket: state.bracket,
   });
+  void clearLiveVetoEntry(matchId);
   renderVetoStatus();
   renderVetoPoolGrid();
   showToast?.("Map veto saved.", "success");
@@ -2763,6 +2953,8 @@ export function teardownVetoSubscriptions() {
   }
   vetoRemoteStateUnsub = null;
   vetoRemoteStateSlug = null;
+
+  stopLiveVetoSubscription();
 }
 
 export function refreshVetoModalIfOpen() {

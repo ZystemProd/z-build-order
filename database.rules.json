@@ -37,6 +37,16 @@
           }
         }
       }
+    },
+    "tournamentVetoes": {
+      "$slug": {
+        "matchVetoes": {
+          "$matchId": {
+            ".read": "auth != null && root.child('tournamentPresence/'+$slug+'/matchInfo/_allow/'+$matchId+'/'+auth.uid).val() === true",
+            ".write": "auth != null && root.child('tournamentPresence/'+$slug+'/matchInfo/_allow/'+$matchId+'/'+auth.uid).val() === true"
+          }
+        }
+      }
     }
   }
 }
