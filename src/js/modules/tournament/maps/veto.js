@@ -79,6 +79,7 @@ let presenceActivityHandler = null;
 let presenceVisibilityHandler = null;
 const presenceAccessCache = new Set();
 let presenceAuthBound = false;
+let vetoChatHome = null;
 const countryFlagCache = new Map();
 const countryUidCache = new Map();
 const COUNTRY_NAME_BY_CODE = new Map(
@@ -445,6 +446,33 @@ function ensurePresenceAuthCleanupBound() {
   });
 }
 
+function moveMatchChatToVetoModal() {
+  const chatSection = document.getElementById("matchChatSection");
+  const slot = document.getElementById("vetoChatSlot");
+  if (!chatSection || !slot) return;
+  if (!vetoChatHome) {
+    vetoChatHome = {
+      parent: chatSection.parentElement,
+      nextSibling: chatSection.nextSibling,
+    };
+  }
+  slot.replaceChildren();
+  slot.appendChild(chatSection);
+}
+
+function restoreMatchChatFromVetoModal() {
+  const chatSection = document.getElementById("matchChatSection");
+  if (!chatSection || !vetoChatHome?.parent) return;
+  if (vetoChatHome.nextSibling) {
+    vetoChatHome.parent.insertBefore(chatSection, vetoChatHome.nextSibling);
+  } else {
+    vetoChatHome.parent.appendChild(chatSection);
+  }
+  const slot = document.getElementById("vetoChatSlot");
+  slot?.replaceChildren();
+  vetoChatHome = null;
+}
+
 // ---- Veto persist serialization + UI lock (prevents fast-click desync) ----
 let vetoUiBusy = false;
 let vetoLocalBusy = false;
@@ -596,21 +624,30 @@ export function openVetoModal(
   const playersById = getPlayersMap();
   const [pA, pB] = resolveParticipants(match, lookup, playersById);
 
+  const uid = auth?.currentUser?.uid || null;
+  const me = resolveCurrentPlayerForPresence();
+  const isParticipant =
+    (me?.id && (me.id === pA?.id || me.id === pB?.id)) ||
+    (uid && (uid === pA?.uid || uid === pB?.uid));
+
   if (!isAdmin) {
-    const uid = auth?.currentUser?.uid || null;
     if (!uid) {
       showToast?.("Sign in to veto/pick maps.", "warning");
       return;
     }
-    const me = resolveCurrentPlayerForPresence();
-    const isParticipant =
-      (me?.id && (me.id === pA?.id || me.id === pB?.id)) ||
-      (uid && (uid === pA?.uid || uid === pB?.uid));
     if (!isParticipant) {
       showToast?.("Only match players can veto/pick maps.", "warning");
       return;
     }
   }
+  moveMatchChatToVetoModal();
+  setupMatchChatUi({
+    matchId,
+    leftPlayer: pA,
+    rightPlayer: pB,
+    isParticipant,
+    uid,
+  });
 
   const ordered = [pA, pB]
     .filter(Boolean)
@@ -2276,6 +2313,7 @@ export function hideVetoModal({ reopenMatchInfo = true } = {}) {
 
   setCurrentVetoMatchIdState(null);
   setVetoStateState(null);
+  restoreMatchChatFromVetoModal();
 
   // NEW: return to match info modal instead of dropping to bracket
   // (only if requested and we have deps/matchId)

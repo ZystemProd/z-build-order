@@ -1196,9 +1196,6 @@ function syncFromRemote(incoming) {
   setStateObj(nextState);
   maybeToastMyMatchReady(prevState, nextState);
 
-  // Auto-open the inspector when a user match becomes ready (opponent advances)
-  maybeAutoOpenReadyMatch(prevState, nextState);
-
   if (onlyVetoChange || vetoOnlyChange) {
     refreshMatchInfoModalIfOpen?.();
     refreshVetoModalIfOpen?.();
@@ -1249,6 +1246,13 @@ function isCurrentUserTournamentPlayer(player) {
     .toLowerCase();
 
   return name === currentUsername || pulseName === currentUsername;
+}
+
+function isCurrentUserTournamentPlayerByUid(player) {
+  if (!player) return false;
+  const uid = auth?.currentUser?.uid ? String(auth.currentUser.uid).trim() : "";
+  if (!uid || !player?.uid) return false;
+  return String(player.uid).trim() === uid;
 }
 
 function findFirstReadyMatchForCurrentUser(snapshot) {
@@ -2372,23 +2376,63 @@ function isInspectorShowingUserWaitingMatch(snapshot, inspectorMatchId) {
 const matchReadyToastShown = new Set();
 const matchReadyToastDismissed = new Set();
 
-function showMatchReadyToast({ matchId, message }) {
+function ensureMatchReadyToastContainer() {
+  let container = document.getElementById("toast-container");
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "toast-container";
+    document.body.appendChild(container);
+  }
+  return container;
+}
+
+function showMatchReadyToast({
+  matchId,
+  message,
+  opponentName,
+  opponentAvatarUrl,
+}) {
   if (!matchId) return;
   if (matchReadyToastDismissed.has(matchId)) return;
   if (matchReadyToastShown.has(matchId)) return;
 
-  const container = document.getElementById("toast-container");
+  const container = ensureMatchReadyToastContainer();
   if (!container) return;
+  container.classList.add("toast-container--match-ready");
 
   matchReadyToastShown.add(matchId);
 
   const toast = document.createElement("div");
-  toast.className = "toast toast--action";
+  toast.className = "toast toast--action toast--match-ready";
   toast.dataset.matchId = matchId;
+  toast.style.opacity = "0";
+  toast.style.transform = "scale(0.98)";
 
   const text = document.createElement("div");
   text.className = "toast__text";
-  text.textContent = message || "Your match is ready.";
+
+  const title = document.createElement("div");
+  title.className = "toast__title";
+  title.textContent = message || "Your match is ready.";
+
+  const meta = document.createElement("div");
+  meta.className = "toast__meta";
+  const label = document.createElement("span");
+  label.className = "toast__label";
+  label.textContent = "Opponent";
+
+  const avatar = document.createElement("img");
+  avatar.className = "toast__avatar";
+  avatar.alt = "";
+  avatar.src = opponentAvatarUrl || DEFAULT_PLAYER_AVATAR;
+
+  const opponent = document.createElement("span");
+  opponent.className = "toast__opponent";
+  opponent.textContent = opponentName || "TBD";
+
+  meta.append(label, avatar, opponent);
+
+  text.append(title, meta);
 
   const actions = document.createElement("div");
   actions.className = "toast__actions";
@@ -2400,6 +2444,9 @@ function showMatchReadyToast({ matchId, message }) {
   goBtn.onclick = () => {
     matchReadyToastShown.delete(matchId);
     toast.remove();
+    if (!container.querySelector(".toast--match-ready")) {
+      container.classList.remove("toast-container--match-ready");
+    }
     openMatchInfoModalUsingDeps(matchId);
   };
 
@@ -2411,11 +2458,18 @@ function showMatchReadyToast({ matchId, message }) {
     matchReadyToastShown.delete(matchId);
     matchReadyToastDismissed.add(matchId);
     toast.remove();
+    if (!container.querySelector(".toast--match-ready")) {
+      container.classList.remove("toast-container--match-ready");
+    }
   };
 
   actions.append(goBtn, dismissBtn);
   toast.append(text, actions);
   container.appendChild(toast);
+  requestAnimationFrame(() => {
+    toast.style.opacity = "1";
+    toast.style.transform = "scale(1)";
+  });
 }
 
 async function checkInCurrentPlayer() {
@@ -3248,22 +3302,7 @@ function updateMatchScore(matchId, scoreA, scoreB, options = {}) {
     lookupAfter,
     playersById,
   );
-  // If this confirm completed the match AND the current user was a participant,
-  // auto-jump the inspector to the next ready match for that user.
-  // (Admins editing other series should not be redirected.)
-  if (completedNow) {
-    const userWasParticipant =
-      isCurrentUserTournamentPlayer(participants?.[0]) ||
-      isCurrentUserTournamentPlayer(participants?.[1]);
-
-    if (userWasParticipant) {
-      const nextReady = findFirstReadyMatchForCurrentUser(state);
-      if (nextReady?.id && nextReady.id !== matchId) {
-        // Uses deps already injected via setVetoDependencies(...)
-        openMatchInfoModalUsingDeps(nextReady.id);
-      }
-    }
-  }
+  // Don't toast here; wait for the updated bracket snapshot so opponent is accurate.
   const nameA = participants[0]?.name || "TBD";
   const nameB = participants[1]?.name || "TBD";
   const scoreAOut = Number.isFinite(nextScores[0]) ? nextScores[0] : 0;
@@ -3318,7 +3357,9 @@ function collectReadyMatchIdsForCurrentUser(snapshot) {
   if (!snapshot?.bracket) return out;
 
   const lookup = getMatchLookup(snapshot.bracket);
-  const playersById = getPlayersMap();
+  const playersById = new Map(
+    (snapshot?.players || []).map((player) => [player?.id, player]),
+  );
 
   for (const match of getAllMatches(snapshot.bracket)) {
     if (!match?.id) continue;
@@ -3328,13 +3369,36 @@ function collectReadyMatchIdsForCurrentUser(snapshot) {
     if (!pA || !pB) continue; // not ready yet
 
     if (
-      isCurrentUserTournamentPlayer(pA) ||
-      isCurrentUserTournamentPlayer(pB)
+      isCurrentUserTournamentPlayerByUid(pA) ||
+      isCurrentUserTournamentPlayerByUid(pB)
     ) {
       out.add(match.id);
     }
   }
   return out;
+}
+
+function resolveOpponentInfoForMatch(snapshot, matchId) {
+  const fallback = { name: "TBD", avatarUrl: DEFAULT_PLAYER_AVATAR };
+  if (!snapshot?.bracket || !matchId) return fallback;
+  const lookup = getMatchLookup(snapshot.bracket);
+  const match = lookup.get(matchId);
+  if (!match) return fallback;
+  const playersById = new Map(
+    (snapshot?.players || []).map((player) => [player?.id, player]),
+  );
+  const [pA, pB] = resolveParticipants(match, lookup, playersById);
+  if (!pA || !pB) return fallback;
+  const isA = isCurrentUserTournamentPlayerByUid(pA);
+  const isB = isCurrentUserTournamentPlayerByUid(pB);
+  let opponent = null;
+  if (isA && !isB) opponent = pB;
+  if (isB && !isA) opponent = pA;
+  if (!opponent) opponent = pA || pB;
+  return {
+    name: opponent?.name || "TBD",
+    avatarUrl: opponent?.avatarUrl || DEFAULT_PLAYER_AVATAR,
+  };
 }
 
 function maybeToastMyMatchReady(prevSnapshot, nextSnapshot) {
@@ -3350,9 +3414,12 @@ function maybeToastMyMatchReady(prevSnapshot, nextSnapshot) {
   for (const matchId of nextReady) {
     if (prevReady.has(matchId)) continue; // not newly ready
     if (openMatchId === matchId) continue;
+    const opponent = resolveOpponentInfoForMatch(nextSnapshot, matchId);
 
     showMatchReadyToast({
       matchId,
+      opponentName: opponent.name,
+      opponentAvatarUrl: opponent.avatarUrl,
       message: "Your next match is ready.",
     });
   }
@@ -6939,6 +7006,7 @@ async function handleRegistration(event) {
     const qualification = await enforceCircuitFinalQualification({
       name,
       sc2Link: sc2LinkInput,
+      uid: auth.currentUser?.uid || "",
       currentTournamentMeta,
       currentSlug,
       fetchCircuitMeta,
@@ -6967,6 +7035,7 @@ async function handleRegistration(event) {
       startingPoints = await getCircuitSeedPoints({
         name,
         sc2Link: sc2LinkInput,
+        uid: auth.currentUser?.uid || "",
         circuitSlug: currentTournamentMeta.circuitSlug,
         tournamentSlug: currentSlug,
       });
@@ -7188,6 +7257,7 @@ function initFinalAdminSearch() {
         startingPoints = await getCircuitSeedPoints({
           name: displayName,
           sc2Link,
+          uid: userId,
           circuitSlug: currentTournamentMeta.circuitSlug,
           tournamentSlug: currentSlug,
         });

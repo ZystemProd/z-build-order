@@ -5278,6 +5278,23 @@ details.stage-section:not([open]) .stage-toggle::after {
   text-overflow: ellipsis;
 }
 
+.leaderboard-player-link {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.leaderboard-player-link:hover {
+  color: var(--link-color);
+  text-decoration: underline;
+}
+
 .leaderboard-table th.first-place-cell,
 .leaderboard-table td.first-place-cell {
   text-align: center;
@@ -6088,13 +6105,97 @@ textarea:focus {
 }
 
 .veto-modal {
-  max-width: 760px;
+  max-width: 1080px;
   width: 90%;
+  max-height: 90vh;
+  height: min(90vh, 860px);
+  overflow: hidden;
+}
+
+.veto-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 18px;
+  align-items: stretch;
+  height: 100%;
+}
+
+.veto-main {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.veto-main #vetoMapPool {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.veto-chat {
+  border-left: 1px solid var(--stroke);
+  padding-left: 16px;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+  min-height: 0;
+}
+
+.veto-chat-header {
+  flex: 0 0 auto;
+}
+
+.veto-chat .match-chat {
+  margin-top: 0;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.veto-chat .match-chat-toggle-row {
+  margin: 0;
+}
+
+.veto-chat .match-chat-panel {
+  height: 100%;
+  flex: 1;
+  min-height: 0;
+  display: flex !important;
+  flex-direction: column;
+}
+
+.veto-chat .match-chat-history {
+  height: auto;
+  flex: 1;
+  min-height: 0;
+  align-content: start;
+  overflow-y: auto;
+}
+
+.veto-chat .match-chat-form {
+  margin-top: 0;
+  margin-top: auto;
 }
 
 .match-info-modal {
   max-width: 520px;
   width: 90%;
+}
+
+@media (max-width: 900px) {
+  .veto-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .veto-chat {
+    border-left: none;
+    border-top: 1px solid var(--stroke);
+    padding-left: 0;
+    padding-top: 12px;
+  }
 }
 
 .match-chat {
@@ -6103,10 +6204,19 @@ textarea:focus {
   margin-top: 10px;
 }
 
+.match-info-modal .match-chat {
+  display: flex;
+  flex-direction: column;
+}
+
 .match-chat-toggle-row {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.match-info-modal .match-chat-toggle-row {
+  margin: 0;
 }
 
 .match-chat-toggle {
@@ -6154,6 +6264,12 @@ textarea:focus {
   padding: 10px;
 }
 
+.match-info-modal .match-chat-panel {
+  display: flex !important;
+  flex-direction: column;
+  max-height: 260px;
+}
+
 .match-chat-history {
   height: 180px;
   overflow-y: auto;
@@ -6162,8 +6278,14 @@ textarea:focus {
   padding-right: 4px;
 }
 
+.match-info-modal .match-chat-history {
+  height: auto;
+  flex: 1;
+  min-height: 0;
+  align-content: start;
+}
+
 .match-chat-message {
-  height: 56px;
   display: grid;
   gap: 4px;
   padding: 8px 10px;
@@ -6196,7 +6318,12 @@ textarea:focus {
   align-items: center;
 }
 
-.match-chat-form input {
+.match-info-modal .match-chat-form {
+  margin-top: auto;
+}
+
+.match-chat-form input,
+.match-chat-form textarea {
   flex: 1;
   border: 1px solid var(--stroke);
   border-radius: 10px;
@@ -6206,7 +6333,15 @@ textarea:focus {
   font-size: 13px;
 }
 
-.match-chat-form input:disabled {
+.match-chat-form textarea {
+  resize: none;
+  min-height: 34px;
+  line-height: 1.4;
+  font-family: inherit;
+}
+
+.match-chat-form input:disabled,
+.match-chat-form textarea:disabled {
   opacity: 0.65;
   cursor: not-allowed;
 }
@@ -6216,7 +6351,6 @@ textarea:focus {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding-right: 36px;
 }
 
 .match-info-modal .match-info-help-btn {
@@ -6380,6 +6514,19 @@ textarea:focus {
   font-size: 12px;
   font-weight: 600;
   color: var(--muted);
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.match-info-player-name > span:nth-of-type(2) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  max-width: 90px;
 }
 
 .match-info-flag {
@@ -8943,6 +9090,107 @@ select[id^="finalBestOf"] {
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
   margin: 10px 0;
+}
+
+#toast-container.toast-container--match-ready {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 1400;
+}
+
+#toast-container.toast-container--match-ready::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 10, 18, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+
+.toast--match-ready {
+  position: relative;
+  width: min(400px, calc(100vw - 48px));
+  max-width: none;
+  text-align: left;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 18px;
+  margin: 0;
+  padding: 26px 28px;
+  background: var(--panel);
+  border: 1px solid var(--stroke);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  pointer-events: auto;
+}
+
+.toast--match-ready .toast__text {
+  display: grid;
+  gap: 10px;
+  text-align: center;
+  justify-items: center;
+}
+
+.toast__title {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.toast__meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 1rem;
+  color: var(--text);
+  justify-content: center;
+}
+
+.toast__label {
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: center;
+}
+
+.toast__avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  object-fit: cover;
+  border: 1px solid var(--stroke);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35);
+}
+
+.toast__opponent {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.toast--match-ready .toast__actions {
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.toast.toast--match-ready {
+  background-color: var(--panel) !important;
+  color: var(--text);
+  padding: 26px 28px !important;
+  max-width: none !important;
+  text-align: left !important;
+}
+
+.toast--match-ready .toast__btn {
+  padding: 10px 16px;
+  border-radius: 12px;
 }
 
 .toast__text {

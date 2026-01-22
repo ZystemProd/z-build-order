@@ -1810,6 +1810,9 @@ export function initTournamentPage({
   syncFormatFieldVisibility("final");
 
   const matchInspector = document.getElementById("matchInfoModal");
+  const matchInspectorContent = matchInspector?.querySelector(
+    ".match-inspector__content",
+  );
   const bracketLayout = document.getElementById("bracketLayout");
   const railBtn = document.getElementById("matchInfoRailBtn");
 
@@ -1818,8 +1821,18 @@ export function initTournamentPage({
 
     const isOpen = !!open;
 
+    if (!isOpen && matchInspector.contains(document.activeElement)) {
+      document.activeElement?.blur();
+    }
+
     matchInspector.classList.toggle("is-open", isOpen);
-    matchInspector.setAttribute("aria-hidden", isOpen ? "false" : "true");
+    matchInspector.removeAttribute("aria-hidden");
+    if (matchInspectorContent) {
+      matchInspectorContent.setAttribute(
+        "aria-hidden",
+        isOpen ? "false" : "true",
+      );
+    }
 
     if (bracketLayout) {
       bracketLayout.classList.toggle("inspector-collapsed", !isOpen);

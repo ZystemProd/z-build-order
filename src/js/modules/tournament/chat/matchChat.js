@@ -39,7 +39,6 @@ export function setupMatchChatUi({
   uid,
 }) {
   const section = document.getElementById("matchChatSection");
-  const toggle = document.getElementById("matchChatToggle");
   const panel = document.getElementById("matchChatPanel");
   const historyEl = document.getElementById("matchChatHistory");
   const form = document.getElementById("matchChatForm");
@@ -51,7 +50,6 @@ export function setupMatchChatUi({
 
   if (
     !section ||
-    !toggle ||
     !panel ||
     !historyEl ||
     !form ||
@@ -76,9 +74,8 @@ export function setupMatchChatUi({
     if (sameMatch && section.dataset.chatBound === "true") {
       stopMatchChat();
       input.value = "";
-      panel.style.display = chatIsOpen ? "grid" : "none";
-      toggle.setAttribute("aria-expanded", chatIsOpen ? "true" : "false");
-      labelEl.textContent = chatIsOpen ? "Hide chat" : "Match chat";
+      panel.style.display = "flex";
+      labelEl.textContent = "Match chat";
       status.textContent = uid
         ? "Only match players can send messages."
         : "Sign in to chat.";
@@ -89,7 +86,6 @@ export function setupMatchChatUi({
     historyEl.replaceChildren();
     input.value = "";
     panel.style.display = "none";
-    toggle.setAttribute("aria-expanded", "false");
     labelEl.textContent = "Match chat";
     status.textContent = "";
     chatIsOpen = false;
@@ -105,16 +101,15 @@ export function setupMatchChatUi({
     return;
   }
 
-  section.style.display = "grid";
+  section.style.display = "flex";
   const uidLookup = buildPlayerUidLookup(state?.players || []);
 
   if (needsFullReset) {
     stopMatchChat();
     historyEl.replaceChildren();
     input.value = "";
-    panel.style.display = "grid";
-    toggle.setAttribute("aria-expanded", "true");
-    labelEl.textContent = "Hide chat";
+    panel.style.display = "flex";
+    labelEl.textContent = "Match chat";
     status.textContent = "";
     chatIsOpen = true;
     lastSeenAtMs = 0;
@@ -127,9 +122,8 @@ export function setupMatchChatUi({
     updateUnreadIndicator(0);
     section.dataset.chatBound = "true";
   } else {
-    panel.style.display = chatIsOpen ? "grid" : "none";
-    toggle.setAttribute("aria-expanded", chatIsOpen ? "true" : "false");
-    labelEl.textContent = chatIsOpen ? "Hide chat" : "Match chat";
+    panel.style.display = "flex";
+    labelEl.textContent = "Match chat";
     if (!sameContext) {
       chatUid = nextUid;
       chatStorageKey = nextStorageKey;
@@ -160,43 +154,14 @@ export function setupMatchChatUi({
     sendBtn.disabled = !enabled;
   };
 
-  const openChat = () => {
-    panel.style.display = "grid";
-    toggle.setAttribute("aria-expanded", "true");
-    labelEl.textContent = "Hide chat";
-    chatIsOpen = true;
-    unreadCount = 0;
-    updateUnreadIndicator(0);
-    setFormState(canSend);
-    status.textContent = canSend ? "" : "Only match players can send messages.";
-  };
+  panel.style.display = "flex";
+  chatIsOpen = true;
+  unreadCount = 0;
+  updateUnreadIndicator(0);
+  setFormState(canSend);
+  status.textContent = canSend ? "" : "Only match players can send messages.";
 
-  if (chatIsOpen) {
-    setFormState(canSend);
-    status.textContent = canSend ? "" : "Only match players can send messages.";
-  } else {
-    setFormState(false);
-    status.textContent = "";
-  }
-
-  const closeChat = () => {
-    panel.style.display = "none";
-    toggle.setAttribute("aria-expanded", "false");
-    labelEl.textContent = "Match chat";
-    chatIsOpen = false;
-  };
-
-  toggle.onclick = () => {
-    const isOpen = panel.style.display !== "none";
-    if (isOpen) {
-      closeChat();
-    } else {
-      openChat();
-    }
-  };
-
-  form.onsubmit = async (event) => {
-    event.preventDefault();
+  const submitChat = async () => {
     if (!chatContext?.messagesRef) return;
     if (!uid) {
       status.textContent = "Sign in to chat.";
@@ -227,6 +192,18 @@ export function setupMatchChatUi({
       console.error("Failed to send chat message", err);
       status.textContent = "Message failed to send.";
     }
+  };
+
+  form.onsubmit = async (event) => {
+    event.preventDefault();
+    await submitChat();
+  };
+
+  input.onkeydown = (event) => {
+    if (event.key !== "Enter") return;
+    if (event.shiftKey) return;
+    event.preventDefault();
+    void submitChat();
   };
 }
 

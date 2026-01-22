@@ -14,6 +14,7 @@ import { sanitizeUrl, escapeHtml } from "./bracket/renderUtils.js";
 import { buildSocialIconSvg } from "./promosShared.js";
 import { playerKey } from "./playerKey.js";
 import { syncMarkdownSurfaceForInput } from "./markdownEditor.js";
+import { openPlayerDetailModal } from "./playerDetail.js";
 
 const DEBUG_CIRCUIT_LEADERBOARD = false;
 
@@ -113,7 +114,7 @@ function isBracketFinished(bracket) {
   );
 }
 
-function getLeaderboardKey(player) {
+export function getLeaderboardKey(player) {
   const uid = String(player?.uid || "").trim();
   const nameKey = String(player?.name || "")
     .trim()
@@ -127,6 +128,76 @@ function getLeaderboardKey(player) {
     };
   }
   return { key: nameKey ? `name:${nameKey}` : legacyKey, legacyKey };
+}
+
+function getUidFromLeaderboardKey(key) {
+  const normalized = String(key || "");
+  return normalized.startsWith("uid:") ? normalized.slice(4) : "";
+}
+
+async function fetchLeaderboardNamesByUid(uids) {
+  const unique = Array.from(new Set((uids || []).filter(Boolean)));
+  if (!unique.length) return new Map();
+  const entries = await Promise.all(
+    unique.map(async (uid) => {
+      try {
+        const snap = await getDoc(doc(db, "users", uid));
+        if (!snap.exists()) return [uid, ""];
+        const data = snap.data() || {};
+        const name =
+          data.username ||
+          data.displayName ||
+          data?.profile?.username ||
+          data?.profile?.displayName ||
+          "";
+        return [uid, String(name || "").trim()];
+      } catch (_) {
+        return [uid, ""];
+      }
+    })
+  );
+  return new Map(entries.filter(([, name]) => name));
+}
+
+async function buildPlayerDetailFromLeaderboard(entry) {
+  const base = {
+    name: entry?.name || "Unknown",
+    uid: entry?.uid || "",
+    sc2Link: entry?.sc2Link || "",
+    pulseName: entry?.pulseName || "",
+    race: entry?.race || "",
+    mmr: entry?.mmr || 0,
+    points: entry?.points || 0,
+    secondaryPulseLinks: entry?.secondaryPulseLinks || [],
+    secondaryPulseProfiles: entry?.secondaryPulseProfiles || [],
+  };
+  if (!base.uid) return base;
+  try {
+    const snap = await getDoc(doc(db, "users", base.uid));
+    if (!snap.exists()) return base;
+    const data = snap.data() || {};
+    const pulse = data?.pulse || {};
+    const byRace = pulse.lastMmrByRace || pulse.byRace || null;
+    const overall = Number(pulse.lastMmr ?? pulse.mmr);
+    const best = pickBestRace(byRace, overall);
+    return {
+      ...base,
+      name: data.username || data.displayName || base.name,
+      pulseName: pulse.accountName || pulse.name || base.pulseName,
+      sc2Link: data.sc2PulseUrl || pulse.url || base.sc2Link,
+      race: best.race || base.race,
+      mmr: Number.isFinite(best.mmr) ? best.mmr : base.mmr,
+      mmrByRace: byRace || base.mmrByRace || null,
+      avatarUrl: data?.profile?.avatarUrl || data?.avatarUrl || base.avatarUrl,
+      country: data?.country || base.country || "",
+      twitchUrl: data?.twitchUrl || base.twitchUrl || "",
+      secondaryPulseProfiles: Array.isArray(pulse.secondary)
+        ? pulse.secondary
+        : base.secondaryPulseProfiles,
+    };
+  } catch (_) {
+    return base;
+  }
 }
 
 function buildCircuitLeaderboardCsv(leaderboard = [], { includeFirstPlaces = false } = {}) {
@@ -741,9 +812,10 @@ export async function buildCircuitLeaderboard(meta, slugs = [], { excludeSlug } 
     const winner = winnerId
       ? players.find((player) => player?.id === winnerId)
       : null;
-    const winnerKey = winner ? playerKey(winner.name, winner.sc2Link) : "";
+    const winnerKey = winner ? getLeaderboardKey(winner).key : "";
     players.forEach((player) => {
       const { key, legacyKey } = getLeaderboardKey(player);
+      const uid = String(player?.uid || "").trim();
       if (!key) return;
       if (DEBUG_CIRCUIT_LEADERBOARD) {
         console.log("[circuit-leaderboard] entry", {
@@ -768,6 +840,7 @@ export async function buildCircuitLeaderboard(meta, slugs = [], { excludeSlug } 
       const points = Number.isFinite(rawPoints) ? rawPoints : 0;
       const entry = totals.get(key) || {
         name: player.name || "Unknown",
+        uid,
         points: 0,
         firstPlaces: 0,
         tournaments: new Set(),
@@ -782,7 +855,8 @@ export async function buildCircuitLeaderboard(meta, slugs = [], { excludeSlug } 
       entry.points += points;
       if (legacyKey) entry.legacyKeys.add(legacyKey);
       if (tournamentSlug && isFinished) entry.tournaments.add(tournamentSlug);
-      if (!entry.name && player.name) entry.name = player.name;
+      if (uid && !entry.uid) entry.uid = uid;
+      if (player.name && entry.name !== player.name) entry.name = player.name;
       if (!entry.sc2Link && player.sc2Link) entry.sc2Link = player.sc2Link;
       if (!entry.pulseName && player.pulseName) entry.pulseName = player.pulseName;
       const race = normalizeRaceLabel(player.race || "") || player.race || "";
@@ -814,6 +888,9 @@ export async function buildCircuitLeaderboard(meta, slugs = [], { excludeSlug } 
     });
   });
   const useFirstPlaceSort = Boolean(meta?.sortByFirstPlace);
+  const uidNameMap = await fetchLeaderboardNamesByUid(
+    Array.from(totals.keys()).map(getUidFromLeaderboardKey)
+  );
   const leaderboard = Array.from(totals.entries())
     .map(([key, entry]) => {
       const legacyKeys = Array.from(entry.legacyKeys || []);
@@ -821,9 +898,11 @@ export async function buildCircuitLeaderboard(meta, slugs = [], { excludeSlug } 
       const legacyOverride = legacyKeys.length
         ? Number(meta?.pointsOverrides?.[legacyKeys[0]])
         : NaN;
+      const resolvedName =
+        (entry.uid && uidNameMap.get(entry.uid)) || entry.name || "Unknown";
       return {
         key,
-        name: entry.name,
+        name: resolvedName,
         points: Number.isFinite(override)
           ? override
           : Number.isFinite(legacyOverride)
@@ -831,6 +910,7 @@ export async function buildCircuitLeaderboard(meta, slugs = [], { excludeSlug } 
           : entry.points,
         firstPlaces: entry.firstPlaces || 0,
         tournaments: entry.tournaments.size,
+        uid: entry.uid || "",
         sc2Link: entry.sc2Link || "",
         pulseName: entry.pulseName || "",
         race: entry.race || "",
@@ -898,7 +978,15 @@ export async function renderCircuitLeaderboard(meta, slugs = [], { showEdit = fa
       rankCell.textContent = String(idx + 1);
 
       const nameCell = document.createElement("td");
-      nameCell.textContent = entry.name || "Unknown";
+      const nameButton = document.createElement("button");
+      nameButton.type = "button";
+      nameButton.className = "leaderboard-player-link player-detail-trigger";
+      nameButton.textContent = entry.name || "Unknown";
+      nameButton.addEventListener("click", async () => {
+        const player = await buildPlayerDetailFromLeaderboard(entry);
+        openPlayerDetailModal(player);
+      });
+      nameCell.appendChild(nameButton);
 
       const firstPlaceCell = document.createElement("td");
       firstPlaceCell.className = "first-place-cell";

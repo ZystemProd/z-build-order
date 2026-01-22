@@ -612,7 +612,7 @@
                   <div class="placeholder">No players yet. Add players to generate the bracket.</div>
                 </div>
                 <!-- Match Info Modal -->
-                <aside id="matchInfoModal" class="match-inspector" aria-hidden="true">
+                <aside id="matchInfoModal" class="match-inspector">
 
                   <!-- Collapsed rail (click to open) -->
                   <button id="matchInfoRailBtn" class="match-inspector__rail" type="button"
@@ -692,7 +692,11 @@
                           <div class="match-info-veto-title">Vetoes</div>
                           <ul id="matchInfoLeftVetoes" class="match-info-veto-list"></ul>
                         </div>
-                        <div class="match-info-veto-spacer" aria-hidden="true"></div>
+                        <div class="match-info-veto-spacer">
+                          <button class="cta ghost small" id="matchInfoEditScoreBtn" style="display:none;">
+                            Edit score
+                          </button>
+                        </div>
                         <div class="match-info-veto-col">
                           <div class="match-info-veto-title">Vetoes</div>
                           <ul id="matchInfoRightVetoes" class="match-info-veto-list"></ul>
@@ -703,9 +707,6 @@
                       <button class="cta primary" id="openMapVetoBtn">Map veto</button>
                       <button class="cta primary" id="confirmMatchScoreBtn" style="display:none;">
                         Confirm score
-                      </button>
-                      <button class="cta ghost" id="matchInfoEditScoreBtn" style="display:none;">
-                        Edit score
                       </button>
                       <button class="cta ghost" id="castMatchBtn" style="display:none;">Cast</button>
                     </div>
@@ -742,17 +743,14 @@
                     </div>
                     <div class="match-chat" id="matchChatSection" style="display:none;">
                       <div class="match-chat-toggle-row">
-                        <button class="cta ghost small match-chat-toggle" id="matchChatToggle" type="button"
-                          aria-expanded="false" aria-controls="matchChatPanel">
-                          <span class="match-chat-label" id="matchChatLabel">Match chat</span>
-                        </button>
+                        <span class="match-chat-label" id="matchChatLabel">Match chat</span>
                         <span class="match-chat-unread" id="matchChatUnread" aria-hidden="true"></span>
                       </div>
                       <div class="match-chat-panel" id="matchChatPanel" style="display:none;">
                         <div class="match-chat-history custom-scroll" id="matchChatHistory"></div>
                         <form class="match-chat-form" id="matchChatForm">
-                          <input id="matchChatInput" type="text" maxlength="500" placeholder="Message..."
-                            autocomplete="off" />
+                          <textarea id="matchChatInput" maxlength="500" placeholder="Message..."
+                            rows="1"></textarea>
                           <button class="cta small primary" id="matchChatSendBtn" type="submit">Send</button>
                         </form>
                         <p class="helper" id="matchChatStatus"></p>
@@ -2891,18 +2889,27 @@
   <!-- Match Veto Modal -->
   <div id="vetoModal" class="modal" style="display:none;">
     <div class="modal-content veto-modal">
-      <div class="modal-header">
-        <h3>Map veto</h3>
-        <button class="icon-btn" id="closeVetoModal" aria-label="Close veto modal">×</button>
-      </div>
-      <div class="veto-status">
-        <p class="helper" id="vetoMatchLabel"></p>
-        <p class="helper" id="vetoBestOfLabel"></p>
-      </div>
-      <div id="vetoMapPool" class="map-pool-grid selectable"></div>
-      <div class="form-actions" style="margin-top:12px;">
-        <button class="cta primary" id="saveVetoBtn">Done</button>
-        <button class="cta danger" id="resetVetoBtn">Reset veto</button>
+      <div class="veto-layout">
+        <div class="veto-main">
+          <div class="modal-header">
+            <h3>Map veto</h3>
+            <button class="icon-btn" id="closeVetoModal" aria-label="Close veto modal">×</button>
+          </div>
+          <div class="veto-status">
+            <p class="helper" id="vetoMatchLabel"></p>
+            <p class="helper" id="vetoBestOfLabel"></p>
+          </div>
+          <div id="vetoMapPool" class="map-pool-grid selectable"></div>
+          <div class="form-actions" style="margin-top:12px;">
+            <button class="cta primary" id="saveVetoBtn">Done</button>
+            <button class="cta danger" id="resetVetoBtn">Reset veto</button>
+          </div>
+        </div>
+        <aside class="veto-chat" id="vetoChatSlot">
+          <div class="veto-chat-header">
+            <p class="eyebrow">Chat</p>
+          </div>
+        </aside>
       </div>
     </div>
   </div>
