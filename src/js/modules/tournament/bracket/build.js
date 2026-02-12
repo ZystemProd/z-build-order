@@ -44,7 +44,9 @@ export function buildBracket(players, tournamentMeta = {}, isRoundRobinFormat) {
     return buildRoundRobinBracket(players, rr);
   }
   const includeLosers = !format.toLowerCase().startsWith("single");
-  return buildEliminationBracket(players, { includeLosers });
+  const includeFinalReset =
+    includeLosers && Boolean(tournamentMeta?.grandFinalReset);
+  return buildEliminationBracket(players, { includeLosers, includeFinalReset });
 }
 
 export function isDualTournamentFormat(format = "") {
@@ -91,6 +93,7 @@ export function buildDualTournamentBracket(players, tournamentMeta = {}) {
     winners: [],
     losers: [],
     finals: null,
+    finalsReset: null,
     seedOrder: players.map((p) => p.id),
   };
 }
@@ -158,12 +161,15 @@ function createDualTournamentMatches(group, playersById, bestOf) {
   return [match1, match2, match3, match4, match5];
 }
 
-export function buildEliminationBracket(players, { includeLosers = true } = {}) {
+export function buildEliminationBracket(
+  players,
+  { includeLosers = true, includeFinalReset = false } = {},
+) {
   const seedOrder = players.map((p) => p.id);
   const total = players.length;
 
   if (!total) {
-    return { winners: [], losers: [], finals: null, seedOrder };
+    return { winners: [], losers: [], finals: null, finalsReset: null, seedOrder };
   }
 
   const seedMap = new Map(players.map((p) => [p.seed, p]));
@@ -182,10 +188,13 @@ export function buildEliminationBracket(players, { includeLosers = true } = {}) 
             1,
             1,
             winnerSource(winners[winners.length - 1][0]),
-            winnerSource(losers[losers.length - 1][0])
+            winnerSource(losers[losers.length - 1][0]),
           )
         : null;
-    return { winners, losers, finals, seedOrder };
+    const finalsReset = includeFinalReset
+      ? createFinalResetMatch(finals)
+      : null;
+    return { winners, losers, finals, finalsReset, seedOrder };
   }
 
   if (total <= 4) {
@@ -243,11 +252,14 @@ export function buildEliminationBracket(players, { includeLosers = true } = {}) 
             1,
             1,
             winnerSource(winners[winners.length - 1][0]),
-            winnerSource(losers[losers.length - 1][0])
+            winnerSource(losers[losers.length - 1][0]),
           )
         : null;
+    const finalsReset = includeFinalReset
+      ? createFinalResetMatch(finals)
+      : null;
 
-    return { winners, losers, finals, seedOrder };
+    return { winners, losers, finals, finalsReset, seedOrder };
   }
 
   const seedPositions = generateSeedPositions(baseSize);
@@ -344,11 +356,12 @@ export function buildEliminationBracket(players, { includeLosers = true } = {}) 
           1,
           1,
           winnerSource(winners[winners.length - 1][0]),
-          winnerSource(losers[losers.length - 1][0])
+          winnerSource(losers[losers.length - 1][0]),
         )
       : null;
+  const finalsReset = includeFinalReset ? createFinalResetMatch(finals) : null;
 
-  return { winners, losers, finals, seedOrder };
+  return { winners, losers, finals, finalsReset, seedOrder };
 }
 
 export function buildRoundRobinBracket(players, rrSettings) {
@@ -385,6 +398,7 @@ export function buildRoundRobinBracket(players, rrSettings) {
     winners: [],
     losers: [],
     finals: null,
+    finalsReset: null,
     seedOrder: players.map((p) => p.id),
   };
 }
@@ -729,4 +743,17 @@ export function createMatch(bracket, round, index, sourceA, sourceB, bestOf = nu
     updatedAt: null,
     bestOf: bestOf || null,
   };
+}
+
+function createFinalResetMatch(finals) {
+  if (!finals) return null;
+  const match = createMatch(
+    "finals",
+    2,
+    1,
+    winnerSource(finals),
+    loserSource(finals),
+  );
+  match.isReset = true;
+  return match;
 }

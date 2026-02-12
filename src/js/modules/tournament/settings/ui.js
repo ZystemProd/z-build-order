@@ -21,6 +21,49 @@ export function syncFormatFieldVisibility(scope) {
   rrBlocks.forEach((el) => {
     el.style.display = isRR || isDual ? "flex" : "none";
   });
+  const playoffsSelectId =
+    scope === "settings"
+      ? "settingsRoundRobinPlayoffs"
+      : scope === "final"
+      ? "finalRoundRobinPlayoffsSelect"
+      : scope === "circuitfinal"
+      ? "circuitFinalRoundRobinPlayoffsSelect"
+      : "roundRobinPlayoffsSelect";
+  const playoffsValue =
+    document.getElementById(playoffsSelectId)?.value || "";
+  const isDoublePlayoffs = playoffsValue.toLowerCase().startsWith("double");
+  const resetRowId =
+    scope === "settings"
+      ? "settingsGrandFinalResetRow"
+      : scope === "final"
+      ? "finalGrandFinalResetRow"
+      : scope === "circuitfinal"
+      ? "circuitFinalGrandFinalResetRow"
+      : "grandFinalResetRow";
+  const resetRow = document.getElementById(resetRowId);
+  const resetToggleId =
+    scope === "settings"
+      ? "settingsGrandFinalResetToggle"
+      : scope === "final"
+      ? "finalGrandFinalResetToggle"
+      : scope === "circuitfinal"
+      ? "circuitFinalGrandFinalResetToggle"
+      : "grandFinalResetToggle";
+  const resetBestOfColId =
+    scope === "settings" ? "settingsFinalResetBestOfCol" : "";
+  const resetBestOfCol = resetBestOfColId
+    ? document.getElementById(resetBestOfColId)
+    : null;
+  const resetToggle = document.getElementById(resetToggleId);
+  if (resetRow) {
+    const showReset =
+      normalized.startsWith("double") || ((isRR || isDual) && isDoublePlayoffs);
+    resetRow.style.display = showReset ? "flex" : "none";
+    if (resetBestOfCol) {
+      resetBestOfCol.style.display =
+        showReset && Boolean(resetToggle?.checked) ? "flex" : "none";
+    }
+  }
   const labelId =
     scope === "settings"
       ? "settingsGroupStageLabel"

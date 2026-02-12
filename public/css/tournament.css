@@ -2230,12 +2230,40 @@ a {
     0 4px 14px rgba(0, 0, 0, 0.35);
 }
 
+.round-title .round-info {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+}
+
+.round-title .round-info svg {
+  width: 12px;
+  height: 12px;
+}
+
 .match-card {
   border: 1px solid var(--stroke);
   padding: 8px;
   background: var(--panel-2);
   box-shadow: 0 6px 22px rgba(0, 0, 0, 0.25);
   position: relative;
+}
+
+.match-card.final-reset {
+  border-style: dashed;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.match-card.final-reset-inactive {
+  opacity: 0.5;
+  filter: grayscale(0.35);
+  pointer-events: none;
 }
 
 .round-column.placeholder {
@@ -2405,7 +2433,7 @@ a {
   font-weight: 600;
   user-select: none;
   z-index: 0;
-  pointer-events: none;
+  pointer-events: auto;
 }
 
 .tree-bracket .tree-match-layer {
@@ -7625,7 +7653,7 @@ label {
 #settingsTab .settings-panels {
   min-width: 0;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 12px 0px 40px;
+  padding: 12px 15px 40px;
 }
 
 .settings-tab-btn {
@@ -7705,6 +7733,13 @@ label {
   margin-top: 10px;
   max-width: 44%;
   margin-inline: auto; /* center inside the panel */
+}
+
+.format-option-row {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 /* Upper & lower rows – center content */
@@ -8370,6 +8405,16 @@ select[id^="finalBestOf"] {
 
 .publish-checkbox-row .checkbox-wrapper-59 {
   justify-self: end;
+}
+
+.publish-checkbox-row.publish-checkbox-row--compact {
+  grid-template-columns: auto auto;
+  justify-content: start;
+  gap: 10px;
+}
+
+.publish-checkbox-row.publish-checkbox-row--compact .checkbox-wrapper-59 {
+  justify-self: start;
 }
 
 .seeding-mode-row {
@@ -9306,4 +9351,12 @@ select[id^="finalBestOf"] {
 .toast__btn--primary {
   border-color: rgba(120, 200, 255, 0.35);
   background: rgba(80, 160, 255, 0.22);
+}
+.tree-bracket .row-title .round-title-label,
+.tree-bracket .row-title .round-bo {
+  pointer-events: none;
+}
+
+.tree-bracket .row-title .round-info {
+  pointer-events: auto;
 }

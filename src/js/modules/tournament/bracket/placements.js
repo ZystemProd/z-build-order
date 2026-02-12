@@ -1,3 +1,6 @@
+import { getMatchLookup } from "./lookup.js";
+import { isFinalWinnerFromLower } from "./finalsReset.js";
+
 export function computePlacementsForBracket(bracket, totalPlayers) {
   const playoffTotal = Array.isArray(bracket?.playoffs?.seededIds)
     ? bracket.playoffs.seededIds.length
@@ -40,12 +43,26 @@ export function computePlacementsForBracket(bracket, totalPlayers) {
 
   const eliminationRounds = bracket.losers || [];
   const finalsMatch = bracket.finals;
+  const finalsReset = bracket.finalsReset;
   if (!finalsMatch?.winnerId || !finalsMatch?.loserId) {
     return null;
   }
+  const lookup = getMatchLookup(bracket);
+  const resetNeeded = finalsReset
+    ? isFinalWinnerFromLower(bracket, lookup)
+    : false;
+  const resolvedFinal =
+    resetNeeded && finalsReset?.winnerId && finalsReset?.loserId
+      ? finalsReset
+      : resetNeeded
+        ? null
+        : finalsMatch;
+  if (!resolvedFinal?.winnerId || !resolvedFinal?.loserId) {
+    return null;
+  }
   const placements = new Map();
-  placements.set(finalsMatch.winnerId, 1);
-  placements.set(finalsMatch.loserId, 2);
+  placements.set(resolvedFinal.winnerId, 1);
+  placements.set(resolvedFinal.loserId, 2);
   let placement = resolvedTotal;
   eliminationRounds.forEach((round) => {
     const losers = new Set();

@@ -14,8 +14,19 @@ import {
   parseMatchNumber,
   raceClassName,
 } from "./renderUtils.js";
+import {
+  isFinalResetActive,
+  isFinalResetMatchId,
+  isFinalResetClosed,
+} from "./finalsReset.js";
 
 const INFO_ICON_SVG = `<svg class="info-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+  <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"></circle>
+  <path d="M12 10.5v6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+  <circle cx="12" cy="7.5" r="1.25" fill="currentColor"></circle>
+</svg>`;
+
+const RESET_INFO_SVG = `<svg class="reset-info-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
   <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"></circle>
   <path d="M12 10.5v6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
   <circle cx="12" cy="7.5" r="1.25" fill="currentColor"></circle>
@@ -49,7 +60,7 @@ function buildBracketLayoutSignature(bracket, isGroupStage) {
   if (isGroupStage) {
     const groups = Array.isArray(bracket.groups) ? bracket.groups : [];
     const groupIds = groups.map((group) => group?.id || "").join("|");
-    return `group:${groupIds}|playoffs:${Boolean(bracket.finals)}`;
+    return `group:${groupIds}|playoffs:${Boolean(bracket.finals)}|reset:${Boolean(bracket.finalsReset)}`;
   }
   const winners = (bracket.winners || [])
     .map((round) => (round || []).map((match) => match?.id || "").join(","))
@@ -58,7 +69,8 @@ function buildBracketLayoutSignature(bracket, isGroupStage) {
     .map((round) => (round || []).map((match) => match?.id || "").join(","))
     .join("|");
   const finals = bracket.finals?.id || "";
-  return `tree:w:${winners}|l:${losers}|f:${finals}`;
+  const finalsReset = bracket.finalsReset?.id || "";
+  return `tree:w:${winners}|l:${losers}|f:${finals}|r:${finalsReset}`;
 }
 
 function getRowRefs(row) {
@@ -373,6 +385,14 @@ function getMatchLabel(match) {
 
 function displayPlaceholderForSource(match, participantIdx, lookup) {
   const src = match?.sources?.[participantIdx];
+  const isReset =
+    isFinalResetMatchId(state?.bracket, match?.id) || match?.isReset;
+  if (isReset && isFinalResetClosed(state?.bracket, lookup)) {
+    return "Reset not needed";
+  }
+  if (isReset && !isFinalResetActive(state?.bracket, lookup)) {
+    return "Awaiting reset";
+  }
   if (!src) return "Awaiting player";
 
   if (src.type === "match" && src.matchId) {
@@ -383,6 +403,19 @@ function displayPlaceholderForSource(match, participantIdx, lookup) {
   }
 
   return "Awaiting player";
+}
+
+function shouldHideResetParticipants(match, lookup) {
+  const isReset =
+    isFinalResetMatchId(state?.bracket, match?.id) || match?.isReset;
+  return isReset && !isFinalResetActive(state?.bracket, lookup);
+}
+
+function resolveParticipantsForRender(match, lookup, playersById) {
+  if (shouldHideResetParticipants(match, lookup)) {
+    return [null, null];
+  }
+  return resolveParticipants(match, lookup, playersById);
 }
 
 function sourceMatchIdFor(match, participantIdx) {
@@ -404,9 +437,21 @@ function renderCastIndicator(match) {
 }
 
 export function renderMatchCard(match, lookup, playersById) {
-  const participants = resolveParticipants(match, lookup, playersById);
+  const participants = resolveParticipantsForRender(
+    match,
+    lookup,
+    playersById,
+  );
   const [pA, pB] = participants;
   const hasScoreReport = Boolean(state?.scoreReports?.[match.id]);
+  const isFinalReset =
+    isFinalResetMatchId(state?.bracket, match?.id) || match?.isReset;
+  const finalResetActive = isFinalReset
+    ? isFinalResetActive(state?.bracket, lookup)
+    : false;
+  const finalResetClosed = isFinalReset
+    ? isFinalResetClosed(state?.bracket, lookup)
+    : false;
   const statusTag =
     match.walkover === "a"
       ? "Walkover (Player A)"
@@ -425,6 +470,10 @@ export function renderMatchCard(match, lookup, playersById) {
     isCurrentUserPlayer(pA) || isCurrentUserPlayer(pB),
   );
   if (isReady && isUserMatch) cls.push("ready");
+  if (isFinalReset) {
+    cls.push("final-reset");
+    if (finalResetClosed) cls.push("final-reset-inactive");
+  }
 
   const valA = displayValueFor(match, 0, participants);
   const valB = displayValueFor(match, 1, participants);
@@ -487,16 +536,31 @@ export function updateTreeMatchCards(
       `.match-card.tree[data-match-id="${matchId}"]`,
     );
     if (!card) return;
-    const participants = resolveParticipants(match, lookup, playersById);
+    const participants = resolveParticipantsForRender(
+      match,
+      lookup,
+      playersById,
+    );
     const [pA, pB] = participants;
     const bestOf = getBestOfForMatch(match);
     const isReady = Boolean(pA && pB && match.status !== "complete");
     const isUserMatch = Boolean(
       isCurrentUserPlayer(pA) || isCurrentUserPlayer(pB),
     );
+    const isFinalReset =
+      isFinalResetMatchId(state?.bracket, match?.id) || match?.isReset;
+    const finalResetClosed = isFinalReset
+      ? isFinalResetClosed(state?.bracket, lookup)
+      : false;
     const hasScoreReport = Boolean(state?.scoreReports?.[match.id]);
     card.classList.toggle("ready", isReady && isUserMatch);
     card.classList.toggle("score-report", hasScoreReport);
+    if (isFinalReset) {
+      card.classList.add("final-reset");
+      card.classList.toggle("final-reset-inactive", finalResetClosed);
+    } else {
+      card.classList.remove("final-reset", "final-reset-inactive");
+    }
     const rows = getCardRows(card);
     updateTreeMatchRow(rows[0], pA, match, 0, lookup, bestOf, participants);
     updateTreeMatchRow(rows[1], pB, match, 1, lookup, bestOf, participants);
@@ -629,16 +693,31 @@ export function renderSimpleMatch(
   lookup = null,
 ) {
   const isTreeLayout = layout === "tree";
+  if (shouldHideResetParticipants(match, lookup)) {
+    pA = null;
+    pB = null;
+  }
   const isReady = Boolean(pA && pB && match?.status !== "complete");
   const isUserMatch = Boolean(
     isCurrentUserPlayer(pA) || isCurrentUserPlayer(pB),
   );
   const shouldHighlightReady = isReady && isUserMatch;
   const hasScoreReport = Boolean(state?.scoreReports?.[match.id]);
+  const isFinalReset =
+    isFinalResetMatchId(state?.bracket, match?.id) || match?.isReset;
+  const finalResetActive = isFinalReset
+    ? isFinalResetActive(state?.bracket, lookup)
+    : false;
+  const finalResetClosed = isFinalReset
+    ? isFinalResetClosed(state?.bracket, lookup)
+    : false;
   const cardClass = isTreeLayout
     ? `match-card tree${shouldHighlightReady ? " ready" : ""}`
     : `match-card group${shouldHighlightReady ? " ready" : ""}`;
   const scoreReportClass = hasScoreReport ? " score-report" : "";
+  const resetClass = isFinalReset
+    ? ` final-reset${finalResetClosed ? " final-reset-inactive" : ""}`
+    : "";
   const aIsPlaceholder = !pA;
   const bIsPlaceholder = !pB;
   const autoRevealA = shouldRevealParticipant(match?.id, 0, pA?.id || null);
@@ -677,7 +756,7 @@ export function renderSimpleMatch(
       ? `M${parsedGroupNumber}`
       : escapeHtml(getMatchLabel(match));
 
-  const html = `<div class="${cardClass}${scoreReportClass}" data-match-id="${
+  const html = `<div class="${cardClass}${scoreReportClass}${resetClass}" data-match-id="${
     match.id
   }" style="${baseStyle}">
     ${castIndicator}
@@ -1036,6 +1115,11 @@ export function layoutBracketSection(
     round.forEach((match) => {
       const pos = positions.get(match.id);
       if (!pos) return;
+      const isReset =
+        isFinalResetMatchId(state?.bracket, match?.id) || match?.isReset;
+      const resetClosed =
+        isReset && isFinalResetClosed(state?.bracket, lookup);
+      if (resetClosed) return;
 
       const parentIds = (match.sources || [])
         .filter((src) => src && src.type === "match" && src.matchId)
@@ -1155,9 +1239,15 @@ export function layoutBracketSection(
         roundLabelOptions,
       );
 
-      return `<div class="round-title row-title" style="left:${
+      const isResetTitle = label.toLowerCase().includes("reset");
+      const infoIcon = isResetTitle
+        ? `<span class="round-info" role="img" aria-label="Grand Final Reset info" title="If the lower bracket wins the first grand final, a reset series is played." data-tooltip="If the lower bracket wins the first grand final, a reset series is played.">${RESET_INFO_SVG}</span>`
+        : "";
+      const titleClass = "round-title row-title";
+
+      return `<div class="${titleClass}" style="left:${
         offsetX + idx * (CARD_WIDTH + H_GAP)
-      }px;">${label} ${boBadge}</div>`;
+      }px;"><span class="round-title-label">${label}</span> ${infoIcon} ${boBadge}</div>`;
     })
     .join("");
 
@@ -1202,17 +1292,31 @@ function getRoundLabel(
   titlePrefix,
   idx,
   totalRounds,
-  { hasGrandFinal = false } = {},
+  { hasGrandFinal = false, hasFinalReset = false } = {},
 ) {
   const fromEnd = totalRounds - idx;
 
   if (titlePrefix === "Playoffs") {
+    if (hasFinalReset) {
+      if (fromEnd === 1) return "Finals Reset";
+      if (fromEnd === 2) return "Finals";
+      if (fromEnd === 3) return "Semi-Finals";
+      return `Round ${idx + 1}`;
+    }
     if (fromEnd === 1) return "Finals";
     if (fromEnd === 2) return "Semi-Finals";
     return `Round ${idx + 1}`;
   }
 
   if (titlePrefix === "Upper") {
+    if (hasFinalReset) {
+      if (fromEnd === 1) return "Grand Final Reset";
+      if (fromEnd === 2) return "Grand Final";
+      if (fromEnd === 3) return "Upper Final";
+      if (fromEnd === 4) return "Semi-final";
+      if (fromEnd === 5) return "Quarterfinal";
+      return `Upper Round ${idx + 1}`;
+    }
     if (fromEnd === 1) return hasGrandFinal ? "Grand Final" : "Final";
     if (fromEnd === 2) return hasGrandFinal ? "Upper Final" : "Semi-final";
     if (fromEnd === 3) return hasGrandFinal ? "Semi-final" : "Quarterfinal";
@@ -1376,6 +1480,9 @@ export function renderRoundRobinPlayoffs(bracket, lookup, playersById) {
   if (bracket.finals) {
     upperRounds.push([{ ...bracket.finals, name: "Finals" }]);
   }
+  if (bracket.finalsReset) {
+    upperRounds.push([{ ...bracket.finalsReset, name: "Finals Reset" }]);
+  }
 
   const hasUpper = upperRounds.some((r) => r.length);
   const hasLower = (bracket.losers || []).some((r) => r.length);
@@ -1394,6 +1501,9 @@ export function renderRoundRobinPlayoffs(bracket, lookup, playersById) {
     playersById,
     0,
     ROUND_TITLE_BAND,
+    {
+      hasFinalReset: Boolean(bracket.finalsReset),
+    },
   );
 
   let lower = { html: "", height: 0 };
@@ -1720,6 +1830,9 @@ export function renderBracketView({
   if (bracket.finals) {
     upperRounds.push([{ ...bracket.finals, name: "Finals" }]);
   }
+  if (bracket.finalsReset) {
+    upperRounds.push([{ ...bracket.finalsReset, name: "Finals Reset" }]);
+  }
 
   const ROUND_TITLE_BAND = 60;
   const upper = layoutBracketSection(
@@ -1731,6 +1844,7 @@ export function renderBracketView({
     ROUND_TITLE_BAND,
     {
       hasGrandFinal: Boolean(bracket.finals),
+      hasFinalReset: Boolean(bracket.finalsReset),
       playerCount: bracket.seedOrder?.length || 0,
     },
   );

@@ -48,6 +48,88 @@ function normalizeMapNameKey(name) {
 let lastVisibleBuild = null;
 let isLoadingMoreBuilds = false;
 let currentBuildFilter = "all";
+const SC2_PATCH_5_0_14_START_MS = Date.UTC(2024, 10, 25); // Nov 25, 2024
+const SC2_PATCH_5_0_15_START_MS = Date.UTC(2025, 8, 30); // Sep 30, 2025
+
+function parseBuildDateMs(rawValue) {
+  if (!rawValue) return null;
+  let ts = rawValue;
+  if (ts && typeof ts.toMillis === "function") ts = ts.toMillis();
+  const numeric = Number(ts);
+  if (Number.isFinite(numeric)) return numeric;
+  const parsed = new Date(ts).getTime();
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function resolveSc2PatchByDateMs(dateMs) {
+  if (!Number.isFinite(dateMs)) return "Unknown";
+  if (dateMs >= SC2_PATCH_5_0_15_START_MS) return "5.0.15";
+  if (dateMs >= SC2_PATCH_5_0_14_START_MS) return "5.0.14";
+  return "Unknown";
+}
+
+function resolveBuildPatchLabel(build) {
+  const dateMs =
+    parseBuildDateMs(build?.datePublished) ?? parseBuildDateMs(build?.timestamp);
+  return resolveSc2PatchByDateMs(dateMs);
+}
+
+function isRectOverlapping(a, b) {
+  return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+}
+
+function shouldHideBuildPreviewForOverlap() {
+  const buildList = document.getElementById("buildList");
+  if (!buildList || getBuildViewMode() !== "list") return false;
+  const entries = buildList.querySelectorAll(".build-entry");
+  for (const entry of entries) {
+    const publishInfo = entry.querySelector(".build-publish-info.publish-published");
+    const metaRow = entry.querySelector(".build-meta");
+    if (!publishInfo || !metaRow) continue;
+    const publishRect = publishInfo.getBoundingClientRect();
+    const chipRects = Array.from(metaRow.querySelectorAll(".meta-chip"))
+      .map((chip) => chip.getBoundingClientRect())
+      .filter((r) => r && r.width > 0 && r.height > 0);
+
+    // Use the actual rendered chips instead of the full .build-meta row box.
+    // .build-meta spans the row width, which can cause false overlap detection.
+    if (!chipRects.length) continue;
+    const chipsRight = Math.max(...chipRects.map((r) => r.right));
+    const chipsTop = Math.min(...chipRects.map((r) => r.top));
+    const chipsBottom = Math.max(...chipRects.map((r) => r.bottom));
+    const verticalOverlap =
+      publishRect.top < chipsBottom && publishRect.bottom > chipsTop;
+    const horizontalOverlap = publishRect.left <= chipsRight + 6;
+
+    if (verticalOverlap && horizontalOverlap) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function updateBuildPreviewVisibilityForOverlap() {
+  const buildPreview = document.getElementById("buildPreview");
+  if (!buildPreview) return;
+  // Measure overlap with preview in a visible layout state to avoid
+  // feedback loops where hiding preview changes widths and flips the result.
+  const prevDisplay = buildPreview.style.display;
+  const prevVisibility = buildPreview.style.visibility;
+  buildPreview.style.visibility = "hidden";
+  buildPreview.style.display = "";
+
+  const shouldHide = shouldHideBuildPreviewForOverlap();
+
+  buildPreview.style.visibility = prevVisibility;
+  buildPreview.style.display = shouldHide ? "none" : "";
+
+  // Keep display stable when unchanged (avoids unnecessary style churn)
+  if (!shouldHide && prevDisplay === "") return;
+}
+
+window.addEventListener("resize", () => {
+  requestAnimationFrame(updateBuildPreviewVisibilityForOverlap);
+});
 
 // --- View Mode State
 const storedViewMode = localStorage.getItem("buildViewMode") || "list";
@@ -79,6 +161,7 @@ export function applyBuildViewMode() {
       listBtn.classList.remove("active");
     }
   }
+  requestAnimationFrame(updateBuildPreviewVisibilityForOverlap);
 }
 
 export async function setBuildViewMode(mode) {
@@ -810,6 +893,7 @@ export async function populateBuildList(
         : `<div class="matchup-icons">Invalid Matchup</div>`;
 
     if (isList) {
+      const patchLabel = resolveBuildPatchLabel(build);
       buildEl.innerHTML = `
         <div class="build-left ${matchupClass}">
           <img src="./img/race/${playerRace}2.webp" alt="${playerRace}" class="matchup-icon">
@@ -828,6 +912,7 @@ export async function populateBuildList(
               <img src="./img/SVG/time.svg" alt="Date" class="meta-icon">
               ${formatShortDate(build.datePublished || build.timestamp)}
             </span>
+            <span class="meta-chip patch-chip">${patchLabel}</span>
           </div>
         </div>
         <button class="delete-build-btn" title="Delete Build">×</button>
@@ -860,6 +945,7 @@ export async function populateBuildList(
         console.warn("Failed to merge matchup chip with icon", e);
       }
     } else {
+      const patchLabel = resolveBuildPatchLabel(build);
       buildEl.innerHTML = `
         <div class="build-card-header">
           ${matchupIconsHTML}
@@ -871,6 +957,7 @@ export async function populateBuildList(
           <p>Date: ${formatShortDate(
             build.datePublished || build.timestamp
           )}</p>
+          <p>Patch: ${patchLabel}</p>
         </div>
         <div class="build-publish-info"></div>
       `;
@@ -1031,11 +1118,12 @@ export async function populateBuildList(
       } else {
         publishInfo.classList.add("publish-unpublished");
         publishInfo.dataset.tooltip = "publish";
-        publishInfo.innerHTML = `<img src="./img/SVG/publish2.svg" class="publish-icon" alt="Publish">`;
+        publishInfo.innerHTML = `<span class="publish-label">Publish</span><img src="./img/SVG/publish2.svg" class="publish-icon" alt="Publish">`;
         publishInfo.addEventListener("click", (e) => {
           e.stopPropagation();
           openPublishModal(build.id);
         });
+        requestAnimationFrame(updateBuildPreviewVisibilityForOverlap);
       }
     }
 
@@ -1044,6 +1132,7 @@ export async function populateBuildList(
 
   buildList.appendChild(fragment);
   updateTooltips();
+  requestAnimationFrame(updateBuildPreviewVisibilityForOverlap);
   isPopulatingBuildList = false;
 }
 
@@ -1130,7 +1219,7 @@ export async function unpublishBuild(buildId) {
     if (buildEl) {
       const publishInfo = buildEl.querySelector(".build-publish-info");
       if (publishInfo) {
-        publishInfo.innerHTML = `<img src="./img/SVG/publish2.svg" alt="Publish" class="publish-icon">`;
+        publishInfo.innerHTML = `<span class="publish-label">Publish</span><img src="./img/SVG/publish2.svg" alt="Publish" class="publish-icon">`;
         publishInfo.dataset.tooltip = "publish";
         publishInfo.classList.remove("publish-published", "no-border");
         publishInfo.classList.add("publish-unpublished");
@@ -1139,6 +1228,7 @@ export async function unpublishBuild(buildId) {
           event.stopPropagation();
           openPublishModal(buildId);
         };
+        requestAnimationFrame(updateBuildPreviewVisibilityForOverlap);
       }
       buildEl.classList.remove("published");
     }

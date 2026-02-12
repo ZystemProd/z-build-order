@@ -346,6 +346,8 @@ input[type="text"]:disabled {
 }
 
 .build-info-item .published-label,
+.build-info-item .patch-label,
+.mobile-info .patch-label,
 .mobile-info .published-label {
   display: inline-flex;
   align-items: center;
@@ -358,6 +360,24 @@ input[type="text"]:disabled {
 
 .mobile-info .published-label {
   margin-bottom: 2px;
+}
+
+#buildPatch,
+#buildPatchMobile {
+  color: #d8e7ff;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid rgba(120, 166, 255, 0.45);
+  border-radius: 999px;
+  padding: 5px 12px;
+  background: linear-gradient(
+    90deg,
+    rgba(22, 30, 54, 0.9),
+    rgba(52, 72, 120, 0.55)
+  );
+  box-shadow: 0 0 0 1px rgba(93, 131, 214, 0.22),
+    0 0 18px rgba(80, 124, 214, 0.2);
 }
 
 .date-info #buildDate {

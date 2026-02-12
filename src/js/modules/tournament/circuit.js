@@ -9,7 +9,8 @@ import {
   loadTournamentStateRemote,
 } from "./sync/persistence.js";
 import { computePlacementsForBracket } from "./bracket/placements.js";
-import { getAllMatches } from "./bracket/lookup.js";
+import { getAllMatches, getMatchLookup } from "./bracket/lookup.js";
+import { isFinalResetActive, shouldCountFinalReset } from "./bracket/finalsReset.js";
 import { sanitizeUrl, escapeHtml } from "./bracket/renderUtils.js";
 import { buildSocialIconSvg } from "./promosShared.js";
 import { playerKey } from "./playerKey.js";
@@ -670,13 +671,22 @@ function isMatchCompleteBasic(match) {
 
 function isBracketFinishedBasic(bracket) {
   if (!bracket || typeof bracket !== "object") return false;
-  if (isMatchCompleteBasic(bracket.finals)) return true;
+  const lookup = getMatchLookup(bracket);
+  const resetActive = isFinalResetActive(bracket, lookup);
+  if (resetActive) {
+    if (isMatchCompleteBasic(bracket.finalsReset)) return true;
+  } else if (isMatchCompleteBasic(bracket.finals)) {
+    return true;
+  }
   const winners = Array.isArray(bracket.winners) ? bracket.winners : [];
   if (winners.length) {
     const lastRound = winners[winners.length - 1] || [];
     if (isMatchCompleteBasic(lastRound[0])) return true;
   }
-  const matches = getAllMatches(bracket);
+  let matches = getAllMatches(bracket);
+  if (bracket.finalsReset && !shouldCountFinalReset(bracket, lookup)) {
+    matches = matches.filter((match) => match?.id !== bracket.finalsReset?.id);
+  }
   if (!matches.length) return false;
   return matches.every(isMatchCompleteBasic);
 }
@@ -1057,6 +1067,9 @@ export async function populateCreateCircuitForm() {
   const finalImageInput = document.getElementById("finalTournamentImageInput");
   const finalImagePreview = document.getElementById("finalTournamentImagePreview");
   const finalQualifyInput = document.getElementById("finalQualifyCountInput");
+  const finalGrandFinalResetToggle = document.getElementById(
+    "finalGrandFinalResetToggle",
+  );
   if (nameInput) nameInput.value = "";
   if (descInput) descInput.value = "";
   syncMarkdownSurfaceForInput(descInput);
@@ -1080,6 +1093,7 @@ export async function populateCreateCircuitForm() {
   if (finalMaxPlayersInput) finalMaxPlayersInput.value = "";
   if (finalCheckInSelect) finalCheckInSelect.value = "0";
   if (finalQualifyInput) finalQualifyInput.value = "";
+  if (finalGrandFinalResetToggle) finalGrandFinalResetToggle.checked = false;
   if (finalImageInput) finalImageInput.value = "";
   if (finalImagePreview) {
     if (finalImagePreview.dataset.tempPreview) {

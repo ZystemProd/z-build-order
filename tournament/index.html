@@ -1211,7 +1211,7 @@
                         <option value="Single Elimination">Single Elimination</option>
                         <option value="Round Robin">Round Robin</option>
                         <option value="GSL/Dual Tournament">GSL/Dual Tournament</option>
-                        <option value="Swiss">Swiss</option>
+                        <option value="Swiss" disabled>Swiss (Coming soon)</option>
                       </select>
                     </label>
                     <div class="format-stage" data-format-scope="settings-roundrobin">
@@ -1338,6 +1338,21 @@
                           </label>
 
                         </div>
+                        <div class="format-col format-col--final-reset" id="settingsFinalResetBestOfCol" style="display:none;">
+                          <div class="format-title">Grand Final Reset</div>
+                          <div class="format-box format-box--medium format-box--final"></div>
+                          <label class="format-input">
+                            Best of
+                            <select id="settingsBestOfFinalReset">
+                              <option value="1">Bo1</option>
+                              <option value="3">Bo3</option>
+                              <option value="5">Bo5</option>
+                              <option value="7">Bo7</option>
+                              <option value="9">Bo9</option>
+                            </select>
+                          </label>
+
+                        </div>
                       </div>
 
                       <!-- LOWER ROW -->
@@ -1396,6 +1411,20 @@
 
                       </div>
 
+                    </div>
+                      <div class="format-option-row" id="settingsGrandFinalResetRow">
+                        <div class="publish-checkbox-row publish-checkbox-row--compact">
+                          <span>Grand Final Reset (lower bracket must win twice)</span>
+                          <div class="checkbox-wrapper-59">
+                          <label class="switch">
+                            <input type="checkbox" id="settingsGrandFinalResetToggle" />
+                            <span class="slider"></span>
+                          </label>
+                        </div>
+                      </div>
+                      <p class="helper">
+                        If the lower bracket wins the first grand final, a reset series is played.
+                      </p>
                     </div>
                   </div>
                   <div class="settings-panel" id="settingsSponsors">
@@ -1653,7 +1682,7 @@
             <option value="Single Elimination">Single Elimination</option>
             <option value="Round Robin">Round Robin</option>
             <option value="GSL/Dual Tournament">GSL/Dual Tournament</option>
-            <option value="Swiss">Swiss</option>
+            <option value="Swiss" disabled>Swiss (Coming soon)</option>
           </select>
         </label>
         <div class="format-stage" data-format-scope="create-roundrobin">
@@ -1817,6 +1846,20 @@
 
             <div class="format-col format-col--spacer"></div>
           </div>
+        </div>
+        <div class="format-option-row" id="grandFinalResetRow">
+          <div class="publish-checkbox-row">
+            <span>Grand Final Reset (lower bracket must win twice)</span>
+            <div class="checkbox-wrapper-59">
+              <label class="switch">
+                <input type="checkbox" id="grandFinalResetToggle" />
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+          <p class="helper">
+            If the lower bracket wins the first grand final, a reset series is played.
+          </p>
         </div>
       </div>
       <div class="form-actions create-modal-footer">
@@ -2063,7 +2106,7 @@
               <option value="Single Elimination">Single Elimination</option>
               <option value="Round Robin">Round Robin</option>
               <option value="GSL/Dual Tournament">GSL/Dual Tournament</option>
-              <option value="Swiss">Swiss</option>
+              <option value="Swiss" disabled>Swiss (Coming soon)</option>
             </select>
           </label>
           <div class="format-stage" data-format-scope="circuitfinal-roundrobin">
@@ -2227,6 +2270,20 @@
 
               <div class="format-col format-col--spacer"></div>
             </div>
+          </div>
+          <div class="format-option-row" id="finalGrandFinalResetRow">
+            <div class="publish-checkbox-row">
+              <span>Grand Final Reset (lower bracket must win twice)</span>
+              <div class="checkbox-wrapper-59">
+                <label class="switch">
+                  <input type="checkbox" id="finalGrandFinalResetToggle" />
+                  <span class="slider"></span>
+                </label>
+              </div>
+            </div>
+            <p class="helper">
+              If the lower bracket wins the first grand final, a reset series is played.
+            </p>
           </div>
         </div>
       </div>
@@ -2404,6 +2461,20 @@
                 tabindex="-1" style="display:none;"></textarea>
             </div>
           </div>
+          <div class="format-option-row" id="circuitFinalGrandFinalResetRow">
+            <div class="publish-checkbox-row">
+              <span>Grand Final Reset (lower bracket must win twice)</span>
+              <div class="checkbox-wrapper-59">
+                <label class="switch">
+                  <input type="checkbox" id="circuitFinalGrandFinalResetToggle" />
+                  <span class="slider"></span>
+                </label>
+              </div>
+            </div>
+            <p class="helper">
+              If the lower bracket wins the first grand final, a reset series is played.
+            </p>
+          </div>
         </div>
         <div class="settings-panel create-final-panel" id="createFinalMaps">
           <div class="map-pool-picker">
@@ -2434,7 +2505,7 @@
               <option value="Single Elimination">Single Elimination</option>
               <option value="Round Robin">Round Robin</option>
               <option value="GSL/Dual Tournament">GSL/Dual Tournament</option>
-              <option value="Swiss">Swiss</option>
+              <option value="Swiss" disabled>Swiss (Coming soon)</option>
             </select>
           </label>
           <div class="format-stage" data-format-scope="final-roundrobin">

@@ -29,13 +29,15 @@ export function safeLoserSource(match) {
 
 export function getAllMatches(bracket) {
   if (!bracket) return [];
-  const { winners = [], losers = [], finals, groups = [] } = bracket || {};
+  const { winners = [], losers = [], finals, finalsReset, groups = [] } =
+    bracket || {};
   const flattened = [
     ...groups.flatMap((g) => g.matches || []),
     ...winners.flat(),
     ...losers.flat(),
   ];
   if (finals) flattened.push(finals);
+  if (finalsReset) flattened.push(finalsReset);
   return flattened;
 }
 

@@ -70,6 +70,7 @@ export const defaultBestOf = {
   semi: 3,
   upperFinal: 3,
   final: 5,
+  finalReset: 5,
   // lower bracket
   lower: 1,
   lowerSemi: 1,

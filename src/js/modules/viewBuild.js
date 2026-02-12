@@ -53,6 +53,25 @@ const LONG_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
   day: "numeric",
   year: "numeric",
 });
+const SC2_PATCH_5_0_14_START_MS = Date.UTC(2024, 10, 25); // Nov 25, 2024
+const SC2_PATCH_5_0_15_START_MS = Date.UTC(2025, 8, 30); // Sep 30, 2025
+
+function parseBuildDateMs(rawValue) {
+  if (!rawValue) return null;
+  let ts = rawValue;
+  if (ts && typeof ts.toMillis === "function") ts = ts.toMillis();
+  const numeric = Number(ts);
+  if (Number.isFinite(numeric)) return numeric;
+  const parsed = new Date(ts).getTime();
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function resolveSc2PatchByDateMs(dateMs) {
+  if (!Number.isFinite(dateMs)) return "Unknown";
+  if (dateMs >= SC2_PATCH_5_0_15_START_MS) return "5.0.15";
+  if (dateMs >= SC2_PATCH_5_0_14_START_MS) return "5.0.14";
+  return "Unknown";
+}
 
 let commentsUnsubscribe = null;
 let latestComments = [];
@@ -831,10 +850,19 @@ function renderOptimisticBuild(build) {
     (build.datePublishedRaw
       ? LONG_DATE_FORMATTER.format(new Date(build.datePublishedRaw))
       : "");
+  const patchDateMs =
+    parseBuildDateMs(build.datePublished) ??
+    parseBuildDateMs(build.datePublishedRaw) ??
+    parseBuildDateMs(build.timestamp);
+  const patchLabel = resolveSc2PatchByDateMs(patchDateMs);
   const dateEl = document.getElementById("buildDate");
   if (dateEl && dateLabel) dateEl.innerText = dateLabel;
   const dateElMobile = document.getElementById("buildDateMobile");
   if (dateElMobile && dateLabel) dateElMobile.innerText = dateLabel;
+  const patchEl = document.getElementById("buildPatch");
+  if (patchEl) patchEl.innerText = patchLabel;
+  const patchElMobile = document.getElementById("buildPatchMobile");
+  if (patchElMobile) patchElMobile.innerText = patchLabel;
 
   const iconSrc =
     build.publisherIcon ||
@@ -3181,6 +3209,9 @@ async function loadBuild() {
           build.subcategory.charAt(2).toUpperCase()
         : build.subcategory || "Unknown";
     const publisherText = build.username || "Anonymous";
+    const patchDateMs =
+      parseBuildDateMs(build.datePublished) ?? parseBuildDateMs(build.timestamp);
+    const patchLabel = resolveSc2PatchByDateMs(patchDateMs);
     let dateText = "Unknown";
     try {
       let ts = build.datePublished;
@@ -3225,6 +3256,8 @@ async function loadBuild() {
     }
     document.getElementById("buildPublisher").innerText = publisherText;
     document.getElementById("buildDate").innerText = dateText;
+    const patchEl = document.getElementById("buildPatch");
+    if (patchEl) patchEl.innerText = patchLabel;
     ensurePublishedLabels();
 
     const mobileMatch = document.getElementById("buildMatchupMobile");
@@ -3233,6 +3266,8 @@ async function loadBuild() {
     if (mobilePub) mobilePub.innerText = publisherText;
     const mobileDate = document.getElementById("buildDateMobile");
     if (mobileDate) mobileDate.innerText = dateText;
+    const mobilePatch = document.getElementById("buildPatchMobile");
+    if (mobilePatch) mobilePatch.innerText = patchLabel;
 
     clearBuildInfoLabels();
     ensurePublishedLabels();

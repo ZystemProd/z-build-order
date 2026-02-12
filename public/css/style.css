@@ -1976,6 +1976,11 @@ body.modal-open {
   height: 16px;
 }
 
+.publish-unpublished .publish-label {
+  font-weight: 600;
+  line-height: 1;
+}
+
 .publish-checkbox-list {
   margin-top: 12px;
   display: flex;

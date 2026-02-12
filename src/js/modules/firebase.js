@@ -3,6 +3,7 @@ import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFunctions } from "firebase/functions";
 import { getDatabase } from "firebase/database";
+import { getPerformance } from "firebase/performance";
 import {
   initializeFirestore,
   persistentLocalCache,
@@ -33,6 +34,11 @@ const db = initializeFirestore(app, {
           tabManager: persistentMultipleTabManager(),
         }),
 });
+
+let perf;
+if (typeof window !== "undefined") {
+  perf = getPerformance(app);
+}
 
 const provider = new GoogleAuthProvider();
 const switchAccountProvider = new GoogleAuthProvider();
@@ -66,4 +72,4 @@ if (typeof window !== "undefined") {
   });
 }
 
-export { app, auth, db, functions, rtdb, provider, switchAccountProvider };
+export { app, auth, db, functions, rtdb, provider, switchAccountProvider, perf };

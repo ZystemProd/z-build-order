@@ -1362,14 +1362,28 @@ export function initTournamentPage({
     syncFormatFieldVisibility("settings");
     syncMaxPlayersInput(settingsFormatSelect, settingsMaxPlayersInput);
   });
+  document
+    .getElementById("settingsRoundRobinPlayoffs")
+    ?.addEventListener("change", () => syncFormatFieldVisibility("settings"));
   finalFormatSelect?.addEventListener("change", () => {
     syncFormatFieldVisibility("final");
     syncMaxPlayersInput(finalFormatSelect, finalMaxPlayersInput);
   });
+  document
+    .getElementById("finalRoundRobinPlayoffsSelect")
+    ?.addEventListener("change", () => syncFormatFieldVisibility("final"));
   circuitFinalFormatSelect?.addEventListener("change", () => {
     syncFormatFieldVisibility("circuitfinal");
     syncMaxPlayersInput(circuitFinalFormatSelect, circuitFinalMaxPlayersInput);
   });
+  document
+    .getElementById("circuitFinalRoundRobinPlayoffsSelect")
+    ?.addEventListener("change", () =>
+      syncFormatFieldVisibility("circuitfinal"),
+    );
+  document
+    .getElementById("roundRobinPlayoffsSelect")
+    ?.addEventListener("change", () => syncFormatFieldVisibility("create"));
   syncMaxPlayersInput(createFormatSelect, tournamentMaxPlayersInput);
   syncMaxPlayersInput(settingsFormatSelect, settingsMaxPlayersInput);
   syncMaxPlayersInput(finalFormatSelect, finalMaxPlayersInput);

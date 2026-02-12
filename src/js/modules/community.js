@@ -28,6 +28,20 @@ let communitySortMode = "hot"; // default sort mode
 const DEBUG_COMMUNITY = false; // verbose logs toggle
 
 const batchSize = 13;
+const SC2_PATCH_5_0_14_START_MS = Date.UTC(2024, 10, 25); // Nov 25, 2024
+const SC2_PATCH_5_0_15_START_MS = Date.UTC(2025, 8, 30); // Sep 30, 2025
+
+function resolveSc2PatchByDateMs(dateMs) {
+  if (!Number.isFinite(dateMs)) return "Unknown";
+  if (dateMs >= SC2_PATCH_5_0_15_START_MS) return "5.0.15";
+  if (dateMs >= SC2_PATCH_5_0_14_START_MS) return "5.0.14";
+  return "Unknown";
+}
+
+function getBuildPatchLabel(build) {
+  const raw = Number(build?.datePublishedRaw);
+  return resolveSc2PatchByDateMs(raw);
+}
 
 // Simple debounce utility to avoid hammering Firestore while typing
 function debounce(fn, wait = 250) {
@@ -1046,6 +1060,9 @@ function renderCommunityBuildBatch(builds) {
           <span class="meta-chip">
             <img src="./img/SVG/time.svg" alt="Date" class="meta-icon">
             ${build.datePublished}
+          </span>
+          <span class="meta-chip patch-chip">
+            ${getBuildPatchLabel(build)}
           </span>
           <span class="meta-chip view-chip" data-id="${build.id}">
             <img src="./img/SVG/preview.svg" alt="Views" class="meta-icon">

@@ -97,6 +97,11 @@ import {
   resolveParticipants,
 } from "./bracket/lookup.js";
 import {
+  isFinalResetActive,
+  isFinalResetMatchId,
+  shouldCountFinalReset,
+} from "./bracket/finalsReset.js";
+import {
   applySeeding,
   buildBracket,
   buildEliminationBracket,
@@ -342,6 +347,16 @@ function isRoundRobinFormat(format) {
 
 function isGroupStageFormat(format) {
   return isRoundRobinFormat(format) || isDualTournamentFormat(format);
+}
+
+function allowGrandFinalReset(format, rrSettings) {
+  const normalized = (format || "").toLowerCase();
+  if (normalized.startsWith("double")) return true;
+  if (isGroupStageFormat(format)) {
+    const playoffs = (rrSettings?.playoffs || "").toLowerCase();
+    return playoffs.startsWith("double");
+  }
+  return false;
 }
 
 function getInviteTokenStorageKey(slug) {
@@ -1621,9 +1636,19 @@ function seedPlayersForState(players = [], snapshot = state) {
   );
 }
 
-function seedEligiblePlayersWithMode(players = [], snapshot = state) {
+function seedEligiblePlayersWithMode(
+  players = [],
+  snapshot = state,
+  { forceRecompute = false } = {},
+) {
   const eligible = getEligiblePlayers(players);
-  const seededEligible = seedPlayersForState(eligible, snapshot);
+  const hasSeedSnapshot =
+    eligible.length > 0 &&
+    eligible.every((player) => Number.isFinite(player?.seed));
+  const seededEligible =
+    hasSeedSnapshot && !forceRecompute
+    ? eligible.map((player) => ({ ...player }))
+    : seedPlayersForState(eligible, snapshot);
   const seedById = new Map(
     seededEligible.map((player) => [player.id, player.seed]),
   );
@@ -1646,6 +1671,38 @@ function applyRosterSeedingWithMode(players = [], snapshot = state) {
   return seedEligiblePlayersWithMode(players, snapshot).mergedPlayers;
 }
 
+function getSeedingTablePlayers(players = [], snapshot = state) {
+  const eligible = getEligiblePlayers(players);
+  const hasSeeds =
+    eligible.length > 0 &&
+    eligible.every((player) => Number.isFinite(player?.seed));
+  if (!hasSeeds) {
+    return seedPlayersForState(players, snapshot);
+  }
+  const seeded = (players || []).map((player) => ({ ...player }));
+  const seededWithSeeds = seeded.filter((player) =>
+    Number.isFinite(player?.seed),
+  );
+  const unseeded = seeded.filter(
+    (player) => !Number.isFinite(player?.seed),
+  );
+  seededWithSeeds.sort((a, b) => (a.seed || 0) - (b.seed || 0));
+  return [...seededWithSeeds, ...unseeded];
+}
+
+async function persistSeedSnapshot(reason = "") {
+  const seeded = seedEligiblePlayersWithMode(state.players || [], state, {
+    forceRecompute: true,
+  }).mergedPlayers;
+  await updateRosterWithTransaction(
+    () => seeded,
+    { needsReseed: false },
+  );
+  if (reason) {
+    addActivity(reason, { skipRemote: true });
+  }
+}
+
 function getManualSeedingActive() {
   return Boolean(state.manualSeedingEnabled) && !state.isLive;
 }
@@ -1660,6 +1717,7 @@ function applySeedingStateUpdate(nextSnapshot, reason) {
   const { mergedPlayers } = seedEligiblePlayersWithMode(
     state.players || [],
     nextSnapshot,
+    { forceRecompute: true },
   );
   saveState(
     {
@@ -1856,7 +1914,7 @@ function renderAll(matchIds = null) {
     }
   }
   // Update seeding table
-  const seedingSnapshot = seedPlayersForState(state.players || [], state);
+  const seedingSnapshot = getSeedingTablePlayers(state.players || [], state);
   const forfeitUndoBlocked = getForfeitUndoBlockedIds();
   const seededWithForfeitStatus = seedingSnapshot.map((player) => ({
     ...player,
@@ -2647,6 +2705,7 @@ async function refreshRosterMmrFromPulse() {
         }),
       { needsReseed: true },
     );
+    await persistSeedSnapshot("MMR refresh updated seeding.");
 
     const failedSuffix = failedCount ? ` (${failedCount} failed)` : "";
     showToast?.(
@@ -2727,7 +2786,7 @@ async function toggleCheckInManualClose() {
   }
 }
 
-function goLiveTournament() {
+async function goLiveTournament() {
   if (state.isLive) {
     showToast?.("Tournament is already live.", "success");
     return;
@@ -2744,11 +2803,14 @@ function goLiveTournament() {
     showToast?.("No checked-in players to go live.", "error");
     return;
   }
+  await persistSeedSnapshot("Seeding locked for live.");
   const { mergedPlayers } = seedEligiblePlayersWithMode(
     state.players || [],
     state,
   );
-  const seededPlayers = seedPlayersForState(checkedInPlayers, state);
+  const seededPlayers = getSeedingTablePlayers(checkedInPlayers, state).filter(
+    (player) => player?.checkedInAt,
+  );
   const bracket = buildBracket(
     seededPlayers,
     currentTournamentMeta || {},
@@ -2780,12 +2842,12 @@ function setTournamentNotLive() {
   renderAll();
 }
 
-function toggleLiveTournament() {
+async function toggleLiveTournament() {
   if (state.isLive) {
     setTournamentNotLive();
     return;
   }
-  goLiveTournament();
+  await goLiveTournament();
 }
 
 function addActivity(message, options = {}) {
@@ -2847,6 +2909,9 @@ function updateSettingsScoreLocks() {
   const hasScores = bracketHasRecordedResults(state.bracket);
   const locks = getBracketScoreLocks(state.bracket);
   const formatSelect = document.getElementById("settingsFormatSelect");
+  const grandFinalResetToggle = document.getElementById(
+    "settingsGrandFinalResetToggle",
+  );
   const rrGroups = document.getElementById("settingsRoundRobinGroups");
   const rrAdvance = document.getElementById("settingsRoundRobinAdvance");
   const rrPlayoffs = document.getElementById("settingsRoundRobinPlayoffs");
@@ -2857,10 +2922,12 @@ function updateSettingsScoreLocks() {
   const semiInput = document.getElementById("settingsBestOfSemi");
   const upperFinalInput = document.getElementById("settingsBestOfUpperFinal");
   const finalInput = document.getElementById("settingsBestOfFinal");
+  const finalResetInput = document.getElementById("settingsBestOfFinalReset");
   const lbSemiInput = document.getElementById("settingsBestOfLowerSemi");
   const lbFinalInput = document.getElementById("settingsBestOfLowerFinal");
 
   if (formatSelect) formatSelect.disabled = hasScores;
+  if (grandFinalResetToggle) grandFinalResetToggle.disabled = hasScores;
 
   if (rrGroups) rrGroups.disabled = hasScores || locks.roundRobin;
   if (rrAdvance) rrAdvance.disabled = hasScores || locks.roundRobin;
@@ -2872,6 +2939,7 @@ function updateSettingsScoreLocks() {
   if (semiInput) semiInput.disabled = locks.semi;
   if (upperFinalInput) upperFinalInput.disabled = locks.upperFinal;
   if (finalInput) finalInput.disabled = locks.final;
+  if (finalResetInput) finalResetInput.disabled = locks.finalReset;
 
   if (lowerInput) lowerInput.disabled = locks.lower;
   if (lbSemiInput) lbSemiInput.disabled = locks.lowerSemi;
@@ -2914,17 +2982,18 @@ function matchHasRecordedScore(match) {
 }
 
 function getBracketScoreLocks(bracket) {
-  const locks = {
-    upper: false,
-    quarter: false,
-    semi: false,
-    upperFinal: false,
-    final: false,
-    lower: false,
-    lowerSemi: false,
-    lowerFinal: false,
-    roundRobin: false,
-  };
+    const locks = {
+      upper: false,
+      quarter: false,
+      semi: false,
+      upperFinal: false,
+      final: false,
+      finalReset: false,
+      lower: false,
+      lowerSemi: false,
+      lowerFinal: false,
+      roundRobin: false,
+    };
   if (!bracket) return locks;
   const winners = Array.isArray(bracket.winners) ? bracket.winners : [];
   const losers = Array.isArray(bracket.losers) ? bracket.losers : [];
@@ -2967,6 +3036,10 @@ function getBracketScoreLocks(bracket) {
 
   if (bracket.finals && matchHasRecordedScore(bracket.finals)) {
     locks.final = true;
+  }
+  if (bracket.finalsReset && matchHasRecordedScore(bracket.finalsReset)) {
+    locks.final = true;
+    locks.finalReset = true;
   }
 
   const groups = Array.isArray(bracket.groups) ? bracket.groups : [];
@@ -3262,6 +3335,16 @@ function updateMatchScore(matchId, scoreA, scoreB, options = {}) {
   if (!state.isLive && !isAdmin) {
     showToast?.("Tournament is not live. Bracket is read-only.", "error");
     return;
+  }
+  if (isFinalResetMatchId(state?.bracket, matchId)) {
+    const lookup = state?.bracket ? getMatchLookup(state.bracket) : null;
+    if (!lookup || !isFinalResetActive(state?.bracket, lookup)) {
+      showToast?.(
+        "Grand Final Reset is only played if the lower bracket wins the first final.",
+        "error",
+      );
+      return;
+    }
   }
   const lookupBefore = state?.bracket ? getMatchLookup(state.bracket) : null;
   const matchBefore = lookupBefore?.get(matchId) || null;
@@ -3860,7 +3943,11 @@ async function renderTournamentList() {
 
 function computeTournamentProgress(bracket) {
   if (!bracket) return null;
-  const matches = getAllMatches(bracket);
+  let matches = getAllMatches(bracket);
+  const lookup = getMatchLookup(bracket);
+  if (bracket.finalsReset && !shouldCountFinalReset(bracket, lookup)) {
+    matches = matches.filter((match) => match?.id !== bracket.finalsReset?.id);
+  }
   if (!matches.length) return null;
   let completed = 0;
   const isWalkoverScore = (value) => {
@@ -3892,6 +3979,8 @@ function computeTournamentProgress(bracket) {
   });
   const percent = Math.round((completed / matches.length) * 100);
   const finalsComplete = isMatchComplete(bracket.finals);
+  const resetActive = isFinalResetActive(bracket, lookup);
+  const finalsResetComplete = isMatchComplete(bracket.finalsReset);
   let winnersFinalComplete = false;
   const winners = Array.isArray(bracket.winners) ? bracket.winners : [];
   if (winners.length) {
@@ -3911,7 +4000,7 @@ function computeTournamentProgress(bracket) {
       groupMatches.length > 0 && groupMatches.every(isMatchComplete);
   }
   const isFinished =
-    finalsComplete ||
+    (resetActive ? finalsResetComplete : finalsComplete) ||
     winnersFinalComplete ||
     groupsComplete ||
     completed === matches.length;
@@ -4071,6 +4160,9 @@ async function populateCreateForm() {
     "bestOfUpperFinalInput",
   );
   const bestOfFinalInput = document.getElementById("bestOfFinalInput");
+  const grandFinalResetToggle = document.getElementById(
+    "grandFinalResetToggle",
+  );
   if (bestOfUpperInput) bestOfUpperInput.value = String(defaultBestOf.upper);
   if (bestOfLowerInput) bestOfLowerInput.value = String(defaultBestOf.lower);
   if (bestOfLowerSemiInput)
@@ -4084,6 +4176,7 @@ async function populateCreateForm() {
     bestOfUpperFinalInput.value = String(defaultBestOf.upperFinal);
   }
   if (bestOfFinalInput) bestOfFinalInput.value = String(defaultBestOf.final);
+  if (grandFinalResetToggle) grandFinalResetToggle.checked = false;
   setCreateTournamentCircuitContext("");
 }
 
@@ -4145,6 +4238,9 @@ function openCircuitSettingsModal() {
   );
   const finalRulesInput = document.getElementById("circuitFinalRulesInput");
   const finalFormatSelect = document.getElementById("circuitFinalFormatSelect");
+  const finalGrandFinalResetToggle = document.getElementById(
+    "circuitFinalGrandFinalResetToggle",
+  );
   const finalImagePreview = document.getElementById("circuitFinalImagePreview");
   const sponsorsList = document.getElementById("circuitFinalSponsorsList");
   const socialsList = document.getElementById("circuitFinalSocialsList");
@@ -4256,6 +4352,12 @@ function openCircuitSettingsModal() {
       assignBestOf("circuitFinalBestOfSemiInput", bestOf.semi);
       assignBestOf("circuitFinalBestOfUpperFinalInput", bestOf.upperFinal);
       assignBestOf("circuitFinalBestOfFinalInput", bestOf.final);
+      const circuitFinalResetToggle = document.getElementById(
+        "circuitFinalGrandFinalResetToggle",
+      );
+      if (circuitFinalResetToggle) {
+        circuitFinalResetToggle.checked = Boolean(meta.grandFinalReset);
+      }
       renderCircuitFinalSponsors(meta.sponsors || []);
       renderCircuitFinalSocials(meta.socials || []);
     })
@@ -4350,6 +4452,11 @@ async function saveCircuitSettings() {
         description: finalDescriptionInput?.value || "",
         rules: finalRulesInput?.value || "",
         format: (finalFormatSelect?.value || "Double Elimination").trim(),
+        grandFinalReset:
+          allowGrandFinalReset(
+            finalFormatSelect?.value || "Double Elimination",
+            extractRoundRobinSettingsUI("circuitfinal", defaultRoundRobinSettings),
+          ) && Boolean(finalGrandFinalResetToggle?.checked),
         maxPlayers: finalMaxPlayers,
         startTime: finalStartTime,
         checkInWindowMinutes: getCheckInWindowMinutes(finalCheckInSelect),
@@ -5434,6 +5541,13 @@ async function handleSaveSettings(event) {
     currentTournamentMeta?.format ||
     "Tournament"
   ).trim();
+  const rrSettings = isFormatTab
+    ? extractRoundRobinSettingsUI("settings", defaultRoundRobinSettings)
+    : normalizeRoundRobinSettings(currentTournamentMeta?.roundRobin || {});
+  let grandFinalReset = Boolean(currentTournamentMeta?.grandFinalReset);
+  if (allowGrandFinalReset(format, rrSettings) && grandFinalResetToggle) {
+    grandFinalReset = Boolean(grandFinalResetToggle.checked);
+  }
   const description = isDescTab
     ? descInput?.value || ""
     : currentTournamentMeta?.description || "";
@@ -5484,12 +5598,12 @@ async function handleSaveSettings(event) {
   const mapPool = isMapsTab
     ? Array.from(mapPoolSelection || [])
     : currentTournamentMeta?.mapPool || [];
-  const rrSettings = isFormatTab
-    ? extractRoundRobinSettingsUI("settings", defaultRoundRobinSettings)
-    : normalizeRoundRobinSettings(currentTournamentMeta?.roundRobin || {});
   const hasScores = bracketHasRecordedResults(state.bracket);
   const scoreLocks = getBracketScoreLocks(state.bracket);
   const currentFormat = (currentTournamentMeta?.format || "Tournament").trim();
+  const currentGrandFinalReset = Boolean(
+    currentTournamentMeta?.grandFinalReset,
+  );
   const currentRoundRobin = normalizeRoundRobinSettings(
     currentTournamentMeta?.roundRobin || {},
   );
@@ -5535,6 +5649,13 @@ async function handleSaveSettings(event) {
       );
       return;
     }
+    if (grandFinalReset !== currentGrandFinalReset) {
+      showToast?.(
+        "Grand Final Reset is locked once scores are recorded. Reset scores to change it.",
+        "error",
+      );
+      return;
+    }
     if (JSON.stringify(nextRoundRobin) !== JSON.stringify(currentRoundRobin)) {
       showToast?.(
         "Round robin settings are locked once scores are recorded.",
@@ -5553,6 +5674,8 @@ async function handleSaveSettings(event) {
       lockedBestOf.push("Upper Final");
     if (bestOf.final !== currentBestOf.final && scoreLocks.final)
       lockedBestOf.push("Final");
+    if (bestOf.finalReset !== currentBestOf.finalReset && scoreLocks.finalReset)
+      lockedBestOf.push("Final Reset");
     if (bestOf.lower !== currentBestOf.lower && scoreLocks.lower)
       lockedBestOf.push("Lower");
     if (bestOf.lowerSemi !== currentBestOf.lowerSemi && scoreLocks.lowerSemi)
@@ -5594,6 +5717,7 @@ async function handleSaveSettings(event) {
     mapPool,
     roundRobin: rrSettings,
     requirePulseLink,
+    grandFinalReset,
     circuitQualifyCount:
       currentTournamentMeta?.isCircuitFinal &&
       Number.isFinite(qualifyCount) &&
@@ -5700,7 +5824,8 @@ async function handleSaveSettings(event) {
   }
   const shouldRebuild =
     isFormatTab &&
-    format !== currentFormat &&
+    (format !== currentFormat ||
+      grandFinalReset !== currentGrandFinalReset) &&
     !bracketHasRecordedResults(state.bracket);
   if (shouldRebuild) {
     rebuildBracket(true, "Settings updated");
@@ -5726,6 +5851,9 @@ async function handleCreateCircuit(event) {
     "finalTournamentAccessSelect",
   );
   const finalFormatSelect = document.getElementById("finalFormatSelect");
+  const finalGrandFinalResetToggle = document.getElementById(
+    "finalGrandFinalResetToggle",
+  );
   const finalStartInput = document.getElementById("finalTournamentStartInput");
   const finalMaxPlayersInput = document.getElementById(
     "finalTournamentMaxPlayersInput",
@@ -5831,6 +5959,9 @@ async function handleCreateCircuit(event) {
     description: finalDescription,
     rules: finalRules,
     format: finalFormat,
+    grandFinalReset:
+      allowGrandFinalReset(finalFormat, rrSettings) &&
+      Boolean(finalGrandFinalResetToggle?.checked),
     maxPlayers: finalMaxPlayers,
     startTime: finalStartTime,
     checkInWindowMinutes: finalCheckInWindowMinutes,
@@ -5896,6 +6027,9 @@ async function handleCreateTournament(event) {
   const nameInput = document.getElementById("tournamentNameInput");
   const slugInput = document.getElementById("tournamentSlugInput");
   const formatSelect = document.getElementById("tournamentFormatSelect");
+  const grandFinalResetToggle = document.getElementById(
+    "grandFinalResetToggle",
+  );
   const startInput = document.getElementById("tournamentStartInput");
   const maxPlayersInput = document.getElementById("tournamentMaxPlayersInput");
   const checkInSelect = document.getElementById("checkInSelect");
@@ -5952,6 +6086,9 @@ async function handleCreateTournament(event) {
     "create",
     defaultRoundRobinSettings,
   );
+  const grandFinalReset =
+    allowGrandFinalReset(format, rrSettings) &&
+    Boolean(grandFinalResetToggle?.checked);
   try {
     const payload = buildCreateTournamentPayload({
       slug,
@@ -5970,6 +6107,7 @@ async function handleCreateTournament(event) {
       createdByName: getCurrentUsername() || "Unknown host",
       roundRobin: rrSettings,
       bestOf: readBestOf("create", defaultBestOf),
+      grandFinalReset,
       circuitSlug: circuitSlug || null,
       isCircuitFinal: circuitSlug ? isCircuitFinal : false,
     });
@@ -7778,12 +7916,20 @@ function getRoundLabel(
   titlePrefix,
   idx,
   totalRounds,
-  { hasGrandFinal = false } = {},
+  { hasGrandFinal = false, hasFinalReset = false } = {},
 ) {
   // idx is 0-based, totalRounds is the number of columns in this section
   const fromEnd = totalRounds - idx; // 1 = last round, 2 = second last, ...
 
   if (titlePrefix === "Upper") {
+    if (hasFinalReset) {
+      if (fromEnd === 1) return "Grand Final Reset";
+      if (fromEnd === 2) return "Grand Final";
+      if (fromEnd === 3) return "Upper Final";
+      if (fromEnd === 4) return "Semi-final";
+      if (fromEnd === 5) return "Quarterfinal";
+      return `Upper Round ${idx + 1}`;
+    }
     if (fromEnd === 1) return hasGrandFinal ? "Grand Final" : "Final";
     if (fromEnd === 2) return hasGrandFinal ? "Upper Final" : "Semi-final";
     if (fromEnd === 3) return hasGrandFinal ? "Semi-final" : "Quarterfinal";

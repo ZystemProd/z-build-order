@@ -23,6 +23,7 @@ export function applyBestOfToSettings(bestOf) {
   const semiInput = document.getElementById("settingsBestOfSemi");
   const upperFinalInput = document.getElementById("settingsBestOfUpperFinal");
   const finalInput = document.getElementById("settingsBestOfFinal");
+  const finalResetInput = document.getElementById("settingsBestOfFinalReset");
   const lbSemiInput = document.getElementById("settingsBestOfLowerSemi");
   const lbFinalInput = document.getElementById("settingsBestOfLowerFinal");
 
@@ -34,6 +35,9 @@ export function applyBestOfToSettings(bestOf) {
   if (upperFinalInput)
     upperFinalInput.value = bestOf.upperFinal ?? defaultBestOf.upperFinal;
   if (finalInput) finalInput.value = bestOf.final ?? defaultBestOf.final;
+  if (finalResetInput)
+    finalResetInput.value =
+      bestOf.finalReset ?? defaultBestOf.finalReset ?? defaultBestOf.final;
   if (lbSemiInput)
     lbSemiInput.value = bestOf.lowerSemi ?? defaultBestOf.lowerSemi;
   if (lbFinalInput)
@@ -79,8 +83,12 @@ export function populateSettingsPanel({
   const semiInput = document.getElementById("settingsBestOfSemi");
   const upperFinalInput = document.getElementById("settingsBestOfUpperFinal");
   const finalInput = document.getElementById("settingsBestOfFinal");
+  const finalResetInput = document.getElementById("settingsBestOfFinalReset");
   const lbSemiInput = document.getElementById("settingsBestOfLowerSemi");
   const lbFinalInput = document.getElementById("settingsBestOfLowerFinal");
+  const grandFinalResetToggle = document.getElementById(
+    "settingsGrandFinalResetToggle"
+  );
   const rrGroups = document.getElementById("settingsRoundRobinGroups");
   const rrAdvance = document.getElementById("settingsRoundRobinAdvance");
   const rrPlayoffs = document.getElementById("settingsRoundRobinPlayoffs");
@@ -161,10 +169,16 @@ export function populateSettingsPanel({
   if (upperFinalInput)
     upperFinalInput.value = bestOf.upperFinal ?? defaultBestOf.upperFinal;
   if (finalInput) finalInput.value = bestOf.final ?? defaultBestOf.final;
+  if (finalResetInput)
+    finalResetInput.value =
+      bestOf.finalReset ?? defaultBestOf.finalReset ?? defaultBestOf.final;
   if (lbSemiInput)
     lbSemiInput.value = bestOf.lowerSemi ?? defaultBestOf.lowerSemi;
   if (lbFinalInput)
     lbFinalInput.value = bestOf.lowerFinal ?? defaultBestOf.lowerFinal;
+  if (grandFinalResetToggle) {
+    grandFinalResetToggle.checked = Boolean(tournament.grandFinalReset);
+  }
   const rrSettings = normalizeRoundRobinSettings(tournament.roundRobin || {});
   if (rrGroups) rrGroups.value = rrSettings.groups;
   if (rrAdvance) rrAdvance.value = rrSettings.advancePerGroup;

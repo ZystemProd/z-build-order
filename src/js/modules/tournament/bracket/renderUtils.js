@@ -69,6 +69,8 @@ export function getBestOfForMatch(match) {
   if (Number.isFinite(match?.bestOf) && match.bestOf > 0) {
     return match.bestOf;
   }
+  const isFinalReset =
+    match?.isReset || state?.bracket?.finalsReset?.id === match?.id;
   const bestOf = currentTournamentMeta?.bestOf || defaultBestOf;
   const winnersRounds = state.bracket?.winners?.length || 0;
 
@@ -114,5 +116,13 @@ export function getBestOfForMatch(match) {
     return bestOf.upper ?? defaultBestOf.upper;
   }
 
+  if (isFinalReset) {
+    return (
+      bestOf.finalReset ??
+      bestOf.final ??
+      defaultBestOf.finalReset ??
+      defaultBestOf.final
+    );
+  }
   return bestOf.final ?? defaultBestOf.final;
 }

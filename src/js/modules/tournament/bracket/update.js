@@ -1,6 +1,11 @@
 import { state } from "../state.js";
 import { getMatchLookup } from "./lookup.js";
 import { getBestOfForMatch } from "./renderUtils.js";
+import {
+  isFinalResetActive,
+  isFinalResetMatchId,
+  finalResetHasRecordedScore,
+} from "./finalsReset.js";
 
 function isForfeitPlayer(id) {
   if (!id) return false;
@@ -160,6 +165,29 @@ function cascadeMatchOutcomeUpdates(startMatchId, lookup) {
   }
 }
 
+function clearMatchOutcome(match) {
+  if (!match) return;
+  match.scores = [0, 0];
+  match.walkover = null;
+  match.winnerId = null;
+  match.loserId = null;
+  match.status = "pending";
+  match.forfeitApplied = false;
+}
+
+function syncFinalResetState(lookup) {
+  const bracket = state?.bracket;
+  if (!bracket?.finalsReset) return { changed: false, resetId: null };
+  const reset = bracket.finalsReset;
+  const active = isFinalResetActive(bracket, lookup);
+  if (active) return { changed: false, resetId: reset.id };
+  if (!finalResetHasRecordedScore(bracket)) {
+    return { changed: false, resetId: reset.id };
+  }
+  clearMatchOutcome(reset);
+  return { changed: true, resetId: reset.id };
+}
+
 /**
  * Update a match score, determine winner/loser, and persist via the provided callbacks.
  * @param {string} matchId
@@ -175,6 +203,13 @@ export function updateMatchScore(
 ) {
   if (!state?.bracket || !matchId) return;
   const lookup = getMatchLookup(state.bracket);
+  if (
+    finalize &&
+    isFinalResetMatchId(state.bracket, matchId) &&
+    !isFinalResetActive(state.bracket, lookup)
+  ) {
+    return;
+  }
   const match = lookup.get(matchId);
   if (!match) return;
 
@@ -267,6 +302,16 @@ export function updateMatchScore(
   if (finalize) {
     cascadeMatchOutcomeUpdates(matchId, lookup);
   }
+  let resetChanged = false;
+  let resetId = null;
+  if (finalize) {
+    const resetResult = syncFinalResetState(lookup);
+    resetChanged = resetResult.changed;
+    resetId = resetResult.resetId;
+  }
+  if (resetChanged && resetId && !affectedMatchIds.includes(resetId)) {
+    affectedMatchIds.push(resetId);
+  }
 
   const shouldClearCast = finalize && match.status === "complete";
   if (shouldClearCast && state.matchCasts?.[matchId]) {
@@ -300,6 +345,10 @@ export function applyForfeitWalkovers({ saveState, renderAll } = {}) {
   changedMatches.forEach((id) => {
     cascadeMatchOutcomeUpdates(id, lookup);
   });
+  const resetResult = syncFinalResetState(lookup);
+  if (resetResult.changed && resetResult.resetId) {
+    changedMatches.push(resetResult.resetId);
+  }
 
   if (changedMatches.length) {
     saveState?.({ bracket: state.bracket });

@@ -16,6 +16,7 @@ const BEST_OF_INPUT_IDS = {
     semi: "settingsBestOfSemi",
     upperFinal: "settingsBestOfUpperFinal",
     final: "settingsBestOfFinal",
+    finalReset: "settingsBestOfFinalReset",
     lowerSemi: "settingsBestOfLowerSemi",
     lowerFinal: "settingsBestOfLowerFinal",
   },
@@ -44,6 +45,13 @@ const BEST_OF_INPUT_IDS = {
 export function readBestOf(scope, defaultBestOf) {
   const ids = BEST_OF_INPUT_IDS[scope];
   if (!ids) return { ...defaultBestOf };
+  const fallbackFinalReset =
+    defaultBestOf.finalReset ?? defaultBestOf.final ?? 1;
+  const finalResetValue = ids.finalReset
+    ? Number(
+        document.getElementById(ids.finalReset)?.value || fallbackFinalReset
+      )
+    : fallbackFinalReset;
   return {
     upper: Number(document.getElementById(ids.upper)?.value || defaultBestOf.upper),
     lower: Number(document.getElementById(ids.lower)?.value || defaultBestOf.lower),
@@ -55,6 +63,7 @@ export function readBestOf(scope, defaultBestOf) {
       document.getElementById(ids.upperFinal)?.value || defaultBestOf.upperFinal
     ),
     final: Number(document.getElementById(ids.final)?.value || defaultBestOf.final),
+    finalReset: finalResetValue,
   };
 }
 
@@ -77,6 +86,7 @@ export function buildCreateTournamentPayload({
   createdByName,
   roundRobin,
   bestOf,
+  grandFinalReset,
   circuitSlug,
   isCircuitFinal,
 }) {
@@ -102,6 +112,7 @@ export function buildCreateTournamentPayload({
     adminUids: [],
     roundRobin,
     bestOf,
+    grandFinalReset: Boolean(grandFinalReset),
     circuitSlug: circuitSlug || null,
     isCircuitFinal: Boolean(isCircuitFinal),
   };
@@ -126,6 +137,7 @@ export function buildSettingsPayload({
   mapPool,
   roundRobin,
   requirePulseLink,
+  grandFinalReset,
   circuitQualifyCount,
 }) {
   return {
@@ -146,6 +158,7 @@ export function buildSettingsPayload({
     requirePulseLink: Boolean(requirePulseLink),
     circuitQualifyCount,
     bestOf,
+    grandFinalReset: Boolean(grandFinalReset),
     mapPool,
     roundRobin,
     lastUpdated: Date.now(),
@@ -171,6 +184,7 @@ export function buildFinalTournamentPayload({
   createdByName,
   roundRobin,
   bestOf,
+  grandFinalReset,
   circuitSlug,
   circuitQualifyCount,
 }) {
@@ -196,6 +210,7 @@ export function buildFinalTournamentPayload({
     adminUids: [],
     roundRobin,
     bestOf,
+    grandFinalReset: Boolean(grandFinalReset),
     circuitSlug,
     isCircuitFinal: true,
     circuitQualifyCount:

@@ -872,19 +872,25 @@ export function openMatchInfoModal(
   });
 
   if (title) {
+    const isFinalReset =
+      match?.isReset || state?.bracket?.finalsReset?.id === match?.id;
     const bracketLabel =
       match?.bracket === "winners"
         ? "Upper"
         : match?.bracket === "losers"
           ? "Lower"
           : match?.bracket === "finals"
-            ? "Finals"
+            ? isFinalReset
+              ? "Grand Final Reset"
+              : "Finals"
             : match?.bracket === "group"
               ? "Group"
               : "Match";
     const roundLabel =
       match?.bracket === "finals"
-        ? "Final"
+        ? isFinalReset
+          ? "Reset"
+          : "Final"
         : Number.isFinite(match?.round)
           ? `Round ${match.round}`
           : "Round";
