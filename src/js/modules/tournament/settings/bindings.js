@@ -19,6 +19,9 @@ export function bindSettingsEvents({
     "settingsUseLadderMapsBtn"
   );
   const settingsFormatSelect = document.getElementById("settingsFormatSelect");
+  const settingsGrandFinalResetToggle = document.getElementById(
+    "settingsGrandFinalResetToggle"
+  );
   const saveSettingsBtn = document.getElementById("saveSettingsBtn");
   const addCircuitPointsRowBtn = document.getElementById("addCircuitPointsRow");
   const applyCircuitPointsBtn = document.getElementById("applyCircuitPointsBtn");
@@ -42,6 +45,9 @@ export function bindSettingsEvents({
     }
     syncFormatFieldVisibility("settings");
   });
+  settingsGrandFinalResetToggle?.addEventListener("change", () =>
+    syncFormatFieldVisibility("settings")
+  );
 
   saveSettingsBtn?.addEventListener("click", handleSaveSettings);
   addCircuitPointsRowBtn?.addEventListener("click", handleAddCircuitPointsRow);

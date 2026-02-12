@@ -8,6 +8,7 @@ import {
   getCurrentUserProfile,
   getPulseState,
   initializeAuthUI,
+  rtdb,
 } from "../../../app.js";
 import { onAuthStateChanged } from "firebase/auth";
 import {
@@ -32,6 +33,7 @@ import {
   deleteObject,
   listAll,
 } from "firebase/storage";
+import { ref as rtdbRef, remove as rtdbRemove } from "firebase/database";
 import { showToast } from "../toastHandler.js";
 import { logAnalyticsEvent } from "../analyticsHelper.js";
 import DOMPurify from "dompurify";
@@ -94,6 +96,11 @@ import {
   getMatchLookup,
   resolveParticipants,
 } from "./bracket/lookup.js";
+import {
+  isFinalResetActive,
+  isFinalResetMatchId,
+  shouldCountFinalReset,
+} from "./bracket/finalsReset.js";
 import {
   applySeeding,
   buildBracket,
@@ -221,6 +228,7 @@ import {
   showVetoInfo,
   attachMatchActionHandlers,
   setVetoDependencies,
+  openMatchInfoModalUsingDeps,
   refreshMatchInfoModalIfOpen,
   refreshMatchInfoPresenceIfOpen,
   refreshVetoModalIfOpen,
@@ -296,17 +304,18 @@ const PULSE_ENDPOINTS = (() => {
     window.location.hostname === "localhost"
   ) {
     endpoints.push(
-      "http://localhost:5001/z-build-order/us-central1/fetchPulseMmr"
+      "http://localhost:5001/z-build-order/us-central1/fetchPulseMmr",
     );
   }
   endpoints.push(
-    "https://us-central1-z-build-order.cloudfunctions.net/fetchPulseMmr"
+    "https://us-central1-z-build-order.cloudfunctions.net/fetchPulseMmr",
   );
   return endpoints;
 })();
 const storage = getStorage(app);
 let currentCircuitMeta = null;
 let isCircuitAdmin = false;
+const chatCleanupDone = new Set();
 let circuitPointsBtnTemplate = null;
 let circuitFinalMapPoolSelection = new Set();
 let circuitFinalMapPoolMode = "ladder";
@@ -340,6 +349,16 @@ function isGroupStageFormat(format) {
   return isRoundRobinFormat(format) || isDualTournamentFormat(format);
 }
 
+function allowGrandFinalReset(format, rrSettings) {
+  const normalized = (format || "").toLowerCase();
+  if (normalized.startsWith("double")) return true;
+  if (isGroupStageFormat(format)) {
+    const playoffs = (rrSettings?.playoffs || "").toLowerCase();
+    return playoffs.startsWith("double");
+  }
+  return false;
+}
+
 function getInviteTokenStorageKey(slug) {
   return `zboInviteToken:${slug || ""}`;
 }
@@ -348,7 +367,7 @@ function readInviteTokenFromStorage(slug) {
   if (typeof window === "undefined" || !slug) return "";
   try {
     return String(
-      sessionStorage.getItem(getInviteTokenStorageKey(slug)) || ""
+      sessionStorage.getItem(getInviteTokenStorageKey(slug)) || "",
     ).trim();
   } catch (_) {
     return "";
@@ -372,7 +391,7 @@ function getInviteTokenFromUrl(slug = currentSlug) {
   if (typeof window === "undefined") return "";
   try {
     const token = String(
-      new URLSearchParams(window.location.search).get("invite") || ""
+      new URLSearchParams(window.location.search).get("invite") || "",
     ).trim();
     if (token) return token;
   } catch (_) {
@@ -387,7 +406,7 @@ function getInviteTokenSource(slug = currentSlug) {
   }
   try {
     const token = String(
-      new URLSearchParams(window.location.search).get("invite") || ""
+      new URLSearchParams(window.location.search).get("invite") || "",
     ).trim();
     if (token) return { token, fromUrl: true };
   } catch (_) {
@@ -400,7 +419,7 @@ function getInviteLinkRef(slug, token) {
   if (!slug || !token) return null;
   return doc(
     collection(db, TOURNAMENT_INVITE_LINK_COLLECTION, slug, "links"),
-    token
+    token,
   );
 }
 
@@ -570,7 +589,7 @@ function setInviteLinkStatus(message) {
 async function loadInviteLinks(slug) {
   if (!slug) return [];
   const snap = await getDocs(
-    collection(db, TOURNAMENT_INVITE_LINK_COLLECTION, slug, "links")
+    collection(db, TOURNAMENT_INVITE_LINK_COLLECTION, slug, "links"),
   );
   return snap.docs.map((d) => {
     const data = d.data() || {};
@@ -699,15 +718,15 @@ function initInviteLinksPanel() {
       const expiresAt = pickedDate
         ? pickedDate.getTime()
         : expiresRaw
-        ? new Date(expiresRaw).getTime()
-        : null;
+          ? new Date(expiresRaw).getTime()
+          : null;
       const token = generateInviteToken();
       try {
         setInviteLinkStatus("Creating invite link...");
         await setDoc(
           doc(
             collection(db, TOURNAMENT_INVITE_LINK_COLLECTION, slug, "links"),
-            token
+            token,
           ),
           {
             token,
@@ -724,7 +743,7 @@ function initInviteLinksPanel() {
             uses: 0,
             revoked: false,
           },
-          { merge: true }
+          { merge: true },
         );
         await refreshInviteLinksPanel();
         const url = buildInviteUrl(token);
@@ -732,7 +751,7 @@ function initInviteLinksPanel() {
           setInviteLinkStatus("Invite link copied.");
         } else {
           setInviteLinkStatus(
-            url ? "Invite link created." : "Invite link created."
+            url ? "Invite link created." : "Invite link created.",
           );
         }
       } catch (err) {
@@ -763,10 +782,10 @@ function initInviteLinksPanel() {
           await setDoc(
             doc(
               collection(db, TOURNAMENT_INVITE_LINK_COLLECTION, slug, "links"),
-              token
+              token,
             ),
             { revoked: true, revokedAt: Date.now() },
-            { merge: true }
+            { merge: true },
           );
           await refreshInviteLinksPanel();
           showToast?.("Invite link revoked.", "success");
@@ -814,20 +833,20 @@ async function loadMapCatalog() {
   if (mapCatalogLoaded) return mapCatalog;
   if (mapCatalogPromise) return mapCatalogPromise;
   mapCatalogPromise = (async () => {
-  try {
-    const resp = await fetch(MAPS_JSON_URL, { cache: "no-cache" });
-    const data = await resp.json();
-    if (Array.isArray(data)) {
-      setMapCatalogState(data);
-      setMapCatalogLoadedState(true);
-      return data;
+    try {
+      const resp = await fetch(MAPS_JSON_URL, { cache: "no-cache" });
+      const data = await resp.json();
+      if (Array.isArray(data)) {
+        setMapCatalogState(data);
+        setMapCatalogLoadedState(true);
+        return data;
+      }
+    } catch (err) {
+      console.warn("Falling back to bundled ladder map list", err);
     }
-  } catch (err) {
-    console.warn("Falling back to bundled ladder map list", err);
-  }
-  setMapCatalogState([]);
-  setMapCatalogLoadedState(true);
-  return mapCatalog;
+    setMapCatalogState([]);
+    setMapCatalogLoadedState(true);
+    return mapCatalog;
   })();
   return mapCatalogPromise;
 }
@@ -964,7 +983,7 @@ function getBracketMatchIdsForPartial(prevBracket, nextBracket) {
   }
   if (!changed.size) return [];
   return Array.from(
-    collectDependentMatchIdsFromLookup(Array.from(changed), nextLookup)
+    collectDependentMatchIdsFromLookup(Array.from(changed), nextLookup),
   );
 }
 
@@ -987,14 +1006,14 @@ function shouldUsePartialRender(prevState, nextState, format) {
   if (
     !safeJsonEqual(
       prevState.manualSeedingEnabled,
-      nextState.manualSeedingEnabled
+      nextState.manualSeedingEnabled,
     )
   )
     return false;
   if (
     !safeJsonEqual(
       prevState.manualSeedingOrder || [],
-      nextState.manualSeedingOrder || []
+      nextState.manualSeedingOrder || [],
     )
   )
     return false;
@@ -1003,7 +1022,7 @@ function shouldUsePartialRender(prevState, nextState, format) {
   if (
     !safeJsonEqual(
       prevState.casterRequests || [],
-      nextState.casterRequests || []
+      nextState.casterRequests || [],
     )
   )
     return false;
@@ -1026,19 +1045,7 @@ function syncFromRemote(incoming) {
   const localOnly = localUids.filter((uid) => !incomingUids.includes(uid));
   const incomingOnly = incomingUids.filter((uid) => !localUids.includes(uid));
 
-  console.log("🧪 [tournament-sync] syncFromRemote INPUT", {
-    slug: currentSlug,
-    incomingLastUpdated: Number(incoming?.lastUpdated) || 0,
-    localLastUpdated: Number(state?.lastUpdated) || 0,
-    incomingPlayersCount: incomingPlayersArr.length,
-    localPlayersCount: localPlayersArr.length,
-    incomingUids,
-    localUids,
-    incomingNames,
-    localNames,
-    localOnly,
-    incomingOnly,
-  });
+  // debug logging removed
 
   if (
     incomingPlayersArr.length === 0 &&
@@ -1051,7 +1058,7 @@ function syncFromRemote(incoming) {
         slug: currentSlug,
         incomingLastUpdated: Number(incoming?.lastUpdated) || 0,
         localPlayersCount: state.players.length,
-      }
+      },
     );
     return;
   }
@@ -1063,7 +1070,7 @@ function syncFromRemote(incoming) {
     JSON.stringify(incomingPresence) !== JSON.stringify(currentPresence || {});
   const matchVetoesChangedEarly = !safeJsonEqual(
     incoming.matchVetoes || {},
-    state.matchVetoes || {}
+    state.matchVetoes || {},
   );
   const casterChanged =
     JSON.stringify(incoming.casterRequests || []) !==
@@ -1088,7 +1095,7 @@ function syncFromRemote(incoming) {
   const prevState = state;
   const nextPlayers = applyRosterSeedingWithMode(
     incoming.players || [],
-    incoming
+    incoming,
   );
   const nextBracket = deserializeBracket(incoming.bracket);
   const inProgressVetoId =
@@ -1118,7 +1125,7 @@ function syncFromRemote(incoming) {
   };
   nextState.matchVetoes = mergeMatchVetoes(
     state.matchVetoes || {},
-    nextState.matchVetoes || {}
+    nextState.matchVetoes || {},
   );
   if (inProgressVetoId && inProgressVeto) {
     const incomingEntry = nextState.matchVetoes?.[inProgressVetoId] || null;
@@ -1133,11 +1140,11 @@ function syncFromRemote(incoming) {
   }
   const activityChanged = !safeJsonEqual(
     prevState.activity || [],
-    nextState.activity || []
+    nextState.activity || [],
   );
   const matchVetoesChanged = !safeJsonEqual(
     prevState.matchVetoes || {},
-    nextState.matchVetoes || {}
+    nextState.matchVetoes || {},
   );
   const onlyVetoChange =
     matchVetoesChanged &&
@@ -1152,18 +1159,18 @@ function syncFromRemote(incoming) {
     safeJsonEqual(prevState.pointsLedger || {}, nextState.pointsLedger || {}) &&
     safeJsonEqual(
       prevState.manualSeedingEnabled,
-      nextState.manualSeedingEnabled
+      nextState.manualSeedingEnabled,
     ) &&
     safeJsonEqual(
       prevState.manualSeedingOrder || [],
-      nextState.manualSeedingOrder || []
+      nextState.manualSeedingOrder || [],
     ) &&
     safeJsonEqual(prevState.matchCasts || {}, nextState.matchCasts || {}) &&
     safeJsonEqual(prevState.scoreReports || {}, nextState.scoreReports || {}) &&
     safeJsonEqual(prevState.casters || [], nextState.casters || []) &&
     safeJsonEqual(
       prevState.casterRequests || [],
-      nextState.casterRequests || []
+      nextState.casterRequests || [],
     );
   const stripVetoState = (value) => {
     const trimmed = { ...(value || {}) };
@@ -1178,13 +1185,13 @@ function syncFromRemote(incoming) {
   let allowPartial = shouldUsePartialRender(
     prevState,
     nextState,
-    currentTournamentMeta?.format
+    currentTournamentMeta?.format,
   );
   let matchIds = [];
   if (allowPartial) {
     const bracketMatchIds = getBracketMatchIdsForPartial(
       prevState.bracket,
-      nextBracket
+      nextBracket,
     );
     if (bracketMatchIds === null) {
       allowPartial = false;
@@ -1192,28 +1199,17 @@ function syncFromRemote(incoming) {
       const combined = new Set(bracketMatchIds);
       getChangedMatchIdsFromMap(
         prevState.matchCasts,
-        nextState.matchCasts
+        nextState.matchCasts,
       ).forEach((id) => combined.add(id));
       getChangedMatchIdsFromMap(
         prevState.scoreReports,
-        nextState.scoreReports
+        nextState.scoreReports,
       ).forEach((id) => combined.add(id));
       matchIds = Array.from(combined).filter(Boolean);
     }
   }
   setStateObj(nextState);
-
-  console.log("🧪 [tournament-sync] state applied", {
-    slug: currentSlug,
-    lastUpdated: Number(nextState?.lastUpdated) || 0,
-    playersCount: Array.isArray(nextState?.players)
-      ? nextState.players.length
-      : 0,
-    playerUids: Array.isArray(nextState?.players)
-      ? nextState.players.map((p) => p?.uid).filter(Boolean)
-      : [],
-    fromCache: Boolean(nextState?._fromCache), // if you ever add metadata
-  });
+  maybeToastMyMatchReady(prevState, nextState);
 
   if (onlyVetoChange || vetoOnlyChange) {
     refreshMatchInfoModalIfOpen?.();
@@ -1246,6 +1242,123 @@ function syncFromRemote(incoming) {
   if (matchVetoesChanged) {
     refreshVetoModalIfOpen?.();
   }
+}
+
+function isCurrentUserTournamentPlayer(player) {
+  if (!player) return false;
+
+  const uid = auth?.currentUser?.uid ? String(auth.currentUser.uid).trim() : "";
+  if (uid && player?.uid && String(player.uid).trim() === uid) return true;
+
+  const currentUsername = (getCurrentUsername?.() || "").trim().toLowerCase();
+  if (!currentUsername) return false;
+
+  const name = String(player?.name || "")
+    .trim()
+    .toLowerCase();
+  const pulseName = String(player?.pulseName || "")
+    .trim()
+    .toLowerCase();
+
+  return name === currentUsername || pulseName === currentUsername;
+}
+
+function isCurrentUserTournamentPlayerByUid(player) {
+  if (!player) return false;
+  const uid = auth?.currentUser?.uid ? String(auth.currentUser.uid).trim() : "";
+  if (!uid || !player?.uid) return false;
+  return String(player.uid).trim() === uid;
+}
+
+function findFirstReadyMatchForCurrentUser(snapshot) {
+  if (!snapshot?.bracket) return null;
+
+  const lookup = getMatchLookup(snapshot.bracket);
+  const playersById = getPlayersMap(); // you already have this helper in index.js
+
+  for (const match of getAllMatches(snapshot.bracket)) {
+    if (!match?.id) continue;
+    if (match.status === "complete") continue;
+
+    const [pA, pB] = resolveParticipants(match, lookup, playersById);
+    if (!pA || !pB) continue; // not ready
+
+    if (
+      isCurrentUserTournamentPlayer(pA) ||
+      isCurrentUserTournamentPlayer(pB)
+    ) {
+      return match;
+    }
+  }
+  return null;
+}
+
+function collectUserReadyMatchIds(snapshot) {
+  const uid = auth?.currentUser?.uid || null;
+  if (!uid) return new Set();
+  const bracket = snapshot?.bracket || null;
+  if (!bracket) return new Set();
+
+  const lookup = getMatchLookup(bracket);
+  const playersById = new Map(
+    (snapshot?.players || []).map((player) => [player?.id, player]),
+  );
+
+  const out = new Set();
+  getAllMatches(bracket).forEach((match) => {
+    if (!match || !match.id) return;
+    if (match.status === "complete") return;
+
+    const [pA, pB] = resolveParticipants(match, lookup, playersById);
+    if (!pA || !pB) return; // not ready yet
+
+    if (pA?.uid === uid || pB?.uid === uid) {
+      out.add(match.id);
+    }
+  });
+
+  return out;
+}
+
+function isMatchInspectorOpen() {
+  const modal = document.getElementById("matchInfoModal");
+  if (!modal) return false;
+  return modal.classList.contains("is-open");
+}
+
+function maybeAutoOpenReadyMatch(prevSnapshot, nextSnapshot) {
+  const { isOpen, matchId: inspectorMatchId } = getMatchInspectorState();
+
+  const prevReady = collectUserReadyMatchIds(prevSnapshot);
+  const nextReady = collectUserReadyMatchIds(nextSnapshot);
+
+  // Find first "newly ready" match for current user
+  let newlyReadyId = "";
+  for (const id of nextReady) {
+    if (!prevReady.has(id)) {
+      newlyReadyId = id;
+      break;
+    }
+  }
+  if (!newlyReadyId) return;
+
+  // If inspector closed, open it.
+  if (!isOpen) {
+    openMatchInfoModalUsingDeps(newlyReadyId);
+    return;
+  }
+
+  // If inspector already on that match, do nothing.
+  if (inspectorMatchId === newlyReadyId) return;
+
+  // If user is currently "waiting" inside inspector on their own match, do nothing.
+  // (This preserves your original requirement.)
+  if (isInspectorShowingUserWaitingMatch(nextSnapshot, inspectorMatchId))
+    return;
+
+  // Otherwise: inspector is open on some other match (like your screenshot),
+  // so switch it to your newly ready match.
+  openMatchInfoModalUsingDeps(newlyReadyId);
 }
 
 function getPromoStripRenderKey(meta) {
@@ -1297,17 +1410,7 @@ function subscribeTournamentStateRemote(slug) {
 
       const incomingPlayers = Array.isArray(data.players) ? data.players : [];
 
-      console.groupCollapsed("🧪 [tournament-sync] RAW SNAPSHOT PLAYERS");
-      incomingPlayers.forEach((p, i) => {
-        console.log(`#${i + 1}`, {
-          id: p?.id,
-          uid: p?.uid,
-          name: p?.name,
-          inviteStatus: p?.inviteStatus,
-          checkedInAt: p?.checkedInAt,
-        });
-      });
-      console.groupEnd();
+      // debug logging removed
 
       // Guard: don't let an "empty players" snapshot overwrite a non-empty local state.
       if (incomingPlayers.length === 0 && state?.players?.length) {
@@ -1326,7 +1429,7 @@ function subscribeTournamentStateRemote(slug) {
     },
     (err) => {
       console.warn("Remote tournament state listener error", err);
-    }
+    },
   );
 }
 
@@ -1339,7 +1442,7 @@ function applyFormattingInline(action, textareaId) {
   const textarea = document.getElementById(textareaId);
   if (!textarea) return;
   const surface = document.querySelector(
-    `.markdown-surface[data-editor-for="${textareaId}"]`
+    `.markdown-surface[data-editor-for="${textareaId}"]`,
   );
   if (surface?.isContentEditable) {
     surface.focus();
@@ -1467,13 +1570,17 @@ function applySeedingMmr(players = [], mode = "current") {
       mode === "registered"
         ? player?.mmr
         : Number.isFinite(player?.currentMmr)
-        ? player.currentMmr
-        : player?.mmr;
+          ? player.currentMmr
+          : player?.mmr;
     return { ...player, seedMmr: Number.isFinite(base) ? base : null };
   });
 }
 
-function buildManualOrder(players = [], manualOrder = [], seedMode = "current") {
+function buildManualOrder(
+  players = [],
+  manualOrder = [],
+  seedMode = "current",
+) {
   const byId = new Map((players || []).map((player) => [player.id, player]));
   const nextOrder = [];
   const used = new Set();
@@ -1483,14 +1590,14 @@ function buildManualOrder(players = [], manualOrder = [], seedMode = "current") 
     used.add(id);
   });
   const remaining = (players || []).filter(
-    (player) => player?.id && !used.has(player.id)
+    (player) => player?.id && !used.has(player.id),
   );
   if (!remaining.length) return nextOrder;
   const seededRemaining = applySeeding(
     applySeedingMmr(
       remaining.map((player) => ({ ...player })),
-      seedMode
-    )
+      seedMode,
+    ),
   );
   seededRemaining.forEach((player) => {
     if (!player?.id || used.has(player.id)) return;
@@ -1500,7 +1607,11 @@ function buildManualOrder(players = [], manualOrder = [], seedMode = "current") 
   return nextOrder;
 }
 
-function applyManualSeeding(players = [], manualOrder = [], seedMode = "current") {
+function applyManualSeeding(
+  players = [],
+  manualOrder = [],
+  seedMode = "current",
+) {
   const clones = (players || []).map((player) => ({ ...player }));
   const byId = new Map(clones.map((player) => [player.id, player]));
   const nextOrder = buildManualOrder(clones, manualOrder, seedMode);
@@ -1520,16 +1631,26 @@ function seedPlayersForState(players = [], snapshot = state) {
   return applySeeding(
     applySeedingMmr(
       (players || []).map((player) => ({ ...player })),
-      seedMode
-    )
+      seedMode,
+    ),
   );
 }
 
-function seedEligiblePlayersWithMode(players = [], snapshot = state) {
+function seedEligiblePlayersWithMode(
+  players = [],
+  snapshot = state,
+  { forceRecompute = false } = {},
+) {
   const eligible = getEligiblePlayers(players);
-  const seededEligible = seedPlayersForState(eligible, snapshot);
+  const hasSeedSnapshot =
+    eligible.length > 0 &&
+    eligible.every((player) => Number.isFinite(player?.seed));
+  const seededEligible =
+    hasSeedSnapshot && !forceRecompute
+    ? eligible.map((player) => ({ ...player }))
+    : seedPlayersForState(eligible, snapshot);
   const seedById = new Map(
-    seededEligible.map((player) => [player.id, player.seed])
+    seededEligible.map((player) => [player.id, player.seed]),
   );
   const mergedPlayers = (players || []).map((player) => {
     const inviteStatus = normalizeInviteStatus(player.inviteStatus);
@@ -1550,6 +1671,38 @@ function applyRosterSeedingWithMode(players = [], snapshot = state) {
   return seedEligiblePlayersWithMode(players, snapshot).mergedPlayers;
 }
 
+function getSeedingTablePlayers(players = [], snapshot = state) {
+  const eligible = getEligiblePlayers(players);
+  const hasSeeds =
+    eligible.length > 0 &&
+    eligible.every((player) => Number.isFinite(player?.seed));
+  if (!hasSeeds) {
+    return seedPlayersForState(players, snapshot);
+  }
+  const seeded = (players || []).map((player) => ({ ...player }));
+  const seededWithSeeds = seeded.filter((player) =>
+    Number.isFinite(player?.seed),
+  );
+  const unseeded = seeded.filter(
+    (player) => !Number.isFinite(player?.seed),
+  );
+  seededWithSeeds.sort((a, b) => (a.seed || 0) - (b.seed || 0));
+  return [...seededWithSeeds, ...unseeded];
+}
+
+async function persistSeedSnapshot(reason = "") {
+  const seeded = seedEligiblePlayersWithMode(state.players || [], state, {
+    forceRecompute: true,
+  }).mergedPlayers;
+  await updateRosterWithTransaction(
+    () => seeded,
+    { needsReseed: false },
+  );
+  if (reason) {
+    addActivity(reason, { skipRemote: true });
+  }
+}
+
 function getManualSeedingActive() {
   return Boolean(state.manualSeedingEnabled) && !state.isLive;
 }
@@ -1563,14 +1716,18 @@ function applySeedingStateUpdate(nextSnapshot, reason) {
   }
   const { mergedPlayers } = seedEligiblePlayersWithMode(
     state.players || [],
-    nextSnapshot
+    nextSnapshot,
+    { forceRecompute: true },
   );
-  saveState({
-    manualSeedingEnabled: nextSnapshot.manualSeedingEnabled,
-    manualSeedingOrder: nextSnapshot.manualSeedingOrder,
-    players: mergedPlayers,
-    needsReseed: hasCompletedMatches,
-  }, { skipRoster: true });
+  saveState(
+    {
+      manualSeedingEnabled: nextSnapshot.manualSeedingEnabled,
+      manualSeedingOrder: nextSnapshot.manualSeedingOrder,
+      players: mergedPlayers,
+      needsReseed: hasCompletedMatches,
+    },
+    { skipRoster: true },
+  );
   renderAll();
 }
 
@@ -1598,7 +1755,7 @@ function setManualSeedingEnabled(nextEnabled) {
   };
   applySeedingStateUpdate(
     nextSnapshot,
-    enabled ? "Manual seeding enabled" : "Automatic seeding enabled"
+    enabled ? "Manual seeding enabled" : "Automatic seeding enabled",
   );
 }
 
@@ -1624,7 +1781,7 @@ function setMmrSeedingMode(nextMode) {
   };
   applySeedingStateUpdate(
     nextSnapshot,
-    `Seeding uses ${mode === "current" ? "current" : "registered"} MMR`
+    `Seeding uses ${mode === "current" ? "current" : "registered"} MMR`,
   );
 }
 
@@ -1640,7 +1797,7 @@ function handleManualSeedingReorder(nextOrder = []) {
   const normalizedOrder = buildManualOrder(
     state.players || [],
     nextOrder,
-    seedMode
+    seedMode,
   );
   const currentOrder = getManualSeedingSettings(state).order;
   const isSame =
@@ -1667,14 +1824,17 @@ function handleApplyCircuitPoints(event) {
   setDoc(
     doc(collection(db, TOURNAMENT_COLLECTION), currentTournamentMeta.slug),
     { circuitPointsApplied: true },
-    { merge: true }
+    { merge: true },
   ).catch((err) => {
     console.error("Failed to store circuit points applied flag", err);
   });
   setDoc(
-    doc(collection(db, TOURNAMENT_STATE_COLLECTION), currentTournamentMeta.slug),
+    doc(
+      collection(db, TOURNAMENT_STATE_COLLECTION),
+      currentTournamentMeta.slug,
+    ),
     { circuitPointsApplied: true },
-    { merge: true }
+    { merge: true },
   ).catch((err) => {
     console.error("Failed to store circuit points applied flag in state", err);
   });
@@ -1696,7 +1856,7 @@ function updatePlacementsRow() {
   const eligiblePlayers = getEligiblePlayers(state.players || []);
   const placements = computePlacementsForBracket(
     state.bracket,
-    eligiblePlayers.length || 0
+    eligiblePlayers.length || 0,
   );
   if (!placements) {
     placementsRow.style.display = "none";
@@ -1704,10 +1864,10 @@ function updatePlacementsRow() {
   }
   const playersById = getPlayersMap();
   const firstId = Array.from(placements.entries()).find(
-    ([, p]) => p === 1
+    ([, p]) => p === 1,
   )?.[0];
   const secondId = Array.from(placements.entries()).find(
-    ([, p]) => p === 2
+    ([, p]) => p === 2,
   )?.[0];
   const thirdIds = Array.from(placements.entries())
     .filter(([, p]) => p === 3)
@@ -1742,7 +1902,7 @@ function renderAll(matchIds = null) {
       {
         currentUsername: getCurrentUsername?.() || "",
         currentUid: auth.currentUser?.uid || "",
-      }
+      },
     );
     if (didPartialUpdate) {
       annotateConnectorPlayers(lookup, playersById);
@@ -1754,7 +1914,7 @@ function renderAll(matchIds = null) {
     }
   }
   // Update seeding table
-  const seedingSnapshot = seedPlayersForState(state.players || [], state);
+  const seedingSnapshot = getSeedingTablePlayers(state.players || [], state);
   const forfeitUndoBlocked = getForfeitUndoBlockedIds();
   const seededWithForfeitStatus = seedingSnapshot.map((player) => ({
     ...player,
@@ -1774,7 +1934,7 @@ function renderAll(matchIds = null) {
     const tournamentFormat = document.getElementById("tournamentFormat");
     const tournamentStart = document.getElementById("tournamentStart");
     const descriptionBody = document.getElementById(
-      "tournamentDescriptionBody"
+      "tournamentDescriptionBody",
     );
     const rulesBody = document.getElementById("tournamentRulesBody");
     const statPlayers = document.getElementById("statPlayers");
@@ -1782,20 +1942,21 @@ function renderAll(matchIds = null) {
     const goLiveBtn = document.getElementById("rebuildBracketBtn");
     const notifyCheckInBtn = document.getElementById("notifyCheckInBtn");
     const refreshMmrBtn = document.getElementById("refreshMmrBtn");
-      const resetTournamentBtn = document.getElementById("resetTournamentBtn");
-      const resetScoresBtn = document.getElementById("resetScoresBtn");
-      const resetVetoScoreChatBtn = document.getElementById(
-        "resetVetoScoreChatBtn"
-      );
+    const resetTournamentBtn = document.getElementById("resetTournamentBtn");
+    const resetScoresBtn = document.getElementById("resetScoresBtn");
+    const resetVetoScoreChatBtn = document.getElementById(
+      "resetVetoScoreChatBtn",
+    );
     const startMs = getStartTimeMs(currentTournamentMeta);
     const liveDot = document.getElementById("liveDot");
     const bracketGrid = document.getElementById("bracketGrid");
     const bracketNotLive = document.getElementById("bracketNotLive");
+    const matchInfoModal = document.getElementById("matchInfoModal");
     const bracketNotLiveMessage = document.getElementById(
-      "bracketNotLiveMessage"
+      "bracketNotLiveMessage",
     );
     const registeredPlayersList = document.getElementById(
-      "registeredPlayersList"
+      "registeredPlayersList",
     );
     const activityCard = document.getElementById("activityCard");
     const casterLiveCard = document.getElementById("casterLiveCard");
@@ -1805,7 +1966,7 @@ function renderAll(matchIds = null) {
       ? (state.players || []).find((p) => p.uid === currentUid)
       : null;
     const currentInviteStatus = normalizeInviteStatus(
-      currentPlayer?.inviteStatus
+      currentPlayer?.inviteStatus,
     );
     const eligiblePlayers = getEligiblePlayers(state.players || []);
     const hasCheckedIn = eligiblePlayers.some((player) => player.checkedInAt);
@@ -1814,7 +1975,7 @@ function renderAll(matchIds = null) {
     const registrationForm = document.getElementById("registrationForm");
     const registrationCard = document.getElementById("registrationCard");
     const registrationGuestMessage = document.getElementById(
-      "registrationGuestMessage"
+      "registrationGuestMessage",
     );
     const isGuest = !auth.currentUser;
 
@@ -1838,7 +1999,7 @@ function renderAll(matchIds = null) {
           tournamentHero.classList.add("has-cover");
           tournamentHero.style.setProperty(
             "--hero-cover-image",
-            `url("${coverUrl}")`
+            `url("${coverUrl}")`,
           );
           tournamentHero.dataset.coverUrl = coverUrl;
         } else {
@@ -1858,7 +2019,7 @@ function renderAll(matchIds = null) {
     }
     if (descriptionBody) {
       descriptionBody.innerHTML = renderMarkdown(
-        currentTournamentMeta.description || ""
+        currentTournamentMeta.description || "",
       );
     }
     if (rulesBody) {
@@ -1987,19 +2148,19 @@ function renderAll(matchIds = null) {
         goLiveBtn.classList.remove("danger");
       }
     }
-      if (resetTournamentBtn) {
-        resetTournamentBtn.classList.add("danger");
-      }
-      if (resetScoresBtn) {
-        resetScoresBtn.classList.add("danger");
-      }
-      if (resetVetoScoreChatBtn) {
-        resetVetoScoreChatBtn.classList.add("danger");
-      }
+    if (resetTournamentBtn) {
+      resetTournamentBtn.classList.add("danger");
+    }
+    if (resetScoresBtn) {
+      resetScoresBtn.classList.add("danger");
+    }
+    if (resetVetoScoreChatBtn) {
+      resetVetoScoreChatBtn.classList.add("danger");
+    }
     if (notifyCheckInBtn) {
       const checkInState = getCheckInWindowState(currentTournamentMeta);
       const eligibleNotCheckedIn = eligiblePlayers.filter(
-        (p) => !p.checkedInAt
+        (p) => !p.checkedInAt,
       );
       notifyCheckInBtn.disabled =
         state.isLive ||
@@ -2008,7 +2169,7 @@ function renderAll(matchIds = null) {
     }
     if (refreshMmrBtn) {
       const refreshable = eligiblePlayers.some((player) =>
-        normalizeSc2PulseIdUrl(player?.sc2Link || "")
+        normalizeSc2PulseIdUrl(player?.sc2Link || ""),
       );
       refreshMmrBtn.disabled = state.isLive || !refreshable;
     }
@@ -2028,13 +2189,21 @@ function renderAll(matchIds = null) {
           (state.activity || []).some(
             (entry) =>
               entry?.message === "Tournament went live." ||
-              entry?.message === "Tournament set to not live."
+              entry?.message === "Tournament set to not live.",
           );
+
         if (bracketNotLiveMessage) {
           bracketNotLiveMessage.style.display = hasBeenLive ? "" : "none";
         }
+
         bracketGrid.style.display = "none";
         bracketNotLive.style.display = "block";
+
+        // ✅ ADD THIS: hide match inspector when not live
+        if (matchInfoModal) matchInfoModal.style.display = "none";
+        // ✅ ADD THIS: ensure it's closed if it was open
+        window.setMatchInspectorOpen?.(false);
+
         if (registeredPlayersList) {
           registeredPlayersList.style.display = "";
           const listKey = JSON.stringify(
@@ -2045,7 +2214,7 @@ function renderAll(matchIds = null) {
               mmr: Number.isFinite(p.mmr) ? Math.round(p.mmr) : "",
               clan: p.clan || "",
               clanLogoUrl: p.clanLogoUrl || "",
-            }))
+            })),
           );
           if (registeredPlayersList.dataset.listKey !== listKey) {
             registeredPlayersList.dataset.listKey = listKey;
@@ -2061,17 +2230,17 @@ function renderAll(matchIds = null) {
               const clanName = (p?.clan || "").trim();
               const clanImg = clanLogo
                 ? `<img class="registered-clan-logo" src="${escapeHtml(
-                    clanLogo
+                    clanLogo,
                   )}" alt="Clan logo" ${
                     clanName ? `data-tooltip="${escapeHtml(clanName)}"` : ""
                   } />`
                 : `<img class="registered-clan-logo is-placeholder" src="img/clan/logo-18px.webp" alt="No clan logo" />`;
               return `<li data-player-id="${escapeHtml(p.id || "")}">
-                        <span class="race-strip ${raceClass}"></span>
-                        ${clanImg}
-                        <span class="name-text" translate="no">${name}</span>
-                        <span class="registered-meta">${raceLabel} - ${mmr}</span>
-                      </li>`;
+                  <span class="race-strip ${raceClass}"></span>
+                  ${clanImg}
+                  <span class="name-text" translate="no">${name}</span>
+                  <span class="registered-meta">${raceLabel} - ${mmr}</span>
+                </li>`;
             });
             registeredPlayersList.innerHTML = items.join("");
           }
@@ -2082,6 +2251,9 @@ function renderAll(matchIds = null) {
         }
         bracketGrid.style.display = "flex";
         bracketNotLive.style.display = "none";
+
+        // ✅ ADD THIS: show match inspector again when live
+        if (matchInfoModal) matchInfoModal.style.display = "";
       }
     }
 
@@ -2125,9 +2297,7 @@ function renderAll(matchIds = null) {
   const canAutoRepair =
     canAutoRebuild && repairVersion < CURRENT_BRACKET_LAYOUT_VERSION;
   const needsLayoutUpgrade =
-    bracket &&
-    layoutVersion < CURRENT_BRACKET_LAYOUT_VERSION &&
-    canAutoRepair;
+    bracket && layoutVersion < CURRENT_BRACKET_LAYOUT_VERSION && canAutoRepair;
   if (needsLayoutUpgrade) {
     rebuildBracket(true, "Updated bracket layout");
     return;
@@ -2138,12 +2308,12 @@ function renderAll(matchIds = null) {
     if (isGroupStageFormat(format)) return false;
     const { seededEligible } = seedEligiblePlayersWithMode(
       state.players || [],
-      state
+      state,
     );
     const expected = buildBracket(
       seededEligible,
       currentTournamentMeta || {},
-      isRoundRobinFormat
+      isRoundRobinFormat,
     );
     const actualIds = getAllMatches(bracket)
       .map((m) => m?.id)
@@ -2185,7 +2355,7 @@ function renderAll(matchIds = null) {
         const html = renderRoundRobinView(
           { ...bracket },
           playersById,
-          computeGroupStandings
+          computeGroupStandings,
         );
         bracketContainer.innerHTML = DOMPurify.sanitize(html);
         attachMatchActionHandlers?.();
@@ -2207,7 +2377,7 @@ function renderAll(matchIds = null) {
       annotateConnectorPlayers(lookup, playersById);
       clampScoreSelectOptions();
       const groupScrolls = bracketContainer.querySelectorAll(
-        ".group-stage-scroll, .playoff-scroll"
+        ".group-stage-scroll, .playoff-scroll",
       );
       groupScrolls.forEach((el) => {
         if (el.dataset.dragScrollBound === "true") return;
@@ -2224,6 +2394,140 @@ function renderAll(matchIds = null) {
   }
   applyBracketReadOnlyState(!state.isLive && !isAdmin);
   updateTooltips?.();
+}
+
+function getMatchInspectorState() {
+  const modal = document.getElementById("matchInfoModal");
+  if (!modal) return { isOpen: false, matchId: "" };
+  return {
+    isOpen: modal.classList.contains("is-open"),
+    matchId: modal.dataset.matchId || "",
+  };
+}
+
+// True only when the inspector is showing a match that includes the current user,
+// but the match is NOT ready yet (missing opponent). This is your “I’m waiting here” case.
+function isInspectorShowingUserWaitingMatch(snapshot, inspectorMatchId) {
+  const uid = auth?.currentUser?.uid || null;
+  if (!uid) return false;
+  if (!snapshot?.bracket || !inspectorMatchId) return false;
+
+  const lookup = getMatchLookup(snapshot.bracket);
+  const playersById = new Map((snapshot.players || []).map((p) => [p?.id, p]));
+
+  const match = getAllMatches(snapshot.bracket).find(
+    (m) => m?.id === inspectorMatchId,
+  );
+  if (!match) return false;
+  if (match.status === "complete") return false;
+
+  const [pA, pB] = resolveParticipants(match, lookup, playersById);
+
+  // If user is not part of this match, they are not "waiting" here.
+  const userInThisMatch = pA?.uid === uid || pB?.uid === uid;
+  if (!userInThisMatch) return false;
+
+  // Waiting = one side missing
+  return !(pA && pB);
+}
+
+const matchReadyToastShown = new Set();
+const matchReadyToastDismissed = new Set();
+
+function ensureMatchReadyToastContainer() {
+  let container = document.getElementById("toast-container");
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "toast-container";
+    document.body.appendChild(container);
+  }
+  return container;
+}
+
+function showMatchReadyToast({
+  matchId,
+  message,
+  opponentName,
+  opponentAvatarUrl,
+}) {
+  if (!matchId) return;
+  if (matchReadyToastDismissed.has(matchId)) return;
+  if (matchReadyToastShown.has(matchId)) return;
+
+  const container = ensureMatchReadyToastContainer();
+  if (!container) return;
+  container.classList.add("toast-container--match-ready");
+
+  matchReadyToastShown.add(matchId);
+
+  const toast = document.createElement("div");
+  toast.className = "toast toast--action toast--match-ready";
+  toast.dataset.matchId = matchId;
+  toast.style.opacity = "0";
+  toast.style.transform = "scale(0.98)";
+
+  const text = document.createElement("div");
+  text.className = "toast__text";
+
+  const title = document.createElement("div");
+  title.className = "toast__title";
+  title.textContent = message || "Your match is ready.";
+
+  const meta = document.createElement("div");
+  meta.className = "toast__meta";
+  const label = document.createElement("span");
+  label.className = "toast__label";
+  label.textContent = "Opponent";
+
+  const avatar = document.createElement("img");
+  avatar.className = "toast__avatar";
+  avatar.alt = "";
+  avatar.src = opponentAvatarUrl || DEFAULT_PLAYER_AVATAR;
+
+  const opponent = document.createElement("span");
+  opponent.className = "toast__opponent";
+  opponent.textContent = opponentName || "TBD";
+
+  meta.append(label, avatar, opponent);
+
+  text.append(title, meta);
+
+  const actions = document.createElement("div");
+  actions.className = "toast__actions";
+
+  const goBtn = document.createElement("button");
+  goBtn.type = "button";
+  goBtn.className = "toast__btn toast__btn--primary";
+  goBtn.textContent = "Go";
+  goBtn.onclick = () => {
+    matchReadyToastShown.delete(matchId);
+    toast.remove();
+    if (!container.querySelector(".toast--match-ready")) {
+      container.classList.remove("toast-container--match-ready");
+    }
+    openMatchInfoModalUsingDeps(matchId);
+  };
+
+  const dismissBtn = document.createElement("button");
+  dismissBtn.type = "button";
+  dismissBtn.className = "toast__btn";
+  dismissBtn.textContent = "Dismiss";
+  dismissBtn.onclick = () => {
+    matchReadyToastShown.delete(matchId);
+    matchReadyToastDismissed.add(matchId);
+    toast.remove();
+    if (!container.querySelector(".toast--match-ready")) {
+      container.classList.remove("toast-container--match-ready");
+    }
+  };
+
+  actions.append(goBtn, dismissBtn);
+  toast.append(text, actions);
+  container.appendChild(toast);
+  requestAnimationFrame(() => {
+    toast.style.opacity = "1";
+    toast.style.transform = "scale(1)";
+  });
 }
 
 async function checkInCurrentPlayer() {
@@ -2258,7 +2562,7 @@ async function checkInCurrentPlayer() {
       if (player?.uid !== uid) return player;
       if (!isInviteAccepted(player)) return player;
       return { ...player, checkedInAt: player.checkedInAt || checkedInAt };
-    })
+    }),
   );
   addActivity(`${players[idx].name || "Player"} checked in.`);
   renderAll();
@@ -2289,7 +2593,7 @@ async function notifyCheckInPlayers() {
     return;
   }
   const eligiblePlayers = getEligiblePlayers(state.players || []).filter(
-    (player) => player?.uid && !player.checkedInAt
+    (player) => player?.uid && !player.checkedInAt,
   );
   if (!eligiblePlayers.length) {
     showToast?.("All eligible players are checked in.", "success");
@@ -2322,7 +2626,7 @@ async function refreshRosterMmrFromPulse() {
   }
   const eligiblePlayers = getEligiblePlayers(state.players || []);
   const targets = eligiblePlayers.filter((player) =>
-    normalizeSc2PulseIdUrl(player?.sc2Link || "")
+    normalizeSc2PulseIdUrl(player?.sc2Link || ""),
   );
   if (!targets.length) {
     showToast?.("No SC2Pulse links to refresh.", "error");
@@ -2399,15 +2703,16 @@ async function refreshRosterMmrFromPulse() {
           const patch = updatesById.get(player?.id);
           return patch ? { ...player, ...patch } : player;
         }),
-      { needsReseed: true }
+      { needsReseed: true },
     );
+    await persistSeedSnapshot("MMR refresh updated seeding.");
 
     const failedSuffix = failedCount ? ` (${failedCount} failed)` : "";
     showToast?.(
       `Updated ${updatedCount} player${
         updatedCount === 1 ? "" : "s"
       }${failedSuffix}.`,
-      "success"
+      "success",
     );
   } finally {
     if (statusText && statusFill) {
@@ -2467,11 +2772,11 @@ async function toggleCheckInManualClose() {
     await setDoc(
       doc(collection(db, TOURNAMENT_COLLECTION), targetSlug),
       { checkInManuallyClosed: nextClosed },
-      { merge: true }
+      { merge: true },
     );
     showToast?.(
       nextClosed ? "Check-in closed." : "Check-in opened.",
-      "success"
+      "success",
     );
   } catch (err) {
     console.error("Failed to toggle check-in", err);
@@ -2481,7 +2786,7 @@ async function toggleCheckInManualClose() {
   }
 }
 
-function goLiveTournament() {
+async function goLiveTournament() {
   if (state.isLive) {
     showToast?.("Tournament is already live.", "success");
     return;
@@ -2492,23 +2797,27 @@ function goLiveTournament() {
     return;
   }
   const checkedInPlayers = getEligiblePlayers(state.players || []).filter(
-    (p) => p.checkedInAt
+    (p) => p.checkedInAt,
   );
   if (!checkedInPlayers.length) {
     showToast?.("No checked-in players to go live.", "error");
     return;
   }
+  await persistSeedSnapshot("Seeding locked for live.");
   const { mergedPlayers } = seedEligiblePlayersWithMode(
     state.players || [],
-    state
+    state,
   );
-  const seededPlayers = seedPlayersForState(checkedInPlayers, state);
+  const seededPlayers = getSeedingTablePlayers(checkedInPlayers, state).filter(
+    (player) => player?.checkedInAt,
+  );
   const bracket = buildBracket(
     seededPlayers,
     currentTournamentMeta || {},
-    (fmt) => (fmt || "").toLowerCase().includes("round robin")
+    (fmt) => (fmt || "").toLowerCase().includes("round robin"),
   );
-    saveState({
+  saveState(
+    {
       players: mergedPlayers,
       bracket,
       needsReseed: false,
@@ -2516,7 +2825,9 @@ function goLiveTournament() {
       bracketRepairVersion: CURRENT_BRACKET_LAYOUT_VERSION,
       isLive: true,
       hasBeenLive: true,
-    }, { skipRoster: true });
+    },
+    { skipRoster: true },
+  );
   addActivity("Tournament went live.");
   renderAll();
 }
@@ -2531,12 +2842,12 @@ function setTournamentNotLive() {
   renderAll();
 }
 
-function toggleLiveTournament() {
+async function toggleLiveTournament() {
   if (state.isLive) {
     setTournamentNotLive();
     return;
   }
-  goLiveTournament();
+  await goLiveTournament();
 }
 
 function addActivity(message, options = {}) {
@@ -2575,8 +2886,8 @@ function updateManualSeedingUi() {
       help.textContent = locked
         ? "Seeding is locked while live."
         : mode === "current"
-        ? "Sorting uses current MMR."
-        : "Sorting uses registered MMR.";
+          ? "Sorting uses current MMR."
+          : "Sorting uses registered MMR.";
     }
   }
 }
@@ -2598,6 +2909,9 @@ function updateSettingsScoreLocks() {
   const hasScores = bracketHasRecordedResults(state.bracket);
   const locks = getBracketScoreLocks(state.bracket);
   const formatSelect = document.getElementById("settingsFormatSelect");
+  const grandFinalResetToggle = document.getElementById(
+    "settingsGrandFinalResetToggle",
+  );
   const rrGroups = document.getElementById("settingsRoundRobinGroups");
   const rrAdvance = document.getElementById("settingsRoundRobinAdvance");
   const rrPlayoffs = document.getElementById("settingsRoundRobinPlayoffs");
@@ -2608,10 +2922,12 @@ function updateSettingsScoreLocks() {
   const semiInput = document.getElementById("settingsBestOfSemi");
   const upperFinalInput = document.getElementById("settingsBestOfUpperFinal");
   const finalInput = document.getElementById("settingsBestOfFinal");
+  const finalResetInput = document.getElementById("settingsBestOfFinalReset");
   const lbSemiInput = document.getElementById("settingsBestOfLowerSemi");
   const lbFinalInput = document.getElementById("settingsBestOfLowerFinal");
 
   if (formatSelect) formatSelect.disabled = hasScores;
+  if (grandFinalResetToggle) grandFinalResetToggle.disabled = hasScores;
 
   if (rrGroups) rrGroups.disabled = hasScores || locks.roundRobin;
   if (rrAdvance) rrAdvance.disabled = hasScores || locks.roundRobin;
@@ -2623,6 +2939,7 @@ function updateSettingsScoreLocks() {
   if (semiInput) semiInput.disabled = locks.semi;
   if (upperFinalInput) upperFinalInput.disabled = locks.upperFinal;
   if (finalInput) finalInput.disabled = locks.final;
+  if (finalResetInput) finalResetInput.disabled = locks.finalReset;
 
   if (lowerInput) lowerInput.disabled = locks.lower;
   if (lbSemiInput) lbSemiInput.disabled = locks.lowerSemi;
@@ -2665,17 +2982,18 @@ function matchHasRecordedScore(match) {
 }
 
 function getBracketScoreLocks(bracket) {
-  const locks = {
-    upper: false,
-    quarter: false,
-    semi: false,
-    upperFinal: false,
-    final: false,
-    lower: false,
-    lowerSemi: false,
-    lowerFinal: false,
-    roundRobin: false,
-  };
+    const locks = {
+      upper: false,
+      quarter: false,
+      semi: false,
+      upperFinal: false,
+      final: false,
+      finalReset: false,
+      lower: false,
+      lowerSemi: false,
+      lowerFinal: false,
+      roundRobin: false,
+    };
   if (!bracket) return locks;
   const winners = Array.isArray(bracket.winners) ? bracket.winners : [];
   const losers = Array.isArray(bracket.losers) ? bracket.losers : [];
@@ -2718,6 +3036,10 @@ function getBracketScoreLocks(bracket) {
 
   if (bracket.finals && matchHasRecordedScore(bracket.finals)) {
     locks.final = true;
+  }
+  if (bracket.finalsReset && matchHasRecordedScore(bracket.finalsReset)) {
+    locks.final = true;
+    locks.finalReset = true;
   }
 
   const groups = Array.isArray(bracket.groups) ? bracket.groups : [];
@@ -2770,7 +3092,7 @@ function buildPlayerFromData(data, players = state.players || []) {
     data.id ||
     `p-${Date.now().toString(36)}-${Math.random().toString(16).slice(2)}`;
   const existing = (players || []).find(
-    (p) => p.id === id || (data.name && p.name === data.name)
+    (p) => p.id === id || (data.name && p.name === data.name),
   );
   if (existing) return { ...existing, ...data, id: existing.id || id };
   const created = { ...data, id };
@@ -2799,7 +3121,7 @@ async function hydrateCurrentUserClanLogo() {
   const mainClanId = profile?.settings?.mainClanId || "";
   if (!mainClanId) return;
   const target = (state.players || []).find(
-    (player) => player?.uid === user.uid && !player?.clanLogoUrl
+    (player) => player?.uid === user.uid && !player?.clanLogoUrl,
   );
   if (!target) {
     selfClanHydrated = true;
@@ -2820,7 +3142,7 @@ async function hydrateCurrentUserClanLogo() {
         clanAbbreviation:
           clanData?.abbreviation || target.clanAbbreviation || "",
         clanLogoUrl,
-      })
+      }),
     );
     selfClanHydrated = true;
   } catch (_) {
@@ -2833,9 +3155,12 @@ async function hydrateCurrentUserClanLogo() {
 async function removePlayer(id) {
   if (state.isLive) return;
   if (!id) return;
-  await updateRosterWithTransaction((players) => removeRosterById(players, id), {
-    needsReseed: true,
-  });
+  await updateRosterWithTransaction(
+    (players) => removeRosterById(players, id),
+    {
+      needsReseed: true,
+    },
+  );
   rebuildBracket(true, "Player removed");
 }
 
@@ -2844,7 +3169,7 @@ async function updatePlayerPoints(id, points) {
   if (!id) return;
   await updateRosterWithTransaction(
     (players) => updateRosterById(players, id, { points }),
-    { needsReseed: true }
+    { needsReseed: true },
   );
   rebuildBracket(true, "Points updated");
 }
@@ -2889,14 +3214,14 @@ async function setPlayerForfeit(id, shouldForfeit) {
       if (matchHasManualResult(match)) {
         showToast?.(
           "Cannot undo forfeit after a later match has a recorded score.",
-          "error"
+          "error",
         );
         return;
       }
     }
   }
   await updateRosterWithTransaction((players) =>
-    updateRosterById(players, id, { forfeit: shouldForfeit })
+    updateRosterById(players, id, { forfeit: shouldForfeit }),
   );
   renderAll();
   applyForfeitWalkovers({ saveState, renderAll });
@@ -2905,7 +3230,7 @@ async function setPlayerForfeit(id, shouldForfeit) {
     addActivity(
       `${changed.name || "Player"} ${
         shouldForfeit ? "marked as forfeit" : "forfeit removed"
-      }.`
+      }.`,
     );
   }
 }
@@ -2921,41 +3246,42 @@ async function setPlayerCheckIn(id, shouldCheckIn) {
         return { ...p, checkedInAt: p.checkedInAt || checkedInAt };
       }
       return { ...p, checkedInAt: null };
-    })
+    }),
   );
   const changed = (state.players || []).find((p) => p.id === id);
   if (changed) {
     addActivity(
       `${changed.name || "Player"} marked ${
         changed.checkedInAt ? "checked in" : "not checked in"
-      }.`
+      }.`,
     );
   }
   renderAll();
 }
 
-  function resetTournament() {
-    const empty = { ...defaultState, lastUpdated: Date.now() };
-    setStateObj(empty);
-    saveState(empty);
-    rebuildBracket(true, "Tournament reset");
-    addActivity("Tournament reset.");
-  }
+function resetTournament() {
+  const empty = { ...defaultState, lastUpdated: Date.now() };
+  setStateObj(empty);
+  saveState(empty);
+  rebuildBracket(true, "Tournament reset");
+  addActivity("Tournament reset.");
+}
 
-  function resetScores() {
-    if (!state?.bracket) return;
-    const { seededEligible, mergedPlayers } = seedEligiblePlayersWithMode(
-      state.players || [],
-      state
-    );
-    const isRoundRobin = (fmt) =>
-      (fmt || "").toLowerCase().includes("round robin");
-    const bracket = buildBracket(
-      seededEligible,
-      currentTournamentMeta || {},
-      isRoundRobin
-    );
-    saveState({
+function resetScores() {
+  if (!state?.bracket) return;
+  const { seededEligible, mergedPlayers } = seedEligiblePlayersWithMode(
+    state.players || [],
+    state,
+  );
+  const isRoundRobin = (fmt) =>
+    (fmt || "").toLowerCase().includes("round robin");
+  const bracket = buildBracket(
+    seededEligible,
+    currentTournamentMeta || {},
+    isRoundRobin,
+  );
+  saveState(
+    {
       players: mergedPlayers,
       bracket,
       needsReseed: false,
@@ -2963,50 +3289,62 @@ async function setPlayerCheckIn(id, shouldCheckIn) {
       matchCasts: {},
       bracketLayoutVersion: CURRENT_BRACKET_LAYOUT_VERSION,
       bracketRepairVersion: CURRENT_BRACKET_LAYOUT_VERSION,
-    }, { skipRoster: true });
-    addActivity("Scores reset.");
-    renderAll();
-  }
+    },
+    { skipRoster: true },
+  );
+  addActivity("Scores reset.");
+  renderAll();
+}
 
-  function resetVetoScoreChat() {
-    if (!state?.bracket) return;
-    const { seededEligible, mergedPlayers } = seedEligiblePlayersWithMode(
-      state.players || [],
-      state
-    );
-    const isRoundRobin = (fmt) =>
-      (fmt || "").toLowerCase().includes("round robin");
-    const bracket = buildBracket(
-      seededEligible,
-      currentTournamentMeta || {},
-      isRoundRobin
-    );
-    setCurrentVetoMatchIdState(null);
-    setVetoStateState(null);
-    saveState(
-      {
-        players: mergedPlayers,
-        bracket,
-        needsReseed: false,
-        scoreReports: {},
-        matchCasts: {},
-        matchVetoes: {},
-        bracketLayoutVersion: CURRENT_BRACKET_LAYOUT_VERSION,
-        bracketRepairVersion: CURRENT_BRACKET_LAYOUT_VERSION,
-      },
-      { skipRoster: true }
-    );
-    const targetSlug = currentSlug || currentTournamentMeta?.slug || "";
-    if (targetSlug) {
-      void deleteTournamentChatHistory(targetSlug);
-    }
-    addActivity("Scores, veto, and chat reset.");
-    renderAll();
+function resetVetoScoreChat() {
+  if (!state?.bracket) return;
+  const { seededEligible, mergedPlayers } = seedEligiblePlayersWithMode(
+    state.players || [],
+    state,
+  );
+  const isRoundRobin = (fmt) =>
+    (fmt || "").toLowerCase().includes("round robin");
+  const bracket = buildBracket(
+    seededEligible,
+    currentTournamentMeta || {},
+    isRoundRobin,
+  );
+  setCurrentVetoMatchIdState(null);
+  setVetoStateState(null);
+  saveState(
+    {
+      players: mergedPlayers,
+      bracket,
+      needsReseed: false,
+      scoreReports: {},
+      matchCasts: {},
+      matchVetoes: {},
+      bracketLayoutVersion: CURRENT_BRACKET_LAYOUT_VERSION,
+      bracketRepairVersion: CURRENT_BRACKET_LAYOUT_VERSION,
+    },
+    { skipRoster: true },
+  );
+  const targetSlug = currentSlug || currentTournamentMeta?.slug || "";
+  if (targetSlug) {
+    void deleteTournamentChatHistory(targetSlug);
   }
+  addActivity("Scores, veto, and chat reset.");
+  renderAll();
+}
 function updateMatchScore(matchId, scoreA, scoreB, options = {}) {
   if (!state.isLive && !isAdmin) {
     showToast?.("Tournament is not live. Bracket is read-only.", "error");
     return;
+  }
+  if (isFinalResetMatchId(state?.bracket, matchId)) {
+    const lookup = state?.bracket ? getMatchLookup(state.bracket) : null;
+    if (!lookup || !isFinalResetActive(state?.bracket, lookup)) {
+      showToast?.(
+        "Grand Final Reset is only played if the lower bracket wins the first final.",
+        "error",
+      );
+      return;
+    }
   }
   const lookupBefore = state?.bracket ? getMatchLookup(state.bracket) : null;
   const matchBefore = lookupBefore?.get(matchId) || null;
@@ -3045,8 +3383,9 @@ function updateMatchScore(matchId, scoreA, scoreB, options = {}) {
   const participants = resolveParticipants(
     matchAfter,
     lookupAfter,
-    playersById
+    playersById,
   );
+  // Don't toast here; wait for the updated bracket snapshot so opponent is accurate.
   const nameA = participants[0]?.name || "TBD";
   const nameB = participants[1]?.name || "TBD";
   const scoreAOut = Number.isFinite(nextScores[0]) ? nextScores[0] : 0;
@@ -3062,6 +3401,17 @@ function updateMatchScore(matchId, scoreA, scoreB, options = {}) {
     skipRemote: true,
   });
   const targetSlug = currentSlug || currentTournamentMeta?.slug || "";
+  if (isAdmin && state?.bracket) {
+    const progress = computeTournamentProgress(state.bracket);
+    if (
+      progress?.isFinished &&
+      targetSlug &&
+      !chatCleanupDone.has(targetSlug)
+    ) {
+      chatCleanupDone.add(targetSlug);
+      void deleteTournamentChatHistory(targetSlug);
+    }
+  }
   if (targetSlug) {
     void submitMatchScoreRemote(
       {
@@ -3071,7 +3421,7 @@ function updateMatchScore(matchId, scoreA, scoreB, options = {}) {
         scoreB,
         finalize: true,
       },
-      showToast
+      showToast,
     ).then((result) => {
       if (result?.updated) return;
       void hydrateStateFromRemote(
@@ -3079,14 +3429,90 @@ function updateMatchScore(matchId, scoreA, scoreB, options = {}) {
         applyRosterSeedingWithMode,
         deserializeBracket,
         saveState,
-        renderAll
+        renderAll,
       );
     });
   }
 }
 
+function collectReadyMatchIdsForCurrentUser(snapshot) {
+  const out = new Set();
+  if (!snapshot?.bracket) return out;
+
+  const lookup = getMatchLookup(snapshot.bracket);
+  const playersById = new Map(
+    (snapshot?.players || []).map((player) => [player?.id, player]),
+  );
+
+  for (const match of getAllMatches(snapshot.bracket)) {
+    if (!match?.id) continue;
+    if (match.status === "complete") continue;
+
+    const [pA, pB] = resolveParticipants(match, lookup, playersById);
+    if (!pA || !pB) continue; // not ready yet
+
+    if (
+      isCurrentUserTournamentPlayerByUid(pA) ||
+      isCurrentUserTournamentPlayerByUid(pB)
+    ) {
+      out.add(match.id);
+    }
+  }
+  return out;
+}
+
+function resolveOpponentInfoForMatch(snapshot, matchId) {
+  const fallback = { name: "TBD", avatarUrl: DEFAULT_PLAYER_AVATAR };
+  if (!snapshot?.bracket || !matchId) return fallback;
+  const lookup = getMatchLookup(snapshot.bracket);
+  const match = lookup.get(matchId);
+  if (!match) return fallback;
+  const playersById = new Map(
+    (snapshot?.players || []).map((player) => [player?.id, player]),
+  );
+  const [pA, pB] = resolveParticipants(match, lookup, playersById);
+  if (!pA || !pB) return fallback;
+  const isA = isCurrentUserTournamentPlayerByUid(pA);
+  const isB = isCurrentUserTournamentPlayerByUid(pB);
+  let opponent = null;
+  if (isA && !isB) opponent = pB;
+  if (isB && !isA) opponent = pA;
+  if (!opponent) opponent = pA || pB;
+  return {
+    name: opponent?.name || "TBD",
+    avatarUrl: opponent?.avatarUrl || DEFAULT_PLAYER_AVATAR,
+  };
+}
+
+function maybeToastMyMatchReady(prevSnapshot, nextSnapshot) {
+  if (!nextSnapshot?.isLive) return;
+  const prevReady = collectReadyMatchIdsForCurrentUser(prevSnapshot);
+  const nextReady = collectReadyMatchIdsForCurrentUser(nextSnapshot);
+
+  // If inspector is already open on that match, don't toast.
+  const modal = document.getElementById("matchInfoModal");
+  const openMatchId = modal?.classList.contains("is-open")
+    ? modal.dataset.matchId || ""
+    : "";
+
+  for (const matchId of nextReady) {
+    if (prevReady.has(matchId)) continue; // not newly ready
+    if (openMatchId === matchId) continue;
+    const opponent = resolveOpponentInfoForMatch(nextSnapshot, matchId);
+
+    showMatchReadyToast({
+      matchId,
+      opponentName: opponent.name,
+      opponentAvatarUrl: opponent.avatarUrl,
+      message: "Your next match is ready.",
+    });
+  }
+}
+
 function normalizePlayerName(value) {
-  return String(value || "").trim().toLowerCase();
+  return String(value || "")
+    .trim()
+    .toLowerCase();
 }
 
 function upsertRosterPlayer(players, incoming) {
@@ -3109,14 +3535,14 @@ function upsertRosterPlayer(players, incoming) {
 function updateRosterById(players, id, patch) {
   if (!id) return players;
   return players.map((player) =>
-    player?.id === id ? { ...player, ...(patch || {}) } : player
+    player?.id === id ? { ...player, ...(patch || {}) } : player,
   );
 }
 
 function updateRosterByUid(players, uid, patch) {
   if (!uid) return players;
   return players.map((player) =>
-    player?.uid === uid ? { ...player, ...(patch || {}) } : player
+    player?.uid === uid ? { ...player, ...(patch || {}) } : player,
   );
 }
 
@@ -3156,8 +3582,8 @@ async function updateRosterWithTransaction(updater, patch = {}, options = {}) {
     const optimisticPlayers = Array.isArray(optimistic?.players)
       ? optimistic.players
       : Array.isArray(optimistic)
-      ? optimistic
-      : state.players || [];
+        ? optimistic
+        : state.players || [];
     applyLocal(optimisticPlayers);
   }
 
@@ -3172,12 +3598,12 @@ async function updateRosterWithTransaction(updater, patch = {}, options = {}) {
         deserializeBracket,
         saveState,
         renderAll,
-        state.lastUpdated
+        state.lastUpdated,
       );
     }
     showToast?.(
       "Roster update failed. Changes may not have been saved.",
-      "error"
+      "error",
     );
     return null;
   }
@@ -3200,15 +3626,15 @@ function saveState(next = {}, options = {}) {
         currentSlug,
         serializeBracket,
         showToast,
-        persistOptions
-      )
+        persistOptions,
+      ),
   );
 }
 
 function rebuildBracket(force = false, reason = "") {
   const { seededEligible, mergedPlayers } = seedEligiblePlayersWithMode(
     state.players || [],
-    state
+    state,
   );
   setStateObj({ ...state, players: mergedPlayers, needsReseed: false });
   const isRoundRobin = (fmt) =>
@@ -3216,19 +3642,21 @@ function rebuildBracket(force = false, reason = "") {
   const bracket = buildBracket(
     seededEligible,
     currentTournamentMeta || {},
-    isRoundRobin
+    isRoundRobin,
   );
-    saveState({
+  saveState(
+    {
       players: mergedPlayers,
       bracket,
       needsReseed: false,
       bracketLayoutVersion: CURRENT_BRACKET_LAYOUT_VERSION,
       bracketRepairVersion: CURRENT_BRACKET_LAYOUT_VERSION,
-    }, { skipRoster: true });
+    },
+    { skipRoster: true },
+  );
   if (reason) addActivity(reason);
   renderAll();
 }
-
 
 function resolveCoverUrlSmall(item = {}) {
   const small = item.coverImageUrlSmall || "";
@@ -3334,7 +3762,7 @@ async function renderTournamentList() {
       } else {
         filtered = filtered.filter(
           (item) =>
-            item.createdBy === userId || registered.has(item.slug || item.id)
+            item.createdBy === userId || registered.has(item.slug || item.id),
         );
       }
     }
@@ -3342,7 +3770,7 @@ async function renderTournamentList() {
       filtered = filtered.filter((item) => userId && item.createdBy === userId);
     } else if (roleFilter === "registered") {
       filtered = filtered.filter((item) =>
-        registered.has(item.slug || item.id)
+        registered.has(item.slug || item.id),
       );
     } else if (roleFilter === "casting") {
       if (!userId) {
@@ -3352,7 +3780,7 @@ async function renderTournamentList() {
           filtered.map(async (item) => ({
             item,
             isCaster: await isCasterForTournament(item.slug, userId),
-          }))
+          })),
         );
         filtered = checks.filter((row) => row.isCaster).map((row) => row.item);
       }
@@ -3360,28 +3788,28 @@ async function renderTournamentList() {
 
     if (!ownerFilterActive && roleFilter === "all") {
       filtered = filtered.filter(
-        (item) => normalizeTournamentVisibility(item.visibility) !== "private"
+        (item) => normalizeTournamentVisibility(item.visibility) !== "private",
       );
     }
 
     const now = Date.now();
     if (statusFilter === "upcoming") {
       filtered = filtered.filter(
-        (item) => item.startTime && item.startTime > now
+        (item) => item.startTime && item.startTime > now,
       );
     } else if (statusFilter === "live" || statusFilter === "finished") {
       const candidates = filtered.filter(
-        (item) => item.startTime && item.startTime <= now
+        (item) => item.startTime && item.startTime <= now,
       );
       const checks = await Promise.all(
         candidates.map(async (item) => ({
           item,
           finished: await getTournamentFinishedStatus(item.slug),
-        }))
+        })),
       );
       filtered = checks
         .filter((row) =>
-          statusFilter === "finished" ? row.finished : !row.finished
+          statusFilter === "finished" ? row.finished : !row.finished,
         )
         .map((row) => row.item);
     }
@@ -3410,7 +3838,7 @@ async function renderTournamentList() {
         }`,
         onPageRender: (targetList) => {
           const targets = Array.from(
-            targetList.querySelectorAll(".tournament-progress")
+            targetList.querySelectorAll(".tournament-progress"),
           ).map((progressEl) => {
             const card = progressEl.closest(".tournament-card");
             return {
@@ -3432,7 +3860,7 @@ async function renderTournamentList() {
                 minute: "2-digit",
               }).format(new Date(item.startTime))
             : "TBD";
-    const coverUrl = sanitizeUrl(resolveCoverUrlSmall(item));
+          const coverUrl = sanitizeUrl(resolveCoverUrlSmall(item));
           let statusLabel = "TBD";
           let statusClass = "status-tbd";
           if (item.startTime) {
@@ -3452,10 +3880,10 @@ async function renderTournamentList() {
           const accessChip = `<span class="status-chip ${accessClass} status-chip-access">${accessLabel}</span>`;
           li.innerHTML = DOMPurify.sanitize(`
             <div class="card-cover${coverUrl ? " has-image" : ""}"${
-            coverUrl
-              ? ` style="background-image:url('${escapeHtml(coverUrl)}')"`
-              : ""
-          }>
+              coverUrl
+                ? ` style="background-image:url('${escapeHtml(coverUrl)}')"`
+                : ""
+            }>
               ${overlayChip}
               ${accessChip}
               <div class="time-block time-block-cover">
@@ -3468,11 +3896,11 @@ async function renderTournamentList() {
               </div>
               <div class="meta">
                 <span>Host: <span translate="no">${escapeHtml(
-                  item.createdByName || "Unknown"
+                  item.createdByName || "Unknown",
                 )}</span></span>
               </div>
               <div class="tournament-progress" data-slug="${escapeHtml(
-                item.slug
+                item.slug,
               )}">
                 <span class="progress-label">Progress</span>
                 <div class="progress-track">
@@ -3515,7 +3943,11 @@ async function renderTournamentList() {
 
 function computeTournamentProgress(bracket) {
   if (!bracket) return null;
-  const matches = getAllMatches(bracket);
+  let matches = getAllMatches(bracket);
+  const lookup = getMatchLookup(bracket);
+  if (bracket.finalsReset && !shouldCountFinalReset(bracket, lookup)) {
+    matches = matches.filter((match) => match?.id !== bracket.finalsReset?.id);
+  }
   if (!matches.length) return null;
   let completed = 0;
   const isWalkoverScore = (value) => {
@@ -3547,6 +3979,8 @@ function computeTournamentProgress(bracket) {
   });
   const percent = Math.round((completed / matches.length) * 100);
   const finalsComplete = isMatchComplete(bracket.finals);
+  const resetActive = isFinalResetActive(bracket, lookup);
+  const finalsResetComplete = isMatchComplete(bracket.finalsReset);
   let winnersFinalComplete = false;
   const winners = Array.isArray(bracket.winners) ? bracket.winners : [];
   if (winners.length) {
@@ -3555,13 +3989,21 @@ function computeTournamentProgress(bracket) {
     winnersFinalComplete = isMatchComplete(finalMatch);
   }
   const groups = Array.isArray(bracket.groups) ? bracket.groups : [];
-  const hasPlayoffs = winners.flat().length || (Array.isArray(bracket.losers) ? bracket.losers.flat().length : 0) || bracket.finals;
+  const hasPlayoffs =
+    winners.flat().length ||
+    (Array.isArray(bracket.losers) ? bracket.losers.flat().length : 0) ||
+    bracket.finals;
   let groupsComplete = false;
   if (groups.length && !hasPlayoffs) {
-    const groupMatches = groups.flatMap((group) => (group?.matches || []));
-    groupsComplete = groupMatches.length > 0 && groupMatches.every(isMatchComplete);
+    const groupMatches = groups.flatMap((group) => group?.matches || []);
+    groupsComplete =
+      groupMatches.length > 0 && groupMatches.every(isMatchComplete);
   }
-  const isFinished = finalsComplete || winnersFinalComplete || groupsComplete || completed === matches.length;
+  const isFinished =
+    (resetActive ? finalsResetComplete : finalsComplete) ||
+    winnersFinalComplete ||
+    groupsComplete ||
+    completed === matches.length;
   return {
     completed,
     total: matches.length,
@@ -3575,7 +4017,7 @@ const TOURNAMENT_PROGRESS_TTL_MS = 30000;
 
 async function getTournamentStateCached(
   slug,
-  { maxAgeMs = TOURNAMENT_PROGRESS_TTL_MS } = {}
+  { maxAgeMs = TOURNAMENT_PROGRESS_TTL_MS } = {},
 ) {
   if (!slug) return null;
   const cached = tournamentStateCache.get(slug);
@@ -3641,14 +4083,14 @@ function updateTournamentProgress(targets = []) {
           statusChip.classList.remove(
             "status-upcoming",
             "status-started",
-            "status-tbd"
+            "status-tbd",
           );
           statusChip.classList.add("status-finished");
         }
       } catch (err) {
         console.warn("Failed to load progress", err);
       }
-    })
+    }),
   );
 }
 
@@ -3685,11 +4127,11 @@ async function populateCreateForm() {
   const checkInSelect = document.getElementById("checkInSelect");
   const accessSelect = document.getElementById("tournamentAccessSelect");
   const visibilitySelect = document.getElementById(
-    "tournamentVisibilitySelect"
+    "tournamentVisibilitySelect",
   );
   const templateSelect = document.getElementById("tournamentTemplateSelect");
   const templateNameInput = document.getElementById(
-    "tournamentTemplateNameInput"
+    "tournamentTemplateNameInput",
   );
   if (imageInput) imageInput.value = "";
   if (imagePreview) {
@@ -3710,14 +4152,17 @@ async function populateCreateForm() {
   const bestOfLowerInput = document.getElementById("bestOfLowerInput");
   const bestOfLowerSemiInput = document.getElementById("bestOfLowerSemiInput");
   const bestOfLowerFinalInput = document.getElementById(
-    "bestOfLowerFinalInput"
+    "bestOfLowerFinalInput",
   );
   const bestOfQuarterInput = document.getElementById("bestOfQuarterInput");
   const bestOfSemiInput = document.getElementById("bestOfSemiInput");
   const bestOfUpperFinalInput = document.getElementById(
-    "bestOfUpperFinalInput"
+    "bestOfUpperFinalInput",
   );
   const bestOfFinalInput = document.getElementById("bestOfFinalInput");
+  const grandFinalResetToggle = document.getElementById(
+    "grandFinalResetToggle",
+  );
   if (bestOfUpperInput) bestOfUpperInput.value = String(defaultBestOf.upper);
   if (bestOfLowerInput) bestOfLowerInput.value = String(defaultBestOf.lower);
   if (bestOfLowerSemiInput)
@@ -3731,6 +4176,7 @@ async function populateCreateForm() {
     bestOfUpperFinalInput.value = String(defaultBestOf.upperFinal);
   }
   if (bestOfFinalInput) bestOfFinalInput.value = String(defaultBestOf.final);
+  if (grandFinalResetToggle) grandFinalResetToggle.checked = false;
   setCreateTournamentCircuitContext("");
 }
 
@@ -3769,29 +4215,32 @@ function openCircuitSettingsModal() {
   const nameInput = document.getElementById("circuitSettingsNameInput");
   const slugInput = document.getElementById("circuitSettingsSlugInput");
   const descriptionInput = document.getElementById(
-    "circuitSettingsDescriptionInput"
+    "circuitSettingsDescriptionInput",
   );
   const finalNameInput = document.getElementById("circuitFinalNameInput");
   const finalSlugInput = document.getElementById("circuitFinalSlugInput");
   const finalVisibilitySelect = document.getElementById(
-    "circuitFinalVisibilitySelect"
+    "circuitFinalVisibilitySelect",
   );
   const finalAccessSelect = document.getElementById("circuitFinalAccessSelect");
   const finalStartInput = document.getElementById("circuitFinalStartInput");
   const finalMaxPlayersInput = document.getElementById(
-    "circuitFinalMaxPlayersInput"
+    "circuitFinalMaxPlayersInput",
   );
   const finalQualifyInput = document.getElementById(
-    "circuitFinalQualifyCountInput"
+    "circuitFinalQualifyCountInput",
   );
   const finalCheckInSelect = document.getElementById(
-    "circuitFinalCheckInSelect"
+    "circuitFinalCheckInSelect",
   );
   const finalDescriptionInput = document.getElementById(
-    "circuitFinalDescriptionInput"
+    "circuitFinalDescriptionInput",
   );
   const finalRulesInput = document.getElementById("circuitFinalRulesInput");
   const finalFormatSelect = document.getElementById("circuitFinalFormatSelect");
+  const finalGrandFinalResetToggle = document.getElementById(
+    "circuitFinalGrandFinalResetToggle",
+  );
   const finalImagePreview = document.getElementById("circuitFinalImagePreview");
   const sponsorsList = document.getElementById("circuitFinalSponsorsList");
   const socialsList = document.getElementById("circuitFinalSocialsList");
@@ -3824,7 +4273,7 @@ function openCircuitSettingsModal() {
       if (finalNameInput) finalNameInput.value = meta.name || "";
       if (finalVisibilitySelect) {
         finalVisibilitySelect.value = normalizeTournamentVisibility(
-          meta.visibility
+          meta.visibility,
         );
       }
       if (finalAccessSelect) {
@@ -3854,7 +4303,7 @@ function openCircuitSettingsModal() {
       if (finalRulesInput) finalRulesInput.value = meta.rules || "";
       syncQuillById?.(
         "circuitFinalDescriptionInput",
-        finalDescriptionInput?.value || ""
+        finalDescriptionInput?.value || "",
       );
       syncQuillById?.("circuitFinalRulesInput", finalRulesInput?.value || "");
       if (finalFormatSelect) {
@@ -3863,22 +4312,22 @@ function openCircuitSettingsModal() {
       }
       const rr = meta.roundRobin || defaultRoundRobinSettings;
       const rrGroups = document.getElementById(
-        "circuitFinalRoundRobinGroupsInput"
+        "circuitFinalRoundRobinGroupsInput",
       );
       const rrAdvance = document.getElementById(
-        "circuitFinalRoundRobinAdvanceInput"
+        "circuitFinalRoundRobinAdvanceInput",
       );
       const rrPlayoffs = document.getElementById(
-        "circuitFinalRoundRobinPlayoffsSelect"
+        "circuitFinalRoundRobinPlayoffsSelect",
       );
       const rrBestOf = document.getElementById(
-        "circuitFinalRoundRobinBestOfInput"
+        "circuitFinalRoundRobinBestOfInput",
       );
       if (rrGroups)
         rrGroups.value = String(rr.groups ?? defaultRoundRobinSettings.groups);
       if (rrAdvance)
         rrAdvance.value = String(
-          rr.advancePerGroup ?? defaultRoundRobinSettings.advancePerGroup
+          rr.advancePerGroup ?? defaultRoundRobinSettings.advancePerGroup,
         );
       if (rrPlayoffs)
         rrPlayoffs.value = rr.playoffs || defaultRoundRobinSettings.playoffs;
@@ -3888,7 +4337,7 @@ function openCircuitSettingsModal() {
       setCircuitFinalMapPoolSelection(
         Array.isArray(meta.mapPool) && meta.mapPool.length
           ? meta.mapPool
-          : getDefaultMapPoolNames()
+          : getDefaultMapPoolNames(),
       );
       const bestOf = meta.bestOf || defaultBestOf;
       const assignBestOf = (id, value) => {
@@ -3903,6 +4352,12 @@ function openCircuitSettingsModal() {
       assignBestOf("circuitFinalBestOfSemiInput", bestOf.semi);
       assignBestOf("circuitFinalBestOfUpperFinalInput", bestOf.upperFinal);
       assignBestOf("circuitFinalBestOfFinalInput", bestOf.final);
+      const circuitFinalResetToggle = document.getElementById(
+        "circuitFinalGrandFinalResetToggle",
+      );
+      if (circuitFinalResetToggle) {
+        circuitFinalResetToggle.checked = Boolean(meta.grandFinalReset);
+      }
       renderCircuitFinalSponsors(meta.sponsors || []);
       renderCircuitFinalSocials(meta.socials || []);
     })
@@ -3921,26 +4376,26 @@ async function saveCircuitSettings() {
   const toggle = document.getElementById("circuitSettingsFirstPlaceSortToggle");
   const nameInput = document.getElementById("circuitSettingsNameInput");
   const descriptionInput = document.getElementById(
-    "circuitSettingsDescriptionInput"
+    "circuitSettingsDescriptionInput",
   );
   const finalNameInput = document.getElementById("circuitFinalNameInput");
   const finalSlugInput = document.getElementById("circuitFinalSlugInput");
   const finalVisibilitySelect = document.getElementById(
-    "circuitFinalVisibilitySelect"
+    "circuitFinalVisibilitySelect",
   );
   const finalAccessSelect = document.getElementById("circuitFinalAccessSelect");
   const finalStartInput = document.getElementById("circuitFinalStartInput");
   const finalMaxPlayersInput = document.getElementById(
-    "circuitFinalMaxPlayersInput"
+    "circuitFinalMaxPlayersInput",
   );
   const finalQualifyInput = document.getElementById(
-    "circuitFinalQualifyCountInput"
+    "circuitFinalQualifyCountInput",
   );
   const finalCheckInSelect = document.getElementById(
-    "circuitFinalCheckInSelect"
+    "circuitFinalCheckInSelect",
   );
   const finalDescriptionInput = document.getElementById(
-    "circuitFinalDescriptionInput"
+    "circuitFinalDescriptionInput",
   );
   const finalRulesInput = document.getElementById("circuitFinalRulesInput");
   const finalFormatSelect = document.getElementById("circuitFinalFormatSelect");
@@ -3959,7 +4414,7 @@ async function saveCircuitSettings() {
         name: circuitName || currentCircuitMeta?.name || "",
         description: circuitDescription,
       },
-      { merge: true }
+      { merge: true },
     );
     currentCircuitMeta = {
       ...currentCircuitMeta,
@@ -3970,7 +4425,7 @@ async function saveCircuitSettings() {
     const finalSlug = (finalSlugInput?.value || "").trim();
     if (finalSlug) {
       const finalVisibility = normalizeTournamentVisibility(
-        finalVisibilitySelect?.value
+        finalVisibilitySelect?.value,
       );
       const finalAccess = normalizeTournamentAccess(finalAccessSelect?.value);
       const finalStartTime = finalStartInput?.value
@@ -3979,7 +4434,7 @@ async function saveCircuitSettings() {
       const finalMaxPlayers = normalizeMaxPlayersForFormat(
         finalMaxPlayersInput?.value,
         finalFormatSelect?.value || "Double Elimination",
-        finalMaxPlayersInput
+        finalMaxPlayersInput,
       );
       if (finalMaxPlayersInput && Number.isFinite(finalMaxPlayers)) {
         finalMaxPlayersInput.value = String(finalMaxPlayers);
@@ -3997,6 +4452,11 @@ async function saveCircuitSettings() {
         description: finalDescriptionInput?.value || "",
         rules: finalRulesInput?.value || "",
         format: (finalFormatSelect?.value || "Double Elimination").trim(),
+        grandFinalReset:
+          allowGrandFinalReset(
+            finalFormatSelect?.value || "Double Elimination",
+            extractRoundRobinSettingsUI("circuitfinal", defaultRoundRobinSettings),
+          ) && Boolean(finalGrandFinalResetToggle?.checked),
         maxPlayers: finalMaxPlayers,
         startTime: finalStartTime,
         checkInWindowMinutes: getCheckInWindowMinutes(finalCheckInSelect),
@@ -4007,7 +4467,7 @@ async function saveCircuitSettings() {
         createdByName: getCurrentUsername() || "Unknown host",
         roundRobin: extractRoundRobinSettingsUI(
           "circuitfinal",
-          defaultRoundRobinSettings
+          defaultRoundRobinSettings,
         ),
         bestOf: readBestOf("circuitfinal", defaultBestOf),
         circuitSlug: currentCircuitMeta.slug,
@@ -4023,14 +4483,14 @@ async function saveCircuitSettings() {
           } catch (err) {
             showToast?.(
               err?.message || "Failed to upload sponsor logo.",
-              "error"
+              "error",
             );
             return;
           }
         }
         const entry = normalizeSponsorEntry(
           { name: sponsor.name, imageUrl, linkUrl: sponsor.linkUrl },
-          { allowEmpty: false }
+          { allowEmpty: false },
         );
         if (entry) processedSponsors.push(entry);
       }
@@ -4039,14 +4499,17 @@ async function saveCircuitSettings() {
         .map((entry) =>
           normalizeSocialEntry(
             { type: entry.type, label: entry.label, url: entry.url },
-            { allowEmpty: false }
-          )
+            { allowEmpty: false },
+          ),
         )
         .filter(Boolean);
       for (const entry of processedSocials) {
         const error = validateSocialUrl(entry.type, entry.url);
         if (error) {
-          showToast?.(`Invalid ${getSocialLabelForType(entry.type)} URL. ${error}`, "error");
+          showToast?.(
+            `Invalid ${getSocialLabelForType(entry.type)} URL. ${error}`,
+            "error",
+          );
           return;
         }
       }
@@ -4054,7 +4517,7 @@ async function saveCircuitSettings() {
       await setDoc(
         doc(collection(db, TOURNAMENT_COLLECTION), finalSlug),
         finalPayload,
-        { merge: true }
+        { merge: true },
       );
       const imageFile = finalImageInput?.files?.[0] || null;
       const reuseUrl = finalImagePreview?.dataset?.reuseUrl || "";
@@ -4069,7 +4532,7 @@ async function saveCircuitSettings() {
               coverImageUrl: uploaded.coverImageUrl,
               coverImageUrlSmall: uploaded.coverImageUrlSmall,
             },
-            { merge: true }
+            { merge: true },
           );
         } catch (err) {
           showToast?.(err?.message || "Failed to upload cover image.", "error");
@@ -4079,7 +4542,7 @@ async function saveCircuitSettings() {
           await setDoc(
             doc(collection(db, TOURNAMENT_COLLECTION), finalSlug),
             { coverImageUrl: reuseUrl, coverImageUrlSmall: "" },
-            { merge: true }
+            { merge: true },
           );
         } catch (err) {
           console.error("Failed to reuse cover image", err);
@@ -4089,7 +4552,7 @@ async function saveCircuitSettings() {
     await renderCircuitLeaderboard(
       currentCircuitMeta,
       normalizeCircuitTournamentSlugs(currentCircuitMeta),
-      { showEdit: isCircuitAdmin }
+      { showEdit: isCircuitAdmin },
     );
     showToast?.("Circuit settings saved.", "success");
     closeCircuitSettingsModal();
@@ -4138,7 +4601,7 @@ async function getTournamentCoverUrlsForDelete(slug) {
   }
   try {
     const tournamentSnap = await getDoc(
-      doc(collection(db, TOURNAMENT_COLLECTION), slug)
+      doc(collection(db, TOURNAMENT_COLLECTION), slug),
     );
     if (!tournamentSnap.exists()) {
       return { coverImageUrl: "", coverImageUrlSmall: "" };
@@ -4156,7 +4619,7 @@ async function getTournamentCoverUrlsForDelete(slug) {
 
 async function deleteTournamentBundle(
   slug,
-  { coverImageUrl = "", coverImageUrlSmall = "" } = {}
+  { coverImageUrl = "", coverImageUrlSmall = "" } = {},
 ) {
   if (!slug) return;
   await deleteTournamentChatHistory(slug);
@@ -4198,13 +4661,13 @@ async function confirmDeleteTournament() {
         updates,
         {
           merge: true,
-        }
+        },
       );
       if (currentCircuitMeta?.slug === circuitSlug) {
         currentCircuitMeta = {
           ...currentCircuitMeta,
           tournaments: (currentCircuitMeta.tournaments || []).filter(
-            (t) => t !== slug
+            (t) => t !== slug,
           ),
           finalTournamentSlug:
             currentCircuitMeta.finalTournamentSlug === slug
@@ -4335,7 +4798,7 @@ async function handleRouteChange() {
     }
     try {
       const snap = await getDoc(
-        doc(collection(db, TOURNAMENT_COLLECTION), route.slug)
+        doc(collection(db, TOURNAMENT_COLLECTION), route.slug),
       );
       if (snap.exists()) {
         const tournamentMeta = snap.data() || {};
@@ -4376,7 +4839,7 @@ async function enterTournament(slug, options = {}) {
   const local = loadLocalState(
     slug,
     applyRosterSeedingWithMode,
-    deserializeBracket
+    deserializeBracket,
   );
   setStateObj(local);
   // Try remote meta first
@@ -4430,7 +4893,7 @@ async function enterTournament(slug, options = {}) {
       renderAll();
       refreshPlayerDetailModalIfOpen(getPlayersMap);
     },
-    state?.lastUpdated || 0
+    state?.lastUpdated || 0,
   );
 
   subscribeTournamentStateRemote(slug);
@@ -4598,7 +5061,7 @@ function isInviteOnlyTournament(meta) {
   if (!meta) return false;
   if (typeof meta.isInviteOnly === "boolean") return meta.isInviteOnly;
   const access = String(
-    meta.accessType || meta.registrationType || ""
+    meta.accessType || meta.registrationType || "",
   ).toLowerCase();
   return access === "closed" || access === "invite-only" || access === "invite";
 }
@@ -4661,7 +5124,7 @@ function normalizeBooleanSetting(value, fallback = true) {
 function getRequirePulseLinkEnabled(meta = currentTournamentMeta) {
   return normalizeBooleanSetting(
     meta?.requirePulseLink,
-    requirePulseLinkSetting
+    requirePulseLinkSetting,
   );
 }
 
@@ -4687,7 +5150,7 @@ function getCheckInWindowState(meta) {
   const windowMinutes = getCheckInWindowMinutesFromMeta(meta);
   const allowAfterStart = normalizeBooleanSetting(
     meta?.allowCheckInAfterStart,
-    false
+    false,
   );
   const isManuallyClosed = Boolean(meta?.checkInManuallyClosed);
   if (!startMs || !windowMinutes) {
@@ -4850,9 +5313,7 @@ function getCheckInWindowMinutes(selectInput) {
 async function deleteTournamentPresence(slug) {
   if (!slug) return;
   try {
-    const colRef = collection(db, "tournamentPresence", slug, "matchInfo");
-    const snap = await getDocs(colRef);
-    await Promise.all(snap.docs.map((docSnap) => deleteDoc(docSnap.ref)));
+    await rtdbRemove(rtdbRef(rtdb, `tournamentPresence/${slug}`));
   } catch (err) {
     console.warn("Failed to delete tournament presence data", err);
   }
@@ -4861,22 +5322,7 @@ async function deleteTournamentPresence(slug) {
 async function deleteTournamentChatHistory(slug) {
   if (!slug) return;
   try {
-    const matchesRef = collection(db, "tournamentChats", slug, "matches");
-    const matchesSnap = await getDocs(matchesRef);
-    for (const matchDoc of matchesSnap.docs) {
-      try {
-        const messagesRef = collection(matchDoc.ref, "messages");
-        const messagesSnap = await getDocs(messagesRef);
-        await Promise.all(messagesSnap.docs.map((msg) => deleteDoc(msg.ref)));
-      } catch (err) {
-        console.warn("Failed to delete match chat messages", err);
-      }
-      try {
-        await deleteDoc(matchDoc.ref);
-      } catch (err) {
-        console.warn("Failed to delete match chat doc", err);
-      }
-    }
+    await rtdbRemove(rtdbRef(rtdb, `tournamentChats/${slug}`));
   } catch (err) {
     console.warn("Failed to delete tournament chat history", err);
   }
@@ -4889,7 +5335,7 @@ async function deleteTournamentInviteLinks(slug) {
       db,
       TOURNAMENT_INVITE_LINK_COLLECTION,
       slug,
-      "links"
+      "links",
     );
     const snap = await getDocs(linksRef);
     await Promise.all(snap.docs.map((docSnap) => deleteDoc(docSnap.ref)));
@@ -4939,7 +5385,7 @@ async function isCoverFolderUsedElsewhere(slug, excludeSlug) {
         isCoverUrlInSlugFolder(String(item.coverImageUrl || "").trim(), slug) ||
         isCoverUrlInSlugFolder(
           String(item.coverImageUrlSmall || "").trim(),
-          slug
+          slug,
         )
       );
     });
@@ -5057,7 +5503,10 @@ async function handleSaveSettings(event) {
   const isSocialsTab = activeSettingsTab === "settingsSocials";
   const isPromosTab = isSponsorsTab || isSocialsTab;
   if (state.isLive && !isDescTab) {
-    showToast?.("Set the tournament to Not Live before saving settings.", "error");
+    showToast?.(
+      "Set the tournament to Not Live before saving settings.",
+      "error",
+    );
     return;
   }
   const formatSelect = document.getElementById("settingsFormatSelect");
@@ -5068,7 +5517,7 @@ async function handleSaveSettings(event) {
   const maxPlayersInput = document.getElementById("settingsMaxPlayersInput");
   const checkInSelect = document.getElementById("settingsCheckInSelect");
   const checkInAfterStartToggle = document.getElementById(
-    "settingsCheckInAfterStartToggle"
+    "settingsCheckInAfterStartToggle",
   );
   const accessSelect = document.getElementById("settingsAccessSelect");
   const visibilitySelect = document.getElementById("settingsVisibilitySelect");
@@ -5077,7 +5526,7 @@ async function handleSaveSettings(event) {
   const imageInput = document.getElementById("settingsImageInput");
   const imagePreview = document.getElementById("settingsImagePreview");
   const copySponsorsToggle = document.getElementById(
-    "settingsCopyCircuitSponsorsToggle"
+    "settingsCopyCircuitSponsorsToggle",
   );
   const imageFile = isGeneralTab ? imageInput?.files?.[0] || null : null;
   const reuseUrl = isGeneralTab ? imagePreview?.dataset.reuseUrl || "" : "";
@@ -5092,6 +5541,13 @@ async function handleSaveSettings(event) {
     currentTournamentMeta?.format ||
     "Tournament"
   ).trim();
+  const rrSettings = isFormatTab
+    ? extractRoundRobinSettingsUI("settings", defaultRoundRobinSettings)
+    : normalizeRoundRobinSettings(currentTournamentMeta?.roundRobin || {});
+  let grandFinalReset = Boolean(currentTournamentMeta?.grandFinalReset);
+  if (allowGrandFinalReset(format, rrSettings) && grandFinalResetToggle) {
+    grandFinalReset = Boolean(grandFinalResetToggle.checked);
+  }
   const description = isDescTab
     ? descInput?.value || ""
     : currentTournamentMeta?.description || "";
@@ -5103,30 +5559,30 @@ async function handleSaveSettings(event) {
       ? new Date(startInput.value)
       : null
     : Number.isFinite(currentTournamentMeta?.startTime)
-    ? new Date(currentTournamentMeta.startTime)
-    : null;
+      ? new Date(currentTournamentMeta.startTime)
+      : null;
   const maxPlayers = isGeneralTab
     ? normalizeMaxPlayersForFormat(
         maxPlayersInput?.value,
         format,
-        maxPlayersInput
+        maxPlayersInput,
       )
     : Number.isFinite(currentTournamentMeta?.maxPlayers)
-    ? currentTournamentMeta.maxPlayers
-    : null;
+      ? currentTournamentMeta.maxPlayers
+      : null;
   if (isGeneralTab && maxPlayersInput && Number.isFinite(maxPlayers)) {
     maxPlayersInput.value = String(maxPlayers);
   }
   const qualifyRaw = isGeneralTab
-    ? qualifyInput?.value ?? ""
-    : currentTournamentMeta?.circuitQualifyCount ?? "";
+    ? (qualifyInput?.value ?? "")
+    : (currentTournamentMeta?.circuitQualifyCount ?? "");
   const qualifyCount =
     qualifyRaw === "" || qualifyRaw === null || qualifyRaw === undefined
       ? null
       : Number(qualifyRaw);
   const checkInWindowMinutes = isGeneralTab
     ? getCheckInWindowMinutes(checkInSelect)
-    : currentTournamentMeta?.checkInWindowMinutes ?? 0;
+    : (currentTournamentMeta?.checkInWindowMinutes ?? 0);
   const allowCheckInAfterStart = isGeneralTab
     ? Boolean(checkInAfterStartToggle?.checked)
     : Boolean(currentTournamentMeta?.allowCheckInAfterStart);
@@ -5142,14 +5598,14 @@ async function handleSaveSettings(event) {
   const mapPool = isMapsTab
     ? Array.from(mapPoolSelection || [])
     : currentTournamentMeta?.mapPool || [];
-  const rrSettings = isFormatTab
-    ? extractRoundRobinSettingsUI("settings", defaultRoundRobinSettings)
-    : normalizeRoundRobinSettings(currentTournamentMeta?.roundRobin || {});
   const hasScores = bracketHasRecordedResults(state.bracket);
   const scoreLocks = getBracketScoreLocks(state.bracket);
   const currentFormat = (currentTournamentMeta?.format || "Tournament").trim();
+  const currentGrandFinalReset = Boolean(
+    currentTournamentMeta?.grandFinalReset,
+  );
   const currentRoundRobin = normalizeRoundRobinSettings(
-    currentTournamentMeta?.roundRobin || {}
+    currentTournamentMeta?.roundRobin || {},
   );
   const nextRoundRobin = normalizeRoundRobinSettings(rrSettings);
   const currentBestOf = {
@@ -5166,7 +5622,7 @@ async function handleSaveSettings(event) {
   const copyFromCircuitPromos = currentTournamentMeta?.circuitSlug
     ? Boolean(
         (isPromosTab ? copySponsorsToggle?.checked : undefined) ??
-          getCopyFromCircuitPromos(currentTournamentMeta)
+        getCopyFromCircuitPromos(currentTournamentMeta),
       )
     : false;
   let coverImageUrl = currentTournamentMeta?.coverImageUrl || "";
@@ -5189,14 +5645,21 @@ async function handleSaveSettings(event) {
     if (format !== currentFormat) {
       showToast?.(
         "Format is locked once scores are recorded. Reset scores to change it.",
-        "error"
+        "error",
+      );
+      return;
+    }
+    if (grandFinalReset !== currentGrandFinalReset) {
+      showToast?.(
+        "Grand Final Reset is locked once scores are recorded. Reset scores to change it.",
+        "error",
       );
       return;
     }
     if (JSON.stringify(nextRoundRobin) !== JSON.stringify(currentRoundRobin)) {
       showToast?.(
         "Round robin settings are locked once scores are recorded.",
-        "error"
+        "error",
       );
       return;
     }
@@ -5211,20 +5674,25 @@ async function handleSaveSettings(event) {
       lockedBestOf.push("Upper Final");
     if (bestOf.final !== currentBestOf.final && scoreLocks.final)
       lockedBestOf.push("Final");
+    if (bestOf.finalReset !== currentBestOf.finalReset && scoreLocks.finalReset)
+      lockedBestOf.push("Final Reset");
     if (bestOf.lower !== currentBestOf.lower && scoreLocks.lower)
       lockedBestOf.push("Lower");
     if (bestOf.lowerSemi !== currentBestOf.lowerSemi && scoreLocks.lowerSemi)
       lockedBestOf.push("Lower Semi");
     if (bestOf.lowerFinal !== currentBestOf.lowerFinal && scoreLocks.lowerFinal)
       lockedBestOf.push("Lower Final");
-    if (nextRoundRobin.bestOf !== currentRoundRobin.bestOf && scoreLocks.roundRobin)
+    if (
+      nextRoundRobin.bestOf !== currentRoundRobin.bestOf &&
+      scoreLocks.roundRobin
+    )
       lockedBestOf.push("Round Robin");
     if (lockedBestOf.length) {
       showToast?.(
         `Best-of is locked for rounds with recorded scores: ${lockedBestOf.join(
-          ", "
+          ", ",
         )}.`,
-        "error"
+        "error",
       );
       return;
     }
@@ -5249,6 +5717,7 @@ async function handleSaveSettings(event) {
     mapPool,
     roundRobin: rrSettings,
     requirePulseLink,
+    grandFinalReset,
     circuitQualifyCount:
       currentTournamentMeta?.isCircuitFinal &&
       Number.isFinite(qualifyCount) &&
@@ -5272,14 +5741,14 @@ async function handleSaveSettings(event) {
           } catch (err) {
             showToast?.(
               err?.message || "Failed to upload sponsor logo.",
-              "error"
+              "error",
             );
             return;
           }
         }
         const entry = normalizeSponsorEntry(
           { name: sponsor.name, imageUrl, linkUrl: sponsor.linkUrl },
-          { allowEmpty: false }
+          { allowEmpty: false },
         );
         if (entry) processedSponsors.push(entry);
       }
@@ -5291,8 +5760,8 @@ async function handleSaveSettings(event) {
         .map((entry) =>
           normalizeSocialEntry(
             { type: entry.type, label: entry.label, url: entry.url },
-            { allowEmpty: false }
-          )
+            { allowEmpty: false },
+          ),
         )
         .filter(Boolean);
       for (const entry of processedSocials) {
@@ -5300,7 +5769,7 @@ async function handleSaveSettings(event) {
         if (error) {
           showToast?.(
             `Invalid ${getSocialLabelForType(entry.type)} URL. ${error}`,
-            "error"
+            "error",
           );
           return;
         }
@@ -5332,7 +5801,7 @@ async function handleSaveSettings(event) {
   await refreshInviteLinksPanel();
   setRequirePulseLinkSettingState(requirePulseLink);
   updateMmrDisplay(document.getElementById("mmrStatus"));
-          saveState({ bracket: state.bracket }, { skipRoster: true }); // keep bracket but bump timestamp via saveState
+  saveState({ bracket: state.bracket }, { skipRoster: true }); // keep bracket but bump timestamp via saveState
   // Reflect slug in the settings input
   const settingsSlugInput = document.getElementById("settingsSlugInput");
   if (settingsSlugInput) settingsSlugInput.value = newSlug;
@@ -5343,7 +5812,7 @@ async function handleSaveSettings(event) {
       await setDoc(
         doc(collection(db, TOURNAMENT_COLLECTION), targetSlug),
         meta,
-        { merge: true }
+        { merge: true },
       );
       showToast?.("Settings saved.", "success");
     } catch (err) {
@@ -5354,7 +5823,10 @@ async function handleSaveSettings(event) {
     showToast?.("Settings saved locally.", "success");
   }
   const shouldRebuild =
-    isFormatTab && format !== currentFormat && !bracketHasRecordedResults(state.bracket);
+    isFormatTab &&
+    (format !== currentFormat ||
+      grandFinalReset !== currentGrandFinalReset) &&
+    !bracketHasRecordedResults(state.bracket);
   if (shouldRebuild) {
     rebuildBracket(true, "Settings updated");
   } else {
@@ -5368,32 +5840,35 @@ async function handleCreateCircuit(event) {
   const slugInput = document.getElementById("circuitSlugInput");
   const descriptionInput = document.getElementById("circuitDescriptionInput");
   const firstPlaceToggle = document.getElementById(
-    "circuitFirstPlaceSortToggle"
+    "circuitFirstPlaceSortToggle",
   );
   const finalNameInput = document.getElementById("finalTournamentNameInput");
   const finalSlugInput = document.getElementById("finalTournamentSlugInput");
   const finalVisibilitySelect = document.getElementById(
-    "finalTournamentVisibilitySelect"
+    "finalTournamentVisibilitySelect",
   );
   const finalAccessSelect = document.getElementById(
-    "finalTournamentAccessSelect"
+    "finalTournamentAccessSelect",
   );
   const finalFormatSelect = document.getElementById("finalFormatSelect");
+  const finalGrandFinalResetToggle = document.getElementById(
+    "finalGrandFinalResetToggle",
+  );
   const finalStartInput = document.getElementById("finalTournamentStartInput");
   const finalMaxPlayersInput = document.getElementById(
-    "finalTournamentMaxPlayersInput"
+    "finalTournamentMaxPlayersInput",
   );
   const finalCheckInSelect = document.getElementById("finalCheckInSelect");
   const finalCheckInAfterStartToggle = document.getElementById(
-    "finalCheckInAfterStartToggle"
+    "finalCheckInAfterStartToggle",
   );
   const finalDescriptionInput = document.getElementById(
-    "finalTournamentDescriptionInput"
+    "finalTournamentDescriptionInput",
   );
   const finalRulesInput = document.getElementById("finalTournamentRulesInput");
   const finalImageInput = document.getElementById("finalTournamentImageInput");
   const finalImagePreview = document.getElementById(
-    "finalTournamentImagePreview"
+    "finalTournamentImagePreview",
   );
   const finalQualifyInput = document.getElementById("finalQualifyCountInput");
   const modal = document.getElementById("createCircuitModal");
@@ -5404,7 +5879,7 @@ async function handleCreateCircuit(event) {
   const description = descriptionInput?.value || "";
   const sortByFirstPlace = Boolean(firstPlaceToggle?.checked);
   const finalVisibility = normalizeTournamentVisibility(
-    finalVisibilitySelect?.value
+    finalVisibilitySelect?.value,
   );
   const finalAccess = normalizeTournamentAccess(finalAccessSelect?.value);
   const finalName =
@@ -5420,14 +5895,14 @@ async function handleCreateCircuit(event) {
   const finalMaxPlayers = normalizeMaxPlayersForFormat(
     finalMaxPlayersInput?.value,
     finalFormat,
-    finalMaxPlayersInput
+    finalMaxPlayersInput,
   );
   if (finalMaxPlayersInput && Number.isFinite(finalMaxPlayers)) {
     finalMaxPlayersInput.value = String(finalMaxPlayers);
   }
   const finalCheckInWindowMinutes = getCheckInWindowMinutes(finalCheckInSelect);
   const finalAllowCheckInAfterStart = Boolean(
-    finalCheckInAfterStartToggle?.checked
+    finalCheckInAfterStartToggle?.checked,
   );
   const finalDescription = finalDescriptionInput?.value || "";
   const finalRules = finalRulesInput?.value || "";
@@ -5442,7 +5917,7 @@ async function handleCreateCircuit(event) {
       : Number(finalQualifyRaw);
   const rrSettings = extractRoundRobinSettingsUI(
     "final",
-    defaultRoundRobinSettings
+    defaultRoundRobinSettings,
   );
   if (!name) {
     showToast?.("Circuit name is required.", "error");
@@ -5484,6 +5959,9 @@ async function handleCreateCircuit(event) {
     description: finalDescription,
     rules: finalRules,
     format: finalFormat,
+    grandFinalReset:
+      allowGrandFinalReset(finalFormat, rrSettings) &&
+      Boolean(finalGrandFinalResetToggle?.checked),
     maxPlayers: finalMaxPlayers,
     startTime: finalStartTime,
     checkInWindowMinutes: finalCheckInWindowMinutes,
@@ -5549,18 +6027,21 @@ async function handleCreateTournament(event) {
   const nameInput = document.getElementById("tournamentNameInput");
   const slugInput = document.getElementById("tournamentSlugInput");
   const formatSelect = document.getElementById("tournamentFormatSelect");
+  const grandFinalResetToggle = document.getElementById(
+    "grandFinalResetToggle",
+  );
   const startInput = document.getElementById("tournamentStartInput");
   const maxPlayersInput = document.getElementById("tournamentMaxPlayersInput");
   const checkInSelect = document.getElementById("checkInSelect");
   const checkInAfterStartToggle = document.getElementById(
-    "checkInAfterStartToggle"
+    "checkInAfterStartToggle",
   );
   const accessSelect = document.getElementById("tournamentAccessSelect");
   const visibilitySelect = document.getElementById(
-    "tournamentVisibilitySelect"
+    "tournamentVisibilitySelect",
   );
   const descriptionInput = document.getElementById(
-    "tournamentDescriptionInput"
+    "tournamentDescriptionInput",
   );
   const rulesInput = document.getElementById("tournamentRulesInput");
   const imageInput = document.getElementById("tournamentImageInput");
@@ -5590,7 +6071,7 @@ async function handleCreateTournament(event) {
   const maxPlayers = normalizeMaxPlayersForFormat(
     maxPlayersInput?.value,
     format,
-    maxPlayersInput
+    maxPlayersInput,
   );
   if (maxPlayersInput && Number.isFinite(maxPlayers)) {
     maxPlayersInput.value = String(maxPlayers);
@@ -5603,8 +6084,11 @@ async function handleCreateTournament(event) {
   const rules = rulesInput?.value || "";
   const rrSettings = extractRoundRobinSettingsUI(
     "create",
-    defaultRoundRobinSettings
+    defaultRoundRobinSettings,
   );
+  const grandFinalReset =
+    allowGrandFinalReset(format, rrSettings) &&
+    Boolean(grandFinalResetToggle?.checked);
   try {
     const payload = buildCreateTournamentPayload({
       slug,
@@ -5623,6 +6107,7 @@ async function handleCreateTournament(event) {
       createdByName: getCurrentUsername() || "Unknown host",
       roundRobin: rrSettings,
       bestOf: readBestOf("create", defaultBestOf),
+      grandFinalReset,
       circuitSlug: circuitSlug || null,
       isCircuitFinal: circuitSlug ? isCircuitFinal : false,
     });
@@ -5640,7 +6125,7 @@ async function handleCreateTournament(event) {
             coverImageUrl: uploaded.coverImageUrl,
             coverImageUrlSmall: uploaded.coverImageUrlSmall,
           },
-          { merge: true }
+          { merge: true },
         );
       } catch (err) {
         showToast?.(err?.message || "Failed to upload cover image.", "error");
@@ -5652,7 +6137,7 @@ async function handleCreateTournament(event) {
         await setDoc(
           doc(collection(db, TOURNAMENT_COLLECTION), slug),
           { coverImageUrl: reuseUrl, coverImageUrlSmall: "" },
-          { merge: true }
+          { merge: true },
         );
       } catch (err) {
         console.error("Failed to reuse cover image", err);
@@ -5669,7 +6154,7 @@ async function handleCreateTournament(event) {
         await setDoc(
           doc(collection(db, CIRCUIT_COLLECTION), circuitSlug),
           circuitPayload,
-          { merge: true }
+          { merge: true },
         );
       } catch (err) {
         console.error("Failed to link tournament to circuit", err);
@@ -5742,7 +6227,7 @@ function setCircuitFinalMapPoolSelection(names) {
   circuitFinalMapPoolSelection = new Set((names || []).filter(Boolean));
   circuitFinalMapPoolMode = isDefaultLadderSelection(
     circuitFinalMapPoolSelection,
-    getDefaultMapPoolNames
+    getDefaultMapPoolNames,
   )
     ? "ladder"
     : "custom";
@@ -5758,7 +6243,7 @@ function toggleCircuitFinalMapSelection(name) {
   }
   circuitFinalMapPoolMode = isDefaultLadderSelection(
     circuitFinalMapPoolSelection,
-    getDefaultMapPoolNames
+    getDefaultMapPoolNames,
   )
     ? "ladder"
     : "custom";
@@ -6038,7 +6523,6 @@ function updateAdminVisibility() {
   }
 }
 
-
 function updateFinalAdminAddVisibility() {
   const panel = document.getElementById("finalAdminAddPanel");
   if (!panel) return;
@@ -6062,7 +6546,6 @@ function recomputeAdminFromMeta() {
   updateAdminVisibility();
   renderTournamentAdmins(currentTournamentMeta);
 }
-
 
 function renderRegistrationPulseSummary() {
   const summaryEl = document.getElementById("registrationPulseSummary");
@@ -6111,7 +6594,7 @@ function hydratePulseFromState(pulseState) {
           mmr: overallMmr,
           secondary,
         }
-      : null
+      : null,
   );
 
   const existingSelection = pulseProfile
@@ -6122,8 +6605,8 @@ function hydratePulseFromState(pulseState) {
     pulseProfile
       ? derivedRace
         ? mmrForRace(derivedRace)
-        : bestMmr ?? overallMmr ?? null
-      : null
+        : (bestMmr ?? overallMmr ?? null)
+      : null,
   );
 
   const hasProfileUrl = Boolean(pulseProfile?.url);
@@ -6216,7 +6699,7 @@ function updateRegistrationRequirementIcons() {
     pulseIcon.classList.toggle("is-valid", hasValid);
     pulseIcon.classList.toggle(
       "is-invalid",
-      requirePulseLinkEnabled && !hasValid
+      requirePulseLinkEnabled && !hasValid,
     );
   }
 }
@@ -6318,10 +6801,10 @@ async function autoFillPlayers() {
     (roster) =>
       createdPlayers.reduce(
         (acc, player) => upsertRosterPlayer(acc, player),
-        roster
+        roster,
       ),
     { needsReseed: false },
-    { optimistic: true }
+    { optimistic: true },
   );
   rebuildBracket(true, "Dev auto-fill");
   addActivity("Auto-filled 32 players for testing.");
@@ -6373,7 +6856,7 @@ function isBotPlayer(player) {
 
 function pickBotName(existingNames) {
   const found = BOT_NAME_POOL.find(
-    (name) => !existingNames.has(name.toLowerCase())
+    (name) => !existingNames.has(name.toLowerCase()),
   );
   if (found) return found;
   let idx = existingNames.size + 1;
@@ -6402,7 +6885,7 @@ async function addBotPlayer() {
   const existingNames = new Set(
     players
       .map((player) => (player?.name || "").trim().toLowerCase())
-      .filter(Boolean)
+      .filter(Boolean),
   );
   const name = pickBotName(existingNames);
   const createdAt = Date.now();
@@ -6421,7 +6904,7 @@ async function addBotPlayer() {
   };
   await updateRosterWithTransaction(
     (roster) => upsertRosterPlayer(roster, bot),
-    { needsReseed: true }
+    { needsReseed: true },
   );
   rebuildBracket(true, `${name} added`);
   addActivity(`${name} added.`);
@@ -6444,7 +6927,7 @@ async function removeAllBots() {
   }
   await updateRosterWithTransaction(
     (roster) => roster.filter((player) => !isBotPlayer(player)),
-    { needsReseed: true }
+    { needsReseed: true },
   );
   rebuildBracket(true, "Bots removed");
   addActivity("All bots removed.");
@@ -6476,7 +6959,7 @@ async function removeBotPlayer() {
   const removed = players[idx];
   await updateRosterWithTransaction(
     (roster) => removeRosterById(roster, removed.id),
-    { needsReseed: true }
+    { needsReseed: true },
   );
   rebuildBracket(true, "Bot removed");
   addActivity(`${removed?.name || "Bot"} removed.`);
@@ -6507,13 +6990,13 @@ async function handleRegistration(event) {
     setStatus(
       statusEl,
       "Sign in and add your SC2Pulse link in Settings first.",
-      true
+      true,
     );
     return;
   }
 
   const existingPlayer = (state.players || []).find(
-    (p) => p.uid === auth.currentUser?.uid
+    (p) => p.uid === auth.currentUser?.uid,
   );
   if (existingPlayer) {
     const inviteStatus = normalizeInviteStatus(existingPlayer.inviteStatus);
@@ -6527,7 +7010,7 @@ async function handleRegistration(event) {
     }
     await updateRosterWithTransaction(
       (players) => removeRosterByUid(players, auth.currentUser?.uid),
-      { needsReseed: true }
+      { needsReseed: true },
     );
     rebuildBracket(true, "Player removed");
     addActivity(`${existingPlayer.name} unregistered.`);
@@ -6543,7 +7026,7 @@ async function handleRegistration(event) {
       setStatus(
         statusEl,
         "This tournament is invite-only. Ask an admin for an invite link or a manual invite.",
-        true
+        true,
       );
       return;
     }
@@ -6558,7 +7041,7 @@ async function handleRegistration(event) {
       setStatus(
         statusEl,
         inviteLinkGate.message || "Invite link invalid.",
-        true
+        true,
       );
       return;
     }
@@ -6574,7 +7057,7 @@ async function handleRegistration(event) {
     setStatus(
       statusEl,
       "Registration is locked once scores are recorded.",
-      true
+      true,
     );
     showToast?.("Registration is locked once scores are recorded.", "error");
     return;
@@ -6601,8 +7084,8 @@ async function handleRegistration(event) {
     requestedPoints === null
       ? null
       : Number.isFinite(requestedPoints)
-      ? Math.max(0, requestedPoints)
-      : null;
+        ? Math.max(0, requestedPoints)
+        : null;
 
   if (requirePulseLinkEnabled && !sc2LinkInput) {
     const message = "This tournament requires your SC2Pulse link.";
@@ -6662,6 +7145,7 @@ async function handleRegistration(event) {
     const qualification = await enforceCircuitFinalQualification({
       name,
       sc2Link: sc2LinkInput,
+      uid: auth.currentUser?.uid || "",
       currentTournamentMeta,
       currentSlug,
       fetchCircuitMeta,
@@ -6672,7 +7156,7 @@ async function handleRegistration(event) {
       setStatus(
         statusEl,
         qualification.message || "Registration is restricted.",
-        true
+        true,
       );
       return;
     }
@@ -6681,7 +7165,7 @@ async function handleRegistration(event) {
       setStatus(
         statusEl,
         "Could not load your MMR. Refresh SC2Pulse in Settings.",
-        true
+        true,
       );
       return;
     }
@@ -6690,6 +7174,7 @@ async function handleRegistration(event) {
       startingPoints = await getCircuitSeedPoints({
         name,
         sc2Link: sc2LinkInput,
+        uid: auth.currentUser?.uid || "",
         circuitSlug: currentTournamentMeta.circuitSlug,
         tournamentSlug: currentSlug,
       });
@@ -6710,7 +7195,7 @@ async function handleRegistration(event) {
       setStatus(
         statusEl,
         "Choose your Z-Build Order avatar in Settings before registering (Google profile pictures are not allowed).",
-        true
+        true,
       );
       return;
     }
@@ -6808,12 +7293,12 @@ async function handleRegistration(event) {
     await updateRosterWithTransaction(
       (players) => upsertRosterPlayer(players, newPlayer),
       { needsReseed: hasCompletedMatches },
-      { optimistic: true }
+      { optimistic: true },
     );
     addActivity(
       `${newPlayer.name} saved (${newPlayer.mmr || "MMR?"} MMR, ${
         newPlayer.points
-      } pts)`
+      } pts)`,
     );
 
     markRegisteredTournament(currentSlug);
@@ -6864,7 +7349,7 @@ function renderFinalAdminSearchResults(results = []) {
     const alreadyAdded = (state.players || []).some(
       (player) =>
         (entry.userId && player.uid === entry.userId) ||
-        (player.name || "").toLowerCase() === entry.username.toLowerCase()
+        (player.name || "").toLowerCase() === entry.username.toLowerCase(),
     );
     if (alreadyAdded) {
       inviteBtn.disabled = true;
@@ -6911,6 +7396,7 @@ function initFinalAdminSearch() {
         startingPoints = await getCircuitSeedPoints({
           name: displayName,
           sc2Link,
+          uid: userId,
           circuitSlug: currentTournamentMeta.circuitSlug,
           tournamentSlug: currentSlug,
         });
@@ -6974,7 +7460,7 @@ function initFinalAdminSearch() {
       await updateRosterWithTransaction(
         (players) => upsertRosterPlayer(players, newPlayer),
         {},
-        { optimistic: true }
+        { optimistic: true },
       );
       if (addMode === "super") {
         addActivity(`Admin added ${newPlayer.name}.`);
@@ -6994,7 +7480,7 @@ function initFinalAdminSearch() {
           console.error("Failed to send invite notification", err);
           showToast?.(
             "Invite created, but notification failed to send.",
-            "error"
+            "error",
           );
         }
       }
@@ -7042,7 +7528,7 @@ function updateMmrDisplay(statusEl, nextRace = null, options = {}) {
     value === undefined ? fallback : Boolean(value);
   const requirePulseLinkEnabled = resolveOverride(
     options.requirePulseLinkEnabled,
-    getRequirePulseLinkEnabled()
+    getRequirePulseLinkEnabled(),
   );
 
   if (!auth.currentUser) {
@@ -7051,7 +7537,7 @@ function updateMmrDisplay(statusEl, nextRace = null, options = {}) {
       requirePulseLinkEnabled
         ? "Sign in and set your SC2Pulse link in Settings to register."
         : "Sign in to register.",
-      true
+      true,
     );
     return;
   }
@@ -7062,7 +7548,7 @@ function updateMmrDisplay(statusEl, nextRace = null, options = {}) {
       requirePulseLinkEnabled
         ? "Set your SC2Pulse link in Settings to load race and MMR."
         : "SC2Pulse link is optional. Add one in Settings to load race and MMR.",
-      requirePulseLinkEnabled
+      requirePulseLinkEnabled,
     );
     return;
   }
@@ -7071,13 +7557,13 @@ function updateMmrDisplay(statusEl, nextRace = null, options = {}) {
     setStatus(
       statusEl,
       `Using ${derivedRace} @ ${derivedMmr} MMR from SC2Pulse.`,
-      false
+      false,
     );
   } else if (derivedRace) {
     setStatus(
       statusEl,
       `No rank found for ${derivedRace} — seeding as 0.`,
-      true
+      true,
     );
   } else if (pulseProfile?.url) {
     setStatus(statusEl, "Waiting for MMR. Refresh SC2Pulse in Settings.", true);
@@ -7086,7 +7572,7 @@ function updateMmrDisplay(statusEl, nextRace = null, options = {}) {
 
 function collectSecondaryPulseLinks() {
   const inputs = document.querySelectorAll(
-    "#secondaryPulseList .secondary-pulse-input"
+    "#secondaryPulseList .secondary-pulse-input",
   );
   const links = [];
   inputs.forEach((input) => {
@@ -7119,7 +7605,7 @@ async function syncCurrentPlayerAvatar(avatarUrl) {
   const existing = players[idx] || {};
   if (existing.avatarUrl === normalized) return;
   await updateRosterWithTransaction((roster) =>
-    updateRosterByUid(roster, uid, { avatarUrl: normalized })
+    updateRosterByUid(roster, uid, { avatarUrl: normalized }),
   );
   renderAll();
   refreshPlayerDetailModalIfOpen(getPlayersMap);
@@ -7131,10 +7617,10 @@ function serializeBracket(bracket) {
     Array.isArray(obj)
       ? obj
       : obj && typeof obj === "object"
-      ? Object.keys(obj)
-          .sort((a, b) => Number(a) - Number(b))
-          .map((key) => obj[key])
-      : [];
+        ? Object.keys(obj)
+            .sort((a, b) => Number(a) - Number(b))
+            .map((key) => obj[key])
+        : [];
   const normalizeRounds = (rounds) =>
     toArr(rounds)
       .map((round) => toArr(round))
@@ -7164,10 +7650,10 @@ function deserializeBracket(bracket) {
     Array.isArray(obj)
       ? obj
       : obj && typeof obj === "object"
-      ? Object.keys(obj)
-          .sort((a, b) => Number(a) - Number(b))
-          .map((key) => obj[key])
-      : [];
+        ? Object.keys(obj)
+            .sort((a, b) => Number(a) - Number(b))
+            .map((key) => obj[key])
+        : [];
   const normalizeRounds = (rounds) =>
     toArr(rounds)
       .map((round) => toArr(round))
@@ -7178,11 +7664,11 @@ function deserializeBracket(bracket) {
   };
   const winners = clampRounds(
     normalizeRounds(bracket.winners),
-    bracket.winnersRoundCount
+    bracket.winnersRoundCount,
   );
   const losers = clampRounds(
     normalizeRounds(bracket.losers),
-    bracket.losersRoundCount
+    bracket.losersRoundCount,
   );
   return {
     ...bracket,
@@ -7219,7 +7705,7 @@ function layoutUpperBracket(bracket, lookup, playersById) {
       } else {
         const parents = match.sources
           .map((src) =>
-            src?.type === "match" ? positions.get(src.matchId) : null
+            src?.type === "match" ? positions.get(src.matchId) : null,
           )
           .filter(Boolean);
         const parentYs = parents.map((p) => p.y + CARD_HEIGHT / 2);
@@ -7255,14 +7741,14 @@ function layoutUpperBracket(bracket, lookup, playersById) {
           CARD_HEIGHT,
           CARD_WIDTH,
           "",
-          ""
-        )
+          "",
+        ),
       );
 
       if (rIdx > 0) {
         const srcs = match.sources
           .map((src) =>
-            src?.type === "match" ? positions.get(src.matchId) : null
+            src?.type === "match" ? positions.get(src.matchId) : null,
           )
           .filter(Boolean);
         const parentIds = (match.sources || [])
@@ -7280,32 +7766,32 @@ function layoutUpperBracket(bracket, lookup, playersById) {
             makeConnector(srcs[0].x + CARD_WIDTH, midY1, junctionX, midY1, {
               from: parentIds[0],
               to: match.id,
-            })
+            }),
           );
           connectors.push(
             makeConnector(srcs[1].x + CARD_WIDTH, midY2, junctionX, midY2, {
               from: parentIds[1],
               to: match.id,
-            })
+            }),
           );
           connectors.push(
             makeVConnector(junctionX, midY1, childMidY, {
               from: parentIds[0],
               to: match.id,
-            })
+            }),
           );
           connectors.push(
             makeVConnector(junctionX, midY2, childMidY, {
               from: parentIds[1],
               to: match.id,
-            })
+            }),
           );
           connectors.push(
             makeConnector(junctionX, childMidY, pos.x, childMidY, {
               from: match.id,
               to: match.id,
               parents: parentIds.join(","),
-            })
+            }),
           );
         }
       }
@@ -7343,7 +7829,7 @@ function makeConnector(x1, y1, x2, y2, meta = {}) {
   const attr = formatConnectorMeta(meta);
   return `<div class="connector h" ${attr} style="left:${Math.min(
     x1,
-    x2
+    x2,
   )}px; top:${y1}px; width:${Math.abs(x2 - x1)}px;"></div>`;
 }
 
@@ -7351,7 +7837,7 @@ function makeVConnector(x, y1, y2, meta = {}) {
   const attr = formatConnectorMeta(meta);
   return `<div class="connector v" ${attr} style="left:${x}px; top:${Math.min(
     y1,
-    y2
+    y2,
   )}px; height:${Math.abs(y2 - y1)}px;"></div>`;
 }
 
@@ -7405,7 +7891,7 @@ function sortRoundsByParents(rounds) {
     }));
 
     const hasRealParents = decorated.some(
-      (d) => d.key !== Number.MAX_SAFE_INTEGER
+      (d) => d.key !== Number.MAX_SAFE_INTEGER,
     );
 
     if (!hasRealParents) {
@@ -7430,12 +7916,20 @@ function getRoundLabel(
   titlePrefix,
   idx,
   totalRounds,
-  { hasGrandFinal = false } = {}
+  { hasGrandFinal = false, hasFinalReset = false } = {},
 ) {
   // idx is 0-based, totalRounds is the number of columns in this section
   const fromEnd = totalRounds - idx; // 1 = last round, 2 = second last, ...
 
   if (titlePrefix === "Upper") {
+    if (hasFinalReset) {
+      if (fromEnd === 1) return "Grand Final Reset";
+      if (fromEnd === 2) return "Grand Final";
+      if (fromEnd === 3) return "Upper Final";
+      if (fromEnd === 4) return "Semi-final";
+      if (fromEnd === 5) return "Quarterfinal";
+      return `Upper Round ${idx + 1}`;
+    }
     if (fromEnd === 1) return hasGrandFinal ? "Grand Final" : "Final";
     if (fromEnd === 2) return hasGrandFinal ? "Upper Final" : "Semi-final";
     if (fromEnd === 3) return hasGrandFinal ? "Semi-final" : "Quarterfinal";

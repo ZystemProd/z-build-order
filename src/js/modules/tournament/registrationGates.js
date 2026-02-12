@@ -1,6 +1,7 @@
 export async function enforceCircuitFinalQualification({
   name,
   sc2Link,
+  uid,
   currentTournamentMeta,
   currentSlug,
   fetchCircuitMeta,
@@ -31,8 +32,13 @@ export async function enforceCircuitFinalQualification({
   if (!leaderboard.length) {
     return { ok: false, message: "Circuit leaderboard is empty." };
   }
-  const key = playerKey(name, sc2Link);
-  const qualified = leaderboard.slice(0, qualifyCount).some((entry) => entry.key === key);
+  const key = uid ? `uid:${uid}` : "";
+  const legacyKey = playerKey(name, sc2Link);
+  const qualified = leaderboard.slice(0, qualifyCount).some(
+    (entry) =>
+      entry.key === key ||
+      (legacyKey && entry.key === legacyKey)
+  );
   if (!qualified) {
     return {
       ok: false,

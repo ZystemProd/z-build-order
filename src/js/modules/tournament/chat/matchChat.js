@@ -1,21 +1,25 @@
 import {
-  addDoc,
-  collection,
-  doc,
-  limit,
-  onSnapshot,
-  orderBy,
+  onValue,
+  push as rtdbPush,
   query,
+  ref as rtdbRef,
+  orderByChild,
+  limitToLast,
   serverTimestamp,
-  setDoc,
-} from "firebase/firestore";
-import { auth, db, getCurrentUsername } from "../../../../app.js";
-import { currentSlug, currentTournamentMeta, isAdmin, state } from "../state.js";
+} from "firebase/database";
+import { httpsCallable } from "firebase/functions";
+import { auth, functions, getCurrentUsername, rtdb } from "../../../../app.js";
+import { currentSlug, state } from "../state.js";
 
 const MATCH_CHAT_COLLECTION = "tournamentChats";
 const MATCH_CHAT_LIMIT = 50;
 const MATCH_CHAT_MAX_LENGTH = 500;
-const chatParticipantCache = new Map();
+const ensureMatchPresenceAccessCallable = httpsCallable(
+  functions,
+  "ensureMatchPresenceAccess",
+);
+const ensuredPresenceForMatch = new Set();
+
 let chatUnsub = null;
 let chatContext = null;
 let chatUnreadEl = null;
@@ -35,7 +39,6 @@ export function setupMatchChatUi({
   uid,
 }) {
   const section = document.getElementById("matchChatSection");
-  const toggle = document.getElementById("matchChatToggle");
   const panel = document.getElementById("matchChatPanel");
   const historyEl = document.getElementById("matchChatHistory");
   const form = document.getElementById("matchChatForm");
@@ -47,7 +50,6 @@ export function setupMatchChatUi({
 
   if (
     !section ||
-    !toggle ||
     !panel ||
     !historyEl ||
     !form ||
@@ -64,19 +66,16 @@ export function setupMatchChatUi({
   const nextStorageKey = getChatStorageKey(nextMatchId, nextUid);
   const sameMatch = nextMatchId === chatMatchId;
   const sameContext =
-    sameMatch &&
-    nextUid === chatUid &&
-    nextStorageKey === chatStorageKey;
+    sameMatch && nextUid === chatUid && nextStorageKey === chatStorageKey;
   const needsFullReset = !section.dataset.chatBound || !sameMatch;
 
-  const canView = Boolean(uid && (isAdmin || isParticipant));
+  const canView = Boolean(uid && isParticipant);
   if (!canView || !currentSlug || !matchId) {
     if (sameMatch && section.dataset.chatBound === "true") {
       stopMatchChat();
       input.value = "";
-      panel.style.display = chatIsOpen ? "grid" : "none";
-      toggle.setAttribute("aria-expanded", chatIsOpen ? "true" : "false");
-      labelEl.textContent = chatIsOpen ? "Hide chat" : "Match chat";
+      panel.style.display = "flex";
+      labelEl.textContent = "Match chat";
       status.textContent = uid
         ? "Only match players can send messages."
         : "Sign in to chat.";
@@ -87,7 +86,6 @@ export function setupMatchChatUi({
     historyEl.replaceChildren();
     input.value = "";
     panel.style.display = "none";
-    toggle.setAttribute("aria-expanded", "false");
     labelEl.textContent = "Match chat";
     status.textContent = "";
     chatIsOpen = false;
@@ -103,16 +101,15 @@ export function setupMatchChatUi({
     return;
   }
 
-  section.style.display = "grid";
+  section.style.display = "flex";
   const uidLookup = buildPlayerUidLookup(state?.players || []);
 
   if (needsFullReset) {
     stopMatchChat();
     historyEl.replaceChildren();
     input.value = "";
-    panel.style.display = "grid";
-    toggle.setAttribute("aria-expanded", "true");
-    labelEl.textContent = "Hide chat";
+    panel.style.display = "flex";
+    labelEl.textContent = "Match chat";
     status.textContent = "";
     chatIsOpen = true;
     lastSeenAtMs = 0;
@@ -125,9 +122,8 @@ export function setupMatchChatUi({
     updateUnreadIndicator(0);
     section.dataset.chatBound = "true";
   } else {
-    panel.style.display = chatIsOpen ? "grid" : "none";
-    toggle.setAttribute("aria-expanded", chatIsOpen ? "true" : "false");
-    labelEl.textContent = chatIsOpen ? "Hide chat" : "Match chat";
+    panel.style.display = "flex";
+    labelEl.textContent = "Match chat";
     if (!sameContext) {
       chatUid = nextUid;
       chatStorageKey = nextStorageKey;
@@ -135,16 +131,10 @@ export function setupMatchChatUi({
     }
   }
 
-  const adminUids = getTournamentAdminUids(currentTournamentMeta);
   const leftUid = resolvePlayerUid(leftPlayer, uidLookup);
   const rightUid = resolvePlayerUid(rightPlayer, uidLookup);
-  const participantUids = uniqueUids([
-    leftUid,
-    rightUid,
-    ...adminUids,
-    uid,
-  ]);
-  const canSend = Boolean(participantUids.includes(uid));
+  const participantUids = uniqueUids([leftUid, rightUid]);
+  const canSend = Boolean(uid && participantUids.includes(uid));
   const displayName = getChatDisplayName();
   if (chatContext) {
     chatContext.canSend = canSend;
@@ -153,7 +143,6 @@ export function setupMatchChatUi({
   if (!sameContext || !chatUnsub) {
     void startMatchChat({
       matchId,
-      participantUids,
       canSend,
       uid,
       displayName,
@@ -165,43 +154,14 @@ export function setupMatchChatUi({
     sendBtn.disabled = !enabled;
   };
 
-  const openChat = () => {
-    panel.style.display = "grid";
-    toggle.setAttribute("aria-expanded", "true");
-    labelEl.textContent = "Hide chat";
-    chatIsOpen = true;
-    unreadCount = 0;
-    updateUnreadIndicator(0);
-    setFormState(canSend);
-    status.textContent = canSend ? "" : "Only match players can send messages.";
-  };
+  panel.style.display = "flex";
+  chatIsOpen = true;
+  unreadCount = 0;
+  updateUnreadIndicator(0);
+  setFormState(canSend);
+  status.textContent = canSend ? "" : "Only match players can send messages.";
 
-  if (chatIsOpen) {
-    setFormState(canSend);
-    status.textContent = canSend ? "" : "Only match players can send messages.";
-  } else {
-    setFormState(false);
-    status.textContent = "";
-  }
-
-  const closeChat = () => {
-    panel.style.display = "none";
-    toggle.setAttribute("aria-expanded", "false");
-    labelEl.textContent = "Match chat";
-    chatIsOpen = false;
-  };
-
-  toggle.onclick = () => {
-    const isOpen = panel.style.display !== "none";
-    if (isOpen) {
-      closeChat();
-    } else {
-      openChat();
-    }
-  };
-
-  form.onsubmit = async (event) => {
-    event.preventDefault();
+  const submitChat = async () => {
     if (!chatContext?.messagesRef) return;
     if (!uid) {
       status.textContent = "Sign in to chat.";
@@ -215,11 +175,15 @@ export function setupMatchChatUi({
     const text = raw.trim().slice(0, MATCH_CHAT_MAX_LENGTH);
     if (!text) return;
     try {
-      await addDoc(chatContext.messagesRef, {
+      await rtdbPush(chatContext.messagesRef, {
         text,
         uid,
         name: chatContext.displayName,
+
+        // ✅ RTDB server timestamp
         createdAt: serverTimestamp(),
+
+        // 🟡 optional
         clientCreatedAt: Date.now(),
       });
       input.value = "";
@@ -228,6 +192,18 @@ export function setupMatchChatUi({
       console.error("Failed to send chat message", err);
       status.textContent = "Message failed to send.";
     }
+  };
+
+  form.onsubmit = async (event) => {
+    event.preventDefault();
+    await submitChat();
+  };
+
+  input.onkeydown = (event) => {
+    if (event.key !== "Enter") return;
+    if (event.shiftKey) return;
+    event.preventDefault();
+    void submitChat();
   };
 }
 
@@ -240,7 +216,9 @@ function buildPlayerUidLookup(players = []) {
     if (player?.id) {
       byId.set(player.id, playerUid);
     }
-    const name = String(player?.name || "").trim().toLowerCase();
+    const name = String(player?.name || "")
+      .trim()
+      .toLowerCase();
     if (!name) return;
     if (!byName.has(name)) byName.set(name, []);
     byName.get(name).push(playerUid);
@@ -255,7 +233,9 @@ function resolvePlayerUid(player, lookup) {
   if (player?.id && lookup.byId.has(player.id)) {
     return lookup.byId.get(player.id) || "";
   }
-  const name = String(player?.name || "").trim().toLowerCase();
+  const name = String(player?.name || "")
+    .trim()
+    .toLowerCase();
   if (name && lookup.byName.has(name)) {
     const candidates = lookup.byName.get(name) || [];
     if (candidates.length === 1) return candidates[0] || "";
@@ -299,18 +279,6 @@ function getChatDisplayName() {
   );
 }
 
-function getTournamentAdminUids(meta) {
-  const uids = [];
-  if (meta?.createdBy) {
-    uids.push(meta.createdBy);
-  }
-  const admins = Array.isArray(meta?.admins) ? meta.admins : [];
-  admins.forEach((entry) => {
-    if (entry?.uid) uids.push(entry.uid);
-  });
-  return uids;
-}
-
 function uniqueUids(list = []) {
   const seen = new Set();
   return list
@@ -325,7 +293,6 @@ function uniqueUids(list = []) {
 
 async function startMatchChat({
   matchId,
-  participantUids = [],
   canSend,
   uid,
   displayName,
@@ -335,52 +302,45 @@ async function startMatchChat({
   const historyEl = document.getElementById("matchChatHistory");
   const status = document.getElementById("matchChatStatus");
   if (!currentSlug || !matchId || !historyEl) return;
-
-  const docRef = doc(db, MATCH_CHAT_COLLECTION, currentSlug, "matches", matchId);
-  const cachedParticipants = chatParticipantCache.get(matchId) || [];
-  const safeParticipants = uniqueUids([...cachedParticipants, ...participantUids]);
-  try {
-    if (safeParticipants.length && safeParticipants.length <= 25) {
-      await setDoc(
-        docRef,
-        {
-          participants: safeParticipants,
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true }
-      );
-      chatParticipantCache.set(matchId, safeParticipants);
-    } else if (safeParticipants.length > 25) {
-      console.warn("Match chat participants exceeded limit, skipping sync.");
+  const ensureKey = `${currentSlug}:${matchId}`;
+  if (!ensuredPresenceForMatch.has(ensureKey)) {
+    if (status) status.textContent = "Loading chat...";
+    try {
+      await ensureMatchPresenceAccessCallable({ slug: currentSlug, matchId });
+      ensuredPresenceForMatch.add(ensureKey);
+    } catch (err) {
+      console.warn("Failed to open match chat", err);
+      if (err?.code === "permission-denied") {
+        if (status) status.textContent = "Chat is unavailable right now.";
+        return;
+      }
+      if (status) status.textContent = "Chat is unavailable right now.";
+      return;
     }
-  } catch (err) {
-    console.warn("Failed to sync match chat participants", err);
-    if (status && err?.code !== "permission-denied") {
-      status.textContent = "Chat is unavailable right now.";
-    }
+  } else {
+    // We already ensured access in this session; attach listener immediately.
+    if (status) status.textContent = "";
   }
 
-  const messagesRef = collection(
-    db,
-    MATCH_CHAT_COLLECTION,
-    currentSlug,
-    "matches",
-    matchId,
-    "messages"
+  const messagesRef = rtdbRef(
+    rtdb,
+    `${MATCH_CHAT_COLLECTION}/${currentSlug}/matches/${matchId}/messages`,
   );
   const messagesQuery = query(
     messagesRef,
-    orderBy("createdAt", "asc"),
-    limit(MATCH_CHAT_LIMIT)
+    orderByChild("createdAt"),
+    limitToLast(MATCH_CHAT_LIMIT),
   );
   chatContext = { messagesRef, canSend, uid, displayName };
-  chatUnsub = onSnapshot(
+  chatUnsub = onValue(
     messagesQuery,
     (snap) => {
-      const messages = snap.docs.map((docSnap) => ({
-        id: docSnap.id,
-        ...(docSnap.data() || {}),
+      const data = snap.val() || {};
+      const messages = Object.entries(data).map(([id, entry]) => ({
+        id,
+        ...(entry || {}),
       }));
+      messages.sort((a, b) => getMessageTimestamp(a) - getMessageTimestamp(b));
       renderMatchChatMessages(messages, uid);
     },
     (err) => {
@@ -390,7 +350,6 @@ async function startMatchChat({
         setTimeout(() => {
           startMatchChat({
             matchId,
-            participantUids,
             canSend,
             uid,
             displayName,
@@ -400,7 +359,7 @@ async function startMatchChat({
         return;
       }
       if (status) status.textContent = "Chat disconnected.";
-    }
+    },
   );
 }
 
@@ -465,7 +424,7 @@ function renderMatchChatMessages(messages = [], uid = null) {
 
 function formatChatTime(entry = {}) {
   const raw = entry.createdAt;
-  const ts = raw?.toMillis ? raw.toMillis() : Number(raw) || entry.clientCreatedAt;
+  const ts = Number(raw) || entry.clientCreatedAt;
   if (!ts) return "";
   const date = new Date(ts);
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -473,7 +432,7 @@ function formatChatTime(entry = {}) {
 
 function getMessageTimestamp(entry = {}) {
   const raw = entry.createdAt;
-  return raw?.toMillis ? raw.toMillis() : Number(raw) || entry.clientCreatedAt || 0;
+  return Number(raw) || entry.clientCreatedAt || 0;
 }
 
 function stopMatchChat() {

@@ -1,7 +1,6 @@
 import { currentTournamentMeta, currentSlug, state, setStateObj } from "./state.js";
 import { computeEliminationPlacements } from "./bracket/placements.js";
-import { playerKey } from "./playerKey.js";
-import { fetchCircuitMeta, normalizeCircuitTournamentSlugs } from "./circuit.js";
+import { fetchCircuitMeta, normalizeCircuitTournamentSlugs, getLeaderboardKey } from "./circuit.js";
 import { loadTournamentStateRemote } from "./sync/persistence.js";
 
 const DEFAULT_CIRCUIT_POINTS = [
@@ -364,12 +363,18 @@ async function loadCircuitSeedPoints(circuitSlug, excludeSlug) {
     if (!snapshot) return;
     const players = Array.isArray(snapshot.players) ? snapshot.players : [];
     players.forEach((player) => {
-      const key = playerKey(player.name, player.sc2Link);
+      const { key, legacyKey } = getLeaderboardKey(player);
       if (!key) return;
       const ledgerPoints = Number(snapshot.pointsLedger?.[key]);
+      const legacyLedgerPoints = Number(snapshot.pointsLedger?.[legacyKey]);
       const useLedger = Number.isFinite(ledgerPoints);
+      const useLegacyLedger = !useLedger && Number.isFinite(legacyLedgerPoints);
       const playerPoints = Number(player.points);
-      const rawPoints = useLedger ? ledgerPoints : playerPoints;
+      const rawPoints = useLedger
+        ? ledgerPoints
+        : useLegacyLedger
+        ? legacyLedgerPoints
+        : playerPoints;
       const points = Number.isFinite(rawPoints) ? rawPoints : 0;
       const current = totals.get(key) || 0;
       totals.set(key, current + points);
@@ -384,13 +389,15 @@ async function loadCircuitSeedPoints(circuitSlug, excludeSlug) {
 export async function getCircuitSeedPoints({
   name,
   sc2Link,
+  uid,
   circuitSlug,
   tournamentSlug,
 } = {}) {
-  const key = playerKey(name, sc2Link);
+  const { key, legacyKey } = getLeaderboardKey({ uid, name, sc2Link });
   if (!key || !circuitSlug) return 0;
   const totals = await loadCircuitSeedPoints(circuitSlug, tournamentSlug || "");
-  return totals.get(key) || 0;
+  if (totals.has(key)) return totals.get(key) || 0;
+  return legacyKey ? totals.get(legacyKey) || 0 : 0;
 }
 
 
@@ -430,15 +437,21 @@ export function handleApplyCircuitPoints(event, { saveState, renderAll } = {}) {
       ? belowRule.points
       : undefined;
     if (!Number.isFinite(points)) return player;
-    const key = playerKey(player.name, player.sc2Link);
+    const { key, legacyKey } = getLeaderboardKey(player);
     const existingEarned = Number(pointsLedger[key]);
-    const earnedBefore = Number.isFinite(existingEarned) ? existingEarned : 0;
+    const legacyEarned = Number(pointsLedger[legacyKey]);
+    const earnedBefore = Number.isFinite(existingEarned)
+      ? existingEarned
+      : Number.isFinite(legacyEarned)
+      ? legacyEarned
+      : 0;
     const existingTotal = Number(player.points);
     const basePoints = Number.isFinite(existingTotal)
       ? Math.max(0, existingTotal - earnedBefore)
       : 0;
     const nextTotal = basePoints + points;
-    if (key) pointsLedger[key] = points;
+    const targetKey = key || legacyKey;
+    if (targetKey) pointsLedger[targetKey] = points;
     updated += 1;
     return { ...player, points: nextTotal };
   });

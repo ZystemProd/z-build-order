@@ -35,7 +35,8 @@ export function ensureRoundRobinPlayoffs(bracket, playersById, lookup) {
   const hasPlayoffs =
     (bracket.winners && bracket.winners.length) ||
     (bracket.losers && bracket.losers.length) ||
-    bracket.finals;
+    bracket.finals ||
+    bracket.finalsReset;
   const nextMode = rrSettings.playoffs || "None";
   if (sameSeeds && hasPlayoffs && (bracket.playoffs?.mode || "") === nextMode) {
     return false;
@@ -50,7 +51,12 @@ export function ensureRoundRobinPlayoffs(bracket, playersById, lookup) {
 
   const includeLosers =
     (rrSettings.playoffs || "").toLowerCase().includes("double");
-  const playoffs = buildEliminationBracket(advancingPlayers, { includeLosers });
+  const includeFinalReset =
+    includeLosers && Boolean(currentTournamentMeta?.grandFinalReset);
+  const playoffs = buildEliminationBracket(advancingPlayers, {
+    includeLosers,
+    includeFinalReset,
+  });
   bracket.playoffs = {
     ...(bracket.playoffs || {}),
     mode: nextMode,
@@ -59,11 +65,13 @@ export function ensureRoundRobinPlayoffs(bracket, playersById, lookup) {
   bracket.winners = playoffs.winners;
   bracket.losers = playoffs.losers;
   bracket.finals = playoffs.finals;
+  bracket.finalsReset = playoffs.finalsReset;
   if (state.matchVetoes) {
     const resetIds = new Set();
     playoffs.winners?.flat().forEach((m) => m?.id && resetIds.add(m.id));
     playoffs.losers?.flat().forEach((m) => m?.id && resetIds.add(m.id));
     if (playoffs.finals?.id) resetIds.add(playoffs.finals.id);
+    if (playoffs.finalsReset?.id) resetIds.add(playoffs.finalsReset.id);
     resetIds.forEach((id) => {
       delete state.matchVetoes[id];
     });

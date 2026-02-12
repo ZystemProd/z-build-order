@@ -101,6 +101,9 @@ function readTournamentTemplateForm(mapPoolSelection) {
   const accessSelect = document.getElementById("tournamentAccessSelect");
   const descriptionInput = document.getElementById("tournamentDescriptionInput");
   const rulesInput = document.getElementById("tournamentRulesInput");
+  const grandFinalResetToggle = document.getElementById(
+    "grandFinalResetToggle",
+  );
   const name = (nameInput?.value || "").trim();
   if (!name) {
     showToast?.("Template name is required.", "error");
@@ -121,6 +124,7 @@ function readTournamentTemplateForm(mapPoolSelection) {
     defaultRoundRobinSettings
   );
   const bestOf = readBestOf("create", defaultBestOf);
+  const grandFinalReset = Boolean(grandFinalResetToggle?.checked);
   const mapPool = Array.from(mapPoolSelection || []);
   return {
     id,
@@ -135,6 +139,7 @@ function readTournamentTemplateForm(mapPoolSelection) {
       rules,
       roundRobin: rrSettings,
       bestOf,
+      grandFinalReset,
       mapPool,
     },
   };
@@ -156,6 +161,9 @@ function applyTournamentTemplate(template, setMapPoolSelection) {
   const rrAdvanceInput = document.getElementById("roundRobinAdvanceInput");
   const rrPlayoffsSelect = document.getElementById("roundRobinPlayoffsSelect");
   const rrBestOfInput = document.getElementById("roundRobinBestOfInput");
+  const grandFinalResetToggle = document.getElementById(
+    "grandFinalResetToggle",
+  );
 
   if (formatSelect) formatSelect.value = settings.format || "Double Elimination";
   syncFormatFieldVisibility("create");
@@ -205,6 +213,10 @@ function applyTournamentTemplate(template, setMapPoolSelection) {
   setBestOf("bestOfSemiInput", bestOf.semi);
   setBestOf("bestOfUpperFinalInput", bestOf.upperFinal);
   setBestOf("bestOfFinalInput", bestOf.final);
+
+  if (grandFinalResetToggle) {
+    grandFinalResetToggle.checked = Boolean(settings.grandFinalReset);
+  }
 
   if (Array.isArray(settings.mapPool)) {
     setMapPoolSelection?.(settings.mapPool);
