@@ -4,8 +4,11 @@ import { readBestOf } from "./tournamentPayloads.js";
 import { extractRoundRobinSettings, syncFormatFieldVisibility } from "./settings/ui.js";
 import { slugify } from "./slugs.js";
 import { syncMarkdownSurfaceForInput } from "./markdownEditor.js";
+import { auth } from "../../../app.js";
+import { loadTournamentRegistry } from "./sync/persistence.js";
 
 const TOURNAMENT_TEMPLATE_STORAGE_KEY = "zbo:tournamentTemplates:v1";
+const TOURNAMENT_COPY_SOURCE_LIMIT = 24;
 let tournamentTemplates = loadTournamentTemplates();
 
 function loadTournamentTemplates() {
@@ -90,6 +93,123 @@ function getCheckInWindowMinutes(selectInput) {
   return Number.isFinite(minutes) && minutes > 0 ? minutes : 0;
 }
 
+function normalizeTournamentVisibility(value) {
+  return String(value || "public").toLowerCase() === "private"
+    ? "private"
+    : "public";
+}
+
+function getTournamentSortTimestamp(meta) {
+  const startTime = Number(meta?.startTime);
+  if (Number.isFinite(startTime) && startTime > 0) return startTime;
+  const updatedAt = Number(meta?.updatedAt);
+  if (Number.isFinite(updatedAt) && updatedAt > 0) return updatedAt;
+  const createdAt = Number(meta?.createdAt);
+  if (Number.isFinite(createdAt) && createdAt > 0) return createdAt;
+  return 0;
+}
+
+function pickRecentTournamentsForCopy(registry, uid) {
+  const all = Array.isArray(registry)
+    ? registry.filter((item) => item && (item.slug || item.id))
+    : [];
+  if (!all.length) return [];
+  const owned = uid ? all.filter((item) => item.createdBy === uid) : [];
+  const source = owned.length ? owned : all;
+  return source
+    .slice()
+    .sort((a, b) => {
+      const diff = getTournamentSortTimestamp(b) - getTournamentSortTimestamp(a);
+      if (diff) return diff;
+      return String(a.name || a.slug || "").localeCompare(
+        String(b.name || b.slug || ""),
+      );
+    })
+    .slice(0, TOURNAMENT_COPY_SOURCE_LIMIT);
+}
+
+function pickRecentTournamentsByCircuit(registry, circuitSlug) {
+  const all = Array.isArray(registry)
+    ? registry.filter((item) => item && (item.slug || item.id))
+    : [];
+  if (!all.length || !circuitSlug) return [];
+  return all
+    .filter((item) => String(item.circuitSlug || "") === String(circuitSlug))
+    .sort((a, b) => {
+      const diff = getTournamentSortTimestamp(b) - getTournamentSortTimestamp(a);
+      if (diff) return diff;
+      return String(a.name || a.slug || "").localeCompare(
+        String(b.name || b.slug || ""),
+      );
+    })
+    .slice(0, TOURNAMENT_COPY_SOURCE_LIMIT);
+}
+
+function buildTournamentCopyGroups(registry, uid, circuitSlug) {
+  const recent = pickRecentTournamentsForCopy(registry, uid);
+  if (!circuitSlug) {
+    return recent.length
+      ? [{ label: "Recent tournaments", items: recent }]
+      : [];
+  }
+  const circuitRecent = pickRecentTournamentsByCircuit(registry, circuitSlug);
+  const circuitIds = new Set(
+    circuitRecent.map((item) => item.slug || item.id).filter(Boolean),
+  );
+  const remainingRecent = recent.filter(
+    (item) => !circuitIds.has(item.slug || item.id),
+  );
+  const groups = [];
+  if (circuitRecent.length) {
+    groups.push({ label: "This circuit", items: circuitRecent });
+  }
+  if (remainingRecent.length) {
+    groups.push({
+      label: circuitRecent.length ? "Other recent tournaments" : "Recent tournaments",
+      items: remainingRecent,
+    });
+  }
+  return groups;
+}
+
+function formatTournamentCopyOptionLabel(meta) {
+  const name = meta?.name || meta?.slug || "Untitled tournament";
+  const format = meta?.format || "Format";
+  const timestamp = getTournamentSortTimestamp(meta);
+  if (!timestamp) return `${name} - ${format}`;
+  const dateLabel = new Date(timestamp).toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+  return `${name} - ${format} - ${dateLabel}`;
+}
+
+function buildTemplateSettingsFromTournament(meta) {
+  return {
+    format: (meta?.format || "Double Elimination").trim(),
+    maxPlayers: Number.isFinite(meta?.maxPlayers) ? Number(meta.maxPlayers) : null,
+    checkInWindowMinutes: Number(meta?.checkInWindowMinutes) > 0
+      ? Number(meta.checkInWindowMinutes)
+      : 0,
+    allowCheckInAfterStart: Boolean(meta?.allowCheckInAfterStart),
+    isInviteOnly: Boolean(meta?.isInviteOnly),
+    visibility: normalizeTournamentVisibility(meta?.visibility),
+    description: meta?.description || "",
+    rules: meta?.rules || "",
+    roundRobin: {
+      ...defaultRoundRobinSettings,
+      ...(meta?.roundRobin || {}),
+    },
+    bestOf: {
+      ...defaultBestOf,
+      ...(meta?.bestOf || {}),
+    },
+    grandFinalReset: Boolean(meta?.grandFinalReset),
+    mapPool: Array.isArray(meta?.mapPool) ? meta.mapPool : [],
+  };
+}
+
 function readTournamentTemplateForm(mapPoolSelection) {
   const nameInput = document.getElementById("tournamentTemplateNameInput");
   const formatSelect = document.getElementById("tournamentFormatSelect");
@@ -99,6 +219,7 @@ function readTournamentTemplateForm(mapPoolSelection) {
     "checkInAfterStartToggle"
   );
   const accessSelect = document.getElementById("tournamentAccessSelect");
+  const visibilitySelect = document.getElementById("tournamentVisibilitySelect");
   const descriptionInput = document.getElementById("tournamentDescriptionInput");
   const rulesInput = document.getElementById("tournamentRulesInput");
   const grandFinalResetToggle = document.getElementById(
@@ -117,6 +238,7 @@ function readTournamentTemplateForm(mapPoolSelection) {
   const checkInWindowMinutes = getCheckInWindowMinutes(checkInSelect);
   const allowCheckInAfterStart = Boolean(checkInAfterStartToggle?.checked);
   const isInviteOnly = accessSelect?.value === "closed";
+  const visibility = normalizeTournamentVisibility(visibilitySelect?.value);
   const description = descriptionInput?.value || "";
   const rules = rulesInput?.value || "";
   const rrSettings = extractRoundRobinSettings(
@@ -135,6 +257,7 @@ function readTournamentTemplateForm(mapPoolSelection) {
       checkInWindowMinutes,
       allowCheckInAfterStart,
       isInviteOnly,
+      visibility,
       description,
       rules,
       roundRobin: rrSettings,
@@ -155,6 +278,7 @@ function applyTournamentTemplate(template, setMapPoolSelection) {
     "checkInAfterStartToggle"
   );
   const accessSelect = document.getElementById("tournamentAccessSelect");
+  const visibilitySelect = document.getElementById("tournamentVisibilitySelect");
   const descriptionInput = document.getElementById("tournamentDescriptionInput");
   const rulesInput = document.getElementById("tournamentRulesInput");
   const rrGroupsInput = document.getElementById("roundRobinGroupsInput");
@@ -183,10 +307,11 @@ function applyTournamentTemplate(template, setMapPoolSelection) {
   if (accessSelect) {
     accessSelect.value = settings.isInviteOnly ? "closed" : "open";
   }
+  if (visibilitySelect) {
+    visibilitySelect.value = normalizeTournamentVisibility(settings.visibility);
+  }
   if (descriptionInput) descriptionInput.value = settings.description || "";
   if (rulesInput) rulesInput.value = settings.rules || "";
-  syncMarkdownSurfaceForInput(descriptionInput);
-  syncMarkdownSurfaceForInput(rulesInput);
   syncMarkdownSurfaceForInput(descriptionInput);
   syncMarkdownSurfaceForInput(rulesInput);
 
@@ -246,8 +371,12 @@ export function initTournamentTemplateManager({
   const templateDeleteBtn = document.getElementById("deleteTournamentTemplateBtn");
   const templateNewBtn = document.getElementById("newTournamentTemplateBtn");
   const templateCloseBtn = document.getElementById("closeTournamentTemplateModal");
+  const copyTournamentSelect = document.getElementById("copyTournamentSettingsSelect");
+  const copyTournamentBtn = document.getElementById("copyTournamentSettingsBtn");
   let activeTemplateId = "";
   let lastTemplateSelection = "";
+  let recentTournamentCopyOptions = [];
+  let copyOptionsRequestId = 0;
 
   const ensureCreateModalHome = () => {
     if (!createModal || !createModalContent) return;
@@ -377,6 +506,79 @@ export function initTournamentTemplateManager({
     renderTemplateList(templates);
   };
 
+  const renderCopyTournamentOptions = (groups) => {
+    if (!copyTournamentSelect) return;
+    const currentValue = copyTournamentSelect.value;
+    const nextOptionMap = new Map();
+    copyTournamentSelect.innerHTML = "";
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    const hasItems = Array.isArray(groups)
+      ? groups.some((group) => Array.isArray(group?.items) && group.items.length > 0)
+      : false;
+    placeholder.textContent = hasItems
+      ? "Choose a tournament..."
+      : "No tournaments available";
+    placeholder.selected = true;
+    copyTournamentSelect.appendChild(placeholder);
+    (groups || []).forEach((group) => {
+      const entries = Array.isArray(group?.items) ? group.items : [];
+      if (!entries.length) return;
+      const optGroup = document.createElement("optgroup");
+      optGroup.label = group?.label || "Recent tournaments";
+      entries.forEach((item) => {
+        const optionValue = item.slug || item.id || "";
+        if (!optionValue || nextOptionMap.has(optionValue)) return;
+        const option = document.createElement("option");
+        option.value = optionValue;
+        option.textContent = formatTournamentCopyOptionLabel(item);
+        optGroup.appendChild(option);
+        nextOptionMap.set(optionValue, item);
+      });
+      if (optGroup.children.length > 0) {
+        copyTournamentSelect.appendChild(optGroup);
+      }
+    });
+    recentTournamentCopyOptions = Array.from(nextOptionMap.values());
+    const hasCurrent = Array.from(copyTournamentSelect.options).some(
+      (option) => option.value === currentValue,
+    );
+    if (hasCurrent) {
+      copyTournamentSelect.value = currentValue;
+    }
+    const disabled = !hasItems;
+    copyTournamentSelect.disabled = disabled;
+    if (copyTournamentBtn) {
+      copyTournamentBtn.disabled = disabled || !copyTournamentSelect.value;
+    }
+  };
+
+  const refreshCopyTournamentOptions = async () => {
+    if (!copyTournamentSelect) return;
+    const requestId = ++copyOptionsRequestId;
+    copyTournamentSelect.innerHTML = "";
+    const loading = document.createElement("option");
+    loading.value = "";
+    loading.textContent = "Loading tournaments...";
+    loading.selected = true;
+    copyTournamentSelect.appendChild(loading);
+    copyTournamentSelect.disabled = true;
+    if (copyTournamentBtn) copyTournamentBtn.disabled = true;
+    try {
+      const registry = await loadTournamentRegistry(true);
+      if (requestId !== copyOptionsRequestId) return;
+      const uid = auth?.currentUser?.uid || "";
+      const circuitSlug = (createModal?.dataset?.circuitSlug || "").trim();
+      const groups = buildTournamentCopyGroups(registry, uid, circuitSlug);
+      renderCopyTournamentOptions(groups);
+    } catch (err) {
+      if (requestId !== copyOptionsRequestId) return;
+      recentTournamentCopyOptions = [];
+      renderCopyTournamentOptions([]);
+      console.warn("Failed to load tournaments for template copy", err);
+    }
+  };
+
   const openTemplateManager = () => {
     if (!templateModal || !templateMain || !createModalContent) return;
     if (createModalContent.parentElement !== templateMain) {
@@ -401,6 +603,7 @@ export function initTournamentTemplateManager({
         delete templateNameInput.dataset.templateId;
       }
     }
+    void refreshCopyTournamentOptions();
     setModalVisible?.(templateModal, true);
   };
 
@@ -451,6 +654,44 @@ export function initTournamentTemplateManager({
   });
   templateCloseBtn?.addEventListener("click", () => {
     closeTemplateManager();
+  });
+  copyTournamentSelect?.addEventListener("change", () => {
+    if (!copyTournamentBtn) return;
+    copyTournamentBtn.disabled =
+      copyTournamentSelect.disabled || !copyTournamentSelect.value;
+  });
+  copyTournamentBtn?.addEventListener("click", () => {
+    const selectedId = copyTournamentSelect?.value || "";
+    if (!selectedId) {
+      showToast?.("Select a tournament to copy from.", "info");
+      return;
+    }
+    const source = recentTournamentCopyOptions.find(
+      (item) => (item.slug || item.id || "") === selectedId,
+    );
+    if (!source) {
+      showToast?.("Could not find that tournament settings.", "error");
+      return;
+    }
+    applyTournamentTemplate(
+      {
+        id: "",
+        name: source.name || "Copied tournament",
+        settings: buildTemplateSettingsFromTournament(source),
+      },
+      setMapPoolSelection,
+    );
+    activeTemplateId = DRAFT_TEMPLATE_ID;
+    lastTemplateSelection = "";
+    if (templateSelect) templateSelect.value = "";
+    if (templateNameInput) {
+      delete templateNameInput.dataset.templateId;
+      if (!templateNameInput.value.trim()) {
+        templateNameInput.value = `${source.name || "Tournament"} template`;
+      }
+    }
+    renderTemplateList(getTournamentTemplates());
+    showToast?.("Tournament settings copied.", "success");
   });
   templateSelect?.addEventListener("change", () => {
     if (!templateSelect) return;

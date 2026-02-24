@@ -4311,6 +4311,69 @@ details.stage-section:not([open]) .stage-toggle::after {
   overflow-y: auto;
 }
 
+.template-manager-copy {
+  display: grid;
+  gap: 8px;
+}
+
+.template-manager-copy-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.template-manager-copy-select {
+  display: flex;
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--stroke);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 0 0 1px rgba(78, 213, 255, 0.18);
+}
+
+.template-manager-copy-select select {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  line-height: 1.2;
+  padding: 10px 30px 10px 12px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.template-manager-copy-select select:focus {
+  outline: none;
+}
+
+.template-manager-copy-select:focus-within {
+  border-color: rgba(78, 213, 255, 0.7);
+  box-shadow:
+    0 0 0 2px rgba(78, 213, 255, 0.2),
+    inset 0 0 0 1px rgba(78, 213, 255, 0.45);
+}
+
+.template-manager-copy-select select option {
+  color: #e7eeff;
+  background: #0b1120;
+}
+
+.template-manager-copy-select select option[value=""] {
+  color: #9aa7c2;
+}
+
+.template-manager-copy-select select optgroup {
+  color: #8fb6ff;
+  background: #0a1020;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.template-manager-copy .cta {
+  width: 100%;
+  justify-content: center;
+}
+
 .template-manager-sidebar-header {
   display: flex;
   align-items: center;

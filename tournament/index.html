@@ -1889,6 +1889,20 @@
         <button class="cta small ghost" id="newTournamentTemplateBtn" type="button">
           New template
         </button>
+        <div class="template-manager-copy">
+          <label class="template-manager-copy-label" for="copyTournamentSettingsSelect">
+            Copy from tournament
+          </label>
+          <div class="template-select template-manager-copy-select">
+            <select id="copyTournamentSettingsSelect" aria-label="Copy settings from tournament">
+              <option value="" selected>Loading tournaments...</option>
+            </select>
+            <span class="template-select-caret">v</span>
+          </div>
+          <button class="cta small ghost" id="copyTournamentSettingsBtn" type="button">
+            Copy settings
+          </button>
+        </div>
         <div class="template-manager-list" id="tournamentTemplateList"></div>
         <p class="helper template-manager-empty" id="tournamentTemplateEmpty">
           No templates saved yet.

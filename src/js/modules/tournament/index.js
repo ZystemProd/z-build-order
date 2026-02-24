@@ -4514,8 +4514,29 @@ async function saveCircuitSettings() {
         }
       }
       finalPayload.socials = processedSocials;
+      const finalTournamentRef = doc(collection(db, TOURNAMENT_COLLECTION), finalSlug);
+      try {
+        const existingFinalSnap = await getDoc(finalTournamentRef);
+        if (existingFinalSnap.exists()) {
+          const existingFinal = existingFinalSnap.data() || {};
+          if (existingFinal.createdBy) {
+            finalPayload.createdBy = existingFinal.createdBy;
+          }
+          if (existingFinal.createdByName) {
+            finalPayload.createdByName = existingFinal.createdByName;
+          }
+          if (existingFinal.circuitSlug) {
+            finalPayload.circuitSlug = existingFinal.circuitSlug;
+          }
+          // Keep existing tournament admin ownership untouched for non-host updates.
+          delete finalPayload.admins;
+          delete finalPayload.adminUids;
+        }
+      } catch (err) {
+        console.warn("Failed to load existing final tournament metadata", err);
+      }
       await setDoc(
-        doc(collection(db, TOURNAMENT_COLLECTION), finalSlug),
+        finalTournamentRef,
         finalPayload,
         { merge: true },
       );
@@ -4527,7 +4548,7 @@ async function saveCircuitSettings() {
           finalPayload.coverImageUrl = uploaded.coverImageUrl;
           finalPayload.coverImageUrlSmall = uploaded.coverImageUrlSmall;
           await setDoc(
-            doc(collection(db, TOURNAMENT_COLLECTION), finalSlug),
+            finalTournamentRef,
             {
               coverImageUrl: uploaded.coverImageUrl,
               coverImageUrlSmall: uploaded.coverImageUrlSmall,
@@ -4540,7 +4561,7 @@ async function saveCircuitSettings() {
       } else if (reuseUrl) {
         try {
           await setDoc(
-            doc(collection(db, TOURNAMENT_COLLECTION), finalSlug),
+            finalTournamentRef,
             { coverImageUrl: reuseUrl, coverImageUrlSmall: "" },
             { merge: true },
           );

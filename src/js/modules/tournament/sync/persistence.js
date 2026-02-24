@@ -90,6 +90,14 @@ export async function loadTournamentRegistry(force = false) {
       const startTime = data.startTime?.toMillis
         ? data.startTime.toMillis()
         : data.startTime;
+      const createdAt = data.createdAt?.toMillis
+        ? data.createdAt.toMillis()
+        : data.createdAt;
+      const updatedAt = data.lastUpdated?.toMillis
+        ? data.lastUpdated.toMillis()
+        : data.lastUpdated;
+      const maxPlayers = Number(data.maxPlayers);
+      const checkInWindowMinutes = Number(data.checkInWindowMinutes);
       return {
         id: d.id,
         slug: data.slug || d.id,
@@ -102,17 +110,29 @@ export async function loadTournamentRegistry(force = false) {
         coverImageUrlSmall: data.coverImageUrlSmall || "",
         sponsors: Array.isArray(data.sponsors) ? data.sponsors : [],
         socials: Array.isArray(data.socials) ? data.socials : [],
-        maxPlayers: data.maxPlayers || null,
+        maxPlayers: Number.isFinite(maxPlayers) ? maxPlayers : null,
         startTime: startTime || null,
+        createdAt: Number.isFinite(createdAt) ? createdAt : null,
+        updatedAt: Number.isFinite(updatedAt) ? updatedAt : null,
         createdBy: data.createdBy || null,
         createdByName: data.createdByName || data.hostName || null,
         circuitSlug: data.circuitSlug || null,
+        checkInWindowMinutes: Number.isFinite(checkInWindowMinutes)
+          ? checkInWindowMinutes
+          : 0,
+        allowCheckInAfterStart: Boolean(data.allowCheckInAfterStart),
+        checkInManuallyClosed: Boolean(data.checkInManuallyClosed),
         isInviteOnly: Boolean(data.isInviteOnly),
         visibility:
           String(data.visibility || "public").toLowerCase() === "private"
             ? "private"
             : "public",
+        roundRobin:
+          data.roundRobin && typeof data.roundRobin === "object"
+            ? data.roundRobin
+            : null,
         bestOf: data.bestOf || defaultState.bestOf || null,
+        grandFinalReset: Boolean(data.grandFinalReset),
       };
     });
     loadTournamentRegistry.cached = list;
