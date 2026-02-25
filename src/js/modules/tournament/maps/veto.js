@@ -1499,7 +1499,7 @@ export function openMatchInfoModal(
   }
 
   if (openVetoBtn) {
-    const canOpenVeto = isAdmin || isParticipant;
+    const canOpenVeto = isAdmin || (state.isLive && isParticipant);
     openVetoBtn.style.display = canOpenVeto ? "" : "none";
     openVetoBtn.onclick = canOpenVeto
       ? () => {

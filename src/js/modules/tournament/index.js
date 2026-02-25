@@ -1949,6 +1949,7 @@ function renderAll(matchIds = null) {
     const statPlayers = document.getElementById("statPlayers");
     const registerBtn = document.getElementById("registerBtn");
     const goLiveBtn = document.getElementById("rebuildBracketBtn");
+    const recreateBracketBtn = document.getElementById("recreateBracketBtn");
     const notifyCheckInBtn = document.getElementById("notifyCheckInBtn");
     const refreshMmrBtn = document.getElementById("refreshMmrBtn");
     const resetTournamentBtn = document.getElementById("resetTournamentBtn");
@@ -2154,17 +2155,30 @@ function renderAll(matchIds = null) {
       const checkInState = getCheckInWindowState(currentTournamentMeta);
       const requiresManualClose =
         checkInState.allowAfterStart && checkInState.isOpen;
+      const canResumeExistingBracket =
+        Boolean(state.hasBeenLive) &&
+        Boolean(state.bracket) &&
+        bracketHasResults();
       if (state.isLive) {
         goLiveBtn.disabled = false;
         goLiveBtn.textContent = "Set Not Live";
         goLiveBtn.classList.add("danger");
         goLiveBtn.classList.remove("success");
       } else {
-        goLiveBtn.disabled = !hasCheckedIn || requiresManualClose;
-        goLiveBtn.textContent = "Go Live";
+        goLiveBtn.disabled = canResumeExistingBracket
+          ? false
+          : !hasCheckedIn || requiresManualClose;
+        goLiveBtn.textContent = canResumeExistingBracket
+          ? "Resume Live"
+          : "Go Live";
         goLiveBtn.classList.add("success");
         goLiveBtn.classList.remove("danger");
       }
+    }
+    if (recreateBracketBtn) {
+      const show = isAdmin && !state.isLive && Boolean(state.hasBeenLive);
+      recreateBracketBtn.style.display = show ? "" : "none";
+      recreateBracketBtn.disabled = false;
     }
     if (resetTournamentBtn) {
       resetTournamentBtn.classList.add("danger");
@@ -2250,10 +2264,8 @@ function renderAll(matchIds = null) {
         bracketGrid.style.display = canShowBracketPreview ? "flex" : "none";
         bracketNotLive.style.display = canShowBracketPreview ? "none" : "block";
 
-        // Hide match inspector when not live.
-        if (matchInfoModal) matchInfoModal.style.display = "none";
-        // Ensure it's closed if it was open.
-        window.setMatchInspectorOpen?.(false);
+        // Keep inspector available in not-live mode.
+        if (matchInfoModal) matchInfoModal.style.display = "";
 
         if (registeredPlayersList) {
           registeredPlayersList.style.display = "";
@@ -2903,6 +2915,14 @@ async function goLiveTournament() {
     showToast?.("Tournament is already live.", "success");
     return;
   }
+  const canResumeExistingBracket =
+    Boolean(state.hasBeenLive) && bracketHasResults() && Boolean(state.bracket);
+  if (canResumeExistingBracket) {
+    saveState({ isLive: true, hasBeenLive: true }, { skipRoster: true });
+    addActivity("Tournament resumed live.");
+    renderAll();
+    return;
+  }
   const checkInState = getCheckInWindowState(currentTournamentMeta);
   if (checkInState.allowAfterStart && checkInState.isOpen) {
     showToast?.("Close check-in before going live.", "error");
@@ -2960,6 +2980,30 @@ async function toggleLiveTournament() {
     return;
   }
   await goLiveTournament();
+}
+
+function recreateLiveBracket(options = {}) {
+  const forceResetScores = Boolean(options?.forceResetScores);
+  if (state.isLive) {
+    showToast?.("Set tournament to not live before recreating bracket.", "error");
+    return false;
+  }
+  if (forceResetScores) {
+    resetScores({ clearReadyTimer: true });
+    showToast?.(
+      "Bracket re-created. Scores, results, and veto outcomes were reset.",
+      "success",
+    );
+    return true;
+  }
+  const hasScores = bracketHasRecordedResults(state.bracket);
+  if (hasScores && !forceResetScores) {
+    showToast?.("Reset scores first before re-creating bracket.", "error");
+    return false;
+  }
+  rebuildBracket(true, "Bracket re-created.");
+  showToast?.("Bracket re-created.", "success");
+  return true;
 }
 
 function addActivity(message, options = {}) {
@@ -3379,7 +3423,8 @@ function resetTournament() {
   addActivity("Tournament reset.");
 }
 
-function resetScores() {
+function resetScores(options = {}) {
+  const clearReadyTimer = Boolean(options?.clearReadyTimer);
   if (!state?.bracket) return;
   const { seededEligible, mergedPlayers } = seedEligiblePlayersWithMode(
     state.players || [],
@@ -3392,6 +3437,8 @@ function resetScores() {
     currentTournamentMeta || {},
     isRoundRobin,
   );
+  setCurrentVetoMatchIdState(null);
+  setVetoStateState(null);
   saveState(
     {
       players: mergedPlayers,
@@ -3399,6 +3446,8 @@ function resetScores() {
       needsReseed: false,
       scoreReports: {},
       matchCasts: {},
+      matchVetoes: {},
+      ...(clearReadyTimer ? { matchReadySince: {} } : {}),
       bracketLayoutVersion: CURRENT_BRACKET_LAYOUT_VERSION,
       bracketRepairVersion: CURRENT_BRACKET_LAYOUT_VERSION,
     },
@@ -6545,6 +6594,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     notifyCheckInPlayers,
     toggleCheckInManualClose,
     toggleLiveTournament,
+    recreateLiveBracket,
+    showToast,
     refreshRosterMmrFromPulse,
   });
   document.addEventListener("click", (event) => {

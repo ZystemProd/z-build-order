@@ -108,6 +108,8 @@ export function initTournamentPage({
   notifyCheckInPlayers,
   toggleCheckInManualClose,
   toggleLiveTournament,
+  recreateLiveBracket,
+  showToast,
   refreshRosterMmrFromPulse,
 }) {
   const runAfterFirstPaint = (fn) => {
@@ -123,6 +125,7 @@ export function initTournamentPage({
 
   const registrationForm = document.getElementById("registrationForm");
   const rebuildBtn = document.getElementById("rebuildBracketBtn");
+  const recreateBracketBtn = document.getElementById("recreateBracketBtn");
   const resetBtn = document.getElementById("resetTournamentBtn");
   const resetScoresBtn = document.getElementById("resetScoresBtn");
   const resetVetoScoreChatBtn = document.getElementById(
@@ -174,6 +177,9 @@ export function initTournamentPage({
     "confirmResetTournamentModal",
   );
   const resetScoresModal = document.getElementById("confirmResetScoresModal");
+  const recreateBracketModal = document.getElementById(
+    "confirmRecreateBracketModal",
+  );
   const resetVetoScoreChatModal = document.getElementById(
     "confirmResetVetoScoreChatModal",
   );
@@ -186,7 +192,13 @@ export function initTournamentPage({
   const confirmResetScoresBtn = document.getElementById(
     "confirmResetScoresBtn",
   );
+  const confirmRecreateBracketBtn = document.getElementById(
+    "confirmRecreateBracketBtn",
+  );
   const cancelResetScoresBtn = document.getElementById("cancelResetScoresBtn");
+  const cancelRecreateBracketBtn = document.getElementById(
+    "cancelRecreateBracketBtn",
+  );
   const confirmResetVetoScoreChatBtn = document.getElementById(
     "confirmResetVetoScoreChatBtn",
   );
@@ -901,7 +913,18 @@ export function initTournamentPage({
   registrationForm?.addEventListener("submit", handleRegistration);
 
   // Lazy-load flatpickr on first interaction.
-  rebuildBtn?.addEventListener("click", () => toggleLiveTournament?.());
+  if (rebuildBtn && rebuildBtn.dataset.liveToggleBound !== "true") {
+    rebuildBtn.dataset.liveToggleBound = "true";
+    rebuildBtn.addEventListener("click", () => toggleLiveTournament?.());
+  }
+  recreateBracketBtn?.addEventListener("click", () => {
+    showToast?.(
+      "Re-create bracket will reset all match scores and results. Choose Proceed or Cancel.",
+      "error",
+      5000,
+    );
+    setModalVisible(recreateBracketModal, true);
+  });
   resetBtn?.addEventListener("click", () => {
     setModalVisible(resetTournamentModal, true);
   });
@@ -1097,6 +1120,13 @@ export function initTournamentPage({
   cancelResetScoresBtn?.addEventListener("click", () => {
     setModalVisible(resetScoresModal, false);
   });
+  confirmRecreateBracketBtn?.addEventListener("click", () => {
+    recreateLiveBracket?.({ forceResetScores: true });
+    setModalVisible(recreateBracketModal, false);
+  });
+  cancelRecreateBracketBtn?.addEventListener("click", () => {
+    setModalVisible(recreateBracketModal, false);
+  });
   confirmResetVetoScoreChatBtn?.addEventListener("click", () => {
     resetVetoScoreChat?.();
     setModalVisible(resetVetoScoreChatModal, false);
@@ -1138,6 +1168,15 @@ export function initTournamentPage({
       e.target === resetScoresModal
     ) {
       setModalVisible(resetScoresModal, false);
+    }
+  });
+  window.addEventListener("mousedown", (e) => {
+    if (
+      recreateBracketModal &&
+      recreateBracketModal.style.display === "flex" &&
+      e.target === recreateBracketModal
+    ) {
+      setModalVisible(recreateBracketModal, false);
     }
   });
   window.addEventListener("mousedown", (e) => {

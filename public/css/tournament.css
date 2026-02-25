@@ -3087,7 +3087,7 @@ details.stage-section:not([open]) .stage-toggle::after {
   height: 100%;
   width: 38px;
   border-radius: 0 10px 10px 0;
-  z-index: 12;
+  z-index: 80;
   background: #1c7f9c;
   border: 1px solid var(--stroke);
   border-left-color: rgba(255, 255, 255, 0.12);
@@ -3123,7 +3123,7 @@ details.stage-section:not([open]) .stage-toggle::after {
   font-weight: 600;
   letter-spacing: 0.02em;
   white-space: nowrap;
-  z-index: 20;
+  z-index: 81;
   opacity: 0;
   pointer-events: none;
   transition:
@@ -3154,6 +3154,13 @@ details.stage-section:not([open]) .stage-toggle::after {
 .match-card.tree.ready .hover-info-container {
   opacity: 1;
   pointer-events: auto;
+}
+
+.match-card.tree:hover,
+.match-card.tree.is-hovering,
+.match-card.group:hover,
+.match-card.group.is-hovering {
+  z-index: 70;
 }
 
 .hover-info-container:hover {

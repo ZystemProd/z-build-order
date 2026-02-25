@@ -1031,6 +1031,7 @@
                   </div>
                   <div class="seeding-right-actions">
                     <button id="notifyCheckInBtn" class="cta small ghost">Notify check-in</button>
+                    <button id="recreateBracketBtn" class="cta small ghost" style="display:none;">Re-create bracket</button>
                     <button id="rebuildBracketBtn" class="cta small ghost">Go Live</button>
                   </div>
                 </div>
@@ -2796,6 +2797,20 @@
       <div class="form-actions">
         <button class="cta danger" id="confirmResetScoresBtn">Yes, reset scores</button>
         <button class="cta ghost" id="cancelResetScoresBtn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Re-create bracket modal -->
+  <div id="confirmRecreateBracketModal" class="modal">
+    <div class="modal-content small-modal">
+      <h3>Re-create bracket</h3>
+      <p class="helper">
+        This will reset all match scores and results, then re-create the bracket from current seeding.
+      </p>
+      <div class="form-actions">
+        <button class="cta danger" id="confirmRecreateBracketBtn">Proceed</button>
+        <button class="cta ghost" id="cancelRecreateBracketBtn">Cancel</button>
       </div>
     </div>
   </div>
