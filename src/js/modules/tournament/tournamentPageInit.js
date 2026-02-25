@@ -74,6 +74,7 @@ export function initTournamentPage({
   updateSettingsDescriptionPreview,
   updateSettingsRulesPreview,
   getPlayersMap,
+  getMatchReadySince,
   getMapByName,
   renderMarkdown,
   mapPoolSelection,
@@ -1751,6 +1752,7 @@ export function initTournamentPage({
     updateMapButtonsUI(currentMapPoolMode);
     setVetoDependencies({
       getPlayersMap,
+      getMatchReadySince,
       getDefaultMapPoolNames,
       getMapByName,
       updateMatchScore,

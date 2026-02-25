@@ -1893,6 +1893,7 @@ function renderAll(matchIds = null) {
   const bracket = state.bracket;
   const playersArr = state.players || [];
   const format = currentTournamentMeta?.format || "Tournament";
+  syncMatchReadySince();
   const shouldPartialUpdate =
     Array.isArray(matchIds) &&
     matchIds.length &&
@@ -1957,6 +1958,15 @@ function renderAll(matchIds = null) {
     );
     const startMs = getStartTimeMs(currentTournamentMeta);
     const liveDot = document.getElementById("liveDot");
+    const bracketPreviewControls = document.getElementById(
+      "bracketPreviewControls",
+    );
+    const bracketShowPreviewToggle = document.getElementById(
+      "bracketShowPreviewToggle",
+    );
+    const bracketShowPreviewPublicToggle = document.getElementById(
+      "bracketShowPreviewPublicToggle",
+    );
     const bracketGrid = document.getElementById("bracketGrid");
     const bracketNotLive = document.getElementById("bracketNotLive");
     const matchInfoModal = document.getElementById("matchInfoModal");
@@ -2190,6 +2200,37 @@ function renderAll(matchIds = null) {
       liveDot.classList.toggle("not-live", !state.isLive);
     }
 
+    const showPreview = Boolean(state.showPreview);
+    const showPreviewPublic = Boolean(state.showPreviewPublic);
+    if (bracketPreviewControls) {
+      bracketPreviewControls.style.display =
+        isAdmin && !state.isLive ? "flex" : "none";
+    }
+    if (bracketShowPreviewToggle) {
+      bracketShowPreviewToggle.checked = showPreview;
+      bracketShowPreviewToggle.disabled = !isAdmin || state.isLive;
+      bracketShowPreviewToggle.onchange = () => {
+        if (!isAdmin || state.isLive) return;
+        saveState(
+          { showPreview: Boolean(bracketShowPreviewToggle.checked) },
+          { skipRoster: true },
+        );
+        renderAll();
+      };
+    }
+    if (bracketShowPreviewPublicToggle) {
+      bracketShowPreviewPublicToggle.checked = showPreviewPublic;
+      bracketShowPreviewPublicToggle.disabled = !isAdmin || state.isLive;
+      bracketShowPreviewPublicToggle.onchange = () => {
+        if (!isAdmin || state.isLive) return;
+        saveState(
+          { showPreviewPublic: Boolean(bracketShowPreviewPublicToggle.checked) },
+          { skipRoster: true },
+        );
+        renderAll();
+      };
+    }
+
     if (bracketGrid && bracketNotLive) {
       if (!state.isLive) {
         const hasBeenLive =
@@ -2204,12 +2245,14 @@ function renderAll(matchIds = null) {
           bracketNotLiveMessage.style.display = hasBeenLive ? "" : "none";
         }
 
-        bracketGrid.style.display = "none";
-        bracketNotLive.style.display = "block";
+        const canShowBracketPreview =
+          showPreviewPublic || (isAdmin && showPreview);
+        bracketGrid.style.display = canShowBracketPreview ? "flex" : "none";
+        bracketNotLive.style.display = canShowBracketPreview ? "none" : "block";
 
-        // ✅ ADD THIS: hide match inspector when not live
+        // Hide match inspector when not live.
         if (matchInfoModal) matchInfoModal.style.display = "none";
-        // ✅ ADD THIS: ensure it's closed if it was open
+        // Ensure it's closed if it was open.
         window.setMatchInspectorOpen?.(false);
 
         if (registeredPlayersList) {
@@ -2260,7 +2303,7 @@ function renderAll(matchIds = null) {
         bracketGrid.style.display = "flex";
         bracketNotLive.style.display = "none";
 
-        // ✅ ADD THIS: show match inspector again when live
+        // Show match inspector again when live.
         if (matchInfoModal) matchInfoModal.style.display = "";
       }
     }
@@ -2441,6 +2484,67 @@ function isInspectorShowingUserWaitingMatch(snapshot, inspectorMatchId) {
 
 const matchReadyToastShown = new Set();
 const matchReadyToastDismissed = new Set();
+
+function normalizeMatchReadySince(source) {
+  if (!source || typeof source !== "object") return {};
+  const normalized = {};
+  for (const [matchId, value] of Object.entries(source)) {
+    if (!matchId) continue;
+    const ts = Number(value);
+    if (Number.isFinite(ts) && ts > 0) {
+      normalized[matchId] = Math.floor(ts);
+    }
+  }
+  return normalized;
+}
+
+function isSameMatchReadySince(a, b) {
+  const left = normalizeMatchReadySince(a);
+  const right = normalizeMatchReadySince(b);
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  if (leftKeys.length !== rightKeys.length) return false;
+  for (const key of leftKeys) {
+    if (!Object.prototype.hasOwnProperty.call(right, key)) return false;
+    if (left[key] !== right[key]) return false;
+  }
+  return true;
+}
+
+function syncMatchReadySince() {
+  const bracket = state?.bracket;
+  const currentReadySince = normalizeMatchReadySince(state?.matchReadySince);
+  if (!bracket) {
+    if (Object.keys(currentReadySince).length) {
+      saveState({ matchReadySince: {} }, { skipRoster: true });
+    }
+    return;
+  }
+  const lookup = getMatchLookup(bracket);
+  const playersById = getPlayersMap();
+  const now = Date.now();
+  const nextReadySince = {};
+  for (const match of getAllMatches(bracket)) {
+    if (!match?.id) continue;
+    const [pA, pB] = resolveParticipants(match, lookup, playersById);
+    const hasTwoPlayers = Boolean(pA && pB);
+    const isComplete = match.status === "complete";
+    if (hasTwoPlayers && !isComplete) {
+      const existing = Number(currentReadySince[match.id]);
+      nextReadySince[match.id] =
+        Number.isFinite(existing) && existing > 0 ? existing : now;
+    }
+  }
+  if (!isSameMatchReadySince(currentReadySince, nextReadySince)) {
+    saveState({ matchReadySince: nextReadySince }, { skipRoster: true });
+  }
+}
+
+function getMatchReadySince(matchId) {
+  if (!matchId) return null;
+  const ts = Number(state?.matchReadySince?.[matchId]);
+  return Number.isFinite(ts) && ts > 0 ? ts : null;
+}
 
 function ensureMatchReadyToastContainer() {
   let container = document.getElementById("toast-container");
@@ -6407,6 +6511,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     updateSettingsDescriptionPreview,
     updateSettingsRulesPreview,
     getPlayersMap,
+    getMatchReadySince,
     getMapByName,
     renderMarkdown,
     mapPoolSelection,
