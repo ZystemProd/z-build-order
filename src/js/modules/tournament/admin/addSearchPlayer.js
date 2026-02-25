@@ -166,7 +166,15 @@ export function createAdminPlayerSearch({
       return;
     }
     try {
-      const userData = {};
+      let userData = {};
+      try {
+        const userSnap = await getDoc(doc(db, "users", userId));
+        if (userSnap.exists()) {
+          userData = userSnap.data() || {};
+        }
+      } catch (_) {
+        // keep add flow robust even if user profile lookup fails
+      }
       await addPlayer({ userId, username: cleaned, userData, options });
       onSuccess?.(cleaned);
     } catch (err) {

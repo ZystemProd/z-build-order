@@ -543,6 +543,8 @@
               <button class="tab-btn" data-tab="descriptionTab">Description &amp; Rules</button>
               <button class="tab-btn" data-tab="mapsTab">Maps</button>
               <button class="tab-btn" data-tab="registrationTab" id="adminTabBtn">Registration</button>
+              <button class="tab-btn" data-tab="superAdminTab" id="superAdminTabBtn" data-super-admin-only="true"
+                style="display:none;">Super Admin</button>
             </div>
             <div class="tab-divider" data-admin-only="true" aria-hidden="true"></div>
             <div class="tab-group admin-tabs" data-admin-only="true">
@@ -945,6 +947,32 @@
               </div>
             </div>
 
+          </section>
+
+          <section id="superAdminTab" class="tab-panel">
+            <div class="card" data-super-admin-only="true" id="superAdminCard" style="display:none;">
+              <div class="card-header">
+                <div>
+                  <p class="eyebrow">Super Admin</p>
+                  <h3>Direct Add Player (Search)</h3>
+                </div>
+              </div>
+              <p class="helper">Search a user by username and add directly to the tournament, bypassing registration.</p>
+              <label>Race for selected user
+                <select id="superAdminRaceSelect" class="settings-input">
+                  <option value="Zerg">Zerg</option>
+                  <option value="Protoss">Protoss</option>
+                  <option value="Terran">Terran</option>
+                  <option value="Random">Random</option>
+                </select>
+              </label>
+              <label>Find player by username
+                <input id="superAdminSearchInput" class="settings-input" type="text"
+                  placeholder="Search username..." autocomplete="off" spellcheck="false" />
+              </label>
+              <div class="admin-search-results" id="superAdminSearchResults"></div>
+              <p class="helper" id="superAdminAddPlayerStatus"></p>
+            </div>
           </section>
 
           <section id="seedingTab" class="tab-panel" data-admin-only="true">

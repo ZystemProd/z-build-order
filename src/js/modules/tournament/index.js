@@ -2,6 +2,7 @@ import {
   auth,
   app,
   db,
+  functions,
   ensureSettingsUiReady,
   getCurrentUsername,
   getCurrentUserAvatarUrl,
@@ -11,6 +12,7 @@ import {
   rtdb,
 } from "../../../app.js";
 import { onAuthStateChanged } from "firebase/auth";
+import { httpsCallable } from "firebase/functions";
 import {
   doc,
   setDoc,
@@ -290,6 +292,7 @@ import {
 } from "./invites.js";
 const renderMapPoolPicker = renderMapPoolPickerUI;
 const CURRENT_BRACKET_LAYOUT_VERSION = 55;
+const SUPER_ADMIN_UID = "3nCnDlMPCiTWNb1MyfvrU8OVvsF2";
 const MAX_TOURNAMENT_IMAGE_SIZE = 12 * 1024 * 1024;
 const COVER_TARGET_WIDTH = 1200;
 const COVER_TARGET_HEIGHT = 675;
@@ -330,6 +333,11 @@ let inviteLinkGate = {
 };
 let selfClanHydrationInFlight = false;
 let selfClanHydrated = false;
+let superAdminAddPlayerCallable = null;
+
+function isSuperAdminUser() {
+  return auth?.currentUser?.uid === SUPER_ADMIN_UID;
+}
 
 function normalizeTournamentVisibility(value) {
   return String(value || "").toLowerCase() === "private" ? "private" : "public";
@@ -6446,6 +6454,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   initCoverReuseModal();
   initCasterControls({ saveState });
   initFinalAdminSearch();
+  initSuperAdminSearch();
   bindTournamentSponsorControls();
   bindTournamentSocialControls();
   bindTournamentPromoSettingsControls(() => currentTournamentMeta);
@@ -6477,6 +6486,9 @@ initBroadcastSync(syncFromRemote, getPersistStorageKey, () => {});
 function switchTab(targetId) {
   const targetPanel = document.getElementById(targetId);
   if (targetPanel && targetPanel.dataset.adminOnly === "true" && !isAdmin) {
+    return;
+  }
+  if (targetId === "superAdminTab" && !isSuperAdminUser()) {
     return;
   }
   if (targetId === "mapsTab" || targetId === "settingsTab") {
@@ -6537,10 +6549,21 @@ function updateAdminVisibility() {
     liveCircuitPointsBtn.style.display =
       isAdmin && currentTournamentMeta?.circuitSlug ? "" : "none";
   }
+  updateSuperAdminVisibility();
   updateFinalAdminAddVisibility();
   updateInviteLinksPanelVisibility();
   if (typeof window !== "undefined") {
     window.__tournamentIsAdmin = isAdmin;
+  }
+}
+
+function updateSuperAdminVisibility() {
+  const allowed = isSuperAdminUser();
+  document.querySelectorAll("[data-super-admin-only='true']").forEach((el) => {
+    el.style.display = allowed ? "" : "none";
+  });
+  if (!allowed && document.querySelector(".tab-btn.active")?.dataset.tab === "superAdminTab") {
+    switchTab("registrationTab");
   }
 }
 
@@ -7341,6 +7364,148 @@ async function handleRegistration(event) {
   } finally {
     setRegisterLoadingState(false);
   }
+}
+
+function setSuperAdminSearchStatus(message) {
+  const statusEl = document.getElementById("superAdminAddPlayerStatus");
+  if (statusEl) statusEl.textContent = message || "";
+}
+
+function renderSuperAdminSearchResults(results = []) {
+  const resultsEl = document.getElementById("superAdminSearchResults");
+  if (!resultsEl) return;
+  resultsEl.replaceChildren();
+  results.forEach((entry) => {
+    const row = document.createElement("div");
+    row.className = "admin-search-item";
+    const label = document.createElement("span");
+    label.setAttribute("translate", "no");
+    label.textContent = entry.username;
+    const addBtn = document.createElement("button");
+    addBtn.type = "button";
+    addBtn.className = "cta small primary";
+    addBtn.textContent = "Add direct";
+    addBtn.dataset.superAdminAddUsername = entry.username;
+    if (entry.userId) {
+      addBtn.dataset.superAdminUserId = entry.userId;
+    }
+    const alreadyAdded = (state.players || []).some(
+      (player) =>
+        (entry.userId && player.uid === entry.userId) ||
+        (player.name || "").toLowerCase() === entry.username.toLowerCase(),
+    );
+    if (alreadyAdded) {
+      addBtn.disabled = true;
+      addBtn.textContent = "Added";
+    }
+    row.append(label, addBtn);
+    resultsEl.append(row);
+  });
+}
+
+async function addSuperAdminPlayerFromSearch({
+  userId,
+  username,
+  userData,
+  selectedRace,
+}) {
+  if (!isSuperAdminUser()) {
+    showToast?.("Unauthorized.", "error");
+    return;
+  }
+  const slug = currentSlug || currentTournamentMeta?.slug || "";
+  if (!slug) throw new Error("Tournament not loaded.");
+  if (!userId) throw new Error("Missing target user id.");
+  const displayName = (userData?.username || username || "").trim();
+  if (!displayName) throw new Error("Missing target username.");
+  const race = normalizeRaceLabel(selectedRace) || "Random";
+  const pulse = userData?.pulse || {};
+  const sc2Link = sanitizeUrl(userData?.sc2PulseUrl || pulse.url || "");
+  const twitchUrl = sanitizeUrl(userData?.twitchUrl || "");
+  const country = String(userData?.country || "").trim().toUpperCase();
+  let startingPoints = null;
+  if (currentTournamentMeta?.circuitSlug && displayName) {
+    startingPoints = await getCircuitSeedPoints({
+      name: displayName,
+      sc2Link,
+      uid: userId,
+      circuitSlug: currentTournamentMeta.circuitSlug,
+      tournamentSlug: currentSlug,
+    });
+  }
+  if (!superAdminAddPlayerCallable) {
+    superAdminAddPlayerCallable = httpsCallable(functions, "superAdminAddPlayer");
+  }
+  await superAdminAddPlayerCallable({
+    slug,
+    name: displayName,
+    race,
+    uid: userId,
+    sc2Link,
+    twitchUrl,
+    country,
+    points: Number.isFinite(startingPoints) ? startingPoints : 0,
+  });
+  await hydrateStateFromRemote(
+    slug,
+    applyRosterSeedingWithMode,
+    deserializeBracket,
+    saveState,
+    renderAll,
+    state?.lastUpdated || 0,
+  );
+  renderAll();
+  showToast?.(`${displayName} added directly to tournament.`, "success");
+}
+
+function initSuperAdminSearch() {
+  const input = document.getElementById("superAdminSearchInput");
+  const resultsEl = document.getElementById("superAdminSearchResults");
+  if (!input || !resultsEl) return;
+  const search = createAdminPlayerSearch({
+    db,
+    getIsEnabled: () => isSuperAdminUser(),
+    getPlayers: () => state.players || [],
+    onStatus: setSuperAdminSearchStatus,
+    onResults: renderSuperAdminSearchResults,
+    onError: (err) => {
+      if (err?.message) showToast?.(err.message, "error");
+    },
+    onSuccess: () => {
+      input.value = "";
+      renderSuperAdminSearchResults([]);
+      setSuperAdminSearchStatus("");
+    },
+    addPlayer: async ({ userId, username, userData, options }) => {
+      const race = normalizeRaceLabel(options?.selectedRace) || "Random";
+      setSuperAdminSearchStatus(`Fetching SC2Pulse MMR for ${race}...`);
+      await addSuperAdminPlayerFromSearch({
+        userId,
+        username,
+        userData,
+        selectedRace: race,
+      });
+      setSuperAdminSearchStatus("Player added.");
+    },
+  });
+
+  input.addEventListener("input", () => {
+    search.debouncedSearch(input.value);
+  });
+  resultsEl.addEventListener("click", (event) => {
+    const target = event.target.closest("[data-super-admin-add-username]");
+    if (!target) return;
+    const username = target.dataset.superAdminAddUsername || "";
+    const userId = target.dataset.superAdminUserId || "";
+    const selectedRace =
+      normalizeRaceLabel(
+        document.getElementById("superAdminRaceSelect")?.value || "Random",
+      ) || "Random";
+    search.addByUsername(username, userId, {
+      mode: "super-admin",
+      selectedRace,
+    });
+  });
 }
 
 function setFinalAdminSearchStatus(message) {
