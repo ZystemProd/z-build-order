@@ -279,6 +279,13 @@ import { createAdminManager } from "./admin/manageAdmins.js";
 import { initCasterControls, renderCasterSection } from "./caster.js";
 import { setTournamentListItems } from "./listSlider.js";
 import {
+  initTabAlerts,
+  setTabAlertsBaseTitle,
+  handleUnreadChatEvent,
+  notifyMatchReadyAlert,
+  clearNotifiedReadyMatch,
+} from "./tabAlerts.js";
+import {
   INVITE_STATUS,
   normalizeInviteStatus,
   isInviteAccepted,
@@ -2009,6 +2016,7 @@ function renderAll(matchIds = null) {
 
     if (tournamentTitle) {
       tournamentTitle.textContent = currentTournamentMeta.name || "Tournament";
+      setTabAlertsBaseTitle(tournamentTitle.textContent);
     }
     const tournamentHero = document.querySelector("#tournamentView .hero");
     if (tournamentHero) {
@@ -2545,6 +2553,11 @@ function syncMatchReadySince() {
       const existing = Number(currentReadySince[match.id]);
       nextReadySince[match.id] =
         Number.isFinite(existing) && existing > 0 ? existing : now;
+    }
+  }
+  for (const matchId of Object.keys(currentReadySince)) {
+    if (!Object.prototype.hasOwnProperty.call(nextReadySince, matchId)) {
+      clearNotifiedReadyMatch(matchId);
     }
   }
   if (!isSameMatchReadySince(currentReadySince, nextReadySince)) {
@@ -3613,8 +3626,9 @@ function collectReadyMatchIdsForCurrentUser(snapshot) {
     if (!pA || !pB) continue; // not ready yet
 
     if (
-      isCurrentUserTournamentPlayerByUid(pA) ||
-      isCurrentUserTournamentPlayerByUid(pB)
+      isAdmin ||
+      isCurrentUserTournamentPlayer(pA) ||
+      isCurrentUserTournamentPlayer(pB)
     ) {
       out.add(match.id);
     }
@@ -3633,6 +3647,12 @@ function resolveOpponentInfoForMatch(snapshot, matchId) {
   );
   const [pA, pB] = resolveParticipants(match, lookup, playersById);
   if (!pA || !pB) return fallback;
+  if (isAdmin) {
+    return {
+      name: `${pA?.name || "TBD"} vs ${pB?.name || "TBD"}`,
+      avatarUrl: DEFAULT_PLAYER_AVATAR,
+    };
+  }
   const isA = isCurrentUserTournamentPlayerByUid(pA);
   const isB = isCurrentUserTournamentPlayerByUid(pB);
   let opponent = null;
@@ -3666,6 +3686,15 @@ function maybeToastMyMatchReady(prevSnapshot, nextSnapshot) {
       opponentName: opponent.name,
       opponentAvatarUrl: opponent.avatarUrl,
       message: "Your next match is ready.",
+    });
+    notifyMatchReadyAlert({
+      matchId,
+      opponentName: opponent.name,
+      tournamentName:
+        currentTournamentMeta?.name ||
+        nextSnapshot?.name ||
+        document.getElementById("tournamentTitle")?.textContent ||
+        "Tournament",
     });
   }
 }
@@ -6498,6 +6527,12 @@ document.addEventListener("tournament:notification-action", (event) => {
 });
 
 document.addEventListener("DOMContentLoaded", async () => {
+  initTabAlerts();
+  document.addEventListener(
+    "tournament:match-chat-unread",
+    handleUnreadChatEvent,
+  );
+
   window.addEventListener("popstate", async () => {
     try {
       await handleRouteChange();

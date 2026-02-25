@@ -657,6 +657,7 @@ export function openVetoModal(
     leftPlayer: pA,
     rightPlayer: pB,
     isParticipant,
+    isAdminUser: isAdmin,
     uid,
   });
 
@@ -870,6 +871,7 @@ export function openMatchInfoModal(
     leftPlayer: pA,
     rightPlayer: pB,
     isParticipant,
+    isAdminUser: isAdmin,
     uid,
   });
 

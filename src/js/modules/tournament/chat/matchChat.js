@@ -30,12 +30,15 @@ let hasInitialized = false;
 let chatStorageKey = "";
 let chatMatchId = "";
 let chatUid = "";
+let latestRenderedMessageTs = 0;
+let chatVisibilityBound = false;
 
 export function setupMatchChatUi({
   matchId,
   leftPlayer,
   rightPlayer,
   isParticipant,
+  isAdminUser,
   uid,
 }) {
   const section = document.getElementById("matchChatSection");
@@ -69,7 +72,7 @@ export function setupMatchChatUi({
     sameMatch && nextUid === chatUid && nextStorageKey === chatStorageKey;
   const needsFullReset = !section.dataset.chatBound || !sameMatch;
 
-  const canView = Boolean(uid && isParticipant);
+  const canView = Boolean(uid && (isParticipant || isAdminUser));
   if (!canView || !currentSlug || !matchId) {
     if (sameMatch && section.dataset.chatBound === "true") {
       stopMatchChat();
@@ -115,6 +118,7 @@ export function setupMatchChatUi({
     lastSeenAtMs = 0;
     unreadCount = 0;
     hasInitialized = false;
+    latestRenderedMessageTs = 0;
     chatMatchId = nextMatchId;
     chatUid = nextUid;
     chatStorageKey = nextStorageKey;
@@ -128,14 +132,32 @@ export function setupMatchChatUi({
       chatUid = nextUid;
       chatStorageKey = nextStorageKey;
       lastSeenAtMs = loadLastSeenAtMs(chatStorageKey);
+      latestRenderedMessageTs = 0;
     }
+  }
+
+  if (!chatVisibilityBound && typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState !== "visible") return;
+      if (!chatIsOpen) return;
+      if (latestRenderedMessageTs > lastSeenAtMs) {
+        lastSeenAtMs = latestRenderedMessageTs;
+        persistLastSeenAtMs(chatStorageKey, lastSeenAtMs);
+      }
+      unreadCount = 0;
+      updateUnreadIndicator(0);
+    });
+    chatVisibilityBound = true;
   }
 
   const leftUid = resolvePlayerUid(leftPlayer, uidLookup);
   const rightUid = resolvePlayerUid(rightPlayer, uidLookup);
   const participantUids = uniqueUids([leftUid, rightUid]);
-  const canSend = Boolean(uid && participantUids.includes(uid));
-  const displayName = getChatDisplayName();
+  const canSend = Boolean(uid && (participantUids.includes(uid) || isAdminUser));
+  const displayName = getChatDisplayName({
+    isAdminUser: Boolean(isAdminUser),
+    isParticipant: Boolean(isParticipant),
+  });
   if (chatContext) {
     chatContext.canSend = canSend;
     chatContext.displayName = displayName;
@@ -271,12 +293,15 @@ export function teardownMatchChatUi() {
   updateUnreadIndicator(0);
 }
 
-function getChatDisplayName() {
-  return (
+function getChatDisplayName({ isAdminUser = false, isParticipant = false } = {}) {
+  const base =
     (getCurrentUsername?.() || "").trim() ||
     auth?.currentUser?.displayName ||
-    "Player"
-  );
+    "Player";
+  if (isAdminUser && !isParticipant) {
+    return `${base} (admin)`;
+  }
+  return base;
 }
 
 function uniqueUids(list = []) {
@@ -405,10 +430,12 @@ function renderMatchChatMessages(messages = [], uid = null) {
 
   const latest = messages[messages.length - 1];
   const latestTs = getMessageTimestamp(latest);
+  latestRenderedMessageTs = latestTs;
   if (!hasInitialized) {
     hasInitialized = true;
   }
-  if (chatIsOpen) {
+  const chatVisibleToUser = chatIsOpen && document.visibilityState === "visible";
+  if (chatVisibleToUser) {
     if (latestTs > lastSeenAtMs) lastSeenAtMs = latestTs;
     unreadCount = 0;
     persistLastSeenAtMs(chatStorageKey, lastSeenAtMs);
@@ -448,10 +475,19 @@ function stopMatchChat() {
 }
 
 function updateUnreadIndicator(count) {
-  if (!chatUnreadEl) return;
   const safeCount = Number.isFinite(count) ? count : 0;
-  chatUnreadEl.textContent = safeCount > 0 ? String(safeCount) : "";
-  chatUnreadEl.classList.toggle("is-visible", safeCount > 0);
+  if (chatUnreadEl) {
+    chatUnreadEl.textContent = safeCount > 0 ? String(safeCount) : "";
+    chatUnreadEl.classList.toggle("is-visible", safeCount > 0);
+  }
+  document.dispatchEvent(
+    new CustomEvent("tournament:match-chat-unread", {
+      detail: {
+        count: safeCount,
+        matchId: chatMatchId || "",
+      },
+    }),
+  );
 }
 
 function getChatStorageKey(matchId, uid) {

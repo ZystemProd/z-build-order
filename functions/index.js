@@ -473,6 +473,10 @@ function isAdminForMeta(meta, uid) {
   return admins.some((entry) => entry.uid === uid);
 }
 
+function normalizeNameKey(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
 function deserializeBracketState(bracket) {
   if (!bracket || typeof bracket !== "object") return bracket || null;
   const toArr = (obj) =>
@@ -2428,9 +2432,29 @@ exports.ensureMatchPresenceAccess = onCall(
     const participantUids = participants
       .map((player) => player?.uid)
       .filter(Boolean);
+    const participantNameKeys = participants
+      .map((player) => normalizeNameKey(player?.name))
+      .filter(Boolean);
 
     const isAdmin = isAdminForMeta(meta, uid);
-    if (!participantUids.includes(uid) && !isAdmin) {
+    let isParticipant = participantUids.includes(uid);
+    if (!isParticipant && !isAdmin) {
+      let usernameKey = "";
+      try {
+        const userSnap = await firestore.collection("users").doc(uid).get();
+        if (userSnap.exists) {
+          const userData = userSnap.data() || {};
+          usernameKey = normalizeNameKey(userData.username || userData.name || "");
+        }
+      } catch (_) {
+        // ignore user lookup errors and continue with strict UID checks
+      }
+      if (usernameKey && participantNameKeys.includes(usernameKey)) {
+        isParticipant = true;
+      }
+    }
+
+    if (!isParticipant && !isAdmin) {
       throw new HttpsError(
         "permission-denied",
         "You cannot view presence for this match."
