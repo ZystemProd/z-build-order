@@ -231,6 +231,7 @@ import {
   attachMatchActionHandlers,
   setVetoDependencies,
   openMatchInfoModalUsingDeps,
+  hideMatchInfoModal,
   refreshMatchInfoModalIfOpen,
   refreshMatchInfoPresenceIfOpen,
   refreshVetoModalIfOpen,
@@ -2272,8 +2273,12 @@ function renderAll(matchIds = null) {
         bracketGrid.style.display = canShowBracketPreview ? "flex" : "none";
         bracketNotLive.style.display = canShowBracketPreview ? "none" : "block";
 
-        // Keep inspector available in not-live mode.
-        if (matchInfoModal) matchInfoModal.style.display = "";
+        if (matchInfoModal) {
+          matchInfoModal.style.display = canShowBracketPreview ? "" : "none";
+          if (!canShowBracketPreview) {
+            hideMatchInfoModal();
+          }
+        }
 
         if (registeredPlayersList) {
           registeredPlayersList.style.display = "";

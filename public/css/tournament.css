@@ -710,7 +710,7 @@ a {
   background: var(--panel);
   border: 1px solid var(--stroke);
   border-radius: 18px;
-  padding: 18px 0px 18px 18px;
+  padding: 18px 18px 18px 18px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
 }
 
@@ -837,6 +837,7 @@ a {
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
+  margin-right: 30px;
 }
 
 .tournament-filter-controls #refreshTournaments {
@@ -8106,6 +8107,146 @@ select[id^="finalBestOf"] {
 
 .small-modal > * + * {
   margin-top: 16px;
+}
+
+/* Tournament page: settings modal should match tournament visual language */
+#settingsModal .small-modal {
+  width: min(900px, 92vw);
+  max-width: 900px;
+  min-height: 0;
+  max-height: 88vh;
+  background:
+    radial-gradient(
+      120% 140% at 10% 0%,
+      rgba(78, 213, 255, 0.12),
+      rgba(8, 12, 22, 0.95) 55%
+    ),
+    linear-gradient(180deg, rgba(8, 14, 28, 0.96), rgba(5, 9, 18, 0.96));
+  color: #e9eefc;
+  border: 1px solid rgba(78, 213, 255, 0.22);
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(78, 213, 255, 0.08) inset;
+  padding: 26px 22px 20px;
+  overflow: hidden;
+}
+
+#settingsModal .settings-modal-title {
+  color: #f5f8ff;
+  margin: 0 0 12px;
+}
+
+#settingsModal .settings-modal-layout {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 14px;
+  min-height: clamp(460px, 66vh, 740px);
+  max-height: calc(88vh - 76px);
+}
+
+#settingsModal .settings-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(10, 15, 28, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 10px;
+}
+
+#settingsModal .settings-tab-btn {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: rgba(234, 240, 255, 0.78);
+  padding: 11px 12px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+#settingsModal .settings-tab-btn.active {
+  background: linear-gradient(
+    135deg,
+    rgba(78, 213, 255, 0.28),
+    rgba(78, 213, 255, 0.12)
+  );
+  border-color: rgba(78, 213, 255, 0.46);
+  color: #ffffff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 8px 20px rgba(27, 87, 139, 0.35);
+}
+
+#settingsModal .settings-modal-panels {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(7, 12, 23, 0.78);
+  padding: 14px 14px 10px;
+  overflow: hidden;
+}
+
+#settingsModal .settings-panel {
+  height: 100%;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+#settingsModal .settings-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+#settingsModal .settings-panel::-webkit-scrollbar-thumb {
+  background: rgba(137, 159, 205, 0.55);
+  border-radius: 999px;
+}
+
+#settingsModal .settings-input,
+#settingsModal .styled-dropdown {
+  background: rgba(5, 9, 18, 0.9);
+  border-color: rgba(148, 168, 214, 0.28);
+  color: #edf2ff;
+}
+
+#settingsModal .settings-input:focus,
+#settingsModal .styled-dropdown:focus {
+  border-color: rgba(78, 213, 255, 0.62);
+  box-shadow: 0 0 0 3px rgba(78, 213, 255, 0.18);
+}
+
+#settingsModal .settings-helper-text {
+  color: rgba(214, 225, 252, 0.76);
+}
+
+#settingsModal .settings-divider {
+  border-top-color: rgba(255, 255, 255, 0.1);
+}
+
+@media (max-width: 840px) {
+  #settingsModal .small-modal {
+    width: min(94vw, 700px);
+    max-height: 90vh;
+  }
+
+  #settingsModal .settings-modal-layout {
+    grid-template-columns: 1fr;
+    min-height: 0;
+    max-height: calc(90vh - 76px);
+  }
+
+  #settingsModal .settings-tabs {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  #settingsModal .settings-tab-btn {
+    width: auto;
+  }
+
+  #settingsModal .settings-modal-panels {
+    min-height: 360px;
+  }
 }
 
 .scrollable-modal {

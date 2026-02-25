@@ -2835,10 +2835,13 @@
     <div class="modal-content small-modal">
       <span class="close-modal" id="closeSettingsModal">&times;</span>
       <h3 class="settings-modal-title">Settings</h3>
-      <div class="settings-tabs" id="userSettingsTabs">
-        <button class="settings-tab-btn active" data-user-settings-tab="settingsGeneral">General</button>
-        <button class="settings-tab-btn" data-user-settings-tab="settingsTournament">Tournament</button>
-      </div>
+      <div class="settings-modal-layout">
+        <div class="settings-tabs" id="userSettingsTabs" role="tablist" aria-label="Settings sections">
+          <button class="settings-tab-btn active" data-user-settings-tab="settingsGeneral" type="button">General</button>
+          <button class="settings-tab-btn" data-user-settings-tab="settingsTournament" type="button">Tournament</button>
+          <button class="settings-tab-btn" data-user-settings-tab="settingsSound" type="button">Sound</button>
+        </div>
+        <div class="settings-modal-panels">
       <div class="settings-panel active" id="settingsGeneral">
         <div class="settings-avatar-section">
           <div class="settings-avatar-preview">
@@ -2941,6 +2944,25 @@
           <p id="settingsCountryStatus" class="settings-helper-text">
             Select where you are from.
           </p>
+        </div>
+      </div>
+      <div class="settings-panel" id="settingsSound">
+        <div class="settings-username-section">
+          <label class="settings-label">Match Ready Sound</label>
+          <div class="publish-checkbox-row">
+            <span>Mute match ready sound</span>
+            <div class="checkbox-wrapper-59">
+              <label class="switch">
+                <input type="checkbox" id="matchReadySoundToggle" />
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+          <p class="settings-helper-text">
+            Turns off the trumpet alert when a match becomes ready.
+          </p>
+        </div>
+      </div>
         </div>
       </div>
       <div id="pulseHelpModal" class="modal">
