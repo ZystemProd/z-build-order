@@ -113,6 +113,10 @@ export function buildCreateTournamentPayload({
     roundRobin,
     bestOf,
     grandFinalReset: Boolean(grandFinalReset),
+    prizePoolTotal: null,
+    prizePoolCurrency: "USD",
+    prizePoolCurrencyCustom: "",
+    prizePoolSplit: [],
     circuitSlug: circuitSlug || null,
     isCircuitFinal: Boolean(isCircuitFinal),
   };
@@ -139,6 +143,10 @@ export function buildSettingsPayload({
   requirePulseLink,
   grandFinalReset,
   circuitQualifyCount,
+  prizePoolTotal,
+  prizePoolCurrency,
+  prizePoolCurrencyCustom,
+  prizePoolSplit,
 }) {
   return {
     ...(currentTournamentMeta || {}),
@@ -156,6 +164,34 @@ export function buildSettingsPayload({
     isInviteOnly: Boolean(isInviteOnly),
     visibility: visibility || "public",
     requirePulseLink: Boolean(requirePulseLink),
+    prizePoolTotal:
+      Number.isFinite(prizePoolTotal) && prizePoolTotal > 0
+        ? Math.round(prizePoolTotal)
+        : null,
+    prizePoolCurrency: String(prizePoolCurrency || "USD").toUpperCase(),
+    prizePoolCurrencyCustom: String(prizePoolCurrencyCustom || "").trim(),
+    prizePoolSplit: Array.isArray(prizePoolSplit)
+      ? prizePoolSplit
+          .map((row, idx) => {
+            if (row && typeof row === "object") {
+              return {
+                place: Number(row.place),
+                amount: Number(
+                  row.amount ?? row.value ?? row.points ?? row.percent ?? 0,
+                ),
+              };
+            }
+            const amount = Number(row);
+            return { place: idx + 1, amount };
+          })
+          .filter(
+            (row) =>
+              Number.isFinite(row.place) &&
+              row.place > 0 &&
+              Number.isFinite(row.amount) &&
+              row.amount >= 0,
+          )
+      : [],
     circuitQualifyCount,
     bestOf,
     grandFinalReset: Boolean(grandFinalReset),
@@ -211,6 +247,10 @@ export function buildFinalTournamentPayload({
     roundRobin,
     bestOf,
     grandFinalReset: Boolean(grandFinalReset),
+    prizePoolTotal: null,
+    prizePoolCurrency: "USD",
+    prizePoolCurrencyCustom: "",
+    prizePoolSplit: [],
     circuitSlug,
     isCircuitFinal: true,
     circuitQualifyCount:

@@ -63,6 +63,7 @@ const ensureMatchPresenceAccessCallable = httpsCallable(
 let presenceUnsub = null;
 let presenceHeartbeat = null;
 let presenceUiTimer = null;
+let readyTimerUiInterval = null;
 let presenceLatest = new Map(); // uid -> { updatedAtMs, playerId, status }
 let presenceContext = {
   matchId: null,
@@ -656,6 +657,7 @@ export function openVetoModal(
     leftPlayer: pA,
     rightPlayer: pB,
     isParticipant,
+    isAdminUser: isAdmin,
     uid,
   });
 
@@ -769,7 +771,7 @@ export function openVetoModal(
 
 export function openMatchInfoModal(
   matchId,
-  { getPlayersMap, getDefaultMapPoolNames, getMapByName },
+  { getPlayersMap, getDefaultMapPoolNames, getMapByName, getMatchReadySince },
 ) {
   ensurePresenceAuthCleanupBound();
   const modal = document.getElementById("matchInfoModal");
@@ -809,6 +811,7 @@ export function openMatchInfoModal(
   );
   const reportApproveBtn = document.getElementById("matchInfoReportApproveBtn");
   const reportRejectBtn = document.getElementById("matchInfoReportRejectBtn");
+  const readyTimerEl = document.getElementById("matchInfoReadyTimer");
   const walkoverSelect = document.getElementById("matchInfoWalkoverSelect");
   const editScoreBtn = document.getElementById("matchInfoEditScoreBtn");
   const closeBtn = document.getElementById("closeMatchInfoModal");
@@ -868,6 +871,7 @@ export function openMatchInfoModal(
     leftPlayer: pA,
     rightPlayer: pB,
     isParticipant,
+    isAdminUser: isAdmin,
     uid,
   });
 
@@ -898,6 +902,33 @@ export function openMatchInfoModal(
   }
   if (boInlineEl) {
     boInlineEl.textContent = `bo${bestOf}`;
+  }
+
+  const formatReadyMinutesLabel = (readySince) => {
+    if (!Number.isFinite(readySince) || readySince <= 0) return "";
+    const minutesAgo = Math.max(0, Math.floor((Date.now() - readySince) / 60000));
+    return `match ready: ${minutesAgo} min ago`;
+  };
+  const updateReadyTimer = () => {
+    if (!readyTimerEl) return;
+    const hasTwoPlayers = Boolean(pA && pB);
+    const isComplete = match?.status === "complete";
+    if (!hasTwoPlayers || isComplete) {
+      readyTimerEl.style.display = "none";
+      readyTimerEl.textContent = "";
+      return;
+    }
+    const readySince = Number(getMatchReadySince?.(matchId)) || Date.now();
+    readyTimerEl.textContent = formatReadyMinutesLabel(readySince);
+    readyTimerEl.style.display = "";
+  };
+  if (readyTimerUiInterval) {
+    clearInterval(readyTimerUiInterval);
+    readyTimerUiInterval = null;
+  }
+  updateReadyTimer();
+  if (readyTimerEl && readyTimerEl.style.display !== "none") {
+    readyTimerUiInterval = setInterval(updateReadyTimer, 30000);
   }
 
   if (leftNameEl) leftNameEl.textContent = aName;
@@ -1218,9 +1249,9 @@ export function openMatchInfoModal(
     if (existingReport) {
       reportStatus.textContent = isAdmin
         ? "Pending admin review."
-        : "Report submitted.";
+        : "Score change submitted.";
     } else if (canReport) {
-      reportStatus.textContent = "Report a corrected score for admin review.";
+      reportStatus.textContent = "Propose a score change for admin review.";
     } else {
       reportStatus.textContent = "";
     }
@@ -1376,7 +1407,7 @@ export function openMatchInfoModal(
     reportSubmitBtn.onclick = () => {
       if (!canReport) return;
       if (!validateReportScores()) {
-        showToast?.("Pick a valid score for the report.", "error");
+        showToast?.("Pick a valid score for the change request.", "error");
         return;
       }
       const { winsA, winsB } = getReportWins(reportResults);
@@ -1399,9 +1430,9 @@ export function openMatchInfoModal(
       }
       renderReportSummaryList();
       if (reportSummaryBy) {
-        reportSummaryBy.textContent = `Reported by ${reportEntry.createdByName}.`;
+        reportSummaryBy.textContent = `Requested by ${reportEntry.createdByName}.`;
       }
-      if (reportStatus) reportStatus.textContent = "Report submitted.";
+      if (reportStatus) reportStatus.textContent = "Score change submitted.";
       showReportControls(false);
       showReportSummary(true);
     };
@@ -1415,7 +1446,7 @@ export function openMatchInfoModal(
     renderReportSummaryList();
     if (reportSummaryBy) {
       const reporter = existingReport.createdByName || "Player";
-      reportSummaryBy.textContent = `Reported by ${reporter}.`;
+      reportSummaryBy.textContent = `Requested by ${reporter}.`;
     }
     showReportControls(false);
     showReportSummary(true);
@@ -1435,7 +1466,7 @@ export function openMatchInfoModal(
         ? () => {
             const { winsA, winsB } = getReportWins(reportResults);
             if (winsA === winsB || Math.max(winsA, winsB) < maxWins) {
-              showToast?.("Report score is not complete.", "error");
+              showToast?.("Score change is not complete.", "error");
               return;
             }
             const record = ensureMatchVetoRecord(matchId, bestOf);
@@ -1470,7 +1501,7 @@ export function openMatchInfoModal(
   }
 
   if (openVetoBtn) {
-    const canOpenVeto = isAdmin || isParticipant;
+    const canOpenVeto = isAdmin || (state.isLive && isParticipant);
     openVetoBtn.style.display = canOpenVeto ? "" : "none";
     openVetoBtn.onclick = canOpenVeto
       ? () => {
@@ -1773,6 +1804,8 @@ export function hideMatchInfoModal() {
   stopPresenceTracking();
   if (presenceUiTimer) clearInterval(presenceUiTimer);
   presenceUiTimer = null;
+  if (readyTimerUiInterval) clearInterval(readyTimerUiInterval);
+  readyTimerUiInterval = null;
 
   void refreshLiveVetoSubscription();
 }

@@ -23,6 +23,8 @@ const SITE_URL =
   process.env.SITE_URL || "https://zbuildorder.com/viewBuild.html";
 const TOURNAMENT_BASE_URL =
   process.env.TOURNAMENT_BASE_URL || "https://zbuildorder.com";
+const SUPER_ADMIN_UID =
+  process.env.SUPER_ADMIN_UID || "3nCnDlMPCiTWNb1MyfvrU8OVvsF2";
 
 const BOT_USER_AGENTS = [
   /googlebot/i,
@@ -80,6 +82,58 @@ function sanitizeUrl(value, fallback) {
     return sanitized;
   }
   return sanitizeText(fallback, fallback);
+}
+
+function normalizeRaceLabel(value) {
+  const raw = sanitizeText(value, "").toLowerCase();
+  if (raw === "zerg") return "Zerg";
+  if (raw === "protoss") return "Protoss";
+  if (raw === "terran") return "Terran";
+  if (raw === "random") return "Random";
+  return "";
+}
+
+function normalizeRaceKey(value) {
+  const raw = sanitizeText(value, "").toLowerCase();
+  if (raw.startsWith("z")) return "zerg";
+  if (raw.startsWith("p")) return "protoss";
+  if (raw.startsWith("t")) return "terran";
+  if (raw.startsWith("r")) return "random";
+  return "";
+}
+
+function normalizeByRaceMap(value) {
+  const out = {};
+  if (!value || typeof value !== "object") return out;
+  Object.entries(value).forEach(([key, raw]) => {
+    const raceKey = normalizeRaceKey(key);
+    const mmr = Number(raw);
+    if (raceKey && Number.isFinite(mmr) && mmr > 0) {
+      out[raceKey] = Math.round(mmr);
+    }
+  });
+  return out;
+}
+
+function pickMmrForRace(byRace = {}, raceLabel = "Random") {
+  const raceKey = normalizeRaceKey(raceLabel);
+  if (raceKey && raceKey !== "random" && Number.isFinite(byRace[raceKey])) {
+    return Math.round(byRace[raceKey]);
+  }
+  const values = Object.values(byRace).filter((value) => Number.isFinite(value) && value > 0);
+  if (!values.length) return null;
+  return Math.round(Math.max(...values));
+}
+
+function normalizeIsoCountry(value) {
+  const raw = sanitizeText(value, "").toUpperCase();
+  return /^[A-Z]{2}$/.test(raw) ? raw : "";
+}
+
+function buildPlayerId() {
+  return `p-${Date.now().toString(36)}-${Math.random()
+    .toString(16)
+    .slice(2, 8)}`;
 }
 
 function getStartTimeMs(meta) {
@@ -417,6 +471,10 @@ function isAdminForMeta(meta, uid) {
   if (meta.createdBy && meta.createdBy === uid) return true;
   const admins = normalizeAdminList(meta.admins);
   return admins.some((entry) => entry.uid === uid);
+}
+
+function normalizeNameKey(value) {
+  return String(value || "").trim().toLowerCase();
 }
 
 function deserializeBracketState(bracket) {
@@ -2374,9 +2432,29 @@ exports.ensureMatchPresenceAccess = onCall(
     const participantUids = participants
       .map((player) => player?.uid)
       .filter(Boolean);
+    const participantNameKeys = participants
+      .map((player) => normalizeNameKey(player?.name))
+      .filter(Boolean);
 
     const isAdmin = isAdminForMeta(meta, uid);
-    if (!participantUids.includes(uid) && !isAdmin) {
+    let isParticipant = participantUids.includes(uid);
+    if (!isParticipant && !isAdmin) {
+      let usernameKey = "";
+      try {
+        const userSnap = await firestore.collection("users").doc(uid).get();
+        if (userSnap.exists) {
+          const userData = userSnap.data() || {};
+          usernameKey = normalizeNameKey(userData.username || userData.name || "");
+        }
+      } catch (_) {
+        // ignore user lookup errors and continue with strict UID checks
+      }
+      if (usernameKey && participantNameKeys.includes(usernameKey)) {
+        isParticipant = true;
+      }
+    }
+
+    if (!isParticipant && !isAdmin) {
       throw new HttpsError(
         "permission-denied",
         "You cannot view presence for this match."
@@ -2390,6 +2468,231 @@ exports.ensureMatchPresenceAccess = onCall(
     await allowRef.set(true);
 
     return { ok: true };
+  }
+);
+
+exports.superAdminAddPlayer = onCall(
+  { region: "us-central1", enforceAppCheck: true },
+  async (request) => {
+    const actorUid = request.auth?.uid || "";
+    if (!actorUid) {
+      throw new HttpsError("unauthenticated", "Sign in required.");
+    }
+    if (actorUid !== SUPER_ADMIN_UID) {
+      throw new HttpsError("permission-denied", "Only super admin is allowed.");
+    }
+
+    const payload = request.data || {};
+    const slug = sanitizeText(payload.slug || "", "");
+    const name = sanitizeText(payload.name || "", "");
+    const race = normalizeRaceLabel(payload.race || "Random");
+    if (!slug || !name || !race) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Missing or invalid slug, name, or race."
+      );
+    }
+
+    const uid = sanitizeText(payload.uid || "", "");
+    const directSc2Link = sanitizeText(payload.sc2Link || "", "");
+    let sc2Link = normalizePulseUrl(directSc2Link);
+    let twitchUrl = sanitizeUrl(payload.twitchUrl || "", "");
+    let country = normalizeIsoCountry(payload.country || "");
+    let avatarUrl = "";
+    let clanName = "";
+    let clanAbbreviation = "";
+    let clanLogoUrl = "";
+    const mmrRaw = Number(payload.mmr);
+    const pointsRaw = Number(payload.points);
+    let mmr = Number.isFinite(mmrRaw) ? Math.max(0, Math.round(mmrRaw)) : null;
+    const points = Number.isFinite(pointsRaw)
+      ? Math.max(0, Math.round(pointsRaw))
+      : 0;
+    let byRace = {};
+    if (uid) {
+      const userSnap = await firestore.collection("users").doc(uid).get();
+      if (userSnap.exists) {
+        const userData = userSnap.data() || {};
+        if (!sc2Link) {
+          const pulse = userData.pulse || {};
+          const secondary = Array.isArray(pulse.secondary)
+            ? pulse.secondary
+            : pulse.secondary && typeof pulse.secondary === "object"
+            ? [pulse.secondary]
+            : [];
+          const secondaryUrl = secondary
+            .map((entry) => sanitizeText(entry?.url || "", ""))
+            .find(Boolean);
+          const userSc2 = sanitizeText(
+            userData.sc2PulseUrl || pulse.url || secondaryUrl || "",
+            ""
+          );
+          sc2Link = normalizePulseUrl(userSc2);
+        }
+        if (!twitchUrl) {
+          twitchUrl = sanitizeUrl(userData.twitchUrl || "", "");
+        }
+        if (!country) {
+          country = normalizeIsoCountry(userData.country || "");
+        }
+        avatarUrl = sanitizeUrl(
+          userData?.profile?.avatarUrl || userData?.avatarUrl || "",
+          ""
+        );
+        const mainClanId = sanitizeText(
+          userData?.settings?.mainClanId || "",
+          ""
+        );
+        if (mainClanId) {
+          const clanSnap = await firestore.collection("clans").doc(mainClanId).get();
+          if (clanSnap.exists) {
+            const clanData = clanSnap.data() || {};
+            clanName = sanitizeText(clanData?.name || "", "");
+            clanAbbreviation = sanitizeText(clanData?.abbreviation || "", "");
+            clanLogoUrl = sanitizeUrl(
+              clanData?.logoUrlSmall || clanData?.logoUrl || "",
+              ""
+            );
+          }
+        }
+        byRace = normalizeByRaceMap(
+          userData?.pulse?.lastMmrByRace ||
+            userData?.pulse?.byRace ||
+            userData?.lastKnownMMRByRace ||
+            {}
+        );
+      }
+    }
+    if (!sc2Link) {
+      throw new HttpsError(
+        "failed-precondition",
+        "User has no SC2Pulse link in profile."
+      );
+    }
+    if (!Number.isFinite(mmr)) {
+      mmr = pickMmrForRace(byRace, race);
+    }
+    if (!Number.isFinite(mmr) || mmr <= 0) {
+      const details = parsePulseUrlDetails(sc2Link);
+      const teamResult = await fetchRaceRatingsFromTeamsApi(details);
+      const charResult = await fetchRaceRatingsFromCharacters(details);
+      byRace = {
+        ...normalizeByRaceMap(teamResult?.byRace || {}),
+        ...normalizeByRaceMap(charResult?.byRace || {}),
+      };
+      mmr = pickMmrForRace(byRace, race);
+    }
+    if (!Number.isFinite(mmr) || mmr <= 0) {
+      throw new HttpsError(
+        "failed-precondition",
+        `Could not resolve SC2Pulse MMR for ${race}.`
+      );
+    }
+    const now = Date.now();
+    const stateRef = firestore.collection("tournamentStates").doc(slug);
+    const metaRef = firestore.collection("tournaments").doc(slug);
+
+    const result = await firestore.runTransaction(async (tx) => {
+      const metaSnap = await tx.get(metaRef);
+      if (!metaSnap.exists) {
+        throw new HttpsError("not-found", "Tournament not found.");
+      }
+
+      const stateSnap = await tx.get(stateRef);
+      const stateData = stateSnap.exists ? stateSnap.data() || {} : {};
+      const players = Array.isArray(stateData.players) ? [...stateData.players] : [];
+      const normalizedName = name.toLowerCase();
+      let index = -1;
+      if (uid) {
+        index = players.findIndex((player) => String(player?.uid || "") === uid);
+      }
+      if (index < 0) {
+        index = players.findIndex(
+          (player) => String(player?.name || "").trim().toLowerCase() === normalizedName
+        );
+      }
+
+      const existing = index >= 0 ? players[index] || {} : {};
+      const nextPlayer = {
+        ...existing,
+        id: existing.id || buildPlayerId(),
+        uid: uid || null,
+        name,
+        race,
+        sc2Link,
+        mmr,
+        currentMmr: mmr,
+        mmrByRace: Object.keys(byRace).length ? byRace : existing.mmrByRace || null,
+        points,
+        inviteStatus: "accepted",
+        twitchUrl,
+        country,
+        avatarUrl:
+          avatarUrl ||
+          sanitizeUrl(existing.avatarUrl || "", "") ||
+          "img/avatar/marine_avatar_1.webp",
+        clan: clanName || existing.clan || "",
+        clanAbbreviation:
+          clanAbbreviation || existing.clanAbbreviation || "",
+        clanLogoUrl: clanLogoUrl || existing.clanLogoUrl || "",
+        superAdminAddedAt: now,
+        superAdminAddedBy: actorUid,
+      };
+      if (!nextPlayer.createdAt) {
+        nextPlayer.createdAt = now;
+      }
+      if (index >= 0) {
+        players[index] = nextPlayer;
+      } else {
+        players.push(nextPlayer);
+      }
+
+      const activity = Array.isArray(stateData.activity) ? [...stateData.activity] : [];
+      activity.unshift(`${name} added by super admin.`);
+
+      tx.set(
+        stateRef,
+        {
+          players,
+          activity: activity.slice(0, 200),
+          needsReseed: true,
+          lastUpdated: now,
+        },
+        { merge: true }
+      );
+
+      return {
+        playerId: nextPlayer.id,
+        playerName: nextPlayer.name,
+        replaced: index >= 0,
+        playerCount: players.length,
+      };
+    });
+
+    try {
+      await firestore.collection("superAdminActions").add({
+        type: "tournament-add-player",
+        actorUid,
+        slug,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        data: {
+          name,
+          race,
+          uid: uid || null,
+          mmr,
+          points,
+          replaced: result.replaced,
+          playerCount: result.playerCount,
+        },
+      });
+    } catch (err) {
+      console.error("Failed to write super admin audit log", err);
+    }
+
+    return {
+      ok: true,
+      ...result,
+    };
   }
 );
 

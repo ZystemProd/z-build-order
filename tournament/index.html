@@ -502,9 +502,15 @@
             </div>
           </div>
           <div class="hero-stats">
-            <div class="stat-card">
-              <p>Registered</p>
-              <h2 id="statPlayers">0</h2>
+            <div class="stat-card stat-card-split">
+              <div class="stat-split-item">
+                <p>Registered</p>
+                <h2 id="statPlayers">0</h2>
+              </div>
+              <div class="stat-split-item">
+                <p>Prize Pool</p>
+                <h2 id="tournamentPrizePool">TBD</h2>
+              </div>
             </div>
             <div class="stat-card accent">
               <p>Start</p>
@@ -543,6 +549,8 @@
               <button class="tab-btn" data-tab="descriptionTab">Description &amp; Rules</button>
               <button class="tab-btn" data-tab="mapsTab">Maps</button>
               <button class="tab-btn" data-tab="registrationTab" id="adminTabBtn">Registration</button>
+              <button class="tab-btn" data-tab="superAdminTab" id="superAdminTabBtn" data-super-admin-only="true"
+                style="display:none;">Super Admin</button>
             </div>
             <div class="tab-divider" data-admin-only="true" aria-hidden="true"></div>
             <div class="tab-group admin-tabs" data-admin-only="true">
@@ -555,6 +563,14 @@
           </div>
 
           <section id="descriptionTab" class="tab-panel">
+            <div class="card" id="tournamentPrizeInfoSection" style="display:none;">
+              <div class="card-header">
+                <div>
+                  <h3>Prize Pool</h3>
+                </div>
+              </div>
+              <div id="tournamentPrizeInfoBody" class="helper"></div>
+            </div>
             <div class="card">
               <div class="card-header">
                 <div>
@@ -592,7 +608,29 @@
                   <p class="eyebrow">Bracket</p>
                   <h3 id="bracketTitle">Double elimination</h3>
                 </div>
-                <div class="live-dot not-live" id="liveDot">Not Live</div>
+                <div class="bracket-header-actions">
+                  <div id="bracketPreviewControls" class="bracket-preview-controls" style="display:none;">
+                    <div class="publish-checkbox-row publish-checkbox-row--compact">
+                      <span>Show Preview</span>
+                      <div class="checkbox-wrapper-59">
+                        <label class="switch">
+                          <input type="checkbox" id="bracketShowPreviewToggle" />
+                          <span class="slider"></span>
+                        </label>
+                      </div>
+                    </div>
+                    <div class="publish-checkbox-row publish-checkbox-row--compact">
+                      <span>Show Preview Public</span>
+                      <div class="checkbox-wrapper-59">
+                        <label class="switch">
+                          <input type="checkbox" id="bracketShowPreviewPublicToggle" />
+                          <span class="slider"></span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="live-dot not-live" id="liveDot">Not Live</div>
+                </div>
               </div>
               <div id="bracketNotLive" class="not-live-panel" style="display:none;">
                 <div class="not-live-grid">
@@ -623,8 +661,9 @@
                   <div class="match-inspector__content match-info-modal">
                     <div class="modal-header">
                       <h3 id="matchInfoTitle">Match</h3>
+                      <span id="matchInfoReadyTimer" class="helper match-ready-timer" style="display:none;"></span>
                       <button class="cta ghost" id="matchInfoReportBtn" type="button" style="display:none;"
-                        aria-label="Report score" data-tooltip="Report score change">
+                        aria-label="Score Change" data-tooltip="Score Change">
                         <svg class="match-info-report-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                           <path d="M7 4h8l4 4v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" fill="none"
                             stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
@@ -713,7 +752,7 @@
                     </div>
                     <div class="match-info-report" id="matchInfoReportSection" style="display:none;">
                       <div class="match-info-report-header">
-                        <span class="eyebrow">Report score change</span>
+                        <span class="eyebrow">Score Change</span>
                         <span class="helper" id="matchInfoReportStatus"></span>
                       </div>
                       <div class="match-info-report-controls" id="matchInfoReportControls" style="display:none;">
@@ -721,7 +760,7 @@
                         <div class="match-info-report-maps" id="matchInfoReportMaps"></div>
                         <div class="form-actions">
                           <button class="cta danger" id="matchInfoReportSubmitBtn" type="button">
-                            Submit report
+                            Submit change
                           </button>
                           <button class="cta ghost" id="matchInfoReportCancelBtn" type="button">
                             Cancel
@@ -734,10 +773,10 @@
                         <p class="helper" id="matchInfoReportSummaryBy"></p>
                         <div class="form-actions" id="matchInfoReportAdminActions" style="display:none;">
                           <button class="cta primary" id="matchInfoReportApproveBtn" type="button">
-                            Apply report
+                            Apply change
                           </button>
                           <button class="cta danger" id="matchInfoReportRejectBtn" type="button">
-                            Deny report
+                            Deny change
                           </button>
                         </div>
                       </div>
@@ -947,6 +986,32 @@
 
           </section>
 
+          <section id="superAdminTab" class="tab-panel">
+            <div class="card" data-super-admin-only="true" id="superAdminCard" style="display:none;">
+              <div class="card-header">
+                <div>
+                  <p class="eyebrow">Super Admin</p>
+                  <h3>Direct Add Player (Search)</h3>
+                </div>
+              </div>
+              <p class="helper">Search a user by username and add directly to the tournament, bypassing registration.</p>
+              <label>Race for selected user
+                <select id="superAdminRaceSelect" class="settings-input">
+                  <option value="Zerg">Zerg</option>
+                  <option value="Protoss">Protoss</option>
+                  <option value="Terran">Terran</option>
+                  <option value="Random">Random</option>
+                </select>
+              </label>
+              <label>Find player by username
+                <input id="superAdminSearchInput" class="settings-input" type="text"
+                  placeholder="Search username..." autocomplete="off" spellcheck="false" />
+              </label>
+              <div class="admin-search-results" id="superAdminSearchResults"></div>
+              <p class="helper" id="superAdminAddPlayerStatus"></p>
+            </div>
+          </section>
+
           <section id="seedingTab" class="tab-panel" data-admin-only="true">
             <div class="card" id="seedingCard">
               <div class="card-header seeding-header">
@@ -980,6 +1045,7 @@
                   </div>
                   <div class="seeding-right-actions">
                     <button id="notifyCheckInBtn" class="cta small ghost">Notify check-in</button>
+                    <button id="recreateBracketBtn" class="cta small ghost" style="display:none;">Re-create bracket</button>
                     <button id="rebuildBracketBtn" class="cta small ghost">Go Live</button>
                   </div>
                 </div>
@@ -1028,6 +1094,7 @@
               <div class="settings-layout">
                 <div class="settings-tabs" id="settingsTabs">
                   <button class="settings-tab-btn active" data-settings-tab="settingsGeneral">General</button>
+                  <button class="settings-tab-btn" data-settings-tab="settingsPrize">Prize Pool</button>
                   <button class="settings-tab-btn" data-settings-tab="settingsDesc">Description &amp; Rules</button>
                   <button class="settings-tab-btn" data-settings-tab="settingsMaps">Maps</button>
                   <button class="settings-tab-btn" data-settings-tab="settingsFormat">Format</button>
@@ -1160,6 +1227,52 @@
                         <p class="helper">Recommended 1200x630. JPG/PNG/WebP.</p>
                       </div>
                     </label>
+                  </div>
+                  <div class="settings-panel" id="settingsPrize">
+                    <div class="admin-settings-grid">
+                      <div class="settings-row">
+                        <div class="settings-row-label">Prize pool total</div>
+                        <div class="settings-row-control">
+                          <div class="inline-row">
+                            <input type="number" id="settingsPrizePoolTotal" min="0" step="1" placeholder="100" />
+                            <select id="settingsPrizePoolCurrency">
+                              <option value="USD">USD</option>
+                              <option value="EUR">EUR</option>
+                              <option value="SEK">SEK</option>
+                              <option value="NOK">NOK</option>
+                              <option value="DKK">DKK</option>
+                              <option value="GBP">GBP</option>
+                              <option value="CAD">CAD</option>
+                              <option value="AUD">AUD</option>
+                              <option value="CUSTOM">Custom</option>
+                            </select>
+                          </div>
+                          <input type="text" id="settingsPrizePoolCurrencyCustom" placeholder="Custom currency (e.g. Credits)" style="display:none; margin-top:8px;" />
+                          <p class="helper">Shown in hero with selected currency.</p>
+                        </div>
+                      </div>
+                      <div class="settings-row">
+                        <div class="settings-row-label">Prize split</div>
+                        <div class="settings-row-control">
+                          <div class="table-wrapper">
+                            <table class="players-table circuit-points-table prize-split-table">
+                              <thead>
+                                <tr>
+                                  <th>Placement</th>
+                                  <th>Amount</th>
+                                  <th></th>
+                                </tr>
+                              </thead>
+                              <tbody id="settingsPrizeSplitBody"></tbody>
+                            </table>
+                          </div>
+                          <div class="circuit-points-actions" style="margin-top:10px;">
+                            <button id="settingsAddPrizeSplitRow" class="cta small ghost" type="button">Add row</button>
+                          </div>
+                          <p class="helper" id="settingsPrizeSplitWarning">Split total should match prize pool total.</p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                   <div class="settings-panel" id="settingsDesc">
                     <div class="markdown-field">
@@ -1889,6 +2002,20 @@
         <button class="cta small ghost" id="newTournamentTemplateBtn" type="button">
           New template
         </button>
+        <div class="template-manager-copy">
+          <label class="template-manager-copy-label" for="copyTournamentSettingsSelect">
+            Copy from tournament
+          </label>
+          <div class="template-select template-manager-copy-select">
+            <select id="copyTournamentSettingsSelect" aria-label="Copy settings from tournament">
+              <option value="" selected>Loading tournaments...</option>
+            </select>
+            <span class="template-select-caret">v</span>
+          </div>
+          <button class="cta small ghost" id="copyTournamentSettingsBtn" type="button">
+            Copy settings
+          </button>
+        </div>
         <div class="template-manager-list" id="tournamentTemplateList"></div>
         <p class="helper template-manager-empty" id="tournamentTemplateEmpty">
           No templates saved yet.
@@ -2735,6 +2862,20 @@
     </div>
   </div>
 
+  <!-- Re-create bracket modal -->
+  <div id="confirmRecreateBracketModal" class="modal">
+    <div class="modal-content small-modal">
+      <h3>Re-create bracket</h3>
+      <p class="helper">
+        This will reset all match scores and results, then re-create the bracket from current seeding.
+      </p>
+      <div class="form-actions">
+        <button class="cta danger" id="confirmRecreateBracketBtn">Proceed</button>
+        <button class="cta ghost" id="cancelRecreateBracketBtn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Reset veto, score, and chat modal -->
   <div id="confirmResetVetoScoreChatModal" class="modal">
     <div class="modal-content small-modal">
@@ -2755,10 +2896,13 @@
     <div class="modal-content small-modal">
       <span class="close-modal" id="closeSettingsModal">&times;</span>
       <h3 class="settings-modal-title">Settings</h3>
-      <div class="settings-tabs" id="userSettingsTabs">
-        <button class="settings-tab-btn active" data-user-settings-tab="settingsGeneral">General</button>
-        <button class="settings-tab-btn" data-user-settings-tab="settingsTournament">Tournament</button>
-      </div>
+      <div class="settings-modal-layout">
+        <div class="settings-tabs" id="userSettingsTabs" role="tablist" aria-label="Settings sections">
+          <button class="settings-tab-btn active" data-user-settings-tab="settingsGeneral" type="button">General</button>
+          <button class="settings-tab-btn" data-user-settings-tab="settingsTournament" type="button">Tournament</button>
+          <button class="settings-tab-btn" data-user-settings-tab="settingsSound" type="button">Sound</button>
+        </div>
+        <div class="settings-modal-panels">
       <div class="settings-panel active" id="settingsGeneral">
         <div class="settings-avatar-section">
           <div class="settings-avatar-preview">
@@ -2861,6 +3005,25 @@
           <p id="settingsCountryStatus" class="settings-helper-text">
             Select where you are from.
           </p>
+        </div>
+      </div>
+      <div class="settings-panel" id="settingsSound">
+        <div class="settings-username-section">
+          <label class="settings-label">Match Ready Sound</label>
+          <div class="publish-checkbox-row">
+            <span>Mute match ready sound</span>
+            <div class="checkbox-wrapper-59">
+              <label class="switch">
+                <input type="checkbox" id="matchReadySoundToggle" />
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+          <p class="settings-helper-text">
+            Turns off the trumpet alert when a match becomes ready.
+          </p>
+        </div>
+      </div>
         </div>
       </div>
       <div id="pulseHelpModal" class="modal">

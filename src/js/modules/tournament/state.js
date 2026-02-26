@@ -33,12 +33,15 @@ export const defaultState = {
   bracketRepairVersion: 0,
   matchVetoes: {},
   scoreReports: {},
+  matchReadySince: {},
   casters: [],
   casterRequests: [],
   matchCasts: {},
   mmrSeedingMode: "current",
   isLive: false,
   hasBeenLive: false,
+  showPreview: false,
+  showPreviewPublic: false,
   disableFinalAutoAdd: false,
 };
 

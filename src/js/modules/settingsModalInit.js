@@ -12,6 +12,25 @@ import { getUserClans } from "./clan.js";
 
 let settingsModalInitialized = false;
 let showSettingsModal = null;
+const MATCH_READY_SOUND_PREF_KEY = "zboNotifyMatchReadySound";
+
+function readBoolPref(key, fallback = true) {
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (raw === null) return fallback;
+    return raw === "1" || raw === "true";
+  } catch (_) {
+    return fallback;
+  }
+}
+
+function writeBoolPref(key, value) {
+  try {
+    window.localStorage.setItem(key, value ? "1" : "0");
+  } catch (_) {
+    // ignore storage failures
+  }
+}
 
 export function initUserSettingsModal(options = {}) {
   if (settingsModalInitialized) return;
@@ -28,6 +47,9 @@ export function initUserSettingsModal(options = {}) {
   const closeBtn = document.getElementById("closeSettingsModal");
   const bracketToggle = document.getElementById("bracketInputToggle");
   const buildToggle = document.getElementById("buildInputToggle");
+  const matchReadySoundToggle = document.getElementById(
+    "matchReadySoundToggle",
+  );
   const mainClanSelect = document.getElementById("mainClanSelect");
   const tabButtons = modal.querySelectorAll("[data-user-settings-tab]");
   const tabPanels = modal.querySelectorAll(".settings-panel");
@@ -51,6 +73,13 @@ export function initUserSettingsModal(options = {}) {
     }
     if (buildToggle) {
       buildToggle.checked = isBuildInputShown();
+    }
+    if (matchReadySoundToggle) {
+      // checkbox means muted, stored pref means enabled
+      matchReadySoundToggle.checked = !readBoolPref(
+        MATCH_READY_SOUND_PREF_KEY,
+        true,
+      );
     }
   };
 
@@ -159,6 +188,13 @@ export function initUserSettingsModal(options = {}) {
       if (typeof onBuildToggleChange === "function") {
         onBuildToggleChange(buildToggle.checked);
       }
+    });
+  }
+
+  if (matchReadySoundToggle) {
+    matchReadySoundToggle.addEventListener("change", () => {
+      const muted = Boolean(matchReadySoundToggle.checked);
+      writeBoolPref(MATCH_READY_SOUND_PREF_KEY, !muted);
     });
   }
 

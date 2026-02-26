@@ -2,6 +2,7 @@ import {
   auth,
   app,
   db,
+  functions,
   ensureSettingsUiReady,
   getCurrentUsername,
   getCurrentUserAvatarUrl,
@@ -11,6 +12,7 @@ import {
   rtdb,
 } from "../../../app.js";
 import { onAuthStateChanged } from "firebase/auth";
+import { httpsCallable } from "firebase/functions";
 import {
   doc,
   setDoc,
@@ -210,6 +212,9 @@ import { enableDragScroll } from "./ui/dragScroll.js";
 import {
   applyBestOfToSettings,
   populateSettingsPanel as populateSettingsPanelUI,
+  readPrizeSplitRows,
+  renderPrizeSplitRows,
+  updatePrizeCurrencyCustomInputVisibility,
 } from "./settings/render.js";
 import {
   syncFormatFieldVisibility as syncFormatFieldVisibilityUI,
@@ -229,6 +234,7 @@ import {
   attachMatchActionHandlers,
   setVetoDependencies,
   openMatchInfoModalUsingDeps,
+  hideMatchInfoModal,
   refreshMatchInfoModalIfOpen,
   refreshMatchInfoPresenceIfOpen,
   refreshVetoModalIfOpen,
@@ -277,6 +283,13 @@ import { createAdminManager } from "./admin/manageAdmins.js";
 import { initCasterControls, renderCasterSection } from "./caster.js";
 import { setTournamentListItems } from "./listSlider.js";
 import {
+  initTabAlerts,
+  setTabAlertsBaseTitle,
+  handleUnreadChatEvent,
+  notifyMatchReadyAlert,
+  clearNotifiedReadyMatch,
+} from "./tabAlerts.js";
+import {
   INVITE_STATUS,
   normalizeInviteStatus,
   isInviteAccepted,
@@ -290,6 +303,7 @@ import {
 } from "./invites.js";
 const renderMapPoolPicker = renderMapPoolPickerUI;
 const CURRENT_BRACKET_LAYOUT_VERSION = 55;
+const SUPER_ADMIN_UID = "3nCnDlMPCiTWNb1MyfvrU8OVvsF2";
 const MAX_TOURNAMENT_IMAGE_SIZE = 12 * 1024 * 1024;
 const COVER_TARGET_WIDTH = 1200;
 const COVER_TARGET_HEIGHT = 675;
@@ -330,6 +344,11 @@ let inviteLinkGate = {
 };
 let selfClanHydrationInFlight = false;
 let selfClanHydrated = false;
+let superAdminAddPlayerCallable = null;
+
+function isSuperAdminUser() {
+  return auth?.currentUser?.uid === SUPER_ADMIN_UID;
+}
 
 function normalizeTournamentVisibility(value) {
   return String(value || "").toLowerCase() === "private" ? "private" : "public";
@@ -1885,6 +1904,7 @@ function renderAll(matchIds = null) {
   const bracket = state.bracket;
   const playersArr = state.players || [];
   const format = currentTournamentMeta?.format || "Tournament";
+  syncMatchReadySince();
   const shouldPartialUpdate =
     Array.isArray(matchIds) &&
     matchIds.length &&
@@ -1937,9 +1957,13 @@ function renderAll(matchIds = null) {
       "tournamentDescriptionBody",
     );
     const rulesBody = document.getElementById("tournamentRulesBody");
+    const prizeInfoSection = document.getElementById("tournamentPrizeInfoSection");
+    const prizeInfoBody = document.getElementById("tournamentPrizeInfoBody");
     const statPlayers = document.getElementById("statPlayers");
+    const tournamentPrizePool = document.getElementById("tournamentPrizePool");
     const registerBtn = document.getElementById("registerBtn");
     const goLiveBtn = document.getElementById("rebuildBracketBtn");
+    const recreateBracketBtn = document.getElementById("recreateBracketBtn");
     const notifyCheckInBtn = document.getElementById("notifyCheckInBtn");
     const refreshMmrBtn = document.getElementById("refreshMmrBtn");
     const resetTournamentBtn = document.getElementById("resetTournamentBtn");
@@ -1949,6 +1973,15 @@ function renderAll(matchIds = null) {
     );
     const startMs = getStartTimeMs(currentTournamentMeta);
     const liveDot = document.getElementById("liveDot");
+    const bracketPreviewControls = document.getElementById(
+      "bracketPreviewControls",
+    );
+    const bracketShowPreviewToggle = document.getElementById(
+      "bracketShowPreviewToggle",
+    );
+    const bracketShowPreviewPublicToggle = document.getElementById(
+      "bracketShowPreviewPublicToggle",
+    );
     const bracketGrid = document.getElementById("bracketGrid");
     const bracketNotLive = document.getElementById("bracketNotLive");
     const matchInfoModal = document.getElementById("matchInfoModal");
@@ -1990,6 +2023,7 @@ function renderAll(matchIds = null) {
 
     if (tournamentTitle) {
       tournamentTitle.textContent = currentTournamentMeta.name || "Tournament";
+      setTabAlertsBaseTitle(tournamentTitle.textContent);
     }
     const tournamentHero = document.querySelector("#tournamentView .hero");
     if (tournamentHero) {
@@ -2025,6 +2059,11 @@ function renderAll(matchIds = null) {
     if (rulesBody) {
       rulesBody.innerHTML = renderMarkdown(currentTournamentMeta.rules || "");
     }
+    if (prizeInfoSection && prizeInfoBody) {
+      const markup = renderPrizeInfoMarkup(currentTournamentMeta);
+      prizeInfoSection.style.display = markup ? "" : "none";
+      prizeInfoBody.innerHTML = markup;
+    }
     if (bracketTitle) {
       const formatLabel = (currentTournamentMeta.format || "").toLowerCase();
       const isGroupStage =
@@ -2047,6 +2086,15 @@ function renderAll(matchIds = null) {
     }
     if (statPlayers)
       statPlayers.textContent = String(eligiblePlayers.length || 0);
+    if (tournamentPrizePool) {
+      tournamentPrizePool.textContent = formatPrizePoolTotal(
+        {
+          total: currentTournamentMeta?.prizePoolTotal,
+          currency: currentTournamentMeta?.prizePoolCurrency || "USD",
+          customCurrency: currentTournamentMeta?.prizePoolCurrencyCustom || "",
+        },
+      );
+    }
 
     const tokenActive =
       isInviteOnly &&
@@ -2136,17 +2184,30 @@ function renderAll(matchIds = null) {
       const checkInState = getCheckInWindowState(currentTournamentMeta);
       const requiresManualClose =
         checkInState.allowAfterStart && checkInState.isOpen;
+      const canResumeExistingBracket =
+        Boolean(state.hasBeenLive) &&
+        Boolean(state.bracket) &&
+        bracketHasResults();
       if (state.isLive) {
         goLiveBtn.disabled = false;
         goLiveBtn.textContent = "Set Not Live";
         goLiveBtn.classList.add("danger");
         goLiveBtn.classList.remove("success");
       } else {
-        goLiveBtn.disabled = !hasCheckedIn || requiresManualClose;
-        goLiveBtn.textContent = "Go Live";
+        goLiveBtn.disabled = canResumeExistingBracket
+          ? false
+          : !hasCheckedIn || requiresManualClose;
+        goLiveBtn.textContent = canResumeExistingBracket
+          ? "Resume Live"
+          : "Go Live";
         goLiveBtn.classList.add("success");
         goLiveBtn.classList.remove("danger");
       }
+    }
+    if (recreateBracketBtn) {
+      const show = isAdmin && !state.isLive && Boolean(state.hasBeenLive);
+      recreateBracketBtn.style.display = show ? "" : "none";
+      recreateBracketBtn.disabled = false;
     }
     if (resetTournamentBtn) {
       resetTournamentBtn.classList.add("danger");
@@ -2182,6 +2243,37 @@ function renderAll(matchIds = null) {
       liveDot.classList.toggle("not-live", !state.isLive);
     }
 
+    const showPreview = Boolean(state.showPreview);
+    const showPreviewPublic = Boolean(state.showPreviewPublic);
+    if (bracketPreviewControls) {
+      bracketPreviewControls.style.display =
+        isAdmin && !state.isLive ? "flex" : "none";
+    }
+    if (bracketShowPreviewToggle) {
+      bracketShowPreviewToggle.checked = showPreview;
+      bracketShowPreviewToggle.disabled = !isAdmin || state.isLive;
+      bracketShowPreviewToggle.onchange = () => {
+        if (!isAdmin || state.isLive) return;
+        saveState(
+          { showPreview: Boolean(bracketShowPreviewToggle.checked) },
+          { skipRoster: true },
+        );
+        renderAll();
+      };
+    }
+    if (bracketShowPreviewPublicToggle) {
+      bracketShowPreviewPublicToggle.checked = showPreviewPublic;
+      bracketShowPreviewPublicToggle.disabled = !isAdmin || state.isLive;
+      bracketShowPreviewPublicToggle.onchange = () => {
+        if (!isAdmin || state.isLive) return;
+        saveState(
+          { showPreviewPublic: Boolean(bracketShowPreviewPublicToggle.checked) },
+          { skipRoster: true },
+        );
+        renderAll();
+      };
+    }
+
     if (bracketGrid && bracketNotLive) {
       if (!state.isLive) {
         const hasBeenLive =
@@ -2196,13 +2288,17 @@ function renderAll(matchIds = null) {
           bracketNotLiveMessage.style.display = hasBeenLive ? "" : "none";
         }
 
-        bracketGrid.style.display = "none";
-        bracketNotLive.style.display = "block";
+        const canShowBracketPreview =
+          showPreviewPublic || (isAdmin && showPreview);
+        bracketGrid.style.display = canShowBracketPreview ? "flex" : "none";
+        bracketNotLive.style.display = canShowBracketPreview ? "none" : "block";
 
-        // ✅ ADD THIS: hide match inspector when not live
-        if (matchInfoModal) matchInfoModal.style.display = "none";
-        // ✅ ADD THIS: ensure it's closed if it was open
-        window.setMatchInspectorOpen?.(false);
+        if (matchInfoModal) {
+          matchInfoModal.style.display = canShowBracketPreview ? "" : "none";
+          if (!canShowBracketPreview) {
+            hideMatchInfoModal();
+          }
+        }
 
         if (registeredPlayersList) {
           registeredPlayersList.style.display = "";
@@ -2252,7 +2348,7 @@ function renderAll(matchIds = null) {
         bracketGrid.style.display = "flex";
         bracketNotLive.style.display = "none";
 
-        // ✅ ADD THIS: show match inspector again when live
+        // Show match inspector again when live.
         if (matchInfoModal) matchInfoModal.style.display = "";
       }
     }
@@ -2272,6 +2368,7 @@ function renderAll(matchIds = null) {
       updateSettingsRulesPreview,
       syncFormatFieldVisibility,
     });
+    updatePrizeSplitWarning();
     updateSettingsScoreLocks();
     const nextPromoKey = getPromoStripRenderKey(currentTournamentMeta);
     if (nextPromoKey && nextPromoKey !== promoStripRenderKey) {
@@ -2433,6 +2530,72 @@ function isInspectorShowingUserWaitingMatch(snapshot, inspectorMatchId) {
 
 const matchReadyToastShown = new Set();
 const matchReadyToastDismissed = new Set();
+
+function normalizeMatchReadySince(source) {
+  if (!source || typeof source !== "object") return {};
+  const normalized = {};
+  for (const [matchId, value] of Object.entries(source)) {
+    if (!matchId) continue;
+    const ts = Number(value);
+    if (Number.isFinite(ts) && ts > 0) {
+      normalized[matchId] = Math.floor(ts);
+    }
+  }
+  return normalized;
+}
+
+function isSameMatchReadySince(a, b) {
+  const left = normalizeMatchReadySince(a);
+  const right = normalizeMatchReadySince(b);
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  if (leftKeys.length !== rightKeys.length) return false;
+  for (const key of leftKeys) {
+    if (!Object.prototype.hasOwnProperty.call(right, key)) return false;
+    if (left[key] !== right[key]) return false;
+  }
+  return true;
+}
+
+function syncMatchReadySince() {
+  const bracket = state?.bracket;
+  const currentReadySince = normalizeMatchReadySince(state?.matchReadySince);
+  if (!bracket) {
+    if (Object.keys(currentReadySince).length) {
+      saveState({ matchReadySince: {} }, { skipRoster: true });
+    }
+    return;
+  }
+  const lookup = getMatchLookup(bracket);
+  const playersById = getPlayersMap();
+  const now = Date.now();
+  const nextReadySince = {};
+  for (const match of getAllMatches(bracket)) {
+    if (!match?.id) continue;
+    const [pA, pB] = resolveParticipants(match, lookup, playersById);
+    const hasTwoPlayers = Boolean(pA && pB);
+    const isComplete = match.status === "complete";
+    if (hasTwoPlayers && !isComplete) {
+      const existing = Number(currentReadySince[match.id]);
+      nextReadySince[match.id] =
+        Number.isFinite(existing) && existing > 0 ? existing : now;
+    }
+  }
+  for (const matchId of Object.keys(currentReadySince)) {
+    if (!Object.prototype.hasOwnProperty.call(nextReadySince, matchId)) {
+      clearNotifiedReadyMatch(matchId);
+    }
+  }
+  if (!isSameMatchReadySince(currentReadySince, nextReadySince)) {
+    saveState({ matchReadySince: nextReadySince }, { skipRoster: true });
+  }
+}
+
+function getMatchReadySince(matchId) {
+  if (!matchId) return null;
+  const ts = Number(state?.matchReadySince?.[matchId]);
+  return Number.isFinite(ts) && ts > 0 ? ts : null;
+}
 
 function ensureMatchReadyToastContainer() {
   let container = document.getElementById("toast-container");
@@ -2791,6 +2954,14 @@ async function goLiveTournament() {
     showToast?.("Tournament is already live.", "success");
     return;
   }
+  const canResumeExistingBracket =
+    Boolean(state.hasBeenLive) && bracketHasResults() && Boolean(state.bracket);
+  if (canResumeExistingBracket) {
+    saveState({ isLive: true, hasBeenLive: true }, { skipRoster: true });
+    addActivity("Tournament resumed live.");
+    renderAll();
+    return;
+  }
   const checkInState = getCheckInWindowState(currentTournamentMeta);
   if (checkInState.allowAfterStart && checkInState.isOpen) {
     showToast?.("Close check-in before going live.", "error");
@@ -2848,6 +3019,30 @@ async function toggleLiveTournament() {
     return;
   }
   await goLiveTournament();
+}
+
+function recreateLiveBracket(options = {}) {
+  const forceResetScores = Boolean(options?.forceResetScores);
+  if (state.isLive) {
+    showToast?.("Set tournament to not live before recreating bracket.", "error");
+    return false;
+  }
+  if (forceResetScores) {
+    resetScores({ clearReadyTimer: true });
+    showToast?.(
+      "Bracket re-created. Scores, results, and veto outcomes were reset.",
+      "success",
+    );
+    return true;
+  }
+  const hasScores = bracketHasRecordedResults(state.bracket);
+  if (hasScores && !forceResetScores) {
+    showToast?.("Reset scores first before re-creating bracket.", "error");
+    return false;
+  }
+  rebuildBracket(true, "Bracket re-created.");
+  showToast?.("Bracket re-created.", "success");
+  return true;
 }
 
 function addActivity(message, options = {}) {
@@ -3267,7 +3462,8 @@ function resetTournament() {
   addActivity("Tournament reset.");
 }
 
-function resetScores() {
+function resetScores(options = {}) {
+  const clearReadyTimer = Boolean(options?.clearReadyTimer);
   if (!state?.bracket) return;
   const { seededEligible, mergedPlayers } = seedEligiblePlayersWithMode(
     state.players || [],
@@ -3280,6 +3476,8 @@ function resetScores() {
     currentTournamentMeta || {},
     isRoundRobin,
   );
+  setCurrentVetoMatchIdState(null);
+  setVetoStateState(null);
   saveState(
     {
       players: mergedPlayers,
@@ -3287,6 +3485,8 @@ function resetScores() {
       needsReseed: false,
       scoreReports: {},
       matchCasts: {},
+      matchVetoes: {},
+      ...(clearReadyTimer ? { matchReadySince: {} } : {}),
       bracketLayoutVersion: CURRENT_BRACKET_LAYOUT_VERSION,
       bracketRepairVersion: CURRENT_BRACKET_LAYOUT_VERSION,
     },
@@ -3452,8 +3652,9 @@ function collectReadyMatchIdsForCurrentUser(snapshot) {
     if (!pA || !pB) continue; // not ready yet
 
     if (
-      isCurrentUserTournamentPlayerByUid(pA) ||
-      isCurrentUserTournamentPlayerByUid(pB)
+      isAdmin ||
+      isCurrentUserTournamentPlayer(pA) ||
+      isCurrentUserTournamentPlayer(pB)
     ) {
       out.add(match.id);
     }
@@ -3472,6 +3673,12 @@ function resolveOpponentInfoForMatch(snapshot, matchId) {
   );
   const [pA, pB] = resolveParticipants(match, lookup, playersById);
   if (!pA || !pB) return fallback;
+  if (isAdmin) {
+    return {
+      name: `${pA?.name || "TBD"} vs ${pB?.name || "TBD"}`,
+      avatarUrl: DEFAULT_PLAYER_AVATAR,
+    };
+  }
   const isA = isCurrentUserTournamentPlayerByUid(pA);
   const isB = isCurrentUserTournamentPlayerByUid(pB);
   let opponent = null;
@@ -3505,6 +3712,15 @@ function maybeToastMyMatchReady(prevSnapshot, nextSnapshot) {
       opponentName: opponent.name,
       opponentAvatarUrl: opponent.avatarUrl,
       message: "Your next match is ready.",
+    });
+    notifyMatchReadyAlert({
+      matchId,
+      opponentName: opponent.name,
+      tournamentName:
+        currentTournamentMeta?.name ||
+        nextSnapshot?.name ||
+        document.getElementById("tournamentTitle")?.textContent ||
+        "Tournament",
     });
   }
 }
@@ -4514,8 +4730,29 @@ async function saveCircuitSettings() {
         }
       }
       finalPayload.socials = processedSocials;
+      const finalTournamentRef = doc(collection(db, TOURNAMENT_COLLECTION), finalSlug);
+      try {
+        const existingFinalSnap = await getDoc(finalTournamentRef);
+        if (existingFinalSnap.exists()) {
+          const existingFinal = existingFinalSnap.data() || {};
+          if (existingFinal.createdBy) {
+            finalPayload.createdBy = existingFinal.createdBy;
+          }
+          if (existingFinal.createdByName) {
+            finalPayload.createdByName = existingFinal.createdByName;
+          }
+          if (existingFinal.circuitSlug) {
+            finalPayload.circuitSlug = existingFinal.circuitSlug;
+          }
+          // Keep existing tournament admin ownership untouched for non-host updates.
+          delete finalPayload.admins;
+          delete finalPayload.adminUids;
+        }
+      } catch (err) {
+        console.warn("Failed to load existing final tournament metadata", err);
+      }
       await setDoc(
-        doc(collection(db, TOURNAMENT_COLLECTION), finalSlug),
+        finalTournamentRef,
         finalPayload,
         { merge: true },
       );
@@ -4527,7 +4764,7 @@ async function saveCircuitSettings() {
           finalPayload.coverImageUrl = uploaded.coverImageUrl;
           finalPayload.coverImageUrlSmall = uploaded.coverImageUrlSmall;
           await setDoc(
-            doc(collection(db, TOURNAMENT_COLLECTION), finalSlug),
+            finalTournamentRef,
             {
               coverImageUrl: uploaded.coverImageUrl,
               coverImageUrlSmall: uploaded.coverImageUrlSmall,
@@ -4540,7 +4777,7 @@ async function saveCircuitSettings() {
       } else if (reuseUrl) {
         try {
           await setDoc(
-            doc(collection(db, TOURNAMENT_COLLECTION), finalSlug),
+            finalTournamentRef,
             { coverImageUrl: reuseUrl, coverImageUrlSmall: "" },
             { merge: true },
           );
@@ -5208,6 +5445,136 @@ function formatCountdown(ms) {
   return `${minutes}m`;
 }
 
+function formatPrizePoolTotal(value) {
+  const total = Number(value?.total ?? value);
+  if (!Number.isFinite(total) || total <= 0) return "TBD";
+  const currency = String(value?.currency || "USD").toUpperCase();
+  const customCurrency = String(value?.customCurrency || "").trim();
+  if (currency === "CUSTOM") {
+    return customCurrency
+      ? `${customCurrency} ${Math.round(total).toLocaleString()}`
+      : `${Math.round(total).toLocaleString()}`;
+  }
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency,
+      maximumFractionDigits: 0,
+    }).format(Math.round(total));
+  } catch (_) {
+    return `${currency} ${Math.round(total).toLocaleString()}`;
+  }
+}
+
+function renderPrizeInfoMarkup(meta) {
+  const total = Number(meta?.prizePoolTotal);
+  if (!Number.isFinite(total) || total <= 0) return "";
+  const currency = String(meta?.prizePoolCurrency || "USD").toUpperCase();
+  const customCurrency = String(meta?.prizePoolCurrencyCustom || "").trim();
+  const rows = normalizeStoredPrizeSplitRows(meta?.prizePoolSplit, total);
+  const splitRows = rows
+    .map((row) => {
+      const amountText = formatPrizePoolTotal({
+        total: row.amount,
+        currency,
+        customCurrency,
+      });
+      return `<li>${escapeHtml(String(row.place))} place: ${escapeHtml(
+        amountText,
+      )}</li>`;
+    })
+    .join("");
+  const totalText = formatPrizePoolTotal({ total, currency, customCurrency });
+  return `
+    <p><strong>Total:</strong> ${escapeHtml(totalText)}</p>
+    ${
+      splitRows
+        ? `<p><strong>Split:</strong></p><ul>${splitRows}</ul>`
+        : `<p><strong>Split:</strong> Not set</p>`
+    }
+  `;
+}
+
+function normalizeStoredPrizeSplitRows(value, total = null) {
+  const raw = Array.isArray(value) ? value : [];
+  const rows = raw
+    .map((row, idx) => {
+      if (row && typeof row === "object") {
+        const legacyPercent = Number(row.percent);
+        const amountFromPercent =
+          Number.isFinite(legacyPercent) &&
+          legacyPercent >= 0 &&
+          Number.isFinite(total) &&
+          total > 0
+            ? Math.round((total * legacyPercent) / 100)
+            : NaN;
+        return {
+          place: Number(row.place),
+          amount: Number(
+            row.amount ?? row.value ?? row.points ?? amountFromPercent ?? 0,
+          ),
+        };
+      }
+      return { place: idx + 1, amount: Number(row) };
+    })
+    .filter(
+      (row) =>
+        Number.isFinite(row.place) &&
+        row.place > 0 &&
+        Number.isFinite(row.amount) &&
+        row.amount >= 0,
+    );
+  const deduped = new Map();
+  rows.forEach((row) => deduped.set(row.place, row.amount));
+  return Array.from(deduped.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([place, amount]) => ({ place, amount }));
+}
+
+function handleAddPrizeSplitRow(event) {
+  event?.preventDefault?.();
+  const rows = readPrizeSplitRows();
+  const nextPlace = rows.length
+    ? Math.max(...rows.map((row) => row.place)) + 1
+    : 1;
+  renderPrizeSplitRows([...rows, { place: nextPlace, amount: 0 }]);
+  updatePrizeSplitWarning();
+}
+
+function handleRemovePrizeSplitRow(event) {
+  event?.preventDefault?.();
+  const row = event.target?.closest?.("[data-prize-split-row]");
+  if (!row) return;
+  row.remove();
+  updatePrizeSplitWarning();
+}
+
+function updatePrizeSplitWarning() {
+  const warningEl = document.getElementById("settingsPrizeSplitWarning");
+  if (!warningEl) return;
+  const totalInput = document.getElementById("settingsPrizePoolTotal");
+  const total = Number(totalInput?.value || 0);
+  const rows = readPrizeSplitRows();
+  const splitTotal = rows.reduce(
+    (sum, row) => sum + Number(row?.amount || 0),
+    0,
+  );
+  if (!Number.isFinite(total) || total <= 0) {
+    warningEl.textContent = "Set prize pool total to validate split.";
+    warningEl.style.color = "";
+    return;
+  }
+  if (splitTotal !== Math.round(total)) {
+    warningEl.textContent = `Warning: split total is ${splitTotal}, expected ${Math.round(
+      total,
+    )}.`;
+    warningEl.style.color = "#ff8b8b";
+    return;
+  }
+  warningEl.textContent = "Split total matches prize pool total.";
+  warningEl.style.color = "#8fe3a2";
+}
+
 function updateCheckInUI() {
   if (!currentTournamentMeta) return;
   const checkInBtn = document.getElementById("checkInBtn");
@@ -5496,6 +5863,7 @@ async function handleSaveSettings(event) {
     document.querySelector("#settingsTab .settings-panel.active")?.id ||
     "settingsGeneral";
   const isGeneralTab = activeSettingsTab === "settingsGeneral";
+  const isPrizeTab = activeSettingsTab === "settingsPrize";
   const isDescTab = activeSettingsTab === "settingsDesc";
   const isMapsTab = activeSettingsTab === "settingsMaps";
   const isFormatTab = activeSettingsTab === "settingsFormat";
@@ -5523,6 +5891,13 @@ async function handleSaveSettings(event) {
   const visibilitySelect = document.getElementById("settingsVisibilitySelect");
   const qualifyInput = document.getElementById("settingsCircuitQualifyCount");
   const requirePulseInput = document.getElementById("settingsRequirePulseLink");
+  const prizePoolTotalInput = document.getElementById("settingsPrizePoolTotal");
+  const prizePoolCurrencyInput = document.getElementById(
+    "settingsPrizePoolCurrency",
+  );
+  const prizePoolCurrencyCustomInput = document.getElementById(
+    "settingsPrizePoolCurrencyCustom",
+  );
   const imageInput = document.getElementById("settingsImageInput");
   const imagePreview = document.getElementById("settingsImagePreview");
   const copySponsorsToggle = document.getElementById(
@@ -5625,6 +6000,48 @@ async function handleSaveSettings(event) {
         getCopyFromCircuitPromos(currentTournamentMeta),
       )
     : false;
+  const rawPrizePoolTotal = isGeneralTab || isPrizeTab
+    ? Number(prizePoolTotalInput?.value)
+    : Number(currentTournamentMeta?.prizePoolTotal);
+  const prizePoolTotal =
+    Number.isFinite(rawPrizePoolTotal) && rawPrizePoolTotal > 0
+      ? Math.round(rawPrizePoolTotal)
+      : null;
+  const prizePoolCurrency = isGeneralTab || isPrizeTab
+    ? String(prizePoolCurrencyInput?.value || "USD").toUpperCase()
+    : String(currentTournamentMeta?.prizePoolCurrency || "USD").toUpperCase();
+  const prizePoolCurrencyCustom = isGeneralTab || isPrizeTab
+    ? String(prizePoolCurrencyCustomInput?.value || "").trim()
+    : String(currentTournamentMeta?.prizePoolCurrencyCustom || "").trim();
+  if ((isGeneralTab || isPrizeTab) && prizePoolCurrency === "CUSTOM") {
+    if (!prizePoolCurrencyCustom) {
+      showToast?.("Enter a custom currency label.", "error");
+      return;
+    }
+  }
+  const prizePoolSplit = isGeneralTab || isPrizeTab
+    ? readPrizeSplitRows()
+    : normalizeStoredPrizeSplitRows(
+        currentTournamentMeta?.prizePoolSplit,
+        Number(currentTournamentMeta?.prizePoolTotal),
+      );
+  const splitTotal = prizePoolSplit.reduce(
+    (sum, row) => sum + Number(row.amount || 0),
+    0,
+  );
+  if ((isGeneralTab || isPrizeTab) && Number.isFinite(prizePoolTotal) && prizePoolTotal > 0) {
+    if (splitTotal !== prizePoolTotal) {
+      showToast?.("Prize split total must equal prize pool total.", "error");
+      return;
+    }
+  }
+  if (isGeneralTab || isPrizeTab) {
+    const places = prizePoolSplit.map((row) => Number(row.place));
+    if (new Set(places).size !== places.length) {
+      showToast?.("Prize split placements must be unique.", "error");
+      return;
+    }
+  }
   let coverImageUrl = currentTournamentMeta?.coverImageUrl || "";
   let coverImageUrlSmall = currentTournamentMeta?.coverImageUrlSmall || "";
   if (!imageFile && reuseUrl) {
@@ -5718,6 +6135,10 @@ async function handleSaveSettings(event) {
     roundRobin: rrSettings,
     requirePulseLink,
     grandFinalReset,
+    prizePoolTotal,
+    prizePoolCurrency,
+    prizePoolCurrencyCustom,
+    prizePoolSplit,
     circuitQualifyCount:
       currentTournamentMeta?.isCircuitFinal &&
       Number.isFinite(qualifyCount) &&
@@ -6316,6 +6737,12 @@ document.addEventListener("tournament:notification-action", (event) => {
 });
 
 document.addEventListener("DOMContentLoaded", async () => {
+  initTabAlerts();
+  document.addEventListener(
+    "tournament:match-chat-unread",
+    handleUnreadChatEvent,
+  );
+
   window.addEventListener("popstate", async () => {
     try {
       await handleRouteChange();
@@ -6378,6 +6805,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     updateSettingsDescriptionPreview,
     updateSettingsRulesPreview,
     getPlayersMap,
+    getMatchReadySince,
     getMapByName,
     renderMarkdown,
     mapPoolSelection,
@@ -6401,6 +6829,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     handleEditCircuitPoints,
     handleSaveCircuitPoints,
     handleApplyCircuitPoints,
+    handleAddPrizeSplitRow,
+    handleRemovePrizeSplitRow,
+    handlePrizeSplitChange: updatePrizeSplitWarning,
+    handlePrizeCurrencyChange: updatePrizeCurrencyCustomInputVisibility,
     addBotPlayer,
     removeBotPlayer,
     removeAllBots,
@@ -6411,6 +6843,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     notifyCheckInPlayers,
     toggleCheckInManualClose,
     toggleLiveTournament,
+    recreateLiveBracket,
+    showToast,
     refreshRosterMmrFromPulse,
   });
   document.addEventListener("click", (event) => {
@@ -6425,6 +6859,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   initCoverReuseModal();
   initCasterControls({ saveState });
   initFinalAdminSearch();
+  initSuperAdminSearch();
   bindTournamentSponsorControls();
   bindTournamentSocialControls();
   bindTournamentPromoSettingsControls(() => currentTournamentMeta);
@@ -6456,6 +6891,9 @@ initBroadcastSync(syncFromRemote, getPersistStorageKey, () => {});
 function switchTab(targetId) {
   const targetPanel = document.getElementById(targetId);
   if (targetPanel && targetPanel.dataset.adminOnly === "true" && !isAdmin) {
+    return;
+  }
+  if (targetId === "superAdminTab" && !isSuperAdminUser()) {
     return;
   }
   if (targetId === "mapsTab" || targetId === "settingsTab") {
@@ -6516,10 +6954,21 @@ function updateAdminVisibility() {
     liveCircuitPointsBtn.style.display =
       isAdmin && currentTournamentMeta?.circuitSlug ? "" : "none";
   }
+  updateSuperAdminVisibility();
   updateFinalAdminAddVisibility();
   updateInviteLinksPanelVisibility();
   if (typeof window !== "undefined") {
     window.__tournamentIsAdmin = isAdmin;
+  }
+}
+
+function updateSuperAdminVisibility() {
+  const allowed = isSuperAdminUser();
+  document.querySelectorAll("[data-super-admin-only='true']").forEach((el) => {
+    el.style.display = allowed ? "" : "none";
+  });
+  if (!allowed && document.querySelector(".tab-btn.active")?.dataset.tab === "superAdminTab") {
+    switchTab("registrationTab");
   }
 }
 
@@ -7320,6 +7769,148 @@ async function handleRegistration(event) {
   } finally {
     setRegisterLoadingState(false);
   }
+}
+
+function setSuperAdminSearchStatus(message) {
+  const statusEl = document.getElementById("superAdminAddPlayerStatus");
+  if (statusEl) statusEl.textContent = message || "";
+}
+
+function renderSuperAdminSearchResults(results = []) {
+  const resultsEl = document.getElementById("superAdminSearchResults");
+  if (!resultsEl) return;
+  resultsEl.replaceChildren();
+  results.forEach((entry) => {
+    const row = document.createElement("div");
+    row.className = "admin-search-item";
+    const label = document.createElement("span");
+    label.setAttribute("translate", "no");
+    label.textContent = entry.username;
+    const addBtn = document.createElement("button");
+    addBtn.type = "button";
+    addBtn.className = "cta small primary";
+    addBtn.textContent = "Add direct";
+    addBtn.dataset.superAdminAddUsername = entry.username;
+    if (entry.userId) {
+      addBtn.dataset.superAdminUserId = entry.userId;
+    }
+    const alreadyAdded = (state.players || []).some(
+      (player) =>
+        (entry.userId && player.uid === entry.userId) ||
+        (player.name || "").toLowerCase() === entry.username.toLowerCase(),
+    );
+    if (alreadyAdded) {
+      addBtn.disabled = true;
+      addBtn.textContent = "Added";
+    }
+    row.append(label, addBtn);
+    resultsEl.append(row);
+  });
+}
+
+async function addSuperAdminPlayerFromSearch({
+  userId,
+  username,
+  userData,
+  selectedRace,
+}) {
+  if (!isSuperAdminUser()) {
+    showToast?.("Unauthorized.", "error");
+    return;
+  }
+  const slug = currentSlug || currentTournamentMeta?.slug || "";
+  if (!slug) throw new Error("Tournament not loaded.");
+  if (!userId) throw new Error("Missing target user id.");
+  const displayName = (userData?.username || username || "").trim();
+  if (!displayName) throw new Error("Missing target username.");
+  const race = normalizeRaceLabel(selectedRace) || "Random";
+  const pulse = userData?.pulse || {};
+  const sc2Link = sanitizeUrl(userData?.sc2PulseUrl || pulse.url || "");
+  const twitchUrl = sanitizeUrl(userData?.twitchUrl || "");
+  const country = String(userData?.country || "").trim().toUpperCase();
+  let startingPoints = null;
+  if (currentTournamentMeta?.circuitSlug && displayName) {
+    startingPoints = await getCircuitSeedPoints({
+      name: displayName,
+      sc2Link,
+      uid: userId,
+      circuitSlug: currentTournamentMeta.circuitSlug,
+      tournamentSlug: currentSlug,
+    });
+  }
+  if (!superAdminAddPlayerCallable) {
+    superAdminAddPlayerCallable = httpsCallable(functions, "superAdminAddPlayer");
+  }
+  await superAdminAddPlayerCallable({
+    slug,
+    name: displayName,
+    race,
+    uid: userId,
+    sc2Link,
+    twitchUrl,
+    country,
+    points: Number.isFinite(startingPoints) ? startingPoints : 0,
+  });
+  await hydrateStateFromRemote(
+    slug,
+    applyRosterSeedingWithMode,
+    deserializeBracket,
+    saveState,
+    renderAll,
+    state?.lastUpdated || 0,
+  );
+  renderAll();
+  showToast?.(`${displayName} added directly to tournament.`, "success");
+}
+
+function initSuperAdminSearch() {
+  const input = document.getElementById("superAdminSearchInput");
+  const resultsEl = document.getElementById("superAdminSearchResults");
+  if (!input || !resultsEl) return;
+  const search = createAdminPlayerSearch({
+    db,
+    getIsEnabled: () => isSuperAdminUser(),
+    getPlayers: () => state.players || [],
+    onStatus: setSuperAdminSearchStatus,
+    onResults: renderSuperAdminSearchResults,
+    onError: (err) => {
+      if (err?.message) showToast?.(err.message, "error");
+    },
+    onSuccess: () => {
+      input.value = "";
+      renderSuperAdminSearchResults([]);
+      setSuperAdminSearchStatus("");
+    },
+    addPlayer: async ({ userId, username, userData, options }) => {
+      const race = normalizeRaceLabel(options?.selectedRace) || "Random";
+      setSuperAdminSearchStatus(`Fetching SC2Pulse MMR for ${race}...`);
+      await addSuperAdminPlayerFromSearch({
+        userId,
+        username,
+        userData,
+        selectedRace: race,
+      });
+      setSuperAdminSearchStatus("Player added.");
+    },
+  });
+
+  input.addEventListener("input", () => {
+    search.debouncedSearch(input.value);
+  });
+  resultsEl.addEventListener("click", (event) => {
+    const target = event.target.closest("[data-super-admin-add-username]");
+    if (!target) return;
+    const username = target.dataset.superAdminAddUsername || "";
+    const userId = target.dataset.superAdminUserId || "";
+    const selectedRace =
+      normalizeRaceLabel(
+        document.getElementById("superAdminRaceSelect")?.value || "Random",
+      ) || "Random";
+    search.addByUsername(username, userId, {
+      mode: "super-admin",
+      selectedRace,
+    });
+  });
 }
 
 function setFinalAdminSearchStatus(message) {

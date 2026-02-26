@@ -23,6 +23,18 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/tournamentCircuits/$(circuitSlug))
         && request.auth.uid == get(/databases/$(database)/documents/tournamentCircuits/$(circuitSlug)).data.createdBy;
     }
+    function isCircuitAdmin(circuitSlug) {
+      return request.auth != null
+        && circuitSlug != null
+        && exists(/databases/$(database)/documents/tournamentCircuits/$(circuitSlug))
+        && (
+          request.auth.uid == get(/databases/$(database)/documents/tournamentCircuits/$(circuitSlug)).data.createdBy ||
+          (
+            get(/databases/$(database)/documents/tournamentCircuits/$(circuitSlug)).data.adminUids is list &&
+            request.auth.uid in get(/databases/$(database)/documents/tournamentCircuits/$(circuitSlug)).data.adminUids
+          )
+        );
+    }
     function isCircuitOwnerForTournament(slug) {
       return request.auth != null
         && exists(/databases/$(database)/documents/tournaments/$(slug))
@@ -222,6 +234,10 @@ service cloud.firestore {
         (
           isTournamentAdmin(slug) &&
           !request.resource.data.diff(resource.data).changedKeys().hasAny(["admins", "adminUids"])
+        ) ||
+        (
+          isCircuitAdmin(resource.data.circuitSlug) &&
+          !request.resource.data.diff(resource.data).changedKeys().hasAny(["admins", "adminUids"])
         )
       );
       allow delete: if request.auth != null && (
@@ -257,7 +273,8 @@ service cloud.firestore {
     match /tournamentCircuits/{slug} {
       allow read: if true;
       allow create: if request.auth != null;
-      allow update, delete: if request.auth != null &&
+      allow update: if isCircuitAdmin(slug);
+      allow delete: if request.auth != null &&
         request.auth.uid == resource.data.createdBy;
     }
 

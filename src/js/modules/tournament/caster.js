@@ -1,10 +1,16 @@
 import { auth, db, functions, getCurrentUsername } from "../../../app.js";
 import { showToast } from "../toastHandler.js";
-import { state, isAdmin, currentSlug, currentTournamentMeta } from "./state.js";
+import {
+  state,
+  isAdmin,
+  currentSlug,
+  currentTournamentMeta,
+  TOURNAMENT_STATE_COLLECTION,
+} from "./state.js";
 import { escapeHtml, sanitizeUrl } from "./bracket/renderUtils.js";
 import { createAdminPlayerSearch } from "./admin/addSearchPlayer.js";
 import { httpsCallable } from "firebase/functions";
-import { doc, getDoc } from "firebase/firestore";
+import { collection, doc, getDoc, setDoc } from "firebase/firestore";
 
 let casterDeps = null;
 let castPopover = null;
@@ -34,6 +40,43 @@ function getCasterProfileFromUser(uid) {
     name: name || "Caster",
     twitchUrl,
   };
+}
+
+function normalizeCasterPatch(patch = {}) {
+  const out = {};
+  if (Object.prototype.hasOwnProperty.call(patch, "casters")) {
+    out.casters = Array.isArray(patch.casters) ? patch.casters : [];
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "casterRequests")) {
+    out.casterRequests = Array.isArray(patch.casterRequests) ? patch.casterRequests : [];
+  }
+  return out;
+}
+
+async function saveCasterPatch(patch = {}) {
+  const nextPatch = normalizeCasterPatch(patch);
+  if (!Object.keys(nextPatch).length) return true;
+
+  casterDeps?.saveState?.(nextPatch, { skipRemote: true });
+
+  const slug = currentSlug || currentTournamentMeta?.slug || "";
+  if (!slug) return true;
+
+  try {
+    await setDoc(
+      doc(collection(db, TOURNAMENT_STATE_COLLECTION), slug),
+      {
+        ...nextPatch,
+        lastUpdated: Date.now(),
+      },
+      { merge: true }
+    );
+    return true;
+  } catch (err) {
+    console.error("Failed to persist caster patch", err);
+    showToast?.("Could not update caster state.", "error");
+    return false;
+  }
 }
 
 function setCasterManageActiveTab(tab) {
@@ -180,7 +223,11 @@ async function addCasterFromRoster(uid) {
   };
   const nextRequests = casterRequests.filter((req) => req?.uid !== uid);
   const nextCasters = [...casters, entry];
-  casterDeps?.saveState?.({ casters: nextCasters, casterRequests: nextRequests });
+  const saved = await saveCasterPatch({
+    casters: nextCasters,
+    casterRequests: nextRequests,
+  });
+  if (!saved) return;
   showToast?.(`${player.name || "Player"} added as caster.`, "success");
   renderCasterSection();
 }
@@ -351,7 +398,7 @@ function handleCasterManageClick(event) {
   }
 }
 
-function handleCasterRequest() {
+async function handleCasterRequest() {
   showToast?.("Sending caster request...", "info");
   const uid = auth.currentUser?.uid || null;
   if (!uid) {
@@ -372,7 +419,8 @@ function handleCasterRequest() {
     return;
   }
   const nextRequests = [...(state.casterRequests || []), { ...profile, requestedAt: Date.now() }];
-  casterDeps?.saveState?.({ casterRequests: nextRequests });
+  const saved = await saveCasterPatch({ casterRequests: nextRequests });
+  if (!saved) return;
   showToast?.("Caster request sent.", "success");
   renderCasterSection();
 }
@@ -381,10 +429,10 @@ function handleCasterRequestClick(event) {
   const button = event.target.closest("#requestCasterBtn");
   if (!button) return;
   event.preventDefault();
-  handleCasterRequest();
+  void handleCasterRequest();
 }
 
-function approveCasterRequest(uid) {
+async function approveCasterRequest(uid) {
   if (!isAdmin) {
     showToast?.("Only admins can approve casters.", "error");
     return;
@@ -398,32 +446,37 @@ function approveCasterRequest(uid) {
     ? casters
     : [...casters, { ...requestEntry, approvedAt: Date.now() }];
   const nextRequests = requests.filter((entry) => entry.uid !== uid);
-  casterDeps?.saveState?.({ casters: nextCasters, casterRequests: nextRequests });
+  const saved = await saveCasterPatch({
+    casters: nextCasters,
+    casterRequests: nextRequests,
+  });
+  if (!saved) return;
   showToast?.("Caster approved.", "success");
   renderCasterSection();
 }
 
-function denyCasterRequest(uid) {
+async function denyCasterRequest(uid) {
   if (!isAdmin) {
     showToast?.("Only admins can decline caster requests.", "error");
     return;
   }
   const requests = Array.isArray(state.casterRequests) ? state.casterRequests : [];
   const nextRequests = requests.filter((entry) => entry.uid !== uid);
-  casterDeps?.saveState?.({ casterRequests: nextRequests });
+  const saved = await saveCasterPatch({ casterRequests: nextRequests });
+  if (!saved) return;
   showToast?.("Caster request removed.", "info");
   renderCasterSection();
 }
 
-function handleCasterAdminAction(event) {
+async function handleCasterAdminAction(event) {
   const button = event.target.closest("[data-caster-action]");
   if (!button) return;
   const uid = button.dataset.casterUid;
   if (!uid) return;
   if (button.dataset.casterAction === "approve") {
-    approveCasterRequest(uid);
+    await approveCasterRequest(uid);
   } else if (button.dataset.casterAction === "deny") {
-    denyCasterRequest(uid);
+    await denyCasterRequest(uid);
   }
 }
 
