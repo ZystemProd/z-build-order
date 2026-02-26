@@ -413,6 +413,12 @@ a {
   font-size: 13px;
 }
 
+.stat-card .stat-sub {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
 .stat-card h2 {
   margin: 4px 0 0;
   font-size: 28px;
@@ -425,6 +431,21 @@ a {
     rgba(17, 24, 43, 0.95)
   );
   border: 1px solid rgba(245, 197, 66, 0.5);
+}
+
+.stat-card-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.stat-split-item {
+  min-width: 0;
+}
+
+.stat-split-item + .stat-split-item {
+  border-left: 1px solid var(--stroke);
+  padding-left: 12px;
 }
 
 .tournament-list .tournament-card {
@@ -1435,6 +1456,12 @@ a {
   margin-left: 0;
 }
 
+#tournamentPrizeInfoBody ul {
+  list-style-position: inside;
+  padding-left: 0;
+  margin-left: 0;
+}
+
 .table-wrapper {
   border: 1px solid var(--stroke);
   border-radius: 12px;
@@ -1672,6 +1699,14 @@ a {
 .circuit-points-table td:last-child {
   width: 1%;
   white-space: nowrap;
+}
+
+.prize-split-table input[data-prize-place] {
+  width: 110px;
+}
+
+.prize-split-table input[data-prize-amount] {
+  width: 120px;
 }
 
 .circuit-points-actions {

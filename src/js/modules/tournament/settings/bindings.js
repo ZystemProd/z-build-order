@@ -12,6 +12,10 @@ export function bindSettingsEvents({
   handleEditCircuitPoints,
   handleSaveCircuitPoints,
   handleApplyCircuitPoints,
+  handleAddPrizeSplitRow,
+  handleRemovePrizeSplitRow,
+  handlePrizeSplitChange,
+  handlePrizeCurrencyChange,
 }) {
   const settingsDescInput = document.getElementById("settingsDescriptionInput");
   const settingsRulesInput = document.getElementById("settingsRulesInput");
@@ -30,6 +34,10 @@ export function bindSettingsEvents({
     "saveTournamentCircuitPointsBtn"
   );
   const circuitPointsBody = document.getElementById("circuitPointsBody");
+  const addPrizeSplitRowBtn = document.getElementById("settingsAddPrizeSplitRow");
+  const prizeSplitBody = document.getElementById("settingsPrizeSplitBody");
+  const prizePoolTotalInput = document.getElementById("settingsPrizePoolTotal");
+  const prizePoolCurrencyInput = document.getElementById("settingsPrizePoolCurrency");
 
   settingsDescInput?.addEventListener(
     "input",
@@ -65,4 +73,18 @@ export function bindSettingsEvents({
   circuitPointsBody?.addEventListener("input", (event) => {
     handleCircuitPointsChange?.(event);
   });
+
+  addPrizeSplitRowBtn?.addEventListener("click", handleAddPrizeSplitRow);
+  prizeSplitBody?.addEventListener("click", (event) => {
+    const target = event.target.closest("[data-prize-remove='true']");
+    if (!target) return;
+    handleRemovePrizeSplitRow?.(event);
+    handlePrizeSplitChange?.();
+  });
+  prizeSplitBody?.addEventListener("input", () => handlePrizeSplitChange?.());
+  prizeSplitBody?.addEventListener("change", () => handlePrizeSplitChange?.());
+  prizePoolTotalInput?.addEventListener("input", () => handlePrizeSplitChange?.());
+  prizePoolCurrencyInput?.addEventListener("change", () =>
+    handlePrizeCurrencyChange?.()
+  );
 }

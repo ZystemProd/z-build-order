@@ -502,9 +502,15 @@
             </div>
           </div>
           <div class="hero-stats">
-            <div class="stat-card">
-              <p>Registered</p>
-              <h2 id="statPlayers">0</h2>
+            <div class="stat-card stat-card-split">
+              <div class="stat-split-item">
+                <p>Registered</p>
+                <h2 id="statPlayers">0</h2>
+              </div>
+              <div class="stat-split-item">
+                <p>Prize Pool</p>
+                <h2 id="tournamentPrizePool">TBD</h2>
+              </div>
             </div>
             <div class="stat-card accent">
               <p>Start</p>
@@ -557,6 +563,14 @@
           </div>
 
           <section id="descriptionTab" class="tab-panel">
+            <div class="card" id="tournamentPrizeInfoSection" style="display:none;">
+              <div class="card-header">
+                <div>
+                  <h3>Prize Pool</h3>
+                </div>
+              </div>
+              <div id="tournamentPrizeInfoBody" class="helper"></div>
+            </div>
             <div class="card">
               <div class="card-header">
                 <div>
@@ -1080,6 +1094,7 @@
               <div class="settings-layout">
                 <div class="settings-tabs" id="settingsTabs">
                   <button class="settings-tab-btn active" data-settings-tab="settingsGeneral">General</button>
+                  <button class="settings-tab-btn" data-settings-tab="settingsPrize">Prize Pool</button>
                   <button class="settings-tab-btn" data-settings-tab="settingsDesc">Description &amp; Rules</button>
                   <button class="settings-tab-btn" data-settings-tab="settingsMaps">Maps</button>
                   <button class="settings-tab-btn" data-settings-tab="settingsFormat">Format</button>
@@ -1212,6 +1227,52 @@
                         <p class="helper">Recommended 1200x630. JPG/PNG/WebP.</p>
                       </div>
                     </label>
+                  </div>
+                  <div class="settings-panel" id="settingsPrize">
+                    <div class="admin-settings-grid">
+                      <div class="settings-row">
+                        <div class="settings-row-label">Prize pool total</div>
+                        <div class="settings-row-control">
+                          <div class="inline-row">
+                            <input type="number" id="settingsPrizePoolTotal" min="0" step="1" placeholder="100" />
+                            <select id="settingsPrizePoolCurrency">
+                              <option value="USD">USD</option>
+                              <option value="EUR">EUR</option>
+                              <option value="SEK">SEK</option>
+                              <option value="NOK">NOK</option>
+                              <option value="DKK">DKK</option>
+                              <option value="GBP">GBP</option>
+                              <option value="CAD">CAD</option>
+                              <option value="AUD">AUD</option>
+                              <option value="CUSTOM">Custom</option>
+                            </select>
+                          </div>
+                          <input type="text" id="settingsPrizePoolCurrencyCustom" placeholder="Custom currency (e.g. Credits)" style="display:none; margin-top:8px;" />
+                          <p class="helper">Shown in hero with selected currency.</p>
+                        </div>
+                      </div>
+                      <div class="settings-row">
+                        <div class="settings-row-label">Prize split</div>
+                        <div class="settings-row-control">
+                          <div class="table-wrapper">
+                            <table class="players-table circuit-points-table prize-split-table">
+                              <thead>
+                                <tr>
+                                  <th>Placement</th>
+                                  <th>Amount</th>
+                                  <th></th>
+                                </tr>
+                              </thead>
+                              <tbody id="settingsPrizeSplitBody"></tbody>
+                            </table>
+                          </div>
+                          <div class="circuit-points-actions" style="margin-top:10px;">
+                            <button id="settingsAddPrizeSplitRow" class="cta small ghost" type="button">Add row</button>
+                          </div>
+                          <p class="helper" id="settingsPrizeSplitWarning">Split total should match prize pool total.</p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                   <div class="settings-panel" id="settingsDesc">
                     <div class="markdown-field">

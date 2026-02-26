@@ -4,6 +4,110 @@ import { normalizeRoundRobinSettings } from "../bracket/build.js";
 import { syncMarkdownSurfaceForInput } from "../markdownEditor.js";
 import { formatLocalDateTimeInput } from "../dateTime.js";
 
+const DEFAULT_PRIZE_SPLIT_ROWS = [
+  { place: 1, amount: 50 },
+  { place: 2, amount: 30 },
+  { place: 3, amount: 20 },
+];
+
+function normalizePrizeSplitRows(value, total = null) {
+  const raw = Array.isArray(value) ? value : [];
+  const mapped = raw
+    .map((row, idx) => {
+      if (row && typeof row === "object") {
+        const legacyPercent = Number(row.percent);
+        const amountFromPercent =
+          Number.isFinite(legacyPercent) &&
+          legacyPercent >= 0 &&
+          Number.isFinite(total) &&
+          total > 0
+            ? Math.round((total * legacyPercent) / 100)
+            : NaN;
+        return {
+          place: Number(row.place),
+          amount: Number(
+            row.amount ??
+              row.value ??
+              row.points ??
+              (Number.isFinite(amountFromPercent)
+                ? amountFromPercent
+                : row.percent) ??
+              0,
+          ),
+        };
+      }
+      const amount = Number(row);
+      return {
+        place: idx + 1,
+        amount,
+      };
+    })
+    .filter(
+      (row) =>
+        Number.isFinite(row.place) &&
+        row.place > 0 &&
+        Number.isFinite(row.amount) &&
+        row.amount >= 0,
+    );
+  const deduped = new Map();
+  mapped.forEach((row) => {
+    deduped.set(row.place, row.amount);
+  });
+  return Array.from(deduped.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([place, amount]) => ({ place, amount }));
+}
+
+export function readPrizeSplitRows() {
+  const rows = Array.from(
+    document.querySelectorAll("#settingsPrizeSplitBody [data-prize-split-row]"),
+  )
+    .map((row) => ({
+      place: Number(row.querySelector("[data-prize-place]")?.value),
+      amount: Number(row.querySelector("[data-prize-amount]")?.value),
+    }))
+    .filter(
+      (row) =>
+        Number.isFinite(row.place) &&
+        row.place > 0 &&
+        Number.isFinite(row.amount) &&
+        row.amount >= 0,
+    );
+  return normalizePrizeSplitRows(rows);
+}
+
+export function renderPrizeSplitRows(value = []) {
+  const body = document.getElementById("settingsPrizeSplitBody");
+  if (!body) return;
+  const rows = normalizePrizeSplitRows(value);
+  const finalRows = rows.length ? rows : DEFAULT_PRIZE_SPLIT_ROWS;
+  body.innerHTML = finalRows
+    .map(
+      (row) => `
+      <tr data-prize-split-row>
+        <td>
+          <input type="number" min="1" step="1" data-prize-place value="${row.place}" />
+        </td>
+        <td>
+          <input type="number" min="0" step="1" data-prize-amount value="${row.amount}" />
+        </td>
+        <td>
+          <button class="cta small ghost" type="button" data-prize-remove="true">Remove</button>
+        </td>
+      </tr>
+    `,
+    )
+    .join("");
+}
+
+export function updatePrizeCurrencyCustomInputVisibility() {
+  const currencySelect = document.getElementById("settingsPrizePoolCurrency");
+  const customInput = document.getElementById("settingsPrizePoolCurrencyCustom");
+  if (!currencySelect || !customInput) return;
+  const isCustom = String(currencySelect.value || "").toUpperCase() === "CUSTOM";
+  customInput.style.display = isCustom ? "" : "none";
+}
+
 function normalizeBooleanSetting(value, fallback = true) {
   if (value === undefined || value === null) return fallback;
   if (typeof value === "boolean") return value;
@@ -94,6 +198,13 @@ export function populateSettingsPanel({
   const rrPlayoffs = document.getElementById("settingsRoundRobinPlayoffs");
   const qualifyRow = document.getElementById("settingsCircuitQualifyRow");
   const qualifyInput = document.getElementById("settingsCircuitQualifyCount");
+  const prizePoolTotalInput = document.getElementById("settingsPrizePoolTotal");
+  const prizePoolCurrencyInput = document.getElementById(
+    "settingsPrizePoolCurrency",
+  );
+  const prizePoolCurrencyCustomInput = document.getElementById(
+    "settingsPrizePoolCurrencyCustom",
+  );
   if (nameInput) nameInput.value = tournament.name || "";
   if (slugInput) slugInput.value = tournament.slug || "";
   if (descInput) descInput.value = tournament.description || "";
@@ -189,6 +300,27 @@ export function populateSettingsPanel({
   if (qualifyInput) {
     qualifyInput.value = Number.isFinite(qualifyCount) ? qualifyCount : "";
   }
+  if (prizePoolTotalInput) {
+    const total = Number(tournament.prizePoolTotal);
+    prizePoolTotalInput.value =
+      Number.isFinite(total) && total > 0 ? String(Math.round(total)) : "";
+  }
+  if (prizePoolCurrencyInput) {
+    const currency = String(tournament.prizePoolCurrency || "USD").toUpperCase();
+    prizePoolCurrencyInput.value = currency || "USD";
+  }
+  if (prizePoolCurrencyCustomInput) {
+    prizePoolCurrencyCustomInput.value = String(
+      tournament.prizePoolCurrencyCustom || "",
+    );
+  }
+  updatePrizeCurrencyCustomInputVisibility();
+  renderPrizeSplitRows(
+    normalizePrizeSplitRows(
+      tournament.prizePoolSplit || [],
+      Number(tournament.prizePoolTotal || 0),
+    ),
+  );
   if (qualifyRow) {
     qualifyRow.style.display = tournament.isCircuitFinal ? "" : "none";
   }

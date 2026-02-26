@@ -212,6 +212,9 @@ import { enableDragScroll } from "./ui/dragScroll.js";
 import {
   applyBestOfToSettings,
   populateSettingsPanel as populateSettingsPanelUI,
+  readPrizeSplitRows,
+  renderPrizeSplitRows,
+  updatePrizeCurrencyCustomInputVisibility,
 } from "./settings/render.js";
 import {
   syncFormatFieldVisibility as syncFormatFieldVisibilityUI,
@@ -1954,7 +1957,10 @@ function renderAll(matchIds = null) {
       "tournamentDescriptionBody",
     );
     const rulesBody = document.getElementById("tournamentRulesBody");
+    const prizeInfoSection = document.getElementById("tournamentPrizeInfoSection");
+    const prizeInfoBody = document.getElementById("tournamentPrizeInfoBody");
     const statPlayers = document.getElementById("statPlayers");
+    const tournamentPrizePool = document.getElementById("tournamentPrizePool");
     const registerBtn = document.getElementById("registerBtn");
     const goLiveBtn = document.getElementById("rebuildBracketBtn");
     const recreateBracketBtn = document.getElementById("recreateBracketBtn");
@@ -2053,6 +2059,11 @@ function renderAll(matchIds = null) {
     if (rulesBody) {
       rulesBody.innerHTML = renderMarkdown(currentTournamentMeta.rules || "");
     }
+    if (prizeInfoSection && prizeInfoBody) {
+      const markup = renderPrizeInfoMarkup(currentTournamentMeta);
+      prizeInfoSection.style.display = markup ? "" : "none";
+      prizeInfoBody.innerHTML = markup;
+    }
     if (bracketTitle) {
       const formatLabel = (currentTournamentMeta.format || "").toLowerCase();
       const isGroupStage =
@@ -2075,6 +2086,15 @@ function renderAll(matchIds = null) {
     }
     if (statPlayers)
       statPlayers.textContent = String(eligiblePlayers.length || 0);
+    if (tournamentPrizePool) {
+      tournamentPrizePool.textContent = formatPrizePoolTotal(
+        {
+          total: currentTournamentMeta?.prizePoolTotal,
+          currency: currentTournamentMeta?.prizePoolCurrency || "USD",
+          customCurrency: currentTournamentMeta?.prizePoolCurrencyCustom || "",
+        },
+      );
+    }
 
     const tokenActive =
       isInviteOnly &&
@@ -2348,6 +2368,7 @@ function renderAll(matchIds = null) {
       updateSettingsRulesPreview,
       syncFormatFieldVisibility,
     });
+    updatePrizeSplitWarning();
     updateSettingsScoreLocks();
     const nextPromoKey = getPromoStripRenderKey(currentTournamentMeta);
     if (nextPromoKey && nextPromoKey !== promoStripRenderKey) {
@@ -5424,6 +5445,136 @@ function formatCountdown(ms) {
   return `${minutes}m`;
 }
 
+function formatPrizePoolTotal(value) {
+  const total = Number(value?.total ?? value);
+  if (!Number.isFinite(total) || total <= 0) return "TBD";
+  const currency = String(value?.currency || "USD").toUpperCase();
+  const customCurrency = String(value?.customCurrency || "").trim();
+  if (currency === "CUSTOM") {
+    return customCurrency
+      ? `${customCurrency} ${Math.round(total).toLocaleString()}`
+      : `${Math.round(total).toLocaleString()}`;
+  }
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency,
+      maximumFractionDigits: 0,
+    }).format(Math.round(total));
+  } catch (_) {
+    return `${currency} ${Math.round(total).toLocaleString()}`;
+  }
+}
+
+function renderPrizeInfoMarkup(meta) {
+  const total = Number(meta?.prizePoolTotal);
+  if (!Number.isFinite(total) || total <= 0) return "";
+  const currency = String(meta?.prizePoolCurrency || "USD").toUpperCase();
+  const customCurrency = String(meta?.prizePoolCurrencyCustom || "").trim();
+  const rows = normalizeStoredPrizeSplitRows(meta?.prizePoolSplit, total);
+  const splitRows = rows
+    .map((row) => {
+      const amountText = formatPrizePoolTotal({
+        total: row.amount,
+        currency,
+        customCurrency,
+      });
+      return `<li>${escapeHtml(String(row.place))} place: ${escapeHtml(
+        amountText,
+      )}</li>`;
+    })
+    .join("");
+  const totalText = formatPrizePoolTotal({ total, currency, customCurrency });
+  return `
+    <p><strong>Total:</strong> ${escapeHtml(totalText)}</p>
+    ${
+      splitRows
+        ? `<p><strong>Split:</strong></p><ul>${splitRows}</ul>`
+        : `<p><strong>Split:</strong> Not set</p>`
+    }
+  `;
+}
+
+function normalizeStoredPrizeSplitRows(value, total = null) {
+  const raw = Array.isArray(value) ? value : [];
+  const rows = raw
+    .map((row, idx) => {
+      if (row && typeof row === "object") {
+        const legacyPercent = Number(row.percent);
+        const amountFromPercent =
+          Number.isFinite(legacyPercent) &&
+          legacyPercent >= 0 &&
+          Number.isFinite(total) &&
+          total > 0
+            ? Math.round((total * legacyPercent) / 100)
+            : NaN;
+        return {
+          place: Number(row.place),
+          amount: Number(
+            row.amount ?? row.value ?? row.points ?? amountFromPercent ?? 0,
+          ),
+        };
+      }
+      return { place: idx + 1, amount: Number(row) };
+    })
+    .filter(
+      (row) =>
+        Number.isFinite(row.place) &&
+        row.place > 0 &&
+        Number.isFinite(row.amount) &&
+        row.amount >= 0,
+    );
+  const deduped = new Map();
+  rows.forEach((row) => deduped.set(row.place, row.amount));
+  return Array.from(deduped.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([place, amount]) => ({ place, amount }));
+}
+
+function handleAddPrizeSplitRow(event) {
+  event?.preventDefault?.();
+  const rows = readPrizeSplitRows();
+  const nextPlace = rows.length
+    ? Math.max(...rows.map((row) => row.place)) + 1
+    : 1;
+  renderPrizeSplitRows([...rows, { place: nextPlace, amount: 0 }]);
+  updatePrizeSplitWarning();
+}
+
+function handleRemovePrizeSplitRow(event) {
+  event?.preventDefault?.();
+  const row = event.target?.closest?.("[data-prize-split-row]");
+  if (!row) return;
+  row.remove();
+  updatePrizeSplitWarning();
+}
+
+function updatePrizeSplitWarning() {
+  const warningEl = document.getElementById("settingsPrizeSplitWarning");
+  if (!warningEl) return;
+  const totalInput = document.getElementById("settingsPrizePoolTotal");
+  const total = Number(totalInput?.value || 0);
+  const rows = readPrizeSplitRows();
+  const splitTotal = rows.reduce(
+    (sum, row) => sum + Number(row?.amount || 0),
+    0,
+  );
+  if (!Number.isFinite(total) || total <= 0) {
+    warningEl.textContent = "Set prize pool total to validate split.";
+    warningEl.style.color = "";
+    return;
+  }
+  if (splitTotal !== Math.round(total)) {
+    warningEl.textContent = `Warning: split total is ${splitTotal}, expected ${Math.round(
+      total,
+    )}.`;
+    warningEl.style.color = "#ff8b8b";
+    return;
+  }
+  warningEl.textContent = "Split total matches prize pool total.";
+  warningEl.style.color = "#8fe3a2";
+}
+
 function updateCheckInUI() {
   if (!currentTournamentMeta) return;
   const checkInBtn = document.getElementById("checkInBtn");
@@ -5712,6 +5863,7 @@ async function handleSaveSettings(event) {
     document.querySelector("#settingsTab .settings-panel.active")?.id ||
     "settingsGeneral";
   const isGeneralTab = activeSettingsTab === "settingsGeneral";
+  const isPrizeTab = activeSettingsTab === "settingsPrize";
   const isDescTab = activeSettingsTab === "settingsDesc";
   const isMapsTab = activeSettingsTab === "settingsMaps";
   const isFormatTab = activeSettingsTab === "settingsFormat";
@@ -5739,6 +5891,13 @@ async function handleSaveSettings(event) {
   const visibilitySelect = document.getElementById("settingsVisibilitySelect");
   const qualifyInput = document.getElementById("settingsCircuitQualifyCount");
   const requirePulseInput = document.getElementById("settingsRequirePulseLink");
+  const prizePoolTotalInput = document.getElementById("settingsPrizePoolTotal");
+  const prizePoolCurrencyInput = document.getElementById(
+    "settingsPrizePoolCurrency",
+  );
+  const prizePoolCurrencyCustomInput = document.getElementById(
+    "settingsPrizePoolCurrencyCustom",
+  );
   const imageInput = document.getElementById("settingsImageInput");
   const imagePreview = document.getElementById("settingsImagePreview");
   const copySponsorsToggle = document.getElementById(
@@ -5841,6 +6000,48 @@ async function handleSaveSettings(event) {
         getCopyFromCircuitPromos(currentTournamentMeta),
       )
     : false;
+  const rawPrizePoolTotal = isGeneralTab || isPrizeTab
+    ? Number(prizePoolTotalInput?.value)
+    : Number(currentTournamentMeta?.prizePoolTotal);
+  const prizePoolTotal =
+    Number.isFinite(rawPrizePoolTotal) && rawPrizePoolTotal > 0
+      ? Math.round(rawPrizePoolTotal)
+      : null;
+  const prizePoolCurrency = isGeneralTab || isPrizeTab
+    ? String(prizePoolCurrencyInput?.value || "USD").toUpperCase()
+    : String(currentTournamentMeta?.prizePoolCurrency || "USD").toUpperCase();
+  const prizePoolCurrencyCustom = isGeneralTab || isPrizeTab
+    ? String(prizePoolCurrencyCustomInput?.value || "").trim()
+    : String(currentTournamentMeta?.prizePoolCurrencyCustom || "").trim();
+  if ((isGeneralTab || isPrizeTab) && prizePoolCurrency === "CUSTOM") {
+    if (!prizePoolCurrencyCustom) {
+      showToast?.("Enter a custom currency label.", "error");
+      return;
+    }
+  }
+  const prizePoolSplit = isGeneralTab || isPrizeTab
+    ? readPrizeSplitRows()
+    : normalizeStoredPrizeSplitRows(
+        currentTournamentMeta?.prizePoolSplit,
+        Number(currentTournamentMeta?.prizePoolTotal),
+      );
+  const splitTotal = prizePoolSplit.reduce(
+    (sum, row) => sum + Number(row.amount || 0),
+    0,
+  );
+  if ((isGeneralTab || isPrizeTab) && Number.isFinite(prizePoolTotal) && prizePoolTotal > 0) {
+    if (splitTotal !== prizePoolTotal) {
+      showToast?.("Prize split total must equal prize pool total.", "error");
+      return;
+    }
+  }
+  if (isGeneralTab || isPrizeTab) {
+    const places = prizePoolSplit.map((row) => Number(row.place));
+    if (new Set(places).size !== places.length) {
+      showToast?.("Prize split placements must be unique.", "error");
+      return;
+    }
+  }
   let coverImageUrl = currentTournamentMeta?.coverImageUrl || "";
   let coverImageUrlSmall = currentTournamentMeta?.coverImageUrlSmall || "";
   if (!imageFile && reuseUrl) {
@@ -5934,6 +6135,10 @@ async function handleSaveSettings(event) {
     roundRobin: rrSettings,
     requirePulseLink,
     grandFinalReset,
+    prizePoolTotal,
+    prizePoolCurrency,
+    prizePoolCurrencyCustom,
+    prizePoolSplit,
     circuitQualifyCount:
       currentTournamentMeta?.isCircuitFinal &&
       Number.isFinite(qualifyCount) &&
@@ -6624,6 +6829,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     handleEditCircuitPoints,
     handleSaveCircuitPoints,
     handleApplyCircuitPoints,
+    handleAddPrizeSplitRow,
+    handleRemovePrizeSplitRow,
+    handlePrizeSplitChange: updatePrizeSplitWarning,
+    handlePrizeCurrencyChange: updatePrizeCurrencyCustomInputVisibility,
     addBotPlayer,
     removeBotPlayer,
     removeAllBots,

@@ -98,6 +98,10 @@ export function initTournamentPage({
   handleEditCircuitPoints,
   handleSaveCircuitPoints,
   handleApplyCircuitPoints,
+  handleAddPrizeSplitRow,
+  handleRemovePrizeSplitRow,
+  handlePrizeSplitChange,
+  handlePrizeCurrencyChange,
   addBotPlayer,
   removeBotPlayer,
   removeAllBots,
@@ -1369,6 +1373,10 @@ export function initTournamentPage({
     handleSaveCircuitPoints: (event) =>
       handleSaveCircuitPoints?.(event, { handleSaveSettings }),
     handleApplyCircuitPoints,
+    handleAddPrizeSplitRow,
+    handleRemovePrizeSplitRow,
+    handlePrizeSplitChange,
+    handlePrizeCurrencyChange,
   });
   const updateMmrStatusPreview = () => {
     const statusEl = document.getElementById("mmrStatus");
