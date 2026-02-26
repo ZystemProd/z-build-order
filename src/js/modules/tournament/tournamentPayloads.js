@@ -165,7 +165,7 @@ export function buildSettingsPayload({
     visibility: visibility || "public",
     requirePulseLink: Boolean(requirePulseLink),
     prizePoolTotal:
-      Number.isFinite(prizePoolTotal) && prizePoolTotal > 0
+      Number.isFinite(prizePoolTotal) && prizePoolTotal >= 0
         ? Math.round(prizePoolTotal)
         : null,
     prizePoolCurrency: String(prizePoolCurrency || "USD").toUpperCase(),

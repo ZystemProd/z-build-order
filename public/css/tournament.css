@@ -5907,11 +5907,13 @@ details.stage-section:not([open]) .stage-toggle::after {
 }
 
 .tournament-map-card .map-meta {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 1fr;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 10px 12px;
+  justify-items: center;
+  min-height: 46px;
+  padding: 8px 12px;
   background-color: #1f2940;
   flex: 0 0 auto;
 }
@@ -5921,11 +5923,15 @@ details.stage-section:not([open]) .stage-toggle::after {
   color: var(--text);
   text-align: center;
   width: 100%;
+  line-height: 1.2;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .tournament-map-card .map-mode {
-  font-size: 12px;
-  color: var(--muted);
+  display: none;
 }
 
 .tournament-map-card.selected {
@@ -6530,6 +6536,19 @@ textarea:focus {
 
 .match-chat-message.is-own {
   background: rgba(78, 213, 255, 0.12);
+}
+
+.match-chat-message.is-admin {
+  background: rgba(212, 170, 84, 0.13);
+  border: 1px solid rgba(212, 170, 84, 0.28);
+}
+
+.match-chat-message.is-admin .match-chat-meta {
+  color: #d9bc7a;
+}
+
+.match-chat-message.is-admin .match-chat-text {
+  color: #f2dfb6;
 }
 
 .match-chat-meta {

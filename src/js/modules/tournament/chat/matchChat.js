@@ -409,6 +409,10 @@ function renderMatchChatMessages(messages = [], uid = null) {
   messages.forEach((entry) => {
     const wrapper = document.createElement("div");
     wrapper.className = "match-chat-message";
+    const isAdminMessage = /\(admin\)\s*$/i.test(String(entry?.name || ""));
+    if (isAdminMessage) {
+      wrapper.classList.add("is-admin");
+    }
     if (uid && entry.uid === uid) {
       wrapper.classList.add("is-own");
     }

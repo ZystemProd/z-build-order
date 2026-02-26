@@ -19,7 +19,6 @@ export function renderMapsTab(tournament, { mapPoolSelection, getDefaultMapPoolN
       <div class="map-thumb"${imgPath ? ` style="background-image:url('${imgPath}')"` : ""}></div>
       <div class="map-meta">
         <div class="map-name" translate="no">${escapeHtml(name)}</div>
-        <span class="map-mode">${escapeHtml(map?.mode || "1v1")}</span>
       </div>
     </div>`;
   });
@@ -41,7 +40,6 @@ export function renderChosenMaps(targetId, { mapPoolSelection, getMapByName }) {
       <div class="map-thumb"${imgPath ? ` style="background-image:url('${imgPath}')"` : ""}></div>
       <div class="map-meta">
         <div class="map-name" translate="no">${escapeHtml(name)}</div>
-        <span class="map-mode">${escapeHtml(map?.mode || "1v1")}</span>
       </div>
     </div>`;
   });

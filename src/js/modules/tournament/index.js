@@ -5447,7 +5447,9 @@ function formatCountdown(ms) {
 
 function formatPrizePoolTotal(value) {
   const total = Number(value?.total ?? value);
-  if (!Number.isFinite(total) || total <= 0) return "TBD";
+  if (!Number.isFinite(total)) return "TBD";
+  if (total === 0) return "No prize pool";
+  if (total < 0) return "TBD";
   const currency = String(value?.currency || "USD").toUpperCase();
   const customCurrency = String(value?.customCurrency || "").trim();
   if (currency === "CUSTOM") {
@@ -5559,9 +5561,19 @@ function updatePrizeSplitWarning() {
     (sum, row) => sum + Number(row?.amount || 0),
     0,
   );
-  if (!Number.isFinite(total) || total <= 0) {
+  if (!Number.isFinite(total)) {
     warningEl.textContent = "Set prize pool total to validate split.";
     warningEl.style.color = "";
+    return;
+  }
+  if (total === 0) {
+    warningEl.textContent = "No prize pool configured (total 0).";
+    warningEl.style.color = "";
+    return;
+  }
+  if (total < 0) {
+    warningEl.textContent = "Prize pool total must be 0 or more.";
+    warningEl.style.color = "#ff8b8b";
     return;
   }
   if (splitTotal !== Math.round(total)) {
@@ -6001,11 +6013,17 @@ async function handleSaveSettings(event) {
       )
     : false;
   const rawPrizePoolTotal = isGeneralTab || isPrizeTab
-    ? Number(prizePoolTotalInput?.value)
+    ? String(prizePoolTotalInput?.value ?? "").trim()
     : Number(currentTournamentMeta?.prizePoolTotal);
+  const parsedPrizePoolTotal =
+    typeof rawPrizePoolTotal === "string"
+      ? rawPrizePoolTotal === ""
+        ? null
+        : Number(rawPrizePoolTotal)
+      : rawPrizePoolTotal;
   const prizePoolTotal =
-    Number.isFinite(rawPrizePoolTotal) && rawPrizePoolTotal > 0
-      ? Math.round(rawPrizePoolTotal)
+    Number.isFinite(parsedPrizePoolTotal) && parsedPrizePoolTotal >= 0
+      ? Math.round(parsedPrizePoolTotal)
       : null;
   const prizePoolCurrency = isGeneralTab || isPrizeTab
     ? String(prizePoolCurrencyInput?.value || "USD").toUpperCase()

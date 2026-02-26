@@ -303,7 +303,7 @@ export function populateSettingsPanel({
   if (prizePoolTotalInput) {
     const total = Number(tournament.prizePoolTotal);
     prizePoolTotalInput.value =
-      Number.isFinite(total) && total > 0 ? String(Math.round(total)) : "";
+      Number.isFinite(total) && total >= 0 ? String(Math.round(total)) : "";
   }
   if (prizePoolCurrencyInput) {
     const currency = String(tournament.prizePoolCurrency || "USD").toUpperCase();
