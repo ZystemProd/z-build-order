@@ -1105,6 +1105,7 @@ export async function populateCreateCircuitForm() {
     finalImagePreview.style.display = "none";
     delete finalImagePreview.dataset.tempPreview;
     delete finalImagePreview.dataset.reuseUrl;
+    delete finalImagePreview.dataset.clearCover;
   }
   if (finalSlugInput && slugInput) {
     const baseSlug = (slugInput.value || "").trim().toLowerCase();

@@ -254,11 +254,13 @@ export function populateSettingsPanel({
       imagePreview.style.display = "block";
       delete imagePreview.dataset.tempPreview;
       imagePreview.dataset.reuseUrl = tournament.coverImageUrl;
+      delete imagePreview.dataset.clearCover;
     } else {
       imagePreview.removeAttribute("src");
       imagePreview.style.display = "none";
       delete imagePreview.dataset.tempPreview;
       delete imagePreview.dataset.reuseUrl;
+      delete imagePreview.dataset.clearCover;
     }
   }
   const requirePulseInput = document.getElementById("settingsRequirePulseLink");

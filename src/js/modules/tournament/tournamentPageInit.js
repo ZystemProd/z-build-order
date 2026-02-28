@@ -880,6 +880,25 @@ export function initTournamentPage({
     }
   };
 
+  const clearCoverPreview = (inputEl, previewEl, { markCleared = true } = {}) => {
+    if (!previewEl) return;
+    if (previewEl.dataset.tempPreview) {
+      try {
+        URL.revokeObjectURL(previewEl.dataset.tempPreview);
+      } catch (_) {}
+    }
+    if (inputEl) inputEl.value = "";
+    previewEl.removeAttribute("src");
+    previewEl.style.display = "none";
+    delete previewEl.dataset.tempPreview;
+    delete previewEl.dataset.reuseUrl;
+    if (markCleared) {
+      previewEl.dataset.clearCover = "true";
+    } else {
+      delete previewEl.dataset.clearCover;
+    }
+  };
+
   const bindImagePreview = (inputEl, previewEl) => {
     if (!inputEl || !previewEl) return;
     inputEl.addEventListener("change", () => {
@@ -902,11 +921,23 @@ export function initTournamentPage({
         } catch (_) {}
       }
       delete previewEl.dataset.reuseUrl;
+      delete previewEl.dataset.clearCover;
       previewEl.src = url;
       previewEl.style.display = "block";
       previewEl.dataset.tempPreview = url;
     });
   };
+
+  document.querySelectorAll(".cover-clear-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const inputId = btn.dataset.coverInput;
+      const previewId = btn.dataset.coverPreview;
+      const inputEl = inputId ? document.getElementById(inputId) : null;
+      const previewEl = previewId ? document.getElementById(previewId) : null;
+      if (!inputEl || !previewEl) return;
+      clearCoverPreview(inputEl, previewEl, { markCleared: true });
+    });
+  });
 
   const templateManager = initTournamentTemplateManager({
     mapPoolSelection,

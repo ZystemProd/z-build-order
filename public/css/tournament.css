@@ -448,6 +448,49 @@ a {
   padding-left: 12px;
 }
 
+#tournamentPrizePool {
+  font-size: clamp(1.4rem, 3vw, 1rem);
+  line-height: 1.52;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+@media (max-width: 1200px) and (min-width: 671px) {
+  .hero.hero-with-admins {
+    grid-template-columns: minmax(0, 1.55fr) minmax(300px, 1fr);
+    grid-template-areas:
+      "main stats"
+      "admins admins";
+  }
+
+  .hero.hero-with-admins .hero-main {
+    grid-area: main;
+    min-width: 0;
+  }
+
+  .hero.hero-with-admins .hero-stats {
+    grid-area: stats;
+    min-width: 0;
+  }
+
+  .hero.hero-with-admins .hero-admin-panel {
+    grid-area: admins;
+    min-width: 0;
+  }
+
+  .hero.hero-with-admins .stat-card-split {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .hero.hero-with-admins .stat-split-item + .stat-split-item {
+    border-left: 0;
+    border-top: 1px solid var(--stroke);
+    padding-left: 0;
+    padding-top: 10px;
+  }
+}
+
 .tournament-list .tournament-card {
   cursor: pointer;
   transition:

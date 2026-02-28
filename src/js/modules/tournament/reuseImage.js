@@ -102,6 +102,7 @@ export function initCoverReuseModal() {
             targetPreview.src = candidate.url;
             targetPreview.style.display = "block";
             targetPreview.dataset.reuseUrl = candidate.url;
+            delete targetPreview.dataset.clearCover;
             closeModal();
           });
           grid.appendChild(card);
