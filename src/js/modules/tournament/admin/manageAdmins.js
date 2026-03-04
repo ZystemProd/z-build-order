@@ -97,7 +97,12 @@ export function createAdminManager({
     if (!uid || !meta) return false;
     if (meta.createdBy && meta.createdBy === uid) return true;
     const admins = normalizeAdminList(meta.admins);
-    return admins.some((entry) => entry.uid === uid);
+    if (admins.some((entry) => entry.uid === uid)) return true;
+    const adminUids = Array.isArray(meta.adminUids) ? meta.adminUids : [];
+    return adminUids.some(
+      (entryUid) =>
+        typeof entryUid === "string" && entryUid.trim() === uid
+    );
   };
 
   const updateTournamentAdminInviteVisibility = (meta = getCurrentTournamentMeta?.()) => {

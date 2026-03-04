@@ -125,12 +125,13 @@ export function syncFromRemoteCore({
     incoming.matchVetoes || {},
     state.matchVetoes || {},
   );
-  const casterChanged = hasCasterDataChanged(incoming, state);
+  const incomingLastUpdated = Number(incoming.lastUpdated) || 0;
+  const localLastUpdated = Number(state.lastUpdated) || 0;
+  const incomingIsStale =
+    incomingLastUpdated > 0 && incomingLastUpdated <= localLastUpdated;
 
   if (
-    incoming.lastUpdated &&
-    incoming.lastUpdated <= state.lastUpdated &&
-    !casterChanged &&
+    incomingIsStale &&
     !matchVetoesChangedEarly
   ) {
     if (presenceChanged) {
@@ -160,6 +161,13 @@ export function syncFromRemoteCore({
     activity: incoming.activity || [],
     bracket: nextBracket,
   };
+  if (incomingIsStale) {
+    // Keep local caster state when handling an older snapshot
+    // (for example when only match vetoes changed remotely).
+    nextState.matchCasts = state.matchCasts || {};
+    nextState.casters = state.casters || [];
+    nextState.casterRequests = state.casterRequests || [];
+  }
   nextState.matchVetoes = mergeMatchVetoes(
     state.matchVetoes || {},
     nextState.matchVetoes || {},

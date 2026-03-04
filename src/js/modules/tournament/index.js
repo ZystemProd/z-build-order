@@ -1646,6 +1646,14 @@ function renderAll(matchIds = null) {
   const bracket = state.bracket;
   const playersArr = state.players || [];
   const format = currentTournamentMeta?.format || "Tournament";
+  if (
+    !state.isLive &&
+    state.needsReseed &&
+    !bracketHasRecordedResults(state.bracket)
+  ) {
+    rebuildBracket(true);
+    return;
+  }
   syncMatchReadySince();
   const shouldPartialUpdate =
     Array.isArray(matchIds) &&

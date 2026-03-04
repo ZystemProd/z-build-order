@@ -208,7 +208,7 @@ export async function loadCircuitRegistry(force = false) {
 
 // State (local + Firestore)
 export function loadState(currentSlug, applySeedingFn, deserializeBracketFn) {
-  if (!currentSlug) return { ...defaultState };
+  if (!currentSlug) return { ...defaultState, lastUpdated: 0 };
 
   try {
     const key = getStorageKey(currentSlug);
@@ -216,7 +216,7 @@ export function loadState(currentSlug, applySeedingFn, deserializeBracketFn) {
 
     if (!raw) {
       dbg("loadState: localStorage MISS", { slug: currentSlug, key });
-      return { ...defaultState };
+      return { ...defaultState, lastUpdated: 0 };
     }
 
     const parsed = JSON.parse(raw);
@@ -244,7 +244,7 @@ export function loadState(currentSlug, applySeedingFn, deserializeBracketFn) {
     };
   } catch (err) {
     dbg("loadState: localStorage ERROR", { slug: currentSlug, err });
-    return { ...defaultState };
+    return { ...defaultState, lastUpdated: 0 };
   }
 }
 

@@ -77,6 +77,7 @@ let presenceActiveKey = "";
 let presenceLastWriteAt = 0;
 let presenceLastMatchId = null;
 let presenceLastPlayerId = null;
+let presenceLastStatus = "active";
 let presenceUiStatus = "active";
 let presenceLastActivityAt = 0;
 let presenceActivityTimer = null;
@@ -2107,14 +2108,15 @@ async function startPresenceTracking(matchId, hint = null) {
   const write = async () => {
     if (!isMatchInfoModalVisible()) return;
     const now = Date.now();
+    const status = presenceUiStatus || "active";
     const samePayload =
       presenceLastMatchId === (matchId || null) &&
-      presenceLastPlayerId === (playerId || null);
+      presenceLastPlayerId === (playerId || null) &&
+      presenceLastStatus === status;
     if (samePayload && now - presenceLastWriteAt < PRESENCE_MIN_WRITE_MS) {
       return;
     }
 
-    const status = presenceUiStatus || "active";
     if (presenceWriteDenied) return;
     try {
       await rtdbSet(ref, {
@@ -2127,6 +2129,7 @@ async function startPresenceTracking(matchId, hint = null) {
       presenceLastWriteAt = now;
       presenceLastMatchId = matchId || null;
       presenceLastPlayerId = playerId || null;
+      presenceLastStatus = status;
     } catch (err) {
       const code = String(err?.code || "");
       if (code === "permission-denied" || code === "PERMISSION_DENIED") {
@@ -2171,7 +2174,10 @@ async function startPresenceTracking(matchId, hint = null) {
 
   write();
   if (presenceHeartbeat) clearInterval(presenceHeartbeat);
-  presenceHeartbeat = null;
+  presenceHeartbeat = setInterval(() => {
+    if (!isMatchInfoModalVisible()) return;
+    void write();
+  }, PRESENCE_HEARTBEAT_MS);
 
   const modalEl = document.getElementById("matchInfoModal");
   if (modalEl) {
@@ -2215,6 +2221,7 @@ function stopPresenceTracking() {
   presenceLastWriteAt = 0;
   presenceLastMatchId = null;
   presenceLastPlayerId = null;
+  presenceLastStatus = "active";
   presenceUiStatus = "active";
   presenceLastActivityAt = 0;
   if (presenceActivityTimer) clearTimeout(presenceActivityTimer);

@@ -40,6 +40,11 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/tournaments/$(slug))
         && isCircuitOwner(get(/databases/$(database)/documents/tournaments/$(slug)).data.circuitSlug);
     }
+    function isCircuitAdminForTournament(slug) {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/tournaments/$(slug))
+        && isCircuitAdmin(get(/databases/$(database)/documents/tournaments/$(slug)).data.circuitSlug);
+    }
 
     // ? USERS
     match /users/{userId} {
@@ -258,10 +263,10 @@ service cloud.firestore {
     match /tournamentInviteLinks/{slug}/links/{token} {
       // Anyone with the URL token can verify it.
       allow get: if true;
-      // Only the tournament owner can list/create/revoke links.
-      allow list, create, delete: if isTournamentAdmin(slug) || isCircuitOwnerForTournament(slug);
+      // Tournament admins and linked-circuit admins can list/create/revoke links.
+      allow list, create, delete: if isTournamentAdmin(slug) || isCircuitAdminForTournament(slug) || isCircuitOwnerForTournament(slug);
       // Owner can update anything; invited users can only consume a link (uses +1).
-      allow update: if isTournamentAdmin(slug) || isCircuitOwnerForTournament(slug) || (
+      allow update: if isTournamentAdmin(slug) || isCircuitAdminForTournament(slug) || isCircuitOwnerForTournament(slug) || (
         request.auth != null &&
         request.resource.data.diff(resource.data).changedKeys().hasOnly(["uses", "lastUsedAt"]) &&
         request.resource.data.uses == resource.data.uses + 1 &&

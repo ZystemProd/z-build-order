@@ -695,11 +695,12 @@ async function updateCircuitTournamentStatus(cardEl, slug) {
   if (!cardEl || !slug) return;
   try {
     const state = await loadTournamentStateRemote(slug);
-    const finished = isBracketFinishedBasic(state?.bracket);
+    const bracket = normalizeBracketForPlacements(state?.bracket);
+    const finished = isBracketFinishedBasic(bracket);
     if (!finished) return;
     const statusChip = cardEl.querySelector(".status-chip");
     if (!statusChip) return;
-    statusChip.textContent = "Finished";
+    statusChip.textContent = "Complete";
     statusChip.classList.remove("status-upcoming", "status-started", "status-tbd");
     statusChip.classList.add("status-finished");
   } catch (_) {

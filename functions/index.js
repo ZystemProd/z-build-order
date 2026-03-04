@@ -117,7 +117,7 @@ function normalizeByRaceMap(value) {
 
 function pickMmrForRace(byRace = {}, raceLabel = "Random") {
   const raceKey = normalizeRaceKey(raceLabel);
-  if (raceKey && raceKey !== "random" && Number.isFinite(byRace[raceKey])) {
+  if (raceKey && Number.isFinite(byRace[raceKey])) {
     return Math.round(byRace[raceKey]);
   }
   const values = Object.values(byRace).filter((value) => Number.isFinite(value) && value > 0);
