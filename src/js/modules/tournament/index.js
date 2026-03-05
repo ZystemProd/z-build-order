@@ -282,6 +282,7 @@ import {
 } from "./tournamentPayloads.js";
 import { syncQuillById } from "./markdownEditor.js";
 import { createAdminManager } from "./admin/manageAdmins.js";
+import { createAdminPlayerSearch } from "./admin/addSearchPlayer.js";
 import { initCasterControls, renderCasterSection } from "./caster.js";
 import { setTournamentListItems } from "./listSlider.js";
 import {
@@ -302,6 +303,7 @@ import {
   handleTournamentCheckInAction,
   sendTournamentCheckInNotifications,
   sendTournamentInviteNotification,
+  sendTeamInviteNotification,
 } from "./invites.js";
 const renderMapPoolPicker = renderMapPoolPickerUI;
 const CURRENT_BRACKET_LAYOUT_VERSION = 55;
@@ -313,6 +315,12 @@ const COVER_CARD_WIDTH = 320;
 const COVER_CARD_HEIGHT = 180;
 const SPONSOR_LOGO_SIZE = 256;
 const COVER_QUALITY = 0.82;
+const TOURNAMENT_MODES = new Set(["1v1", "2v2", "3v3", "4v4"]);
+const TEAM_MEMBER_STATUS = {
+  accepted: "accepted",
+  pending: "pending",
+  denied: "denied",
+};
 const PULSE_ENDPOINTS = (() => {
   const endpoints = ["/api/pulse-mmr"];
   if (
@@ -365,6 +373,10 @@ let inviteLinkGate = {
 let selfClanHydrationInFlight = false;
 let selfClanHydrated = false;
 let adminSearchBootstrapPromise = null;
+let teamInviteDraft = [];
+let teamInviteDraftSlug = "";
+let teamInviteSearchInitialized = false;
+let teamInviteDraftDirty = false;
 
 async function ensureAdminSearchBootstrap() {
   if (adminSearchBootstrapPromise) return adminSearchBootstrapPromise;
@@ -439,6 +451,292 @@ function allowGrandFinalReset(format, rrSettings) {
     return playoffs.startsWith("double");
   }
   return false;
+}
+
+function normalizeTournamentMode(value) {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase();
+  if (TOURNAMENT_MODES.has(normalized)) return normalized;
+  return "1v1";
+}
+
+function getTournamentMode(meta = currentTournamentMeta) {
+  return normalizeTournamentMode(meta?.mode);
+}
+
+function getTeamSizeFromMode(mode) {
+  const normalized = normalizeTournamentMode(mode);
+  const teamSize = Number(normalized.charAt(0));
+  return Number.isFinite(teamSize) && teamSize > 1 ? teamSize : 1;
+}
+
+function getTournamentTeamSize(meta = currentTournamentMeta) {
+  return getTeamSizeFromMode(getTournamentMode(meta));
+}
+
+function isTeamTournament(meta = currentTournamentMeta) {
+  return getTournamentTeamSize(meta) > 1;
+}
+
+function normalizeTeamMemberStatus(status) {
+  const normalized = String(status || "")
+    .trim()
+    .toLowerCase();
+  if (
+    normalized === TEAM_MEMBER_STATUS.accepted ||
+    normalized === TEAM_MEMBER_STATUS.pending ||
+    normalized === TEAM_MEMBER_STATUS.denied
+  ) {
+    return normalized;
+  }
+  return TEAM_MEMBER_STATUS.pending;
+}
+
+function hasTeamMemberInviteBeenSent(member) {
+  const sentAt = Number(member?.inviteSentAt);
+  return Number.isFinite(sentAt) && sentAt > 0;
+}
+
+function normalizeTeamMembersFromPlayer(player, teamSize = getTournamentTeamSize()) {
+  const rawMembers = Array.isArray(player?.team?.members) ? player.team.members : [];
+  const memberStatusRank = (status) => {
+    const normalized = normalizeTeamMemberStatus(status);
+    if (normalized === TEAM_MEMBER_STATUS.accepted) return 0;
+    if (normalized === TEAM_MEMBER_STATUS.pending) return 1;
+    return 2;
+  };
+  const memberActivityTs = (member) =>
+    Number(member?.respondedAt || member?.invitedAt || 0) || 0;
+  const pickBetterMember = (a, b) => {
+    if (!a) return b;
+    if (!b) return a;
+    const roleA = a.role === "leader" ? 0 : 1;
+    const roleB = b.role === "leader" ? 0 : 1;
+    if (roleA !== roleB) return roleA < roleB ? a : b;
+    const rankA = memberStatusRank(a.status);
+    const rankB = memberStatusRank(b.status);
+    if (rankA !== rankB) return rankA < rankB ? a : b;
+    return memberActivityTs(a) >= memberActivityTs(b) ? a : b;
+  };
+  const normalized = rawMembers
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") return null;
+      const uid = String(entry.uid || "").trim();
+      if (!uid) return null;
+      return {
+        uid,
+        name: String(entry.name || "").trim() || "Unknown",
+        role: entry.role === "leader" ? "leader" : "member",
+        status:
+          entry.role === "leader"
+            ? TEAM_MEMBER_STATUS.accepted
+            : normalizeTeamMemberStatus(entry.status),
+        race: String(entry.race || "").trim(),
+        sc2Link: String(entry.sc2Link || "").trim(),
+        pulseName: String(entry.pulseName || "").trim(),
+        mmr: Number.isFinite(Number(entry.mmr)) ? Math.max(0, Number(entry.mmr)) : 0,
+        mmrByRace:
+          entry.mmrByRace && typeof entry.mmrByRace === "object"
+            ? { ...entry.mmrByRace }
+            : null,
+        secondaryPulseLinks: Array.isArray(entry.secondaryPulseLinks)
+          ? entry.secondaryPulseLinks.slice()
+          : [],
+        secondaryPulseProfiles: Array.isArray(entry.secondaryPulseProfiles)
+          ? entry.secondaryPulseProfiles.slice()
+          : [],
+        twitchUrl: String(entry.twitchUrl || "").trim(),
+        country: String(entry.country || "").trim(),
+        avatarUrl: String(entry.avatarUrl || "").trim(),
+        invitedAt: Number.isFinite(Number(entry.invitedAt))
+          ? Number(entry.invitedAt)
+          : null,
+        inviteSentAt: Number.isFinite(Number(entry.inviteSentAt))
+          ? Number(entry.inviteSentAt)
+          : null,
+        respondedAt: Number.isFinite(Number(entry.respondedAt))
+          ? Number(entry.respondedAt)
+          : null,
+      };
+    })
+    .filter(Boolean);
+  if (!normalized.length) return [];
+  const byUid = new Map();
+  normalized.forEach((member) => {
+    byUid.set(member.uid, pickBetterMember(byUid.get(member.uid), member));
+  });
+  const deduped = Array.from(byUid.values());
+  const leaderUid = String(player?.uid || "").trim();
+  const leaderName = String(player?.name || "").trim() || "Leader";
+  const leaderIndex = deduped.findIndex((entry) => entry.uid === leaderUid);
+  if (leaderUid) {
+    const leader = {
+      uid: leaderUid,
+      name: leaderName,
+      role: "leader",
+      status: TEAM_MEMBER_STATUS.accepted,
+      race: String(player?.race || "").trim(),
+      sc2Link: String(player?.sc2Link || "").trim(),
+      pulseName: String(player?.pulseName || "").trim(),
+      mmr: Number.isFinite(Number(player?.mmr)) ? Math.max(0, Number(player.mmr)) : 0,
+      mmrByRace:
+        player?.mmrByRace && typeof player.mmrByRace === "object"
+          ? { ...player.mmrByRace }
+          : null,
+      secondaryPulseLinks: Array.isArray(player?.secondaryPulseLinks)
+        ? player.secondaryPulseLinks.slice()
+        : [],
+      secondaryPulseProfiles: Array.isArray(player?.secondaryPulseProfiles)
+        ? player.secondaryPulseProfiles.slice()
+        : [],
+      twitchUrl: String(player?.twitchUrl || "").trim(),
+      country: String(player?.country || "").trim(),
+      avatarUrl: String(player?.avatarUrl || "").trim(),
+      invitedAt:
+        Number.isFinite(Number(player?.team?.createdAt))
+          ? Number(player.team.createdAt)
+          : Date.now(),
+      inviteSentAt: null,
+      respondedAt: Number.isFinite(Number(player?.team?.createdAt))
+        ? Number(player.team.createdAt)
+        : Date.now(),
+    };
+    if (leaderIndex >= 0) {
+      deduped[leaderIndex] = { ...deduped[leaderIndex], ...leader };
+    } else {
+      deduped.unshift(leader);
+    }
+  }
+  const maxMembers = Math.max(1, Number(teamSize) || 1);
+  const leaders = deduped.filter((entry) => entry.role === "leader");
+  const members = deduped
+    .filter((entry) => entry.role !== "leader")
+    .sort((a, b) => {
+      const rankDiff = memberStatusRank(a.status) - memberStatusRank(b.status);
+      if (rankDiff) return rankDiff;
+      const aTs = memberActivityTs(a);
+      const bTs = memberActivityTs(b);
+      return bTs - aTs;
+    });
+  const primaryLeader = leaders[0];
+  const capped = [
+    ...(primaryLeader ? [primaryLeader] : []),
+    ...members.slice(0, Math.max(0, maxMembers - 1)),
+  ];
+  return capped;
+}
+
+function findTeamMembership(players = [], uid, options = {}) {
+  if (!uid) return null;
+  const includeDenied = Boolean(options.includeDenied);
+  const candidates = [];
+  for (const player of players || []) {
+    if (!player || typeof player !== "object") continue;
+    const teamSize = getTeamSizeFromMode(player?.team?.mode || getTournamentMode());
+    const members = normalizeTeamMembersFromPlayer(player, teamSize);
+    if (!members.length) continue;
+    const member = members.find((entry) => entry.uid === uid);
+    if (!member) continue;
+    const status = normalizeTeamMemberStatus(member.status);
+    if (!includeDenied && status === TEAM_MEMBER_STATUS.denied) continue;
+    candidates.push({
+      player,
+      member,
+      role: member.role === "leader" ? "leader" : "member",
+      status,
+      teamSize,
+      updatedAt:
+        Number(player?.team?.updatedAt || player?.team?.createdAt || 0) ||
+        Number(member?.respondedAt || member?.invitedAt || 0) ||
+        0,
+    });
+  }
+  if (!candidates.length) return null;
+  const statusRank = (status) => {
+    if (status === TEAM_MEMBER_STATUS.accepted) return 0;
+    if (status === TEAM_MEMBER_STATUS.pending) return 1;
+    return 2;
+  };
+  candidates.sort((a, b) => {
+    const roleA = a.role === "leader" ? 0 : 1;
+    const roleB = b.role === "leader" ? 0 : 1;
+    if (roleA !== roleB) return roleA - roleB;
+    const statusDiff = statusRank(a.status) - statusRank(b.status);
+    if (statusDiff) return statusDiff;
+    return b.updatedAt - a.updatedAt;
+  });
+  return candidates[0];
+}
+
+function getTeamInviteUiRefs() {
+  return {
+    layout: document.getElementById("teamModeLayout"),
+    section: document.getElementById("teamInviteSection"),
+    teamNameInput: document.getElementById("teamNameInput"),
+    helperText: document.getElementById("teamInviteHelperText"),
+    slotsText: document.getElementById("teamInviteSlotsText"),
+    searchInput: document.getElementById("teamInviteSearchInput"),
+    searchResults: document.getElementById("teamInviteSearchResults"),
+    list: document.getElementById("teamInviteList"),
+    status: document.getElementById("teamInviteStatus"),
+    currentSection: document.getElementById("teamCurrentSection"),
+    currentList: document.getElementById("teamCurrentList"),
+    currentStatus: document.getElementById("teamCurrentStatus"),
+    leaveBtn: document.getElementById("leaveTeamBtn"),
+  };
+}
+
+function resetTeamInviteDraftForCurrentSlug() {
+  if (teamInviteDraftSlug === currentSlug) return;
+  teamInviteDraftSlug = currentSlug || "";
+  teamInviteDraft = [];
+  teamInviteDraftDirty = false;
+  const refs = getTeamInviteUiRefs();
+  if (refs.teamNameInput) {
+    refs.teamNameInput.value = "";
+  }
+}
+
+function setTeamInviteStatus(message = "", isError = false) {
+  const { status } = getTeamInviteUiRefs();
+  setStatus(status, message, isError);
+}
+
+function setTeamCurrentStatus(message = "", isError = false) {
+  const { currentStatus } = getTeamInviteUiRefs();
+  setStatus(currentStatus, message, isError);
+}
+
+function syncTeamInviteDraftFromPlayer(player, teamSize) {
+  if (!player || !isTeamTournament(currentTournamentMeta)) return;
+  const members = normalizeTeamMembersFromPlayer(player, teamSize)
+    .filter((entry) => entry.role !== "leader")
+    .map((entry) => ({ ...entry }));
+  teamInviteDraft = members;
+  teamInviteDraftDirty = false;
+}
+
+function getRequiredTeammateCount(meta = currentTournamentMeta) {
+  return Math.max(0, getTournamentTeamSize(meta) - 1);
+}
+
+function getActiveMembershipForUser(uid) {
+  if (!uid) return null;
+  return findTeamMembership(state.players || [], uid, { includeDenied: false });
+}
+
+function isUidInAnotherTeam(uid, ignoreTeamId = "") {
+  if (!uid) return false;
+  const membership = findTeamMembership(state.players || [], uid, {
+    includeDenied: false,
+  });
+  if (!membership) return false;
+  const memberTeamId = String(membership.player?.team?.teamId || "");
+  if (ignoreTeamId && memberTeamId && memberTeamId === ignoreTeamId) {
+    return false;
+  }
+  return true;
 }
 
 function getInviteTokenStorageKey(slug) {
@@ -1747,7 +2045,11 @@ function renderAll(matchIds = null) {
     refreshTournamentPromoSettings,
     renderCircuitPointsSettings,
     hydrateCurrentUserClanLogo,
+    getTeamMembership: findTeamMembership,
+    getTournamentTeamSize,
+    normalizeTournamentMode,
   });
+  renderTeamInviteSection();
 
   // Render maps tab from current meta or default pool
   renderMapsTabUI(currentTournamentMeta, {
@@ -1925,6 +2227,16 @@ async function checkInCurrentPlayer() {
     showToast?.("You must be signed in to check in.", "error");
     return;
   }
+  const isTeamMode = getTournamentTeamSize(meta) > 1;
+  if (isTeamMode) {
+    const membership = findTeamMembership(state.players || [], uid, {
+      includeDenied: false,
+    });
+    if (membership?.role === "member") {
+      showToast?.("Only the team leader checks in for team tournaments.", "error");
+      return;
+    }
+  }
   const players = state.players || [];
   const idx = players.findIndex((p) => p.uid === uid);
   if (idx === -1) {
@@ -1948,6 +2260,79 @@ async function checkInCurrentPlayer() {
     }),
   );
   addActivity(`${players[idx].name || "Player"} checked in.`);
+  renderAll();
+}
+
+async function leaveCurrentTeam() {
+  if (state.isLive) {
+    showToast?.("Tournament is live. Team changes are locked.", "error");
+    return;
+  }
+  const uid = auth.currentUser?.uid || "";
+  if (!uid) {
+    showToast?.("Sign in to leave team.", "error");
+    return;
+  }
+  if (bracketHasRecordedResults(state.bracket)) {
+    showToast?.("Registration is locked once scores are recorded.", "error");
+    return;
+  }
+  const membership = findTeamMembership(state.players || [], uid, {
+    includeDenied: false,
+  });
+  if (!membership || membership.role !== "member") {
+    showToast?.("You are not currently in a team as teammate.", "error");
+    return;
+  }
+  const now = Date.now();
+  let changed = false;
+  await updateRosterWithTransaction(
+    (players) =>
+      (players || []).map((player) => {
+        const team = player?.team && typeof player.team === "object" ? player.team : null;
+        if (!team) return player;
+        const teamSize = Math.max(
+          1,
+          Number(team.size) || getTeamSizeFromMode(team.mode || getTournamentMode()),
+        );
+        const normalizedMembers = normalizeTeamMembersFromPlayer(player, teamSize);
+        const nextMembers = normalizedMembers.filter(
+          (entry) => String(entry?.uid || "") !== uid,
+        );
+        if (nextMembers.length === normalizedMembers.length) return player;
+        changed = true;
+        const required = Math.max(0, teamSize - 1);
+        const acceptedCount = nextMembers.filter(
+          (entry) =>
+            entry.role !== "leader" &&
+            normalizeTeamMemberStatus(entry.status) === TEAM_MEMBER_STATUS.accepted,
+        ).length;
+        const inviteStatus =
+          acceptedCount >= required ? INVITE_STATUS.accepted : INVITE_STATUS.pending;
+        return {
+          ...player,
+          inviteStatus,
+          checkedInAt: inviteStatus === INVITE_STATUS.accepted ? player.checkedInAt || null : null,
+          team: {
+            ...team,
+            mode: normalizeTournamentMode(team.mode || getTournamentMode()),
+            size: teamSize,
+            updatedAt: now,
+            members: nextMembers,
+          },
+        };
+      }),
+    { needsReseed: true },
+    { optimistic: true },
+  );
+  if (!changed) {
+    showToast?.("Could not leave team.", "error");
+    return;
+  }
+  teamInviteDraft = [];
+  teamInviteDraftDirty = false;
+  addActivity(`${getCurrentUsername?.() || "Teammate"} left the team.`);
+  showToast?.("You left the team.", "success");
   renderAll();
 }
 
@@ -2755,6 +3140,31 @@ function updateMatchScore(matchId, scoreA, scoreB, options = {}) {
       return;
     }
   }
+  if (!isAdmin) {
+    const lookup = state?.bracket ? getMatchLookup(state.bracket) : null;
+    const match = lookup?.get(matchId) || null;
+    const playersById = getPlayersMap();
+    const [pA, pB] = match
+      ? resolveParticipants(match, lookup, playersById)
+      : [null, null];
+    const currentUid = auth?.currentUser?.uid || "";
+    const isTeamMode = getTournamentTeamSize(currentTournamentMeta) > 1;
+    const canSubmit = isTeamMode
+      ? Boolean(currentUid && (currentUid === pA?.uid || currentUid === pB?.uid))
+      : Boolean(
+          isCurrentUserTournamentPlayerByUid(pA) ||
+            isCurrentUserTournamentPlayerByUid(pB),
+        );
+    if (!canSubmit) {
+      showToast?.(
+        isTeamMode
+          ? "Only team leaders can report scores."
+          : "Only match participants can report scores.",
+        "error",
+      );
+      return;
+    }
+  }
   const lookupBefore = state?.bracket ? getMatchLookup(state.bracket) : null;
   const matchBefore = lookupBefore?.get(matchId) || null;
   const prevScores = Array.isArray(matchBefore?.scores)
@@ -3549,6 +3959,7 @@ async function populateCreateForm() {
   }
   const imageInput = document.getElementById("tournamentImageInput");
   const imagePreview = document.getElementById("tournamentImagePreview");
+  const modeSelect = document.getElementById("tournamentModeSelect");
   const checkInSelect = document.getElementById("checkInSelect");
   const accessSelect = document.getElementById("tournamentAccessSelect");
   const visibilitySelect = document.getElementById(
@@ -3567,6 +3978,7 @@ async function populateCreateForm() {
     delete imagePreview.dataset.clearCover;
   }
   if (checkInSelect) checkInSelect.value = "0";
+  if (modeSelect) modeSelect.value = "1v1";
   if (accessSelect) accessSelect.value = "open";
   if (visibilitySelect) visibilitySelect.value = "public";
   if (templateSelect) templateSelect.value = "";
@@ -4700,6 +5112,10 @@ function updateCheckInUI() {
   const startMs = getStartTimeMs(currentTournamentMeta);
   const checkInState = getCheckInWindowState(currentTournamentMeta);
   const currentUid = auth.currentUser?.uid || null;
+  const isTeamMode = getTournamentTeamSize(currentTournamentMeta) > 1;
+  const teamMembership = currentUid
+    ? findTeamMembership(state.players || [], currentUid, { includeDenied: false })
+    : null;
   const currentPlayer = currentUid
     ? (state.players || []).find((p) => p.uid === currentUid)
     : null;
@@ -4751,11 +5167,16 @@ function updateCheckInUI() {
 
   if (!currentPlayer) {
     checkInBtn.style.display = "none";
-    checkInStatus.textContent =
-      isInviteOnly && !isAdmin
-        ? "Invite required to check in."
-        : "Register to check in.";
-    checkInStatus.classList.add("is-open");
+    if (isTeamMode && teamMembership?.role === "member") {
+      checkInStatus.textContent = "Only the team leader checks in and reports scores.";
+      checkInStatus.classList.add("is-open");
+    } else {
+      checkInStatus.textContent =
+        isInviteOnly && !isAdmin
+          ? "Invite required to check in."
+          : "Register to check in.";
+      checkInStatus.classList.add("is-open");
+    }
     return;
   }
   if (inviteStatus !== INVITE_STATUS.accepted) {
@@ -5428,6 +5849,7 @@ async function handleCreateTournament(event) {
   event?.preventDefault?.();
   const nameInput = document.getElementById("tournamentNameInput");
   const slugInput = document.getElementById("tournamentSlugInput");
+  const modeSelect = document.getElementById("tournamentModeSelect");
   const formatSelect = document.getElementById("tournamentFormatSelect");
   const grandFinalResetToggle = document.getElementById(
     "grandFinalResetToggle",
@@ -5469,6 +5891,7 @@ async function handleCreateTournament(event) {
     updateSlugPreview();
   }
   const format = (formatSelect?.value || "Double Elimination").trim();
+  const mode = normalizeTournamentMode(modeSelect?.value || "1v1");
   const startTime = startInput?.value ? new Date(startInput.value) : null;
   const maxPlayers = normalizeMaxPlayersForFormat(
     maxPlayersInput?.value,
@@ -5495,6 +5918,7 @@ async function handleCreateTournament(event) {
     const payload = buildCreateTournamentPayload({
       slug,
       name,
+      mode,
       description,
       rules,
       format,
@@ -5773,6 +6197,7 @@ registerTournamentEvents({
     resetScores,
     resetVetoScoreChat,
     checkInCurrentPlayer,
+    leaveCurrentTeam,
     notifyCheckInPlayers,
     toggleCheckInManualClose,
     toggleLiveTournament,
@@ -6067,6 +6492,498 @@ function updateRegistrationRequirementIcons() {
   }
 }
 
+function getNormalizedTeamInviteDraft(requiredCount = getRequiredTeammateCount()) {
+  const limit = Math.max(0, Number(requiredCount) || 0);
+  const unique = [];
+  const seen = new Set();
+  for (const rawEntry of teamInviteDraft || []) {
+    if (!rawEntry || typeof rawEntry !== "object") continue;
+    const uid = String(rawEntry.uid || "").trim();
+    if (!uid || seen.has(uid)) continue;
+    seen.add(uid);
+    unique.push({
+      uid,
+      name: String(rawEntry.name || "").trim() || "Unknown",
+      role: "member",
+      status: normalizeTeamMemberStatus(rawEntry.status),
+      race: String(rawEntry.race || "").trim(),
+      sc2Link: String(rawEntry.sc2Link || "").trim(),
+      pulseName: String(rawEntry.pulseName || "").trim(),
+      mmr: Number.isFinite(Number(rawEntry.mmr))
+        ? Math.max(0, Number(rawEntry.mmr))
+        : 0,
+      mmrByRace:
+        rawEntry.mmrByRace && typeof rawEntry.mmrByRace === "object"
+          ? { ...rawEntry.mmrByRace }
+          : null,
+      secondaryPulseLinks: Array.isArray(rawEntry.secondaryPulseLinks)
+        ? rawEntry.secondaryPulseLinks.slice()
+        : [],
+      secondaryPulseProfiles: Array.isArray(rawEntry.secondaryPulseProfiles)
+        ? rawEntry.secondaryPulseProfiles.slice()
+        : [],
+      twitchUrl: String(rawEntry.twitchUrl || "").trim(),
+      country: String(rawEntry.country || "").trim(),
+      avatarUrl: String(rawEntry.avatarUrl || "").trim(),
+      invitedAt: Number.isFinite(Number(rawEntry.invitedAt))
+        ? Number(rawEntry.invitedAt)
+        : Date.now(),
+      inviteSentAt: Number.isFinite(Number(rawEntry.inviteSentAt))
+        ? Number(rawEntry.inviteSentAt)
+        : null,
+      respondedAt: Number.isFinite(Number(rawEntry.respondedAt))
+        ? Number(rawEntry.respondedAt)
+        : null,
+    });
+    if (unique.length >= limit) break;
+  }
+  teamInviteDraft = unique;
+  return unique;
+}
+
+function removeDraftInviteByUid(uid) {
+  const targetUid = String(uid || "").trim();
+  if (!targetUid) return;
+  teamInviteDraft = (teamInviteDraft || []).filter(
+    (entry) => String(entry?.uid || "").trim() !== targetUid,
+  );
+  teamInviteDraftDirty = true;
+}
+
+function canEditTeamInviteDraft(activeMembership) {
+  if (!isTeamTournament(currentTournamentMeta)) return false;
+  if (state.isLive) return false;
+  if (!auth.currentUser?.uid) return false;
+  if (!activeMembership) return true;
+  return false;
+}
+
+function buildCurrentTeamEntries(activeMembership, entries = []) {
+  const currentUid = auth.currentUser?.uid || "";
+  const currentName =
+    (document.getElementById("playerNameInput")?.value || "").trim() ||
+    getCurrentUsername?.() ||
+    getCurrentUserProfile?.()?.username ||
+    "You";
+  if (activeMembership?.player) {
+    const teamSize = getTournamentTeamSize(currentTournamentMeta);
+    return normalizeTeamMembersFromPlayer(activeMembership.player, teamSize);
+  }
+  if (!currentUid) return [];
+  return [
+    {
+      uid: currentUid,
+      name: currentName,
+      role: "leader",
+      status: TEAM_MEMBER_STATUS.accepted,
+      invitedAt: Date.now(),
+      inviteSentAt: null,
+      respondedAt: Date.now(),
+    },
+    ...(entries || []).map((entry) => ({
+      uid: entry.uid,
+      name: entry.name,
+      role: "member",
+      status: normalizeTeamMemberStatus(entry.status),
+      invitedAt: Number.isFinite(Number(entry.invitedAt))
+        ? Number(entry.invitedAt)
+        : null,
+      inviteSentAt: Number.isFinite(Number(entry.inviteSentAt))
+        ? Number(entry.inviteSentAt)
+        : null,
+      respondedAt: Number.isFinite(Number(entry.respondedAt))
+        ? Number(entry.respondedAt)
+        : null,
+    })),
+  ];
+}
+
+function renderTeamInviteSection() {
+  const refs = getTeamInviteUiRefs();
+  if (!refs.layout && !refs.section) return;
+  initTeamInviteSearchUi();
+  resetTeamInviteDraftForCurrentSlug();
+
+  const teamSize = getTournamentTeamSize(currentTournamentMeta);
+  const required = getRequiredTeammateCount(currentTournamentMeta);
+  const isTeamMode = teamSize > 1;
+  const currentUid = auth.currentUser?.uid || "";
+  const activeMembership = getActiveMembershipForUser(currentUid);
+  const hasRegisteredTeam = Boolean(activeMembership?.player);
+  const editable = canEditTeamInviteDraft(activeMembership);
+
+  if (!isTeamMode) {
+    if (refs.layout) refs.layout.style.display = "none";
+    if (refs.section) refs.section.style.display = "none";
+    if (refs.currentSection) refs.currentSection.style.display = "none";
+    if (refs.teamNameInput) refs.teamNameInput.value = "";
+    setTeamInviteStatus("");
+    setTeamCurrentStatus("");
+    if (refs.searchResults) refs.searchResults.replaceChildren();
+    if (refs.currentList) refs.currentList.replaceChildren();
+    if (refs.leaveBtn) refs.leaveBtn.style.display = "none";
+    return;
+  }
+
+  if (refs.layout) refs.layout.style.display = "";
+  if (refs.section) refs.section.style.display = "";
+  if (refs.currentSection) refs.currentSection.style.display = "";
+  if (refs.helperText) {
+    refs.helperText.textContent = hasRegisteredTeam
+      ? "Teammates must accept their invitation in the Notification Center before your team is registered."
+      : "Teammate invitations are sent after you press Register team.";
+  }
+  if (refs.teamNameInput) {
+    const savedTeamName = String(activeMembership?.player?.team?.teamName || "").trim();
+    if (savedTeamName && !refs.teamNameInput.value.trim()) {
+      refs.teamNameInput.value = savedTeamName;
+    }
+  }
+
+  if (activeMembership && !teamInviteDraftDirty) {
+    syncTeamInviteDraftFromPlayer(activeMembership.player, teamSize);
+  }
+
+  const entries = getNormalizedTeamInviteDraft(required);
+  const acceptedCount = entries.filter(
+    (entry) => normalizeTeamMemberStatus(entry.status) === TEAM_MEMBER_STATUS.accepted,
+  ).length;
+  const currentTeamEntries = buildCurrentTeamEntries(activeMembership, entries);
+
+  if (refs.slotsText) {
+    refs.slotsText.textContent = hasRegisteredTeam
+      ? `Mode ${getTournamentMode(
+          currentTournamentMeta,
+        )}: invite ${required} teammate${required === 1 ? "" : "s"} (${acceptedCount}/${required} accepted).`
+      : `Mode ${getTournamentMode(
+          currentTournamentMeta,
+        )}: select ${required} teammate${required === 1 ? "" : "s"} (${entries.length}/${required} selected).`;
+  }
+
+  if (refs.searchInput) {
+    refs.searchInput.disabled = !editable || entries.length >= required;
+    if (editable) {
+      refs.searchInput.placeholder = "Search username...";
+    } else if (activeMembership?.role === "leader") {
+      refs.searchInput.placeholder = "Unregister team to edit teammates";
+    } else {
+      refs.searchInput.placeholder = "Only the team leader can manage invites";
+    }
+  }
+  if (refs.teamNameInput) {
+    refs.teamNameInput.disabled = !editable;
+    if (editable) {
+      refs.teamNameInput.placeholder = "Enter team name...";
+    } else if (activeMembership?.role === "leader") {
+      refs.teamNameInput.placeholder = "Unregister team to edit team name";
+    } else {
+      refs.teamNameInput.placeholder = "Only the team leader can manage team";
+    }
+  }
+
+  if (refs.list) {
+    refs.list.replaceChildren();
+    if (!entries.length) {
+      const empty = document.createElement("p");
+      empty.className = "team-invite-empty";
+      empty.textContent = "No teammates invited yet.";
+      refs.list.appendChild(empty);
+    } else {
+      entries.forEach((entry) => {
+        const row = document.createElement("div");
+        row.className = "team-invite-row";
+        const nameEl = document.createElement("span");
+        nameEl.className = "team-invite-name";
+        nameEl.setAttribute("translate", "no");
+        nameEl.textContent = entry.name || "Unknown";
+        const meta = document.createElement("div");
+        meta.className = "team-invite-meta";
+        const status = document.createElement("span");
+        const normalizedStatus = normalizeTeamMemberStatus(entry.status);
+        const isQueued =
+          normalizedStatus === TEAM_MEMBER_STATUS.pending &&
+          !hasTeamMemberInviteBeenSent(entry);
+        status.className = `seed-status ${normalizedStatus}`;
+        status.textContent = isQueued
+          ? "Queued"
+          : normalizedStatus === TEAM_MEMBER_STATUS.accepted
+            ? "Accepted"
+            : normalizedStatus === TEAM_MEMBER_STATUS.denied
+              ? "Denied"
+              : "Pending";
+        meta.appendChild(status);
+        if (editable) {
+          const removeBtn = document.createElement("button");
+          removeBtn.type = "button";
+          removeBtn.className = "cta small subtle";
+          removeBtn.dataset.teamInviteRemoveUid = entry.uid;
+          removeBtn.textContent = "Remove";
+          meta.appendChild(removeBtn);
+        }
+        row.append(nameEl, meta);
+        refs.list.appendChild(row);
+      });
+    }
+  }
+
+  if (refs.currentList) {
+    refs.currentList.replaceChildren();
+    if (!currentTeamEntries.length) {
+      const empty = document.createElement("p");
+      empty.className = "team-invite-empty";
+      empty.textContent = "No active team yet.";
+      refs.currentList.appendChild(empty);
+    } else {
+      currentTeamEntries.forEach((entry) => {
+        const row = document.createElement("div");
+        row.className = "team-current-row";
+        const nameEl = document.createElement("span");
+        nameEl.className = "team-current-name";
+        nameEl.setAttribute("translate", "no");
+        const roleLabel = entry.role === "leader" ? "Leader" : "Teammate";
+        nameEl.textContent = entry.name || "Unknown";
+        const roleBadge = document.createElement("span");
+        roleBadge.className = "role-badge";
+        roleBadge.textContent = roleLabel;
+        nameEl.appendChild(roleBadge);
+        const status = document.createElement("span");
+        const normalized = normalizeTeamMemberStatus(entry.status);
+        status.className = `seed-status ${normalized}`;
+        const isQueued =
+          entry.role !== "leader" &&
+          normalized === TEAM_MEMBER_STATUS.pending &&
+          !hasTeamMemberInviteBeenSent(entry);
+        status.textContent = isQueued
+          ? "Queued"
+          : normalized === TEAM_MEMBER_STATUS.accepted
+            ? "Accepted"
+            : normalized === TEAM_MEMBER_STATUS.denied
+              ? "Denied"
+              : "Pending";
+        row.append(nameEl, status);
+        refs.currentList.appendChild(row);
+      });
+    }
+  }
+
+  if (refs.leaveBtn) {
+    const canLeave = Boolean(
+      activeMembership && activeMembership.role === "member" && !state.isLive,
+    );
+    refs.leaveBtn.style.display = canLeave ? "" : "none";
+    refs.leaveBtn.disabled = !canLeave;
+  }
+
+  if (!editable && activeMembership?.role === "leader") {
+    const leaderInviteStatus = normalizeInviteStatus(
+      activeMembership.player?.inviteStatus,
+    );
+    if (leaderInviteStatus === INVITE_STATUS.pending) {
+      setTeamInviteStatus(
+        "Waiting for teammates to accept in Notification Center.",
+        false,
+      );
+      setTeamCurrentStatus("Team is pending teammate acceptance.", false);
+    } else if (leaderInviteStatus === INVITE_STATUS.accepted) {
+      setTeamInviteStatus("Team registration is complete.", false);
+      setTeamCurrentStatus("Team is fully registered.", false);
+    } else {
+      setTeamInviteStatus("", false);
+      setTeamCurrentStatus("", false);
+    }
+  } else if (!editable && activeMembership?.role === "member") {
+    if (activeMembership.status === TEAM_MEMBER_STATUS.pending) {
+      const inviteSent = hasTeamMemberInviteBeenSent(activeMembership.member);
+      if (inviteSent) {
+        setTeamInviteStatus(
+          "You have a pending team invitation. Accept it in the Notification Center.",
+          false,
+        );
+        setTeamCurrentStatus("You have not accepted this team yet.", false);
+      } else {
+        setTeamInviteStatus(
+          `Your leader has not registered this ${getTournamentMode(
+            currentTournamentMeta,
+          )} team yet. Invitation will appear after they press Register team.`,
+          false,
+        );
+        setTeamCurrentStatus("Team is still in draft.", false);
+      }
+    } else if (activeMembership.status === TEAM_MEMBER_STATUS.accepted) {
+      setTeamInviteStatus("You are already part of a registered team.", false);
+      setTeamCurrentStatus("You are currently in this team.", false);
+    } else {
+      setTeamInviteStatus("", false);
+      setTeamCurrentStatus("", false);
+    }
+  } else if (entries.length < required) {
+    setTeamInviteStatus(
+      `Invite ${required - entries.length} more teammate${
+        required - entries.length === 1 ? "" : "s"
+      } to submit team registration.`,
+      false,
+    );
+    setTeamCurrentStatus(
+      activeMembership ? "Team is pending teammate acceptance." : "Build your team, then register.",
+      false,
+    );
+  } else {
+    if (!hasRegisteredTeam) {
+      setTeamInviteStatus(
+        `Ready to register. Invitations will be sent when you press Register ${getTournamentMode(
+          currentTournamentMeta,
+        )} team.`,
+        false,
+      );
+      setTeamCurrentStatus("Team is not registered yet.", false);
+      return;
+    }
+    setTeamInviteStatus("", false);
+    setTeamCurrentStatus(
+      activeMembership ? "Waiting for teammates to accept in Notification Center." : "",
+      false,
+    );
+  }
+}
+
+function initTeamInviteSearchUi() {
+  if (teamInviteSearchInitialized) return;
+  const refs = getTeamInviteUiRefs();
+  if (!refs.searchInput || !refs.searchResults || !refs.list) return;
+  teamInviteSearchInitialized = true;
+
+  const renderSearchResults = (results = []) => {
+    refs.searchResults.replaceChildren();
+    const currentUid = auth.currentUser?.uid || "";
+    const activeMembership = getActiveMembershipForUser(currentUid);
+    const editable = canEditTeamInviteDraft(activeMembership);
+    const required = getRequiredTeammateCount(currentTournamentMeta);
+    const entries = getNormalizedTeamInviteDraft(required);
+    results.forEach((entry) => {
+      const username = String(entry?.username || "").trim();
+      const userId = String(entry?.userId || "").trim();
+      if (!username || !userId) return;
+      const row = document.createElement("div");
+      row.className = "admin-search-item";
+      const label = document.createElement("span");
+      label.textContent = username;
+      label.setAttribute("translate", "no");
+      const inviteBtn = document.createElement("button");
+      inviteBtn.type = "button";
+      inviteBtn.className = "cta small ghost";
+      inviteBtn.textContent = "Invite";
+      inviteBtn.dataset.teamInviteUsername = username;
+      inviteBtn.dataset.teamInviteUid = userId;
+      const alreadyDrafted = entries.some((item) => item.uid === userId);
+      const blockedByTeam = isUidInAnotherTeam(userId, activeMembership?.player?.team?.teamId || "");
+      const selfInvite = userId === currentUid;
+      const noSlotsLeft = entries.length >= required;
+      if (!editable || alreadyDrafted || blockedByTeam || selfInvite || noSlotsLeft) {
+        inviteBtn.disabled = true;
+        if (alreadyDrafted) inviteBtn.textContent = "Invited";
+        else if (blockedByTeam) inviteBtn.textContent = "In team";
+        else if (selfInvite) inviteBtn.textContent = "You";
+        else if (noSlotsLeft) inviteBtn.textContent = "Full";
+      }
+      row.append(label, inviteBtn);
+      refs.searchResults.appendChild(row);
+    });
+  };
+
+  const search = createAdminPlayerSearch({
+    db,
+    getIsEnabled: () => canEditTeamInviteDraft(getActiveMembershipForUser(auth.currentUser?.uid || "")),
+    getPlayers: () => [],
+    onStatus: (message) => {
+      if (!message || message.startsWith("Found")) {
+        if (!message) setTeamInviteStatus("", false);
+        return;
+      }
+      setTeamInviteStatus(message, false);
+    },
+    onResults: renderSearchResults,
+    onError: (err) => {
+      if (err?.message) {
+        setTeamInviteStatus(err.message, true);
+      }
+    },
+    onSuccess: () => {
+      refs.searchInput.value = "";
+      refs.searchResults.replaceChildren();
+    },
+    addPlayer: async ({ userId, username }) => {
+      const currentUid = auth.currentUser?.uid || "";
+      const activeMembership = getActiveMembershipForUser(currentUid);
+      const editable = canEditTeamInviteDraft(activeMembership);
+      const required = getRequiredTeammateCount(currentTournamentMeta);
+      const entries = getNormalizedTeamInviteDraft(required);
+      if (!editable) {
+        setTeamInviteStatus("Only the team leader can invite teammates.", true);
+        return;
+      }
+      if (entries.length >= required) {
+        setTeamInviteStatus("Team invite slots are full.", true);
+        return;
+      }
+      if (userId === currentUid) {
+        setTeamInviteStatus("You cannot invite yourself.", true);
+        return;
+      }
+      if (entries.some((entry) => entry.uid === userId)) {
+        setTeamInviteStatus("Teammate already invited.", true);
+        return;
+      }
+      if (isUidInAnotherTeam(userId, activeMembership?.player?.team?.teamId || "")) {
+        setTeamInviteStatus("This user is already in another team.", true);
+        return;
+      }
+      teamInviteDraft = [
+        ...entries,
+        {
+          uid: userId,
+          name: username,
+          role: "member",
+          status: TEAM_MEMBER_STATUS.pending,
+          invitedAt: Date.now(),
+          inviteSentAt: null,
+          respondedAt: null,
+        },
+      ];
+      teamInviteDraftDirty = true;
+      renderTeamInviteSection();
+      refs.searchInput.value = "";
+      refs.searchResults.replaceChildren();
+      setTeamInviteStatus(`Teammate ${username} added.`, false);
+    },
+  });
+
+  refs.searchInput.addEventListener("input", () => {
+    const currentUid = auth.currentUser?.uid || "";
+    const activeMembership = getActiveMembershipForUser(currentUid);
+    if (!canEditTeamInviteDraft(activeMembership)) {
+      refs.searchResults.replaceChildren();
+      return;
+    }
+    search.debouncedSearch(refs.searchInput.value);
+  });
+
+  refs.searchResults.addEventListener("click", (event) => {
+    const target = event.target.closest("[data-team-invite-username]");
+    if (!target) return;
+    const username = target.dataset.teamInviteUsername || "";
+    const userId = target.dataset.teamInviteUid || "";
+    search.addByUsername(username, userId, {});
+  });
+
+  refs.list.addEventListener("click", (event) => {
+    const removeBtn = event.target.closest("[data-team-invite-remove-uid]");
+    if (!removeBtn) return;
+    const uid = removeBtn.dataset.teamInviteRemoveUid || "";
+    removeDraftInviteByUid(uid);
+    renderTeamInviteSection();
+  });
+}
+
 function normalizeRaceLabel(raw) {
   const val = (raw || "").toString().toLowerCase();
   if (val.startsWith("z")) return "Zerg";
@@ -6209,6 +7126,18 @@ const BOT_NAME_POOL = [
   "CoreSync",
 ];
 const BOT_RACES = ["Zerg", "Protoss", "Terran", "Random"];
+const BOT_TEAM_NAME_POOL = [
+  "Void Syndicate",
+  "Warp Runners",
+  "Omega Forge",
+  "Nova Pact",
+  "Iron Swarm",
+  "Arc Tempest",
+  "Lunar Echo",
+  "Shadow Circuit",
+  "Starlight Crew",
+  "Quantum Raiders",
+];
 
 function isBotPlayer(player) {
   if (!player) return false;
@@ -6227,6 +7156,20 @@ function pickBotName(existingNames) {
   while (existingNames.has(name.toLowerCase())) {
     idx += 1;
     name = `Bot ${idx}`;
+  }
+  return name;
+}
+
+function pickBotTeamName(existingTeamNames) {
+  const found = BOT_TEAM_NAME_POOL.find(
+    (name) => !existingTeamNames.has(name.toLowerCase()),
+  );
+  if (found) return found;
+  let idx = existingTeamNames.size + 1;
+  let name = `Team Bot ${idx}`;
+  while (existingTeamNames.has(name.toLowerCase())) {
+    idx += 1;
+    name = `Team Bot ${idx}`;
   }
   return name;
 }
@@ -6250,14 +7193,27 @@ async function addBotPlayer() {
       .map((player) => (player?.name || "").trim().toLowerCase())
       .filter(Boolean),
   );
-  const name = pickBotName(existingNames);
+  const tournamentMode = getTournamentMode(currentTournamentMeta);
+  const teamSize = getTeamSizeFromMode(tournamentMode);
+  const isTeamMode = teamSize > 1;
+  const existingTeamNames = new Set(
+    players
+      .map((player) => String(player?.team?.teamName || "").trim().toLowerCase())
+      .filter(Boolean),
+  );
   const createdAt = Date.now();
+  const botId = `bot-${createdAt.toString(36)}-${Math.random()
+    .toString(16)
+    .slice(2, 6)}`;
+  const leaderName = pickBotName(existingNames);
+  existingNames.add(leaderName.toLowerCase());
+  const leaderRace = BOT_RACES[Math.floor(Math.random() * BOT_RACES.length)];
+  const leaderUid = `${botId}-leader`;
   const bot = {
-    id: `bot-${createdAt.toString(36)}-${Math.random()
-      .toString(16)
-      .slice(2, 6)}`,
-    name,
-    race: BOT_RACES[Math.floor(Math.random() * BOT_RACES.length)],
+    id: botId,
+    uid: leaderUid,
+    name: leaderName,
+    race: leaderRace,
     sc2Link: "",
     mmr: 0,
     points: 0,
@@ -6265,12 +7221,79 @@ async function addBotPlayer() {
     createdAt,
     isBot: true,
   };
+  if (isTeamMode) {
+    const teamId = `team-${createdAt.toString(36)}-${Math.random()
+      .toString(16)
+      .slice(2, 8)}`;
+    const teamName = pickBotTeamName(existingTeamNames);
+    const members = [
+      {
+        uid: leaderUid,
+        name: leaderName,
+        role: "leader",
+        status: TEAM_MEMBER_STATUS.accepted,
+        race: leaderRace,
+        sc2Link: "",
+        pulseName: "",
+        mmr: 0,
+        mmrByRace: null,
+        secondaryPulseLinks: [],
+        secondaryPulseProfiles: [],
+        twitchUrl: "",
+        country: "",
+        avatarUrl: "",
+        invitedAt: createdAt,
+        inviteSentAt: null,
+        respondedAt: createdAt,
+      },
+    ];
+    for (let idx = 1; idx < teamSize; idx += 1) {
+      const memberName = pickBotName(existingNames);
+      existingNames.add(memberName.toLowerCase());
+      const memberRace = BOT_RACES[Math.floor(Math.random() * BOT_RACES.length)];
+      members.push({
+        uid: `${botId}-m${idx}`,
+        name: memberName,
+        role: "member",
+        status: TEAM_MEMBER_STATUS.accepted,
+        race: memberRace,
+        sc2Link: "",
+        pulseName: "",
+        mmr: 0,
+        mmrByRace: null,
+        secondaryPulseLinks: [],
+        secondaryPulseProfiles: [],
+        twitchUrl: "",
+        country: "",
+        avatarUrl: "",
+        invitedAt: createdAt,
+        inviteSentAt: null,
+        respondedAt: createdAt,
+      });
+    }
+    bot.team = {
+      teamId,
+      mode: tournamentMode,
+      size: teamSize,
+      leaderUid,
+      leaderName,
+      teamName,
+      createdAt,
+      updatedAt: createdAt,
+      members,
+    };
+    bot.inviteStatus = INVITE_STATUS.accepted;
+  }
   await updateRosterWithTransaction(
     (roster) => upsertRosterPlayer(roster, bot),
     { needsReseed: true },
   );
-  rebuildBracket(true, `${name} added`);
-  addActivity(`${name} added.`);
+  const activityLabel =
+    isTeamMode && bot.team?.teamName
+      ? `${bot.team.teamName} added`
+      : `${leaderName} added`;
+  rebuildBracket(true, activityLabel);
+  addActivity(`${activityLabel}.`);
 }
 
 async function removeAllBots() {
@@ -6298,6 +7321,12 @@ async function removeAllBots() {
 
 function updateBotManagerCount() {
   const label = document.getElementById("botCountText");
+  const addBotBtn = document.getElementById("addBotBtn");
+  const tournamentMode = getTournamentMode(currentTournamentMeta);
+  const teamSize = getTeamSizeFromMode(tournamentMode);
+  if (addBotBtn) {
+    addBotBtn.textContent = teamSize > 1 ? "Add Team Bot" : "Add bot";
+  }
   if (!label) return;
   const players = Array.isArray(state.players) ? state.players : [];
   const count = players.filter((player) => isBotPlayer(player)).length;
@@ -6348,6 +7377,12 @@ async function handleRegistration(event) {
   const isInviteOnly = isInviteOnlyTournament(currentTournamentMeta);
   const inviteToken = getInviteTokenFromUrl();
   const needsInviteLink = Boolean(isInviteOnly && !isAdmin);
+  const tournamentMode = getTournamentMode(currentTournamentMeta);
+  const teamSize = getTeamSizeFromMode(tournamentMode);
+  const isTeamMode = teamSize > 1;
+  const requiredTeammates = Math.max(0, teamSize - 1);
+  const teamNameInput = document.getElementById("teamNameInput");
+  const teamName = String(teamNameInput?.value || "").trim();
 
   if (!auth.currentUser) {
     setStatus(
@@ -6358,16 +7393,37 @@ async function handleRegistration(event) {
     return;
   }
 
+  const currentUid = auth.currentUser?.uid || "";
+  const activeTeamMembership = getActiveMembershipForUser(currentUid);
+  if (isTeamMode && activeTeamMembership?.role === "member") {
+    const status = activeTeamMembership.status;
+    if (status === TEAM_MEMBER_STATUS.pending) {
+      const inviteSent = hasTeamMemberInviteBeenSent(activeTeamMembership.member);
+      setStatus(
+        statusEl,
+        inviteSent
+          ? "Your team invite is still pending. Accept it in Notification Center."
+          : "Your leader has not registered this team yet.",
+        true,
+      );
+      return;
+    }
+    if (status === TEAM_MEMBER_STATUS.accepted) {
+      setStatus(statusEl, "You are already part of a registered team.", true);
+      return;
+    }
+  }
+
   const existingPlayer = (state.players || []).find(
     (p) => p.uid === auth.currentUser?.uid,
   );
   if (existingPlayer) {
     const inviteStatus = normalizeInviteStatus(existingPlayer.inviteStatus);
-    if (inviteStatus === INVITE_STATUS.pending) {
+    if (!isTeamMode && inviteStatus === INVITE_STATUS.pending) {
       setStatus(statusEl, "Your invite is still pending.", true);
       return;
     }
-    if (inviteStatus === INVITE_STATUS.denied) {
+    if (!isTeamMode && inviteStatus === INVITE_STATUS.denied) {
       setStatus(statusEl, "Your invite was declined.", true);
       return;
     }
@@ -6378,6 +7434,11 @@ async function handleRegistration(event) {
     rebuildBracket(true, "Player removed");
     addActivity(`${existingPlayer.name} unregistered.`);
     showToast?.("You have been unregistered.", "success");
+    if (isTeamMode) {
+      teamInviteDraft = [];
+      teamInviteDraftDirty = false;
+      setTeamInviteStatus("");
+    }
     event.target.reset();
     hydratePulseFromState(pulseProfile);
     renderAll();
@@ -6436,6 +7497,51 @@ async function handleRegistration(event) {
     setStatus(statusEl, message, true);
     showToast?.(message, "error");
     return;
+  }
+  if (isTeamMode && !teamName) {
+    const message = "Team name is required for team registration.";
+    setStatus(statusEl, message, true);
+    setTeamInviteStatus(message, true);
+    showToast?.(message, "error");
+    return;
+  }
+
+  const teamInviteEntries = isTeamMode
+    ? getNormalizedTeamInviteDraft(requiredTeammates)
+    : [];
+  if (isTeamMode) {
+    if (teamInviteEntries.length !== requiredTeammates) {
+      const message = `Invite exactly ${requiredTeammates} teammate${
+        requiredTeammates === 1 ? "" : "s"
+      } for ${tournamentMode}.`;
+      setStatus(statusEl, message, true);
+      setTeamInviteStatus(message, true);
+      return;
+    }
+    const seen = new Set([currentUid]);
+    const ignoreTeamId = String(activeTeamMembership?.player?.team?.teamId || "");
+    for (const teammate of teamInviteEntries) {
+      const teammateUid = String(teammate?.uid || "").trim();
+      if (!teammateUid) {
+        const message = "Each teammate invite must target a valid user.";
+        setStatus(statusEl, message, true);
+        setTeamInviteStatus(message, true);
+        return;
+      }
+      if (seen.has(teammateUid)) {
+        const message = "Duplicate teammate invites are not allowed.";
+        setStatus(statusEl, message, true);
+        setTeamInviteStatus(message, true);
+        return;
+      }
+      seen.add(teammateUid);
+      if (isUidInAnotherTeam(teammateUid, ignoreTeamId)) {
+        const message = `${teammate.name || "A teammate"} is already in another team.`;
+        setStatus(statusEl, message, true);
+        setTeamInviteStatus(message, true);
+        return;
+      }
+    }
   }
 
   const rawPoints = pointsField?.value ?? "";
@@ -6628,16 +7734,91 @@ async function handleRegistration(event) {
       };
     }
 
+    const now = Date.now();
     const checkInState = getCheckInWindowState(currentTournamentMeta);
-    const autoCheckedInAt = checkInState.isOpen ? Date.now() : null;
+    const autoCheckedInAt = checkInState.isOpen ? now : null;
+    const leaderName = name;
+    const teamId =
+      existingPlayer?.team?.teamId ||
+      `team-${now.toString(36)}-${Math.random().toString(16).slice(2, 8)}`;
+    const normalizedTeamMembers = isTeamMode
+      ? [
+          {
+            uid: currentUid,
+            name: leaderName,
+            role: "leader",
+            status: TEAM_MEMBER_STATUS.accepted,
+            race,
+            sc2Link: sc2LinkInput,
+            pulseName: pulseProfile?.accountName || "",
+            mmr: Number.isFinite(mmr) ? Math.max(0, Number(mmr)) : 0,
+            mmrByRace: mmrByRace || null,
+            secondaryPulseLinks,
+            secondaryPulseProfiles,
+            twitchUrl,
+            country: countryCode || "",
+            avatarUrl,
+            invitedAt:
+              Number.isFinite(Number(existingPlayer?.team?.createdAt))
+                ? Number(existingPlayer.team.createdAt)
+                : now,
+            inviteSentAt: null,
+            respondedAt: now,
+          },
+          ...teamInviteEntries.map((entry) => ({
+            uid: entry.uid,
+            name: entry.name,
+            role: "member",
+            status: normalizeTeamMemberStatus(entry.status),
+            race: String(entry?.race || "").trim(),
+            sc2Link: String(entry?.sc2Link || "").trim(),
+            pulseName: String(entry?.pulseName || "").trim(),
+            mmr: Number.isFinite(Number(entry?.mmr)) ? Math.max(0, Number(entry.mmr)) : 0,
+            mmrByRace:
+              entry?.mmrByRace && typeof entry.mmrByRace === "object"
+                ? { ...entry.mmrByRace }
+                : null,
+            secondaryPulseLinks: Array.isArray(entry?.secondaryPulseLinks)
+              ? entry.secondaryPulseLinks
+              : [],
+            secondaryPulseProfiles: Array.isArray(entry?.secondaryPulseProfiles)
+              ? entry.secondaryPulseProfiles
+              : [],
+            twitchUrl: String(entry?.twitchUrl || "").trim(),
+            country: String(entry?.country || "").trim(),
+            avatarUrl: String(entry?.avatarUrl || "").trim(),
+            invitedAt: Number.isFinite(Number(entry.invitedAt))
+              ? Number(entry.invitedAt)
+              : now,
+            inviteSentAt: Number.isFinite(Number(entry.inviteSentAt))
+              ? Number(entry.inviteSentAt)
+              : null,
+            respondedAt: Number.isFinite(Number(entry.respondedAt))
+              ? Number(entry.respondedAt)
+              : null,
+          })),
+        ]
+      : [];
+    const allTeamMembersAccepted =
+      !isTeamMode ||
+      (normalizedTeamMembers.length === teamSize &&
+        normalizedTeamMembers.every(
+          (member) =>
+            normalizeTeamMemberStatus(member.status) === TEAM_MEMBER_STATUS.accepted,
+        ));
+    const inviteStatus = allTeamMembersAccepted
+      ? INVITE_STATUS.accepted
+      : INVITE_STATUS.pending;
     const newPlayer = buildPlayerFromData({
       name,
       race,
       sc2Link: sc2LinkInput,
       mmr: Number.isFinite(mmr) ? mmr : 0,
       points: startingPoints,
-      inviteStatus: INVITE_STATUS.accepted,
-      ...(autoCheckedInAt ? { checkedInAt: autoCheckedInAt } : {}),
+      inviteStatus,
+      ...(autoCheckedInAt && inviteStatus === INVITE_STATUS.accepted
+        ? { checkedInAt: autoCheckedInAt }
+        : {}),
       ...(inviteLinkMeta || {}),
       avatarUrl,
       twitchUrl,
@@ -6650,6 +7831,24 @@ async function handleRegistration(event) {
       clanLogoUrl: clanLogoUrl || "",
       pulseName: pulseProfile?.accountName || "",
       uid: auth.currentUser?.uid || null,
+      ...(isTeamMode
+        ? {
+            team: {
+              teamId,
+              mode: tournamentMode,
+              size: teamSize,
+              leaderUid: currentUid,
+              leaderName,
+              teamName,
+              createdAt:
+                Number.isFinite(Number(existingPlayer?.team?.createdAt))
+                  ? Number(existingPlayer.team.createdAt)
+                  : now,
+              updatedAt: now,
+              members: normalizedTeamMembers,
+            },
+          }
+        : {}),
     });
 
     const hasCompletedMatches = bracketHasResults();
@@ -6664,7 +7863,81 @@ async function handleRegistration(event) {
       } pts)`,
     );
 
-    markRegisteredTournament(currentSlug);
+    if (!isTeamMode || inviteStatus === INVITE_STATUS.accepted) {
+      markRegisteredTournament(currentSlug);
+    }
+
+    if (isTeamMode) {
+      const pendingTeammates = normalizedTeamMembers.filter(
+        (member) =>
+          member.role !== "leader" &&
+          normalizeTeamMemberStatus(member.status) === TEAM_MEMBER_STATUS.pending &&
+          !member.inviteSentAt,
+      );
+      if (pendingTeammates.length) {
+        const sentUids = [];
+        let failedCount = 0;
+        for (const teammate of pendingTeammates) {
+          try {
+            await sendTeamInviteNotification({
+              db,
+              auth,
+              getCurrentUsername,
+              userId: teammate.uid,
+              teammateName: teammate.name,
+              tournamentMeta: currentTournamentMeta,
+              slug: currentSlug,
+              teamId,
+              leaderName,
+              mode: tournamentMode,
+            });
+            sentUids.push(teammate.uid);
+          } catch (err) {
+            console.error("Failed to send teammate invite notification", err);
+            failedCount += 1;
+          }
+        }
+        if (failedCount > 0) {
+          showToast?.(
+            "Team created, but some teammate notifications failed to send.",
+            "error",
+          );
+        }
+        if (sentUids.length) {
+          const sentAt = Date.now();
+          await updateRosterWithTransaction(
+            (players) =>
+              (players || []).map((player) => {
+                if ((player?.id || "") !== (newPlayer?.id || "")) return player;
+                const members = Array.isArray(player?.team?.members)
+                  ? player.team.members
+                  : [];
+                return {
+                  ...player,
+                  team: {
+                    ...(player.team || {}),
+                    updatedAt: sentAt,
+                    members: members.map((member) => {
+                      if (!sentUids.includes(member?.uid)) return member;
+                      return {
+                        ...member,
+                        inviteSentAt:
+                          Number.isFinite(Number(member?.inviteSentAt))
+                            ? Number(member.inviteSentAt)
+                            : sentAt,
+                      };
+                    }),
+                  },
+                };
+              }),
+            {},
+            { optimistic: true },
+          );
+        }
+      }
+      teamInviteDraftDirty = false;
+      syncTeamInviteDraftFromPlayer(newPlayer, teamSize);
+    }
 
     const shouldAutoRebuild = !hasCompletedMatches;
     if (shouldAutoRebuild) {
@@ -6676,7 +7949,14 @@ async function handleRegistration(event) {
         renderAll();
       }
     }
-    showToast?.(`${newPlayer.name} added to the bracket`, "success");
+    if (isTeamMode && inviteStatus !== INVITE_STATUS.accepted) {
+      showToast?.(
+        `${teamName}'s team is pending. Teammates must accept in Notification Center.`,
+        "success",
+      );
+    } else {
+      showToast?.(`${newPlayer.name} added to the bracket`, "success");
+    }
 
     event.target.reset();
     hydratePulseFromState(pulseProfile);

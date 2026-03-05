@@ -109,6 +109,7 @@ export function initTournamentPage({
   resetScores,
   resetVetoScoreChat,
   checkInCurrentPlayer,
+  leaveCurrentTeam,
   notifyCheckInPlayers,
   toggleCheckInManualClose,
   toggleLiveTournament,
@@ -146,6 +147,7 @@ export function initTournamentPage({
   const mmrSeedingToggle = document.getElementById("mmrSeedingToggle");
   const autoFillBtn = document.getElementById("autoFillBtn");
   const checkInBtn = document.getElementById("checkInBtn");
+  const leaveTeamBtn = document.getElementById("leaveTeamBtn");
   const signInBtn = document.getElementById("signInBtn");
   const signOutBtn = document.getElementById("signOutBtn");
   const switchAccountBtn = document.getElementById("switchAccountBtn");
@@ -971,6 +973,7 @@ export function initTournamentPage({
   });
   autoFillBtn?.addEventListener("click", autoFillPlayers);
   checkInBtn?.addEventListener("click", () => checkInCurrentPlayer?.());
+  leaveTeamBtn?.addEventListener("click", () => leaveCurrentTeam?.());
   checkInToggleBtn?.addEventListener("click", () =>
     toggleCheckInManualClose?.(),
   );

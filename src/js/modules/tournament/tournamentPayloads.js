@@ -70,6 +70,7 @@ export function readBestOf(scope, defaultBestOf) {
 export function buildCreateTournamentPayload({
   slug,
   name,
+  mode,
   description,
   rules,
   format,
@@ -93,6 +94,7 @@ export function buildCreateTournamentPayload({
   return {
     slug,
     name,
+    mode: mode || "1v1",
     description,
     rules,
     format,
@@ -204,6 +206,7 @@ export function buildSettingsPayload({
 export function buildFinalTournamentPayload({
   slug,
   name,
+  mode,
   description,
   rules,
   format,
@@ -227,6 +230,7 @@ export function buildFinalTournamentPayload({
   return {
     slug,
     name,
+    mode: mode || "1v1",
     description,
     rules,
     format,

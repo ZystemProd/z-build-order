@@ -102,6 +102,7 @@ export async function loadTournamentRegistry(force = false) {
         id: d.id,
         slug: data.slug || d.id,
         name: data.name || d.id,
+        mode: data.mode || "1v1",
         description: data.description || "",
         rules: data.rules || "",
         mapPool: data.mapPool?.length ? data.mapPool : [],

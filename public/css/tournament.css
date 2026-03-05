@@ -1350,6 +1350,106 @@ a {
   align-self: end;
 }
 
+.team-mode-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.team-invite-section {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--stroke);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.team-current-section {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--stroke);
+  background: rgba(255, 255, 255, 0.03);
+  align-content: start;
+}
+
+.team-current-list {
+  display: grid;
+  gap: 8px;
+}
+
+.team-current-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--stroke);
+  background: var(--panel-2);
+}
+
+.team-current-name {
+  font-size: 14px;
+}
+
+.team-current-name .role-badge {
+  margin-left: 6px;
+}
+
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.team-invite-list {
+  display: grid;
+  gap: 8px;
+}
+
+.team-invite-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--stroke);
+  background: var(--panel-2);
+}
+
+.team-invite-name {
+  font-size: 14px;
+}
+
+.team-invite-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.team-invite-empty {
+  color: var(--muted);
+  font-size: 13px;
+  padding: 2px 0;
+}
+
+@media (max-width: 980px) {
+  .team-mode-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
 .settings-actions {
   justify-content: space-between;
   flex-wrap: wrap;
@@ -2084,7 +2184,7 @@ a {
   padding: 5px 10px;
   font-size: 12px;
   border-radius: 6px;
-  white-space: nowrap;
+  white-space: pre-line;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
   opacity: 0;
   visibility: hidden;
@@ -3260,6 +3360,18 @@ details.stage-section:not([open]) .stage-toggle::after {
   border-radius: 4px;
   background: #6c7385;
   display: inline-block;
+}
+
+.race-strip-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.match-card.tree .race-strip-group .race-strip,
+.match-card.group .race-strip-group .race-strip {
+  width: 6px;
 }
 
 .race-terran {
@@ -8512,7 +8624,7 @@ select[id^="finalBestOf"] {
 }
 
 .player-detail-card {
-  max-width: 720px;
+  max-width: 900px;
   width: 90vw;
   background: var(--panel);
   border: 1px solid var(--stroke);
@@ -8578,7 +8690,83 @@ select[id^="finalBestOf"] {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 14px;
+}
+
+.player-detail-body {
+  display: grid;
+  grid-template-columns: minmax(200px, 240px) minmax(0, 1fr);
+  gap: 14px;
   margin-top: 14px;
+}
+
+.player-detail-team-panel {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--stroke);
+  border-radius: 12px;
+  padding: 12px;
+  align-self: start;
+}
+
+.player-detail-team-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.player-detail-team-tab {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  border: 1px solid var(--stroke);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  padding: 8px 10px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.player-detail-team-tab.is-active {
+  border-color: rgba(78, 213, 255, 0.5);
+  background: rgba(78, 213, 255, 0.08);
+}
+
+.player-detail-team-member {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.player-detail-team-race {
+  flex-shrink: 0;
+}
+
+.player-detail-team-member-name {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player-detail-team-role {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid var(--stroke);
+  font-size: 11px;
+  padding: 1px 7px;
+}
+
+@media (max-width: 900px) {
+  .player-detail-body {
+    grid-template-columns: 1fr;
+  }
 }
 
 .player-detail-section {

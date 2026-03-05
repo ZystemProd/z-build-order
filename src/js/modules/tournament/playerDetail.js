@@ -15,10 +15,12 @@ import { playerKey } from "./playerKey.js";
 import {
   MAX_SECONDARY_PULSE_LINKS,
   DEFAULT_PLAYER_AVATAR,
+  currentTournamentMeta,
+  state,
   playerDetailModalInitialized,
   setPlayerDetailModalInitializedState,
 } from "./state.js";
-import { escapeHtml } from "./bracket/renderUtils.js";
+import { escapeHtml, raceClassName } from "./bracket/renderUtils.js";
 import countries from "../../data/countries.json" assert { type: "json" };
 import { updateTooltips } from "../tooltip.js";
 
@@ -27,6 +29,7 @@ const countryUidCache = new Map();
 let activePlayerDetailId = "";
 let activePlayerDetailUid = "";
 let activePlayerDetailKey = "";
+let activePlayerDetailMemberUid = "";
 let getPlayersMapRef = null;
 let activeAvatarRefreshToken = 0;
 const COUNTRY_NAME_BY_CODE = new Map(
@@ -731,18 +734,214 @@ function resolvePlayerAvatar(player, { isCurrentUser = false } = {}) {
   return DEFAULT_PLAYER_AVATAR;
 }
 
+function getTournamentModeValue() {
+  return String(currentTournamentMeta?.mode || "1v1")
+    .trim()
+    .toLowerCase();
+}
+
+function isTeamTournamentMode() {
+  const mode = getTournamentModeValue();
+  return mode === "2v2" || mode === "3v3" || mode === "4v4";
+}
+
+function normalizeTeamMemberStatus(status) {
+  const normalized = String(status || "")
+    .trim()
+    .toLowerCase();
+  if (normalized === "accepted" || normalized === "pending" || normalized === "denied") {
+    return normalized;
+  }
+  return "pending";
+}
+
+function getTeamMembers(player) {
+  const raw = Array.isArray(player?.team?.members) ? player.team.members : [];
+  const teamMembers = raw
+    .map((member) => {
+      if (!member || typeof member !== "object") return null;
+      const uid = String(member.uid || "").trim();
+      if (!uid) return null;
+      const role = member.role === "leader" ? "leader" : "member";
+      const fallbackLeaderRace =
+        role === "leader" && uid === String(player?.uid || "").trim()
+          ? String(player?.race || "").trim()
+          : "";
+      const resolvedRace = String(member.race || "").trim() || fallbackLeaderRace;
+      return {
+        uid,
+        name: String(member.name || "").trim() || "Unknown",
+        role,
+        status:
+          role === "leader"
+            ? "accepted"
+            : normalizeTeamMemberStatus(member.status),
+        race: resolvedRace,
+        sc2Link: String(member.sc2Link || "").trim(),
+        pulseName: String(member.pulseName || "").trim(),
+        mmr: Number.isFinite(Number(member.mmr)) ? Math.max(0, Number(member.mmr)) : 0,
+        mmrByRace:
+          member.mmrByRace && typeof member.mmrByRace === "object"
+            ? { ...member.mmrByRace }
+            : null,
+        secondaryPulseLinks: Array.isArray(member.secondaryPulseLinks)
+          ? member.secondaryPulseLinks.slice()
+          : [],
+        secondaryPulseProfiles: Array.isArray(member.secondaryPulseProfiles)
+          ? member.secondaryPulseProfiles.slice()
+          : [],
+        twitchUrl: String(member.twitchUrl || "").trim(),
+        country: String(member.country || "").trim(),
+        avatarUrl: String(member.avatarUrl || "").trim(),
+      };
+    })
+    .filter(Boolean);
+  const leaderUid = String(player?.uid || "").trim();
+  if (leaderUid && !teamMembers.some((entry) => entry.uid === leaderUid)) {
+    teamMembers.unshift({
+      uid: leaderUid,
+      name: String(player?.name || "").trim() || "Leader",
+      role: "leader",
+      status: "accepted",
+      race: String(player?.race || "").trim(),
+      sc2Link: String(player?.sc2Link || "").trim(),
+      pulseName: String(player?.pulseName || "").trim(),
+      mmr: Number.isFinite(Number(player?.mmr)) ? Math.max(0, Number(player.mmr)) : 0,
+      mmrByRace:
+        player?.mmrByRace && typeof player.mmrByRace === "object"
+          ? { ...player.mmrByRace }
+          : null,
+      secondaryPulseLinks: Array.isArray(player?.secondaryPulseLinks)
+        ? player.secondaryPulseLinks.slice()
+        : [],
+      secondaryPulseProfiles: Array.isArray(player?.secondaryPulseProfiles)
+        ? player.secondaryPulseProfiles.slice()
+        : [],
+      twitchUrl: String(player?.twitchUrl || "").trim(),
+      country: String(player?.country || "").trim(),
+      avatarUrl: String(player?.avatarUrl || "").trim(),
+    });
+  }
+  teamMembers.sort((a, b) => {
+    const roleA = a.role === "leader" ? 0 : 1;
+    const roleB = b.role === "leader" ? 0 : 1;
+    if (roleA !== roleB) return roleA - roleB;
+    return a.name.localeCompare(b.name);
+  });
+  return teamMembers;
+}
+
+function resolveTeamMemberPlayer(anchorPlayer, member) {
+  if (!member) return anchorPlayer;
+  if (String(member.uid || "") === String(anchorPlayer?.uid || "")) return anchorPlayer;
+  const playersMap = getPlayersMapRef?.() || null;
+  let linked = null;
+  if (playersMap && member.uid) {
+    for (const entry of playersMap.values()) {
+      if (String(entry?.uid || "") === String(member.uid || "")) {
+        linked = entry;
+        break;
+      }
+    }
+  }
+  const teamName = String(anchorPlayer?.team?.teamName || "").trim();
+  return {
+    ...(linked || {}),
+    uid: member.uid,
+    name: member.name || linked?.name || "Unknown",
+    race: member.race || linked?.race || "",
+    team: {
+      ...(anchorPlayer?.team || {}),
+      teamName,
+    },
+    pulseName: linked?.pulseName || member.pulseName || "",
+    sc2Link: linked?.sc2Link || member.sc2Link || "",
+    twitchUrl: linked?.twitchUrl || member.twitchUrl || "",
+    points: Number.isFinite(linked?.points) ? linked.points : 0,
+    mmr: Number.isFinite(linked?.mmr)
+      ? linked.mmr
+      : Number.isFinite(member?.mmr)
+        ? Number(member.mmr)
+        : 0,
+    mmrByRace:
+      linked?.mmrByRace && typeof linked.mmrByRace === "object"
+        ? linked.mmrByRace
+        : member?.mmrByRace && typeof member.mmrByRace === "object"
+          ? member.mmrByRace
+          : null,
+    secondaryPulseLinks: Array.isArray(linked?.secondaryPulseLinks)
+      ? linked.secondaryPulseLinks
+      : Array.isArray(member?.secondaryPulseLinks)
+        ? member.secondaryPulseLinks
+        : [],
+    secondaryPulseProfiles: Array.isArray(linked?.secondaryPulseProfiles)
+      ? linked.secondaryPulseProfiles
+      : Array.isArray(member?.secondaryPulseProfiles)
+        ? member.secondaryPulseProfiles
+        : [],
+    clan: linked?.clan || "",
+    clanAbbreviation: linked?.clanAbbreviation || "",
+    clanLogoUrl: linked?.clanLogoUrl || "",
+    country: linked?.country || member.country || "",
+    avatarUrl: linked?.avatarUrl || member.avatarUrl || "",
+  };
+}
+
+function renderTeamRosterTabs(anchorPlayer, selectedUid = "") {
+  const panel = document.getElementById("playerDetailTeamPanel");
+  const listEl = document.getElementById("playerDetailTeamList");
+  if (!panel || !listEl) return [];
+  if (!isTeamTournamentMode()) {
+    panel.style.display = "none";
+    listEl.replaceChildren();
+    return [];
+  }
+  const members = getTeamMembers(anchorPlayer);
+  if (!members.length) {
+    panel.style.display = "none";
+    listEl.replaceChildren();
+    return [];
+  }
+  panel.style.display = "";
+  listEl.innerHTML = members
+    .map((member) => {
+      const uid = String(member.uid || "");
+      const isActive = uid === selectedUid;
+      const roleLabel = member.role === "leader" ? "Leader" : "Teammate";
+      return `<li>
+        <button type="button" class="player-detail-team-tab ${
+          isActive ? "is-active" : ""
+        }" data-team-member-uid="${escapeHtml(uid)}">
+          <span class="player-detail-team-member">
+            <span class="race-strip player-detail-team-race ${escapeHtml(
+              raceClassName(member.race || ""),
+            )}"></span>
+            <span class="player-detail-team-member-name" translate="no">${escapeHtml(
+              member.name || "Unknown",
+            )}</span>
+            <span class="player-detail-team-role">${escapeHtml(roleLabel)}</span>
+          </span>
+        </button>
+      </li>`;
+    })
+    .join("");
+  return members;
+}
+
 export function setupPlayerDetailModal() {
   if (playerDetailModalInitialized) return;
   const modal = document.getElementById("playerDetailModal");
   if (!modal) return;
   const closeBtn = document.getElementById("closePlayerDetailModal");
   const { sortBtn, listEl } = getAchievementElements();
+  const teamListEl = document.getElementById("playerDetailTeamList");
 
   const hide = () => {
     modal.style.display = "none";
     activePlayerDetailId = "";
     activePlayerDetailUid = "";
     activePlayerDetailKey = "";
+    activePlayerDetailMemberUid = "";
   };
   const show = () => {
     modal.style.display = "block";
@@ -768,6 +967,23 @@ export function setupPlayerDetailModal() {
       if (listEl.scrollTop + listEl.clientHeight >= listEl.scrollHeight - threshold) {
         renderNextAchievementBatch();
       }
+    });
+  }
+  if (teamListEl && teamListEl.dataset.bound !== "true") {
+    teamListEl.dataset.bound = "true";
+    teamListEl.addEventListener("click", (event) => {
+      const target = event.target.closest?.("[data-team-member-uid]");
+      if (!target) return;
+      const memberUid = String(target.dataset.teamMemberUid || "").trim();
+      if (!memberUid) return;
+      const playersMap = getPlayersMapRef?.();
+      const anchorPlayer = findPlayerInMap(playersMap, {
+        id: activePlayerDetailId,
+        uid: activePlayerDetailUid,
+        key: activePlayerDetailKey,
+      });
+      if (!anchorPlayer) return;
+      openPlayerDetailModal(anchorPlayer, { memberUid });
     });
   }
   window.addEventListener("mousedown", (e) => {
@@ -832,7 +1048,7 @@ export function attachPlayerDetailHandlers({ getPlayersMap }) {
   registeredPlayersList?.addEventListener("click", handler);
 }
 
-export async function openPlayerDetailModal(player) {
+export async function openPlayerDetailModal(player, options = {}) {
   const modal = document.getElementById("playerDetailModal");
   if (!modal) return;
   const avatar = document.getElementById("playerDetailAvatar");
@@ -852,24 +1068,43 @@ export async function openPlayerDetailModal(player) {
     player?.name || player?.pulseName || "",
     player?.sc2Link || ""
   );
+  const teamMembers = renderTeamRosterTabs(
+    player,
+    String(options?.memberUid || activePlayerDetailMemberUid || player?.uid || ""),
+  );
+  const selectedMemberUid = String(
+    options?.memberUid ||
+      activePlayerDetailMemberUid ||
+      teamMembers.find((entry) => entry.role === "leader")?.uid ||
+      player?.uid ||
+      "",
+  ).trim();
+  activePlayerDetailMemberUid = selectedMemberUid;
+  const selectedMember = teamMembers.find(
+    (entry) => String(entry?.uid || "") === selectedMemberUid,
+  );
+  const detailPlayer = selectedMember
+    ? resolveTeamMemberPlayer(player, selectedMember)
+    : player;
 
-  const isCurrentUser = isCurrentUserPlayer(player);
+  const isCurrentUser = isCurrentUserPlayer(detailPlayer);
   const currentAvatar = getCurrentUserAvatarUrl?.() || "";
   const useCurrentAvatar =
     isCurrentUser && currentAvatar && !isPlaceholderAvatar(currentAvatar);
-  const avatarUrl = resolvePlayerAvatar(player, { isCurrentUser });
+  const avatarUrl = resolvePlayerAvatar(detailPlayer, { isCurrentUser });
   if (avatar) {
     if (useCurrentAvatar) {
       avatar.src = currentAvatar;
-      player.avatarUrl = currentAvatar;
+      detailPlayer.avatarUrl = currentAvatar;
     } else {
       avatar.src = avatarUrl;
     }
   }
   let shouldHydrateProfile = false;
   if (nameEl) {
-    const abbr = player?.clanAbbreviation;
-    const displayName = player?.name || player?.pulseName;
+    const abbr = detailPlayer?.clanAbbreviation;
+    const displayName = detailPlayer?.name || detailPlayer?.pulseName;
+    const teamName = String(player?.team?.teamName || "").trim();
     const safeName = displayName || "Player";
     const composedName = abbr ? `[${abbr}] ${safeName}` : safeName;
     if (nameTextEl) {
@@ -877,19 +1112,24 @@ export async function openPlayerDetailModal(player) {
     } else {
       nameEl.textContent = composedName;
     }
+    if (teamName && isTeamTournamentMode()) {
+      nameEl.dataset.teamName = teamName;
+    } else if (nameEl.dataset.teamName) {
+      delete nameEl.dataset.teamName;
+    }
     if (flagEl) {
-      const flag = countryCodeToFlag(player?.country || "");
+      const flag = countryCodeToFlag(detailPlayer?.country || "");
       setFlagIcon(flagEl, flag);
       flagEl.style.display = flag ? "inline-flex" : "none";
-      setFlagTitle(flagEl, player?.country || "");
+      setFlagTitle(flagEl, detailPlayer?.country || "");
       updateTooltips();
-      const needsAvatarHydration = isPlaceholderAvatar(player?.avatarUrl);
+      const needsAvatarHydration = isPlaceholderAvatar(detailPlayer?.avatarUrl);
       shouldHydrateProfile = !flag || needsAvatarHydration;
     }
   }
   if (shouldHydrateProfile && flagEl) {
-    await hydratePlayerProfile(player, flagEl, avatar);
-    const refreshedAvatar = resolvePlayerAvatar(player, { isCurrentUser });
+    await hydratePlayerProfile(detailPlayer, flagEl, avatar);
+    const refreshedAvatar = resolvePlayerAvatar(detailPlayer, { isCurrentUser });
     if (avatar && refreshedAvatar && avatar.src !== refreshedAvatar) {
       avatar.src = refreshedAvatar;
     }
@@ -898,18 +1138,18 @@ export async function openPlayerDetailModal(player) {
     scheduleAvatarRefresh(avatar, isCurrentUser);
   }
   if (clanEl) {
-    const clan = player?.clan || "";
+    const clan = detailPlayer?.clan || "";
     clanEl.textContent = clan || "No clan";
     clanEl.style.display = clan ? "inline-flex" : "none";
   }
-  if (raceEl) raceEl.textContent = player?.race || "";
+  if (raceEl) raceEl.textContent = detailPlayer?.race || "";
   if (pointsEl)
-    pointsEl.textContent = `${player?.points || 0} pts  ${player?.mmr || 0} MMR`;
+    pointsEl.textContent = `${detailPlayer?.points || 0} pts  ${detailPlayer?.mmr || 0} MMR`;
 
   if (mainPulseEl) {
-    const displayName = player?.pulseName || "Main SC2Pulse";
-    if (player?.sc2Link) {
-      mainPulseEl.href = player.sc2Link;
+    const displayName = detailPlayer?.pulseName || "Main SC2Pulse";
+    if (detailPlayer?.sc2Link) {
+      mainPulseEl.href = detailPlayer.sc2Link;
       mainPulseEl.textContent = displayName;
     } else {
       mainPulseEl.removeAttribute("href");
@@ -919,10 +1159,10 @@ export async function openPlayerDetailModal(player) {
 
   if (secondaryEl) {
     const secondaryProfiles =
-      player?.secondaryPulseProfiles && player.secondaryPulseProfiles.length
-        ? player.secondaryPulseProfiles
-        : player?.secondaryPulseLinks && player.secondaryPulseLinks.length
-        ? player.secondaryPulseLinks
+      detailPlayer?.secondaryPulseProfiles && detailPlayer.secondaryPulseProfiles.length
+        ? detailPlayer.secondaryPulseProfiles
+        : detailPlayer?.secondaryPulseLinks && detailPlayer.secondaryPulseLinks.length
+        ? detailPlayer.secondaryPulseLinks
         : [];
     const linkClass =
       (mainPulseEl && mainPulseEl.className) || "secondary-pulse-link";
@@ -930,7 +1170,7 @@ export async function openPlayerDetailModal(player) {
   }
 
   if (twitchEl) {
-    const twitchUrl = player?.twitchUrl || "";
+    const twitchUrl = detailPlayer?.twitchUrl || "";
     if (twitchUrl) {
       twitchEl.href = twitchUrl;
       twitchEl.innerHTML = `<img src="img/SVG/glitch_flat_purple.svg" class="menu-icon settings-list-icon" aria-hidden="true" /> ${escapeHtml(
@@ -942,9 +1182,9 @@ export async function openPlayerDetailModal(player) {
     }
   }
 
-  void updateAchievementsForPlayer(player);
+  void updateAchievementsForPlayer(detailPlayer);
 
-  formatMmrByRace(player);
+  formatMmrByRace(detailPlayer);
   modal.dataset.ready = "true";
   modal.showModal?.();
 }
@@ -1016,7 +1256,9 @@ export function refreshPlayerDetailModalIfOpen(getPlayersMap) {
     key: activePlayerDetailKey,
   });
   if (player) {
-    openPlayerDetailModal(player);
+    openPlayerDetailModal(player, {
+      memberUid: activePlayerDetailMemberUid || "",
+    });
   }
 }
 

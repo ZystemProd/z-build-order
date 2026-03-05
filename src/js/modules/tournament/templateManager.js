@@ -187,6 +187,7 @@ function formatTournamentCopyOptionLabel(meta) {
 
 function buildTemplateSettingsFromTournament(meta) {
   return {
+    mode: (meta?.mode || "1v1").trim(),
     format: (meta?.format || "Double Elimination").trim(),
     maxPlayers: Number.isFinite(meta?.maxPlayers) ? Number(meta.maxPlayers) : null,
     checkInWindowMinutes: Number(meta?.checkInWindowMinutes) > 0
@@ -212,6 +213,7 @@ function buildTemplateSettingsFromTournament(meta) {
 
 function readTournamentTemplateForm(mapPoolSelection) {
   const nameInput = document.getElementById("tournamentTemplateNameInput");
+  const modeSelect = document.getElementById("tournamentModeSelect");
   const formatSelect = document.getElementById("tournamentFormatSelect");
   const maxPlayersInput = document.getElementById("tournamentMaxPlayersInput");
   const checkInSelect = document.getElementById("checkInSelect");
@@ -231,6 +233,7 @@ function readTournamentTemplateForm(mapPoolSelection) {
     return null;
   }
   const id = nameInput?.dataset.templateId || "";
+  const mode = (modeSelect?.value || "1v1").trim();
   const format = (formatSelect?.value || "Double Elimination").trim();
   const maxPlayers = maxPlayersInput?.value
     ? Number(maxPlayersInput.value)
@@ -252,6 +255,7 @@ function readTournamentTemplateForm(mapPoolSelection) {
     id,
     name,
     settings: {
+      mode,
       format,
       maxPlayers,
       checkInWindowMinutes,
@@ -271,6 +275,7 @@ function readTournamentTemplateForm(mapPoolSelection) {
 function applyTournamentTemplate(template, setMapPoolSelection) {
   if (!template?.settings) return;
   const settings = template.settings;
+  const modeSelect = document.getElementById("tournamentModeSelect");
   const formatSelect = document.getElementById("tournamentFormatSelect");
   const maxPlayersInput = document.getElementById("tournamentMaxPlayersInput");
   const checkInSelect = document.getElementById("checkInSelect");
@@ -289,6 +294,7 @@ function applyTournamentTemplate(template, setMapPoolSelection) {
     "grandFinalResetToggle",
   );
 
+  if (modeSelect) modeSelect.value = settings.mode || "1v1";
   if (formatSelect) formatSelect.value = settings.format || "Double Elimination";
   syncFormatFieldVisibility("create");
 

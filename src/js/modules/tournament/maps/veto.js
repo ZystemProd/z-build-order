@@ -87,6 +87,27 @@ const presenceAccessCache = new Set();
 const vetoAccessCache = new Set();
 let presenceAuthBound = false;
 let vetoChatHome = null;
+
+function getTournamentModeValue() {
+  return String(currentTournamentMeta?.mode || "1v1")
+    .trim()
+    .toLowerCase();
+}
+
+function isTeamTournamentMode() {
+  const mode = getTournamentModeValue();
+  return mode === "2v2" || mode === "3v3" || mode === "4v4";
+}
+
+function getParticipantDisplayName(player) {
+  if (!player) return "TBD";
+  if (isTeamTournamentMode()) {
+    const teamName = String(player?.team?.teamName || "").trim();
+    if (teamName) return teamName;
+  }
+  return String(player?.name || "TBD");
+}
+
 const countryFlagCache = new Map();
 const countryUidCache = new Map();
 const COUNTRY_NAME_BY_CODE = new Map(
@@ -838,8 +859,8 @@ export function openMatchInfoModal(
   const vetoedMaps = Array.isArray(saved?.vetoed) ? saved.vetoed : [];
   const playersById = getPlayersMap();
   const [pA, pB] = resolveParticipants(match, lookup, playersById);
-  const aName = pA?.name || "TBD";
-  const bName = pB?.name || "TBD";
+  const aName = getParticipantDisplayName(pA);
+  const bName = getParticipantDisplayName(pB);
   const leftPlayerId = pA?.id || null;
   const rightPlayerId = pB?.id || null;
   const uid = auth?.currentUser?.uid || null;
@@ -849,7 +870,9 @@ export function openMatchInfoModal(
   const isParticipant =
     (me?.id && (me.id === leftPlayerId || me.id === rightPlayerId)) ||
     (uid && (uid === pA?.uid || uid === pB?.uid));
-  const showPresence = Boolean(isParticipant);
+  const isUidParticipant = Boolean(uid && (uid === pA?.uid || uid === pB?.uid));
+  const isParticipantForTeam = isTeamTournamentMode() ? isUidParticipant : isParticipant;
+  const showPresence = Boolean(isParticipantForTeam);
   const allowScoreEditToggle = Boolean(isAdmin && match?.status === "complete");
   if (allowScoreEditToggle) {
     if (modal.dataset.scoreEdit !== "true") {
@@ -863,7 +886,7 @@ export function openMatchInfoModal(
   const computeCanEditResults = () =>
     isAdmin
       ? match?.status !== "complete" || scoreEditEnabled
-      : state.isLive && isParticipant && match?.status !== "complete";
+      : state.isLive && isParticipantForTeam && match?.status !== "complete";
   let canEditResults = computeCanEditResults();
 
   modal.dataset.canEditResults = canEditResults ? "true" : "false";
@@ -871,7 +894,7 @@ export function openMatchInfoModal(
     matchId,
     leftPlayer: pA,
     rightPlayer: pB,
-    isParticipant,
+    isParticipant: isParticipantForTeam,
     isAdminUser: isAdmin,
     uid,
   });
@@ -1240,7 +1263,10 @@ export function openMatchInfoModal(
   const scoreReports = state.scoreReports || {};
   const existingReport = scoreReports[matchId] || null;
   const canReport = Boolean(
-    uid && isParticipant && leftPlayerId && rightPlayerId,
+    uid &&
+      leftPlayerId &&
+      rightPlayerId &&
+      (isTeamTournamentMode() ? isUidParticipant : isParticipant),
   );
   const shouldShowReport = Boolean(existingReport);
   if (reportSection) {
@@ -1502,7 +1528,7 @@ export function openMatchInfoModal(
   }
 
   if (openVetoBtn) {
-    const canOpenVeto = isAdmin || (state.isLive && isParticipant);
+    const canOpenVeto = isAdmin || (state.isLive && isParticipantForTeam);
     openVetoBtn.style.display = canOpenVeto ? "" : "none";
     openVetoBtn.onclick = canOpenVeto
       ? () => {

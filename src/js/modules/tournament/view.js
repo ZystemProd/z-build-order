@@ -1,3 +1,136 @@
+function normalizeMode(mode) {
+  return String(mode || "")
+    .trim()
+    .toLowerCase();
+}
+
+function parseTeamSizeFromMode(mode) {
+  const parsed = Number(normalizeMode(mode).charAt(0));
+  return Number.isFinite(parsed) && parsed > 1 ? parsed : 1;
+}
+
+function getParticipantRaceClassesForList(player, currentTournamentMeta, raceClassName) {
+  const mode = normalizeMode(currentTournamentMeta?.mode || "1v1");
+  const isTeamMode = mode === "2v2" || mode === "3v3" || mode === "4v4";
+  if (!isTeamMode) {
+    return [raceClassName(player?.race)];
+  }
+  if (!player || typeof player !== "object") {
+    return [raceClassName("")];
+  }
+  const fallbackLeaderRace = String(player?.race || "").trim();
+  const explicitTeamSize = Number(player?.team?.size);
+  const teamSize = Math.max(
+    2,
+    Number.isFinite(explicitTeamSize) && explicitTeamSize > 1
+      ? explicitTeamSize
+      : parseTeamSizeFromMode(player?.team?.mode || mode),
+  );
+  const rawMembers = Array.isArray(player?.team?.members) ? player.team.members : [];
+  const deduped = [];
+  const seen = new Set();
+  rawMembers.forEach((member) => {
+    if (!member || typeof member !== "object") return;
+    const uid = String(member.uid || "").trim();
+    if (!uid || seen.has(uid)) return;
+    seen.add(uid);
+    deduped.push({
+      uid,
+      role: member.role === "leader" ? "leader" : "member",
+      race: String(member.race || "").trim(),
+    });
+  });
+  const leaderUid = String(player?.uid || "").trim();
+  let leader =
+    deduped.find(
+      (entry) =>
+        entry.role === "leader" && (!leaderUid || entry.uid === leaderUid),
+    ) ||
+    deduped.find((entry) => leaderUid && entry.uid === leaderUid) ||
+    null;
+  if (!leader) {
+    leader = { uid: leaderUid || "leader", role: "leader", race: fallbackLeaderRace };
+  } else if (!leader.race && fallbackLeaderRace && leaderUid && leader.uid === leaderUid) {
+    leader = { ...leader, race: fallbackLeaderRace };
+  }
+  const teammates = deduped.filter((entry) => entry.uid !== leader.uid);
+  const ordered = [leader, ...teammates].slice(0, Math.max(1, teamSize));
+  const classes = ordered.map((entry) => raceClassName(String(entry?.race || "").trim()));
+  return classes.length ? classes : [raceClassName(fallbackLeaderRace)];
+}
+
+function renderParticipantRaceStripMarkupForList(
+  player,
+  currentTournamentMeta,
+  raceClassName,
+  escapeHtml,
+) {
+  const raceClasses = getParticipantRaceClassesForList(
+    player,
+    currentTournamentMeta,
+    raceClassName,
+  );
+  const signature = raceClasses.join("|");
+  const strips = raceClasses
+    .map((raceClass) => `<span class="race-strip ${raceClass}"></span>`)
+    .join("");
+  return `<span class="race-strip-group" data-race-signature="${escapeHtml(
+    signature,
+  )}" aria-hidden="true">${strips}</span>`;
+}
+
+function getParticipantRaceLabelForList(player, currentTournamentMeta) {
+  const mode = normalizeMode(currentTournamentMeta?.mode || "1v1");
+  const isTeamMode = mode === "2v2" || mode === "3v3" || mode === "4v4";
+  if (!isTeamMode) {
+    const race = String(player?.race || "").trim();
+    return race || "Race TBD";
+  }
+  const members = Array.isArray(player?.team?.members) ? player.team.members : [];
+  const labels = [];
+  const seen = new Set();
+  members.forEach((member) => {
+    const uid = String(member?.uid || "").trim();
+    if (!uid || seen.has(uid)) return;
+    seen.add(uid);
+    const race = String(member?.race || "").trim();
+    if (race) labels.push(race);
+  });
+  return labels.length ? labels.join(" / ") : "Race TBD";
+}
+
+function getTeamMemberTooltipForList(player, currentTournamentMeta) {
+  const mode = normalizeMode(currentTournamentMeta?.mode || "1v1");
+  const isTeamMode = mode === "2v2" || mode === "3v3" || mode === "4v4";
+  if (!isTeamMode || !player || typeof player !== "object") return "";
+  const members = Array.isArray(player?.team?.members) ? player.team.members : [];
+  const seen = new Set();
+  const deduped = [];
+  members.forEach((member) => {
+    const uid = String(member?.uid || "").trim();
+    if (!uid || seen.has(uid)) return;
+    seen.add(uid);
+    deduped.push({
+      uid,
+      role: member?.role === "leader" ? "leader" : "member",
+      name: String(member?.name || "").trim(),
+    });
+  });
+  const leaderUid = String(player?.uid || "").trim();
+  deduped.sort((a, b) => {
+    const rankA = a.role === "leader" || (leaderUid && a.uid === leaderUid) ? 0 : 1;
+    const rankB = b.role === "leader" || (leaderUid && b.uid === leaderUid) ? 0 : 1;
+    if (rankA !== rankB) return rankA - rankB;
+    return a.name.localeCompare(b.name);
+  });
+  const names = deduped
+    .map((member) => member.name)
+    .filter(Boolean);
+  if (!names.length && player?.name) names.push(String(player.name).trim());
+  if (!names.length) return "";
+  return names.join("\n");
+}
+
 export function updatePlacementsRowView({
   currentTournamentMeta,
   state,
@@ -28,6 +161,18 @@ export function updatePlacementsRowView({
     return;
   }
   const playersById = getPlayersMap();
+  const mode = String(currentTournamentMeta?.mode || "1v1")
+    .trim()
+    .toLowerCase();
+  const isTeamMode = mode === "2v2" || mode === "3v3" || mode === "4v4";
+  const displayName = (player) => {
+    if (!player) return "—";
+    if (isTeamMode) {
+      const teamName = String(player?.team?.teamName || "").trim();
+      if (teamName) return teamName;
+    }
+    return player?.name || "—";
+  };
   const firstId = Array.from(placements.entries()).find(
     ([, place]) => place === 1,
   )?.[0];
@@ -37,10 +182,10 @@ export function updatePlacementsRowView({
   const thirdIds = Array.from(placements.entries())
     .filter(([, place]) => place === 3)
     .map(([id]) => id);
-  placementFirst.textContent = playersById.get(firstId)?.name || "—";
-  placementSecond.textContent = playersById.get(secondId)?.name || "—";
+  placementFirst.textContent = displayName(playersById.get(firstId));
+  placementSecond.textContent = displayName(playersById.get(secondId));
   placementThirdFourth.textContent = thirdIds.length
-    ? thirdIds.map((id) => playersById.get(id)?.name || "—").join(" · ")
+    ? thirdIds.map((id) => displayName(playersById.get(id))).join(" · ")
     : "—";
   placementsRow.style.display = "flex";
 }
@@ -181,6 +326,9 @@ export function renderTournamentMetaSection({
   refreshTournamentPromoSettings,
   renderCircuitPointsSettings,
   hydrateCurrentUserClanLogo,
+  getTeamMembership,
+  getTournamentTeamSize,
+  normalizeTournamentMode,
 }) {
   if (!currentTournamentMeta) return;
   const tournamentTitle = document.getElementById("tournamentTitle");
@@ -218,10 +366,33 @@ export function renderTournamentMetaSection({
   const casterLiveCard = document.getElementById("casterLiveCard");
   const bracketTitle = document.getElementById("bracketTitle");
   const currentUid = auth.currentUser?.uid || null;
-  const currentPlayer = currentUid
+  const directPlayer = currentUid
     ? (state.players || []).find((p) => p.uid === currentUid)
     : null;
+  const teamMembership = currentUid
+    ? getTeamMembership?.(state.players || [], currentUid, {
+        includeDenied: false,
+      }) || null
+    : null;
+  const currentPlayer =
+    directPlayer || (teamMembership?.role === "leader" ? teamMembership.player : null);
+  const isMemberOnly = Boolean(teamMembership && teamMembership.role === "member");
+  const isMemberAccepted = isMemberOnly && teamMembership.status === "accepted";
+  const memberInviteSentAt = Number(teamMembership?.member?.inviteSentAt || 0);
+  const hasMemberInviteBeenSent =
+    Number.isFinite(memberInviteSentAt) && memberInviteSentAt > 0;
+  const isMemberPending =
+    isMemberOnly &&
+    teamMembership.status === "pending" &&
+    hasMemberInviteBeenSent;
+  const isMemberQueued =
+    isMemberOnly &&
+    teamMembership.status === "pending" &&
+    !hasMemberInviteBeenSent;
   const currentInviteStatus = normalizeInviteStatus(currentPlayer?.inviteStatus);
+  const teamSize = Number(getTournamentTeamSize?.(currentTournamentMeta) || 1);
+  const tournamentMode = normalizeTournamentMode?.(currentTournamentMeta?.mode || "1v1") || "1v1";
+  const isTeamMode = teamSize > 1;
   const eligiblePlayers = getEligiblePlayers(state.players || []);
   const hasCheckedIn = eligiblePlayers.some((player) => player.checkedInAt);
   const isInviteOnly = isInviteOnlyTournament(currentTournamentMeta);
@@ -351,14 +522,31 @@ export function renderTournamentMetaSection({
     if (state.isLive) {
       registerBtn.textContent = "Registration closed";
       registerBtn.disabled = true;
-    } else if (currentPlayer && currentInviteStatus === INVITE_STATUS.pending) {
+    } else if (isTeamMode && isMemberQueued) {
+      registerBtn.textContent = "Awaiting leader registration";
+      registerBtn.disabled = true;
+    } else if (isTeamMode && isMemberPending) {
+      registerBtn.textContent = "Team invite pending";
+      registerBtn.disabled = true;
+    } else if (isTeamMode && isMemberAccepted) {
+      registerBtn.textContent = "Team registered";
+      registerBtn.disabled = true;
+    } else if (
+      currentPlayer &&
+      !isTeamMode &&
+      currentInviteStatus === INVITE_STATUS.pending
+    ) {
       registerBtn.textContent = "Invitation pending";
       registerBtn.disabled = true;
-    } else if (currentPlayer && currentInviteStatus === INVITE_STATUS.denied) {
+    } else if (
+      currentPlayer &&
+      !isTeamMode &&
+      currentInviteStatus === INVITE_STATUS.denied
+    ) {
       registerBtn.textContent = "Invite declined";
       registerBtn.disabled = true;
     } else if (currentPlayer) {
-      registerBtn.textContent = "Unregister";
+      registerBtn.textContent = isTeamMode ? "Unregister team" : "Unregister";
       registerBtn.disabled = false;
     } else if (isInviteOnly && !isAdmin) {
       const hasToken =
@@ -373,11 +561,13 @@ export function renderTournamentMetaSection({
         registerBtn.textContent = "Invite link invalid";
         registerBtn.disabled = true;
       } else {
-        registerBtn.textContent = "Register";
+        registerBtn.textContent = isTeamMode
+          ? "Send invites & register"
+          : "Register";
         registerBtn.disabled = Boolean(isRegisterLoading);
       }
     } else {
-      registerBtn.textContent = "Register";
+      registerBtn.textContent = isTeamMode ? "Send invites & register" : "Register";
       registerBtn.disabled = Boolean(isRegisterLoading);
     }
   }
@@ -491,7 +681,16 @@ export function renderTournamentMetaSection({
           eligiblePlayers.map((p) => ({
             id: p.id || "",
             name: p.name || "",
+            teamName: p?.team?.teamName || "",
             race: p.race || "",
+            teamMembers: Array.isArray(p?.team?.members)
+              ? p.team.members.map((member) => ({
+                  uid: member?.uid || "",
+                  name: member?.name || "",
+                  race: member?.race || "",
+                  role: member?.role || "",
+                }))
+              : [],
             mmr: Number.isFinite(p.mmr) ? Math.round(p.mmr) : "",
             clan: p.clan || "",
             clanLogoUrl: p.clanLogoUrl || "",
@@ -500,26 +699,43 @@ export function renderTournamentMetaSection({
         if (registeredPlayersList.dataset.listKey !== listKey) {
           registeredPlayersList.dataset.listKey = listKey;
           const items = eligiblePlayers.map((p) => {
-            const name = escapeHtml(p.name || "Unknown");
-            const race = (p.race || "").trim();
-            const raceClass = raceClassName(race);
-            const raceLabel = race ? escapeHtml(race) : "Race TBD";
+            const displayName = isTeamMode
+              ? String(p?.team?.teamName || "").trim() || p.name || "Unknown"
+              : p.name || "Unknown";
+            const name = escapeHtml(displayName);
+            const teamTooltip = escapeHtml(
+              getTeamMemberTooltipForList(p, currentTournamentMeta),
+            );
+            const raceLabel = escapeHtml(
+              getParticipantRaceLabelForList(p, currentTournamentMeta),
+            );
             const mmr = Number.isFinite(p.mmr)
               ? `${Math.round(p.mmr)} MMR`
               : "MMR TBD";
-            const clanLogo = p?.clanLogoUrl ? sanitizeUrl(p.clanLogoUrl) : "";
-            const clanName = (p?.clan || "").trim();
-            const clanImg = clanLogo
-              ? `<img class="registered-clan-logo" src="${escapeHtml(
-                  clanLogo,
-                )}" alt="Clan logo" ${
-                  clanName ? `data-tooltip="${escapeHtml(clanName)}"` : ""
-                } />`
-              : `<img class="registered-clan-logo is-placeholder" src="img/clan/logo-18px.webp" alt="No clan logo" />`;
+            const clanImg = isTeamMode
+              ? ""
+              : (() => {
+                  const clanLogo = p?.clanLogoUrl ? sanitizeUrl(p.clanLogoUrl) : "";
+                  const clanName = (p?.clan || "").trim();
+                  return clanLogo
+                    ? `<img class="registered-clan-logo" src="${escapeHtml(
+                        clanLogo,
+                      )}" alt="Clan logo" ${
+                        clanName ? `data-tooltip="${escapeHtml(clanName)}"` : ""
+                      } />`
+                    : `<img class="registered-clan-logo is-placeholder" src="img/clan/logo-18px.webp" alt="No clan logo" />`;
+                })();
             return `<li data-player-id="${escapeHtml(p.id || "")}">
-                <span class="race-strip ${raceClass}"></span>
+                ${renderParticipantRaceStripMarkupForList(
+                  p,
+                  currentTournamentMeta,
+                  raceClassName,
+                  escapeHtml,
+                )}
                 ${clanImg}
-                <span class="name-text" translate="no">${name}</span>
+                <span class="name-text" translate="no" ${
+                  teamTooltip ? `data-tooltip="${teamTooltip}"` : ""
+                }>${name}</span>
                 <span class="registered-meta">${raceLabel} - ${mmr}</span>
               </li>`;
           });

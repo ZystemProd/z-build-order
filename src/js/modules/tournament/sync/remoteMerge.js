@@ -125,6 +125,53 @@ export function syncFromRemoteCore({
     incoming.matchVetoes || {},
     state.matchVetoes || {},
   );
+  const playersChangedEarly = !safeJsonEqual(
+    incomingPlayersArr,
+    localPlayersArr,
+  );
+  const activityChangedEarly = !safeJsonEqual(
+    incoming.activity || [],
+    state.activity || [],
+  );
+  const pointsLedgerChangedEarly = !safeJsonEqual(
+    incoming.pointsLedger || {},
+    state.pointsLedger || {},
+  );
+  const scoreReportsChangedEarly = !safeJsonEqual(
+    incoming.scoreReports || {},
+    state.scoreReports || {},
+  );
+  const manualSeedingChangedEarly =
+    !safeJsonEqual(
+      incoming.manualSeedingEnabled,
+      state.manualSeedingEnabled,
+    ) ||
+    !safeJsonEqual(
+      incoming.manualSeedingOrder || [],
+      state.manualSeedingOrder || [],
+    );
+  const lifecycleChangedEarly =
+    !safeJsonEqual(incoming.isLive, state.isLive) ||
+    !safeJsonEqual(incoming.hasBeenLive, state.hasBeenLive) ||
+    !safeJsonEqual(incoming.disableFinalAutoAdd, state.disableFinalAutoAdd) ||
+    !safeJsonEqual(incoming.needsReseed, state.needsReseed) ||
+    !safeJsonEqual(
+      incoming.bracketLayoutVersion,
+      state.bracketLayoutVersion,
+    );
+  const bracketChangedEarly = !safeJsonEqual(
+    incoming.bracket || null,
+    state.bracket || null,
+  );
+  const staleHasMeaningfulChanges =
+    playersChangedEarly ||
+    activityChangedEarly ||
+    pointsLedgerChangedEarly ||
+    scoreReportsChangedEarly ||
+    manualSeedingChangedEarly ||
+    lifecycleChangedEarly ||
+    bracketChangedEarly ||
+    hasCasterDataChanged(incoming, state);
   const incomingLastUpdated = Number(incoming.lastUpdated) || 0;
   const localLastUpdated = Number(state.lastUpdated) || 0;
   const incomingIsStale =
@@ -132,7 +179,8 @@ export function syncFromRemoteCore({
 
   if (
     incomingIsStale &&
-    !matchVetoesChangedEarly
+    !matchVetoesChangedEarly &&
+    !staleHasMeaningfulChanges
   ) {
     if (presenceChanged) {
       setStateObj({ ...state, presence: { matchInfo: incomingPresence } });

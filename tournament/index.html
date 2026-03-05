@@ -875,6 +875,39 @@
                     <input id="pulseLinkDisplay" type="text" placeholder="Add your SC2Pulse link in Settings" />
                   </div>
                 </div>
+                <div class="team-mode-layout" id="teamModeLayout" style="display:none;">
+                  <div class="team-current-section" id="teamCurrentSection">
+                    <div class="section-title">Current team</div>
+                    <p class="helper" id="teamCurrentHelperText">
+                      This includes you and all teammates for this tournament.
+                    </p>
+                    <div class="team-current-list" id="teamCurrentList"></div>
+                    <p class="helper" id="teamCurrentStatus"></p>
+                    <div class="form-actions">
+                      <button type="button" class="cta ghost small" id="leaveTeamBtn" style="display:none;">
+                        Leave team
+                      </button>
+                    </div>
+                  </div>
+                  <div class="team-invite-section" id="teamInviteSection">
+                    <div class="section-title">Invite teammates</div>
+                    <label>Team name
+                      <input id="teamNameInput" class="settings-input" type="text"
+                        placeholder="Enter team name..." autocomplete="off" spellcheck="false" maxlength="40" />
+                    </label>
+                    <p class="helper" id="teamInviteHelperText">
+                      Teammates must accept their invitation in the Notification Center before your team is registered.
+                    </p>
+                    <p class="helper" id="teamInviteSlotsText"></p>
+                    <label>Find teammate by username
+                      <input id="teamInviteSearchInput" class="settings-input" type="text"
+                        placeholder="Search username..." autocomplete="off" spellcheck="false" />
+                    </label>
+                    <div class="admin-search-results" id="teamInviteSearchResults"></div>
+                    <div class="team-invite-list" id="teamInviteList"></div>
+                    <p class="helper" id="teamInviteStatus"></p>
+                  </div>
+                </div>
                 <div class="form-actions">
                   <button type="submit" class="cta primary" id="registerBtn">
                     Register
@@ -1677,6 +1710,14 @@
         </label>
         <label>Tournament name <span class="required">*</span>
           <input type="text" id="tournamentNameInput" placeholder="My Weekly Cup" required />
+        </label>
+        <label>Tournament mode
+          <select id="tournamentModeSelect">
+            <option value="1v1" selected>1v1</option>
+            <option value="2v2">2v2</option>
+            <option value="3v3">3v3</option>
+            <option value="4v4">4v4</option>
+          </select>
         </label>
         <label class="template-manager-hide">Custom URL slug
           <div class="inline-row">
@@ -3195,34 +3236,40 @@
           <div id="playerDetailPoints" class="helper"></div>
         </div>
       </div>
-      <div class="player-detail-grid">
-        <div class="player-detail-section">
-          <p class="eyebrow">SC2Pulse</p>
-          <div id="playerDetailPulseName" class="helper"></div>
-          <a id="playerDetailMainPulse" class="pill-link" target="_blank" rel="noopener">Not provided</a>
-          <div id="playerDetailSecondary" class="secondary-pulse-list"></div>
-        </div>
-        <div class="player-detail-section">
-          <p class="eyebrow">Twitch</p>
-          <a id="playerDetailTwitch" class="pill-link" target="_blank" rel="noopener">
-            <img src="img/SVG/glitch_flat_purple.svg" class="menu-icon" aria-hidden="true" />
-            Not provided
-          </a>
-        </div>
-        <div class="player-detail-section">
-          <p class="eyebrow">MMR by race</p>
-          <ul id="playerDetailMmrList" class="mmr-list"></ul>
-        </div>
-        <div class="player-detail-section">
-          <div class="player-detail-section-header">
-            <p class="eyebrow">Achievements</p>
-            <button id="playerDetailAchievementSort" class="pill achievement-sort-toggle" type="button"
-              data-sort="recent" aria-pressed="false">
-              Sort: Recent
-            </button>
+      <div class="player-detail-body">
+        <aside class="player-detail-team-panel" id="playerDetailTeamPanel" style="display:none;">
+          <p class="eyebrow">Team roster</p>
+          <ul id="playerDetailTeamList" class="player-detail-team-list"></ul>
+        </aside>
+        <div class="player-detail-grid">
+          <div class="player-detail-section">
+            <p class="eyebrow">SC2Pulse</p>
+            <div id="playerDetailPulseName" class="helper"></div>
+            <a id="playerDetailMainPulse" class="pill-link" target="_blank" rel="noopener">Not provided</a>
+            <div id="playerDetailSecondary" class="secondary-pulse-list"></div>
           </div>
-          <ul id="playerDetailAchievements" class="achievement-list custom-scroll"></ul>
-          <p id="playerDetailAchievementsEmpty" class="helper" style="display:none;"></p>
+          <div class="player-detail-section">
+            <p class="eyebrow">Twitch</p>
+            <a id="playerDetailTwitch" class="pill-link" target="_blank" rel="noopener">
+              <img src="img/SVG/glitch_flat_purple.svg" class="menu-icon" aria-hidden="true" />
+              Not provided
+            </a>
+          </div>
+          <div class="player-detail-section">
+            <p class="eyebrow">MMR by race</p>
+            <ul id="playerDetailMmrList" class="mmr-list"></ul>
+          </div>
+          <div class="player-detail-section">
+            <div class="player-detail-section-header">
+              <p class="eyebrow">Achievements</p>
+              <button id="playerDetailAchievementSort" class="pill achievement-sort-toggle" type="button"
+                data-sort="recent" aria-pressed="false">
+                Sort: Recent
+              </button>
+            </div>
+            <ul id="playerDetailAchievements" class="achievement-list custom-scroll"></ul>
+            <p id="playerDetailAchievementsEmpty" class="helper" style="display:none;"></p>
+          </div>
         </div>
       </div>
     </div>

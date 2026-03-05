@@ -79,6 +79,7 @@ function getRowRefs(row) {
   if (cached) return cached;
   const refs = {
     seedChip: row.querySelector(".seed-chip"),
+    raceStripGroup: row.querySelector(".race-strip-group"),
     raceStrip: row.querySelector(".race-strip"),
     clanImg: row.querySelector("img.clan-logo-inline"),
     nameText: row.querySelector(".name-text"),
@@ -188,6 +189,128 @@ function isCurrentUserPlayer(player) {
   );
 }
 
+function getTournamentModeValue() {
+  return String(currentTournamentMeta?.mode || "1v1")
+    .trim()
+    .toLowerCase();
+}
+
+function isTeamTournamentMode() {
+  const mode = getTournamentModeValue();
+  return mode === "2v2" || mode === "3v3" || mode === "4v4";
+}
+
+function getParticipantDisplayName(player) {
+  if (!player) return "Unknown";
+  if (isTeamTournamentMode()) {
+    const teamName = String(player?.team?.teamName || "").trim();
+    if (teamName) return teamName;
+  }
+  return player?.name || "Unknown";
+}
+
+function getTeamMemberTooltip(player) {
+  if (!isTeamTournamentMode() || !player || typeof player !== "object") return "";
+  const rawMembers = Array.isArray(player?.team?.members) ? player.team.members : [];
+  const seen = new Set();
+  const members = [];
+  rawMembers.forEach((member) => {
+    if (!member || typeof member !== "object") return;
+    const uid = String(member.uid || "").trim();
+    if (!uid || seen.has(uid)) return;
+    seen.add(uid);
+    members.push({
+      uid,
+      role: member.role === "leader" ? "leader" : "member",
+      name: String(member.name || "").trim(),
+    });
+  });
+  const leaderUid = String(player?.uid || "").trim();
+  members.sort((a, b) => {
+    const rankA = a.role === "leader" || (leaderUid && a.uid === leaderUid) ? 0 : 1;
+    const rankB = b.role === "leader" || (leaderUid && b.uid === leaderUid) ? 0 : 1;
+    if (rankA !== rankB) return rankA - rankB;
+    return a.name.localeCompare(b.name);
+  });
+  const names = members
+    .map((member) => member.name)
+    .filter(Boolean);
+  if (!names.length && player?.name) names.push(String(player.name).trim());
+  if (!names.length) return "";
+  return names.join("\n");
+}
+
+function parseTeamSizeFromMode(mode) {
+  const normalized = String(mode || "")
+    .trim()
+    .toLowerCase();
+  const parsed = Number(normalized.charAt(0));
+  return Number.isFinite(parsed) && parsed > 1 ? parsed : 1;
+}
+
+function getParticipantRaceClasses(player) {
+  if (!isTeamTournamentMode()) {
+    return [raceClassName(player?.race)];
+  }
+  if (!player || typeof player !== "object") {
+    return [raceClassName("")];
+  }
+  const fallbackLeaderRace = String(player?.race || "").trim();
+  const explicitTeamSize = Number(player?.team?.size);
+  const teamSize = Math.max(
+    2,
+    Number.isFinite(explicitTeamSize) && explicitTeamSize > 1
+      ? explicitTeamSize
+      : parseTeamSizeFromMode(player?.team?.mode || getTournamentModeValue()),
+  );
+  const rawMembers = Array.isArray(player?.team?.members) ? player.team.members : [];
+  const deduped = [];
+  const seen = new Set();
+  rawMembers.forEach((member) => {
+    if (!member || typeof member !== "object") return;
+    const uid = String(member.uid || "").trim();
+    if (!uid || seen.has(uid)) return;
+    seen.add(uid);
+    deduped.push({
+      uid,
+      role: member.role === "leader" ? "leader" : "member",
+      race: String(member.race || "").trim(),
+    });
+  });
+  const leaderUid = String(player?.uid || "").trim();
+  let leader =
+    deduped.find(
+      (entry) =>
+        entry.role === "leader" && (!leaderUid || entry.uid === leaderUid),
+    ) ||
+    deduped.find((entry) => leaderUid && entry.uid === leaderUid) ||
+    null;
+  if (!leader) {
+    leader = {
+      uid: leaderUid || "leader",
+      role: "leader",
+      race: fallbackLeaderRace,
+    };
+  } else if (!leader.race && fallbackLeaderRace && leaderUid && leader.uid === leaderUid) {
+    leader = { ...leader, race: fallbackLeaderRace };
+  }
+  const teammates = deduped.filter((entry) => entry.uid !== leader.uid);
+  const ordered = [leader, ...teammates].slice(0, Math.max(1, teamSize));
+  const classes = ordered.map((entry) => raceClassName(String(entry?.race || "").trim()));
+  return classes.length ? classes : [raceClassName(fallbackLeaderRace)];
+}
+
+function renderParticipantRaceStripMarkup(player) {
+  const raceClasses = getParticipantRaceClasses(player);
+  const signature = raceClasses.join("|");
+  const strips = raceClasses
+    .map((raceClass) => `<span class="race-strip ${raceClass}"></span>`)
+    .join("");
+  return `<span class="race-strip-group" data-race-signature="${escapeHtml(
+    signature,
+  )}" aria-hidden="true">${strips}</span>`;
+}
+
 function getWalkoverSide(match, participants) {
   if (match.walkover) return match.walkover;
   const [pA, pB] = participants || [];
@@ -228,12 +351,13 @@ function updateTreeMatchRow(
   if (!row) return;
   const isPlaceholder = !player;
   const name = player
-    ? player.name
+    ? getParticipantDisplayName(player)
     : displayPlaceholderForSource(match, participantIdx, lookup);
-  const raceClass = raceClassName(player?.race);
-  const clanLogo = player?.clanLogoUrl ? sanitizeUrl(player.clanLogoUrl) : "";
+  const showClanLogo = !isTeamTournamentMode();
+  const clanLogo =
+    showClanLogo && player?.clanLogoUrl ? sanitizeUrl(player.clanLogoUrl) : "";
   const clanName = (player?.clan || "").trim();
-  const { seedChip, raceStrip, clanImg, nameText, scoreEl } = getRowRefs(row);
+  const { seedChip, raceStripGroup, raceStrip, clanImg, nameText, scoreEl } = getRowRefs(row);
 
   row.dataset.playerId = player?.id || "";
   row.classList.toggle("winner", match.winnerId === player?.id);
@@ -243,40 +367,56 @@ function updateTreeMatchRow(
     seedChip.textContent = player ? `#${player.seed || "?"}` : "";
   }
 
-  if (raceStrip) {
-    raceStrip.className = `race-strip ${raceClass}`;
+  if (raceStripGroup) {
+    const raceClasses = getParticipantRaceClasses(player);
+    const signature = raceClasses.join("|");
+    if (raceStripGroup.dataset.raceSignature !== signature) {
+      raceStripGroup.dataset.raceSignature = signature;
+      raceStripGroup.innerHTML = raceClasses
+        .map((raceClass) => `<span class="race-strip ${raceClass}"></span>`)
+        .join("");
+    }
+  } else if (raceStrip) {
+    raceStrip.className = `race-strip ${raceClassName(player?.race)}`;
   }
 
   if (clanImg) {
-    const nextSrc = clanLogo || "img/clan/logo-18px.webp";
-    const nextAlt = clanLogo ? "Clan logo" : "No clan logo";
-    if (clanLogo) {
-      clanImg.classList.toggle("is-placeholder", false);
-      if (normalizeImageSrc(clanImg.src) !== normalizeImageSrc(nextSrc)) {
-        clanImg.src = nextSrc;
+    clanImg.style.display = showClanLogo ? "" : "none";
+    if (!showClanLogo) {
+      if (clanImg.hasAttribute("data-tooltip")) {
+        clanImg.removeAttribute("data-tooltip");
       }
-      if (clanImg.alt !== nextAlt) {
-        clanImg.alt = nextAlt;
-      }
-      if (clanName) {
-        if (clanImg.dataset.tooltip !== clanName) {
-          clanImg.dataset.tooltip = clanName;
+    } else {
+      const nextSrc = clanLogo || "img/clan/logo-18px.webp";
+      const nextAlt = clanLogo ? "Clan logo" : "No clan logo";
+      if (clanLogo) {
+        clanImg.classList.toggle("is-placeholder", false);
+        if (normalizeImageSrc(clanImg.src) !== normalizeImageSrc(nextSrc)) {
+          clanImg.src = nextSrc;
+        }
+        if (clanImg.alt !== nextAlt) {
+          clanImg.alt = nextAlt;
+        }
+        if (clanName) {
+          if (clanImg.dataset.tooltip !== clanName) {
+            clanImg.dataset.tooltip = clanName;
+          }
+        } else {
+          if (clanImg.hasAttribute("data-tooltip")) {
+            clanImg.removeAttribute("data-tooltip");
+          }
         }
       } else {
+        clanImg.classList.toggle("is-placeholder", true);
+        if (normalizeImageSrc(clanImg.src) !== normalizeImageSrc(nextSrc)) {
+          clanImg.src = nextSrc;
+        }
+        if (clanImg.alt !== nextAlt) {
+          clanImg.alt = nextAlt;
+        }
         if (clanImg.hasAttribute("data-tooltip")) {
           clanImg.removeAttribute("data-tooltip");
         }
-      }
-    } else {
-      clanImg.classList.toggle("is-placeholder", true);
-      if (normalizeImageSrc(clanImg.src) !== normalizeImageSrc(nextSrc)) {
-        clanImg.src = nextSrc;
-      }
-      if (clanImg.alt !== nextAlt) {
-        clanImg.alt = nextAlt;
-      }
-      if (clanImg.hasAttribute("data-tooltip")) {
-        clanImg.removeAttribute("data-tooltip");
       }
     }
   }
@@ -302,6 +442,14 @@ function updateTreeMatchRow(
       nameText.dataset.sourceMatchId = sourceMatchId;
     } else if (nameText.dataset.sourceMatchId) {
       delete nameText.dataset.sourceMatchId;
+    }
+    const teamTooltip = !isPlaceholder ? getTeamMemberTooltip(player) : "";
+    if (teamTooltip) {
+      if (nameText.dataset.tooltip !== teamTooltip) {
+        nameText.dataset.tooltip = teamTooltip;
+      }
+    } else if (nameText.hasAttribute("data-tooltip")) {
+      nameText.removeAttribute("data-tooltip");
     }
     nameText.textContent = name;
   }
@@ -605,7 +753,7 @@ export function renderPlayerRow(
     <div class="${nameClass.join(" ")}" data-player-id="${player.id || ""}">
       <span class="seed-chip">#${player.seed || "?"}</span>
       <div>
-        <strong translate="no">${escapeHtml(player.name)}</strong>
+        <strong translate="no">${escapeHtml(getParticipantDisplayName(player))}</strong>
         <div class="helper">${player.points || 0} pts ${
           player.mmr || 0
         } MMR</div>
@@ -724,14 +872,21 @@ export function renderSimpleMatch(
   const autoRevealB = shouldRevealParticipant(match?.id, 1, pB?.id || null);
   const revealA = consumeNameReveal(match?.id, 0) || autoRevealA;
   const revealB = consumeNameReveal(match?.id, 1) || autoRevealB;
-  const aName = pA ? pA.name : displayPlaceholderForSource(match, 0, lookup);
-  const bName = pB ? pB.name : displayPlaceholderForSource(match, 1, lookup);
+  const aName = pA
+    ? getParticipantDisplayName(pA)
+    : displayPlaceholderForSource(match, 0, lookup);
+  const bName = pB
+    ? getParticipantDisplayName(pB)
+    : displayPlaceholderForSource(match, 1, lookup);
   const aSourceMatchId = aIsPlaceholder ? sourceMatchIdFor(match, 0) : "";
   const bSourceMatchId = bIsPlaceholder ? sourceMatchIdFor(match, 1) : "";
-  const raceClassA = raceClassName(pA?.race);
-  const raceClassB = raceClassName(pB?.race);
-  const clanLogoA = pA?.clanLogoUrl ? sanitizeUrl(pA.clanLogoUrl) : "";
-  const clanLogoB = pB?.clanLogoUrl ? sanitizeUrl(pB.clanLogoUrl) : "";
+  const teamTooltipA = !aIsPlaceholder ? getTeamMemberTooltip(pA) : "";
+  const teamTooltipB = !bIsPlaceholder ? getTeamMemberTooltip(pB) : "";
+  const showClanLogo = !isTeamTournamentMode();
+  const clanLogoA =
+    showClanLogo && pA?.clanLogoUrl ? sanitizeUrl(pA.clanLogoUrl) : "";
+  const clanLogoB =
+    showClanLogo && pB?.clanLogoUrl ? sanitizeUrl(pB.clanLogoUrl) : "";
   const clanNameA = (pA?.clan || "").trim();
   const clanNameB = (pB?.clan || "").trim();
   const bestOf = getBestOfForMatch(match);
@@ -766,14 +921,16 @@ export function renderSimpleMatch(
     }" data-player-id="${pA?.id || ""}">
       <span class="name"><span class="seed-chip ${
         pA ? "" : "is-placeholder"
-      }">${pA ? `#${pA.seed || "?"}` : ""}</span><span class="race-strip ${raceClassA}"></span>${
-        clanLogoA
-          ? `<img class="clan-logo-inline" src="${escapeHtml(
-              clanLogoA,
-            )}" alt="Clan logo" loading="eager" decoding="sync" ${
-              clanNameA ? `data-tooltip="${escapeHtml(clanNameA)}"` : ""
-            } />`
-          : `<img class="clan-logo-inline is-placeholder" src="img/clan/logo-18px.webp" alt="No clan logo" loading="eager" decoding="sync" />`
+      }">${pA ? `#${pA.seed || "?"}` : ""}</span>${renderParticipantRaceStripMarkup(pA)}${
+        showClanLogo
+          ? clanLogoA
+            ? `<img class="clan-logo-inline" src="${escapeHtml(
+                clanLogoA,
+              )}" alt="Clan logo" loading="eager" decoding="sync" ${
+                clanNameA ? `data-tooltip="${escapeHtml(clanNameA)}"` : ""
+              } />`
+            : `<img class="clan-logo-inline is-placeholder" src="img/clan/logo-18px.webp" alt="No clan logo" loading="eager" decoding="sync" />`
+          : ""
       }<span class="name-text ${[
         aIsPlaceholder ? "is-placeholder" : "",
         revealA && !aIsPlaceholder ? "name-reveal" : "",
@@ -781,6 +938,8 @@ export function renderSimpleMatch(
         .filter(Boolean)
         .join(" ")}" translate="no" ${
           aSourceMatchId ? `data-source-match-id="${aSourceMatchId}"` : ""
+        } ${
+          teamTooltipA ? `data-tooltip="${escapeHtml(teamTooltipA)}"` : ""
         }>${escapeHtml(aName)}</span></span>
       <div class="row-actions">
         <div class="score-select score-display ${
@@ -795,14 +954,16 @@ export function renderSimpleMatch(
     }" data-player-id="${pB?.id || ""}">
       <span class="name"><span class="seed-chip ${
         pB ? "" : "is-placeholder"
-      }">${pB ? `#${pB.seed || "?"}` : ""}</span><span class="race-strip ${raceClassB}"></span>${
-        clanLogoB
-          ? `<img class="clan-logo-inline" src="${escapeHtml(
-              clanLogoB,
-            )}" alt="Clan logo" loading="eager" decoding="sync" ${
-              clanNameB ? `data-tooltip="${escapeHtml(clanNameB)}"` : ""
-            } />`
-          : `<img class="clan-logo-inline is-placeholder" src="img/clan/logo-18px.webp" alt="No clan logo" loading="eager" decoding="sync" />`
+      }">${pB ? `#${pB.seed || "?"}` : ""}</span>${renderParticipantRaceStripMarkup(pB)}${
+        showClanLogo
+          ? clanLogoB
+            ? `<img class="clan-logo-inline" src="${escapeHtml(
+                clanLogoB,
+              )}" alt="Clan logo" loading="eager" decoding="sync" ${
+                clanNameB ? `data-tooltip="${escapeHtml(clanNameB)}"` : ""
+              } />`
+            : `<img class="clan-logo-inline is-placeholder" src="img/clan/logo-18px.webp" alt="No clan logo" loading="eager" decoding="sync" />`
+          : ""
       }<span class="name-text ${[
         bIsPlaceholder ? "is-placeholder" : "",
         revealB && !bIsPlaceholder ? "name-reveal" : "",
@@ -810,6 +971,8 @@ export function renderSimpleMatch(
         .filter(Boolean)
         .join(" ")}" translate="no" ${
           bSourceMatchId ? `data-source-match-id="${bSourceMatchId}"` : ""
+        } ${
+          teamTooltipB ? `data-tooltip="${escapeHtml(teamTooltipB)}"` : ""
         }>${escapeHtml(bName)}</span></span>
       <div class="row-actions">
         <div class="score-select score-display ${
@@ -1621,8 +1784,12 @@ export function renderGroupBlock(group, bracket, lookup, playersById) {
         const tied = !qualified && isTied(row.playerId);
         const rowClass = qualified ? "is-qualified" : tied ? "is-tied" : "";
         const nameCell = player
-          ? `<span class="player-detail-trigger name-text" data-player-id="${pid}" translate="no">${escapeHtml(
-              player.name,
+          ? `<span class="player-detail-trigger name-text" data-player-id="${pid}" translate="no" ${
+              getTeamMemberTooltip(player)
+                ? `data-tooltip="${escapeHtml(getTeamMemberTooltip(player))}"`
+                : ""
+            }>${escapeHtml(
+              getParticipantDisplayName(player),
             )}</span>`
           : "TBD";
         return `<tr class="${rowClass}">
