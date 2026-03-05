@@ -3939,6 +3939,7 @@ async function validateSlug() {
 }
 
 async function populateCreateForm() {
+  await loadMapCatalog();
   renderMapPoolPicker("mapPoolPicker", {
     mapPoolSelection,
     getAll1v1Maps,
@@ -4816,16 +4817,35 @@ function isInviteOnlyTournament(meta) {
   return access === "closed" || access === "invite-only" || access === "invite";
 }
 
-function getDefaultMapPoolNames() {
+function getCreateModalModeIfOpen() {
+  const modal = document.getElementById("createTournamentModal");
+  if (!modal) return null;
+  const isVisible =
+    typeof window !== "undefined" &&
+    window.getComputedStyle(modal).display !== "none";
+  if (!isVisible) return null;
+  const modeSelect = document.getElementById("tournamentModeSelect");
+  return normalizeTournamentMode(modeSelect?.value || "1v1");
+}
+
+function getActiveMapPoolMode() {
+  const createMode = getCreateModalModeIfOpen();
+  if (createMode) return createMode;
+  return normalizeTournamentMode(currentTournamentMeta?.mode || "1v1");
+}
+
+function getDefaultMapPoolNames(mode = null) {
+  const resolvedMode = normalizeTournamentMode(mode || getActiveMapPoolMode());
   const list = (mapCatalog || []).filter((m) => {
     const folder = (m.folder || "").toLowerCase();
     const isArchive = folder.includes("archive");
-    return m.mode === "1v1" && !isArchive;
+    return normalizeTournamentMode(m.mode || "1v1") === resolvedMode && !isArchive;
   });
   if (list.length) {
     return list.map((m) => m.name);
   }
-  // Fallback to bundled current ladder list
+  // Fallback exists only for 1v1 bundled ladder maps.
+  if (resolvedMode !== "1v1") return [];
   return FALLBACK_LADDER_MAPS.map((m) => m.name);
 }
 
@@ -6003,17 +6023,29 @@ async function handleCreateTournament(event) {
   }
 }
 
-function getAll1v1Maps() {
+function getAll1v1Maps(mode = null) {
+  const resolvedMode = normalizeTournamentMode(mode || getActiveMapPoolMode());
   const source =
     Array.isArray(mapCatalog) && mapCatalog.length
       ? mapCatalog
       : FALLBACK_LADDER_MAPS || [];
-  return source.filter((m) => (m.mode || "").toLowerCase() === "1v1");
+  const filtered = source.filter(
+    (m) => normalizeTournamentMode(m.mode || "1v1") === resolvedMode,
+  );
+  if (filtered.length) return filtered;
+  if (resolvedMode !== "1v1") return [];
+  return source.filter((m) => normalizeTournamentMode(m.mode || "1v1") === "1v1");
 }
 
-function getMapByName(name) {
+function getMapByName(name, mode = null) {
   if (!name) return null;
-  return getAll1v1Maps().find((m) => m.name === name) || null;
+  const scoped = getAll1v1Maps(mode).find((m) => m.name === name);
+  if (scoped) return scoped;
+  const source =
+    Array.isArray(mapCatalog) && mapCatalog.length
+      ? mapCatalog
+      : FALLBACK_LADDER_MAPS || [];
+  return source.find((m) => m.name === name) || null;
 }
 
 function toggleMapSelection(name) {

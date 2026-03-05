@@ -13,27 +13,32 @@ export function setMapPoolSelection(
     updateMapButtonsUI,
   }
 ) {
-  setMapPoolSelectionState(new Set((names || []).filter(Boolean)));
-  setCurrentMapPoolModeState(
-    isDefaultLadderSelection(mapPoolSelection, getDefaultMapPoolNames)
-      ? "ladder"
-      : "custom"
-  );
-  renderMapPoolPickerUI("mapPoolPicker", { mapPoolSelection, getAll1v1Maps });
-  renderMapPoolPickerUI("settingsMapPoolPicker", {
-    mapPoolSelection,
+  const nextSelection = new Set((names || []).filter(Boolean));
+  setMapPoolSelectionState(nextSelection);
+  const nextPoolMode = isDefaultLadderSelection(
+    nextSelection,
+    getDefaultMapPoolNames
+  )
+    ? "ladder"
+    : "custom";
+  setCurrentMapPoolModeState(nextPoolMode);
+  renderMapPoolPickerUI("mapPoolPicker", {
+    mapPoolSelection: nextSelection,
     getAll1v1Maps,
   });
-  renderChosenMapsUI("chosenMapList", { mapPoolSelection, getMapByName });
-  renderChosenMapsUI("settingsChosenMapList", {
-    mapPoolSelection,
+  renderMapPoolPickerUI("settingsMapPoolPicker", {
+    mapPoolSelection: nextSelection,
+    getAll1v1Maps,
+  });
+  renderChosenMapsUI("chosenMapList", {
+    mapPoolSelection: nextSelection,
     getMapByName,
   });
-  updateMapButtonsUI(
-    isDefaultLadderSelection(mapPoolSelection, getDefaultMapPoolNames)
-      ? "ladder"
-      : "custom"
-  );
+  renderChosenMapsUI("settingsChosenMapList", {
+    mapPoolSelection: nextSelection,
+    getMapByName,
+  });
+  updateMapButtonsUI(nextPoolMode);
 }
 
 export function toggleMapSelection(

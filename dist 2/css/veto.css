@@ -1,0 +1,1244 @@
+@font-face {
+  font-family: "MyCustomFont"; /* Use any name you want */
+  src: url("../fonts/EuroStyleNormal.woff2") format("woff2"); /* Adjust path based on your structure */
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --dark-blue: #0a0d23;
+  --darker-blue: #0a3b6c;
+  --vetoed-red: #8b0000;
+  --hover-blue: #00ffff;
+  --hover-red: #ff3333;
+  --settings-purple: #322f4f;
+}
+
+/* Apply the font to the map list */
+.map-list {
+  font-family: "MyCustomFont", sans-serif; /* Use your custom font and fall back to a default sans-serif font */
+  font-size: 19px;
+
+  max-height: 100px; /* Set a fixed height for the map list */
+  overflow: hidden; /* Prevent overflow */
+}
+
+body,
+html {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden; /* Prevent horizontal scrolling */
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  font-family: Arial, sans-serif;
+  background-color: black;
+  color: white;
+  min-height: 100vh;
+  margin: 0;
+}
+
+#backButton {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 40px;
+}
+
+.container {
+  display: flex;
+  justify-content: center; /* Center the container */
+  align-items: flex-start;
+  position: relative;
+  max-width: 1200px; /* or any value suitable for your design */
+  width: 100%;
+  gap: 10px; /* Add gap between map list and map preview */
+  margin: 0 auto; /* Center the container */
+}
+
+/* Sort controls column (fixed width to avoid layout shift) */
+.sort-controls {
+  flex: 0 0 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px; /* reserve some height even when content is small */
+}
+
+.sort-button {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 59, 108, 0.65); /* var(--darker-blue) tinted */
+  border: 1px solid rgba(0, 255, 255, 0.6); /* var(--hover-blue) */
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.25);
+  cursor: pointer;
+  opacity: 0; /* hidden by default */
+  pointer-events: none; /* no interaction when hidden */
+  transition: opacity 0.15s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sort-button .sort-icon {
+  width: 22px;
+  height: 22px;
+  display: block;
+  object-fit: contain;
+  filter: drop-shadow(0 0 2px rgba(0,0,0,0.6));
+}
+
+.sort-button:hover {
+  background: rgba(10, 59, 108, 0.9);
+  border-color: var(--hover-blue);
+  box-shadow: 0 0 14px rgba(0, 255, 255, 0.45);
+}
+
+.sort-button:hover .sort-icon { filter: drop-shadow(0 0 2px rgba(0,255,255,0.6)); }
+
+.sort-button:focus-visible {
+  outline: 2px solid var(--hover-blue);
+  outline-offset: 2px;
+}
+
+/* Show sort button only when container hovered AND order is complete */
+.container.has-complete-order:hover .sort-button {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.map-list {
+  display: initial;
+  width: 30%;
+  max-height: 100%;
+  overflow-y: auto;
+  position: relative; /* Required for positioning the order indicator */
+  padding: 20px;
+  vertical-align: middle;
+  letter-spacing: 0.1rem;
+}
+
+.map-preview {
+  width: 45%; /* Adjust the width to make the preview wider */
+  text-align: center;
+  height: 500px; /* Set a fixed height for the map preview container */
+  -webkit-user-select: none; /* Safari */
+  -ms-user-select: none; /* IE 10 and IE 11 */
+  user-select: none; /* Standard syntax */
+  position: relative; /* Needed for stat toggle overlay */
+}
+
+.map-list li:hover {
+  border-color: #fff;
+}
+
+#previewImage {
+  width: 100%;
+  max-width: 400px; /* Max width for preview image */
+  max-height: 500px; /* Max height for preview image */
+  object-fit: contain; /* Scale the image while maintaining aspect ratio */
+  border: 2px solid var(--darker-blue); /* White border for better visibility */
+  border-radius: 30px;
+  margin-top: 25px;
+  -webkit-user-select: none; /* Safari */
+  -ms-user-select: none; /* IE 10 and IE 11 */
+  user-select: none; /* Standard syntax */
+}
+
+/* Stat toggle overlay button */
+.stat-toggle-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 6px 10px;
+  font-size: 12px;
+  line-height: 1;
+  background: rgba(0, 0, 0, 0.6);
+  color: #eee;
+  border: 1px solid #444;
+  border-radius: 6px;
+  cursor: pointer;
+  z-index: 2;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.stat-toggle-btn:hover {
+  background: rgba(0, 0, 0, 0.75);
+}
+
+/* Show toggle on hover when available */
+.map-preview.has-stat:hover .stat-toggle-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* On touch devices show it when available */
+@media (hover: none) and (pointer: coarse) {
+  .map-preview.has-stat .stat-toggle-btn {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+/* Other styles remain unchanged */
+.map-list ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+.map-list li {
+  margin: 0;
+  padding: 10px;
+  padding-top: 12px;
+  background-color: var(--dark-blue); /* Very dark blue background */
+  max-height: 16px;
+  border: 2px solid var(--darker-blue); /* Dark blue border */
+  border-radius: 10px; /* Slightly rounded corners */
+  transition: all 0.3s ease;
+  display: flex; /* Use flexbox for layout */
+  justify-content: space-between; /* Space out the content */
+  align-items: center; /* Center vertically */
+  gap: 8px;
+  cursor: pointer; /* Change cursor to pointer for better UX */
+  -webkit-user-select: none; /* Safari */
+  -ms-user-select: none; /* IE 10 and IE 11 */
+  user-select: none; /* Standard syntax */
+}
+
+.map-list li span:not(.order-indicator) {
+  flex: 1;
+  display: block;
+  margin-right: 8px;
+  vertical-align: middle; /* Ensures alignment */
+  font-size: inherit; /* Maintain the font size */
+}
+
+/* Styling for the order indicator */
+.order-indicator {
+  font-family: Arial, Helvetica, sans-serif;
+  display: flex;
+  justify-content: center; /* Centers content horizontally */
+  align-items: center; /* Centers content vertically */
+  font-size: 16px; /* Adjust text size as needed */
+  height: 20px;
+  min-width: 32px;
+  margin-left: auto;
+  text-align: center; /* Center the text */
+  color: white; /* White text color */
+  border-radius: 5px; /* Slightly rounded corners */
+  padding: 4px 8px; /* Padding for the indicator */
+  transition: background 0.3s; /* Smooth background transition */
+  cursor: default;
+  visibility: visible; /* Ensure it's visible initially */
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+.order-indicator span {
+  background: #f50000; /* Darker background on hover */
+}
+
+.order-indicator--active {
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.order-indicator--active:hover {
+  background: #555; /* Darker background on hover */
+}
+/* Normal hover effect */
+
+/* Vetoed maps (checked maps) */
+.map-list li.vetoed-map {
+  border-color: var(--vetoed-red); /* Dark red border when vetoed */
+  background-color: #330000; /* Darker red background */
+}
+
+/* Hover effect for vetoed maps */
+.map-list li.vetoed-map:hover {
+  border-color: var(--hover-red); /* Neon red border on hover when vetoed */
+  background: #330000; /* background for vetoed maps */
+}
+
+/* Hide the indicator for vetoed maps */
+.map-list li.vetoed-map .order-indicator {
+  visibility: hidden; /* Hide indicator for vetoed maps */
+}
+
+label span {
+  color: white; /* Ensure labels and spans are white */
+}
+
+h2 {
+  color: white;
+}
+
+.control-area {
+  display: flex;
+  flex-direction: column;
+  gap: 10px; /* Add spacing between dropdowns */
+}
+
+select,
+input[type="text"],
+button {
+  margin: 10px;
+  padding: 5px;
+  font-size: 16px;
+}
+
+.footer {
+  position: fixed;
+  bottom: 0; /* Align to the bottom of the page */
+  left: 0;
+  width: 100%; /* Full width of the page */
+  height: 60px; /* Fixed height for the footer */
+  display: flex;
+  justify-content: center; /* Center the text horizontally */
+  align-items: center; /* Center the text vertically within the footer */
+  color: white;
+  font-family: Arial, sans-serif;
+  z-index: 1;
+}
+
+.footer-logo {
+  position: absolute; /* Position the logo independently */
+  right: 20px; /* Distance from the right edge */
+  bottom: 10px; /* Distance from the bottom edge */
+  max-width: 50px; /* Adjust the logo size */
+  height: auto;
+}
+
+.footer p {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* Container for control area */
+.control-container {
+  display: flex;
+  justify-content: center; /* Center the container */
+  align-items: flex-start;
+  max-width: 1200px; /* or any value suitable for your design */
+  width: 100%;
+  gap: 10px; /* Add gap between map list and map preview */
+  margin: 0 auto; /* Center the container */
+  min-height: 240px; /* Keep the control area from jumping */
+  transition: min-height 0.3s ease; /* Smooth size changes */
+}
+
+/* Left side of the control area */
+.control-left {
+  flex: 1; /* Take up remaining space */
+  display: flex;
+  flex-direction: column;
+  background-color: black;
+  border: 2px solid var(--settings-purple); /* purple border for better visibility */
+  border-radius: 10px;
+  gap: 5px; /* Add space between elements */
+  padding: 0 10px 0 10px;
+  z-index: 1;
+}
+
+/* Right side container for Best of Dropdown */
+.control-right {
+  flex: 1; /* Take up remaining space */
+  display: flex;
+  flex-direction: column;
+  background-color: black;
+  border: 2px solid var(--settings-purple); /* purple border for better visibility */
+  border-radius: 10px;
+  gap: 5px; /* Add space between elements */
+  padding: 0 10px 0 10px;
+  z-index: 1;
+}
+
+.control-right button,
+.control-right select,
+.control-right input {
+  margin: 5px 0;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.mobile-action-buttons {
+  display: none;
+  gap: 10px;
+  margin-top: 10px;
+  justify-content: space-between;
+}
+
+.mobile-action-buttons button {
+  flex: 1;
+}
+.option-display {
+  margin: 0 15px; /* Add horizontal space around the selected map text */
+  color: #eee; /* Match text color */
+  font-size: 16px; /* Font size for the selected map text */
+}
+
+.button-container {
+  display: flex;
+  align-items: center; /* Center the text vertically with buttons */
+  justify-content: space-between; /* Space between buttons and text */
+}
+
+button {
+  padding: 10px 20px; /* Padding for buttons */
+  background-color: #444; /* Dark background for buttons */
+  color: #eee; /* Light text color */
+  border: none; /* No border */
+  border-radius: 5px; /* Rounded corners */
+  cursor: pointer; /* Pointer cursor */
+  transition: background 0.3s; /* Smooth background transition */
+}
+
+button:hover {
+  background-color: #555; /* Change background on hover */
+}
+
+/* Panel stat toggle disabled state */
+.stat-toggle-panel-btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toggle-content {
+  transition: max-height 0.5s ease, opacity 0.5s ease; /* Transition for max-height and opacity */
+  max-height: 500px; /* Adjust as needed */
+  opacity: 1; /* Initially visible */
+  overflow: hidden; /* Hide overflow */
+}
+
+.toggle-content.hidden {
+  max-height: 0; /* Set to 0 when hidden */
+  opacity: 0; /* Make it invisible */
+  pointer-events: none; /* Disable pointer events */
+}
+
+.control-left h5 {
+  margin-bottom: 0px; /* Space between the heading and controls */
+  color: #eee; /* Text color to match the design */
+  font-size: 18px; /* Font size for the headings */
+  text-align: center;
+  margin-top: 10px;
+}
+
+.control-right h5 {
+  padding-top: 10px;
+  padding-bottom: 5px;
+  margin: 0 0 8px;
+  color: #eee; /* Text color to match the design */
+  font-size: 18px; /* Font size for the headings */
+  text-align: center;
+}
+button {
+  margin-top: 10px;
+  background-color: var(--settings-purple);
+  color: white;
+}
+
+/* Dropdown Container */
+.custom-dropdown {
+  position: relative;
+  display: inline-block;
+  width: 300px;
+}
+
+.dropdown-btn {
+  width: 100%;
+  padding: 10px;
+  background-color: #333;
+  color: #eee;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  text-align: left;
+  position: relative;
+}
+
+/* The dropdown arrow */
+.dropdown-btn::after {
+  content: "▼";
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: #eee;
+}
+
+/* The dropdown list, hidden by default */
+.dropdown-list {
+  display: none;
+  position: absolute;
+  background-color: #333;
+  color: #eee;
+  border: 1px solid #444;
+  border-radius: 5px;
+  margin-top: 5px;
+  width: 100%;
+  z-index: 1;
+}
+
+/* List items */
+.dropdown-list li {
+  padding: 10px;
+  cursor: pointer;
+}
+
+.dropdown-list li:hover {
+  background-color: #555;
+}
+
+/* Show the dropdown list when active */
+.custom-dropdown.active .dropdown-list {
+  display: block;
+}
+
+select {
+  appearance: none; /* Removes default arrow */
+  width: 100%;
+  padding: 10px 40px 10px 15px; /* Space for text and arrow: left, right, and top */
+  font-size: 16px;
+  border: 2px solid #444;
+  border-radius: 8px;
+  background-color: #333;
+  color: #eee;
+  cursor: pointer;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2); /* Soft shadow */
+  position: relative; /* Ensure the custom arrow appears within the select */
+}
+
+select:hover {
+  border-color: #555;
+}
+
+select:focus {
+  border-color: #00ffff;
+  outline: none;
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.5); /* Glowing effect */
+}
+
+/* Custom Arrow */
+.custom-dropdown::after {
+  content: "▼"; /* Custom down arrow */
+  font-size: 14px;
+  position: absolute;
+  right: 15px; /* Aligns the arrow to the right within the select */
+  top: 50%;
+  transform: translateY(-50%); /* Center the arrow vertically */
+  pointer-events: none; /* Prevent the arrow from blocking clicks */
+  color: #eee; /* Same color as the text */
+}
+
+/* Label Styling */
+label {
+  font-size: 14px;
+  color: #eee; /* Match the dropdown text color */
+  margin-bottom: 5px;
+  display: block;
+  font-weight: bold;
+}
+
+/* Pulsing border animation */
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 14px 2px rgba(0, 255, 255, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 14px 4px rgba(0, 255, 255, 0.99);
+  }
+  100% {
+    box-shadow: 0 0 14px 2px rgba(0, 255, 255, 0.2);
+  }
+}
+
+/* Class to apply the pulsing border */
+.pulsing-border {
+  animation: pulse 3s infinite ease-in-out;
+}
+
+/* Red pulsing animation for active player names */
+@keyframes pulse-red {
+  0% {
+    box-shadow: 0 0 10px 2px rgba(255, 0, 0, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 10px 4px rgba(255, 0, 0, 0.9);
+  }
+  100% {
+    box-shadow: 0 0 10px 2px rgba(255, 0, 0, 0.3);
+  }
+}
+
+.active-player-name {
+  display: inline-block;
+  width: fit-content;
+  box-shadow: 0 0 0 2px red;
+  border-radius: 6px;
+  padding: 2px 6px; /* matches default spacing */
+  animation: pulse-red 1.5s infinite ease-in-out;
+  margin: 1em auto; /* keep space consistent */
+}
+
+/* Toggle checkbox component */
+.checkbox-wrapper-59 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px;
+}
+
+.checkbox-wrapper-59 input[type="checkbox"] {
+  visibility: hidden;
+  display: none;
+}
+
+.checkbox-wrapper-59 *,
+.checkbox-wrapper-59 ::after,
+.checkbox-wrapper-59 ::before {
+  box-sizing: border-box;
+}
+
+.checkbox-wrapper-59 .switch {
+  width: 45px;
+  height: 20px;
+  position: relative;
+  display: inline-block;
+}
+
+.checkbox-wrapper-59 .slider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  border-radius: 30px;
+  box-shadow: 0 0 0 2px #777, 0 0 4px #777;
+  cursor: pointer;
+  border: 4px solid transparent;
+  overflow: hidden;
+  transition: 0.2s;
+}
+
+.checkbox-wrapper-59 .slider:before {
+  position: absolute;
+  content: "";
+  width: 12px;
+  height: 12px;
+  left: 0px;
+  bottom: 0px;
+  background-color: #777;
+  border-radius: 50%;
+  transition: 0.2s;
+}
+
+.checkbox-wrapper-59 input:checked + .slider:before {
+  transform: translateX(24px);
+  background-color: limeGreen;
+}
+
+.checkbox-wrapper-59 input:checked + .slider {
+  box-shadow: 0 0 0 2px limeGreen, 0 0 8px limeGreen;
+}
+
+.hidden {
+  display: none; /* Hides the element */
+}
+
+#mapFileInput {
+  display: block;
+}
+
+.map-preview.hidden {
+  display: none;
+}
+
+.advanced-view.hidden {
+  display: none;
+}
+
+/* ---------- Advanced View Styles ---------- */
+.advanced-view {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.player-column,
+.center-column {
+  flex: 1;
+  text-align: center;
+}
+
+/* Keep player name headings from shifting when active */
+.player-column h3 {
+  padding: 2px 6px;
+}
+
+.advanced-map-list,
+.player-list {
+  list-style: none;
+  padding: 0;
+  min-height: 320px; /* Keep player columns from jumping */
+  overflow-y: auto; /* Scroll when overflowing */
+}
+
+.advanced-map-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+
+  min-width: 320px;
+  min-height: 320px; /* ✅ Prevents shrinking vertically */
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+.advanced-map-list li,
+.player-list li {
+  position: relative;
+  margin: 5px auto;
+  max-width: 150px;
+  border: 2px solid var(--darker-blue);
+  border-radius: 8px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.05);
+  transition: transform 0.3s ease;
+}
+
+.advanced-map-list li {
+  flex: 0 0 auto;
+  width: 140px;
+  height: 105px; /* Enforce 4:3 ratio (140 * 0.75 = 105) */
+  max-width: 140px;
+  border: 2px solid var(--darker-blue);
+  border-radius: 8px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.05);
+  transition: transform 0.3s ease;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  position: relative;
+}
+
+.player-list li {
+  width: 100%;
+}
+
+.advanced-map-list li:hover {
+  border-color: #fff;
+}
+
+.advanced-map-list img,
+.player-list img {
+  width: 100%;
+  display: block;
+  border-radius: 8px;
+}
+
+.advanced-map-list img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+  display: block;
+}
+
+.adv-map-label {
+  position: absolute;
+  bottom: 4px;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 4px 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.player-list li.vetoed-map,
+.advanced-map-list li.vetoed-map {
+  border-color: var(--vetoed-red);
+  position: relative;
+}
+
+.player-list li.vetoed-map::after,
+.advanced-map-list li.vetoed-map::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 0, 0, 0.25);
+  border-radius: 8px;
+  z-index: 1;
+}
+
+.picked-maps {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin-top: 40px;
+  margin-bottom: 40px;
+  flex-wrap: wrap;
+  min-height: 150px; /* Reserve space even when empty */
+}
+
+.pick-item {
+  position: relative;
+  border: 2px solid var(--darker-blue);
+  border-radius: 8px;
+  width: 220px;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.pick-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.pick-number {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.pick-label {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.pick-player-banner {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-size: 14px;
+  color: #fff;
+}
+
+@keyframes slideLeft {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-60px);
+  }
+}
+
+@keyframes slideRight {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(60px);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(20px);
+    opacity: 1;
+  }
+}
+
+.slide-left {
+  animation: slideLeft 0.3s ease-out;
+}
+
+.slide-right {
+  animation: slideRight 0.3s ease-out;
+}
+
+.slide-down {
+  animation: slideDown 0.3s ease-out;
+}
+
+.stage-indicator {
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.stage-text.veto {
+  color: red;
+}
+
+.stage-text.pick {
+  color: blue;
+}
+
+.stage-text.done {
+  color: green;
+}
+
+#startPlayerWrapper {
+  margin-top: 10px;
+}
+
+#startPlayerWrapper select {
+  margin-left: 5px;
+}
+
+.name-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.name-inputs.hidden {
+  display: none;
+}
+
+.name-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.name-field input {
+  padding: 2px 4px;
+}
+
+.map-card {
+  transition: transform 0.5s ease, opacity 0.5s ease;
+}
+
+.veto-left {
+  transform: translateX(-100px);
+  opacity: 0;
+}
+.veto-right {
+  transform: translateX(100px);
+  opacity: 0;
+}
+body,
+html {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding-bottom: 60px; /* ensures spacing above footer */
+}
+
+.advanced-view {
+  min-height: 420px; /* ensures stable vertical size */
+}
+
+.control-container {
+  margin-top: 40px;
+}
+
+.center-column {
+  min-width: 300px; /* 🚨 prevents shrinking */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.best-of-indicator {
+  margin: 4px 0 12px;
+  font-size: 18px;
+  color: #eee;
+}
+
+.bestof-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.bestof-content {
+  background: #222;
+  padding: 20px;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.mode-select {
+  margin: 10px 0;
+}
+
+.mode-select label {
+  margin-right: 8px;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.mode-select select {
+  padding: 5px 10px;
+  border: 2px solid #444;
+  border-radius: 6px;
+  background-color: #333;
+  color: #eee;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+/* Modal */
+.map-preview-modal {
+  display: none;
+  position: fixed;
+  z-index: 2000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.8);
+  justify-content: center;
+  align-items: center;
+}
+
+.map-preview-modal-content {
+  background: #222;
+  padding: 12px;
+  border-radius: 10px;
+  max-width: 90%;
+  max-height: 80%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.map-preview-modal-content img {
+  max-width: 100%;
+  max-height: 70vh;
+  border-radius: 10px;
+}
+
+.close-preview {
+  color: #fff;
+  font-size: 28px;
+  font-weight: bold;
+  cursor: pointer;
+  margin-bottom: 6px;
+}
+
+/* New wrapper for each map row */
+.map-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+  margin-bottom: 5px;
+}
+
+/* Keep map li same as before */
+.map-row li {
+  flex: 1;
+  margin: 0;
+}
+
+.map-row:last-child {
+  margin-bottom: 0;
+}
+
+.map-row.dragging {
+  opacity: 0.6;
+}
+
+/* Preview button styling */
+.preview-btn {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  margin: 0;
+  align-items: center;
+  justify-content: center;
+}
+
+.preview-btn svg {
+  width: 22px;
+  height: 22px;
+  fill: #eee;
+  transition: fill 0.2s;
+}
+
+.preview-btn:hover svg {
+  fill: var(--hover-blue);
+}
+
+/* Remove preview button if vetoed */
+.map-row li.vetoed-map + .preview-btn {
+  display: none;
+}
+
+/* Responsive Layout */
+@media (max-width: 768px) {
+  .container {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* Hide sort controls on mobile layout */
+  .sort-controls {
+    display: none;
+  }
+
+  .map-list,
+  .map-preview {
+    width: 70%;
+    max-width: 420px;
+  }
+
+  .map-list {
+    height: calc(100vh - 220px);
+    overflow-y: auto;
+    padding-bottom: 140px; /* ✅ adds breathing room so mobile-action-buttons don't overlap */
+  }
+
+  .map-preview {
+    display: none;
+    margin-top: 20px;
+    height: auto;
+  }
+
+  .control-container {
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .control-left,
+  .control-right {
+    width: 100%;
+  }
+  .mobile-action-buttons {
+    display: flex;
+    position: fixed;
+    bottom: 80px; /* ✅ slightly closer to footer */
+    width: 70%;
+    max-width: 420px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10; /* make sure it's above content */
+  }
+
+  .footer {
+    flex-direction: column;
+    height: auto;
+    padding: 10px 0;
+    z-index: -1;
+  }
+
+  .footer-logo {
+    position: static;
+    margin-top: 6px;
+    right: auto;
+    bottom: auto;
+  }
+
+  .map-row {
+    margin: 6px 0; /* still compact on mobile */
+  }
+
+  .map-row .preview-btn {
+    display: flex; /* show button */
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    margin-left: 6px; /* small gap, not big */
+    align-items: center;
+    justify-content: center;
+  }
+
+  .map-row .preview-btn svg {
+    width: 22px;
+    height: 22px;
+    fill: #eee;
+    transition: fill 0.2s;
+  }
+
+  .map-row .preview-btn:hover svg {
+    fill: var(--hover-blue);
+  }
+
+  /* Hide preview button when vetoed */
+  .map-row li.vetoed-map + .preview-btn {
+    display: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .advanced-view {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .player-column,
+  .center-column {
+    width: 100%;
+  }
+
+  .advanced-map-list li {
+    width: 48%;
+    max-width: none;
+  }
+}
+
+@media (min-width: 769px) {
+  .map-row .preview-btn {
+    display: none !important;
+  }
+}

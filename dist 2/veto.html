@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Title -->
+  <title>Map Veto Tool – Z-Build Order</title>
+
+  <!-- Primary SEO Meta Tags -->
+  <meta name="description"
+    content="Ban and pick StarCraft 2 maps easily with the Z-Build Order Map Veto Tool. Perfect for ladder preparation, tournaments, and team matches from 1v1 to 4v4.">
+  <meta name="keywords"
+    content="StarCraft 2, SC2, map veto, ladder maps, StarCraft 2 map picker, SC2 veto tool, tournament prep, Z-Build Order">
+  <meta name="robots" content="index, follow">
+  <meta name="author" content="Z-Build Order">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:title" content="Z-Build Order – Map Veto Tool for StarCraft 2">
+  <meta property="og:description"
+    content="Ban and pick StarCraft 2 maps quickly for your next tournament or ladder game. Supports 1v1 to 4v4 modes.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://zbuildorder.com/veto.html">
+  <meta property="og:image" content="https://zbuildorder.com/img/og-image.webp">
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Z-Build Order – SC2 Map Veto Tool">
+  <meta name="twitter:description"
+    content="Ban and pick maps with the Z-Build Order Map Veto Tool. Supports ladder and tournament modes.">
+  <meta name="twitter:image" content="https://zbuildorder.com/img/og-image.webp">
+
+  <!-- Canonical URL -->
+  <link rel="canonical" href="https://zbuildorder.com/veto.html">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/x-icon" href="/img/favicon.ico" />
+
+  <!-- Structured Data (Software Application Schema) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Z-Build Order – Map Veto Tool",
+    "operatingSystem": "All",
+    "applicationCategory": "Game, Utility",
+    "description": "Ban and pick StarCraft 2 maps easily with the Z-Build Order Map Veto Tool. Perfect for ladder preparation, tournaments, and team matches from 1v1 to 4v4.",
+    "url": "https://zbuildorder.com/veto.html",
+    "image": "https://zbuildorder.com/img/og-image.webp",
+    "author": {
+      "@type": "Organization",
+      "name": "Z-Build Order",
+      "url": "https://zbuildorder.com"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "Z-Build Order",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://zbuildorder.com/img/og-image.webp"
+      }
+    }
+  }
+  </script>
+
+  <!-- Styles -->
+  <script type="module" crossorigin src="/veto.js"></script>
+  <link rel="modulepreload" crossorigin href="/modulepreload-polyfill.js">
+  <link rel="stylesheet" crossorigin href="/veto.css">
+</head>
+
+
+
+<body>
+  <div id="bestOfModal" class="bestof-modal" style="display:none;">
+    <div class="bestof-content">
+      <label for="bestOfSelect">Best of (1-9):</label>
+      <select id="bestOfSelect">
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+        <option value="6">6</option>
+        <option value="7">7</option>
+        <option value="8">8</option>
+        <option value="9">9</option>
+      </select>
+      <button id="confirmBestOfButton">Confirm</button>
+
+      <!-- Mode dropdown moved here -->
+      <label for="modeDropdown">Mode:</label>
+      <select id="modeDropdown">
+        <option value="1v1" selected>1v1</option>
+        <option value="2v2">2v2</option>
+        <option value="3v3">3v3</option>
+        <option value="4v4">4v4</option>
+      </select>
+    </div>
+  </div>
+
+
+  <div class="main-wrapper">
+    <div class="container">
+      <a href="index.html" id="backButton" class="back-button">
+        <img src="./img/SVG/back.svg" alt="Back" />
+      </a>
+
+      <div class="map-list" id="map-list">
+        <ul class="map-list"></ul>
+        <!-- Empty list to be populated by JS -->
+      </div>
+      <!-- Sort control between list and preview -->
+      <div class="sort-controls">
+        <button id="sortButton" class="sort-button" type="button" aria-label="Sort maps by order" title="Sort by order">
+          <img class="sort-icon" src="./img/SVG/sort.svg" alt="Sort" />
+        </button>
+      </div>
+      <div class="mobile-action-buttons">
+        <button id="resetButtonMobile">Reset All</button>
+        <button id="undoButtonMobile">Undo</button>
+      </div>
+
+      <!-- Map Preview Modal -->
+      <div id="mapPreviewModal" class="map-preview-modal">
+        <div class="map-preview-modal-content">
+          <span id="closePreviewModal" class="close-preview">&times;</span>
+          <img id="modalPreviewImage" src="" alt="Map Preview" />
+        </div>
+      </div>
+
+
+      <div class="map-preview">
+        <img id="previewImage" src="img/maps/current/incorporeal.webp" alt="Map Preview" />
+        <button id="statToggleBtn" class="stat-toggle-btn" type="button" aria-pressed="false" title="Show Stat">Stat</button>
+      </div>
+    </div>
+
+    <div id="advanced-view" class="advanced-view hidden">
+      <div class="player-column" id="player1-column">
+        <h3>Player 1</h3>
+        <ul id="player1-list" class="player-list"></ul>
+      </div>
+      <div class="center-column">
+        <h2 id="stageIndicator" class="stage-indicator"></h2>
+        <p id="bestOfIndicator" class="best-of-indicator"></p>
+        <ul id="advanced-map-list" class="advanced-map-list"></ul>
+        <div class="invisible-placeholder" style="width: 300px; height: 300px; opacity: 0; pointer-events: none;"></div>
+      </div>
+      <div class="player-column" id="player2-column">
+        <h3>Player 2</h3>
+        <ul id="player2-list" class="player-list"></ul>
+      </div>
+    </div>
+    <div id="picked-maps" class="picked-maps"></div>
+
+    <!-- Control Area -->
+    <div class="control-container">
+      <div class="control-left">
+        <h5>
+          Map Settings
+          <button id="toggleVisibilityButton" class="toggle-button">
+            Show
+          </button>
+        </h5>
+
+        <!-- Heading for Map Settings -->
+        <div class="button-container">
+          <button id="prevMapButton">Previous</button>
+          <div class="option-display">
+            <p id="selectedMapText">Selected Map: <span class="selected-map-name" translate="no">Map 1</span></p>
+            <!-- Display the selected option -->
+          </div>
+          <button id="nextMapButton">Next</button>
+        </div>
+
+        <!-- Button for changing map name -->
+        <input type="file" id="mapFileInput" accept="image/*" style="display: none" />
+        <div id="ChangeMapPreview">
+          <button onclick="document.getElementById('mapFileInput').click()">
+            Change Map
+          </button>
+        </div>
+
+        <!-- Add the Hide Map Preview checkbox -->
+        <div id="custom-checkbox" class="checkbox-wrapper-59">
+          <label class="switch">
+            <input type="checkbox" id="hidePreviewCheckbox" />
+            <span class="slider"></span>
+          </label>
+          <label for="hidePreviewCheckbox">Hide Map Preview</label>
+        </div>
+
+        <!-- Stat toggle in panel -->
+        <div id="statTogglePanelWrapper">
+          <button id="statToggleBtnPanel" class="stat-toggle-panel-btn" type="button" aria-pressed="false" title="Show Stat">Stat</button>
+        </div>
+      </div>
+
+      <div class="control-right">
+        <h5>Game Settings</h5>
+
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+          <button id="resetButton">Reset All</button>
+          <button id="undoButton">Undo</button>
+        </div>
+
+        <div id="startPlayerWrapper" class="hidden"><label for="startingPlayerSelect">Start:</label> <select
+            id="startingPlayerSelect">
+            <option value="player1">Player 1</option>
+            <option value="player2">Player 2</option>
+          </select></div>
+
+        <div class="name-inputs hidden">
+          <div class="name-field">
+            <label for="player1NameInput">Player 1 Name:</label>
+            <input type="text" id="player1NameInput" placeholder="Player 1" />
+          </div>
+          <div class="name-field">
+            <label for="player2NameInput">Player 2 Name:</label>
+            <input type="text" id="player2NameInput" placeholder="Player 2" />
+          </div>
+        </div>
+
+        <button id="advancedToggle">Advanced Mode</button>
+      </div>
+    </div>
+
+
+
+  </div>
+  <!-- Footer Section -->
+  <div class="footer">
+
+    <p>Version 1.0.0</p>
+
+    <!-- Version number here -->
+  </div>
+
+</body>
+
+</html>

@@ -507,6 +507,34 @@ function findMatchingPlayerId(players, identity) {
   return "";
 }
 
+function findTeamPlacementPlayerId(players, identity) {
+  if (!Array.isArray(players)) return "";
+  const hasUid = Boolean(identity?.uid);
+  const hasKey = Boolean(identity?.key);
+  if (!hasUid && !hasKey) return "";
+  for (const entry of players) {
+    if (!entry || typeof entry !== "object" || !entry.id) continue;
+    const members = Array.isArray(entry?.team?.members) ? entry.team.members : [];
+    if (!members.length) continue;
+    const matchedMember = members.find((member) => {
+      if (!member || typeof member !== "object") return false;
+      const memberUid = String(member?.uid || "").trim();
+      if (hasUid && memberUid && memberUid === identity.uid) return true;
+      if (hasKey) {
+        const key = playerKey(member?.name || "", member?.sc2Link || "");
+        if (key && key === identity.key) return true;
+      }
+      return false;
+    });
+    if (!matchedMember) continue;
+    const role = String(matchedMember?.role || "").trim().toLowerCase();
+    if (role === "leader") return entry.id;
+    const status = normalizeTeamMemberStatus(matchedMember?.status);
+    if (status === "accepted") return entry.id;
+  }
+  return "";
+}
+
 function formatPlacementLabel(place) {
   const value = Number(place);
   if (!Number.isFinite(value) || value <= 0) return "TBD";
@@ -668,7 +696,9 @@ async function loadPlayerAchievements(player) {
         const snapshot = await loadTournamentStateRemote(slug);
         if (!snapshot) return null;
         const players = Array.isArray(snapshot.players) ? snapshot.players : [];
-        const playerId = findMatchingPlayerId(players, identity);
+        const playerId =
+          findMatchingPlayerId(players, identity) ||
+          findTeamPlacementPlayerId(players, identity);
         if (!playerId) return null;
         const bracket = normalizeBracketForPlacements(snapshot.bracket);
         const placements = computePlacementsForBracket(bracket, players.length || 0);
