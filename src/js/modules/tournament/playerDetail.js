@@ -529,7 +529,11 @@ function findTeamPlacementPlayerId(players, identity) {
     if (!matchedMember) continue;
     const role = String(matchedMember?.role || "").trim().toLowerCase();
     if (role === "leader") return entry.id;
-    const status = normalizeTeamMemberStatus(matchedMember?.status);
+    const rawStatus = String(matchedMember?.status || "")
+      .trim()
+      .toLowerCase();
+    if (!rawStatus) return entry.id; // legacy team-member entries may omit status
+    const status = normalizeTeamMemberStatus(rawStatus);
     if (status === "accepted") return entry.id;
   }
   return "";
@@ -696,14 +700,21 @@ async function loadPlayerAchievements(player) {
         const snapshot = await loadTournamentStateRemote(slug);
         if (!snapshot) return null;
         const players = Array.isArray(snapshot.players) ? snapshot.players : [];
-        const playerId =
-          findMatchingPlayerId(players, identity) ||
-          findTeamPlacementPlayerId(players, identity);
-        if (!playerId) return null;
         const bracket = normalizeBracketForPlacements(snapshot.bracket);
         const placements = computePlacementsForBracket(bracket, players.length || 0);
         if (!placements) return null;
-        const placement = placements.get(playerId);
+        const candidateIds = Array.from(
+          new Set([
+            findMatchingPlayerId(players, identity),
+            findTeamPlacementPlayerId(players, identity),
+          ].filter(Boolean)),
+        );
+        if (!candidateIds.length) return null;
+        const placement = candidateIds.reduce((found, candidateId) => {
+          if (Number.isFinite(found)) return found;
+          const next = placements.get(candidateId);
+          return Number.isFinite(next) ? next : null;
+        }, null);
         if (!Number.isFinite(placement)) return null;
         const rawStartTime = Number(meta?.startTime || snapshot?.lastUpdated || 0);
         const startTime =

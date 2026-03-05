@@ -3270,10 +3270,11 @@ function collectReadyMatchIdsForCurrentUser(snapshot) {
     const [pA, pB] = resolveParticipants(match, lookup, playersById);
     if (!pA || !pB) continue; // not ready yet
 
+    // Match-ready alerts should only target authenticated participants.
+    // Using UID-only checks avoids false positives from display-name matches.
     if (
-      isAdmin ||
-      isCurrentUserTournamentPlayer(pA) ||
-      isCurrentUserTournamentPlayer(pB)
+      isCurrentUserTournamentPlayerByUid(pA) ||
+      isCurrentUserTournamentPlayerByUid(pB)
     ) {
       out.add(match.id);
     }
@@ -3292,12 +3293,6 @@ function resolveOpponentInfoForMatch(snapshot, matchId) {
   );
   const [pA, pB] = resolveParticipants(match, lookup, playersById);
   if (!pA || !pB) return fallback;
-  if (isAdmin) {
-    return {
-      name: `${pA?.name || "TBD"} vs ${pB?.name || "TBD"}`,
-      avatarUrl: DEFAULT_PLAYER_AVATAR,
-    };
-  }
   const isA = isCurrentUserTournamentPlayerByUid(pA);
   const isB = isCurrentUserTournamentPlayerByUid(pB);
   let opponent = null;

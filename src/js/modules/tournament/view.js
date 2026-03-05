@@ -131,6 +131,33 @@ function getTeamMemberTooltipForList(player, currentTournamentMeta) {
   return names.join("\n");
 }
 
+function getTeamMemberNamesForPlacement(player) {
+  if (!player || typeof player !== "object") return [];
+  const members = Array.isArray(player?.team?.members) ? player.team.members : [];
+  const deduped = [];
+  const seen = new Set();
+  members.forEach((member) => {
+    const uid = String(member?.uid || "").trim();
+    const name = String(member?.name || "").trim();
+    const key = uid || name.toLowerCase();
+    if (!key || seen.has(key) || !name) return;
+    seen.add(key);
+    deduped.push({
+      uid,
+      name,
+      role: member?.role === "leader" ? "leader" : "member",
+    });
+  });
+  const leaderUid = String(player?.uid || "").trim();
+  deduped.sort((a, b) => {
+    const rankA = a.role === "leader" || (leaderUid && a.uid === leaderUid) ? 0 : 1;
+    const rankB = b.role === "leader" || (leaderUid && b.uid === leaderUid) ? 0 : 1;
+    if (rankA !== rankB) return rankA - rankB;
+    return a.name.localeCompare(b.name);
+  });
+  return deduped.map((entry) => entry.name).filter(Boolean);
+}
+
 export function updatePlacementsRowView({
   currentTournamentMeta,
   state,
@@ -169,7 +196,12 @@ export function updatePlacementsRowView({
     if (!player) return "—";
     if (isTeamMode) {
       const teamName = String(player?.team?.teamName || "").trim();
-      if (teamName) return teamName;
+      if (teamName) {
+        const memberNames = getTeamMemberNamesForPlacement(player);
+        return memberNames.length
+          ? `${teamName} - ${memberNames.join(", ")}`
+          : teamName;
+      }
     }
     return player?.name || "—";
   };
