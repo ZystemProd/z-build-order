@@ -49,6 +49,7 @@ export function initTournamentPage({
   normalizeRaceLabel,
   mmrForRace,
   updateMmrDisplay,
+  handleAddCustomMap,
   switchTab,
   populateCreateForm,
   populateCreateCircuitForm,
@@ -253,6 +254,26 @@ export function initTournamentPage({
   const mapPoolPicker = document.getElementById("mapPoolPicker");
   const useLadderMapsBtn = document.getElementById("useLadderMapsBtn");
   const clearMapPoolBtn = document.getElementById("clearMapPoolBtn");
+  const settingsAddCustomMapBtn = document.getElementById(
+    "settingsAddCustomMapBtn",
+  );
+  const settingsCustomMapNameInput = document.getElementById(
+    "settingsCustomMapNameInput",
+  );
+  const settingsCustomMapImageInput = document.getElementById(
+    "settingsCustomMapImageInput",
+  );
+  const settingsCustomMapStatus = document.getElementById(
+    "settingsCustomMapStatus",
+  );
+  const createAddCustomMapBtn = document.getElementById("createAddCustomMapBtn");
+  const createCustomMapNameInput = document.getElementById(
+    "createCustomMapNameInput",
+  );
+  const createCustomMapImageInput = document.getElementById(
+    "createCustomMapImageInput",
+  );
+  const createCustomMapStatus = document.getElementById("createCustomMapStatus");
   const finalMapPoolPicker = document.getElementById("finalMapPoolPicker");
   const finalUseLadderMapsBtn = document.getElementById(
     "finalUseLadderMapsBtn",
@@ -1369,6 +1390,59 @@ export function initTournamentPage({
     setMapPoolSelection,
     getDefaultMapPoolNames,
     toggleMapSelection,
+  });
+  const bindCustomMapUpload = ({
+    button,
+    nameInput,
+    fileInput,
+    statusEl,
+    source,
+  }) => {
+    if (!button || !nameInput || !fileInput || !handleAddCustomMap) return;
+    const setStatus = (message = "", isError = false) => {
+      if (!statusEl) return;
+      statusEl.textContent = message;
+      statusEl.style.color = isError ? "var(--danger)" : "";
+    };
+    const submit = async () => {
+      const name = String(nameInput.value || "").trim();
+      if (!name) {
+        setStatus("Enter a map name first.", true);
+        return;
+      }
+      const file = fileInput.files?.[0] || null;
+      button.disabled = true;
+      setStatus("Uploading...");
+      try {
+        const result = await handleAddCustomMap({ name, file, source });
+        if (result?.ok) {
+          setStatus(result.message || "Custom map added.");
+          nameInput.value = "";
+          fileInput.value = "";
+        } else {
+          setStatus(result?.message || "Could not add custom map.", true);
+        }
+      } catch (err) {
+        setStatus(err?.message || "Could not add custom map.", true);
+      } finally {
+        button.disabled = false;
+      }
+    };
+    button.addEventListener("click", submit);
+  };
+  bindCustomMapUpload({
+    button: settingsAddCustomMapBtn,
+    nameInput: settingsCustomMapNameInput,
+    fileInput: settingsCustomMapImageInput,
+    statusEl: settingsCustomMapStatus,
+    source: "settings",
+  });
+  bindCustomMapUpload({
+    button: createAddCustomMapBtn,
+    nameInput: createCustomMapNameInput,
+    fileInput: createCustomMapImageInput,
+    statusEl: createCustomMapStatus,
+    source: "create",
   });
   finalUseLadderMapsBtn?.addEventListener("click", () =>
     setFinalMapPoolSelection?.(getDefaultMapPoolNames()),

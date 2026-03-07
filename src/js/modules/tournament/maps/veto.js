@@ -734,8 +734,14 @@ export function openVetoModal(
       vetoed: savedVetoed,
       picks: savedPicks,
       updatedAt: savedUpdatedAt,
-      lowerName: saved.participants?.lower || lower?.name || "Lower seed",
-      higherName: saved.participants?.higher || higher?.name || "Higher seed",
+      lowerName:
+        saved.participants?.lower ||
+        getParticipantDisplayName(lower) ||
+        "Lower seed",
+      higherName:
+        saved.participants?.higher ||
+        getParticipantDisplayName(higher) ||
+        "Higher seed",
     });
   } else {
     setVetoStateState({
@@ -747,8 +753,8 @@ export function openVetoModal(
       vetoed: [],
       picks: [],
       updatedAt: 0,
-      lowerName: lower?.name || "Lower seed",
-      higherName: higher?.name || "Higher seed",
+      lowerName: getParticipantDisplayName(lower) || "Lower seed",
+      higherName: getParticipantDisplayName(higher) || "Higher seed",
     });
   }
   if (modal) {
@@ -756,8 +762,8 @@ export function openVetoModal(
   }
 
   if (label) {
-    const aName = pA?.name || "TBD";
-    const bName = pB?.name || "TBD";
+    const aName = getParticipantDisplayName(pA);
+    const bName = getParticipantDisplayName(pB);
     label.textContent = `Match ${matchId || ""} · ${aName} vs ${bName}`;
   }
   if (bestOfLabel) bestOfLabel.textContent = "";
@@ -1039,8 +1045,16 @@ export function openMatchInfoModal(
     leftVetoesEl,
     rightVetoesEl,
     vetoedMaps,
-    aName,
-    bName,
+    leftAliases: [
+      aName,
+      pA?.name,
+      pA?.team?.teamName,
+    ],
+    rightAliases: [
+      bName,
+      pB?.name,
+      pB?.team?.teamName,
+    ],
   });
   setPresenceContext({ matchId, leftPlayerId, rightPlayerId });
   if (leftPresenceEl) leftPresenceEl.style.display = showPresence ? "" : "none";
@@ -1583,19 +1597,23 @@ function renderMatchInfoVetoes({
   leftVetoesEl,
   rightVetoesEl,
   vetoedMaps,
-  aName,
-  bName,
+  leftAliases = [],
+  rightAliases = [],
 }) {
   if (leftVetoesEl) leftVetoesEl.innerHTML = "";
   if (rightVetoesEl) rightVetoesEl.innerHTML = "";
   if (!leftVetoesEl && !rightVetoesEl) return;
 
+  const normalize = (value) => String(value || "").trim().toLowerCase();
+  const leftAliasSet = new Set((leftAliases || []).map(normalize).filter(Boolean));
+  const rightAliasSet = new Set((rightAliases || []).map(normalize).filter(Boolean));
   const left = [];
   const right = [];
   for (const entry of vetoedMaps || []) {
-    const picker = entry?.picker || "";
-    if (picker === aName) left.push(entry);
-    else if (picker === bName) right.push(entry);
+    const picker = normalize(entry?.picker || "");
+    if (!picker) continue;
+    if (leftAliasSet.has(picker)) left.push(entry);
+    else if (rightAliasSet.has(picker)) right.push(entry);
   }
 
   if (leftVetoesEl) {
@@ -2782,7 +2800,9 @@ export function renderVetoPoolGrid(poolOverride = null) {
       const vetoIdx = vetoEntry
         ? (vetoState?.vetoed?.findIndex((m) => m.map === map.name) ?? -1)
         : -1;
-      const imgPath = map.folder ? `img/maps/${map.folder}/${map.file}` : "";
+      const imgPath =
+        map.imageUrl ||
+        (map.folder && map.file ? `/img/maps/${map.folder}/${map.file}` : "");
       const stateClass =
         pickedIdx !== -1 ? "selected" : vetoIdx !== -1 ? "vetoed" : "";
       const helper =
@@ -3114,8 +3134,10 @@ export function refreshVetoModalIfOpen() {
     vetoed: savedVetoed,
     picks: savedPicks,
     updatedAt: savedUpdatedAt,
-    lowerName: saved.participants?.lower || lower?.name || "Lower seed",
-    higherName: saved.participants?.higher || higher?.name || "Higher seed",
+    lowerName:
+      saved.participants?.lower || getParticipantDisplayName(lower) || "Lower seed",
+    higherName:
+      saved.participants?.higher || getParticipantDisplayName(higher) || "Higher seed",
   });
   modal.dataset.vetoUpdatedAt = String(savedUpdatedAt);
   modal.dataset.bestOf = String(savedBestOf);
