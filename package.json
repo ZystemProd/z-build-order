@@ -15,7 +15,9 @@
     "cleanup-covers": "cd functions && node scripts/cleanupTournamentCovers.js",
     "cleanup-covers:apply": "cd functions && node scripts/cleanupTournamentCovers.js --apply",
     "bracket-sim": "node scripts/bracket-sim.js",
-    "test:ui": "playwright test"
+    "test:ui": "playwright test",
+    "test:load": "node functions/scripts/tournamentLoadHarness.js",
+    "test:load:emulator": "firebase emulators:exec --only firestore \"node functions/scripts/tournamentLoadHarness.js --projectId demo-z-build-order $LOAD_ARGS\""
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",

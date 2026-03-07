@@ -1263,6 +1263,81 @@ function ensureMapCatalogLoadedForUi() {
     });
 }
 
+const TOURNAMENT_PERF_STORAGE_KEY = "zboTournamentPerf";
+const TOURNAMENT_PERF_MAX_EVENTS = 500;
+
+function isTournamentPerfEnabled() {
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem(TOURNAMENT_PERF_STORAGE_KEY) === "1";
+  } catch (_) {
+    return false;
+  }
+}
+
+function getTournamentPerfStore() {
+  if (!isTournamentPerfEnabled() || typeof window === "undefined") return null;
+  const existing = window.__zboTournamentPerf;
+  if (existing && typeof existing === "object") return existing;
+  const created = {
+    enabledAt: Date.now(),
+    events: [],
+  };
+  window.__zboTournamentPerf = created;
+  return created;
+}
+
+function beginTournamentPerfSpan(name, details = {}) {
+  const store = getTournamentPerfStore();
+  if (!store) return null;
+  const nowPerf =
+    typeof performance !== "undefined" && performance.now
+      ? performance.now()
+      : Date.now();
+  return {
+    store,
+    name,
+    details,
+    startedPerf: nowPerf,
+    startedAt: Date.now(),
+  };
+}
+
+function endTournamentPerfSpan(span, details = {}) {
+  if (!span?.store) return;
+  const nowPerf =
+    typeof performance !== "undefined" && performance.now
+      ? performance.now()
+      : Date.now();
+  const durationMs = Number((nowPerf - span.startedPerf).toFixed(2));
+  const nextEvent = {
+    name: span.name,
+    startedAt: span.startedAt,
+    endedAt: Date.now(),
+    durationMs,
+    ...span.details,
+    ...details,
+  };
+  const events = Array.isArray(span.store.events) ? span.store.events : [];
+  events.push(nextEvent);
+  if (events.length > TOURNAMENT_PERF_MAX_EVENTS) {
+    events.splice(0, events.length - TOURNAMENT_PERF_MAX_EVENTS);
+  }
+  span.store.events = events;
+}
+
+function estimateJsonSizeBytes(value) {
+  try {
+    const json = JSON.stringify(value);
+    if (typeof TextEncoder !== "undefined") {
+      return new TextEncoder().encode(json).length;
+    }
+    return json.length;
+  } catch (_) {
+    return null;
+  }
+}
+
 function safeJsonEqual(a, b) {
   if (a === b) return true;
   try {
@@ -1410,32 +1485,43 @@ function shouldUsePartialRender(prevState, nextState, format) {
 }
 
 function syncFromRemote(incoming) {
-  syncFromRemoteCore({
-    incoming,
-    getState: () => state,
-    setStateObj,
-    currentSlug,
-    safeJsonEqual,
-    refreshMatchInfoPresenceIfOpen,
-    applyRosterSeedingWithMode,
-    deserializeBracket,
-    currentVetoMatchId,
-    vetoState,
-    defaultState,
-    shouldUsePartialRender,
-    getFormat: () => currentTournamentMeta?.format,
-    getBracketMatchIdsForPartial,
-    getChangedMatchIdsFromMap,
-    maybeToastMyMatchReady,
-    refreshMatchInfoModalIfOpen,
-    refreshVetoModalIfOpen,
-    renderAll,
-    renderActivityList,
-    escapeHtml,
-    formatTime,
-    refreshPlayerDetailModalIfOpen,
-    getPlayersMap,
+  const span = beginTournamentPerfSpan("syncFromRemote", {
+    slug: currentSlug || "",
+    incomingBytes: estimateJsonSizeBytes(incoming),
   });
+  try {
+    syncFromRemoteCore({
+      incoming,
+      getState: () => state,
+      setStateObj,
+      currentSlug,
+      safeJsonEqual,
+      refreshMatchInfoPresenceIfOpen,
+      applyRosterSeedingWithMode,
+      deserializeBracket,
+      currentVetoMatchId,
+      vetoState,
+      defaultState,
+      shouldUsePartialRender,
+      getFormat: () => currentTournamentMeta?.format,
+      getBracketMatchIdsForPartial,
+      getChangedMatchIdsFromMap,
+      maybeToastMyMatchReady,
+      refreshMatchInfoModalIfOpen,
+      refreshVetoModalIfOpen,
+      renderAll,
+      renderActivityList,
+      escapeHtml,
+      formatTime,
+      refreshPlayerDetailModalIfOpen,
+      getPlayersMap,
+    });
+  } finally {
+    endTournamentPerfSpan(span, {
+      localPlayers: Array.isArray(state?.players) ? state.players.length : 0,
+      hasBracket: Boolean(state?.bracket),
+    });
+  }
 }
 
 function isCurrentUserTournamentPlayer(player) {
@@ -1940,190 +2026,210 @@ function updatePlacementsRow() {
 }
 
 function renderAll(matchIds = null) {
-  const bracketContainer = document.getElementById("bracketGrid");
-  const bracket = state.bracket;
-  const playersArr = state.players || [];
-  const format = currentTournamentMeta?.format || "Tournament";
-  if (
-    !state.isLive &&
-    state.needsReseed &&
-    !bracketHasRecordedResults(state.bracket)
-  ) {
-    rebuildBracket(true);
-    return;
-  }
-  syncMatchReadySince();
-  const shouldPartialUpdate =
-    Array.isArray(matchIds) &&
-    matchIds.length &&
-    bracketContainer &&
-    bracket &&
-    !isGroupStageFormat(format);
-
-  if (shouldPartialUpdate) {
-    const lookup = getMatchLookup(bracket);
-    const playersById = getPlayersMap();
-    const didPartialUpdate = updateTreeMatchCards(
-      matchIds,
-      lookup,
-      playersById,
-      {
-        currentUsername: getCurrentUsername?.() || "",
-        currentUid: auth.currentUser?.uid || "",
-      },
-    );
-    if (didPartialUpdate) {
-      annotateConnectorPlayers(lookup, playersById);
-      clampScoreSelectOptions();
-      updatePlacementsRow();
-      applyBracketReadOnlyState(!state.isLive && !isAdmin);
-      updateTooltips?.();
+  const span = beginTournamentPerfSpan("renderAll", {
+    slug: currentSlug || "",
+    requestedMatchIds: Array.isArray(matchIds) ? matchIds.length : 0,
+  });
+  let renderMode = "full";
+  try {
+    const bracketContainer = document.getElementById("bracketGrid");
+    const bracket = state.bracket;
+    const playersArr = state.players || [];
+    const format = currentTournamentMeta?.format || "Tournament";
+    if (
+      !state.isLive &&
+      state.needsReseed &&
+      !bracketHasRecordedResults(state.bracket)
+    ) {
+      renderMode = "rebuild";
+      rebuildBracket(true);
       return;
     }
-  }
-  // Update seeding table
-  const seedingSnapshot = getSeedingTablePlayers(state.players || [], state);
-  const forfeitUndoBlocked = getForfeitUndoBlockedIds();
-  const seededWithForfeitStatus = seedingSnapshot.map((player) => ({
-    ...player,
-    forfeitUndoBlocked: forfeitUndoBlocked.has(player.id),
-  }));
-  renderSeedingTable(seededWithForfeitStatus, {
-    isLive: state.isLive,
-    isAdmin,
-    manualSeeding: state.manualSeedingEnabled,
-  });
-  updateManualSeedingUi();
-  updateMmrSeedingUi();
-  updateBotManagerCount();
+    syncMatchReadySince();
+    const shouldPartialUpdate =
+      Array.isArray(matchIds) &&
+      matchIds.length &&
+      bracketContainer &&
+      bracket &&
+      !isGroupStageFormat(format);
 
-  renderTournamentMetaSection({
-    currentTournamentMeta,
-    state,
-    isAdmin,
-    currentSlug,
-    inviteLinkGate,
-    auth,
-    setTabAlertsBaseTitle,
-    sanitizeUrl,
-    renderMarkdown,
-    renderPrizeInfoMarkup,
-    isDualTournamentFormat,
-    getStartTimeMs,
-    getEligiblePlayers,
-    formatPrizePoolTotal,
-    isInviteOnlyTournament,
-    normalizeInviteStatus,
-    INVITE_STATUS,
-    updatePlacementsRow,
-    getCheckInWindowState,
-    bracketHasResults,
-    normalizeSc2PulseIdUrl,
-    updateCheckInUI,
-    renderCasterSection,
-    saveState,
-    renderAll,
-    hideMatchInfoModal,
-    escapeHtml,
-    raceClassName,
-    renderActivityList,
-    formatTime,
-    populateSettingsPanelUI,
-    setMapPoolSelection,
-    getDefaultMapPoolNames,
-    updateSettingsDescriptionPreview,
-    updateSettingsRulesPreview,
-    syncFormatFieldVisibility,
-    updatePrizeSplitWarning,
-    updateSettingsScoreLocks,
-    getPromoStripRenderKey,
-    promoStripRenderKey,
-    setPromoStripRenderKey: (next) => {
-      promoStripRenderKey = next;
-    },
-    refreshTournamentPromoStrip,
-    refreshTournamentPromoSettings,
-    renderCircuitPointsSettings,
-    hydrateCurrentUserClanLogo,
-    getTeamMembership: findTeamMembership,
-    getTournamentTeamSize,
-    normalizeTournamentMode,
-  });
-  renderTeamInviteSection();
+    if (shouldPartialUpdate) {
+      const lookup = getMatchLookup(bracket);
+      const playersById = getPlayersMap();
+      const didPartialUpdate = updateTreeMatchCards(
+        matchIds,
+        lookup,
+        playersById,
+        {
+          currentUsername: getCurrentUsername?.() || "",
+          currentUid: auth.currentUser?.uid || "",
+        },
+      );
+      if (didPartialUpdate) {
+        renderMode = "partial";
+        annotateConnectorPlayers(lookup, playersById);
+        clampScoreSelectOptions();
+        updatePlacementsRow();
+        applyBracketReadOnlyState(!state.isLive && !isAdmin);
+        updateTooltips?.();
+        return;
+      }
+    }
+    // Update seeding table
+    const seedingSnapshot = getSeedingTablePlayers(state.players || [], state);
+    const forfeitUndoBlocked = getForfeitUndoBlockedIds();
+    const seededWithForfeitStatus = seedingSnapshot.map((player) => ({
+      ...player,
+      forfeitUndoBlocked: forfeitUndoBlocked.has(player.id),
+    }));
+    renderSeedingTable(seededWithForfeitStatus, {
+      isLive: state.isLive,
+      isAdmin,
+      manualSeeding: state.manualSeedingEnabled,
+    });
+    updateManualSeedingUi();
+    updateMmrSeedingUi();
+    updateBotManagerCount();
 
-  // Render maps tab from current meta or default pool
-  renderMapsTabUI(currentTournamentMeta, {
-    mapPoolSelection,
-    getDefaultMapPoolNames,
-    getMapByName,
-  });
-
-  const layoutVersion = state.bracketLayoutVersion || 1;
-  const repairVersion = Number(state.bracketRepairVersion) || 0;
-  const hasScoreReports = Object.keys(state.scoreReports || {}).length > 0;
-  const canAutoRebuild =
-    !hasScoreReports && !bracketHasRecordedResults(bracket);
-  const canAutoRepair =
-    canAutoRebuild && repairVersion < CURRENT_BRACKET_LAYOUT_VERSION;
-  const needsLayoutUpgrade =
-    bracket && layoutVersion < CURRENT_BRACKET_LAYOUT_VERSION && canAutoRepair;
-  if (needsLayoutUpgrade) {
-    rebuildBracket(true, "Updated bracket layout");
-    return;
-  }
-  const needsBracketRepair = (() => {
-    if (!bracket || !playersArr.length) return false;
-    if (!canAutoRepair) return false;
-    if (isGroupStageFormat(format)) return false;
-    const { seededEligible } = seedEligiblePlayersWithMode(
-      state.players || [],
+    renderTournamentMetaSection({
+      currentTournamentMeta,
       state,
-    );
-    const expected = buildBracket(
-      seededEligible,
-      currentTournamentMeta || {},
-      isRoundRobinFormat,
-    );
-    const actualIds = getAllMatches(bracket)
-      .map((m) => m?.id)
-      .filter(Boolean);
-    const expectedIds = getAllMatches(expected)
-      .map((m) => m?.id)
-      .filter(Boolean);
-    if (actualIds.length !== expectedIds.length) return true;
-    const expectedSet = new Set(expectedIds);
-    return actualIds.some((id) => !expectedSet.has(id));
-  })();
-  if (needsBracketRepair) {
-    rebuildBracket(true, "Bracket repaired");
-    return;
+      isAdmin,
+      currentSlug,
+      inviteLinkGate,
+      auth,
+      setTabAlertsBaseTitle,
+      sanitizeUrl,
+      renderMarkdown,
+      renderPrizeInfoMarkup,
+      isDualTournamentFormat,
+      getStartTimeMs,
+      getEligiblePlayers,
+      formatPrizePoolTotal,
+      isInviteOnlyTournament,
+      normalizeInviteStatus,
+      INVITE_STATUS,
+      updatePlacementsRow,
+      getCheckInWindowState,
+      bracketHasResults,
+      normalizeSc2PulseIdUrl,
+      updateCheckInUI,
+      renderCasterSection,
+      saveState,
+      renderAll,
+      hideMatchInfoModal,
+      escapeHtml,
+      raceClassName,
+      renderActivityList,
+      formatTime,
+      populateSettingsPanelUI,
+      setMapPoolSelection,
+      getDefaultMapPoolNames,
+      updateSettingsDescriptionPreview,
+      updateSettingsRulesPreview,
+      syncFormatFieldVisibility,
+      updatePrizeSplitWarning,
+      updateSettingsScoreLocks,
+      getPromoStripRenderKey,
+      promoStripRenderKey,
+      setPromoStripRenderKey: (next) => {
+        promoStripRenderKey = next;
+      },
+      refreshTournamentPromoStrip,
+      refreshTournamentPromoSettings,
+      renderCircuitPointsSettings,
+      hydrateCurrentUserClanLogo,
+      getTeamMembership: findTeamMembership,
+      getTournamentTeamSize,
+      normalizeTournamentMode,
+    });
+    renderTeamInviteSection();
+
+    // Render maps tab from current meta or default pool
+    renderMapsTabUI(currentTournamentMeta, {
+      mapPoolSelection,
+      getDefaultMapPoolNames,
+      getMapByName,
+    });
+
+    const layoutVersion = state.bracketLayoutVersion || 1;
+    const repairVersion = Number(state.bracketRepairVersion) || 0;
+    const hasScoreReports = Object.keys(state.scoreReports || {}).length > 0;
+    const canAutoRebuild =
+      !hasScoreReports && !bracketHasRecordedResults(bracket);
+    const canAutoRepair =
+      canAutoRebuild && repairVersion < CURRENT_BRACKET_LAYOUT_VERSION;
+    const needsLayoutUpgrade =
+      bracket &&
+      layoutVersion < CURRENT_BRACKET_LAYOUT_VERSION &&
+      canAutoRepair;
+    if (needsLayoutUpgrade) {
+      renderMode = "rebuild";
+      rebuildBracket(true, "Updated bracket layout");
+      return;
+    }
+    const needsBracketRepair = (() => {
+      if (!bracket || !playersArr.length) return false;
+      if (!canAutoRepair) return false;
+      if (isGroupStageFormat(format)) return false;
+      const { seededEligible } = seedEligiblePlayersWithMode(
+        state.players || [],
+        state,
+      );
+      const expected = buildBracket(
+        seededEligible,
+        currentTournamentMeta || {},
+        isRoundRobinFormat,
+      );
+      const actualIds = getAllMatches(bracket)
+        .map((m) => m?.id)
+        .filter(Boolean);
+      const expectedIds = getAllMatches(expected)
+        .map((m) => m?.id)
+        .filter(Boolean);
+      if (actualIds.length !== expectedIds.length) return true;
+      const expectedSet = new Set(expectedIds);
+      return actualIds.some((id) => !expectedSet.has(id));
+    })();
+    if (needsBracketRepair) {
+      renderMode = "rebuild";
+      rebuildBracket(true, "Bracket repaired");
+      return;
+    }
+    renderBracketContent({
+      bracketContainer,
+      bracket,
+      playersArr,
+      format,
+      matchIds,
+      isGroupStageFormat,
+      getMatchLookup,
+      getPlayersMap,
+      updateTreeMatchCards,
+      getCurrentUsername,
+      auth,
+      annotateConnectorPlayers,
+      clampScoreSelectOptions,
+      ensureRoundRobinPlayoffs,
+      saveState,
+      renderRoundRobinView,
+      computeGroupStandings,
+      DOMPurify,
+      attachMatchActionHandlers,
+      renderBracketView,
+      attachMatchHoverHandlers,
+      enableDragScroll,
+    });
+    applyBracketReadOnlyState(!state.isLive && !isAdmin);
+    updateTooltips?.();
+  } finally {
+    endTournamentPerfSpan(span, {
+      mode: renderMode,
+      players: Array.isArray(state?.players) ? state.players.length : 0,
+      hasBracket: Boolean(state?.bracket),
+      isLive: Boolean(state?.isLive),
+    });
   }
-  renderBracketContent({
-    bracketContainer,
-    bracket,
-    playersArr,
-    format,
-    matchIds,
-    isGroupStageFormat,
-    getMatchLookup,
-    getPlayersMap,
-    updateTreeMatchCards,
-    getCurrentUsername,
-    auth,
-    annotateConnectorPlayers,
-    clampScoreSelectOptions,
-    ensureRoundRobinPlayoffs,
-    saveState,
-    renderRoundRobinView,
-    computeGroupStandings,
-    DOMPurify,
-    attachMatchActionHandlers,
-    renderBracketView,
-    attachMatchHoverHandlers,
-    enableDragScroll,
-  });
-  applyBracketReadOnlyState(!state.isLive && !isAdmin);
-  updateTooltips?.();
 }
 
 const matchReadyToastShown = new Set();
