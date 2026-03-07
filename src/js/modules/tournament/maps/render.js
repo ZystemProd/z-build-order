@@ -14,7 +14,9 @@ export function renderMapsTab(tournament, { mapPoolSelection, getDefaultMapPoolN
   }
   const cards = poolNames.map((name) => {
     const map = getMapByName(name);
-    const imgPath = map ? `img/maps/${map.folder}/${map.file}` : null;
+    const imgPath = map
+      ? map.imageUrl || (map.folder && map.file ? `/img/maps/${map.folder}/${map.file}` : null)
+      : null;
     return `<div class="tournament-map-card">
       <div class="map-thumb"${imgPath ? ` style="background-image:url('${imgPath}')"` : ""}></div>
       <div class="map-meta">
@@ -35,7 +37,9 @@ export function renderChosenMaps(targetId, { mapPoolSelection, getMapByName }) {
   }
   const cards = selectedNames.map((name) => {
     const map = getMapByName(name);
-    const imgPath = map ? `img/maps/${map.folder}/${map.file}` : null;
+    const imgPath = map
+      ? map.imageUrl || (map.folder && map.file ? `/img/maps/${map.folder}/${map.file}` : null)
+      : null;
     return `<div class="tournament-map-card selected">
       <div class="map-thumb"${imgPath ? ` style="background-image:url('${imgPath}')"` : ""}></div>
       <div class="map-meta">

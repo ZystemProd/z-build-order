@@ -314,6 +314,8 @@ const COVER_TARGET_HEIGHT = 675;
 const COVER_CARD_WIDTH = 320;
 const COVER_CARD_HEIGHT = 180;
 const SPONSOR_LOGO_SIZE = 256;
+const CUSTOM_MAP_WIDTH = 640;
+const CUSTOM_MAP_HEIGHT = 400;
 const COVER_QUALITY = 0.82;
 const TOURNAMENT_MODES = new Set(["1v1", "2v2", "3v3", "4v4"]);
 const TEAM_MEMBER_STATUS = {
@@ -341,8 +343,10 @@ const {
   deleteTournamentCoverByUrl,
   deleteTournamentCoverFolder,
   deleteTournamentSponsorFolder,
+  deleteTournamentMapFolder,
   uploadTournamentCover,
   uploadSponsorLogo,
+  uploadCustomMapImage,
 } = createTournamentCoverStorage({
   storage,
   loadTournamentRegistry,
@@ -353,6 +357,8 @@ const {
   coverCardWidth: COVER_CARD_WIDTH,
   coverCardHeight: COVER_CARD_HEIGHT,
   sponsorLogoSize: SPONSOR_LOGO_SIZE,
+  customMapWidth: CUSTOM_MAP_WIDTH,
+  customMapHeight: CUSTOM_MAP_HEIGHT,
   coverQuality: COVER_QUALITY,
 });
 let currentCircuitMeta = null;
@@ -377,6 +383,8 @@ let teamInviteDraft = [];
 let teamInviteDraftSlug = "";
 let teamInviteSearchInitialized = false;
 let teamInviteDraftDirty = false;
+let createCustomMapsDraft = [];
+let liveToggleInFlight = false;
 
 async function ensureAdminSearchBootstrap() {
   if (adminSearchBootstrapPromise) return adminSearchBootstrapPromise;
@@ -1232,6 +1240,7 @@ async function loadMapCatalog() {
 }
 
 function refreshMapCatalogUi() {
+  renderCustomMapSections();
   renderMapPoolPickerUI("mapPoolPicker", { mapPoolSelection, getAll1v1Maps });
   renderMapPoolPickerUI("settingsMapPoolPicker", {
     mapPoolSelection,
@@ -2725,11 +2734,17 @@ function setTournamentNotLive() {
 }
 
 async function toggleLiveTournament() {
-  if (state.isLive) {
-    setTournamentNotLive();
-    return;
+  if (liveToggleInFlight) return;
+  liveToggleInFlight = true;
+  try {
+    if (state.isLive) {
+      setTournamentNotLive();
+      return;
+    }
+    await goLiveTournament();
+  } finally {
+    liveToggleInFlight = false;
   }
-  await goLiveTournament();
 }
 
 function recreateLiveBracket(options = {}) {
@@ -4041,6 +4056,9 @@ async function validateSlug() {
 
 async function populateCreateForm() {
   await loadMapCatalog();
+  clearCreateCustomMapsDraft();
+  setMapPoolSelection(getDefaultMapPoolNames("1v1"));
+  renderCustomMapSections();
   renderMapPoolPicker("mapPoolPicker", {
     mapPoolSelection,
     getAll1v1Maps,
@@ -4618,6 +4636,7 @@ async function deleteTournamentBundle(
   await deleteDoc(doc(collection(db, TOURNAMENT_COLLECTION), slug));
   await deleteDoc(doc(collection(db, TOURNAMENT_STATE_COLLECTION), slug));
   await deleteTournamentSponsorFolder(slug);
+  await deleteTournamentMapFolder(slug);
   try {
     localStorage.removeItem(getPersistStorageKey(slug));
   } catch (_) {
@@ -4950,6 +4969,97 @@ function getDefaultMapPoolNames(mode = null) {
   return FALLBACK_LADDER_MAPS.map((m) => m.name);
 }
 
+function getTournamentCustomMaps(mode = null) {
+  const resolvedMode = normalizeTournamentMode(mode || getActiveMapPoolMode());
+  if (getCreateModalModeIfOpen()) {
+    return (createCustomMapsDraft || [])
+      .filter(
+        (entry) =>
+          normalizeTournamentMode(entry?.mode || "1v1") === resolvedMode,
+      )
+      .map((entry) => ({
+        id: String(entry.id || ""),
+        name: String(entry.name || "").trim(),
+        mode: normalizeTournamentMode(entry.mode || "1v1"),
+        imageUrl: String(entry.imageUrl || "").trim(),
+        isCustom: true,
+      }))
+      .filter((entry) => entry.name);
+  }
+  const source = Array.isArray(currentTournamentMeta?.customMaps)
+    ? currentTournamentMeta.customMaps
+    : [];
+  const deduped = new Map();
+  source.forEach((entry) => {
+    if (!entry || typeof entry !== "object") return;
+    const name = String(entry.name || "").trim();
+    const imageUrl = String(entry.imageUrl || "").trim();
+    if (!name) return;
+    const itemMode = normalizeTournamentMode(
+      entry.mode || currentTournamentMeta?.mode || "1v1",
+    );
+    if (itemMode !== resolvedMode) return;
+    const key = name.toLowerCase();
+    if (deduped.has(key)) return;
+    deduped.set(key, {
+      id: String(entry.id || key),
+      name,
+      mode: itemMode,
+      imageUrl,
+      isCustom: true,
+    });
+  });
+  return Array.from(deduped.values());
+}
+
+function clearCreateCustomMapsDraft() {
+  (createCustomMapsDraft || []).forEach((entry) => {
+    const url = String(entry?.imageUrl || "");
+    if (!url.startsWith("blob:")) return;
+    try {
+      URL.revokeObjectURL(url);
+    } catch (_) {
+      // ignore
+    }
+  });
+  createCustomMapsDraft = [];
+}
+
+function renderCustomMapSection(targetId, maps = []) {
+  const grid = document.getElementById(targetId);
+  if (!grid) return;
+  const items = Array.isArray(maps) ? maps : [];
+  if (!items.length) {
+    grid.innerHTML = DOMPurify.sanitize(`<p class="helper">No custom maps yet.</p>`);
+    return;
+  }
+  const cards = items.map((entry) => {
+    const name = escapeHtml(String(entry?.name || "").trim());
+    const imageUrl = String(entry?.imageUrl || "").trim();
+    return `<div class="tournament-map-card">
+      <div class="map-thumb"${
+        imageUrl ? ` style="background-image:url('${imageUrl}')"` : ""
+      }></div>
+      <div class="map-meta">
+        <div class="map-name" translate="no">${name}</div>
+      </div>
+    </div>`;
+  });
+  grid.innerHTML = DOMPurify.sanitize(cards.join(""));
+}
+
+function renderCustomMapSections() {
+  const createMaps = getTournamentCustomMaps(
+    getCreateModalModeIfOpen() || "1v1",
+  );
+  const settingsMode = normalizeTournamentMode(currentTournamentMeta?.mode || "1v1");
+  const settingsMaps = getCreateModalModeIfOpen()
+    ? []
+    : getTournamentCustomMaps(settingsMode);
+  renderCustomMapSection("createCustomMapGrid", createMaps);
+  renderCustomMapSection("settingsCustomMapGrid", settingsMaps);
+}
+
 function setMapPoolSelection(names) {
   setMapPoolSelectionUI(names, {
     setMapPoolSelectionState,
@@ -4960,10 +5070,129 @@ function setMapPoolSelection(names) {
     getAll1v1Maps,
     updateMapButtonsUI,
   });
+  renderCustomMapSections();
 }
 
 function validateTournamentImage(file) {
   return validateImageFile(file, { maxBytes: MAX_TOURNAMENT_IMAGE_SIZE });
+}
+
+async function handleAddCustomMap({ name, file, source } = {}) {
+  const trimmedName = String(name || "").trim();
+  if (!trimmedName) {
+    return { ok: false, message: "Enter a map name." };
+  }
+  if (trimmedName.length > 60) {
+    return { ok: false, message: "Map name must be 60 characters or fewer." };
+  }
+  if (file) {
+    const imageValidationError = validateTournamentImage(file);
+    if (imageValidationError) {
+      return { ok: false, message: imageValidationError };
+    }
+  }
+  const createMode = normalizeTournamentMode(
+    document.getElementById("tournamentModeSelect")?.value || "1v1",
+  );
+  if (source === "create") {
+    const existingName = getAll1v1Maps(createMode).some(
+      (map) =>
+        String(map?.name || "").trim().toLowerCase() ===
+        trimmedName.toLowerCase(),
+    );
+    if (existingName) {
+      return { ok: false, message: "A map with this name already exists." };
+    }
+    const previewUrl = file ? URL.createObjectURL(file) : "";
+    createCustomMapsDraft.push({
+      id: `cmd-${Date.now().toString(36)}-${Math.random()
+        .toString(36)
+        .slice(2, 8)}`,
+      name: trimmedName,
+      mode: createMode,
+      imageUrl: previewUrl,
+      file,
+      createdAt: Date.now(),
+      createdBy: auth?.currentUser?.uid || null,
+    });
+    if (!mapPoolSelection.has(trimmedName)) {
+      setMapPoolSelection(Array.from(new Set([
+        ...Array.from(mapPoolSelection || []),
+        trimmedName,
+      ])));
+    } else {
+      renderCustomMapSections();
+    }
+    return { ok: true, message: "Custom map added. It will upload on create." };
+  }
+  const slug = String(currentTournamentMeta?.slug || currentSlug || "").trim();
+  if (!slug) {
+    return {
+      ok: false,
+      message: "Open a tournament first.",
+    };
+  }
+  if (!isAdmin) {
+    return {
+      ok: false,
+      message: "Only tournament admins can add custom maps.",
+    };
+  }
+  const mode = normalizeTournamentMode(currentTournamentMeta?.mode || "1v1");
+  const existingName = getAll1v1Maps(mode).some(
+    (map) =>
+      String(map?.name || "").trim().toLowerCase() ===
+      trimmedName.toLowerCase(),
+  );
+  if (existingName) {
+    return { ok: false, message: "A map with this name already exists." };
+  }
+  try {
+    const mapId = `cm-${Date.now().toString(36)}-${Math.random()
+      .toString(36)
+      .slice(2, 8)}`;
+    const uploaded = file ? await uploadCustomMapImage(file, slug, mapId) : null;
+    const nextEntry = {
+      id: mapId,
+      name: trimmedName,
+      mode,
+      imageUrl: uploaded?.imageUrl || "",
+      createdAt: Date.now(),
+      createdBy: auth?.currentUser?.uid || null,
+    };
+    const existing = Array.isArray(currentTournamentMeta?.customMaps)
+      ? currentTournamentMeta.customMaps
+      : [];
+    const nextCustomMaps = [...existing, nextEntry];
+    const nextMapPool = Array.from(
+      new Set([...(currentTournamentMeta?.mapPool || []), trimmedName]),
+    );
+    await setDoc(
+      doc(collection(db, TOURNAMENT_COLLECTION), slug),
+      {
+        customMaps: nextCustomMaps,
+        mapPool: nextMapPool,
+        lastUpdated: Date.now(),
+      },
+      { merge: true },
+    );
+    setCurrentTournamentMetaState({
+      ...(currentTournamentMeta || {}),
+      slug,
+      customMaps: nextCustomMaps,
+      mapPool: nextMapPool,
+      lastUpdated: Date.now(),
+    });
+    setMapPoolSelection(nextMapPool);
+    renderAll();
+    return { ok: true, message: "Custom map added and selected." };
+  } catch (err) {
+    console.error("Failed to add custom map", err);
+    return {
+      ok: false,
+      message: err?.message || "Failed to upload custom map.",
+    };
+  }
 }
 
 function getStartTimeMs(meta) {
@@ -6035,6 +6264,9 @@ async function handleCreateTournament(event) {
   const grandFinalReset =
     allowGrandFinalReset(format, rrSettings) &&
     Boolean(grandFinalResetToggle?.checked);
+  const createCustomMapsForMode = (createCustomMapsDraft || []).filter(
+    (entry) => normalizeTournamentMode(entry?.mode || "1v1") === mode,
+  );
   try {
     const payload = buildCreateTournamentPayload({
       slug,
@@ -6058,6 +6290,7 @@ async function handleCreateTournament(event) {
       circuitSlug: circuitSlug || null,
       isCircuitFinal: circuitSlug ? isCircuitFinal : false,
     });
+    payload.customMaps = [];
     await setDoc(doc(collection(db, TOURNAMENT_COLLECTION), slug), payload, {
       merge: true,
     });
@@ -6090,6 +6323,47 @@ async function handleCreateTournament(event) {
         console.error("Failed to reuse cover image", err);
       }
     }
+    if (createCustomMapsForMode.length) {
+      const uploadedCustomMaps = [];
+      for (const entry of createCustomMapsForMode) {
+        const imageFile = entry?.file || null;
+        const normalizedEntry = {
+          id: String(entry.id || ""),
+          name: String(entry.name || "").trim(),
+          mode: normalizeTournamentMode(entry.mode || mode || "1v1"),
+          imageUrl: "",
+          createdAt: Number(entry.createdAt) || Date.now(),
+          createdBy: entry.createdBy || auth.currentUser?.uid || null,
+        };
+        if (!normalizedEntry.name) continue;
+        if (!imageFile) {
+          uploadedCustomMaps.push(normalizedEntry);
+          continue;
+        }
+        try {
+          const uploaded = await uploadCustomMapImage(imageFile, slug, entry.id);
+          uploadedCustomMaps.push({
+            ...normalizedEntry,
+            imageUrl: uploaded.imageUrl,
+          });
+        } catch (err) {
+          console.error("Failed to upload custom map image", err);
+          showToast?.(
+            `Failed to upload custom map "${entry?.name || "Unknown"}".`,
+            "error",
+          );
+          uploadedCustomMaps.push(normalizedEntry);
+        }
+      }
+      if (uploadedCustomMaps.length) {
+        payload.customMaps = uploadedCustomMaps;
+        await setDoc(
+          doc(collection(db, TOURNAMENT_COLLECTION), slug),
+          { customMaps: uploadedCustomMaps },
+          { merge: true },
+        );
+      }
+    }
     if (circuitSlug) {
       const circuitPayload = {
         tournaments: arrayUnion(slug),
@@ -6110,6 +6384,7 @@ async function handleCreateTournament(event) {
     }
     setCurrentSlugState(slug);
     setCurrentTournamentMetaState(payload);
+    clearCreateCustomMapsDraft();
     logAnalyticsEvent("tournament_created");
     showToast?.("Tournament saved.", "success");
     if (modal) {
@@ -6130,23 +6405,54 @@ function getAll1v1Maps(mode = null) {
     Array.isArray(mapCatalog) && mapCatalog.length
       ? mapCatalog
       : FALLBACK_LADDER_MAPS || [];
+  const customMaps = getTournamentCustomMaps(resolvedMode);
   const filtered = source.filter(
     (m) => normalizeTournamentMode(m.mode || "1v1") === resolvedMode,
   );
-  if (filtered.length) return filtered;
+  if (filtered.length || customMaps.length) {
+    const byName = new Map();
+    [...customMaps, ...filtered].forEach((map) => {
+      const key = String(map?.name || "").trim().toLowerCase();
+      if (!key || byName.has(key)) return;
+      byName.set(key, map);
+    });
+    return Array.from(byName.values());
+  }
   if (resolvedMode !== "1v1") return [];
-  return source.filter((m) => normalizeTournamentMode(m.mode || "1v1") === "1v1");
+  const fallback = source.filter(
+    (m) => normalizeTournamentMode(m.mode || "1v1") === "1v1",
+  );
+  if (!customMaps.length) return fallback;
+  const byName = new Map();
+  [...customMaps, ...fallback].forEach((map) => {
+    const key = String(map?.name || "").trim().toLowerCase();
+    if (!key || byName.has(key)) return;
+    byName.set(key, map);
+  });
+  return Array.from(byName.values());
 }
 
 function getMapByName(name, mode = null) {
   if (!name) return null;
-  const scoped = getAll1v1Maps(mode).find((m) => m.name === name);
+  const normalizedName = String(name).trim().toLowerCase();
+  const scoped = getAll1v1Maps(mode).find(
+    (m) => String(m?.name || "").trim().toLowerCase() === normalizedName,
+  );
   if (scoped) return scoped;
   const source =
     Array.isArray(mapCatalog) && mapCatalog.length
       ? mapCatalog
       : FALLBACK_LADDER_MAPS || [];
-  return source.find((m) => m.name === name) || null;
+  const custom = getTournamentCustomMaps(mode);
+  return (
+    source.find(
+      (m) => String(m?.name || "").trim().toLowerCase() === normalizedName,
+    ) ||
+    custom.find(
+      (m) => String(m?.name || "").trim().toLowerCase() === normalizedName,
+    ) ||
+    null
+  );
 }
 
 function toggleMapSelection(name) {
@@ -6270,6 +6576,7 @@ registerTournamentEvents({
     normalizeRaceLabel,
     mmrForRace,
     updateMmrDisplay,
+    handleAddCustomMap,
     switchTab,
     populateCreateForm,
     populateCreateCircuitForm,

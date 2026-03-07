@@ -1335,6 +1335,27 @@
                     <div class="map-pool-picker">
                       <div class="picker-header">
                         <div>
+                          <p class="eyebrow">Custom maps</p>
+                          <h4>Tournament custom maps</h4>
+                        </div>
+                        <div class="picker-actions">
+                          <div class="custom-map-input-group">
+                            <label for="settingsCustomMapNameInput" class="helper">Map name</label>
+                            <input type="text" id="settingsCustomMapNameInput" placeholder="Custom map name" maxlength="60" />
+                          </div>
+                          <div class="custom-map-input-group">
+                            <label for="settingsCustomMapImageInput" class="helper">Map image (optional)</label>
+                            <input type="file" id="settingsCustomMapImageInput" accept="image/*" />
+                          </div>
+                          <button type="button" class="cta small ghost" id="settingsAddCustomMapBtn">Add custom map</button>
+                        </div>
+                      </div>
+                      <p class="helper" id="settingsCustomMapStatus"></p>
+                      <div id="settingsCustomMapGrid" class="map-pool-grid"></div>
+                    </div>
+                    <div class="map-pool-picker">
+                      <div class="picker-header">
+                        <div>
                           <p class="eyebrow">Maps</p>
                           <h4>Chosen map pool</h4>
                         </div>
@@ -1816,6 +1837,28 @@
         </div>
       </div>
       <div class="settings-panel" id="createMaps">
+        <div class="map-pool-picker">
+          <div class="picker-header">
+            <div>
+              <p class="eyebrow">Custom maps</p>
+              <h4>Tournament custom maps</h4>
+              <p class="helper">Added now, uploaded when you create the tournament.</p>
+            </div>
+            <div class="picker-actions">
+              <div class="custom-map-input-group">
+                <label for="createCustomMapNameInput" class="helper">Map name</label>
+                <input type="text" id="createCustomMapNameInput" placeholder="Custom map name" maxlength="60" />
+              </div>
+              <div class="custom-map-input-group">
+                <label for="createCustomMapImageInput" class="helper">Map image (optional)</label>
+                <input type="file" id="createCustomMapImageInput" accept="image/*" />
+              </div>
+              <button type="button" class="cta small ghost" id="createAddCustomMapBtn">Add custom map</button>
+            </div>
+          </div>
+          <p class="helper" id="createCustomMapStatus"></p>
+          <div id="createCustomMapGrid" class="map-pool-grid"></div>
+        </div>
         <div class="map-pool-picker">
           <div class="picker-header">
             <div>

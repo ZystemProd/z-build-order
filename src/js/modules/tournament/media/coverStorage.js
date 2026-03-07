@@ -16,6 +16,8 @@ export function createTournamentCoverStorage({
   coverCardWidth,
   coverCardHeight,
   sponsorLogoSize,
+  customMapWidth,
+  customMapHeight,
   coverQuality,
 }) {
   function isFirebaseStorageUrl(url) {
@@ -107,6 +109,17 @@ export function createTournamentCoverStorage({
     }
   }
 
+  async function deleteTournamentMapFolder(slug) {
+    if (!slug) return;
+    try {
+      const folderRef = storageRef(storage, `tournamentMaps/${slug}`);
+      const list = await listAll(folderRef);
+      await Promise.all(list.items.map((item) => deleteObject(item)));
+    } catch (err) {
+      console.warn("Failed to delete tournament map folder", err);
+    }
+  }
+
   async function uploadTournamentCover(file, slug) {
     const error = validateTournamentImage(file);
     if (error) throw new Error(error);
@@ -164,11 +177,33 @@ export function createTournamentCoverStorage({
     return getDownloadURL(ref);
   }
 
+  async function uploadCustomMapImage(file, slug, mapId) {
+    const error = validateTournamentImage(file);
+    if (error) throw new Error(error);
+    if (!slug) throw new Error("Missing tournament slug.");
+    if (!mapId) throw new Error("Missing custom map id.");
+    const processed = await prepareImageForUpload(file, {
+      targetWidth: customMapWidth,
+      targetHeight: customMapHeight,
+      quality: coverQuality,
+      outputType: "image/webp",
+      fallbackType: "image/jpeg",
+    });
+    const path = `tournamentMaps/${slug}/${mapId}-${Date.now()}.webp`;
+    const ref = storageRef(storage, path);
+    await uploadBytes(ref, processed.blob, {
+      contentType: processed.contentType,
+    });
+    return { imageUrl: await getDownloadURL(ref) };
+  }
+
   return {
     deleteTournamentCoverByUrl,
     deleteTournamentCoverFolder,
     deleteTournamentSponsorFolder,
+    deleteTournamentMapFolder,
     uploadTournamentCover,
     uploadSponsorLogo,
+    uploadCustomMapImage,
   };
 }

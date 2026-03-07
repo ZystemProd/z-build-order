@@ -106,6 +106,7 @@ export async function loadTournamentRegistry(force = false) {
         description: data.description || "",
         rules: data.rules || "",
         mapPool: data.mapPool?.length ? data.mapPool : [],
+        customMaps: Array.isArray(data.customMaps) ? data.customMaps : [],
         format: data.format || "Tournament",
         coverImageUrl: data.coverImageUrl || "",
         coverImageUrlSmall: data.coverImageUrlSmall || "",

@@ -6138,6 +6138,23 @@ details.stage-section:not([open]) .stage-toggle::after {
 .picker-actions {
   display: flex;
   gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.picker-actions input[type="text"] {
+  min-width: 200px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--stroke);
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+.custom-map-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .create-modal .modal-content {

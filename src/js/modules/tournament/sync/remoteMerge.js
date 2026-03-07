@@ -176,6 +176,18 @@ export function syncFromRemoteCore({
   const localLastUpdated = Number(state.lastUpdated) || 0;
   const incomingIsStale =
     incomingLastUpdated > 0 && incomingLastUpdated <= localLastUpdated;
+  const staleLifecycleRegression =
+    incomingIsStale &&
+    (!safeJsonEqual(incoming.isLive, state.isLive) ||
+      !safeJsonEqual(incoming.hasBeenLive, state.hasBeenLive));
+
+  if (staleLifecycleRegression) {
+    if (presenceChanged) {
+      setStateObj({ ...state, presence: { matchInfo: incomingPresence } });
+      refreshMatchInfoPresenceIfOpen?.();
+    }
+    return;
+  }
 
   if (
     incomingIsStale &&
