@@ -9,8 +9,8 @@
     "preview": "vite preview",
     "deploy": "npm run build && firebase deploy",
     "preview-deploy": "npm run clean-dist && npm run build && firebase hosting:channel:deploy dev",
-    "clean-dist": "npx rimraf dist",
-    "clean": "rimraf node_modules/.vite dist",
+    "clean-dist": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\"",
+    "clean": "node -e \"const fs=require('fs'); fs.rmSync('node_modules/.vite', { recursive: true, force: true }); fs.rmSync('dist', { recursive: true, force: true });\"",
     "minify-firebase": "node scripts/minify-firebase.js",
     "cleanup-covers": "cd functions && node scripts/cleanupTournamentCovers.js",
     "cleanup-covers:apply": "cd functions && node scripts/cleanupTournamentCovers.js --apply",
@@ -19,7 +19,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",
-    "firebase-tools": "^14.5.1",
+    "firebase-tools": "^15.8.0",
     "rimraf": "^6.0.1",
     "vite": "^6.4.1"
   },

@@ -56,7 +56,10 @@ export function initTournamentNotifications() {
     const createdAt = data.createdAt?.toMillis ? data.createdAt.toMillis() : data.createdAt;
     const type = data.type || "generic";
     const rawStatus = data.status || "";
-    const status = type === "tournament-invite" ? normalizeStatus(rawStatus) : rawStatus;
+    const status =
+      type === "tournament-invite" || type === "teammate-invite"
+        ? normalizeStatus(rawStatus)
+        : rawStatus;
     const tournamentName = data.tournamentName || data.tournamentSlug || "Tournament";
     const slugFromName =
       tournamentName && /^[a-z0-9-]+$/i.test(tournamentName) ? tournamentName : "";
@@ -65,6 +68,7 @@ export function initTournamentNotifications() {
     const tournamentUrl = data.tournamentUrl || "";
     const circuitSlug = data.circuitSlug || "";
     const senderName = data.senderUsername || data.senderName || "Tournament admin";
+    const leaderName = data.leaderName || senderName;
     const readAt = data.readAt?.toMillis ? data.readAt.toMillis() : data.readAt;
     let title = data.title || "Notification";
     let preview = data.preview || data.message || "";
@@ -75,6 +79,12 @@ export function initTournamentNotifications() {
       preview = `${senderName} invited you to ${tournamentName}.`;
       body = `${senderName} invited you to ${tournamentName}.\n\nAccept to join the tournament.`;
       typeLabel = "Invite";
+    } else if (type === "teammate-invite") {
+      const teamMode = data.teamMode || "team";
+      title = `Team invite: ${tournamentName}`;
+      preview = `${leaderName} invited you to a ${teamMode} team.`;
+      body = `${leaderName} invited you to join their ${teamMode} team in ${tournamentName}.`;
+      typeLabel = "Team invite";
     } else if (type === "caster-invite") {
       title = `Caster invite: ${tournamentName}`;
       preview = `${senderName} invited you to cast ${tournamentName}.`;
@@ -95,7 +105,10 @@ export function initTournamentNotifications() {
       tournamentUrl,
       tournamentName,
       senderName,
+      leaderName,
       userId: data.userId || "",
+      teamId: data.teamId || "",
+      teamMode: data.teamMode || "",
       title,
       preview,
       body,
@@ -214,6 +227,7 @@ export function initTournamentNotifications() {
     detailTitle.textContent = "";
     if (
       (note.type === "tournament-invite" ||
+        note.type === "teammate-invite" ||
         note.type === "tournament-checkin" ||
         note.type === "caster-invite") &&
       (note.tournamentUrl || note.tournamentSlug)
@@ -253,6 +267,28 @@ export function initTournamentNotifications() {
       const prompt = document.createElement("p");
       prompt.className = "notification-message";
       prompt.textContent = "Accept to join the tournament.";
+      detailBody.append(message, prompt);
+    } else if (note.type === "teammate-invite") {
+      const message = document.createElement("p");
+      message.className = "notification-message";
+      message.append(`${note.leaderName} invited you to join their team in `);
+      const href = getTournamentHref(note);
+      if (href) {
+        const link = document.createElement("a");
+        link.className = "notification-inline-link";
+        link.href = href;
+        link.textContent = note.tournamentName;
+        link.rel = "noopener";
+        link.target = "_blank";
+        message.appendChild(link);
+      } else {
+        message.append(note.tournamentName);
+      }
+      message.append(".");
+      const prompt = document.createElement("p");
+      prompt.className = "notification-message";
+      prompt.textContent =
+        "Accept to join the team. Team registration completes when all teammates accept.";
       detailBody.append(message, prompt);
     } else if (note.type === "caster-invite") {
       const message = document.createElement("p");
@@ -298,9 +334,11 @@ export function initTournamentNotifications() {
       detailBody.textContent = note.body;
     }
     detailActions.innerHTML = "";
-    if (note.type === "tournament-invite") {
+    if (note.type === "tournament-invite" || note.type === "teammate-invite") {
       if (note.status === "pending") {
-        if (racePromptId === note.id) {
+        const needsRacePrompt =
+          note.type === "tournament-invite" || note.type === "teammate-invite";
+        if (needsRacePrompt && racePromptId === note.id) {
           const divider = document.createElement("div");
           divider.className = "notification-action-divider";
           const prompt = document.createElement("p");
@@ -363,7 +401,10 @@ export function initTournamentNotifications() {
       } else {
         const statusPill = document.createElement("span");
         statusPill.className = `notification-status-pill ${note.status}`;
-        statusPill.textContent = `Invite ${note.status}`;
+        statusPill.textContent =
+          note.type === "teammate-invite"
+            ? `Team invite ${note.status}`
+            : `Invite ${note.status}`;
         detailActions.appendChild(statusPill);
       }
     } else if (note.type === "tournament-checkin") {
@@ -426,7 +467,10 @@ export function initTournamentNotifications() {
     if (!action || !id || actionPending.has(id)) return;
     const note = notifications.find((entry) => entry.id === id);
     if (!note) return;
-    if (action === "accept") {
+    if (
+      action === "accept" &&
+      (note.type === "tournament-invite" || note.type === "teammate-invite")
+    ) {
       racePromptId = id;
       selectedRace = "";
       renderDetail(id);
@@ -441,7 +485,11 @@ export function initTournamentNotifications() {
       return;
     }
     const resolvedAction = action === "confirm-accept" ? "accept" : action;
-    if (resolvedAction === "accept" && !selectedRace) {
+    if (
+      (note.type === "tournament-invite" || note.type === "teammate-invite") &&
+      resolvedAction === "accept" &&
+      !selectedRace
+    ) {
       return;
     }
     actionPending.add(id);

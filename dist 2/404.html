@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Tournament Not Available</title>
+    <link rel="icon" type="image/x-icon" href="/img/favicon.ico">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    >
+    <style>
+      :root {
+        --bg: #0e1014;
+        --bg-deep: #08090b;
+        --panel: #141821;
+        --text: #f2f4f8;
+        --muted: #a7b0c2;
+        --accent: #4cc9ff;
+        --accent-soft: rgba(76, 201, 255, 0.22);
+        --stroke: rgba(255, 255, 255, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Space Grotesk", "Segoe UI", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(1200px 600px at 10% 10%, rgba(255, 138, 31, 0.12), transparent 60%),
+          radial-gradient(900px 700px at 90% 20%, rgba(76, 156, 255, 0.12), transparent 55%),
+          linear-gradient(180deg, var(--bg), var(--bg-deep));
+        display: grid;
+        place-items: center;
+        padding: 32px;
+      }
+
+      .card {
+        width: min(560px, 92vw);
+        background: linear-gradient(160deg, rgba(20, 24, 33, 0.95), rgba(12, 14, 18, 0.95));
+        border: 1px solid var(--stroke);
+        border-radius: 18px;
+        padding: 32px;
+        box-shadow: 0 25px 60px rgba(0, 0, 0, 0.45);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .card::after {
+        content: "";
+        position: absolute;
+        inset: -60% -10% auto -10%;
+        height: 200px;
+        background: linear-gradient(120deg, transparent, var(--accent-soft), transparent);
+        opacity: 0.5;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 12px;
+        border-radius: 999px;
+        border: 1px solid var(--stroke);
+        background: rgba(255, 255, 255, 0.03);
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        font-size: 12px;
+        color: var(--accent);
+      }
+
+      h1 {
+        margin: 18px 0 8px;
+        font-size: clamp(28px, 4vw, 36px);
+        font-weight: 700;
+      }
+
+      p {
+        margin: 0 0 20px;
+        color: var(--muted);
+        font-size: 16px;
+        line-height: 1.6;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 12px 18px;
+        border-radius: 10px;
+        text-decoration: none;
+        font-weight: 600;
+        color: #111318;
+        background: var(--accent);
+        box-shadow: 0 10px 30px rgba(76, 201, 255, 0.25);
+      }
+
+      .ghost {
+        background: transparent;
+        color: var(--text);
+        border: 1px solid var(--stroke);
+      }
+
+      .page-logo {
+        width: 120px;
+        margin-bottom: 20px;
+        filter: drop-shadow(0 12px 30px rgba(76, 201, 255, 0.35));
+      }
+
+      @media (max-width: 540px) {
+        .card {
+          padding: 24px;
+        }
+
+        .page-logo {
+          width: 96px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <img class="page-logo" src="/img/toplogo.webp" alt="Z-Build Order">
+    <main class="card">
+      <span class="badge">404</span>
+      <h1>Tournament Not Available</h1>
+      <p>This tournament does not exist or has been removed. Check the link or head back to the tournament list.</p>
+      <div class="actions">
+        <a class="btn" href="/tournament/">Go to Tournaments</a>
+        <a class="btn ghost" href="/">Go to Build Order</a>
+      </div>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,14 @@
+[
+  {
+    "date": "2024-05-01",
+    "from": "Alice",
+    "amount": "$5",
+    "method": "Ko-fi"
+  },
+  {
+    "date": "2024-06-15",
+    "from": "Bob",
+    "amount": "$10",
+    "method": "Patreon"
+  }
+]

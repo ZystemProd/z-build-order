@@ -70,6 +70,7 @@ export function readBestOf(scope, defaultBestOf) {
 export function buildCreateTournamentPayload({
   slug,
   name,
+  mode,
   description,
   rules,
   format,
@@ -93,6 +94,7 @@ export function buildCreateTournamentPayload({
   return {
     slug,
     name,
+    mode: mode || "1v1",
     description,
     rules,
     format,
@@ -165,7 +167,7 @@ export function buildSettingsPayload({
     visibility: visibility || "public",
     requirePulseLink: Boolean(requirePulseLink),
     prizePoolTotal:
-      Number.isFinite(prizePoolTotal) && prizePoolTotal > 0
+      Number.isFinite(prizePoolTotal) && prizePoolTotal >= 0
         ? Math.round(prizePoolTotal)
         : null,
     prizePoolCurrency: String(prizePoolCurrency || "USD").toUpperCase(),
@@ -204,6 +206,7 @@ export function buildSettingsPayload({
 export function buildFinalTournamentPayload({
   slug,
   name,
+  mode,
   description,
   rules,
   format,
@@ -227,6 +230,7 @@ export function buildFinalTournamentPayload({
   return {
     slug,
     name,
+    mode: mode || "1v1",
     description,
     rules,
     format,

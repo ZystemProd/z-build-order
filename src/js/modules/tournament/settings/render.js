@@ -254,11 +254,13 @@ export function populateSettingsPanel({
       imagePreview.style.display = "block";
       delete imagePreview.dataset.tempPreview;
       imagePreview.dataset.reuseUrl = tournament.coverImageUrl;
+      delete imagePreview.dataset.clearCover;
     } else {
       imagePreview.removeAttribute("src");
       imagePreview.style.display = "none";
       delete imagePreview.dataset.tempPreview;
       delete imagePreview.dataset.reuseUrl;
+      delete imagePreview.dataset.clearCover;
     }
   }
   const requirePulseInput = document.getElementById("settingsRequirePulseLink");
@@ -303,7 +305,7 @@ export function populateSettingsPanel({
   if (prizePoolTotalInput) {
     const total = Number(tournament.prizePoolTotal);
     prizePoolTotalInput.value =
-      Number.isFinite(total) && total > 0 ? String(Math.round(total)) : "";
+      Number.isFinite(total) && total >= 0 ? String(Math.round(total)) : "";
   }
   if (prizePoolCurrencyInput) {
     const currency = String(tournament.prizePoolCurrency || "USD").toUpperCase();

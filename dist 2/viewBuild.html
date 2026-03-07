@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <base href="/">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Detailed StarCraft build order and strategy information" />
+  <title>View Build</title>
+  <link rel="icon" type="image/x-icon" href="/img/favicon.ico" />
+  <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin />
+  <link rel="preconnect" href="https://www.googleapis.com" crossorigin />
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin />
+
+
+  <script type="module" crossorigin src="/viewBuild.js"></script>
+  <link rel="modulepreload" crossorigin href="/modulepreload-polyfill.js">
+  <link rel="modulepreload" crossorigin href="/vendor-dompurify.js">
+  <link rel="modulepreload" crossorigin href="/vendor.js">
+  <link rel="modulepreload" crossorigin href="/vendor-firebase-core.js">
+  <link rel="modulepreload" crossorigin href="/notificationHelpers.js">
+  <link rel="modulepreload" crossorigin href="/ui.js">
+  <link rel="modulepreload" crossorigin href="/viewBuildInit.js">
+  <link rel="stylesheet" crossorigin href="/viewBuild.css">
+  <link rel="stylesheet" crossorigin href="/style.css">
+  <link rel="stylesheet" crossorigin href="/showToast.css">
+</head>
+
+<body>
+  <div id="viewLoadingOverlay" class="view-loading-overlay" role="status" aria-live="polite" aria-label="Loading build"
+    aria-busy="true">
+    <div class="loading-spinner" aria-hidden="true"></div>
+    <p>Loading build...</p>
+  </div>
+  <div id="toast-container"></div>
+  <a href="/" id="pageBackButton" data-return-community="true" class="back-button">
+    <img src="./img/SVG/back.svg" alt="Back" />
+  </a>
+  <!-- Auth Container -->
+  <div id="auth-container">
+    <div class="auth-info" style="display: flex; align-items: center; gap: 10px;">
+
+      <div id="authLoadingWrapper" style="display: flex; align-items: center; gap: 8px;">
+        <div id="authLoading" class="spinner"></div>
+        <span id="authLoadingText" style="color: #555;">Loading user...</span>
+      </div>
+
+      <div class="user-details">
+        <p id="userName" class="user-name fade-in" style="display: none;">Guest</p>
+      </div>
+
+      <img id="userPhoto" class="user-avatar fade-in" src="img/avatar/marine_avatar_1.webp" alt="User Avatar"
+        style="width: 40px; height: 40px; display: none;" />
+
+
+      <div id="userMenu" class="user-menu" style="display: none;">
+        <div class="menu-section">
+          <p id="userNameMenu" class="user-name fade-in">Guest</p>
+          <p id="userMmrMenu" class="user-mmr" style="display: none;">MMR: --</p>
+          <hr id="userNameDivider" class="menu-divider" />
+          <button class="menu-item" id="mapVetoBtn">
+            <img src="img/SVG/map-solid.svg" class="menu-icon" /> Map Veto
+          </button>
+          <hr class="menu-divider" />
+          <button class="menu-item" id="showClanModalButton">
+            <img src="img/SVG/clan.svg" class="menu-icon" /> Clans
+          </button>
+          <hr class="menu-divider" />
+          <button id="showStatsButton" class="menu-item">
+            <img src="img/SVG/stats.svg" class="menu-icon" /> My Stats
+          </button>
+          <hr class="menu-divider" />
+          <button class="menu-item" id="settingsBtn">
+            <img src="img/SVG/settings.svg" class="menu-icon" /> Settings
+          </button>
+          <hr class="menu-divider" />
+          <button class="menu-item" id="switchAccountBtn">
+            <img src="img/SVG/switch.svg" class="menu-icon" /> Switch Account
+          </button>
+          <button class="menu-item" id="signOutBtn">
+            <img src="img/SVG/logout.svg" class="menu-icon" /> Sign Out
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Auth Buttons -->
+    <button id="signInBtn" class="auth-button">Sign In</button>
+  </div>
+
+  <!-- Optional Loading Status -->
+  <p id="authLoading" style="color: #555"></p>
+
+  <!-- Username Modal -->
+  <div id="usernameModal" class="modal" style="display: none">
+    <div class="modal-content">
+      <h3>Choose a Username</h3>
+      <input type="text" id="usernameInput" placeholder="Enter your username" />
+      <br /><br />
+      <button id="confirmUsernameButton">Confirm</button>
+    </div>
+  </div>
+
+  <!-- Sign-in Modal -->
+  <div id="signInModal" class="modal">
+    <div class="modal-content auth-modal-content">
+      <span class="close-modal" id="closeSignInModal">&times;</span>
+      <h3>Sign in</h3>
+      <p class="auth-modal-subtext">
+        Create an account to save builds and sync settings.
+      </p>
+      <button id="googleSignInButton" class="auth-provider-button">
+        Continue with Google
+      </button>
+      <div class="auth-divider"><span>or</span></div>
+      <form id="authForm" class="auth-form" autocomplete="on">
+        <label for="authEmail">Email</label>
+        <input id="authEmail" type="email" autocomplete="email" required />
+
+        <label for="authPassword">Password</label>
+        <input id="authPassword" type="password" autocomplete="current-password" required />
+
+        <div class="auth-actions">
+          <button id="emailSignInButton" type="submit" class="auth-primary-button">
+            Sign in
+          </button>
+
+          <button id="emailSignUpButton" type="button" class="auth-secondary-button">
+            Create account
+          </button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+
+  <div class="view-build-container is-loading">
+    <div class="build-header-row">
+      <a href="index.html" id="backButton" data-return-community="true" class="back-button">
+        <img src="./img/SVG/back.svg" alt="Back" />
+      </a>
+
+      <button id="importBuildButton" class="header-btn" type="button" style="display: none;">
+        <img src="./img/SVG/import2.svg" alt="Import" />
+        Import
+      </button>
+
+      <h1 id="buildTitle">Loading...</h1>
+
+      <button id="shareBuildButton" class="header-btn" type="button" style="display: none;"
+        data-tooltip="Share build link">
+        <img src="./img/SVG/share.svg" alt="Share" class="svg-icon" />
+        Share
+      </button>
+    </div>
+
+
+    <!-- Build Info Grid -->
+    <div class="build-info-grid">
+      <div class="build-info-item desktop-info">
+        <label aria-hidden="true"></label>
+        <span id="buildMatchup" data-fade-target>Loading...</span>
+      </div>
+      <div class="build-info-item desktop-info">
+        <label aria-hidden="true"></label>
+        <span class="meta-chip publisher-chip"><img id="buildPublisherIcon" src="./img/SVG/user-svgrepo-com.svg"
+            alt="Publisher" class="meta-icon" width="32" height="32" loading="lazy" decoding="async" /> <span
+            id="buildPublisher" data-fade-target>Loading...</span></span>
+      </div>
+      <div class="build-info-item desktop-info date-info">
+        <label class="published-label" aria-hidden="true" data-keep-label="true">Published</label>
+        <span id="buildDate" data-fade-target>Loading...</span>
+      </div>
+      <div class="build-info-item desktop-info patch-info">
+        <label class="patch-label" aria-hidden="true" data-keep-label="true">Patch</label>
+        <span class="meta-chip patch-chip" id="buildPatch" data-fade-target>Loading...</span>
+      </div>
+      <div class="build-info-item mobile-info">
+        <div class="info-pair publisher-pair">
+          <span class="info-label" aria-hidden="true"></span>
+          <span class="info-value">
+            <span class="meta-chip publisher-chip">
+              <img id="buildPublisherIconMobile" src="./img/SVG/user-svgrepo-com.svg" alt="Publisher" class="meta-icon"
+                width="32" height="32" loading="lazy" decoding="async" />
+              <span id="buildPublisherMobile" data-fade-target>Loading...</span>
+            </span>
+          </span>
+        </div>
+        <div class="info-pair matchup-pair">
+          <span class="info-label" aria-hidden="true"></span>
+          <span class="info-value" id="buildMatchupMobile" data-fade-target>Loading...</span>
+        </div>
+        <div class="info-pair date-pair">
+          <span class="info-label published-label" aria-hidden="true" data-keep-label="true">Published</span>
+          <span class="info-value" id="buildDateMobile" data-fade-target>Loading...</span>
+        </div>
+        <div class="info-pair patch-pair">
+          <span class="info-label patch-label" aria-hidden="true" data-keep-label="true">Patch</span>
+          <span class="info-value">
+            <span class="meta-chip patch-chip" id="buildPatchMobile" data-fade-target>Loading...</span>
+          </span>
+        </div>
+      </div>
+      <div class="build-info-item rating-item" id="ratingItem">
+        <label aria-hidden="true"></label>
+        <div id="votingSection" class="vote-section">
+          <div class="vote-buttons">
+            <button class="vote-button vote-up" data-id="">
+              <img src="./img/SVG/vote-up.svg" alt="Upvote" />
+            </button>
+            <button class="vote-button vote-down" data-id="">
+              <img src="./img/SVG/vote-down.svg" alt="Downvote" />
+            </button>
+          </div>
+          <div class="vote-results-row">
+            <span class="vote-percentage" id="vote-percentage-text">0%</span>
+            <span class="vote-count" id="vote-count-text">0 votes</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Variation Tabs (read-only) -->
+    <div id="variationTabs" class="variation-tabs"></div>
+
+    <!-- Build Order -->
+    <div id="buildOrder" class="build-order-container">
+      <!-- Build steps are dynamically inserted here -->
+    </div>
+
+    <!-- Build Description Section: always visible under the build order -->
+    <div class="build-description-container">
+      <h3 id="descriptionHeader" class="toggle-title">Description</h3>
+      <p id="buildDescription" class="description-display"></p>
+    </div>
+
+    <!-- Second Row Layout -->
+    <div class="main-layout">
+      <!-- Second Row: Map and Description/Video -->
+
+      <div class="hideable-section visible" id="secondRow">
+        <div id="map-container">
+          <!-- Map preview and controls -->
+          <div id="map-controls-row">
+            <span id="selected-map-text" translate="no">No map selected</span>
+            <button class="clear-annotations-button" data-tooltip="Erase All">
+              <img src="img/SVG/eraser-solid.svg" alt="Eraser Icon" style="width:20px; height:20px;" class="svg-icon">
+            </button>
+          </div>
+
+          <div id="map-preview-container" class="map-preview">
+            <img id="map-preview-image" class="map-image" src="" alt="Map Preview" />
+            <div id="map-annotations" class="annotations"></div>
+          </div>
+        </div>
+
+        <!-- RIGHT COLUMN: Description & Video Container -->
+        <div class="description-video-container">
+          <h3 id="replayHeader" style="display: none">Replay</h3>
+          <div id="replayViewWrapper" style="display: none;">
+            <a id="replayDownloadBtn" href="#" target="_blank" class="download-replay-link">
+              Download Replay
+            </a>
+          </div>
+          <h3 id="videoHeader" style="display: none">Video</h3>
+          <iframe id="videoIframe" style="display: none;" width="560" height="315" frameborder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen></iframe>
+        </div>
+      </div>
+    </div>
+
+    <!-- Comment Section -->
+    <div class="comment-section comment-section--ready">
+      <div class="comment-section-header">
+        <h3>Comments <span id="commentsCount" class="comment-count">0 comments</span></h3>
+        <button id="commentSignInBtn" class="comment-signin-btn" type="button">Sign in to comment</button>
+      </div>
+      <p id="commentSignInPrompt" class="comment-signin-prompt">
+        Sign in to share your thoughts.
+      </p>
+      <div id="commentForm" class="comment-form" style="display: none;">
+        <textarea id="newCommentInput" placeholder="Write a comment..."></textarea>
+        <button id="postCommentBtn" type="button">Post</button>
+      </div>
+      <div id="commentsList" class="comments-list">
+        <p class="comment-loading">Loading comments...</p>
+      </div>
+    </div>
+
+
+
+  </div>
+
+  <div id="settingsModal" class="modal">
+    <div class="modal-content small-modal">
+      <span class="close-modal" id="closeSettingsModal">&times;</span>
+      <h3>Settings</h3>
+      <div class="settings-avatar-section">
+        <div class="settings-avatar-preview">
+          <img id="settingsCurrentAvatar" src="img/avatar/marine_avatar_1.webp" alt="Current avatar" />
+        </div>
+        <button type="button" class="settings-avatar-button" id="changeAvatarBtn">
+          <img id="settingsAvatarButtonImage" src="img/SVG/user-svgrepo-com.svg" class="menu-icon" alt=""
+            aria-hidden="true" />
+          Change Avatar
+        </button>
+      </div>
+      <hr class="settings-divider" />
+      <div class="settings-username-section">
+        <label for="settingsUsernameInput" class="settings-label">Username</label>
+        <div class="settings-username-row">
+          <input id="settingsUsernameInput" class="settings-input" type="text" maxlength="20" placeholder="New username"
+            autocomplete="off" spellcheck="false" />
+          <button type="button" class="settings-username-button" id="saveUsernameButton">
+            <img src="img/SVG/pencil.svg" class="menu-icon" alt="" aria-hidden="true" />
+            Update
+          </button>
+        </div>
+        <p id="settingsUsernameStatus" class="settings-helper-text">
+          Use 3-20 letters, numbers, or underscores.
+        </p>
+      </div>
+      <hr class="settings-divider" />
+      <div class="settings-username-section">
+        <div class="settings-label-row">
+          <label for="sc2PulseInput" class="settings-label">SC2Pulse Link</label>
+          <button type="button" class="help-circle animated-help" id="pulseHelpBtn"
+            aria-label="How to find your SC2Pulse link" title="How to find your SC2Pulse link">
+            ?
+          </button>
+        </div>
+        <div class="settings-username-row">
+          <input id="sc2PulseInput" class="settings-input" type="url"
+            placeholder="https://sc2pulse.nephest.com/sc2/?type=character&id=..." autocomplete="off"
+            spellcheck="false" />
+          <button type="button" class="settings-username-button" id="connectPulseBtn">
+            <img src="img/SVG/stats.svg" class="menu-icon" alt="" aria-hidden="true" />
+            Update
+          </button>
+        </div>
+        <p id="pulseStatusText" class="settings-helper-text">
+          Paste your SC2Pulse profile link to sync your latest MMR.
+        </p>
+        <div class="settings-secondary-pulse">
+          <button type="button" class="secondary-pulse-button" id="openSecondaryPulseModalBtn">
+            Manage secondary SC2Pulse links
+          </button>
+        </div>
+        <div class="settings-username-section">
+          <label for="settingsTwitchInput" class="settings-label">Twitch Channel</label>
+          <div class="settings-username-row">
+            <input id="settingsTwitchInput" class="settings-input" type="text"
+              placeholder="https://www.twitch.tv/username" />
+            <button type="button" class="settings-username-button" id="saveTwitchButton">
+              <img src="img/SVG/twitch.svg" class="menu-icon" alt="" aria-hidden="true" />
+              Save
+            </button>
+          </div>
+          <p id="settingsTwitchStatus" class="settings-helper-text">
+            Add your Twitch channel to link your stream.
+          </p>
+        </div>
+        <div class="settings-username-section">
+          <label for="settingsCountrySelect" class="settings-label">Country</label>
+          <select id="settingsCountrySelect" class="settings-input styled-dropdown"></select>
+          <p id="settingsCountryStatus" class="settings-helper-text">
+            Select where you are from.
+          </p>
+        </div>
+        <div id="pulseHelpModal" class="modal">
+          <div class="modal-content">
+            <span class="close" id="closePulseHelp">&times;</span>
+            <h3>How to find your SC2Pulse link</h3>
+            <ol>
+              <li>Open your SC2Pulse profile and go to the MMR tab.</li>
+              <li>Copy the URL from the address bar (looks like
+                <code>https://sc2pulse.nephest.com/sc2/?type=character&id=579686&m=1</code>).
+              </li>
+              <li>Paste that URL here and click Update.</li>
+            </ol>
+          </div>
+          <div id="secondaryPulseModal" class="modal">
+            <div class="modal-content small-modal">
+              <span class="close-modal" id="closeSecondaryPulseModal">&times;</span>
+              <h3>Secondary SC2Pulse links</h3>
+              <p class="helper settings-helper-text">Add up to five optional SC2Pulse profiles.</p>
+              <div id="secondaryPulseList" class="secondary-pulse-list"></div>
+              <div class="secondary-actions">
+                <button type="button" class="cta small ghost" id="secondaryAddInputBtn">
+                  Add another link
+                </button>
+                <button type="button" class="cta primary" id="saveSecondaryPulseBtn">
+                  Save links
+                </button>
+              </div>
+              <p id="secondaryPulseHelper" class="settings-helper-text">
+                You can save up to 5 secondary SC2Pulse links.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <hr class="settings-divider" />
+      <div class="publish-checkbox-row">
+        <span>Enable Bracket Input</span>
+        <div class="checkbox-wrapper-59">
+          <label class="switch">
+            <input type="checkbox" id="bracketInputToggle" checked />
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+      <div class="publish-checkbox-row">
+        <span>Show Build Input</span>
+        <div class="checkbox-wrapper-59">
+          <label class="switch">
+            <input type="checkbox" id="buildInputToggle" checked />
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+      <div class="publish-checkbox-row">
+        <span>Main Clan</span>
+        <select id="mainClanSelect" class="styled-dropdown"></select>
+      </div>
+      <hr class="settings-divider" />
+      <div class="settings-danger-zone">
+        <button type="button" class="settings-danger-button" id="deleteAccountBtn">
+          <img src="img/SVG/trash.svg" class="menu-icon" alt="" aria-hidden="true" />
+          Delete Account
+        </button>
+        <p class="settings-danger-note">This action will permanently remove your account.</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="deleteAccountModal" class="modal">
+    <div class="modal-content">
+      <h3>?? Confirm Account Deletion</h3>
+      <p>This will permanently delete your account and personal builds.</p>
+      <div class="publish-checkbox-row">
+        <span>Also delete my published community builds</span>
+        <div class="checkbox-wrapper-59">
+          <label class="switch">
+            <input type="checkbox" id="deleteCommunityBuildsCheckbox" />
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+      <br /><br />
+      <button id="confirmDeleteAccountButton" class="auth-button">Yes, Delete My Account</button>
+      <button id="cancelDeleteAccountButton" class="auth-button">Cancel</button>
+    </div>
+  </div>
+
+  <div id="avatarModal" class="modal" style="display: none;">
+    <div class="modal-content avatar-modal-content">
+      <button id="closeAvatarModal" class="modal-close-button" aria-label="Close avatar selector">&times;</button>
+      <h3>Select an Avatar</h3>
+      <div id="avatarGrid" class="avatar-grid"></div>
+    </div>
+  </div>
+  <!-- Focus Modal for build output -->
+  <div id="focusModal" class="modal">
+    <div class="modal-content">
+      <span class="close-modal" id="closeFocusModal">&times;</span>
+      <div class="font-controls">
+        <button id="increaseFontBtn">A+</button>
+        <button id="decreaseFontBtn">A-</button>
+      </div>
+      <div id="focusContent" class="focus-content"></div>
+    </div>
+  </div>
+
+</body>
+
+</html>

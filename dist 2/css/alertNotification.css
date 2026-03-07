@@ -1,0 +1,39 @@
+#deleteConfirmationModal {
+  display: none;
+  position: fixed;
+  z-index: 9999;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0, 0.2);
+  justify-content: center;
+  align-items: center;
+}
+
+#deleteConfirmationModal .modal-content {
+  xbackground: #f9f9f900;
+  padding: 20px;
+  border-radius: 8px;
+  text-align: center;
+  max-height: 200px;
+  top: 20%;
+  overflow: hidden;
+}
+
+#deleteConfirmationModal .modal-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+#deleteConfirmationModal .btn {
+  padding: 10px 20px;
+  cursor: pointer;
+}
+
+#deleteConfirmationModal .btn-danger {
+  background-color: #d9534f;
+  color: #fff;
+  border: none;
+}

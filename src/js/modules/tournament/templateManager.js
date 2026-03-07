@@ -187,6 +187,7 @@ function formatTournamentCopyOptionLabel(meta) {
 
 function buildTemplateSettingsFromTournament(meta) {
   return {
+    mode: (meta?.mode || "1v1").trim(),
     format: (meta?.format || "Double Elimination").trim(),
     maxPlayers: Number.isFinite(meta?.maxPlayers) ? Number(meta.maxPlayers) : null,
     checkInWindowMinutes: Number(meta?.checkInWindowMinutes) > 0
@@ -212,6 +213,7 @@ function buildTemplateSettingsFromTournament(meta) {
 
 function readTournamentTemplateForm(mapPoolSelection) {
   const nameInput = document.getElementById("tournamentTemplateNameInput");
+  const modeSelect = document.getElementById("tournamentModeSelect");
   const formatSelect = document.getElementById("tournamentFormatSelect");
   const maxPlayersInput = document.getElementById("tournamentMaxPlayersInput");
   const checkInSelect = document.getElementById("checkInSelect");
@@ -231,6 +233,7 @@ function readTournamentTemplateForm(mapPoolSelection) {
     return null;
   }
   const id = nameInput?.dataset.templateId || "";
+  const mode = (modeSelect?.value || "1v1").trim();
   const format = (formatSelect?.value || "Double Elimination").trim();
   const maxPlayers = maxPlayersInput?.value
     ? Number(maxPlayersInput.value)
@@ -252,6 +255,7 @@ function readTournamentTemplateForm(mapPoolSelection) {
     id,
     name,
     settings: {
+      mode,
       format,
       maxPlayers,
       checkInWindowMinutes,
@@ -271,6 +275,7 @@ function readTournamentTemplateForm(mapPoolSelection) {
 function applyTournamentTemplate(template, setMapPoolSelection) {
   if (!template?.settings) return;
   const settings = template.settings;
+  const modeSelect = document.getElementById("tournamentModeSelect");
   const formatSelect = document.getElementById("tournamentFormatSelect");
   const maxPlayersInput = document.getElementById("tournamentMaxPlayersInput");
   const checkInSelect = document.getElementById("checkInSelect");
@@ -289,6 +294,7 @@ function applyTournamentTemplate(template, setMapPoolSelection) {
     "grandFinalResetToggle",
   );
 
+  if (modeSelect) modeSelect.value = settings.mode || "1v1";
   if (formatSelect) formatSelect.value = settings.format || "Double Elimination";
   syncFormatFieldVisibility("create");
 
@@ -357,6 +363,7 @@ export function initTournamentTemplateManager({
   setModalVisible,
 }) {
   const DRAFT_TEMPLATE_ID = "__draft__";
+  const TOURNAMENT_COPY_VALUE_PREFIX = "__copy__:";
   const createModal = document.getElementById("createTournamentModal");
   const createModalContent = createModal?.querySelector(".modal-content");
   const createModalTitle = createModalContent?.querySelector(".modal-title-row h3");
@@ -376,7 +383,9 @@ export function initTournamentTemplateManager({
   let activeTemplateId = "";
   let lastTemplateSelection = "";
   let recentTournamentCopyOptions = [];
+  let recentTournamentTemplateOptions = [];
   let copyOptionsRequestId = 0;
+  let templateSelectOptionsRequestId = 0;
 
   const ensureCreateModalHome = () => {
     if (!createModal || !createModalContent) return;
@@ -394,40 +403,70 @@ export function initTournamentTemplateManager({
     }
   };
 
-  const refreshTemplateSelect = (templates) => {
+  const refreshTemplateSelect = (templates, recentTournamentGroups = []) => {
     if (!templateSelect) return;
     const currentValue = templateSelect.value;
+    const nextCopyOptionMap = new Map();
     templateSelect.innerHTML = "";
-    const placeholder = document.createElement("option");
-    placeholder.value = "";
-    placeholder.textContent = "Template";
-    placeholder.selected = true;
-    templateSelect.appendChild(placeholder);
     const managerOption = document.createElement("option");
     managerOption.value = "__manager__";
     managerOption.textContent = "Template manager...";
     templateSelect.appendChild(managerOption);
-    if (templates.length) {
-      const divider = document.createElement("option");
-      divider.disabled = true;
-      divider.textContent = "--------";
-      templateSelect.appendChild(divider);
-    }
-    templates.forEach((template) => {
-      const option = document.createElement("option");
-      option.value = template.id;
-      option.textContent = template.name;
-      templateSelect.appendChild(option);
+
+    (recentTournamentGroups || []).forEach((group) => {
+      const entries = Array.isArray(group?.items) ? group.items : [];
+      if (!entries.length) return;
+      const optGroup = document.createElement("optgroup");
+      optGroup.label = group?.label || "Recent tournaments";
+      entries.forEach((item) => {
+        const sourceId = item.slug || item.id || "";
+        if (!sourceId || nextCopyOptionMap.has(sourceId)) return;
+        const option = document.createElement("option");
+        option.value = `${TOURNAMENT_COPY_VALUE_PREFIX}${sourceId}`;
+        option.textContent = formatTournamentCopyOptionLabel(item);
+        optGroup.appendChild(option);
+        nextCopyOptionMap.set(sourceId, item);
+      });
+      if (optGroup.children.length > 0) {
+        templateSelect.appendChild(optGroup);
+      }
     });
-    if (
-      currentValue &&
-      currentValue !== "__manager__" &&
-      templateSelect.querySelector(`option[value="${currentValue}"]`)
-    ) {
-      templateSelect.value = currentValue;
-    } else if (lastTemplateSelection) {
-      templateSelect.value = lastTemplateSelection;
+    recentTournamentTemplateOptions = Array.from(nextCopyOptionMap.values());
+
+    const uniqueTemplates = Array.isArray(templates)
+      ? templates.filter((template) => template?.id)
+      : [];
+    if (uniqueTemplates.length) {
+      const templateGroup = document.createElement("optgroup");
+      templateGroup.label = "Saved templates";
+      uniqueTemplates.forEach((template) => {
+        const option = document.createElement("option");
+        option.value = template.id;
+        option.textContent = template.name;
+        templateGroup.appendChild(option);
+      });
+      templateSelect.appendChild(templateGroup);
     }
+
+    const hasCurrent = Array.from(templateSelect.options).some(
+      (option) => option.value === currentValue,
+    );
+    if (hasCurrent) {
+      templateSelect.value = currentValue;
+      return;
+    }
+    if (currentValue === "") {
+      templateSelect.value = "__manager__";
+      return;
+    }
+    if (
+      lastTemplateSelection &&
+      templateSelect.querySelector(`option[value="${lastTemplateSelection}"]`)
+    ) {
+      templateSelect.value = lastTemplateSelection;
+      return;
+    }
+    templateSelect.value = "__manager__";
   };
 
   const getDraftTemplate = () => {
@@ -500,10 +539,28 @@ export function initTournamentTemplateManager({
     });
   };
 
+  const refreshTemplateSelectCopyOptions = async () => {
+    if (!templateSelect) return;
+    const requestId = ++templateSelectOptionsRequestId;
+    try {
+      const registry = await loadTournamentRegistry(true);
+      if (requestId !== templateSelectOptionsRequestId) return;
+      const uid = auth?.currentUser?.uid || "";
+      const circuitSlug = (createModal?.dataset?.circuitSlug || "").trim();
+      const groups = buildTournamentCopyGroups(registry, uid, circuitSlug);
+      refreshTemplateSelect(getTournamentTemplates(), groups);
+    } catch (err) {
+      if (requestId !== templateSelectOptionsRequestId) return;
+      refreshTemplateSelect(getTournamentTemplates(), []);
+      console.warn("Failed to load tournaments for template select", err);
+    }
+  };
+
   const refreshTemplateUI = () => {
     const templates = getTournamentTemplates();
     refreshTemplateSelect(templates);
     renderTemplateList(templates);
+    void refreshTemplateSelectCopyOptions();
   };
 
   const renderCopyTournamentOptions = (groups) => {
@@ -585,7 +642,11 @@ export function initTournamentTemplateManager({
       templateMain.appendChild(createModalContent);
     }
     if (templateSelect?.value) {
-      activeTemplateId = templateSelect.value === "__manager__" ? "" : templateSelect.value;
+      activeTemplateId =
+        templateSelect.value === "__manager__" ||
+        templateSelect.value.startsWith(TOURNAMENT_COPY_VALUE_PREFIX)
+          ? ""
+          : templateSelect.value;
     }
     if (activeTemplateId) {
       lastTemplateSelection = activeTemplateId;
@@ -707,6 +768,36 @@ export function initTournamentTemplateManager({
     }
     if (!selection) {
       activeTemplateId = "";
+      return;
+    }
+    if (selection.startsWith(TOURNAMENT_COPY_VALUE_PREFIX)) {
+      const sourceId = selection.slice(TOURNAMENT_COPY_VALUE_PREFIX.length);
+      const source = recentTournamentTemplateOptions.find(
+        (item) => (item.slug || item.id || "") === sourceId,
+      );
+      if (!source) {
+        showToast?.("Could not find that tournament settings.", "error");
+        templateSelect.value = "";
+        return;
+      }
+      applyTournamentTemplate(
+        {
+          id: "",
+          name: source.name || "Copied tournament",
+          settings: buildTemplateSettingsFromTournament(source),
+        },
+        setMapPoolSelection,
+      );
+      activeTemplateId = DRAFT_TEMPLATE_ID;
+      lastTemplateSelection = "";
+      if (templateNameInput) {
+        delete templateNameInput.dataset.templateId;
+        if (!templateNameInput.value.trim()) {
+          templateNameInput.value = `${source.name || "Tournament"} template`;
+        }
+      }
+      renderTemplateList(getTournamentTemplates());
+      showToast?.("Tournament settings copied.", "success");
       return;
     }
     const templates = getTournamentTemplates();

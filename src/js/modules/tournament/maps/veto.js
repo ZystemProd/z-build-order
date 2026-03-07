@@ -77,6 +77,7 @@ let presenceActiveKey = "";
 let presenceLastWriteAt = 0;
 let presenceLastMatchId = null;
 let presenceLastPlayerId = null;
+let presenceLastStatus = "active";
 let presenceUiStatus = "active";
 let presenceLastActivityAt = 0;
 let presenceActivityTimer = null;
@@ -86,6 +87,27 @@ const presenceAccessCache = new Set();
 const vetoAccessCache = new Set();
 let presenceAuthBound = false;
 let vetoChatHome = null;
+
+function getTournamentModeValue() {
+  return String(currentTournamentMeta?.mode || "1v1")
+    .trim()
+    .toLowerCase();
+}
+
+function isTeamTournamentMode() {
+  const mode = getTournamentModeValue();
+  return mode === "2v2" || mode === "3v3" || mode === "4v4";
+}
+
+function getParticipantDisplayName(player) {
+  if (!player) return "TBD";
+  if (isTeamTournamentMode()) {
+    const teamName = String(player?.team?.teamName || "").trim();
+    if (teamName) return teamName;
+  }
+  return String(player?.name || "TBD");
+}
+
 const countryFlagCache = new Map();
 const countryUidCache = new Map();
 const COUNTRY_NAME_BY_CODE = new Map(
@@ -837,8 +859,8 @@ export function openMatchInfoModal(
   const vetoedMaps = Array.isArray(saved?.vetoed) ? saved.vetoed : [];
   const playersById = getPlayersMap();
   const [pA, pB] = resolveParticipants(match, lookup, playersById);
-  const aName = pA?.name || "TBD";
-  const bName = pB?.name || "TBD";
+  const aName = getParticipantDisplayName(pA);
+  const bName = getParticipantDisplayName(pB);
   const leftPlayerId = pA?.id || null;
   const rightPlayerId = pB?.id || null;
   const uid = auth?.currentUser?.uid || null;
@@ -848,7 +870,9 @@ export function openMatchInfoModal(
   const isParticipant =
     (me?.id && (me.id === leftPlayerId || me.id === rightPlayerId)) ||
     (uid && (uid === pA?.uid || uid === pB?.uid));
-  const showPresence = Boolean(isParticipant);
+  const isUidParticipant = Boolean(uid && (uid === pA?.uid || uid === pB?.uid));
+  const isParticipantForTeam = isTeamTournamentMode() ? isUidParticipant : isParticipant;
+  const showPresence = Boolean(isParticipantForTeam);
   const allowScoreEditToggle = Boolean(isAdmin && match?.status === "complete");
   if (allowScoreEditToggle) {
     if (modal.dataset.scoreEdit !== "true") {
@@ -862,7 +886,7 @@ export function openMatchInfoModal(
   const computeCanEditResults = () =>
     isAdmin
       ? match?.status !== "complete" || scoreEditEnabled
-      : state.isLive && isParticipant && match?.status !== "complete";
+      : state.isLive && isParticipantForTeam && match?.status !== "complete";
   let canEditResults = computeCanEditResults();
 
   modal.dataset.canEditResults = canEditResults ? "true" : "false";
@@ -870,7 +894,7 @@ export function openMatchInfoModal(
     matchId,
     leftPlayer: pA,
     rightPlayer: pB,
-    isParticipant,
+    isParticipant: isParticipantForTeam,
     isAdminUser: isAdmin,
     uid,
   });
@@ -1239,7 +1263,10 @@ export function openMatchInfoModal(
   const scoreReports = state.scoreReports || {};
   const existingReport = scoreReports[matchId] || null;
   const canReport = Boolean(
-    uid && isParticipant && leftPlayerId && rightPlayerId,
+    uid &&
+      leftPlayerId &&
+      rightPlayerId &&
+      (isTeamTournamentMode() ? isUidParticipant : isParticipant),
   );
   const shouldShowReport = Boolean(existingReport);
   if (reportSection) {
@@ -1501,7 +1528,7 @@ export function openMatchInfoModal(
   }
 
   if (openVetoBtn) {
-    const canOpenVeto = isAdmin || (state.isLive && isParticipant);
+    const canOpenVeto = isAdmin || (state.isLive && isParticipantForTeam);
     openVetoBtn.style.display = canOpenVeto ? "" : "none";
     openVetoBtn.onclick = canOpenVeto
       ? () => {
@@ -2107,14 +2134,15 @@ async function startPresenceTracking(matchId, hint = null) {
   const write = async () => {
     if (!isMatchInfoModalVisible()) return;
     const now = Date.now();
+    const status = presenceUiStatus || "active";
     const samePayload =
       presenceLastMatchId === (matchId || null) &&
-      presenceLastPlayerId === (playerId || null);
+      presenceLastPlayerId === (playerId || null) &&
+      presenceLastStatus === status;
     if (samePayload && now - presenceLastWriteAt < PRESENCE_MIN_WRITE_MS) {
       return;
     }
 
-    const status = presenceUiStatus || "active";
     if (presenceWriteDenied) return;
     try {
       await rtdbSet(ref, {
@@ -2127,6 +2155,7 @@ async function startPresenceTracking(matchId, hint = null) {
       presenceLastWriteAt = now;
       presenceLastMatchId = matchId || null;
       presenceLastPlayerId = playerId || null;
+      presenceLastStatus = status;
     } catch (err) {
       const code = String(err?.code || "");
       if (code === "permission-denied" || code === "PERMISSION_DENIED") {
@@ -2171,7 +2200,10 @@ async function startPresenceTracking(matchId, hint = null) {
 
   write();
   if (presenceHeartbeat) clearInterval(presenceHeartbeat);
-  presenceHeartbeat = null;
+  presenceHeartbeat = setInterval(() => {
+    if (!isMatchInfoModalVisible()) return;
+    void write();
+  }, PRESENCE_HEARTBEAT_MS);
 
   const modalEl = document.getElementById("matchInfoModal");
   if (modalEl) {
@@ -2215,6 +2247,7 @@ function stopPresenceTracking() {
   presenceLastWriteAt = 0;
   presenceLastMatchId = null;
   presenceLastPlayerId = null;
+  presenceLastStatus = "active";
   presenceUiStatus = "active";
   presenceLastActivityAt = 0;
   if (presenceActivityTimer) clearTimeout(presenceActivityTimer);

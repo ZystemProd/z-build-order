@@ -6,6 +6,7 @@ export function bindMapSelectionEvents({
   const useLadderMapsBtn = document.getElementById("useLadderMapsBtn");
   const clearMapPoolBtn = document.getElementById("clearMapPoolBtn");
   const mapPoolPicker = document.getElementById("mapPoolPicker");
+  const tournamentModeSelect = document.getElementById("tournamentModeSelect");
   const settingsUseLadderMapsBtn = document.getElementById(
     "settingsUseLadderMapsBtn"
   );
@@ -24,6 +25,10 @@ export function bindMapSelectionEvents({
     const card = e.target.closest(".tournament-map-card");
     if (!card) return;
     toggleMapSelection(card.dataset.mapName);
+  });
+  tournamentModeSelect?.addEventListener("change", () => {
+    // Keep create flow intuitive: changing mode resets to that mode's current default pool.
+    setMapPoolSelection(getDefaultMapPoolNames(tournamentModeSelect.value || "1v1"));
   });
 
   settingsUseLadderMapsBtn?.addEventListener("click", () =>

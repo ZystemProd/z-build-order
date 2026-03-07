@@ -12,7 +12,6 @@ import {
   rtdb,
 } from "../../../app.js";
 import { onAuthStateChanged } from "firebase/auth";
-import { httpsCallable } from "firebase/functions";
 import {
   doc,
   setDoc,
@@ -29,11 +28,6 @@ import {
 } from "firebase/firestore";
 import {
   getStorage,
-  ref as storageRef,
-  uploadBytes,
-  getDownloadURL,
-  deleteObject,
-  listAll,
 } from "firebase/storage";
 import { ref as rtdbRef, remove as rtdbRemove } from "firebase/database";
 import { showToast } from "../toastHandler.js";
@@ -175,7 +169,6 @@ import {
   renderPlayerRow,
   renderScoreOptions,
   clampScoreSelectOptions,
-  renderSimpleMatch,
   updateTreeMatchCards,
   layoutBracketSection,
   attachMatchHoverHandlers,
@@ -209,6 +202,7 @@ import {
 } from "./playerDetail.js";
 import { renderSeedingTable } from "./ui/seeding.js";
 import { enableDragScroll } from "./ui/dragScroll.js";
+import { showMatchReadyToastUi } from "./ui/matchReadyToast.js";
 import {
   applyBestOfToSettings,
   populateSettingsPanel as populateSettingsPanelUI,
@@ -240,6 +234,13 @@ import {
   refreshVetoModalIfOpen,
 } from "./maps/veto.js";
 import { initTournamentPage } from "./tournamentPageInit.js";
+import { registerTournamentEvents } from "./events.js";
+import { createTournamentController } from "./controller.js";
+import {
+  renderBracketContent,
+  renderTournamentMetaSection,
+  updatePlacementsRowView,
+} from "./view.js";
 import {
   loadState as loadLocalState,
   hydrateStateFromRemote,
@@ -254,6 +255,7 @@ import {
   loadCircuitRegistry,
   updateTournamentRosterRemote,
 } from "./sync/persistence.js";
+import { syncFromRemoteCore } from "./sync/remoteMerge.js";
 import { createFinalTournamentForCircuit } from "./finalsCreate.js";
 import { initCoverReuseModal } from "./reuseImage.js";
 import { lockBodyScroll, unlockBodyScroll } from "./modalLock.js";
@@ -271,6 +273,7 @@ import {
   updateFinalSlugPreview,
   updateSlugPreview,
 } from "./slugs.js";
+import { createTournamentCoverStorage } from "./media/coverStorage.js";
 import {
   buildCreateTournamentPayload,
   buildFinalTournamentPayload,
@@ -278,8 +281,8 @@ import {
   readBestOf,
 } from "./tournamentPayloads.js";
 import { syncQuillById } from "./markdownEditor.js";
-import { createAdminPlayerSearch } from "./admin/addSearchPlayer.js";
 import { createAdminManager } from "./admin/manageAdmins.js";
+import { createAdminPlayerSearch } from "./admin/addSearchPlayer.js";
 import { initCasterControls, renderCasterSection } from "./caster.js";
 import { setTournamentListItems } from "./listSlider.js";
 import {
@@ -300,6 +303,7 @@ import {
   handleTournamentCheckInAction,
   sendTournamentCheckInNotifications,
   sendTournamentInviteNotification,
+  sendTeamInviteNotification,
 } from "./invites.js";
 const renderMapPoolPicker = renderMapPoolPickerUI;
 const CURRENT_BRACKET_LAYOUT_VERSION = 55;
@@ -311,6 +315,12 @@ const COVER_CARD_WIDTH = 320;
 const COVER_CARD_HEIGHT = 180;
 const SPONSOR_LOGO_SIZE = 256;
 const COVER_QUALITY = 0.82;
+const TOURNAMENT_MODES = new Set(["1v1", "2v2", "3v3", "4v4"]);
+const TEAM_MEMBER_STATUS = {
+  accepted: "accepted",
+  pending: "pending",
+  denied: "denied",
+};
 const PULSE_ENDPOINTS = (() => {
   const endpoints = ["/api/pulse-mmr"];
   if (
@@ -327,6 +337,24 @@ const PULSE_ENDPOINTS = (() => {
   return endpoints;
 })();
 const storage = getStorage(app);
+const {
+  deleteTournamentCoverByUrl,
+  deleteTournamentCoverFolder,
+  deleteTournamentSponsorFolder,
+  uploadTournamentCover,
+  uploadSponsorLogo,
+} = createTournamentCoverStorage({
+  storage,
+  loadTournamentRegistry,
+  prepareImageForUpload,
+  validateTournamentImage,
+  coverTargetWidth: COVER_TARGET_WIDTH,
+  coverTargetHeight: COVER_TARGET_HEIGHT,
+  coverCardWidth: COVER_CARD_WIDTH,
+  coverCardHeight: COVER_CARD_HEIGHT,
+  sponsorLogoSize: SPONSOR_LOGO_SIZE,
+  coverQuality: COVER_QUALITY,
+});
 let currentCircuitMeta = null;
 let isCircuitAdmin = false;
 const chatCleanupDone = new Set();
@@ -344,7 +372,54 @@ let inviteLinkGate = {
 };
 let selfClanHydrationInFlight = false;
 let selfClanHydrated = false;
-let superAdminAddPlayerCallable = null;
+let adminSearchBootstrapPromise = null;
+let teamInviteDraft = [];
+let teamInviteDraftSlug = "";
+let teamInviteSearchInitialized = false;
+let teamInviteDraftDirty = false;
+
+async function ensureAdminSearchBootstrap() {
+  if (adminSearchBootstrapPromise) return adminSearchBootstrapPromise;
+  adminSearchBootstrapPromise = import("./admin/searchBootstrap.js")
+    .then(({ initAdminSearchBootstrap }) =>
+      initAdminSearchBootstrap({
+        db,
+        auth,
+        functions,
+        getState: () => state,
+        getIsAdmin: () => isAdmin,
+        isSuperAdminUser,
+        showToast,
+        normalizeRaceLabel,
+        sanitizeUrl,
+        getCircuitSeedPoints,
+        getCurrentTournamentMeta: () => currentTournamentMeta,
+        getCurrentSlug: () => currentSlug,
+        hydrateStateFromRemote,
+        applyRosterSeedingWithMode,
+        deserializeBracket,
+        saveState,
+        renderAll,
+        bracketHasRecordedResults,
+        pickBestRace,
+        DEFAULT_PLAYER_AVATAR,
+        getDoc,
+        doc,
+        updateRosterWithTransaction,
+        upsertRosterPlayer,
+        addActivity,
+        sendTournamentInviteNotification,
+        getCurrentUsername,
+        buildPlayerFromData,
+        INVITE_STATUS,
+      }),
+    )
+    .catch((err) => {
+      adminSearchBootstrapPromise = null;
+      console.error("Failed to initialize admin search bootstrap", err);
+    });
+  return adminSearchBootstrapPromise;
+}
 
 function isSuperAdminUser() {
   return auth?.currentUser?.uid === SUPER_ADMIN_UID;
@@ -376,6 +451,292 @@ function allowGrandFinalReset(format, rrSettings) {
     return playoffs.startsWith("double");
   }
   return false;
+}
+
+function normalizeTournamentMode(value) {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase();
+  if (TOURNAMENT_MODES.has(normalized)) return normalized;
+  return "1v1";
+}
+
+function getTournamentMode(meta = currentTournamentMeta) {
+  return normalizeTournamentMode(meta?.mode);
+}
+
+function getTeamSizeFromMode(mode) {
+  const normalized = normalizeTournamentMode(mode);
+  const teamSize = Number(normalized.charAt(0));
+  return Number.isFinite(teamSize) && teamSize > 1 ? teamSize : 1;
+}
+
+function getTournamentTeamSize(meta = currentTournamentMeta) {
+  return getTeamSizeFromMode(getTournamentMode(meta));
+}
+
+function isTeamTournament(meta = currentTournamentMeta) {
+  return getTournamentTeamSize(meta) > 1;
+}
+
+function normalizeTeamMemberStatus(status) {
+  const normalized = String(status || "")
+    .trim()
+    .toLowerCase();
+  if (
+    normalized === TEAM_MEMBER_STATUS.accepted ||
+    normalized === TEAM_MEMBER_STATUS.pending ||
+    normalized === TEAM_MEMBER_STATUS.denied
+  ) {
+    return normalized;
+  }
+  return TEAM_MEMBER_STATUS.pending;
+}
+
+function hasTeamMemberInviteBeenSent(member) {
+  const sentAt = Number(member?.inviteSentAt);
+  return Number.isFinite(sentAt) && sentAt > 0;
+}
+
+function normalizeTeamMembersFromPlayer(player, teamSize = getTournamentTeamSize()) {
+  const rawMembers = Array.isArray(player?.team?.members) ? player.team.members : [];
+  const memberStatusRank = (status) => {
+    const normalized = normalizeTeamMemberStatus(status);
+    if (normalized === TEAM_MEMBER_STATUS.accepted) return 0;
+    if (normalized === TEAM_MEMBER_STATUS.pending) return 1;
+    return 2;
+  };
+  const memberActivityTs = (member) =>
+    Number(member?.respondedAt || member?.invitedAt || 0) || 0;
+  const pickBetterMember = (a, b) => {
+    if (!a) return b;
+    if (!b) return a;
+    const roleA = a.role === "leader" ? 0 : 1;
+    const roleB = b.role === "leader" ? 0 : 1;
+    if (roleA !== roleB) return roleA < roleB ? a : b;
+    const rankA = memberStatusRank(a.status);
+    const rankB = memberStatusRank(b.status);
+    if (rankA !== rankB) return rankA < rankB ? a : b;
+    return memberActivityTs(a) >= memberActivityTs(b) ? a : b;
+  };
+  const normalized = rawMembers
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") return null;
+      const uid = String(entry.uid || "").trim();
+      if (!uid) return null;
+      return {
+        uid,
+        name: String(entry.name || "").trim() || "Unknown",
+        role: entry.role === "leader" ? "leader" : "member",
+        status:
+          entry.role === "leader"
+            ? TEAM_MEMBER_STATUS.accepted
+            : normalizeTeamMemberStatus(entry.status),
+        race: String(entry.race || "").trim(),
+        sc2Link: String(entry.sc2Link || "").trim(),
+        pulseName: String(entry.pulseName || "").trim(),
+        mmr: Number.isFinite(Number(entry.mmr)) ? Math.max(0, Number(entry.mmr)) : 0,
+        mmrByRace:
+          entry.mmrByRace && typeof entry.mmrByRace === "object"
+            ? { ...entry.mmrByRace }
+            : null,
+        secondaryPulseLinks: Array.isArray(entry.secondaryPulseLinks)
+          ? entry.secondaryPulseLinks.slice()
+          : [],
+        secondaryPulseProfiles: Array.isArray(entry.secondaryPulseProfiles)
+          ? entry.secondaryPulseProfiles.slice()
+          : [],
+        twitchUrl: String(entry.twitchUrl || "").trim(),
+        country: String(entry.country || "").trim(),
+        avatarUrl: String(entry.avatarUrl || "").trim(),
+        invitedAt: Number.isFinite(Number(entry.invitedAt))
+          ? Number(entry.invitedAt)
+          : null,
+        inviteSentAt: Number.isFinite(Number(entry.inviteSentAt))
+          ? Number(entry.inviteSentAt)
+          : null,
+        respondedAt: Number.isFinite(Number(entry.respondedAt))
+          ? Number(entry.respondedAt)
+          : null,
+      };
+    })
+    .filter(Boolean);
+  if (!normalized.length) return [];
+  const byUid = new Map();
+  normalized.forEach((member) => {
+    byUid.set(member.uid, pickBetterMember(byUid.get(member.uid), member));
+  });
+  const deduped = Array.from(byUid.values());
+  const leaderUid = String(player?.uid || "").trim();
+  const leaderName = String(player?.name || "").trim() || "Leader";
+  const leaderIndex = deduped.findIndex((entry) => entry.uid === leaderUid);
+  if (leaderUid) {
+    const leader = {
+      uid: leaderUid,
+      name: leaderName,
+      role: "leader",
+      status: TEAM_MEMBER_STATUS.accepted,
+      race: String(player?.race || "").trim(),
+      sc2Link: String(player?.sc2Link || "").trim(),
+      pulseName: String(player?.pulseName || "").trim(),
+      mmr: Number.isFinite(Number(player?.mmr)) ? Math.max(0, Number(player.mmr)) : 0,
+      mmrByRace:
+        player?.mmrByRace && typeof player.mmrByRace === "object"
+          ? { ...player.mmrByRace }
+          : null,
+      secondaryPulseLinks: Array.isArray(player?.secondaryPulseLinks)
+        ? player.secondaryPulseLinks.slice()
+        : [],
+      secondaryPulseProfiles: Array.isArray(player?.secondaryPulseProfiles)
+        ? player.secondaryPulseProfiles.slice()
+        : [],
+      twitchUrl: String(player?.twitchUrl || "").trim(),
+      country: String(player?.country || "").trim(),
+      avatarUrl: String(player?.avatarUrl || "").trim(),
+      invitedAt:
+        Number.isFinite(Number(player?.team?.createdAt))
+          ? Number(player.team.createdAt)
+          : Date.now(),
+      inviteSentAt: null,
+      respondedAt: Number.isFinite(Number(player?.team?.createdAt))
+        ? Number(player.team.createdAt)
+        : Date.now(),
+    };
+    if (leaderIndex >= 0) {
+      deduped[leaderIndex] = { ...deduped[leaderIndex], ...leader };
+    } else {
+      deduped.unshift(leader);
+    }
+  }
+  const maxMembers = Math.max(1, Number(teamSize) || 1);
+  const leaders = deduped.filter((entry) => entry.role === "leader");
+  const members = deduped
+    .filter((entry) => entry.role !== "leader")
+    .sort((a, b) => {
+      const rankDiff = memberStatusRank(a.status) - memberStatusRank(b.status);
+      if (rankDiff) return rankDiff;
+      const aTs = memberActivityTs(a);
+      const bTs = memberActivityTs(b);
+      return bTs - aTs;
+    });
+  const primaryLeader = leaders[0];
+  const capped = [
+    ...(primaryLeader ? [primaryLeader] : []),
+    ...members.slice(0, Math.max(0, maxMembers - 1)),
+  ];
+  return capped;
+}
+
+function findTeamMembership(players = [], uid, options = {}) {
+  if (!uid) return null;
+  const includeDenied = Boolean(options.includeDenied);
+  const candidates = [];
+  for (const player of players || []) {
+    if (!player || typeof player !== "object") continue;
+    const teamSize = getTeamSizeFromMode(player?.team?.mode || getTournamentMode());
+    const members = normalizeTeamMembersFromPlayer(player, teamSize);
+    if (!members.length) continue;
+    const member = members.find((entry) => entry.uid === uid);
+    if (!member) continue;
+    const status = normalizeTeamMemberStatus(member.status);
+    if (!includeDenied && status === TEAM_MEMBER_STATUS.denied) continue;
+    candidates.push({
+      player,
+      member,
+      role: member.role === "leader" ? "leader" : "member",
+      status,
+      teamSize,
+      updatedAt:
+        Number(player?.team?.updatedAt || player?.team?.createdAt || 0) ||
+        Number(member?.respondedAt || member?.invitedAt || 0) ||
+        0,
+    });
+  }
+  if (!candidates.length) return null;
+  const statusRank = (status) => {
+    if (status === TEAM_MEMBER_STATUS.accepted) return 0;
+    if (status === TEAM_MEMBER_STATUS.pending) return 1;
+    return 2;
+  };
+  candidates.sort((a, b) => {
+    const roleA = a.role === "leader" ? 0 : 1;
+    const roleB = b.role === "leader" ? 0 : 1;
+    if (roleA !== roleB) return roleA - roleB;
+    const statusDiff = statusRank(a.status) - statusRank(b.status);
+    if (statusDiff) return statusDiff;
+    return b.updatedAt - a.updatedAt;
+  });
+  return candidates[0];
+}
+
+function getTeamInviteUiRefs() {
+  return {
+    layout: document.getElementById("teamModeLayout"),
+    section: document.getElementById("teamInviteSection"),
+    teamNameInput: document.getElementById("teamNameInput"),
+    helperText: document.getElementById("teamInviteHelperText"),
+    slotsText: document.getElementById("teamInviteSlotsText"),
+    searchInput: document.getElementById("teamInviteSearchInput"),
+    searchResults: document.getElementById("teamInviteSearchResults"),
+    list: document.getElementById("teamInviteList"),
+    status: document.getElementById("teamInviteStatus"),
+    currentSection: document.getElementById("teamCurrentSection"),
+    currentList: document.getElementById("teamCurrentList"),
+    currentStatus: document.getElementById("teamCurrentStatus"),
+    leaveBtn: document.getElementById("leaveTeamBtn"),
+  };
+}
+
+function resetTeamInviteDraftForCurrentSlug() {
+  if (teamInviteDraftSlug === currentSlug) return;
+  teamInviteDraftSlug = currentSlug || "";
+  teamInviteDraft = [];
+  teamInviteDraftDirty = false;
+  const refs = getTeamInviteUiRefs();
+  if (refs.teamNameInput) {
+    refs.teamNameInput.value = "";
+  }
+}
+
+function setTeamInviteStatus(message = "", isError = false) {
+  const { status } = getTeamInviteUiRefs();
+  setStatus(status, message, isError);
+}
+
+function setTeamCurrentStatus(message = "", isError = false) {
+  const { currentStatus } = getTeamInviteUiRefs();
+  setStatus(currentStatus, message, isError);
+}
+
+function syncTeamInviteDraftFromPlayer(player, teamSize) {
+  if (!player || !isTeamTournament(currentTournamentMeta)) return;
+  const members = normalizeTeamMembersFromPlayer(player, teamSize)
+    .filter((entry) => entry.role !== "leader")
+    .map((entry) => ({ ...entry }));
+  teamInviteDraft = members;
+  teamInviteDraftDirty = false;
+}
+
+function getRequiredTeammateCount(meta = currentTournamentMeta) {
+  return Math.max(0, getTournamentTeamSize(meta) - 1);
+}
+
+function getActiveMembershipForUser(uid) {
+  if (!uid) return null;
+  return findTeamMembership(state.players || [], uid, { includeDenied: false });
+}
+
+function isUidInAnotherTeam(uid, ignoreTeamId = "") {
+  if (!uid) return false;
+  const membership = findTeamMembership(state.players || [], uid, {
+    includeDenied: false,
+  });
+  if (!membership) return false;
+  const memberTeamId = String(membership.player?.team?.teamId || "");
+  if (ignoreTeamId && memberTeamId && memberTeamId === ignoreTeamId) {
+    return false;
+  }
+  return true;
 }
 
 function getInviteTokenStorageKey(slug) {
@@ -1049,218 +1410,32 @@ function shouldUsePartialRender(prevState, nextState, format) {
 }
 
 function syncFromRemote(incoming) {
-  if (!incoming || typeof incoming !== "object") return;
-  const incomingPlayersArr = Array.isArray(incoming?.players)
-    ? incoming.players
-    : [];
-  const localPlayersArr = Array.isArray(state?.players) ? state.players : [];
-
-  const incomingUids = incomingPlayersArr.map((p) => p?.uid).filter(Boolean);
-  const localUids = localPlayersArr.map((p) => p?.uid).filter(Boolean);
-
-  const incomingNames = incomingPlayersArr.map((p) => p?.name).filter(Boolean);
-  const localNames = localPlayersArr.map((p) => p?.name).filter(Boolean);
-
-  const localOnly = localUids.filter((uid) => !incomingUids.includes(uid));
-  const incomingOnly = incomingUids.filter((uid) => !localUids.includes(uid));
-
-  // debug logging removed
-
-  if (
-    incomingPlayersArr.length === 0 &&
-    Array.isArray(state?.players) &&
-    state.players.length > 0
-  ) {
-    console.warn(
-      "🛑 [tournament-sync] syncFromRemote ignored empty incoming.players",
-      {
-        slug: currentSlug,
-        incomingLastUpdated: Number(incoming?.lastUpdated) || 0,
-        localPlayersCount: state.players.length,
-      },
-    );
-    return;
-  }
-
-  const incomingPresence = incoming.presence?.matchInfo || null;
-  const currentPresence = state?.presence?.matchInfo || null;
-  const presenceChanged =
-    incomingPresence &&
-    JSON.stringify(incomingPresence) !== JSON.stringify(currentPresence || {});
-  const matchVetoesChangedEarly = !safeJsonEqual(
-    incoming.matchVetoes || {},
-    state.matchVetoes || {},
-  );
-  const casterChanged =
-    JSON.stringify(incoming.casterRequests || []) !==
-      JSON.stringify(state.casterRequests || []) ||
-    JSON.stringify(incoming.casters || []) !==
-      JSON.stringify(state.casters || []) ||
-    JSON.stringify(incoming.matchCasts || {}) !==
-      JSON.stringify(state.matchCasts || {});
-
-  if (
-    incoming.lastUpdated &&
-    incoming.lastUpdated <= state.lastUpdated &&
-    !casterChanged &&
-    !matchVetoesChangedEarly
-  ) {
-    if (presenceChanged) {
-      setStateObj({ ...state, presence: { matchInfo: incomingPresence } });
-      refreshMatchInfoPresenceIfOpen?.();
-    }
-    return;
-  }
-  const prevState = state;
-  const nextPlayers = applyRosterSeedingWithMode(
-    incoming.players || [],
+  syncFromRemoteCore({
     incoming,
-  );
-  const nextBracket = deserializeBracket(incoming.bracket);
-  const inProgressVetoId =
-    currentVetoMatchId && vetoState && vetoState.stage !== "done"
-      ? currentVetoMatchId
-      : null;
-  const inProgressVeto = inProgressVetoId
-    ? {
-        maps: vetoState?.picks || [],
-        vetoed: vetoState?.vetoed || [],
-        bestOf: vetoState?.bestOf || 1,
-        updatedAt: vetoState?.updatedAt || Date.now(),
-        participants: {
-          lower: vetoState?.lowerName || "Lower seed",
-          higher: vetoState?.higherName || "Higher seed",
-        },
-        mapResults: state.matchVetoes?.[inProgressVetoId]?.mapResults || [],
-      }
-    : null;
-  const nextState = {
-    ...defaultState,
-    ...incoming,
-    players: nextPlayers,
-    pointsLedger: incoming.pointsLedger || {},
-    activity: incoming.activity || [],
-    bracket: nextBracket,
-  };
-  nextState.matchVetoes = mergeMatchVetoes(
-    state.matchVetoes || {},
-    nextState.matchVetoes || {},
-  );
-  if (inProgressVetoId && inProgressVeto) {
-    const incomingEntry = nextState.matchVetoes?.[inProgressVetoId] || null;
-    const incomingUpdated = Number(incomingEntry?.updatedAt) || 0;
-    const localUpdated = Number(inProgressVeto.updatedAt) || 0;
-    if (localUpdated >= incomingUpdated) {
-      nextState.matchVetoes = {
-        ...(nextState.matchVetoes || {}),
-        [inProgressVetoId]: inProgressVeto,
-      };
-    }
-  }
-  const activityChanged = !safeJsonEqual(
-    prevState.activity || [],
-    nextState.activity || [],
-  );
-  const matchVetoesChanged = !safeJsonEqual(
-    prevState.matchVetoes || {},
-    nextState.matchVetoes || {},
-  );
-  const onlyVetoChange =
-    matchVetoesChanged &&
-    !activityChanged &&
-    prevState.isLive === nextState.isLive &&
-    prevState.hasBeenLive === nextState.hasBeenLive &&
-    prevState.disableFinalAutoAdd === nextState.disableFinalAutoAdd &&
-    prevState.needsReseed === nextState.needsReseed &&
-    prevState.bracketLayoutVersion === nextState.bracketLayoutVersion &&
-    safeJsonEqual(prevState.players || [], nextState.players || []) &&
-    safeJsonEqual(prevState.bracket || null, nextState.bracket || null) &&
-    safeJsonEqual(prevState.pointsLedger || {}, nextState.pointsLedger || {}) &&
-    safeJsonEqual(
-      prevState.manualSeedingEnabled,
-      nextState.manualSeedingEnabled,
-    ) &&
-    safeJsonEqual(
-      prevState.manualSeedingOrder || [],
-      nextState.manualSeedingOrder || [],
-    ) &&
-    safeJsonEqual(prevState.matchCasts || {}, nextState.matchCasts || {}) &&
-    safeJsonEqual(prevState.scoreReports || {}, nextState.scoreReports || {}) &&
-    safeJsonEqual(prevState.casters || [], nextState.casters || []) &&
-    safeJsonEqual(
-      prevState.casterRequests || [],
-      nextState.casterRequests || [],
-    );
-  const stripVetoState = (value) => {
-    const trimmed = { ...(value || {}) };
-    delete trimmed.matchVetoes;
-    delete trimmed.lastUpdated;
-    delete trimmed.presence;
-    return trimmed;
-  };
-  const vetoOnlyChange =
-    matchVetoesChanged &&
-    safeJsonEqual(stripVetoState(prevState), stripVetoState(nextState));
-  let allowPartial = shouldUsePartialRender(
-    prevState,
-    nextState,
-    currentTournamentMeta?.format,
-  );
-  let matchIds = [];
-  if (allowPartial) {
-    const bracketMatchIds = getBracketMatchIdsForPartial(
-      prevState.bracket,
-      nextBracket,
-    );
-    if (bracketMatchIds === null) {
-      allowPartial = false;
-    } else {
-      const combined = new Set(bracketMatchIds);
-      getChangedMatchIdsFromMap(
-        prevState.matchCasts,
-        nextState.matchCasts,
-      ).forEach((id) => combined.add(id));
-      getChangedMatchIdsFromMap(
-        prevState.scoreReports,
-        nextState.scoreReports,
-      ).forEach((id) => combined.add(id));
-      matchIds = Array.from(combined).filter(Boolean);
-    }
-  }
-  setStateObj(nextState);
-  maybeToastMyMatchReady(prevState, nextState);
-
-  if (onlyVetoChange || vetoOnlyChange) {
-    refreshMatchInfoModalIfOpen?.();
-    refreshVetoModalIfOpen?.();
-    return;
-  }
-
-  if (
-    allowPartial &&
-    !matchIds.length &&
-    matchVetoesChanged &&
-    !activityChanged
-  ) {
-    refreshMatchInfoModalIfOpen?.();
-    refreshVetoModalIfOpen?.();
-    return;
-  }
-  if (allowPartial && matchIds.length) {
-    renderAll(matchIds);
-    if (activityChanged) {
-      renderActivityList({ state, escapeHtml, formatTime });
-    }
-  } else if (allowPartial && activityChanged) {
-    renderActivityList({ state, escapeHtml, formatTime });
-  } else {
-    renderAll();
-  }
-  refreshPlayerDetailModalIfOpen(getPlayersMap);
-  refreshMatchInfoModalIfOpen?.();
-  if (matchVetoesChanged) {
-    refreshVetoModalIfOpen?.();
-  }
+    getState: () => state,
+    setStateObj,
+    currentSlug,
+    safeJsonEqual,
+    refreshMatchInfoPresenceIfOpen,
+    applyRosterSeedingWithMode,
+    deserializeBracket,
+    currentVetoMatchId,
+    vetoState,
+    defaultState,
+    shouldUsePartialRender,
+    getFormat: () => currentTournamentMeta?.format,
+    getBracketMatchIdsForPartial,
+    getChangedMatchIdsFromMap,
+    maybeToastMyMatchReady,
+    refreshMatchInfoModalIfOpen,
+    refreshVetoModalIfOpen,
+    renderAll,
+    renderActivityList,
+    escapeHtml,
+    formatTime,
+    refreshPlayerDetailModalIfOpen,
+    getPlayersMap,
+  });
 }
 
 function isCurrentUserTournamentPlayer(player) {
@@ -1289,97 +1464,6 @@ function isCurrentUserTournamentPlayerByUid(player) {
   return String(player.uid).trim() === uid;
 }
 
-function findFirstReadyMatchForCurrentUser(snapshot) {
-  if (!snapshot?.bracket) return null;
-
-  const lookup = getMatchLookup(snapshot.bracket);
-  const playersById = getPlayersMap(); // you already have this helper in index.js
-
-  for (const match of getAllMatches(snapshot.bracket)) {
-    if (!match?.id) continue;
-    if (match.status === "complete") continue;
-
-    const [pA, pB] = resolveParticipants(match, lookup, playersById);
-    if (!pA || !pB) continue; // not ready
-
-    if (
-      isCurrentUserTournamentPlayer(pA) ||
-      isCurrentUserTournamentPlayer(pB)
-    ) {
-      return match;
-    }
-  }
-  return null;
-}
-
-function collectUserReadyMatchIds(snapshot) {
-  const uid = auth?.currentUser?.uid || null;
-  if (!uid) return new Set();
-  const bracket = snapshot?.bracket || null;
-  if (!bracket) return new Set();
-
-  const lookup = getMatchLookup(bracket);
-  const playersById = new Map(
-    (snapshot?.players || []).map((player) => [player?.id, player]),
-  );
-
-  const out = new Set();
-  getAllMatches(bracket).forEach((match) => {
-    if (!match || !match.id) return;
-    if (match.status === "complete") return;
-
-    const [pA, pB] = resolveParticipants(match, lookup, playersById);
-    if (!pA || !pB) return; // not ready yet
-
-    if (pA?.uid === uid || pB?.uid === uid) {
-      out.add(match.id);
-    }
-  });
-
-  return out;
-}
-
-function isMatchInspectorOpen() {
-  const modal = document.getElementById("matchInfoModal");
-  if (!modal) return false;
-  return modal.classList.contains("is-open");
-}
-
-function maybeAutoOpenReadyMatch(prevSnapshot, nextSnapshot) {
-  const { isOpen, matchId: inspectorMatchId } = getMatchInspectorState();
-
-  const prevReady = collectUserReadyMatchIds(prevSnapshot);
-  const nextReady = collectUserReadyMatchIds(nextSnapshot);
-
-  // Find first "newly ready" match for current user
-  let newlyReadyId = "";
-  for (const id of nextReady) {
-    if (!prevReady.has(id)) {
-      newlyReadyId = id;
-      break;
-    }
-  }
-  if (!newlyReadyId) return;
-
-  // If inspector closed, open it.
-  if (!isOpen) {
-    openMatchInfoModalUsingDeps(newlyReadyId);
-    return;
-  }
-
-  // If inspector already on that match, do nothing.
-  if (inspectorMatchId === newlyReadyId) return;
-
-  // If user is currently "waiting" inside inspector on their own match, do nothing.
-  // (This preserves your original requirement.)
-  if (isInspectorShowingUserWaitingMatch(nextSnapshot, inspectorMatchId))
-    return;
-
-  // Otherwise: inspector is open on some other match (like your screenshot),
-  // so switch it to your newly ready match.
-  openMatchInfoModalUsingDeps(newlyReadyId);
-}
-
 function getPromoStripRenderKey(meta) {
   if (!meta) return "";
   return JSON.stringify({
@@ -1388,20 +1472,6 @@ function getPromoStripRenderKey(meta) {
     circuitSlug: meta.circuitSlug || "",
     copyFromCircuitPromos: getCopyFromCircuitPromos(meta),
   });
-}
-
-function mergeMatchVetoes(local = {}, incoming = {}) {
-  const out = { ...incoming };
-  Object.keys(local || {}).forEach((matchId) => {
-    const localEntry = local[matchId];
-    const incomingEntry = incoming[matchId];
-    const localUpdated = Number(localEntry?.updatedAt) || 0;
-    const incomingUpdated = Number(incomingEntry?.updatedAt) || 0;
-    if (!incomingEntry || localUpdated > incomingUpdated) {
-      out[matchId] = localEntry;
-    }
-  });
-  return out;
 }
 
 let unsubscribeRemoteState = null;
@@ -1860,43 +1930,13 @@ function handleApplyCircuitPoints(event) {
 }
 
 function updatePlacementsRow() {
-  if (!currentTournamentMeta) return;
-  const placementsRow = document.getElementById("tournamentPlacements");
-  const placementFirst = document.getElementById("placementFirst");
-  const placementSecond = document.getElementById("placementSecond");
-  const placementThirdFourth = document.getElementById("placementThirdFourth");
-  if (
-    !placementsRow ||
-    !placementFirst ||
-    !placementSecond ||
-    !placementThirdFourth
-  )
-    return;
-  const eligiblePlayers = getEligiblePlayers(state.players || []);
-  const placements = computePlacementsForBracket(
-    state.bracket,
-    eligiblePlayers.length || 0,
-  );
-  if (!placements) {
-    placementsRow.style.display = "none";
-    return;
-  }
-  const playersById = getPlayersMap();
-  const firstId = Array.from(placements.entries()).find(
-    ([, p]) => p === 1,
-  )?.[0];
-  const secondId = Array.from(placements.entries()).find(
-    ([, p]) => p === 2,
-  )?.[0];
-  const thirdIds = Array.from(placements.entries())
-    .filter(([, p]) => p === 3)
-    .map(([id]) => id);
-  placementFirst.textContent = playersById.get(firstId)?.name || "—";
-  placementSecond.textContent = playersById.get(secondId)?.name || "—";
-  placementThirdFourth.textContent = thirdIds.length
-    ? thirdIds.map((id) => playersById.get(id)?.name || "—").join(" · ")
-    : "—";
-  placementsRow.style.display = "flex";
+  updatePlacementsRowView({
+    currentTournamentMeta,
+    state,
+    getEligiblePlayers,
+    computePlacementsForBracket,
+    getPlayersMap,
+  });
 }
 
 function renderAll(matchIds = null) {
@@ -1904,6 +1944,14 @@ function renderAll(matchIds = null) {
   const bracket = state.bracket;
   const playersArr = state.players || [];
   const format = currentTournamentMeta?.format || "Tournament";
+  if (
+    !state.isLive &&
+    state.needsReseed &&
+    !bracketHasRecordedResults(state.bracket)
+  ) {
+    rebuildBracket(true);
+    return;
+  }
   syncMatchReadySince();
   const shouldPartialUpdate =
     Array.isArray(matchIds) &&
@@ -1949,435 +1997,59 @@ function renderAll(matchIds = null) {
   updateMmrSeedingUi();
   updateBotManagerCount();
 
-  if (currentTournamentMeta) {
-    const tournamentTitle = document.getElementById("tournamentTitle");
-    const tournamentFormat = document.getElementById("tournamentFormat");
-    const tournamentStart = document.getElementById("tournamentStart");
-    const descriptionBody = document.getElementById(
-      "tournamentDescriptionBody",
-    );
-    const rulesBody = document.getElementById("tournamentRulesBody");
-    const prizeInfoSection = document.getElementById("tournamentPrizeInfoSection");
-    const prizeInfoBody = document.getElementById("tournamentPrizeInfoBody");
-    const statPlayers = document.getElementById("statPlayers");
-    const tournamentPrizePool = document.getElementById("tournamentPrizePool");
-    const registerBtn = document.getElementById("registerBtn");
-    const goLiveBtn = document.getElementById("rebuildBracketBtn");
-    const recreateBracketBtn = document.getElementById("recreateBracketBtn");
-    const notifyCheckInBtn = document.getElementById("notifyCheckInBtn");
-    const refreshMmrBtn = document.getElementById("refreshMmrBtn");
-    const resetTournamentBtn = document.getElementById("resetTournamentBtn");
-    const resetScoresBtn = document.getElementById("resetScoresBtn");
-    const resetVetoScoreChatBtn = document.getElementById(
-      "resetVetoScoreChatBtn",
-    );
-    const startMs = getStartTimeMs(currentTournamentMeta);
-    const liveDot = document.getElementById("liveDot");
-    const bracketPreviewControls = document.getElementById(
-      "bracketPreviewControls",
-    );
-    const bracketShowPreviewToggle = document.getElementById(
-      "bracketShowPreviewToggle",
-    );
-    const bracketShowPreviewPublicToggle = document.getElementById(
-      "bracketShowPreviewPublicToggle",
-    );
-    const bracketGrid = document.getElementById("bracketGrid");
-    const bracketNotLive = document.getElementById("bracketNotLive");
-    const matchInfoModal = document.getElementById("matchInfoModal");
-    const bracketNotLiveMessage = document.getElementById(
-      "bracketNotLiveMessage",
-    );
-    const registeredPlayersList = document.getElementById(
-      "registeredPlayersList",
-    );
-    const activityCard = document.getElementById("activityCard");
-    const casterLiveCard = document.getElementById("casterLiveCard");
-    const bracketTitle = document.getElementById("bracketTitle");
-    const currentUid = auth.currentUser?.uid || null;
-    const currentPlayer = currentUid
-      ? (state.players || []).find((p) => p.uid === currentUid)
-      : null;
-    const currentInviteStatus = normalizeInviteStatus(
-      currentPlayer?.inviteStatus,
-    );
-    const eligiblePlayers = getEligiblePlayers(state.players || []);
-    const hasCheckedIn = eligiblePlayers.some((player) => player.checkedInAt);
-    const isInviteOnly = isInviteOnlyTournament(currentTournamentMeta);
-    const accessNote = document.getElementById("registrationAccessNote");
-    const registrationForm = document.getElementById("registrationForm");
-    const registrationCard = document.getElementById("registrationCard");
-    const registrationGuestMessage = document.getElementById(
-      "registrationGuestMessage",
-    );
-    const isGuest = !auth.currentUser;
-
-    hydrateCurrentUserClanLogo();
-
-    if (registrationGuestMessage) {
-      registrationGuestMessage.style.display = isGuest ? "block" : "none";
-    }
-    if (registrationCard) {
-      registrationCard.style.display = isGuest ? "none" : "";
-    }
-
-    if (tournamentTitle) {
-      tournamentTitle.textContent = currentTournamentMeta.name || "Tournament";
-      setTabAlertsBaseTitle(tournamentTitle.textContent);
-    }
-    const tournamentHero = document.querySelector("#tournamentView .hero");
-    if (tournamentHero) {
-      const coverUrl = sanitizeUrl(currentTournamentMeta.coverImageUrl || "");
-      if (coverUrl) {
-        if (tournamentHero.dataset.coverUrl !== coverUrl) {
-          tournamentHero.classList.add("has-cover");
-          tournamentHero.style.setProperty(
-            "--hero-cover-image",
-            `url("${coverUrl}")`,
-          );
-          tournamentHero.dataset.coverUrl = coverUrl;
-        } else {
-          tournamentHero.classList.add("has-cover");
-        }
-      } else {
-        tournamentHero.classList.remove("has-cover");
-        tournamentHero.style.removeProperty("--hero-cover-image");
-        if (tournamentHero.dataset.coverUrl) {
-          delete tournamentHero.dataset.coverUrl;
-        }
-      }
-    }
-    if (tournamentFormat) {
-      tournamentFormat.textContent =
-        currentTournamentMeta.format || "Tournament";
-    }
-    if (descriptionBody) {
-      descriptionBody.innerHTML = renderMarkdown(
-        currentTournamentMeta.description || "",
-      );
-    }
-    if (rulesBody) {
-      rulesBody.innerHTML = renderMarkdown(currentTournamentMeta.rules || "");
-    }
-    if (prizeInfoSection && prizeInfoBody) {
-      const markup = renderPrizeInfoMarkup(currentTournamentMeta);
-      prizeInfoSection.style.display = markup ? "" : "none";
-      prizeInfoBody.innerHTML = markup;
-    }
-    if (bracketTitle) {
-      const formatLabel = (currentTournamentMeta.format || "").toLowerCase();
-      const isGroupStage =
-        formatLabel.includes("round robin") ||
-        isDualTournamentFormat(formatLabel);
-      bracketTitle.textContent = isGroupStage
-        ? "Group Stage"
-        : currentTournamentMeta.format || "Bracket";
-    }
-    if (tournamentStart) {
-      tournamentStart.textContent = startMs
-        ? new Date(startMs).toLocaleString([], {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          })
-        : "TBD";
-    }
-    if (statPlayers)
-      statPlayers.textContent = String(eligiblePlayers.length || 0);
-    if (tournamentPrizePool) {
-      tournamentPrizePool.textContent = formatPrizePoolTotal(
-        {
-          total: currentTournamentMeta?.prizePoolTotal,
-          currency: currentTournamentMeta?.prizePoolCurrency || "USD",
-          customCurrency: currentTournamentMeta?.prizePoolCurrencyCustom || "",
-        },
-      );
-    }
-
-    const tokenActive =
-      isInviteOnly &&
-      !isAdmin &&
-      !currentPlayer &&
-      inviteLinkGate?.slug === currentSlug &&
-      Boolean(inviteLinkGate?.token);
-    const inviteLinkExhausted =
-      tokenActive &&
-      inviteLinkGate.status === "ready" &&
-      !inviteLinkGate.ok &&
-      String(inviteLinkGate.message || "")
-        .toLowerCase()
-        .includes("no remaining uses");
-
-    if (accessNote) {
-      accessNote.classList.toggle("is-blocking", inviteLinkExhausted);
-      if (isInviteOnly && !isAdmin) {
-        if (tokenActive) {
-          accessNote.textContent =
-            inviteLinkGate.message || "Invite link detected.";
-        } else {
-          accessNote.textContent =
-            "This tournament is invite-only. Ask an admin for an invite.";
-        }
-        accessNote.style.display = "block";
-      } else {
-        accessNote.textContent = "";
-        accessNote.style.display = "none";
-      }
-    }
-
-    if (registrationForm) {
-      if (inviteLinkExhausted) {
-        registrationForm.style.display = "none";
-      } else {
-        registrationForm.style.display = "";
-      }
-    }
-
-    updatePlacementsRow();
-
-    if (registerBtn) {
-      const isRegisterLoading = registerBtn.classList.contains("is-loading");
-      if (state.isLive) {
-        registerBtn.textContent = "Registration closed";
-        registerBtn.disabled = true;
-      } else if (
-        currentPlayer &&
-        currentInviteStatus === INVITE_STATUS.pending
-      ) {
-        registerBtn.textContent = "Invitation pending";
-        registerBtn.disabled = true;
-      } else if (
-        currentPlayer &&
-        currentInviteStatus === INVITE_STATUS.denied
-      ) {
-        registerBtn.textContent = "Invite declined";
-        registerBtn.disabled = true;
-      } else if (currentPlayer) {
-        registerBtn.textContent = "Unregister";
-        registerBtn.disabled = false;
-      } else if (isInviteOnly && !isAdmin) {
-        const tokenActive =
-          inviteLinkGate?.slug === currentSlug &&
-          Boolean(inviteLinkGate?.token);
-        if (!tokenActive) {
-          registerBtn.textContent = "Invite required";
-          registerBtn.disabled = true;
-        } else if (inviteLinkGate.status === "loading") {
-          registerBtn.textContent = "Checking invite link...";
-          registerBtn.disabled = true;
-        } else if (!inviteLinkGate.ok) {
-          registerBtn.textContent = "Invite link invalid";
-          registerBtn.disabled = true;
-        } else {
-          registerBtn.textContent = "Register";
-          registerBtn.disabled = isRegisterLoading ? true : false;
-        }
-      } else {
-        registerBtn.textContent = "Register";
-        registerBtn.disabled = isRegisterLoading ? true : false;
-      }
-    }
-
-    if (goLiveBtn) {
-      const checkInState = getCheckInWindowState(currentTournamentMeta);
-      const requiresManualClose =
-        checkInState.allowAfterStart && checkInState.isOpen;
-      const canResumeExistingBracket =
-        Boolean(state.hasBeenLive) &&
-        Boolean(state.bracket) &&
-        bracketHasResults();
-      if (state.isLive) {
-        goLiveBtn.disabled = false;
-        goLiveBtn.textContent = "Set Not Live";
-        goLiveBtn.classList.add("danger");
-        goLiveBtn.classList.remove("success");
-      } else {
-        goLiveBtn.disabled = canResumeExistingBracket
-          ? false
-          : !hasCheckedIn || requiresManualClose;
-        goLiveBtn.textContent = canResumeExistingBracket
-          ? "Resume Live"
-          : "Go Live";
-        goLiveBtn.classList.add("success");
-        goLiveBtn.classList.remove("danger");
-      }
-    }
-    if (recreateBracketBtn) {
-      const show = isAdmin && !state.isLive && Boolean(state.hasBeenLive);
-      recreateBracketBtn.style.display = show ? "" : "none";
-      recreateBracketBtn.disabled = false;
-    }
-    if (resetTournamentBtn) {
-      resetTournamentBtn.classList.add("danger");
-    }
-    if (resetScoresBtn) {
-      resetScoresBtn.classList.add("danger");
-    }
-    if (resetVetoScoreChatBtn) {
-      resetVetoScoreChatBtn.classList.add("danger");
-    }
-    if (notifyCheckInBtn) {
-      const checkInState = getCheckInWindowState(currentTournamentMeta);
-      const eligibleNotCheckedIn = eligiblePlayers.filter(
-        (p) => !p.checkedInAt,
-      );
-      notifyCheckInBtn.disabled =
-        state.isLive ||
-        !checkInState.isOpen ||
-        eligibleNotCheckedIn.length === 0;
-    }
-    if (refreshMmrBtn) {
-      const refreshable = eligiblePlayers.some((player) =>
-        normalizeSc2PulseIdUrl(player?.sc2Link || ""),
-      );
-      refreshMmrBtn.disabled = state.isLive || !refreshable;
-    }
-
-    updateCheckInUI();
-    renderCasterSection();
-
-    if (liveDot) {
-      liveDot.textContent = state.isLive ? "Live" : "Not Live";
-      liveDot.classList.toggle("not-live", !state.isLive);
-    }
-
-    const showPreview = Boolean(state.showPreview);
-    const showPreviewPublic = Boolean(state.showPreviewPublic);
-    if (bracketPreviewControls) {
-      bracketPreviewControls.style.display =
-        isAdmin && !state.isLive ? "flex" : "none";
-    }
-    if (bracketShowPreviewToggle) {
-      bracketShowPreviewToggle.checked = showPreview;
-      bracketShowPreviewToggle.disabled = !isAdmin || state.isLive;
-      bracketShowPreviewToggle.onchange = () => {
-        if (!isAdmin || state.isLive) return;
-        saveState(
-          { showPreview: Boolean(bracketShowPreviewToggle.checked) },
-          { skipRoster: true },
-        );
-        renderAll();
-      };
-    }
-    if (bracketShowPreviewPublicToggle) {
-      bracketShowPreviewPublicToggle.checked = showPreviewPublic;
-      bracketShowPreviewPublicToggle.disabled = !isAdmin || state.isLive;
-      bracketShowPreviewPublicToggle.onchange = () => {
-        if (!isAdmin || state.isLive) return;
-        saveState(
-          { showPreviewPublic: Boolean(bracketShowPreviewPublicToggle.checked) },
-          { skipRoster: true },
-        );
-        renderAll();
-      };
-    }
-
-    if (bracketGrid && bracketNotLive) {
-      if (!state.isLive) {
-        const hasBeenLive =
-          Boolean(state.hasBeenLive) ||
-          (state.activity || []).some(
-            (entry) =>
-              entry?.message === "Tournament went live." ||
-              entry?.message === "Tournament set to not live.",
-          );
-
-        if (bracketNotLiveMessage) {
-          bracketNotLiveMessage.style.display = hasBeenLive ? "" : "none";
-        }
-
-        const canShowBracketPreview =
-          showPreviewPublic || (isAdmin && showPreview);
-        bracketGrid.style.display = canShowBracketPreview ? "flex" : "none";
-        bracketNotLive.style.display = canShowBracketPreview ? "none" : "block";
-
-        if (matchInfoModal) {
-          matchInfoModal.style.display = canShowBracketPreview ? "" : "none";
-          if (!canShowBracketPreview) {
-            hideMatchInfoModal();
-          }
-        }
-
-        if (registeredPlayersList) {
-          registeredPlayersList.style.display = "";
-          const listKey = JSON.stringify(
-            eligiblePlayers.map((p) => ({
-              id: p.id || "",
-              name: p.name || "",
-              race: p.race || "",
-              mmr: Number.isFinite(p.mmr) ? Math.round(p.mmr) : "",
-              clan: p.clan || "",
-              clanLogoUrl: p.clanLogoUrl || "",
-            })),
-          );
-          if (registeredPlayersList.dataset.listKey !== listKey) {
-            registeredPlayersList.dataset.listKey = listKey;
-            const items = eligiblePlayers.map((p) => {
-              const name = escapeHtml(p.name || "Unknown");
-              const race = (p.race || "").trim();
-              const raceClass = raceClassName(race);
-              const raceLabel = race ? escapeHtml(race) : "Race TBD";
-              const mmr = Number.isFinite(p.mmr)
-                ? `${Math.round(p.mmr)} MMR`
-                : "MMR TBD";
-              const clanLogo = p?.clanLogoUrl ? sanitizeUrl(p.clanLogoUrl) : "";
-              const clanName = (p?.clan || "").trim();
-              const clanImg = clanLogo
-                ? `<img class="registered-clan-logo" src="${escapeHtml(
-                    clanLogo,
-                  )}" alt="Clan logo" ${
-                    clanName ? `data-tooltip="${escapeHtml(clanName)}"` : ""
-                  } />`
-                : `<img class="registered-clan-logo is-placeholder" src="img/clan/logo-18px.webp" alt="No clan logo" />`;
-              return `<li data-player-id="${escapeHtml(p.id || "")}">
-                  <span class="race-strip ${raceClass}"></span>
-                  ${clanImg}
-                  <span class="name-text" translate="no">${name}</span>
-                  <span class="registered-meta">${raceLabel} - ${mmr}</span>
-                </li>`;
-            });
-            registeredPlayersList.innerHTML = items.join("");
-          }
-        }
-      } else {
-        if (bracketNotLiveMessage) {
-          bracketNotLiveMessage.style.display = "";
-        }
-        bracketGrid.style.display = "flex";
-        bracketNotLive.style.display = "none";
-
-        // Show match inspector again when live.
-        if (matchInfoModal) matchInfoModal.style.display = "";
-      }
-    }
-
-    if (activityCard) {
-      activityCard.style.display = state.isLive ? "" : "none";
-    }
-    if (casterLiveCard) {
-      casterLiveCard.style.display = state.isLive ? "" : "none";
-    }
-    renderActivityList({ state, escapeHtml, formatTime });
-    populateSettingsPanelUI({
-      tournament: currentTournamentMeta,
-      setMapPoolSelection,
-      getDefaultMapPoolNames,
-      updateSettingsDescriptionPreview,
-      updateSettingsRulesPreview,
-      syncFormatFieldVisibility,
-    });
-    updatePrizeSplitWarning();
-    updateSettingsScoreLocks();
-    const nextPromoKey = getPromoStripRenderKey(currentTournamentMeta);
-    if (nextPromoKey && nextPromoKey !== promoStripRenderKey) {
-      promoStripRenderKey = nextPromoKey;
-      void refreshTournamentPromoStrip(currentTournamentMeta);
-    }
-    void refreshTournamentPromoSettings(currentTournamentMeta);
-    renderCircuitPointsSettings();
-  }
+  renderTournamentMetaSection({
+    currentTournamentMeta,
+    state,
+    isAdmin,
+    currentSlug,
+    inviteLinkGate,
+    auth,
+    setTabAlertsBaseTitle,
+    sanitizeUrl,
+    renderMarkdown,
+    renderPrizeInfoMarkup,
+    isDualTournamentFormat,
+    getStartTimeMs,
+    getEligiblePlayers,
+    formatPrizePoolTotal,
+    isInviteOnlyTournament,
+    normalizeInviteStatus,
+    INVITE_STATUS,
+    updatePlacementsRow,
+    getCheckInWindowState,
+    bracketHasResults,
+    normalizeSc2PulseIdUrl,
+    updateCheckInUI,
+    renderCasterSection,
+    saveState,
+    renderAll,
+    hideMatchInfoModal,
+    escapeHtml,
+    raceClassName,
+    renderActivityList,
+    formatTime,
+    populateSettingsPanelUI,
+    setMapPoolSelection,
+    getDefaultMapPoolNames,
+    updateSettingsDescriptionPreview,
+    updateSettingsRulesPreview,
+    syncFormatFieldVisibility,
+    updatePrizeSplitWarning,
+    updateSettingsScoreLocks,
+    getPromoStripRenderKey,
+    promoStripRenderKey,
+    setPromoStripRenderKey: (next) => {
+      promoStripRenderKey = next;
+    },
+    refreshTournamentPromoStrip,
+    refreshTournamentPromoSettings,
+    renderCircuitPointsSettings,
+    hydrateCurrentUserClanLogo,
+    getTeamMembership: findTeamMembership,
+    getTournamentTeamSize,
+    normalizeTournamentMode,
+  });
+  renderTeamInviteSection();
 
   // Render maps tab from current meta or default pool
   renderMapsTabUI(currentTournamentMeta, {
@@ -2426,106 +2098,32 @@ function renderAll(matchIds = null) {
     rebuildBracket(true, "Bracket repaired");
     return;
   }
-  if (bracketContainer && bracket) {
-    let lookup = getMatchLookup(bracket);
-    const playersById = getPlayersMap();
-    const shouldPartialUpdate =
-      Array.isArray(matchIds) && matchIds.length && !isGroupStageFormat(format);
-    let didPartialUpdate = false;
-    if (shouldPartialUpdate) {
-      didPartialUpdate = updateTreeMatchCards(matchIds, lookup, playersById, {
-        currentUsername: getCurrentUsername?.() || "",
-        currentUid: auth.currentUser?.uid || "",
-      });
-      if (didPartialUpdate) {
-        annotateConnectorPlayers(lookup, playersById);
-        clampScoreSelectOptions();
-      }
-    }
-    if (!didPartialUpdate) {
-      if (isGroupStageFormat(format)) {
-        const changed = ensureRoundRobinPlayoffs(bracket, playersById, lookup);
-        if (changed) {
-          lookup = getMatchLookup(bracket);
-          saveState({ bracket }, { skipRoster: true });
-        }
-        const html = renderRoundRobinView(
-          { ...bracket },
-          playersById,
-          computeGroupStandings,
-        );
-        bracketContainer.innerHTML = DOMPurify.sanitize(html);
-        attachMatchActionHandlers?.();
-      } else {
-        renderBracketView({
-          bracket,
-          players: playersArr,
-          format,
-          ensurePlayoffs: (b) =>
-            ensureRoundRobinPlayoffs(b, playersById, lookup),
-          getPlayersMap,
-          attachMatchActionHandlers,
-          computeGroupStandings,
-          currentUsername: getCurrentUsername?.() || "",
-          currentUid: auth.currentUser?.uid || "",
-        });
-      }
-      attachMatchHoverHandlers();
-      annotateConnectorPlayers(lookup, playersById);
-      clampScoreSelectOptions();
-      const groupScrolls = bracketContainer.querySelectorAll(
-        ".group-stage-scroll, .playoff-scroll",
-      );
-      groupScrolls.forEach((el) => {
-        if (el.dataset.dragScrollBound === "true") return;
-        enableDragScroll(el, {
-          axisLock: true,
-          scrollXElement: el,
-          scrollYElement: el,
-          ignoreSelector:
-            'a, button, input, select, textarea, label, [contenteditable="true"], [data-no-drag]',
-        });
-        el.dataset.dragScrollBound = "true";
-      });
-    }
-  }
+  renderBracketContent({
+    bracketContainer,
+    bracket,
+    playersArr,
+    format,
+    matchIds,
+    isGroupStageFormat,
+    getMatchLookup,
+    getPlayersMap,
+    updateTreeMatchCards,
+    getCurrentUsername,
+    auth,
+    annotateConnectorPlayers,
+    clampScoreSelectOptions,
+    ensureRoundRobinPlayoffs,
+    saveState,
+    renderRoundRobinView,
+    computeGroupStandings,
+    DOMPurify,
+    attachMatchActionHandlers,
+    renderBracketView,
+    attachMatchHoverHandlers,
+    enableDragScroll,
+  });
   applyBracketReadOnlyState(!state.isLive && !isAdmin);
   updateTooltips?.();
-}
-
-function getMatchInspectorState() {
-  const modal = document.getElementById("matchInfoModal");
-  if (!modal) return { isOpen: false, matchId: "" };
-  return {
-    isOpen: modal.classList.contains("is-open"),
-    matchId: modal.dataset.matchId || "",
-  };
-}
-
-// True only when the inspector is showing a match that includes the current user,
-// but the match is NOT ready yet (missing opponent). This is your “I’m waiting here” case.
-function isInspectorShowingUserWaitingMatch(snapshot, inspectorMatchId) {
-  const uid = auth?.currentUser?.uid || null;
-  if (!uid) return false;
-  if (!snapshot?.bracket || !inspectorMatchId) return false;
-
-  const lookup = getMatchLookup(snapshot.bracket);
-  const playersById = new Map((snapshot.players || []).map((p) => [p?.id, p]));
-
-  const match = getAllMatches(snapshot.bracket).find(
-    (m) => m?.id === inspectorMatchId,
-  );
-  if (!match) return false;
-  if (match.status === "complete") return false;
-
-  const [pA, pB] = resolveParticipants(match, lookup, playersById);
-
-  // If user is not part of this match, they are not "waiting" here.
-  const userInThisMatch = pA?.uid === uid || pB?.uid === uid;
-  if (!userInThisMatch) return false;
-
-  // Waiting = one side missing
-  return !(pA && pB);
 }
 
 const matchReadyToastShown = new Set();
@@ -2597,99 +2195,23 @@ function getMatchReadySince(matchId) {
   return Number.isFinite(ts) && ts > 0 ? ts : null;
 }
 
-function ensureMatchReadyToastContainer() {
-  let container = document.getElementById("toast-container");
-  if (!container) {
-    container = document.createElement("div");
-    container.id = "toast-container";
-    document.body.appendChild(container);
-  }
-  return container;
-}
-
 function showMatchReadyToast({
   matchId,
   message,
   opponentName,
   opponentAvatarUrl,
 }) {
-  if (!matchId) return;
-  if (matchReadyToastDismissed.has(matchId)) return;
-  if (matchReadyToastShown.has(matchId)) return;
-
-  const container = ensureMatchReadyToastContainer();
-  if (!container) return;
-  container.classList.add("toast-container--match-ready");
-
-  matchReadyToastShown.add(matchId);
-
-  const toast = document.createElement("div");
-  toast.className = "toast toast--action toast--match-ready";
-  toast.dataset.matchId = matchId;
-  toast.style.opacity = "0";
-  toast.style.transform = "scale(0.98)";
-
-  const text = document.createElement("div");
-  text.className = "toast__text";
-
-  const title = document.createElement("div");
-  title.className = "toast__title";
-  title.textContent = message || "Your match is ready.";
-
-  const meta = document.createElement("div");
-  meta.className = "toast__meta";
-  const label = document.createElement("span");
-  label.className = "toast__label";
-  label.textContent = "Opponent";
-
-  const avatar = document.createElement("img");
-  avatar.className = "toast__avatar";
-  avatar.alt = "";
-  avatar.src = opponentAvatarUrl || DEFAULT_PLAYER_AVATAR;
-
-  const opponent = document.createElement("span");
-  opponent.className = "toast__opponent";
-  opponent.textContent = opponentName || "TBD";
-
-  meta.append(label, avatar, opponent);
-
-  text.append(title, meta);
-
-  const actions = document.createElement("div");
-  actions.className = "toast__actions";
-
-  const goBtn = document.createElement("button");
-  goBtn.type = "button";
-  goBtn.className = "toast__btn toast__btn--primary";
-  goBtn.textContent = "Go";
-  goBtn.onclick = () => {
-    matchReadyToastShown.delete(matchId);
-    toast.remove();
-    if (!container.querySelector(".toast--match-ready")) {
-      container.classList.remove("toast-container--match-ready");
-    }
-    openMatchInfoModalUsingDeps(matchId);
-  };
-
-  const dismissBtn = document.createElement("button");
-  dismissBtn.type = "button";
-  dismissBtn.className = "toast__btn";
-  dismissBtn.textContent = "Dismiss";
-  dismissBtn.onclick = () => {
-    matchReadyToastShown.delete(matchId);
-    matchReadyToastDismissed.add(matchId);
-    toast.remove();
-    if (!container.querySelector(".toast--match-ready")) {
-      container.classList.remove("toast-container--match-ready");
-    }
-  };
-
-  actions.append(goBtn, dismissBtn);
-  toast.append(text, actions);
-  container.appendChild(toast);
-  requestAnimationFrame(() => {
-    toast.style.opacity = "1";
-    toast.style.transform = "scale(1)";
+  showMatchReadyToastUi({
+    matchId,
+    message,
+    opponentName,
+    opponentAvatarUrl,
+    defaultAvatarUrl: DEFAULT_PLAYER_AVATAR,
+    shownSet: matchReadyToastShown,
+    dismissedSet: matchReadyToastDismissed,
+    onGo: (id) => {
+      openMatchInfoModalUsingDeps(id);
+    },
   });
 }
 
@@ -2704,6 +2226,16 @@ async function checkInCurrentPlayer() {
   if (!uid) {
     showToast?.("You must be signed in to check in.", "error");
     return;
+  }
+  const isTeamMode = getTournamentTeamSize(meta) > 1;
+  if (isTeamMode) {
+    const membership = findTeamMembership(state.players || [], uid, {
+      includeDenied: false,
+    });
+    if (membership?.role === "member") {
+      showToast?.("Only the team leader checks in for team tournaments.", "error");
+      return;
+    }
   }
   const players = state.players || [];
   const idx = players.findIndex((p) => p.uid === uid);
@@ -2728,6 +2260,79 @@ async function checkInCurrentPlayer() {
     }),
   );
   addActivity(`${players[idx].name || "Player"} checked in.`);
+  renderAll();
+}
+
+async function leaveCurrentTeam() {
+  if (state.isLive) {
+    showToast?.("Tournament is live. Team changes are locked.", "error");
+    return;
+  }
+  const uid = auth.currentUser?.uid || "";
+  if (!uid) {
+    showToast?.("Sign in to leave team.", "error");
+    return;
+  }
+  if (bracketHasRecordedResults(state.bracket)) {
+    showToast?.("Registration is locked once scores are recorded.", "error");
+    return;
+  }
+  const membership = findTeamMembership(state.players || [], uid, {
+    includeDenied: false,
+  });
+  if (!membership || membership.role !== "member") {
+    showToast?.("You are not currently in a team as teammate.", "error");
+    return;
+  }
+  const now = Date.now();
+  let changed = false;
+  await updateRosterWithTransaction(
+    (players) =>
+      (players || []).map((player) => {
+        const team = player?.team && typeof player.team === "object" ? player.team : null;
+        if (!team) return player;
+        const teamSize = Math.max(
+          1,
+          Number(team.size) || getTeamSizeFromMode(team.mode || getTournamentMode()),
+        );
+        const normalizedMembers = normalizeTeamMembersFromPlayer(player, teamSize);
+        const nextMembers = normalizedMembers.filter(
+          (entry) => String(entry?.uid || "") !== uid,
+        );
+        if (nextMembers.length === normalizedMembers.length) return player;
+        changed = true;
+        const required = Math.max(0, teamSize - 1);
+        const acceptedCount = nextMembers.filter(
+          (entry) =>
+            entry.role !== "leader" &&
+            normalizeTeamMemberStatus(entry.status) === TEAM_MEMBER_STATUS.accepted,
+        ).length;
+        const inviteStatus =
+          acceptedCount >= required ? INVITE_STATUS.accepted : INVITE_STATUS.pending;
+        return {
+          ...player,
+          inviteStatus,
+          checkedInAt: inviteStatus === INVITE_STATUS.accepted ? player.checkedInAt || null : null,
+          team: {
+            ...team,
+            mode: normalizeTournamentMode(team.mode || getTournamentMode()),
+            size: teamSize,
+            updatedAt: now,
+            members: nextMembers,
+          },
+        };
+      }),
+    { needsReseed: true },
+    { optimistic: true },
+  );
+  if (!changed) {
+    showToast?.("Could not leave team.", "error");
+    return;
+  }
+  teamInviteDraft = [];
+  teamInviteDraftDirty = false;
+  addActivity(`${getCurrentUsername?.() || "Teammate"} left the team.`);
+  showToast?.("You left the team.", "success");
   renderAll();
 }
 
@@ -3297,17 +2902,6 @@ function buildPlayerFromData(data, players = state.players || []) {
   return created;
 }
 
-function createOrUpdatePlayer(data) {
-  const merged = buildPlayerFromData(data);
-  if (!merged) return null;
-  const existing = (state.players || []).find((p) => p.id === merged.id);
-  const players = existing
-    ? state.players.map((p) => (p.id === merged.id ? merged : p))
-    : [...(state.players || []), merged];
-  setStateObj({ ...state, players });
-  return merged;
-}
-
 async function hydrateCurrentUserClanLogo() {
   if (selfClanHydrationInFlight || selfClanHydrated) return;
   const user = auth.currentUser;
@@ -3546,6 +3140,31 @@ function updateMatchScore(matchId, scoreA, scoreB, options = {}) {
       return;
     }
   }
+  if (!isAdmin) {
+    const lookup = state?.bracket ? getMatchLookup(state.bracket) : null;
+    const match = lookup?.get(matchId) || null;
+    const playersById = getPlayersMap();
+    const [pA, pB] = match
+      ? resolveParticipants(match, lookup, playersById)
+      : [null, null];
+    const currentUid = auth?.currentUser?.uid || "";
+    const isTeamMode = getTournamentTeamSize(currentTournamentMeta) > 1;
+    const canSubmit = isTeamMode
+      ? Boolean(currentUid && (currentUid === pA?.uid || currentUid === pB?.uid))
+      : Boolean(
+          isCurrentUserTournamentPlayerByUid(pA) ||
+            isCurrentUserTournamentPlayerByUid(pB),
+        );
+    if (!canSubmit) {
+      showToast?.(
+        isTeamMode
+          ? "Only team leaders can report scores."
+          : "Only match participants can report scores.",
+        "error",
+      );
+      return;
+    }
+  }
   const lookupBefore = state?.bracket ? getMatchLookup(state.bracket) : null;
   const matchBefore = lookupBefore?.get(matchId) || null;
   const prevScores = Array.isArray(matchBefore?.scores)
@@ -3651,10 +3270,11 @@ function collectReadyMatchIdsForCurrentUser(snapshot) {
     const [pA, pB] = resolveParticipants(match, lookup, playersById);
     if (!pA || !pB) continue; // not ready yet
 
+    // Match-ready alerts should only target authenticated participants.
+    // Using UID-only checks avoids false positives from display-name matches.
     if (
-      isAdmin ||
-      isCurrentUserTournamentPlayer(pA) ||
-      isCurrentUserTournamentPlayer(pB)
+      isCurrentUserTournamentPlayerByUid(pA) ||
+      isCurrentUserTournamentPlayerByUid(pB)
     ) {
       out.add(match.id);
     }
@@ -3673,12 +3293,6 @@ function resolveOpponentInfoForMatch(snapshot, matchId) {
   );
   const [pA, pB] = resolveParticipants(match, lookup, playersById);
   if (!pA || !pB) return fallback;
-  if (isAdmin) {
-    return {
-      name: `${pA?.name || "TBD"} vs ${pB?.name || "TBD"}`,
-      avatarUrl: DEFAULT_PLAYER_AVATAR,
-    };
-  }
   const isA = isCurrentUserTournamentPlayerByUid(pA);
   const isB = isCurrentUserTournamentPlayerByUid(pB);
   let opponent = null;
@@ -4320,6 +3934,7 @@ async function validateSlug() {
 }
 
 async function populateCreateForm() {
+  await loadMapCatalog();
   renderMapPoolPicker("mapPoolPicker", {
     mapPoolSelection,
     getAll1v1Maps,
@@ -4340,6 +3955,7 @@ async function populateCreateForm() {
   }
   const imageInput = document.getElementById("tournamentImageInput");
   const imagePreview = document.getElementById("tournamentImagePreview");
+  const modeSelect = document.getElementById("tournamentModeSelect");
   const checkInSelect = document.getElementById("checkInSelect");
   const accessSelect = document.getElementById("tournamentAccessSelect");
   const visibilitySelect = document.getElementById(
@@ -4355,8 +3971,10 @@ async function populateCreateForm() {
     imagePreview.style.display = "none";
     delete imagePreview.dataset.tempPreview;
     delete imagePreview.dataset.reuseUrl;
+    delete imagePreview.dataset.clearCover;
   }
   if (checkInSelect) checkInSelect.value = "0";
+  if (modeSelect) modeSelect.value = "1v1";
   if (accessSelect) accessSelect.value = "open";
   if (visibilitySelect) visibilitySelect.value = "public";
   if (templateSelect) templateSelect.value = "";
@@ -4549,7 +4167,18 @@ function openCircuitSettingsModal() {
         rrPlayoffs.value = rr.playoffs || defaultRoundRobinSettings.playoffs;
       if (rrBestOf)
         rrBestOf.value = String(rr.bestOf ?? defaultRoundRobinSettings.bestOf);
-      if (finalImagePreview) finalImagePreview.src = meta.coverImageUrl || "";
+      if (finalImagePreview) {
+        if (finalImagePreview.dataset.tempPreview) {
+          try {
+            URL.revokeObjectURL(finalImagePreview.dataset.tempPreview);
+          } catch (_) {}
+        }
+        finalImagePreview.src = meta.coverImageUrl || "";
+        finalImagePreview.style.display = meta.coverImageUrl ? "block" : "none";
+        delete finalImagePreview.dataset.tempPreview;
+        delete finalImagePreview.dataset.reuseUrl;
+        delete finalImagePreview.dataset.clearCover;
+      }
       setCircuitFinalMapPoolSelection(
         Array.isArray(meta.mapPool) && meta.mapPool.length
           ? meta.mapPool
@@ -4758,6 +4387,7 @@ async function saveCircuitSettings() {
       );
       const imageFile = finalImageInput?.files?.[0] || null;
       const reuseUrl = finalImagePreview?.dataset?.reuseUrl || "";
+      const clearCover = finalImagePreview?.dataset?.clearCover === "true";
       if (imageFile) {
         try {
           const uploaded = await uploadTournamentCover(imageFile, finalSlug);
@@ -4783,6 +4413,16 @@ async function saveCircuitSettings() {
           );
         } catch (err) {
           console.error("Failed to reuse cover image", err);
+        }
+      } else if (clearCover) {
+        try {
+          await setDoc(
+            finalTournamentRef,
+            { coverImageUrl: "", coverImageUrlSmall: "" },
+            { merge: true },
+          );
+        } catch (err) {
+          console.error("Failed to clear cover image", err);
         }
       }
     }
@@ -4989,192 +4629,54 @@ async function confirmDeleteCircuit() {
   }
 }
 
-function getRouteFromPath() {
-  const parts = (window.location.pathname || "").split("/").filter(Boolean);
-  if (!parts.length) {
-    return { view: "landing", slug: "" };
-  }
-  if (parts.length === 1 && parts[0].toLowerCase() === "tournament") {
-    return { view: "landing", slug: "" };
-  }
-  if (
-    parts[0].toLowerCase() === "tournament" &&
-    parts[1]?.toLowerCase() === "circuit" &&
-    parts[2]
-  ) {
-    return { view: "circuitLegacy", slug: parts[2] };
-  }
-  if (parts[0].toLowerCase() === "tournament" && parts.length >= 3) {
-    return { view: "circuitTournament", circuitSlug: parts[1], slug: parts[2] };
-  }
-  if (parts[0].toLowerCase() === "tournament" && parts.length === 2) {
-    return { view: "slug", slug: parts[1] };
-  }
-  return { view: "landing", slug: "" };
-}
-
-async function handleRouteChange() {
-  const route = getRouteFromPath();
-  if (route.view === "circuitLegacy" && route.slug) {
-    await enterCircuit(route.slug);
-    return;
-  }
-  if (route.view === "circuitTournament" && route.slug && route.circuitSlug) {
-    await enterTournament(route.slug, { circuitSlug: route.circuitSlug });
-    return;
-  }
-  if (route.view === "circuit" && route.slug) {
-    await enterCircuit(route.slug);
-    return;
-  }
-  if (route.view === "slug" && route.slug) {
-    const meta = await fetchCircuitMeta(route.slug);
-    if (meta) {
-      await enterCircuit(route.slug, { meta });
-      return;
-    }
-    try {
-      const snap = await getDoc(
-        doc(collection(db, TOURNAMENT_COLLECTION), route.slug),
-      );
-      if (snap.exists()) {
-        const tournamentMeta = snap.data() || {};
-        const circuitSlug = String(tournamentMeta?.circuitSlug || "").trim();
-        if (circuitSlug) {
-          await enterTournament(route.slug, { circuitSlug });
-          return;
-        }
-      }
-    } catch (_) {
-      // ignore lookup errors
-    }
-    await enterTournament(route.slug);
-    return;
-  }
-  await showLanding();
-}
-
-async function enterTournament(slug, options = {}) {
-  const { circuitSlug = "" } = options;
-  setCurrentSlugState(slug || null);
-  if (slug) {
-    const target = circuitSlug
-      ? `/tournament/${circuitSlug}/${slug}`
-      : `/tournament/${slug}`;
-    if (window.location.pathname !== target) {
-      window.history.pushState({}, "", target);
-    }
-  }
-  const backLink = document.getElementById("tournamentBackLink");
-  if (backLink) {
-    const label = backLink.querySelector("[data-back-label]");
-    backLink.href = circuitSlug ? `/tournament/${circuitSlug}` : "/tournament";
-    if (label)
-      label.textContent = circuitSlug ? "Circuit Page" : "Tournament Center";
-  }
-  // Load local state for this slug
-  const local = loadLocalState(
-    slug,
-    applyRosterSeedingWithMode,
-    deserializeBracket,
-  );
-  setStateObj(local);
-  // Try remote meta first
-  try {
-    const snap = await getDoc(doc(collection(db, TOURNAMENT_COLLECTION), slug));
-    if (snap.exists()) {
-      const meta = snap.data() || null;
-      if (meta && circuitSlug && !meta.circuitSlug) {
-        meta.circuitSlug = circuitSlug;
-      }
-      setCurrentTournamentMetaState(meta);
-      const metaCircuitSlug = meta?.circuitSlug || "";
-      if (slug && metaCircuitSlug && !circuitSlug) {
-        const target = `/tournament/${metaCircuitSlug}/${slug}`;
-        if (window.location.pathname !== target) {
-          window.history.pushState({}, "", target);
-        }
-      }
-      const backLink = document.getElementById("tournamentBackLink");
-      if (backLink) {
-        const label = backLink.querySelector("[data-back-label]");
-        backLink.href = metaCircuitSlug
-          ? `/tournament/${metaCircuitSlug}`
-          : "/tournament";
-        if (label)
-          label.textContent = metaCircuitSlug
-            ? "Circuit Page"
-            : "Tournament Center";
-      }
-
-      await refreshInviteLinkGate(slug);
-    } else {
-      if (typeof window !== "undefined") {
-        window.location.href = "/404.html";
-      }
-      return;
-    }
-  } catch (_) {
-    // ignore
-  }
-  // Update admin flag based on ownership
-  recomputeAdminFromMeta();
-  await refreshInviteLinksPanel();
-  // Hydrate remote state (merge) and render
-  await hydrateStateFromRemote(
-    slug,
-    applyRosterSeedingWithMode,
-    deserializeBracket,
-    saveState,
-    () => {
-      renderAll();
-      refreshPlayerDetailModalIfOpen(getPlayersMap);
-    },
-    state?.lastUpdated || 0,
-  );
-
-  subscribeTournamentStateRemote(slug);
-  const landingView = document.getElementById("landingView");
-  const tournamentView = document.getElementById("tournamentView");
-  const circuitView = document.getElementById("circuitView");
-  if (landingView) landingView.style.display = "none";
-  if (tournamentView) tournamentView.style.display = "block";
-  if (circuitView) circuitView.style.display = "none";
-  currentCircuitMeta = null;
-  isCircuitAdmin = false;
-  updateCircuitAdminVisibility();
-  renderAll();
-  logAnalyticsEvent("tournament_viewed");
-  switchTab("bracketTab");
-}
-
-async function showLanding() {
-  try {
-    unsubscribeRemoteState?.();
-  } catch (_) {
-    // ignore
-  }
-  unsubscribeRemoteState = null;
-  setIsAdminState(false);
-  updateAdminVisibility();
-  const landingView = document.getElementById("landingView");
-  const tournamentView = document.getElementById("tournamentView");
-  const circuitView = document.getElementById("circuitView");
-  if (landingView) landingView.style.display = "block";
-  if (tournamentView) tournamentView.style.display = "none";
-  if (circuitView) circuitView.style.display = "none";
-  currentCircuitMeta = null;
-  isCircuitAdmin = false;
-  updateCircuitAdminVisibility();
-  switchTab("registrationTab");
-}
-
+let enterCircuit = async () => {};
 const {
-  enterCircuit,
-  refreshCircuitView,
-  updateCircuitAdminVisibility,
-  recomputeCircuitAdminFromMeta,
-} = createCircuitPageHandlers({
+  getRouteFromPath,
+  handleRouteChange,
+  enterTournament,
+  showLanding,
+} = createTournamentController({
+  db,
+  TOURNAMENT_COLLECTION,
+  setCurrentSlugState,
+  loadLocalState,
+  applyRosterSeedingWithMode,
+  deserializeBracket,
+  setStateObj,
+  getDoc,
+  doc,
+  collection,
+  setCurrentTournamentMetaState,
+  refreshInviteLinkGate,
+  recomputeAdminFromMeta,
+  refreshInviteLinksPanel,
+  hydrateStateFromRemote,
+  saveState,
+  renderAll,
+  refreshPlayerDetailModalIfOpen,
+  getPlayersMap,
+  getState: () => state,
+  subscribeTournamentStateRemote,
+  setCurrentCircuitMeta: (next) => {
+    currentCircuitMeta = next;
+  },
+  setIsCircuitAdmin: (next) => {
+    isCircuitAdmin = next;
+  },
+  updateCircuitAdminVisibility: () => updateCircuitAdminVisibility(),
+  logAnalyticsEvent,
+  switchTab,
+  setIsAdminState,
+  updateAdminVisibility,
+  getUnsubscribeRemoteState: () => unsubscribeRemoteState,
+  setUnsubscribeRemoteState: (next) => {
+    unsubscribeRemoteState = next;
+  },
+  fetchCircuitMeta,
+  getEnterCircuit: () => enterCircuit,
+});
+
+const circuitPageHandlers = createCircuitPageHandlers({
   fetchCircuitMeta,
   renderCircuitView,
   enterTournament,
@@ -5199,6 +4701,13 @@ const {
   isAdminForMeta,
   renderAdmins: renderCircuitAdmins,
 });
+enterCircuit = circuitPageHandlers.enterCircuit;
+
+const {
+  refreshCircuitView,
+  updateCircuitAdminVisibility,
+  recomputeCircuitAdminFromMeta,
+} = circuitPageHandlers;
 
 function setStatus(el, message, isError = false) {
   if (!el) return;
@@ -5303,16 +4812,35 @@ function isInviteOnlyTournament(meta) {
   return access === "closed" || access === "invite-only" || access === "invite";
 }
 
-function getDefaultMapPoolNames() {
+function getCreateModalModeIfOpen() {
+  const modal = document.getElementById("createTournamentModal");
+  if (!modal) return null;
+  const isVisible =
+    typeof window !== "undefined" &&
+    window.getComputedStyle(modal).display !== "none";
+  if (!isVisible) return null;
+  const modeSelect = document.getElementById("tournamentModeSelect");
+  return normalizeTournamentMode(modeSelect?.value || "1v1");
+}
+
+function getActiveMapPoolMode() {
+  const createMode = getCreateModalModeIfOpen();
+  if (createMode) return createMode;
+  return normalizeTournamentMode(currentTournamentMeta?.mode || "1v1");
+}
+
+function getDefaultMapPoolNames(mode = null) {
+  const resolvedMode = normalizeTournamentMode(mode || getActiveMapPoolMode());
   const list = (mapCatalog || []).filter((m) => {
     const folder = (m.folder || "").toLowerCase();
     const isArchive = folder.includes("archive");
-    return m.mode === "1v1" && !isArchive;
+    return normalizeTournamentMode(m.mode || "1v1") === resolvedMode && !isArchive;
   });
   if (list.length) {
     return list.map((m) => m.name);
   }
-  // Fallback to bundled current ladder list
+  // Fallback exists only for 1v1 bundled ladder maps.
+  if (resolvedMode !== "1v1") return [];
   return FALLBACK_LADDER_MAPS.map((m) => m.name);
 }
 
@@ -5447,7 +4975,9 @@ function formatCountdown(ms) {
 
 function formatPrizePoolTotal(value) {
   const total = Number(value?.total ?? value);
-  if (!Number.isFinite(total) || total <= 0) return "TBD";
+  if (!Number.isFinite(total)) return "TBD";
+  if (total === 0) return "No prize pool";
+  if (total < 0) return "TBD";
   const currency = String(value?.currency || "USD").toUpperCase();
   const customCurrency = String(value?.customCurrency || "").trim();
   if (currency === "CUSTOM") {
@@ -5559,9 +5089,19 @@ function updatePrizeSplitWarning() {
     (sum, row) => sum + Number(row?.amount || 0),
     0,
   );
-  if (!Number.isFinite(total) || total <= 0) {
+  if (!Number.isFinite(total)) {
     warningEl.textContent = "Set prize pool total to validate split.";
     warningEl.style.color = "";
+    return;
+  }
+  if (total === 0) {
+    warningEl.textContent = "No prize pool configured (total 0).";
+    warningEl.style.color = "";
+    return;
+  }
+  if (total < 0) {
+    warningEl.textContent = "Prize pool total must be 0 or more.";
+    warningEl.style.color = "#ff8b8b";
     return;
   }
   if (splitTotal !== Math.round(total)) {
@@ -5587,6 +5127,10 @@ function updateCheckInUI() {
   const startMs = getStartTimeMs(currentTournamentMeta);
   const checkInState = getCheckInWindowState(currentTournamentMeta);
   const currentUid = auth.currentUser?.uid || null;
+  const isTeamMode = getTournamentTeamSize(currentTournamentMeta) > 1;
+  const teamMembership = currentUid
+    ? findTeamMembership(state.players || [], currentUid, { includeDenied: false })
+    : null;
   const currentPlayer = currentUid
     ? (state.players || []).find((p) => p.uid === currentUid)
     : null;
@@ -5638,11 +5182,16 @@ function updateCheckInUI() {
 
   if (!currentPlayer) {
     checkInBtn.style.display = "none";
-    checkInStatus.textContent =
-      isInviteOnly && !isAdmin
-        ? "Invite required to check in."
-        : "Register to check in.";
-    checkInStatus.classList.add("is-open");
+    if (isTeamMode && teamMembership?.role === "member") {
+      checkInStatus.textContent = "Only the team leader checks in and reports scores.";
+      checkInStatus.classList.add("is-open");
+    } else {
+      checkInStatus.textContent =
+        isInviteOnly && !isAdmin
+          ? "Invite required to check in."
+          : "Register to check in.";
+      checkInStatus.classList.add("is-open");
+    }
     return;
   }
   if (inviteStatus !== INVITE_STATUS.accepted) {
@@ -5711,152 +5260,6 @@ async function deleteTournamentInviteLinks(slug) {
   }
 }
 
-function isFirebaseStorageUrl(url) {
-  return /^gs:\/\//.test(url) || url.includes("firebasestorage.googleapis.com");
-}
-
-function isCoverUrlInSlugFolder(url, slug) {
-  if (!url || !slug) return false;
-  const encodedSlug = encodeURIComponent(slug);
-  return (
-    url.includes(`tournamentCovers/${slug}/`) ||
-    url.includes(`tournamentCovers%2F${encodedSlug}%2F`)
-  );
-}
-
-async function isCoverUrlUsedElsewhere(coverImageUrl, excludeSlug) {
-  const trimmed = String(coverImageUrl || "").trim();
-  if (!trimmed) return false;
-  try {
-    const registry = await loadTournamentRegistry(true);
-    return (registry || []).some((item) => {
-      if (!item || item.slug === excludeSlug) return false;
-      return (
-        String(item.coverImageUrl || "").trim() === trimmed ||
-        String(item.coverImageUrlSmall || "").trim() === trimmed
-      );
-    });
-  } catch (err) {
-    console.warn("Failed to verify cover image usage", err);
-    return true;
-  }
-}
-
-async function isCoverFolderUsedElsewhere(slug, excludeSlug) {
-  if (!slug) return false;
-  try {
-    const registry = await loadTournamentRegistry(true);
-    return (registry || []).some((item) => {
-      if (!item || item.slug === excludeSlug) return false;
-      return (
-        isCoverUrlInSlugFolder(String(item.coverImageUrl || "").trim(), slug) ||
-        isCoverUrlInSlugFolder(
-          String(item.coverImageUrlSmall || "").trim(),
-          slug,
-        )
-      );
-    });
-  } catch (err) {
-    console.warn("Failed to verify cover folder usage", err);
-    return true;
-  }
-}
-
-async function deleteTournamentCoverByUrl(coverImageUrl, slug) {
-  const trimmed = String(coverImageUrl || "").trim();
-  if (!trimmed || !isFirebaseStorageUrl(trimmed)) return;
-  if (slug && !isCoverUrlInSlugFolder(trimmed, slug)) return;
-  const usedElsewhere = await isCoverUrlUsedElsewhere(trimmed, slug);
-  if (usedElsewhere) return;
-  try {
-    const coverRef = storageRef(storage, trimmed);
-    await deleteObject(coverRef);
-  } catch (err) {
-    console.warn("Failed to delete tournament cover image", err);
-  }
-}
-
-async function deleteTournamentCoverFolder(slug) {
-  if (!slug) return;
-  const usedElsewhere = await isCoverFolderUsedElsewhere(slug, slug);
-  if (usedElsewhere) return;
-  try {
-    const folderRef = storageRef(storage, `tournamentCovers/${slug}`);
-    const list = await listAll(folderRef);
-    await Promise.all(list.items.map((item) => deleteObject(item)));
-  } catch (err) {
-    console.warn("Failed to delete tournament cover folder", err);
-  }
-}
-
-async function deleteTournamentSponsorFolder(slug) {
-  if (!slug) return;
-  try {
-    const folderRef = storageRef(storage, `tournamentSponsors/${slug}`);
-    const list = await listAll(folderRef);
-    await Promise.all(list.items.map((item) => deleteObject(item)));
-  } catch (err) {
-    console.warn("Failed to delete tournament sponsor folder", err);
-  }
-}
-
-async function uploadTournamentCover(file, slug) {
-  const error = validateTournamentImage(file);
-  if (error) throw new Error(error);
-  if (!slug) throw new Error("Missing tournament slug.");
-  const processedLarge = await prepareImageForUpload(file, {
-    targetWidth: COVER_TARGET_WIDTH,
-    targetHeight: COVER_TARGET_HEIGHT,
-    quality: COVER_QUALITY,
-    outputType: "image/webp",
-    fallbackType: "image/jpeg",
-  });
-  const processedSmall = await prepareImageForUpload(file, {
-    targetWidth: COVER_CARD_WIDTH,
-    targetHeight: COVER_CARD_HEIGHT,
-    quality: COVER_QUALITY,
-    outputType: "image/webp",
-    fallbackType: "image/jpeg",
-  });
-  const stamp = Date.now();
-  const largePath = `tournamentCovers/${slug}/cover-${stamp}-1200.webp`;
-  const smallPath = `tournamentCovers/${slug}/cover-${stamp}-320.webp`;
-  const largeRef = storageRef(storage, largePath);
-  const smallRef = storageRef(storage, smallPath);
-  await Promise.all([
-    uploadBytes(largeRef, processedLarge.blob, {
-      contentType: processedLarge.contentType,
-    }),
-    uploadBytes(smallRef, processedSmall.blob, {
-      contentType: processedSmall.contentType,
-    }),
-  ]);
-  const [coverImageUrl, coverImageUrlSmall] = await Promise.all([
-    getDownloadURL(largeRef),
-    getDownloadURL(smallRef),
-  ]);
-  return { coverImageUrl, coverImageUrlSmall };
-}
-
-async function uploadSponsorLogo(file, slug) {
-  const error = validateTournamentImage(file);
-  if (error) throw new Error(error);
-  if (!slug) throw new Error("Missing tournament slug.");
-  const processed = await prepareImageForUpload(file, {
-    targetWidth: SPONSOR_LOGO_SIZE,
-    targetHeight: SPONSOR_LOGO_SIZE,
-    quality: COVER_QUALITY,
-    outputType: "image/webp",
-    fallbackType: "image/jpeg",
-  });
-  const path = `tournamentSponsors/${slug}/logo-${Date.now()}.webp`;
-  const ref = storageRef(storage, path);
-  await uploadBytes(ref, processed.blob, {
-    contentType: processed.contentType,
-  });
-  return getDownloadURL(ref);
-}
-
 async function handleSaveSettings(event) {
   event?.preventDefault?.();
   const activeSettingsTab =
@@ -5905,6 +5308,9 @@ async function handleSaveSettings(event) {
   );
   const imageFile = isGeneralTab ? imageInput?.files?.[0] || null : null;
   const reuseUrl = isGeneralTab ? imagePreview?.dataset.reuseUrl || "" : "";
+  const clearCover = isGeneralTab
+    ? imagePreview?.dataset.clearCover === "true"
+    : false;
   const newSlugRaw = isGeneralTab ? (slugInput?.value || "").trim() : "";
   const newSlug = newSlugRaw || currentSlug || "";
   const slugChanged = newSlug && newSlug !== currentSlug;
@@ -6001,11 +5407,17 @@ async function handleSaveSettings(event) {
       )
     : false;
   const rawPrizePoolTotal = isGeneralTab || isPrizeTab
-    ? Number(prizePoolTotalInput?.value)
+    ? String(prizePoolTotalInput?.value ?? "").trim()
     : Number(currentTournamentMeta?.prizePoolTotal);
+  const parsedPrizePoolTotal =
+    typeof rawPrizePoolTotal === "string"
+      ? rawPrizePoolTotal === ""
+        ? null
+        : Number(rawPrizePoolTotal)
+      : rawPrizePoolTotal;
   const prizePoolTotal =
-    Number.isFinite(rawPrizePoolTotal) && rawPrizePoolTotal > 0
-      ? Math.round(rawPrizePoolTotal)
+    Number.isFinite(parsedPrizePoolTotal) && parsedPrizePoolTotal >= 0
+      ? Math.round(parsedPrizePoolTotal)
       : null;
   const prizePoolCurrency = isGeneralTab || isPrizeTab
     ? String(prizePoolCurrencyInput?.value || "USD").toUpperCase()
@@ -6044,8 +5456,13 @@ async function handleSaveSettings(event) {
   }
   let coverImageUrl = currentTournamentMeta?.coverImageUrl || "";
   let coverImageUrlSmall = currentTournamentMeta?.coverImageUrlSmall || "";
+  if (clearCover && !imageFile && !reuseUrl) {
+    coverImageUrl = "";
+    coverImageUrlSmall = "";
+  }
   if (!imageFile && reuseUrl) {
     coverImageUrl = reuseUrl;
+    coverImageUrlSmall = "";
   }
   if (imageFile) {
     try {
@@ -6447,6 +5864,7 @@ async function handleCreateTournament(event) {
   event?.preventDefault?.();
   const nameInput = document.getElementById("tournamentNameInput");
   const slugInput = document.getElementById("tournamentSlugInput");
+  const modeSelect = document.getElementById("tournamentModeSelect");
   const formatSelect = document.getElementById("tournamentFormatSelect");
   const grandFinalResetToggle = document.getElementById(
     "grandFinalResetToggle",
@@ -6488,6 +5906,7 @@ async function handleCreateTournament(event) {
     updateSlugPreview();
   }
   const format = (formatSelect?.value || "Double Elimination").trim();
+  const mode = normalizeTournamentMode(modeSelect?.value || "1v1");
   const startTime = startInput?.value ? new Date(startInput.value) : null;
   const maxPlayers = normalizeMaxPlayersForFormat(
     maxPlayersInput?.value,
@@ -6514,6 +5933,7 @@ async function handleCreateTournament(event) {
     const payload = buildCreateTournamentPayload({
       slug,
       name,
+      mode,
       description,
       rules,
       format,
@@ -6598,17 +6018,29 @@ async function handleCreateTournament(event) {
   }
 }
 
-function getAll1v1Maps() {
+function getAll1v1Maps(mode = null) {
+  const resolvedMode = normalizeTournamentMode(mode || getActiveMapPoolMode());
   const source =
     Array.isArray(mapCatalog) && mapCatalog.length
       ? mapCatalog
       : FALLBACK_LADDER_MAPS || [];
-  return source.filter((m) => (m.mode || "").toLowerCase() === "1v1");
+  const filtered = source.filter(
+    (m) => normalizeTournamentMode(m.mode || "1v1") === resolvedMode,
+  );
+  if (filtered.length) return filtered;
+  if (resolvedMode !== "1v1") return [];
+  return source.filter((m) => normalizeTournamentMode(m.mode || "1v1") === "1v1");
 }
 
-function getMapByName(name) {
+function getMapByName(name, mode = null) {
   if (!name) return null;
-  return getAll1v1Maps().find((m) => m.name === name) || null;
+  const scoped = getAll1v1Maps(mode).find((m) => m.name === name);
+  if (scoped) return scoped;
+  const source =
+    Array.isArray(mapCatalog) && mapCatalog.length
+      ? mapCatalog
+      : FALLBACK_LADDER_MAPS || [];
+  return source.find((m) => m.name === name) || null;
 }
 
 function toggleMapSelection(name) {
@@ -6679,88 +6111,40 @@ function getCircuitFinalMapPoolSelection() {
   return new Set(circuitFinalMapPoolSelection);
 }
 
-if (typeof window !== "undefined") {
-  window.addEventListener("pulse-state-changed", (event) => {
-    hydratePulseFromState(event.detail);
-    if (currentTournamentMeta) {
-      renderAll();
-    }
-  });
-  window.addEventListener("user-avatar-updated", (event) => {
-    const avatarUrl =
-      event?.detail?.avatarUrl || getCurrentUserAvatarUrl?.() || "";
-    syncCurrentPlayerAvatar(avatarUrl);
-  });
-  window.addEventListener("user-profile-updated", () => {
-    const avatarUrl = getCurrentUserAvatarUrl?.() || "";
-    syncCurrentPlayerAvatar(avatarUrl);
-  });
-}
-
-onAuthStateChanged?.(auth, (user) => {
-  recomputeAdminFromMeta();
-  recomputeCircuitAdminFromMeta();
-  if (currentTournamentMeta) {
-    renderAll();
-  }
-});
-
-document.addEventListener("tournament:notification-action", (event) => {
-  const detail = event.detail || {};
-  if (detail.notification?.type === "tournament-checkin") {
-    handleTournamentCheckInAction({
-      notification: detail.notification,
-      auth,
-      db,
-      currentSlug,
-      checkInLocal: checkInCurrentPlayer,
-      showToast,
-    });
-    return;
-  }
-  handleTournamentInviteAction({
-    notification: detail.notification,
-    action: detail.action,
-    race: detail.race,
-    auth,
-    db,
-    currentSlug,
-    state,
-    isLive: state.isLive,
-    saveState,
-    renderAll,
-    rebuildBracket,
-    seedEligiblePlayers: seedEligiblePlayersWithMode,
-    bracketHasResults,
-    showToast,
-  });
-});
-
-document.addEventListener("DOMContentLoaded", async () => {
-  initTabAlerts();
-  document.addEventListener(
-    "tournament:match-chat-unread",
-    handleUnreadChatEvent,
-  );
-
-  window.addEventListener("popstate", async () => {
-    try {
-      await handleRouteChange();
-    } catch (err) {
-      console.error("Failed to handle history navigation", err);
-    }
-  });
-
-  // Attach all UI handlers first so buttons work even if async setup below fails/awaits.
-  configureFinalMapPool({
-    getDefaultMapPoolNames,
-    getAll1v1Maps,
-    getMapByName,
-    renderMapPoolPickerUI,
-    renderChosenMapsUI,
-    isDefaultLadderSelection,
-  });
-  initTournamentPage({
+registerTournamentEvents({
+  auth,
+  db,
+  onAuthStateChanged,
+  getCurrentSlug: () => currentSlug,
+  getState: () => state,
+  getCurrentTournamentMeta: () => currentTournamentMeta,
+  getCurrentUserAvatarUrl,
+  getPulseState,
+  showToast,
+  saveState,
+  renderAll,
+  rebuildBracket,
+  bracketHasResults,
+  seedEligiblePlayersWithMode,
+  checkInCurrentPlayer,
+  syncCurrentPlayerAvatar,
+  hydratePulseFromState,
+  recomputeAdminFromMeta,
+  recomputeCircuitAdminFromMeta,
+  handleTournamentCheckInAction,
+  handleTournamentInviteAction,
+  initTabAlerts,
+  handleUnreadChatEvent,
+  handleRouteChange,
+  configureFinalMapPool,
+  getDefaultMapPoolNames,
+  getAll1v1Maps,
+  getMapByName,
+  renderMapPoolPickerUI,
+  renderChosenMapsUI,
+  isDefaultLadderSelection,
+  initTournamentPage,
+  buildTournamentPageInitArgs: () => ({
     handleRegistration,
     handleCreateTournament,
     handleCreateCircuit,
@@ -6840,50 +6224,29 @@ document.addEventListener("DOMContentLoaded", async () => {
     resetScores,
     resetVetoScoreChat,
     checkInCurrentPlayer,
+    leaveCurrentTeam,
     notifyCheckInPlayers,
     toggleCheckInManualClose,
     toggleLiveTournament,
     recreateLiveBracket,
     showToast,
     refreshRosterMmrFromPulse,
-  });
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    if (!(target instanceof Element)) return;
-    const mapSelector =
-      "#mapPoolPicker, #settingsMapPoolPicker, #finalMapPoolPicker, #circuitFinalMapPoolPicker";
-    if (target.closest(mapSelector)) {
-      ensureMapCatalogLoadedForUi();
-    }
-  });
-  initCoverReuseModal();
-  initCasterControls({ saveState });
-  initFinalAdminSearch();
-  initSuperAdminSearch();
-  bindTournamentSponsorControls();
-  bindTournamentSocialControls();
-  bindTournamentPromoSettingsControls(() => currentTournamentMeta);
-  initInviteLinksPanel();
-  initAdminInviteModal();
-
-  if (typeof window !== "undefined") {
-    setInterval(() => {
-      if (currentTournamentMeta) {
-        updateCheckInUI();
-      }
-    }, 30000);
-  }
-
-  try {
-    setMapPoolSelection(getDefaultMapPoolNames());
-    resetFinalMapPoolSelection();
-    ensureSettingsUiReady();
-    initializeAuthUI();
-    hydratePulseFromState(getPulseState());
-    await handleRouteChange();
-  } catch (err) {
-    console.error("Tournament page init failed", err);
-  }
+  }),
+  ensureMapCatalogLoadedForUi,
+  initCoverReuseModal,
+  initCasterControls,
+  ensureAdminSearchBootstrap,
+  getIsAdmin: () => isAdmin,
+  bindTournamentSponsorControls,
+  bindTournamentSocialControls,
+  bindTournamentPromoSettingsControls,
+  initInviteLinksPanel,
+  initAdminInviteModal,
+  updateCheckInUI,
+  setMapPoolSelection,
+  resetFinalMapPoolSelection,
+  ensureSettingsUiReady,
+  initializeAuthUI,
 });
 
 initBroadcastSync(syncFromRemote, getPersistStorageKey, () => {});
@@ -6989,6 +6352,9 @@ function recomputeAdminFromMeta() {
   const uid = auth?.currentUser?.uid || null;
   const owns = Boolean(uid && isAdminForMeta(currentTournamentMeta, uid));
   setIsAdminState(owns);
+  if (owns || isSuperAdminUser()) {
+    void ensureAdminSearchBootstrap();
+  }
   if (typeof window !== "undefined") {
     window.__tournamentIsAdmin = owns;
   }
@@ -7153,6 +6519,498 @@ function updateRegistrationRequirementIcons() {
   }
 }
 
+function getNormalizedTeamInviteDraft(requiredCount = getRequiredTeammateCount()) {
+  const limit = Math.max(0, Number(requiredCount) || 0);
+  const unique = [];
+  const seen = new Set();
+  for (const rawEntry of teamInviteDraft || []) {
+    if (!rawEntry || typeof rawEntry !== "object") continue;
+    const uid = String(rawEntry.uid || "").trim();
+    if (!uid || seen.has(uid)) continue;
+    seen.add(uid);
+    unique.push({
+      uid,
+      name: String(rawEntry.name || "").trim() || "Unknown",
+      role: "member",
+      status: normalizeTeamMemberStatus(rawEntry.status),
+      race: String(rawEntry.race || "").trim(),
+      sc2Link: String(rawEntry.sc2Link || "").trim(),
+      pulseName: String(rawEntry.pulseName || "").trim(),
+      mmr: Number.isFinite(Number(rawEntry.mmr))
+        ? Math.max(0, Number(rawEntry.mmr))
+        : 0,
+      mmrByRace:
+        rawEntry.mmrByRace && typeof rawEntry.mmrByRace === "object"
+          ? { ...rawEntry.mmrByRace }
+          : null,
+      secondaryPulseLinks: Array.isArray(rawEntry.secondaryPulseLinks)
+        ? rawEntry.secondaryPulseLinks.slice()
+        : [],
+      secondaryPulseProfiles: Array.isArray(rawEntry.secondaryPulseProfiles)
+        ? rawEntry.secondaryPulseProfiles.slice()
+        : [],
+      twitchUrl: String(rawEntry.twitchUrl || "").trim(),
+      country: String(rawEntry.country || "").trim(),
+      avatarUrl: String(rawEntry.avatarUrl || "").trim(),
+      invitedAt: Number.isFinite(Number(rawEntry.invitedAt))
+        ? Number(rawEntry.invitedAt)
+        : Date.now(),
+      inviteSentAt: Number.isFinite(Number(rawEntry.inviteSentAt))
+        ? Number(rawEntry.inviteSentAt)
+        : null,
+      respondedAt: Number.isFinite(Number(rawEntry.respondedAt))
+        ? Number(rawEntry.respondedAt)
+        : null,
+    });
+    if (unique.length >= limit) break;
+  }
+  teamInviteDraft = unique;
+  return unique;
+}
+
+function removeDraftInviteByUid(uid) {
+  const targetUid = String(uid || "").trim();
+  if (!targetUid) return;
+  teamInviteDraft = (teamInviteDraft || []).filter(
+    (entry) => String(entry?.uid || "").trim() !== targetUid,
+  );
+  teamInviteDraftDirty = true;
+}
+
+function canEditTeamInviteDraft(activeMembership) {
+  if (!isTeamTournament(currentTournamentMeta)) return false;
+  if (state.isLive) return false;
+  if (!auth.currentUser?.uid) return false;
+  if (!activeMembership) return true;
+  return false;
+}
+
+function buildCurrentTeamEntries(activeMembership, entries = []) {
+  const currentUid = auth.currentUser?.uid || "";
+  const currentName =
+    (document.getElementById("playerNameInput")?.value || "").trim() ||
+    getCurrentUsername?.() ||
+    getCurrentUserProfile?.()?.username ||
+    "You";
+  if (activeMembership?.player) {
+    const teamSize = getTournamentTeamSize(currentTournamentMeta);
+    return normalizeTeamMembersFromPlayer(activeMembership.player, teamSize);
+  }
+  if (!currentUid) return [];
+  return [
+    {
+      uid: currentUid,
+      name: currentName,
+      role: "leader",
+      status: TEAM_MEMBER_STATUS.accepted,
+      invitedAt: Date.now(),
+      inviteSentAt: null,
+      respondedAt: Date.now(),
+    },
+    ...(entries || []).map((entry) => ({
+      uid: entry.uid,
+      name: entry.name,
+      role: "member",
+      status: normalizeTeamMemberStatus(entry.status),
+      invitedAt: Number.isFinite(Number(entry.invitedAt))
+        ? Number(entry.invitedAt)
+        : null,
+      inviteSentAt: Number.isFinite(Number(entry.inviteSentAt))
+        ? Number(entry.inviteSentAt)
+        : null,
+      respondedAt: Number.isFinite(Number(entry.respondedAt))
+        ? Number(entry.respondedAt)
+        : null,
+    })),
+  ];
+}
+
+function renderTeamInviteSection() {
+  const refs = getTeamInviteUiRefs();
+  if (!refs.layout && !refs.section) return;
+  initTeamInviteSearchUi();
+  resetTeamInviteDraftForCurrentSlug();
+
+  const teamSize = getTournamentTeamSize(currentTournamentMeta);
+  const required = getRequiredTeammateCount(currentTournamentMeta);
+  const isTeamMode = teamSize > 1;
+  const currentUid = auth.currentUser?.uid || "";
+  const activeMembership = getActiveMembershipForUser(currentUid);
+  const hasRegisteredTeam = Boolean(activeMembership?.player);
+  const editable = canEditTeamInviteDraft(activeMembership);
+
+  if (!isTeamMode) {
+    if (refs.layout) refs.layout.style.display = "none";
+    if (refs.section) refs.section.style.display = "none";
+    if (refs.currentSection) refs.currentSection.style.display = "none";
+    if (refs.teamNameInput) refs.teamNameInput.value = "";
+    setTeamInviteStatus("");
+    setTeamCurrentStatus("");
+    if (refs.searchResults) refs.searchResults.replaceChildren();
+    if (refs.currentList) refs.currentList.replaceChildren();
+    if (refs.leaveBtn) refs.leaveBtn.style.display = "none";
+    return;
+  }
+
+  if (refs.layout) refs.layout.style.display = "";
+  if (refs.section) refs.section.style.display = "";
+  if (refs.currentSection) refs.currentSection.style.display = "";
+  if (refs.helperText) {
+    refs.helperText.textContent = hasRegisteredTeam
+      ? "Teammates must accept their invitation in the Notification Center before your team is registered."
+      : "Teammate invitations are sent after you press Register team.";
+  }
+  if (refs.teamNameInput) {
+    const savedTeamName = String(activeMembership?.player?.team?.teamName || "").trim();
+    if (savedTeamName && !refs.teamNameInput.value.trim()) {
+      refs.teamNameInput.value = savedTeamName;
+    }
+  }
+
+  if (activeMembership && !teamInviteDraftDirty) {
+    syncTeamInviteDraftFromPlayer(activeMembership.player, teamSize);
+  }
+
+  const entries = getNormalizedTeamInviteDraft(required);
+  const acceptedCount = entries.filter(
+    (entry) => normalizeTeamMemberStatus(entry.status) === TEAM_MEMBER_STATUS.accepted,
+  ).length;
+  const currentTeamEntries = buildCurrentTeamEntries(activeMembership, entries);
+
+  if (refs.slotsText) {
+    refs.slotsText.textContent = hasRegisteredTeam
+      ? `Mode ${getTournamentMode(
+          currentTournamentMeta,
+        )}: invite ${required} teammate${required === 1 ? "" : "s"} (${acceptedCount}/${required} accepted).`
+      : `Mode ${getTournamentMode(
+          currentTournamentMeta,
+        )}: select ${required} teammate${required === 1 ? "" : "s"} (${entries.length}/${required} selected).`;
+  }
+
+  if (refs.searchInput) {
+    refs.searchInput.disabled = !editable || entries.length >= required;
+    if (editable) {
+      refs.searchInput.placeholder = "Search username...";
+    } else if (activeMembership?.role === "leader") {
+      refs.searchInput.placeholder = "Unregister team to edit teammates";
+    } else {
+      refs.searchInput.placeholder = "Only the team leader can manage invites";
+    }
+  }
+  if (refs.teamNameInput) {
+    refs.teamNameInput.disabled = !editable;
+    if (editable) {
+      refs.teamNameInput.placeholder = "Enter team name...";
+    } else if (activeMembership?.role === "leader") {
+      refs.teamNameInput.placeholder = "Unregister team to edit team name";
+    } else {
+      refs.teamNameInput.placeholder = "Only the team leader can manage team";
+    }
+  }
+
+  if (refs.list) {
+    refs.list.replaceChildren();
+    if (!entries.length) {
+      const empty = document.createElement("p");
+      empty.className = "team-invite-empty";
+      empty.textContent = "No teammates invited yet.";
+      refs.list.appendChild(empty);
+    } else {
+      entries.forEach((entry) => {
+        const row = document.createElement("div");
+        row.className = "team-invite-row";
+        const nameEl = document.createElement("span");
+        nameEl.className = "team-invite-name";
+        nameEl.setAttribute("translate", "no");
+        nameEl.textContent = entry.name || "Unknown";
+        const meta = document.createElement("div");
+        meta.className = "team-invite-meta";
+        const status = document.createElement("span");
+        const normalizedStatus = normalizeTeamMemberStatus(entry.status);
+        const isQueued =
+          normalizedStatus === TEAM_MEMBER_STATUS.pending &&
+          !hasTeamMemberInviteBeenSent(entry);
+        status.className = `seed-status ${normalizedStatus}`;
+        status.textContent = isQueued
+          ? "Queued"
+          : normalizedStatus === TEAM_MEMBER_STATUS.accepted
+            ? "Accepted"
+            : normalizedStatus === TEAM_MEMBER_STATUS.denied
+              ? "Denied"
+              : "Pending";
+        meta.appendChild(status);
+        if (editable) {
+          const removeBtn = document.createElement("button");
+          removeBtn.type = "button";
+          removeBtn.className = "cta small subtle";
+          removeBtn.dataset.teamInviteRemoveUid = entry.uid;
+          removeBtn.textContent = "Remove";
+          meta.appendChild(removeBtn);
+        }
+        row.append(nameEl, meta);
+        refs.list.appendChild(row);
+      });
+    }
+  }
+
+  if (refs.currentList) {
+    refs.currentList.replaceChildren();
+    if (!currentTeamEntries.length) {
+      const empty = document.createElement("p");
+      empty.className = "team-invite-empty";
+      empty.textContent = "No active team yet.";
+      refs.currentList.appendChild(empty);
+    } else {
+      currentTeamEntries.forEach((entry) => {
+        const row = document.createElement("div");
+        row.className = "team-current-row";
+        const nameEl = document.createElement("span");
+        nameEl.className = "team-current-name";
+        nameEl.setAttribute("translate", "no");
+        const roleLabel = entry.role === "leader" ? "Leader" : "Teammate";
+        nameEl.textContent = entry.name || "Unknown";
+        const roleBadge = document.createElement("span");
+        roleBadge.className = "role-badge";
+        roleBadge.textContent = roleLabel;
+        nameEl.appendChild(roleBadge);
+        const status = document.createElement("span");
+        const normalized = normalizeTeamMemberStatus(entry.status);
+        status.className = `seed-status ${normalized}`;
+        const isQueued =
+          entry.role !== "leader" &&
+          normalized === TEAM_MEMBER_STATUS.pending &&
+          !hasTeamMemberInviteBeenSent(entry);
+        status.textContent = isQueued
+          ? "Queued"
+          : normalized === TEAM_MEMBER_STATUS.accepted
+            ? "Accepted"
+            : normalized === TEAM_MEMBER_STATUS.denied
+              ? "Denied"
+              : "Pending";
+        row.append(nameEl, status);
+        refs.currentList.appendChild(row);
+      });
+    }
+  }
+
+  if (refs.leaveBtn) {
+    const canLeave = Boolean(
+      activeMembership && activeMembership.role === "member" && !state.isLive,
+    );
+    refs.leaveBtn.style.display = canLeave ? "" : "none";
+    refs.leaveBtn.disabled = !canLeave;
+  }
+
+  if (!editable && activeMembership?.role === "leader") {
+    const leaderInviteStatus = normalizeInviteStatus(
+      activeMembership.player?.inviteStatus,
+    );
+    if (leaderInviteStatus === INVITE_STATUS.pending) {
+      setTeamInviteStatus(
+        "Waiting for teammates to accept in Notification Center.",
+        false,
+      );
+      setTeamCurrentStatus("Team is pending teammate acceptance.", false);
+    } else if (leaderInviteStatus === INVITE_STATUS.accepted) {
+      setTeamInviteStatus("Team registration is complete.", false);
+      setTeamCurrentStatus("Team is fully registered.", false);
+    } else {
+      setTeamInviteStatus("", false);
+      setTeamCurrentStatus("", false);
+    }
+  } else if (!editable && activeMembership?.role === "member") {
+    if (activeMembership.status === TEAM_MEMBER_STATUS.pending) {
+      const inviteSent = hasTeamMemberInviteBeenSent(activeMembership.member);
+      if (inviteSent) {
+        setTeamInviteStatus(
+          "You have a pending team invitation. Accept it in the Notification Center.",
+          false,
+        );
+        setTeamCurrentStatus("You have not accepted this team yet.", false);
+      } else {
+        setTeamInviteStatus(
+          `Your leader has not registered this ${getTournamentMode(
+            currentTournamentMeta,
+          )} team yet. Invitation will appear after they press Register team.`,
+          false,
+        );
+        setTeamCurrentStatus("Team is still in draft.", false);
+      }
+    } else if (activeMembership.status === TEAM_MEMBER_STATUS.accepted) {
+      setTeamInviteStatus("You are already part of a registered team.", false);
+      setTeamCurrentStatus("You are currently in this team.", false);
+    } else {
+      setTeamInviteStatus("", false);
+      setTeamCurrentStatus("", false);
+    }
+  } else if (entries.length < required) {
+    setTeamInviteStatus(
+      `Invite ${required - entries.length} more teammate${
+        required - entries.length === 1 ? "" : "s"
+      } to submit team registration.`,
+      false,
+    );
+    setTeamCurrentStatus(
+      activeMembership ? "Team is pending teammate acceptance." : "Build your team, then register.",
+      false,
+    );
+  } else {
+    if (!hasRegisteredTeam) {
+      setTeamInviteStatus(
+        `Ready to register. Invitations will be sent when you press Register ${getTournamentMode(
+          currentTournamentMeta,
+        )} team.`,
+        false,
+      );
+      setTeamCurrentStatus("Team is not registered yet.", false);
+      return;
+    }
+    setTeamInviteStatus("", false);
+    setTeamCurrentStatus(
+      activeMembership ? "Waiting for teammates to accept in Notification Center." : "",
+      false,
+    );
+  }
+}
+
+function initTeamInviteSearchUi() {
+  if (teamInviteSearchInitialized) return;
+  const refs = getTeamInviteUiRefs();
+  if (!refs.searchInput || !refs.searchResults || !refs.list) return;
+  teamInviteSearchInitialized = true;
+
+  const renderSearchResults = (results = []) => {
+    refs.searchResults.replaceChildren();
+    const currentUid = auth.currentUser?.uid || "";
+    const activeMembership = getActiveMembershipForUser(currentUid);
+    const editable = canEditTeamInviteDraft(activeMembership);
+    const required = getRequiredTeammateCount(currentTournamentMeta);
+    const entries = getNormalizedTeamInviteDraft(required);
+    results.forEach((entry) => {
+      const username = String(entry?.username || "").trim();
+      const userId = String(entry?.userId || "").trim();
+      if (!username || !userId) return;
+      const row = document.createElement("div");
+      row.className = "admin-search-item";
+      const label = document.createElement("span");
+      label.textContent = username;
+      label.setAttribute("translate", "no");
+      const inviteBtn = document.createElement("button");
+      inviteBtn.type = "button";
+      inviteBtn.className = "cta small ghost";
+      inviteBtn.textContent = "Invite";
+      inviteBtn.dataset.teamInviteUsername = username;
+      inviteBtn.dataset.teamInviteUid = userId;
+      const alreadyDrafted = entries.some((item) => item.uid === userId);
+      const blockedByTeam = isUidInAnotherTeam(userId, activeMembership?.player?.team?.teamId || "");
+      const selfInvite = userId === currentUid;
+      const noSlotsLeft = entries.length >= required;
+      if (!editable || alreadyDrafted || blockedByTeam || selfInvite || noSlotsLeft) {
+        inviteBtn.disabled = true;
+        if (alreadyDrafted) inviteBtn.textContent = "Invited";
+        else if (blockedByTeam) inviteBtn.textContent = "In team";
+        else if (selfInvite) inviteBtn.textContent = "You";
+        else if (noSlotsLeft) inviteBtn.textContent = "Full";
+      }
+      row.append(label, inviteBtn);
+      refs.searchResults.appendChild(row);
+    });
+  };
+
+  const search = createAdminPlayerSearch({
+    db,
+    getIsEnabled: () => canEditTeamInviteDraft(getActiveMembershipForUser(auth.currentUser?.uid || "")),
+    getPlayers: () => [],
+    onStatus: (message) => {
+      if (!message || message.startsWith("Found")) {
+        if (!message) setTeamInviteStatus("", false);
+        return;
+      }
+      setTeamInviteStatus(message, false);
+    },
+    onResults: renderSearchResults,
+    onError: (err) => {
+      if (err?.message) {
+        setTeamInviteStatus(err.message, true);
+      }
+    },
+    onSuccess: () => {
+      refs.searchInput.value = "";
+      refs.searchResults.replaceChildren();
+    },
+    addPlayer: async ({ userId, username }) => {
+      const currentUid = auth.currentUser?.uid || "";
+      const activeMembership = getActiveMembershipForUser(currentUid);
+      const editable = canEditTeamInviteDraft(activeMembership);
+      const required = getRequiredTeammateCount(currentTournamentMeta);
+      const entries = getNormalizedTeamInviteDraft(required);
+      if (!editable) {
+        setTeamInviteStatus("Only the team leader can invite teammates.", true);
+        return;
+      }
+      if (entries.length >= required) {
+        setTeamInviteStatus("Team invite slots are full.", true);
+        return;
+      }
+      if (userId === currentUid) {
+        setTeamInviteStatus("You cannot invite yourself.", true);
+        return;
+      }
+      if (entries.some((entry) => entry.uid === userId)) {
+        setTeamInviteStatus("Teammate already invited.", true);
+        return;
+      }
+      if (isUidInAnotherTeam(userId, activeMembership?.player?.team?.teamId || "")) {
+        setTeamInviteStatus("This user is already in another team.", true);
+        return;
+      }
+      teamInviteDraft = [
+        ...entries,
+        {
+          uid: userId,
+          name: username,
+          role: "member",
+          status: TEAM_MEMBER_STATUS.pending,
+          invitedAt: Date.now(),
+          inviteSentAt: null,
+          respondedAt: null,
+        },
+      ];
+      teamInviteDraftDirty = true;
+      renderTeamInviteSection();
+      refs.searchInput.value = "";
+      refs.searchResults.replaceChildren();
+      setTeamInviteStatus(`Teammate ${username} added.`, false);
+    },
+  });
+
+  refs.searchInput.addEventListener("input", () => {
+    const currentUid = auth.currentUser?.uid || "";
+    const activeMembership = getActiveMembershipForUser(currentUid);
+    if (!canEditTeamInviteDraft(activeMembership)) {
+      refs.searchResults.replaceChildren();
+      return;
+    }
+    search.debouncedSearch(refs.searchInput.value);
+  });
+
+  refs.searchResults.addEventListener("click", (event) => {
+    const target = event.target.closest("[data-team-invite-username]");
+    if (!target) return;
+    const username = target.dataset.teamInviteUsername || "";
+    const userId = target.dataset.teamInviteUid || "";
+    search.addByUsername(username, userId, {});
+  });
+
+  refs.list.addEventListener("click", (event) => {
+    const removeBtn = event.target.closest("[data-team-invite-remove-uid]");
+    if (!removeBtn) return;
+    const uid = removeBtn.dataset.teamInviteRemoveUid || "";
+    removeDraftInviteByUid(uid);
+    renderTeamInviteSection();
+  });
+}
+
 function normalizeRaceLabel(raw) {
   const val = (raw || "").toString().toLowerCase();
   if (val.startsWith("z")) return "Zerg";
@@ -7295,6 +7153,18 @@ const BOT_NAME_POOL = [
   "CoreSync",
 ];
 const BOT_RACES = ["Zerg", "Protoss", "Terran", "Random"];
+const BOT_TEAM_NAME_POOL = [
+  "Void Syndicate",
+  "Warp Runners",
+  "Omega Forge",
+  "Nova Pact",
+  "Iron Swarm",
+  "Arc Tempest",
+  "Lunar Echo",
+  "Shadow Circuit",
+  "Starlight Crew",
+  "Quantum Raiders",
+];
 
 function isBotPlayer(player) {
   if (!player) return false;
@@ -7313,6 +7183,20 @@ function pickBotName(existingNames) {
   while (existingNames.has(name.toLowerCase())) {
     idx += 1;
     name = `Bot ${idx}`;
+  }
+  return name;
+}
+
+function pickBotTeamName(existingTeamNames) {
+  const found = BOT_TEAM_NAME_POOL.find(
+    (name) => !existingTeamNames.has(name.toLowerCase()),
+  );
+  if (found) return found;
+  let idx = existingTeamNames.size + 1;
+  let name = `Team Bot ${idx}`;
+  while (existingTeamNames.has(name.toLowerCase())) {
+    idx += 1;
+    name = `Team Bot ${idx}`;
   }
   return name;
 }
@@ -7336,14 +7220,27 @@ async function addBotPlayer() {
       .map((player) => (player?.name || "").trim().toLowerCase())
       .filter(Boolean),
   );
-  const name = pickBotName(existingNames);
+  const tournamentMode = getTournamentMode(currentTournamentMeta);
+  const teamSize = getTeamSizeFromMode(tournamentMode);
+  const isTeamMode = teamSize > 1;
+  const existingTeamNames = new Set(
+    players
+      .map((player) => String(player?.team?.teamName || "").trim().toLowerCase())
+      .filter(Boolean),
+  );
   const createdAt = Date.now();
+  const botId = `bot-${createdAt.toString(36)}-${Math.random()
+    .toString(16)
+    .slice(2, 6)}`;
+  const leaderName = pickBotName(existingNames);
+  existingNames.add(leaderName.toLowerCase());
+  const leaderRace = BOT_RACES[Math.floor(Math.random() * BOT_RACES.length)];
+  const leaderUid = `${botId}-leader`;
   const bot = {
-    id: `bot-${createdAt.toString(36)}-${Math.random()
-      .toString(16)
-      .slice(2, 6)}`,
-    name,
-    race: BOT_RACES[Math.floor(Math.random() * BOT_RACES.length)],
+    id: botId,
+    uid: leaderUid,
+    name: leaderName,
+    race: leaderRace,
     sc2Link: "",
     mmr: 0,
     points: 0,
@@ -7351,12 +7248,79 @@ async function addBotPlayer() {
     createdAt,
     isBot: true,
   };
+  if (isTeamMode) {
+    const teamId = `team-${createdAt.toString(36)}-${Math.random()
+      .toString(16)
+      .slice(2, 8)}`;
+    const teamName = pickBotTeamName(existingTeamNames);
+    const members = [
+      {
+        uid: leaderUid,
+        name: leaderName,
+        role: "leader",
+        status: TEAM_MEMBER_STATUS.accepted,
+        race: leaderRace,
+        sc2Link: "",
+        pulseName: "",
+        mmr: 0,
+        mmrByRace: null,
+        secondaryPulseLinks: [],
+        secondaryPulseProfiles: [],
+        twitchUrl: "",
+        country: "",
+        avatarUrl: "",
+        invitedAt: createdAt,
+        inviteSentAt: null,
+        respondedAt: createdAt,
+      },
+    ];
+    for (let idx = 1; idx < teamSize; idx += 1) {
+      const memberName = pickBotName(existingNames);
+      existingNames.add(memberName.toLowerCase());
+      const memberRace = BOT_RACES[Math.floor(Math.random() * BOT_RACES.length)];
+      members.push({
+        uid: `${botId}-m${idx}`,
+        name: memberName,
+        role: "member",
+        status: TEAM_MEMBER_STATUS.accepted,
+        race: memberRace,
+        sc2Link: "",
+        pulseName: "",
+        mmr: 0,
+        mmrByRace: null,
+        secondaryPulseLinks: [],
+        secondaryPulseProfiles: [],
+        twitchUrl: "",
+        country: "",
+        avatarUrl: "",
+        invitedAt: createdAt,
+        inviteSentAt: null,
+        respondedAt: createdAt,
+      });
+    }
+    bot.team = {
+      teamId,
+      mode: tournamentMode,
+      size: teamSize,
+      leaderUid,
+      leaderName,
+      teamName,
+      createdAt,
+      updatedAt: createdAt,
+      members,
+    };
+    bot.inviteStatus = INVITE_STATUS.accepted;
+  }
   await updateRosterWithTransaction(
     (roster) => upsertRosterPlayer(roster, bot),
     { needsReseed: true },
   );
-  rebuildBracket(true, `${name} added`);
-  addActivity(`${name} added.`);
+  const activityLabel =
+    isTeamMode && bot.team?.teamName
+      ? `${bot.team.teamName} added`
+      : `${leaderName} added`;
+  rebuildBracket(true, activityLabel);
+  addActivity(`${activityLabel}.`);
 }
 
 async function removeAllBots() {
@@ -7384,6 +7348,12 @@ async function removeAllBots() {
 
 function updateBotManagerCount() {
   const label = document.getElementById("botCountText");
+  const addBotBtn = document.getElementById("addBotBtn");
+  const tournamentMode = getTournamentMode(currentTournamentMeta);
+  const teamSize = getTeamSizeFromMode(tournamentMode);
+  if (addBotBtn) {
+    addBotBtn.textContent = teamSize > 1 ? "Add Team Bot" : "Add bot";
+  }
   if (!label) return;
   const players = Array.isArray(state.players) ? state.players : [];
   const count = players.filter((player) => isBotPlayer(player)).length;
@@ -7434,6 +7404,12 @@ async function handleRegistration(event) {
   const isInviteOnly = isInviteOnlyTournament(currentTournamentMeta);
   const inviteToken = getInviteTokenFromUrl();
   const needsInviteLink = Boolean(isInviteOnly && !isAdmin);
+  const tournamentMode = getTournamentMode(currentTournamentMeta);
+  const teamSize = getTeamSizeFromMode(tournamentMode);
+  const isTeamMode = teamSize > 1;
+  const requiredTeammates = Math.max(0, teamSize - 1);
+  const teamNameInput = document.getElementById("teamNameInput");
+  const teamName = String(teamNameInput?.value || "").trim();
 
   if (!auth.currentUser) {
     setStatus(
@@ -7444,16 +7420,37 @@ async function handleRegistration(event) {
     return;
   }
 
+  const currentUid = auth.currentUser?.uid || "";
+  const activeTeamMembership = getActiveMembershipForUser(currentUid);
+  if (isTeamMode && activeTeamMembership?.role === "member") {
+    const status = activeTeamMembership.status;
+    if (status === TEAM_MEMBER_STATUS.pending) {
+      const inviteSent = hasTeamMemberInviteBeenSent(activeTeamMembership.member);
+      setStatus(
+        statusEl,
+        inviteSent
+          ? "Your team invite is still pending. Accept it in Notification Center."
+          : "Your leader has not registered this team yet.",
+        true,
+      );
+      return;
+    }
+    if (status === TEAM_MEMBER_STATUS.accepted) {
+      setStatus(statusEl, "You are already part of a registered team.", true);
+      return;
+    }
+  }
+
   const existingPlayer = (state.players || []).find(
     (p) => p.uid === auth.currentUser?.uid,
   );
   if (existingPlayer) {
     const inviteStatus = normalizeInviteStatus(existingPlayer.inviteStatus);
-    if (inviteStatus === INVITE_STATUS.pending) {
+    if (!isTeamMode && inviteStatus === INVITE_STATUS.pending) {
       setStatus(statusEl, "Your invite is still pending.", true);
       return;
     }
-    if (inviteStatus === INVITE_STATUS.denied) {
+    if (!isTeamMode && inviteStatus === INVITE_STATUS.denied) {
       setStatus(statusEl, "Your invite was declined.", true);
       return;
     }
@@ -7464,6 +7461,11 @@ async function handleRegistration(event) {
     rebuildBracket(true, "Player removed");
     addActivity(`${existingPlayer.name} unregistered.`);
     showToast?.("You have been unregistered.", "success");
+    if (isTeamMode) {
+      teamInviteDraft = [];
+      teamInviteDraftDirty = false;
+      setTeamInviteStatus("");
+    }
     event.target.reset();
     hydratePulseFromState(pulseProfile);
     renderAll();
@@ -7522,6 +7524,51 @@ async function handleRegistration(event) {
     setStatus(statusEl, message, true);
     showToast?.(message, "error");
     return;
+  }
+  if (isTeamMode && !teamName) {
+    const message = "Team name is required for team registration.";
+    setStatus(statusEl, message, true);
+    setTeamInviteStatus(message, true);
+    showToast?.(message, "error");
+    return;
+  }
+
+  const teamInviteEntries = isTeamMode
+    ? getNormalizedTeamInviteDraft(requiredTeammates)
+    : [];
+  if (isTeamMode) {
+    if (teamInviteEntries.length !== requiredTeammates) {
+      const message = `Invite exactly ${requiredTeammates} teammate${
+        requiredTeammates === 1 ? "" : "s"
+      } for ${tournamentMode}.`;
+      setStatus(statusEl, message, true);
+      setTeamInviteStatus(message, true);
+      return;
+    }
+    const seen = new Set([currentUid]);
+    const ignoreTeamId = String(activeTeamMembership?.player?.team?.teamId || "");
+    for (const teammate of teamInviteEntries) {
+      const teammateUid = String(teammate?.uid || "").trim();
+      if (!teammateUid) {
+        const message = "Each teammate invite must target a valid user.";
+        setStatus(statusEl, message, true);
+        setTeamInviteStatus(message, true);
+        return;
+      }
+      if (seen.has(teammateUid)) {
+        const message = "Duplicate teammate invites are not allowed.";
+        setStatus(statusEl, message, true);
+        setTeamInviteStatus(message, true);
+        return;
+      }
+      seen.add(teammateUid);
+      if (isUidInAnotherTeam(teammateUid, ignoreTeamId)) {
+        const message = `${teammate.name || "A teammate"} is already in another team.`;
+        setStatus(statusEl, message, true);
+        setTeamInviteStatus(message, true);
+        return;
+      }
+    }
   }
 
   const rawPoints = pointsField?.value ?? "";
@@ -7714,16 +7761,91 @@ async function handleRegistration(event) {
       };
     }
 
+    const now = Date.now();
     const checkInState = getCheckInWindowState(currentTournamentMeta);
-    const autoCheckedInAt = checkInState.isOpen ? Date.now() : null;
+    const autoCheckedInAt = checkInState.isOpen ? now : null;
+    const leaderName = name;
+    const teamId =
+      existingPlayer?.team?.teamId ||
+      `team-${now.toString(36)}-${Math.random().toString(16).slice(2, 8)}`;
+    const normalizedTeamMembers = isTeamMode
+      ? [
+          {
+            uid: currentUid,
+            name: leaderName,
+            role: "leader",
+            status: TEAM_MEMBER_STATUS.accepted,
+            race,
+            sc2Link: sc2LinkInput,
+            pulseName: pulseProfile?.accountName || "",
+            mmr: Number.isFinite(mmr) ? Math.max(0, Number(mmr)) : 0,
+            mmrByRace: mmrByRace || null,
+            secondaryPulseLinks,
+            secondaryPulseProfiles,
+            twitchUrl,
+            country: countryCode || "",
+            avatarUrl,
+            invitedAt:
+              Number.isFinite(Number(existingPlayer?.team?.createdAt))
+                ? Number(existingPlayer.team.createdAt)
+                : now,
+            inviteSentAt: null,
+            respondedAt: now,
+          },
+          ...teamInviteEntries.map((entry) => ({
+            uid: entry.uid,
+            name: entry.name,
+            role: "member",
+            status: normalizeTeamMemberStatus(entry.status),
+            race: String(entry?.race || "").trim(),
+            sc2Link: String(entry?.sc2Link || "").trim(),
+            pulseName: String(entry?.pulseName || "").trim(),
+            mmr: Number.isFinite(Number(entry?.mmr)) ? Math.max(0, Number(entry.mmr)) : 0,
+            mmrByRace:
+              entry?.mmrByRace && typeof entry.mmrByRace === "object"
+                ? { ...entry.mmrByRace }
+                : null,
+            secondaryPulseLinks: Array.isArray(entry?.secondaryPulseLinks)
+              ? entry.secondaryPulseLinks
+              : [],
+            secondaryPulseProfiles: Array.isArray(entry?.secondaryPulseProfiles)
+              ? entry.secondaryPulseProfiles
+              : [],
+            twitchUrl: String(entry?.twitchUrl || "").trim(),
+            country: String(entry?.country || "").trim(),
+            avatarUrl: String(entry?.avatarUrl || "").trim(),
+            invitedAt: Number.isFinite(Number(entry.invitedAt))
+              ? Number(entry.invitedAt)
+              : now,
+            inviteSentAt: Number.isFinite(Number(entry.inviteSentAt))
+              ? Number(entry.inviteSentAt)
+              : null,
+            respondedAt: Number.isFinite(Number(entry.respondedAt))
+              ? Number(entry.respondedAt)
+              : null,
+          })),
+        ]
+      : [];
+    const allTeamMembersAccepted =
+      !isTeamMode ||
+      (normalizedTeamMembers.length === teamSize &&
+        normalizedTeamMembers.every(
+          (member) =>
+            normalizeTeamMemberStatus(member.status) === TEAM_MEMBER_STATUS.accepted,
+        ));
+    const inviteStatus = allTeamMembersAccepted
+      ? INVITE_STATUS.accepted
+      : INVITE_STATUS.pending;
     const newPlayer = buildPlayerFromData({
       name,
       race,
       sc2Link: sc2LinkInput,
       mmr: Number.isFinite(mmr) ? mmr : 0,
       points: startingPoints,
-      inviteStatus: INVITE_STATUS.accepted,
-      ...(autoCheckedInAt ? { checkedInAt: autoCheckedInAt } : {}),
+      inviteStatus,
+      ...(autoCheckedInAt && inviteStatus === INVITE_STATUS.accepted
+        ? { checkedInAt: autoCheckedInAt }
+        : {}),
       ...(inviteLinkMeta || {}),
       avatarUrl,
       twitchUrl,
@@ -7736,6 +7858,24 @@ async function handleRegistration(event) {
       clanLogoUrl: clanLogoUrl || "",
       pulseName: pulseProfile?.accountName || "",
       uid: auth.currentUser?.uid || null,
+      ...(isTeamMode
+        ? {
+            team: {
+              teamId,
+              mode: tournamentMode,
+              size: teamSize,
+              leaderUid: currentUid,
+              leaderName,
+              teamName,
+              createdAt:
+                Number.isFinite(Number(existingPlayer?.team?.createdAt))
+                  ? Number(existingPlayer.team.createdAt)
+                  : now,
+              updatedAt: now,
+              members: normalizedTeamMembers,
+            },
+          }
+        : {}),
     });
 
     const hasCompletedMatches = bracketHasResults();
@@ -7750,7 +7890,81 @@ async function handleRegistration(event) {
       } pts)`,
     );
 
-    markRegisteredTournament(currentSlug);
+    if (!isTeamMode || inviteStatus === INVITE_STATUS.accepted) {
+      markRegisteredTournament(currentSlug);
+    }
+
+    if (isTeamMode) {
+      const pendingTeammates = normalizedTeamMembers.filter(
+        (member) =>
+          member.role !== "leader" &&
+          normalizeTeamMemberStatus(member.status) === TEAM_MEMBER_STATUS.pending &&
+          !member.inviteSentAt,
+      );
+      if (pendingTeammates.length) {
+        const sentUids = [];
+        let failedCount = 0;
+        for (const teammate of pendingTeammates) {
+          try {
+            await sendTeamInviteNotification({
+              db,
+              auth,
+              getCurrentUsername,
+              userId: teammate.uid,
+              teammateName: teammate.name,
+              tournamentMeta: currentTournamentMeta,
+              slug: currentSlug,
+              teamId,
+              leaderName,
+              mode: tournamentMode,
+            });
+            sentUids.push(teammate.uid);
+          } catch (err) {
+            console.error("Failed to send teammate invite notification", err);
+            failedCount += 1;
+          }
+        }
+        if (failedCount > 0) {
+          showToast?.(
+            "Team created, but some teammate notifications failed to send.",
+            "error",
+          );
+        }
+        if (sentUids.length) {
+          const sentAt = Date.now();
+          await updateRosterWithTransaction(
+            (players) =>
+              (players || []).map((player) => {
+                if ((player?.id || "") !== (newPlayer?.id || "")) return player;
+                const members = Array.isArray(player?.team?.members)
+                  ? player.team.members
+                  : [];
+                return {
+                  ...player,
+                  team: {
+                    ...(player.team || {}),
+                    updatedAt: sentAt,
+                    members: members.map((member) => {
+                      if (!sentUids.includes(member?.uid)) return member;
+                      return {
+                        ...member,
+                        inviteSentAt:
+                          Number.isFinite(Number(member?.inviteSentAt))
+                            ? Number(member.inviteSentAt)
+                            : sentAt,
+                      };
+                    }),
+                  },
+                };
+              }),
+            {},
+            { optimistic: true },
+          );
+        }
+      }
+      teamInviteDraftDirty = false;
+      syncTeamInviteDraftFromPlayer(newPlayer, teamSize);
+    }
 
     const shouldAutoRebuild = !hasCompletedMatches;
     if (shouldAutoRebuild) {
@@ -7762,339 +7976,20 @@ async function handleRegistration(event) {
         renderAll();
       }
     }
-    showToast?.(`${newPlayer.name} added to the bracket`, "success");
+    if (isTeamMode && inviteStatus !== INVITE_STATUS.accepted) {
+      showToast?.(
+        `${teamName}'s team is pending. Teammates must accept in Notification Center.`,
+        "success",
+      );
+    } else {
+      showToast?.(`${newPlayer.name} added to the bracket`, "success");
+    }
 
     event.target.reset();
     hydratePulseFromState(pulseProfile);
   } finally {
     setRegisterLoadingState(false);
   }
-}
-
-function setSuperAdminSearchStatus(message) {
-  const statusEl = document.getElementById("superAdminAddPlayerStatus");
-  if (statusEl) statusEl.textContent = message || "";
-}
-
-function renderSuperAdminSearchResults(results = []) {
-  const resultsEl = document.getElementById("superAdminSearchResults");
-  if (!resultsEl) return;
-  resultsEl.replaceChildren();
-  results.forEach((entry) => {
-    const row = document.createElement("div");
-    row.className = "admin-search-item";
-    const label = document.createElement("span");
-    label.setAttribute("translate", "no");
-    label.textContent = entry.username;
-    const addBtn = document.createElement("button");
-    addBtn.type = "button";
-    addBtn.className = "cta small primary";
-    addBtn.textContent = "Add direct";
-    addBtn.dataset.superAdminAddUsername = entry.username;
-    if (entry.userId) {
-      addBtn.dataset.superAdminUserId = entry.userId;
-    }
-    const alreadyAdded = (state.players || []).some(
-      (player) =>
-        (entry.userId && player.uid === entry.userId) ||
-        (player.name || "").toLowerCase() === entry.username.toLowerCase(),
-    );
-    if (alreadyAdded) {
-      addBtn.disabled = true;
-      addBtn.textContent = "Added";
-    }
-    row.append(label, addBtn);
-    resultsEl.append(row);
-  });
-}
-
-async function addSuperAdminPlayerFromSearch({
-  userId,
-  username,
-  userData,
-  selectedRace,
-}) {
-  if (!isSuperAdminUser()) {
-    showToast?.("Unauthorized.", "error");
-    return;
-  }
-  const slug = currentSlug || currentTournamentMeta?.slug || "";
-  if (!slug) throw new Error("Tournament not loaded.");
-  if (!userId) throw new Error("Missing target user id.");
-  const displayName = (userData?.username || username || "").trim();
-  if (!displayName) throw new Error("Missing target username.");
-  const race = normalizeRaceLabel(selectedRace) || "Random";
-  const pulse = userData?.pulse || {};
-  const sc2Link = sanitizeUrl(userData?.sc2PulseUrl || pulse.url || "");
-  const twitchUrl = sanitizeUrl(userData?.twitchUrl || "");
-  const country = String(userData?.country || "").trim().toUpperCase();
-  let startingPoints = null;
-  if (currentTournamentMeta?.circuitSlug && displayName) {
-    startingPoints = await getCircuitSeedPoints({
-      name: displayName,
-      sc2Link,
-      uid: userId,
-      circuitSlug: currentTournamentMeta.circuitSlug,
-      tournamentSlug: currentSlug,
-    });
-  }
-  if (!superAdminAddPlayerCallable) {
-    superAdminAddPlayerCallable = httpsCallable(functions, "superAdminAddPlayer");
-  }
-  await superAdminAddPlayerCallable({
-    slug,
-    name: displayName,
-    race,
-    uid: userId,
-    sc2Link,
-    twitchUrl,
-    country,
-    points: Number.isFinite(startingPoints) ? startingPoints : 0,
-  });
-  await hydrateStateFromRemote(
-    slug,
-    applyRosterSeedingWithMode,
-    deserializeBracket,
-    saveState,
-    renderAll,
-    state?.lastUpdated || 0,
-  );
-  renderAll();
-  showToast?.(`${displayName} added directly to tournament.`, "success");
-}
-
-function initSuperAdminSearch() {
-  const input = document.getElementById("superAdminSearchInput");
-  const resultsEl = document.getElementById("superAdminSearchResults");
-  if (!input || !resultsEl) return;
-  const search = createAdminPlayerSearch({
-    db,
-    getIsEnabled: () => isSuperAdminUser(),
-    getPlayers: () => state.players || [],
-    onStatus: setSuperAdminSearchStatus,
-    onResults: renderSuperAdminSearchResults,
-    onError: (err) => {
-      if (err?.message) showToast?.(err.message, "error");
-    },
-    onSuccess: () => {
-      input.value = "";
-      renderSuperAdminSearchResults([]);
-      setSuperAdminSearchStatus("");
-    },
-    addPlayer: async ({ userId, username, userData, options }) => {
-      const race = normalizeRaceLabel(options?.selectedRace) || "Random";
-      setSuperAdminSearchStatus(`Fetching SC2Pulse MMR for ${race}...`);
-      await addSuperAdminPlayerFromSearch({
-        userId,
-        username,
-        userData,
-        selectedRace: race,
-      });
-      setSuperAdminSearchStatus("Player added.");
-    },
-  });
-
-  input.addEventListener("input", () => {
-    search.debouncedSearch(input.value);
-  });
-  resultsEl.addEventListener("click", (event) => {
-    const target = event.target.closest("[data-super-admin-add-username]");
-    if (!target) return;
-    const username = target.dataset.superAdminAddUsername || "";
-    const userId = target.dataset.superAdminUserId || "";
-    const selectedRace =
-      normalizeRaceLabel(
-        document.getElementById("superAdminRaceSelect")?.value || "Random",
-      ) || "Random";
-    search.addByUsername(username, userId, {
-      mode: "super-admin",
-      selectedRace,
-    });
-  });
-}
-
-function setFinalAdminSearchStatus(message) {
-  const statusEl = document.getElementById("finalAdminSearchStatus");
-  if (statusEl) statusEl.textContent = message || "";
-}
-
-function renderFinalAdminSearchResults(results = []) {
-  const resultsEl = document.getElementById("finalAdminSearchResults");
-  if (!resultsEl) return;
-  resultsEl.replaceChildren();
-  results.forEach((entry) => {
-    const row = document.createElement("div");
-    row.className = "admin-search-item";
-    const label = document.createElement("span");
-    label.setAttribute("translate", "no");
-    label.textContent = entry.username;
-    const inviteBtn = document.createElement("button");
-    inviteBtn.type = "button";
-    inviteBtn.className = "cta small ghost";
-    inviteBtn.textContent = "Invite";
-    inviteBtn.dataset.adminAddUsername = entry.username;
-    inviteBtn.dataset.adminAddMode = "invite";
-    if (entry.userId) {
-      inviteBtn.dataset.adminUserId = entry.userId;
-    }
-    const alreadyAdded = (state.players || []).some(
-      (player) =>
-        (entry.userId && player.uid === entry.userId) ||
-        (player.name || "").toLowerCase() === entry.username.toLowerCase(),
-    );
-    if (alreadyAdded) {
-      inviteBtn.disabled = true;
-      inviteBtn.textContent = "Added";
-    }
-    row.append(label, inviteBtn);
-    resultsEl.append(row);
-  });
-}
-
-function initFinalAdminSearch() {
-  const input = document.getElementById("finalAdminSearchInput");
-  const resultsEl = document.getElementById("finalAdminSearchResults");
-  if (!input || !resultsEl) return;
-  const search = createAdminPlayerSearch({
-    db,
-    getIsEnabled: () => isAdmin,
-    getPlayers: () => state.players || [],
-    onStatus: setFinalAdminSearchStatus,
-    onResults: renderFinalAdminSearchResults,
-    onError: (err) => {
-      if (err?.message) showToast?.(err.message, "error");
-    },
-    onSuccess: () => {
-      input.value = "";
-      renderFinalAdminSearchResults([]);
-      setFinalAdminSearchStatus("");
-    },
-    addPlayer: async ({ userId, username, userData, options }) => {
-      if (bracketHasRecordedResults(state.bracket)) {
-        showToast?.("Cannot add players after scores are recorded.", "error");
-        return;
-      }
-      const displayName = userData.username || username;
-      const pulse = userData?.pulse || {};
-      const byRace = pulse.lastMmrByRace || pulse.byRace || null;
-      const fallbackMmr = Number(pulse.lastMmr ?? pulse.mmr);
-      const pick = pickBestRace(byRace, fallbackMmr);
-      const race = pick.race || "Random";
-      const mmr = Number.isFinite(pick.mmr) ? pick.mmr : 0;
-      const sc2Link = sanitizeUrl(userData.sc2PulseUrl || pulse.url || "");
-      let startingPoints = null;
-      if (currentTournamentMeta?.circuitSlug && displayName) {
-        startingPoints = await getCircuitSeedPoints({
-          name: displayName,
-          sc2Link,
-          uid: userId,
-          circuitSlug: currentTournamentMeta.circuitSlug,
-          tournamentSlug: currentSlug,
-        });
-      }
-      const avatarUrl =
-        userData?.profile?.avatarUrl ||
-        userData?.avatarUrl ||
-        DEFAULT_PLAYER_AVATAR;
-      const secondaryPulseProfiles = Array.isArray(pulse.secondary)
-        ? pulse.secondary
-        : [];
-      const secondaryPulseLinks = secondaryPulseProfiles
-        .map((entry) => (entry && typeof entry === "object" ? entry.url : ""))
-        .filter(Boolean);
-      let clanName = "";
-      let clanAbbreviation = "";
-      let clanLogoUrl = "";
-      const mainClanId = userData?.settings?.mainClanId || "";
-      if (mainClanId) {
-        try {
-          const clanDoc = await getDoc(doc(db, "clans", mainClanId));
-          if (clanDoc.exists()) {
-            const clanData = clanDoc.data() || {};
-            clanName = clanData?.name || "";
-            clanAbbreviation = clanData?.abbreviation || "";
-            clanLogoUrl = clanData?.logoUrlSmall || clanData?.logoUrl || "";
-          }
-        } catch (err) {
-          console.warn("Could not fetch clan data", err);
-        }
-      }
-      const addMode = options?.mode === "super" ? "super" : "invite";
-      const inviterName = getCurrentUsername?.() || "Tournament admin";
-      const newPlayer = buildPlayerFromData({
-        name: displayName,
-        race,
-        sc2Link,
-        mmr,
-        points: Number.isFinite(startingPoints) ? startingPoints : 0,
-        inviteStatus:
-          addMode === "super" ? INVITE_STATUS.accepted : INVITE_STATUS.pending,
-        ...(addMode === "super"
-          ? {}
-          : {
-              invitedAt: Date.now(),
-              invitedByUid: auth.currentUser?.uid || "",
-              invitedByName: inviterName,
-            }),
-        avatarUrl,
-        twitchUrl: userData?.twitchUrl || "",
-        secondaryPulseLinks,
-        secondaryPulseProfiles,
-        mmrByRace: byRace || null,
-        country: (userData?.country || "").toUpperCase(),
-        clan: clanName,
-        clanAbbreviation,
-        clanLogoUrl,
-        pulseName: pulse.name || pulse.accountName || "",
-        uid: userId,
-      });
-      await updateRosterWithTransaction(
-        (players) => upsertRosterPlayer(players, newPlayer),
-        {},
-        { optimistic: true },
-      );
-      if (addMode === "super") {
-        addActivity(`Admin added ${newPlayer.name}.`);
-      } else {
-        addActivity(`Admin invited ${newPlayer.name}.`);
-        try {
-          await sendTournamentInviteNotification({
-            db,
-            auth,
-            getCurrentUsername,
-            userId,
-            playerName: newPlayer.name,
-            tournamentMeta: currentTournamentMeta,
-            slug: currentSlug,
-          });
-        } catch (err) {
-          console.error("Failed to send invite notification", err);
-          showToast?.(
-            "Invite created, but notification failed to send.",
-            "error",
-          );
-        }
-      }
-      renderAll();
-      if (addMode === "super") {
-        showToast?.(`${newPlayer.name} added to player list.`, "success");
-      } else {
-        showToast?.(`Invite sent to ${newPlayer.name}.`, "success");
-      }
-    },
-  });
-
-  input.addEventListener("input", () => {
-    search.debouncedSearch(input.value);
-  });
-  resultsEl.addEventListener("click", (event) => {
-    const target = event.target.closest("[data-admin-add-username]");
-    if (!target) return;
-    const username = target.dataset.adminAddUsername || "";
-    const userId = target.dataset.adminUserId || "";
-    const mode = target.dataset.adminAddMode || "invite";
-    search.addByUsername(username, userId, { mode });
-  });
 }
 
 function mmrForRace(raceLabel) {
@@ -8178,11 +8073,6 @@ function collectSecondaryPulseLinks() {
 function isGoogleAvatarUrl(url = "") {
   if (!url) return false;
   return GOOGLE_AVATAR_PATTERNS.some((pattern) => pattern.test(url));
-}
-
-function resolvePlayerAvatar(player) {
-  const userPhoto = document.getElementById("userPhoto")?.src;
-  return player?.avatarUrl || userPhoto || DEFAULT_PLAYER_AVATAR;
 }
 
 async function syncCurrentPlayerAvatar(avatarUrl) {
@@ -8272,271 +8162,6 @@ function deserializeBracket(bracket) {
 function formatTime(ts) {
   const d = new Date(ts);
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
-
-function layoutUpperBracket(bracket, lookup, playersById) {
-  const winners = bracket.winners || [];
-  if (!winners.length) {
-    return `<div class="placeholder">Add players to generate the bracket.</div>`;
-  }
-
-  const CARD_HEIGHT = 90;
-  const CARD_WIDTH = 240;
-  const V_GAP = 8;
-  const H_GAP = 90;
-
-  const positions = new Map(); // matchId -> {x,y}
-
-  winners.forEach((round, rIdx) => {
-    round.forEach((match, mIdx) => {
-      const x = rIdx * (CARD_WIDTH + H_GAP);
-      if (rIdx === 0) {
-        const y = mIdx * (CARD_HEIGHT + V_GAP);
-        positions.set(match.id, { x, y });
-      } else {
-        const parents = match.sources
-          .map((src) =>
-            src?.type === "match" ? positions.get(src.matchId) : null,
-          )
-          .filter(Boolean);
-        const parentYs = parents.map((p) => p.y + CARD_HEIGHT / 2);
-        const yCenter =
-          parentYs.length === 2
-            ? (parentYs[0] + parentYs[1]) / 2
-            : parentYs[0] || mIdx * (CARD_HEIGHT + V_GAP);
-        const y = yCenter - CARD_HEIGHT / 2;
-        positions.set(match.id, { x, y, parents });
-      }
-    });
-  });
-
-  const connectors = [];
-  const matchCards = [];
-  const renderedMatches = new Set();
-  let maxY = 0;
-
-  winners.forEach((round, rIdx) => {
-    round.forEach((match) => {
-      const pos = positions.get(match.id);
-      if (!pos) return;
-      maxY = Math.max(maxY, pos.y + CARD_HEIGHT);
-      const participants = resolveParticipants(match, lookup, playersById);
-      const [pA, pB] = participants;
-      matchCards.push(
-        renderSimpleMatch(
-          match,
-          pA,
-          pB,
-          pos.x,
-          pos.y,
-          CARD_HEIGHT,
-          CARD_WIDTH,
-          "",
-          "",
-        ),
-      );
-
-      if (rIdx > 0) {
-        const srcs = match.sources
-          .map((src) =>
-            src?.type === "match" ? positions.get(src.matchId) : null,
-          )
-          .filter(Boolean);
-        const parentIds = (match.sources || [])
-          .map((s) => (s?.type === "match" ? s.matchId : null))
-          .filter(Boolean);
-        if (
-          srcs.length === 2 &&
-          matchCards.some((m) => m.includes(`data-match-id="${match.id}"`))
-        ) {
-          const midY1 = srcs[0].y + CARD_HEIGHT / 2;
-          const midY2 = srcs[1].y + CARD_HEIGHT / 2;
-          const childMidY = pos.y + CARD_HEIGHT / 2;
-          const junctionX = pos.x - 30;
-          connectors.push(
-            makeConnector(srcs[0].x + CARD_WIDTH, midY1, junctionX, midY1, {
-              from: parentIds[0],
-              to: match.id,
-            }),
-          );
-          connectors.push(
-            makeConnector(srcs[1].x + CARD_WIDTH, midY2, junctionX, midY2, {
-              from: parentIds[1],
-              to: match.id,
-            }),
-          );
-          connectors.push(
-            makeVConnector(junctionX, midY1, childMidY, {
-              from: parentIds[0],
-              to: match.id,
-            }),
-          );
-          connectors.push(
-            makeVConnector(junctionX, midY2, childMidY, {
-              from: parentIds[1],
-              to: match.id,
-            }),
-          );
-          connectors.push(
-            makeConnector(junctionX, childMidY, pos.x, childMidY, {
-              from: match.id,
-              to: match.id,
-              parents: parentIds.join(","),
-            }),
-          );
-        }
-      }
-    });
-  });
-
-  const titles = winners
-    .map((round, idx) => {
-      const bestOfLabel = round?.length ? getBestOfForMatch(round[0]) : null;
-      const boBadge = bestOfLabel
-        ? `<span class="round-bo">Bo${bestOfLabel}</span>`
-        : "";
-      return `<div class="round-title row-title" style="left:${
-        idx * (CARD_WIDTH + H_GAP)
-      }px;">${round.name || `Round ${idx + 1}`} ${boBadge}</div>`;
-    })
-    .join("");
-
-  return `<div class="tree-bracket" style="height:${maxY + 20}px">
-    ${titles}
-    ${matchCards.join("")}
-    ${connectors.join("")}
-  </div>`;
-}
-
-function formatConnectorMeta(meta = {}) {
-  const attrs = [];
-  if (meta.from) attrs.push(`data-from="${meta.from}"`);
-  if (meta.to) attrs.push(`data-to="${meta.to}"`);
-  if (meta.parents) attrs.push(`data-parents="${meta.parents}"`);
-  return attrs.join(" ");
-}
-
-function makeConnector(x1, y1, x2, y2, meta = {}) {
-  const attr = formatConnectorMeta(meta);
-  return `<div class="connector h" ${attr} style="left:${Math.min(
-    x1,
-    x2,
-  )}px; top:${y1}px; width:${Math.abs(x2 - x1)}px;"></div>`;
-}
-
-function makeVConnector(x, y1, y2, meta = {}) {
-  const attr = formatConnectorMeta(meta);
-  return `<div class="connector v" ${attr} style="left:${x}px; top:${Math.min(
-    y1,
-    y2,
-  )}px; height:${Math.abs(y2 - y1)}px;"></div>`;
-}
-
-// --- Round ordering helper to reduce crossing connectors --------------------
-
-function getParentOrderKey(match, prevIndexMap) {
-  if (!match || !Array.isArray(match.sources)) {
-    return Number.MAX_SAFE_INTEGER;
-  }
-  const indices = match.sources
-    .filter((src) => src && src.type === "match")
-    .map((src) => {
-      const idx = prevIndexMap.get(src.matchId);
-      return typeof idx === "number" ? idx : Number.MAX_SAFE_INTEGER;
-    });
-
-  if (!indices.length) {
-    return Number.MAX_SAFE_INTEGER;
-  }
-  return Math.min(...indices);
-}
-
-/**
- * Reorders matches in each round so that matches whose parents are
- * higher in the previous round also appear higher in this round.
- * This keeps connector lines from crossing as much as possible.
- */
-function sortRoundsByParents(rounds) {
-  if (!Array.isArray(rounds) || rounds.length === 0) {
-    return [];
-  }
-
-  const ordered = [];
-
-  for (let rIdx = 0; rIdx < rounds.length; rIdx++) {
-    const round = Array.isArray(rounds[rIdx]) ? [...rounds[rIdx]] : [];
-
-    // First round: keep original order
-    if (rIdx === 0) {
-      ordered.push(round);
-      continue;
-    }
-
-    const prevRound = ordered[rIdx - 1] || rounds[rIdx - 1] || [];
-    const prevIndexMap = new Map(prevRound.map((m, idx) => [m.id, idx]));
-
-    const decorated = round.map((match, i) => ({
-      match,
-      key: getParentOrderKey(match, prevIndexMap),
-      originalIndex: i,
-    }));
-
-    const hasRealParents = decorated.some(
-      (d) => d.key !== Number.MAX_SAFE_INTEGER,
-    );
-
-    if (!hasRealParents) {
-      // Nothing to sort against – keep original order
-      ordered.push(round);
-      continue;
-    }
-
-    decorated.sort((a, b) => {
-      if (a.key !== b.key) return a.key - b.key;
-      return a.originalIndex - b.originalIndex;
-    });
-
-    ordered.push(decorated.map((d) => d.match));
-  }
-
-  return ordered;
-}
-
-// Helper: pretty round titles (Final / Semi-final / Lower Final, etc.)
-function getRoundLabel(
-  titlePrefix,
-  idx,
-  totalRounds,
-  { hasGrandFinal = false, hasFinalReset = false } = {},
-) {
-  // idx is 0-based, totalRounds is the number of columns in this section
-  const fromEnd = totalRounds - idx; // 1 = last round, 2 = second last, ...
-
-  if (titlePrefix === "Upper") {
-    if (hasFinalReset) {
-      if (fromEnd === 1) return "Grand Final Reset";
-      if (fromEnd === 2) return "Grand Final";
-      if (fromEnd === 3) return "Upper Final";
-      if (fromEnd === 4) return "Semi-final";
-      if (fromEnd === 5) return "Quarterfinal";
-      return `Upper Round ${idx + 1}`;
-    }
-    if (fromEnd === 1) return hasGrandFinal ? "Grand Final" : "Final";
-    if (fromEnd === 2) return hasGrandFinal ? "Upper Final" : "Semi-final";
-    if (fromEnd === 3) return hasGrandFinal ? "Semi-final" : "Quarterfinal";
-    if (fromEnd === 4)
-      return hasGrandFinal ? "Quarterfinal" : `Upper Round ${idx + 1}`;
-    return `Upper Round ${idx + 1}`;
-  }
-
-  if (titlePrefix === "Lower") {
-    if (fromEnd === 1) return "Lower Final";
-    if (fromEnd === 2) return "Lower Semi-final";
-    return `Lower Round ${idx + 1}`;
-  }
-
-  // Fallback for any other prefix
-  return `${titlePrefix} Round ${idx + 1}`;
 }
 
 function getMatchLookupForTesting() {
