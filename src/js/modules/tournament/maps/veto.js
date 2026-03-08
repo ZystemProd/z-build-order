@@ -857,10 +857,7 @@ export function openMatchInfoModal(
     match || { bracket: "winners", round: 1 },
   );
   const saved = state.matchVetoes?.[matchId] || null;
-  const bestOf = Math.max(
-    1,
-    Number(saved?.bestOf || match?.bestOf || bestOfComputed) || 1,
-  );
+  const bestOf = Math.max(1, Number(bestOfComputed) || 1);
   const pickedMaps = Array.isArray(saved?.maps) ? saved.maps : [];
   const vetoedMaps = Array.isArray(saved?.vetoed) ? saved.vetoed : [];
   const playersById = getPlayersMap();
@@ -1092,9 +1089,16 @@ export function openMatchInfoModal(
     const winsA = winners.filter((w) => w === "A").length;
     const winsB = winners.filter((w) => w === "B").length;
     const needed = Math.max(1, Math.ceil(bestOf / 2));
+    const isResetScoreEdit =
+      allowScoreEditToggle &&
+      scoreEditEnabled &&
+      walkoverValue === "" &&
+      winsA === 0 &&
+      winsB === 0;
     const canConfirm =
       walkoverValue !== "" ||
-      (winsA !== winsB && Math.max(winsA, winsB) >= needed);
+      (winsA !== winsB && Math.max(winsA, winsB) >= needed) ||
+      isResetScoreEdit;
     confirmScoreBtn.style.display = "";
     confirmScoreBtn.disabled = !canConfirm;
     confirmScoreBtn.textContent = "Confirm score";
@@ -2765,8 +2769,9 @@ export function saveVetoSelection() {
   });
   const lookup = getMatchLookup(state.bracket || {});
   const match = lookup.get(currentVetoMatchId);
-  if (match)
-    match.bestOf = vetoState.bestOf || match.bestOf || defaultBestOf.upper;
+  if (match && Object.prototype.hasOwnProperty.call(match, "bestOf")) {
+    delete match.bestOf;
+  }
   vetoDeps?.saveState?.({
     matchVetoes: state.matchVetoes,
     bracket: state.bracket,

@@ -59,23 +59,48 @@ export function getSelectValue(match, idx, bestOf = 3, participants = null) {
   return match.scores?.[idx] ?? 0;
 }
 
+function resolveRoundPosition(match) {
+  if (!match || !state?.bracket) return null;
+  const rounds =
+    match.bracket === "winners"
+      ? state.bracket?.winners
+      : match.bracket === "losers"
+        ? state.bracket?.losers
+        : null;
+  if (!Array.isArray(rounds)) return null;
+  const matchId = match?.id || null;
+  for (let i = 0; i < rounds.length; i += 1) {
+    const round = Array.isArray(rounds[i]) ? rounds[i] : [];
+    const found = round.some(
+      (entry) => entry === match || (matchId && entry?.id === matchId),
+    );
+    if (found) {
+      return { round: i + 1, total: rounds.length };
+    }
+  }
+  return null;
+}
+
 export function getBestOfForMatch(match) {
+  if (!match) return defaultBestOf.final ?? 1;
   if (match?.bracket === "group") {
     const groupBestOf = Number(currentTournamentMeta?.roundRobin?.bestOf);
     if (Number.isFinite(groupBestOf) && groupBestOf > 0) {
       return groupBestOf;
     }
-  }
-  if (Number.isFinite(match?.bestOf) && match.bestOf > 0) {
-    return match.bestOf;
+    if (Number.isFinite(match?.bestOf) && match.bestOf > 0) {
+      return match.bestOf;
+    }
   }
   const isFinalReset =
     match?.isReset || state?.bracket?.finalsReset?.id === match?.id;
   const bestOf = currentTournamentMeta?.bestOf || defaultBestOf;
-  const winnersRounds = state.bracket?.winners?.length || 0;
 
   if (match.bracket === "winners") {
-    if (match.round === winnersRounds) {
+    const resolvedRound = resolveRoundPosition(match);
+    const winnersRounds = resolvedRound?.total || state.bracket?.winners?.length || 0;
+    const roundNumber = resolvedRound?.round ?? match.round;
+    if (roundNumber === winnersRounds) {
       if (state.bracket?.finals) {
         return (
           bestOf.upperFinal ??
@@ -86,23 +111,25 @@ export function getBestOfForMatch(match) {
       }
       return bestOf.final ?? defaultBestOf.final;
     }
-    if (match.round === winnersRounds - 1)
+    if (roundNumber === winnersRounds - 1)
       return bestOf.semi ?? defaultBestOf.semi;
-    if (match.round === winnersRounds - 2)
+    if (roundNumber === winnersRounds - 2)
       return bestOf.quarter ?? defaultBestOf.quarter;
     return bestOf.upper ?? defaultBestOf.upper;
   }
 
   if (match.bracket === "losers") {
-    const losersRounds = state.bracket?.losers?.length || 0;
-    if (match.round === losersRounds)
+    const resolvedRound = resolveRoundPosition(match);
+    const losersRounds = resolvedRound?.total || state.bracket?.losers?.length || 0;
+    const roundNumber = resolvedRound?.round ?? match.round;
+    if (roundNumber === losersRounds)
       return (
         bestOf.lowerFinal ??
         bestOf.lower ??
         defaultBestOf.lowerFinal ??
         defaultBestOf.lower
       );
-    if (match.round === losersRounds - 1)
+    if (roundNumber === losersRounds - 1)
       return (
         bestOf.lowerSemi ??
         bestOf.lower ??
