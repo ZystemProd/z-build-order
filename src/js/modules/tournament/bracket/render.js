@@ -1,5 +1,5 @@
 import DOMPurify from "dompurify";
-import { state, currentTournamentMeta, defaultBestOf } from "../state.js";
+import { state, currentTournamentMeta, defaultBestOf, isAdmin } from "../state.js";
 import {
   getAllMatches,
   getMatchLookup,
@@ -69,6 +69,7 @@ function buildBracketLayoutSignature(bracket, isGroupStage) {
     bestOfMeta.lowerSemi,
     bestOfMeta.lowerFinal,
     currentTournamentMeta?.roundRobin?.bestOf,
+    isAdmin ? 1 : 0,
   ].join(",");
   if (isGroupStage) {
     const groups = Array.isArray(bracket.groups) ? bracket.groups : [];
@@ -1422,7 +1423,7 @@ export function layoutBracketSection(
       );
       let boBadge = "";
       if (bestOfLabel) {
-        if (bestOfKey) {
+        if (bestOfKey && isAdmin) {
           const lockTitle = roundLocked
             ? "Best-of locked for this round (scores already recorded)."
             : "Click to edit Best-of for this round.";
