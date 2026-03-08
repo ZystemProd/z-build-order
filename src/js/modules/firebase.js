@@ -41,6 +41,7 @@ if (typeof window !== "undefined") {
 }
 
 const provider = new GoogleAuthProvider();
+provider.setCustomParameters({ prompt: "select_account" });
 const switchAccountProvider = new GoogleAuthProvider();
 switchAccountProvider.setCustomParameters({ prompt: "select_account" });
 

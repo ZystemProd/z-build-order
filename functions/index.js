@@ -628,6 +628,28 @@ function normalizeBestOf(meta) {
   return out;
 }
 
+function resolveRoundPosition(match, bracket) {
+  if (!match || typeof match !== "object") return null;
+  const rounds =
+    match.bracket === "winners"
+      ? normalizeRounds(bracket?.winners)
+      : match.bracket === "losers"
+        ? normalizeRounds(bracket?.losers)
+        : null;
+  if (!rounds) return null;
+  const matchId = match.id || null;
+  for (let i = 0; i < rounds.length; i += 1) {
+    const round = toArray(rounds[i]);
+    const found = round.some(
+      (entry) => entry === match || (matchId && entry?.id === matchId),
+    );
+    if (found) {
+      return { round: i + 1, total: rounds.length };
+    }
+  }
+  return null;
+}
+
 function getBestOfForMatch(match, meta, bracket) {
   if (!match || typeof match !== "object") return 1;
   if (match.bracket === "group") {
@@ -635,32 +657,36 @@ function getBestOfForMatch(match, meta, bracket) {
     if (Number.isFinite(groupBestOf) && groupBestOf > 0) {
       return groupBestOf;
     }
-  }
-  if (Number.isFinite(match?.bestOf) && match.bestOf > 0) {
-    return match.bestOf;
+    if (Number.isFinite(match?.bestOf) && match.bestOf > 0) {
+      return match.bestOf;
+    }
   }
   const bestOf = normalizeBestOf(meta);
-  const winnersRounds = toArray(bracket?.winners).length || 0;
-  const losersRounds = toArray(bracket?.losers).length || 0;
 
   if (match.bracket === "winners") {
-    if (match.round === winnersRounds) {
+    const resolvedRound = resolveRoundPosition(match, bracket);
+    const winnersRounds = resolvedRound?.total || toArray(bracket?.winners).length || 0;
+    const roundNumber = resolvedRound?.round ?? match.round;
+    if (roundNumber === winnersRounds) {
       if (bracket?.finals) {
         return bestOf.upperFinal || bestOf.final || DEFAULT_BEST_OF.upperFinal;
       }
       return bestOf.final || DEFAULT_BEST_OF.final;
     }
-    if (match.round === winnersRounds - 1) {
+    if (roundNumber === winnersRounds - 1) {
       return bestOf.semi || DEFAULT_BEST_OF.semi;
     }
-    if (match.round === winnersRounds - 2) {
+    if (roundNumber === winnersRounds - 2) {
       return bestOf.quarter || DEFAULT_BEST_OF.quarter;
     }
     return bestOf.upper || DEFAULT_BEST_OF.upper;
   }
 
   if (match.bracket === "losers") {
-    if (match.round === losersRounds) {
+    const resolvedRound = resolveRoundPosition(match, bracket);
+    const losersRounds = resolvedRound?.total || toArray(bracket?.losers).length || 0;
+    const roundNumber = resolvedRound?.round ?? match.round;
+    if (roundNumber === losersRounds) {
       return (
         bestOf.lowerFinal ||
         bestOf.lower ||
@@ -668,7 +694,7 @@ function getBestOfForMatch(match, meta, bracket) {
         DEFAULT_BEST_OF.lower
       );
     }
-    if (match.round === losersRounds - 1) {
+    if (roundNumber === losersRounds - 1) {
       return (
         bestOf.lowerSemi ||
         bestOf.lower ||

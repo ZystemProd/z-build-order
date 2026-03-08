@@ -1,5 +1,5 @@
 import DOMPurify from "dompurify";
-import { state, currentTournamentMeta, defaultBestOf } from "../state.js";
+import { state, currentTournamentMeta, defaultBestOf, isAdmin } from "../state.js";
 import {
   getAllMatches,
   getMatchLookup,
@@ -57,10 +57,24 @@ function hashLayoutSignature(signature) {
 
 function buildBracketLayoutSignature(bracket, isGroupStage) {
   if (!bracket) return "";
+  const bestOfMeta = currentTournamentMeta?.bestOf || defaultBestOf;
+  const bestOfSig = [
+    bestOfMeta.upper,
+    bestOfMeta.quarter,
+    bestOfMeta.semi,
+    bestOfMeta.upperFinal,
+    bestOfMeta.final,
+    bestOfMeta.finalReset,
+    bestOfMeta.lower,
+    bestOfMeta.lowerSemi,
+    bestOfMeta.lowerFinal,
+    currentTournamentMeta?.roundRobin?.bestOf,
+    isAdmin ? 1 : 0,
+  ].join(",");
   if (isGroupStage) {
     const groups = Array.isArray(bracket.groups) ? bracket.groups : [];
     const groupIds = groups.map((group) => group?.id || "").join("|");
-    return `group:${groupIds}|playoffs:${Boolean(bracket.finals)}|reset:${Boolean(bracket.finalsReset)}`;
+    return `group:${groupIds}|playoffs:${Boolean(bracket.finals)}|reset:${Boolean(bracket.finalsReset)}|bo:${bestOfSig}`;
   }
   const winners = (bracket.winners || [])
     .map((round) => (round || []).map((match) => match?.id || "").join(","))
@@ -70,7 +84,7 @@ function buildBracketLayoutSignature(bracket, isGroupStage) {
     .join("|");
   const finals = bracket.finals?.id || "";
   const finalsReset = bracket.finalsReset?.id || "";
-  return `tree:w:${winners}|l:${losers}|f:${finals}|r:${finalsReset}`;
+  return `tree:w:${winners}|l:${losers}|f:${finals}|r:${finalsReset}|bo:${bestOfSig}`;
 }
 
 function getRowRefs(row) {
@@ -1391,9 +1405,6 @@ export function layoutBracketSection(
   const titles = orderedRounds
     .map((round, idx) => {
       const bestOfLabel = round?.length ? getBestOfForMatch(round[0]) : null;
-      const boBadge = bestOfLabel
-        ? `<span class="round-bo">Bo${bestOfLabel}</span>`
-        : "";
 
       const label = getRoundLabel(
         titlePrefix,
@@ -1401,6 +1412,26 @@ export function layoutBracketSection(
         totalRounds,
         roundLabelOptions,
       );
+      const bestOfKey = getBestOfSettingKey(
+        titlePrefix,
+        idx,
+        totalRounds,
+        roundLabelOptions,
+      );
+      const roundLocked = (round || []).some((match) =>
+        matchHasRecordedScore(match),
+      );
+      let boBadge = "";
+      if (bestOfLabel) {
+        if (bestOfKey && isAdmin) {
+          const lockTitle = roundLocked
+            ? "Best-of locked for this round (scores already recorded)."
+            : "Click to edit Best-of for this round.";
+          boBadge = `<span class="round-bo" role="button" tabindex="0" data-no-drag data-bestof-key="${bestOfKey}" data-bestof-locked="${roundLocked ? "true" : "false"}" data-bestof-label="${escapeHtml(label)}" title="${escapeHtml(lockTitle)}">Bo${bestOfLabel}</span>`;
+        } else {
+          boBadge = `<span class="round-bo">Bo${bestOfLabel}</span>`;
+        }
+      }
 
       const isResetTitle = label.toLowerCase().includes("reset");
       const infoIcon = isResetTitle
@@ -1495,6 +1526,44 @@ function getRoundLabel(
   }
 
   return `${titlePrefix} Round ${idx + 1}`;
+}
+
+function matchHasRecordedScore(match) {
+  if (!match) return false;
+  if (match.status === "complete") return true;
+  if (match.winnerId || match.walkover) return true;
+  const scores = Array.isArray(match.scores) ? match.scores : [];
+  return (scores[0] || 0) + (scores[1] || 0) > 0;
+}
+
+function getBestOfSettingKey(
+  titlePrefix,
+  idx,
+  totalRounds,
+  { hasGrandFinal = false, hasFinalReset = false } = {},
+) {
+  const fromEnd = totalRounds - idx;
+  if (titlePrefix === "Upper") {
+    if (hasFinalReset) {
+      if (fromEnd === 1) return "finalReset";
+      if (fromEnd === 2) return "final";
+      if (fromEnd === 3) return "upperFinal";
+      if (fromEnd === 4) return "semi";
+      if (fromEnd === 5) return "quarter";
+      return "upper";
+    }
+    if (fromEnd === 1) return "final";
+    if (fromEnd === 2) return hasGrandFinal ? "upperFinal" : "semi";
+    if (fromEnd === 3) return hasGrandFinal ? "semi" : "quarter";
+    if (fromEnd === 4) return hasGrandFinal ? "quarter" : "upper";
+    return "upper";
+  }
+  if (titlePrefix === "Lower") {
+    if (fromEnd === 1) return "lowerFinal";
+    if (fromEnd === 2) return "lowerSemi";
+    return "lower";
+  }
+  return null;
 }
 
 export function layoutUpperBracket(bracket, lookup, playersById) {

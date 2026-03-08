@@ -14,6 +14,7 @@ import {
   deleteField,
   doc,
   onSnapshot,
+  runTransaction,
   updateDoc,
 } from "firebase/firestore";
 import {
@@ -857,10 +858,7 @@ export function openMatchInfoModal(
     match || { bracket: "winners", round: 1 },
   );
   const saved = state.matchVetoes?.[matchId] || null;
-  const bestOf = Math.max(
-    1,
-    Number(saved?.bestOf || match?.bestOf || bestOfComputed) || 1,
-  );
+  const bestOf = Math.max(1, Number(bestOfComputed) || 1);
   const pickedMaps = Array.isArray(saved?.maps) ? saved.maps : [];
   const vetoedMaps = Array.isArray(saved?.vetoed) ? saved.vetoed : [];
   const playersById = getPlayersMap();
@@ -982,26 +980,31 @@ export function openMatchInfoModal(
       } else {
         castTooltip = "Mark this match as casting to show the stream icon.";
       }
-      castBtn.onclick = () => {
+      castBtn.onclick = async () => {
         if (!uid) {
           showToast?.("Sign in to cast a match.", "error");
           return;
         }
-        const nextMatchCasts = { ...(state.matchCasts || {}) };
+        const expectedLastUpdated = Number(state.lastUpdated) || 0;
+        let nextCastEntry = null;
         if (isCasting) {
-          delete nextMatchCasts[matchId];
+          nextCastEntry = null;
         } else if (isTaken) {
           showToast?.("This match already has a caster.", "error");
           return;
         } else {
-          nextMatchCasts[matchId] = {
+          nextCastEntry = {
             uid,
             name: casterEntry?.name || getCurrentUsername?.() || "Caster",
             twitchUrl: casterEntry?.twitchUrl || "",
             startedAt: Date.now(),
           };
         }
-        vetoDeps?.saveState?.({ matchCasts: nextMatchCasts });
+        const ok = await patchMatchCastRemote(matchId, nextCastEntry, {
+          expectedLastUpdated,
+          showErrors: true,
+        });
+        if (!ok) return;
         vetoDeps?.renderAll?.();
         openMatchInfoModal(matchId, vetoDeps);
       };
@@ -1092,9 +1095,16 @@ export function openMatchInfoModal(
     const winsA = winners.filter((w) => w === "A").length;
     const winsB = winners.filter((w) => w === "B").length;
     const needed = Math.max(1, Math.ceil(bestOf / 2));
+    const isResetScoreEdit =
+      allowScoreEditToggle &&
+      scoreEditEnabled &&
+      walkoverValue === "" &&
+      winsA === 0 &&
+      winsB === 0;
     const canConfirm =
       walkoverValue !== "" ||
-      (winsA !== winsB && Math.max(winsA, winsB) >= needed);
+      (winsA !== winsB && Math.max(winsA, winsB) >= needed) ||
+      isResetScoreEdit;
     confirmScoreBtn.style.display = "";
     confirmScoreBtn.disabled = !canConfirm;
     confirmScoreBtn.textContent = "Confirm score";
@@ -1104,11 +1114,12 @@ export function openMatchInfoModal(
             scoreEditEnabled = false;
             modal.dataset.scoreEdit = "false";
           }
-          const clearMatchCast = () => {
+          const clearMatchCast = async () => {
             if (!state.matchCasts?.[matchId]) return;
-            const nextMatchCasts = { ...(state.matchCasts || {}) };
-            delete nextMatchCasts[matchId];
-            vetoDeps?.saveState?.({ matchCasts: nextMatchCasts });
+            await patchMatchCastRemote(matchId, null, {
+              expectedLastUpdated: Number(state.lastUpdated) || 0,
+              showErrors: false,
+            });
           };
           vetoDeps?.saveState?.({ matchVetoes: state.matchVetoes });
           if (walkoverValue === "A") {
@@ -1120,7 +1131,7 @@ export function openMatchInfoModal(
               finalize: true,
             });
           }
-          clearMatchCast();
+          void clearMatchCast();
           // Keep the inspector open after confirming; just refresh it
           if (vetoDeps) {
             openMatchInfoModal(matchId, vetoDeps);
@@ -2056,6 +2067,83 @@ function tournamentStateDocRef() {
   return doc(collection(db, TOURNAMENT_STATE_COLLECTION), currentSlug);
 }
 
+function readLastUpdatedMs(value) {
+  if (value && typeof value.toMillis === "function") {
+    return Number(value.toMillis()) || 0;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+async function patchMatchCastRemote(
+  matchId,
+  nextCastEntry,
+  { expectedLastUpdated = 0, showErrors = true } = {},
+) {
+  const ref = tournamentStateDocRef();
+  if (!ref || !matchId) return false;
+  const expected = Number(expectedLastUpdated) || 0;
+  let nextUpdatedAt = 0;
+  try {
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists()) {
+        const err = new Error("state-missing");
+        err.code = "state-missing";
+        throw err;
+      }
+      const data = snap.data() || {};
+      const remoteUpdated = readLastUpdatedMs(data.lastUpdated);
+      if (expected && remoteUpdated && remoteUpdated > expected) {
+        const err = new Error("stale-state");
+        err.code = "stale-state";
+        throw err;
+      }
+      const nextMatchCasts = { ...(data.matchCasts || {}) };
+      if (nextCastEntry) {
+        nextMatchCasts[matchId] = nextCastEntry;
+      } else {
+        delete nextMatchCasts[matchId];
+      }
+      nextUpdatedAt = Date.now();
+      tx.set(
+        ref,
+        {
+          matchCasts: nextMatchCasts,
+          lastUpdated: nextUpdatedAt,
+        },
+        { merge: true },
+      );
+    });
+
+    const localMatchCasts = { ...(state.matchCasts || {}) };
+    if (nextCastEntry) {
+      localMatchCasts[matchId] = nextCastEntry;
+    } else {
+      delete localMatchCasts[matchId];
+    }
+    state.matchCasts = localMatchCasts;
+    state.lastUpdated = Math.max(
+      Number(state.lastUpdated) || 0,
+      Number(nextUpdatedAt) || 0,
+    );
+    return true;
+  } catch (err) {
+    const stale =
+      err?.code === "stale-state" ||
+      String(err?.message || "").toLowerCase().includes("stale-state");
+    if (showErrors) {
+      if (stale) {
+        showToast?.("State changed on another client. Try again.", "warning");
+      } else {
+        showToast?.("Could not update casting state.", "error");
+      }
+    }
+    console.warn("Failed to patch match cast", err);
+    return false;
+  }
+}
+
 async function clearScoreReportRemote(matchId) {
   const ref = tournamentStateDocRef();
   if (!ref || !matchId) return;
@@ -2765,8 +2853,9 @@ export function saveVetoSelection() {
   });
   const lookup = getMatchLookup(state.bracket || {});
   const match = lookup.get(currentVetoMatchId);
-  if (match)
-    match.bestOf = vetoState.bestOf || match.bestOf || defaultBestOf.upper;
+  if (match && Object.prototype.hasOwnProperty.call(match, "bestOf")) {
+    delete match.bestOf;
+  }
   vetoDeps?.saveState?.({
     matchVetoes: state.matchVetoes,
     bracket: state.bracket,

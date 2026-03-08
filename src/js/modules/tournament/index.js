@@ -1499,6 +1499,32 @@ function syncFromRemote(incoming) {
     incomingBytes: estimateJsonSizeBytes(incoming),
   });
   try {
+    const incomingLastUpdated = Number(incoming?.lastUpdated) || 0;
+    const localLastUpdated = Number(state?.lastUpdated) || 0;
+    const incomingBestOf =
+      incoming?.bestOf && typeof incoming.bestOf === "object"
+        ? incoming.bestOf
+        : null;
+    if (
+      incomingBestOf &&
+      currentTournamentMeta &&
+      (!incomingLastUpdated || incomingLastUpdated >= localLastUpdated)
+    ) {
+      const currentBestOf = currentTournamentMeta?.bestOf || {};
+      if (!safeJsonEqual(currentBestOf, incomingBestOf)) {
+        const mergedBestOf = {
+          ...defaultBestOf,
+          ...incomingBestOf,
+        };
+        setCurrentTournamentMetaState({
+          ...currentTournamentMeta,
+          bestOf: mergedBestOf,
+        });
+        applyBestOfToSettings(mergedBestOf);
+        updateSettingsScoreLocks();
+      }
+    }
+
     syncFromRemoteCore({
       incoming,
       getState: () => state,
@@ -2042,6 +2068,7 @@ function renderAll(matchIds = null) {
   let renderMode = "full";
   try {
     const bracketContainer = document.getElementById("bracketGrid");
+    bindRoundBestOfEditor();
     const bracket = state.bracket;
     const playersArr = state.players || [];
     const format = currentTournamentMeta?.format || "Tournament";
@@ -3004,6 +3031,120 @@ function applyBracketReadOnlyState(readOnly) {
       btn.setAttribute("aria-disabled", "false");
       delete btn.dataset.readOnlyDisabled;
     }
+  });
+}
+
+function isBestOfKeyLocked(key, locks) {
+  if (!key || !locks) return false;
+  return Boolean(locks[key]);
+}
+
+async function updateRoundBestOfOverride(key, value, label = "") {
+  const currentBest = {
+    ...defaultBestOf,
+    ...(currentTournamentMeta?.bestOf || {}),
+  };
+  const previousMeta = currentTournamentMeta
+    ? {
+        ...currentTournamentMeta,
+        bestOf: { ...(currentTournamentMeta.bestOf || {}) },
+      }
+    : null;
+  const nextBestOf = {
+    ...currentBest,
+    [key]: value,
+  };
+  const nextMeta = {
+    ...(currentTournamentMeta || {}),
+    bestOf: nextBestOf,
+    lastUpdated: Date.now(),
+  };
+  setCurrentTournamentMetaState(nextMeta);
+  applyBestOfToSettings(nextBestOf);
+  updateSettingsScoreLocks();
+  saveState(
+    { bestOf: nextBestOf, bracket: state.bracket },
+    { skipRoster: true },
+  );
+  renderAll();
+
+  const targetSlug = currentSlug || currentTournamentMeta?.slug || "";
+  if (!targetSlug) {
+    showToast?.(`Best-of updated for ${label || key} (local only).`, "success");
+    return;
+  }
+
+  try {
+    await setDoc(
+      doc(collection(db, TOURNAMENT_COLLECTION), targetSlug),
+      {
+        bestOf: nextBestOf,
+        lastUpdated: nextMeta.lastUpdated,
+      },
+      { merge: true },
+    );
+    showToast?.(`Best-of updated for ${label || key}.`, "success");
+  } catch (err) {
+    console.error("Failed to update round best-of", err);
+    if (previousMeta) {
+      setCurrentTournamentMetaState(previousMeta);
+      applyBestOfToSettings({
+        ...defaultBestOf,
+        ...(previousMeta.bestOf || {}),
+      });
+      updateSettingsScoreLocks();
+      renderAll();
+    }
+    showToast?.("Failed to update best-of.", "error");
+  }
+}
+
+function bindRoundBestOfEditor() {
+  const bracketGrid = document.getElementById("bracketGrid");
+  if (!bracketGrid) return;
+  if (bracketGrid.dataset.roundBoEditorBound === "true") return;
+  bracketGrid.dataset.roundBoEditorBound = "true";
+  const onActivate = (badge) => {
+    if (!badge || !bracketGrid.contains(badge)) return;
+    if (!isAdmin) return;
+    const key = String(badge.dataset.bestofKey || "").trim();
+    if (!key) return;
+    const label = String(badge.dataset.bestofLabel || key).trim();
+    const locks = getBracketScoreLocks(state.bracket);
+    const lockedByRound = badge.dataset.bestofLocked === "true";
+    if (lockedByRound || isBestOfKeyLocked(key, locks)) {
+      showToast?.(`${label} is locked because scores are recorded.`, "error");
+      return;
+    }
+    const currentBest = {
+      ...defaultBestOf,
+      ...(currentTournamentMeta?.bestOf || {}),
+    };
+    const currentValue = Number(currentBest[key]) || 1;
+    const promptValue = window.prompt(
+      `Set Best-of for ${label} (odd integer >= 1):`,
+      String(currentValue),
+    );
+    if (promptValue == null) return;
+    const parsed = Number(promptValue);
+    if (!Number.isFinite(parsed) || parsed < 1 || parsed % 2 === 0) {
+      showToast?.("Best-of must be an odd integer (1, 3, 5, ...).", "error");
+      return;
+    }
+    const normalized = Math.floor(parsed);
+    if (normalized === currentValue) return;
+    void updateRoundBestOfOverride(key, normalized, label);
+  };
+  bracketGrid.addEventListener("click", (event) => {
+    const badge = event.target.closest?.(".round-bo[data-bestof-key]");
+    onActivate(badge);
+  });
+  bracketGrid.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    const badge = event.target.closest?.(".round-bo[data-bestof-key]");
+    if (!badge) return;
+    event.preventDefault();
+    onActivate(badge);
   });
 }
 
