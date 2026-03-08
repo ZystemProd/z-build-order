@@ -1,0 +1,47 @@
+{
+  "config": {
+    "projectId": "z-build-order",
+    "firestoreEmulatorHost": "127.0.0.1:8181",
+    "slug": "load-harness-1772933663890",
+    "viewers": 25,
+    "writers": 6,
+    "durationSec": 120,
+    "writeIntervalMs": 800,
+    "jitterMs": 300,
+    "payloadKb": 8,
+    "seed": true,
+    "transactions": true,
+    "burstEveryMs": 0,
+    "summaryEveryMs": 5000
+  },
+  "timing": {
+    "startedAt": "2026-03-08T01:34:25.251Z",
+    "endedAt": "2026-03-08T01:36:26.325Z",
+    "durationMs": 121074
+  },
+  "metrics": {
+    "snapshots": 5950,
+    "snapshotErrors": 0,
+    "writesAttempted": 237,
+    "writesSucceeded": 237,
+    "writesFailed": 0,
+    "abortedConflicts": 0,
+    "writeSuccessRatePct": 100,
+    "latencyMs": {
+      "count": 5925,
+      "avg": 2234.82,
+      "p50": 1753,
+      "p95": 7162,
+      "p99": 17124,
+      "max": 18043
+    },
+    "payloadBytes": {
+      "count": 5950,
+      "avg": 13177.42,
+      "p50": 13181,
+      "p95": 13181,
+      "p99": 13181,
+      "max": 13181
+    }
+  }
+}

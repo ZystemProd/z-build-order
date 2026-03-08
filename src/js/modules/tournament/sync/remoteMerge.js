@@ -323,6 +323,11 @@ export function syncFromRemoteCore({
     refreshVetoModalIfOpen?.();
     return;
   }
+  if (allowPartial && !matchIds.length && !activityChanged && !matchVetoesChanged) {
+    // No visual state changed; avoid forcing a full bracket render on heartbeat-like snapshots.
+    refreshMatchInfoModalIfOpen?.();
+    return;
+  }
   if (allowPartial && matchIds.length) {
     renderAll(matchIds);
     if (activityChanged) {

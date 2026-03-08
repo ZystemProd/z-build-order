@@ -799,6 +799,12 @@ a {
   margin-right: 14px;
 }
 
+.bracket-title-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .bracket-preview-controls {
   display: flex;
   align-items: center;
@@ -7321,6 +7327,27 @@ textarea:focus {
   color: rgba(168, 236, 255, 0.95);
   font-weight: 700;
   white-space: nowrap;
+}
+
+.bracket-live-badge {
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(78, 213, 255, 0.35);
+  background: rgba(78, 213, 255, 0.08);
+  color: rgba(168, 236, 255, 0.92);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 140ms ease;
+}
+
+.bracket-live-badge.is-active {
+  opacity: 1;
+  visibility: visible;
 }
 
 .selected-maps {
