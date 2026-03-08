@@ -88,6 +88,44 @@ const presenceAccessCache = new Set();
 const vetoAccessCache = new Set();
 let presenceAuthBound = false;
 let vetoChatHome = null;
+const matchInfoDraftByMatchId = new Map();
+const MATCH_INFO_CONFIRM_PENDING_MS = 2_500;
+
+function areWinnerArraysEqual(left, right) {
+  const a = Array.isArray(left) ? left : [];
+  const b = Array.isArray(right) ? right : [];
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if ((a[i] || null) !== (b[i] || null)) return false;
+  }
+  return true;
+}
+
+function getMatchInfoDraft(matchId) {
+  if (!matchId) return null;
+  const draft = matchInfoDraftByMatchId.get(matchId);
+  return draft && typeof draft === "object" ? draft : null;
+}
+
+function patchMatchInfoDraft(matchId, patch = {}) {
+  if (!matchId || !patch || typeof patch !== "object") return;
+  const current = getMatchInfoDraft(matchId) || {};
+  const next = { ...current, ...patch };
+  if (Array.isArray(patch.mapResults)) next.mapResults = [...patch.mapResults];
+  if (Array.isArray(patch.reportResults))
+    next.reportResults = [...patch.reportResults];
+  matchInfoDraftByMatchId.set(matchId, next);
+}
+
+function clearMatchInfoDraft(matchId) {
+  if (!matchId) return;
+  matchInfoDraftByMatchId.delete(matchId);
+}
+
+function isMatchInfoConfirmPending(matchId) {
+  const draft = getMatchInfoDraft(matchId);
+  return Number(draft?.confirmPendingUntil) > Date.now();
+}
 
 function getTournamentModeValue() {
   return String(currentTournamentMeta?.mode || "1v1")
@@ -691,12 +729,6 @@ export function openVetoModal(
   const higher = ordered[1] || ordered[0] || null;
 
   const saved = state.matchVetoes?.[matchId];
-  console.debug("[veto] openVetoModal", {
-    matchId,
-    hasSaved: Boolean(saved),
-    savedPicks: saved?.maps?.length || 0,
-    savedVetoes: saved?.vetoed?.length || 0,
-  });
   if (saved) {
     const savedUpdatedAt = Number(saved.updatedAt) || 0;
     const usedNames = new Set([
@@ -859,6 +891,7 @@ export function openMatchInfoModal(
   );
   const saved = state.matchVetoes?.[matchId] || null;
   const bestOf = Math.max(1, Number(bestOfComputed) || 1);
+  const draft = getMatchInfoDraft(matchId);
   const pickedMaps = Array.isArray(saved?.maps) ? saved.maps : [];
   const vetoedMaps = Array.isArray(saved?.vetoed) ? saved.vetoed : [];
   const playersById = getPlayersMap();
@@ -878,15 +911,17 @@ export function openMatchInfoModal(
   const isParticipantForTeam = isTeamTournamentMode() ? isUidParticipant : isParticipant;
   const showPresence = Boolean(isParticipantForTeam);
   const allowScoreEditToggle = Boolean(isAdmin && match?.status === "complete");
+  const draftScoreEditEnabled = Boolean(draft?.scoreEditEnabled);
   if (allowScoreEditToggle) {
-    if (modal.dataset.scoreEdit !== "true") {
+    if (draftScoreEditEnabled) {
+      modal.dataset.scoreEdit = "true";
+    } else if (modal.dataset.scoreEdit !== "true") {
       modal.dataset.scoreEdit = "false";
     }
   } else {
     modal.dataset.scoreEdit = "false";
   }
-  let scoreEditEnabled =
-    allowScoreEditToggle && modal.dataset.scoreEdit === "true";
+  let scoreEditEnabled = allowScoreEditToggle && modal.dataset.scoreEdit === "true";
   const computeCanEditResults = () =>
     isAdmin
       ? match?.status !== "complete" || scoreEditEnabled
@@ -1071,27 +1106,56 @@ export function openMatchInfoModal(
     );
   };
 
-  let winners = [];
+  const remoteWinners = normalizeMapResults(saved?.mapResults, bestOf);
+  const draftWinners = Array.isArray(draft?.mapResults)
+    ? normalizeMapResults(draft.mapResults, bestOf)
+    : null;
+  let winners = Array.isArray(draftWinners) ? draftWinners : remoteWinners;
+  let walkoverDraft =
+    draft?.walkover != null
+      ? String(draft.walkover || "")
+      : match?.walkover === "a"
+        ? "A"
+        : match?.walkover === "b"
+          ? "B"
+          : "";
+  if (
+    draft &&
+    areWinnerArraysEqual(winners, remoteWinners) &&
+    walkoverDraft ===
+      (match?.walkover === "a" ? "A" : match?.walkover === "b" ? "B" : "") &&
+    !draft.reportEditing &&
+    !isMatchInfoConfirmPending(matchId)
+  ) {
+    clearMatchInfoDraft(matchId);
+  }
   const setWalkoverSelection = () => {
     if (!walkoverSelect) return;
     if (walkoverSelect.options.length >= 3) {
       walkoverSelect.options[1].textContent = `${aName} forfeits`;
       walkoverSelect.options[2].textContent = `${bName} forfeits`;
     }
-    if (match?.walkover === "a") walkoverSelect.value = "A";
-    else if (match?.walkover === "b") walkoverSelect.value = "B";
-    else walkoverSelect.value = "";
-    walkoverSelect.disabled = !computeCanEditResults();
+    walkoverSelect.value = walkoverDraft;
+    walkoverSelect.disabled =
+      !computeCanEditResults() || isMatchInfoConfirmPending(matchId);
   };
   const updateConfirmScoreButton = () => {
     if (!confirmScoreBtn) return;
+    const confirmPending = isMatchInfoConfirmPending(matchId);
     canEditResults = computeCanEditResults();
-    if (!canEditResults) {
+    if (!canEditResults && !confirmPending) {
       confirmScoreBtn.style.display = "none";
       confirmScoreBtn.onclick = null;
       return;
     }
-    const walkoverValue = walkoverSelect?.value || "";
+    if (confirmPending) {
+      confirmScoreBtn.style.display = "";
+      confirmScoreBtn.disabled = true;
+      confirmScoreBtn.textContent = "Saving...";
+      confirmScoreBtn.onclick = null;
+      return;
+    }
+    const walkoverValue = walkoverSelect?.value || walkoverDraft || "";
     const winsA = winners.filter((w) => w === "A").length;
     const winsB = winners.filter((w) => w === "B").length;
     const needed = Math.max(1, Math.ceil(bestOf / 2));
@@ -1114,6 +1178,13 @@ export function openMatchInfoModal(
             scoreEditEnabled = false;
             modal.dataset.scoreEdit = "false";
           }
+          patchMatchInfoDraft(matchId, {
+            mapResults: winners,
+            walkover: walkoverValue,
+            scoreEditEnabled: false,
+            confirmPendingUntil: Date.now() + MATCH_INFO_CONFIRM_PENDING_MS,
+          });
+          updateConfirmScoreButton();
           const clearMatchCast = async () => {
             if (!state.matchCasts?.[matchId]) return;
             await patchMatchCastRemote(matchId, null, {
@@ -1162,7 +1233,9 @@ export function openMatchInfoModal(
       record.playerIds = participantIds;
       saveMatchVetoesLocal();
     }
-    winners = normalizeMapResults(record.mapResults, bestOf);
+    if (!draftWinners) {
+      winners = normalizeMapResults(record.mapResults, bestOf);
+    }
     record.mapResults = winners;
     updateMatchInfoHeaderScores({ leftScoreEl, rightScoreEl, winners, match });
     renderMatchInfoRows(rowsEl, {
@@ -1173,7 +1246,7 @@ export function openMatchInfoModal(
 
     bindRowInteractivity = () => {
       const canEdit = computeCanEditResults();
-      if (!canEdit) {
+      if (!canEdit || isMatchInfoConfirmPending(matchId)) {
         rowsEl.querySelectorAll(".match-info-pick-cell").forEach((cell) => {
           cell.classList.add("is-disabled");
         });
@@ -1225,6 +1298,12 @@ export function openMatchInfoModal(
         }
         clearMapsAfterDecision(winners, bestOf);
         record.mapResults = winners;
+        walkoverDraft = "";
+        patchMatchInfoDraft(matchId, {
+          mapResults: winners,
+          walkover: "",
+          scoreEditEnabled,
+        });
 
         saveMatchVetoesLocal();
         updateMatchInfoHeaderScores({
@@ -1244,12 +1323,14 @@ export function openMatchInfoModal(
   if (editScoreBtn) {
     if (allowScoreEditToggle) {
       editScoreBtn.style.display = "inline-flex";
-      editScoreBtn.disabled = scoreEditEnabled;
+      editScoreBtn.disabled =
+        scoreEditEnabled || isMatchInfoConfirmPending(matchId);
       editScoreBtn.textContent = scoreEditEnabled ? "Editing" : "Edit score";
       editScoreBtn.onclick = () => {
         scoreEditEnabled = true;
         modal.dataset.scoreEdit = "true";
         modal.dataset.canEditResults = "true";
+        patchMatchInfoDraft(matchId, { scoreEditEnabled: true });
         editScoreBtn.disabled = true;
         editScoreBtn.textContent = "Editing";
         setWalkoverSelection();
@@ -1267,12 +1348,18 @@ export function openMatchInfoModal(
   if (walkoverSelect) {
     walkoverSelect.onchange = () => {
       const value = walkoverSelect.value;
+      walkoverDraft = value || "";
       if (value) {
         winners = normalizeMapResults([], bestOf);
         const record = ensureMatchVetoRecord(matchId, bestOf);
         record.mapResults = winners;
         saveMatchVetoesLocal();
       }
+      patchMatchInfoDraft(matchId, {
+        mapResults: winners,
+        walkover: walkoverDraft,
+        scoreEditEnabled,
+      });
       updateMatchInfoHeaderScores({
         leftScoreEl,
         rightScoreEl,
@@ -1293,7 +1380,7 @@ export function openMatchInfoModal(
       rightPlayerId &&
       (isTeamTournamentMode() ? isUidParticipant : isParticipant),
   );
-  const shouldShowReport = Boolean(existingReport);
+  const shouldShowReport = Boolean(existingReport || draft?.reportEditing);
   if (reportSection) {
     reportSection.style.display = shouldShowReport ? "grid" : "none";
   }
@@ -1345,6 +1432,8 @@ export function openMatchInfoModal(
       existingReport?.scoreA || 0,
       existingReport?.scoreB || 0,
     );
+  } else if (Array.isArray(draft?.reportResults)) {
+    reportResults = normalizeReportResults(draft.reportResults);
   } else {
     reportResults = normalizeReportResults(winners);
   }
@@ -1425,6 +1514,10 @@ export function openMatchInfoModal(
             updateReportScoreLine();
             updateReportSubmitState();
             showReportControls(true);
+            patchMatchInfoDraft(matchId, {
+              reportEditing: true,
+              reportResults,
+            });
             reportBtn.style.display = "none";
           }
         : null;
@@ -1436,6 +1529,7 @@ export function openMatchInfoModal(
       if (!existingReport && reportSection) {
         reportSection.style.display = "none";
       }
+      patchMatchInfoDraft(matchId, { reportEditing: false });
       if (reportBtn && canReport && !existingReport) {
         reportBtn.style.display = "inline-flex";
       }
@@ -1450,6 +1544,10 @@ export function openMatchInfoModal(
       if (!Number.isFinite(idx) || idx < 0 || idx >= bestOf) return;
       const value = select.value;
       reportResults[idx] = value === "A" || value === "B" ? value : null;
+      patchMatchInfoDraft(matchId, {
+        reportEditing: true,
+        reportResults,
+      });
       updateReportScoreLine();
       updateReportSubmitState();
     };
@@ -1476,6 +1574,7 @@ export function openMatchInfoModal(
       next[matchId] = reportEntry;
       state.scoreReports = next;
       vetoDeps?.saveState?.({ scoreReports: next });
+      patchMatchInfoDraft(matchId, { reportEditing: false, reportResults: [] });
       vetoDeps?.renderAll?.();
       if (reportSummaryText) {
         reportSummaryText.textContent = `${aName} ${winsA}-${winsB} ${bName}`;
@@ -1491,6 +1590,7 @@ export function openMatchInfoModal(
   }
 
   if (existingReport) {
+    patchMatchInfoDraft(matchId, { reportEditing: false, reportResults: [] });
     const { winsA, winsB } = getReportWins(reportResults);
     if (reportSummaryText) {
       reportSummaryText.textContent = `${aName} ${winsA}-${winsB} ${bName}`;
@@ -1505,7 +1605,15 @@ export function openMatchInfoModal(
   } else {
     showReportSummary(false);
     if (reportMapSummary) reportMapSummary.innerHTML = "";
-    if (reportControls && !canReport) reportControls.style.display = "none";
+    if (reportControls) {
+      reportControls.style.display =
+        canReport && draft?.reportEditing ? "grid" : "none";
+    }
+    if (canReport && draft?.reportEditing) {
+      renderReportMaps();
+      updateReportScoreLine();
+      updateReportSubmitState();
+    }
   }
 
   if (reportAdminActions) {
@@ -1852,6 +1960,7 @@ export function hideMatchInfoModal() {
 
   const modal = document.getElementById("matchInfoModal");
   if (modal) {
+    clearMatchInfoDraft(modal.dataset.matchId || "");
     modal.classList.remove("is-open");
     modal.setAttribute("aria-hidden", "true");
     delete modal.dataset.matchId;
@@ -2779,13 +2888,6 @@ async function persistLiveVetoState() {
   // IMPORTANT: also advance local lastUpdated so other logic sees the change
   state.lastUpdated = nextUpdatedAt;
 
-  console.debug("[veto] persistLiveVetoState", {
-    matchId,
-    picks: vetoState.picks?.length || 0,
-    vetoed: vetoState.vetoed?.length || 0,
-    stage: vetoState.stage,
-    updatedAt: nextUpdatedAt,
-  });
 
   // Keep local state in sync, but do not broadcast again from here
   vetoDeps?.saveState?.(
@@ -2845,12 +2947,6 @@ export function saveVetoSelection() {
     mapResults: existingMapResults,
   };
   vetoState.updatedAt = nextUpdatedAt;
-  console.debug("[veto] saveVetoSelection", {
-    matchId,
-    picks: trimmed.length,
-    vetoed: (vetoState.vetoed || []).length,
-    bestOf: vetoState.bestOf,
-  });
   const lookup = getMatchLookup(state.bracket || {});
   const match = lookup.get(currentVetoMatchId);
   if (match && Object.prototype.hasOwnProperty.call(match, "bestOf")) {

@@ -1274,6 +1274,22 @@ function ensureMapCatalogLoadedForUi() {
 
 const TOURNAMENT_PERF_STORAGE_KEY = "zboTournamentPerf";
 const TOURNAMENT_PERF_MAX_EVENTS = 500;
+const BRACKET_LIVE_BADGE_IDLE_HIDE_MS = 1200;
+let bracketLiveBadgeHideTimer = null;
+
+function markBracketLiveUpdating() {
+  if (typeof document === "undefined") return;
+  const badge = document.getElementById("bracketLiveUpdatingBadge");
+  if (!badge) return;
+  badge.classList.add("is-active");
+  if (bracketLiveBadgeHideTimer) {
+    clearTimeout(bracketLiveBadgeHideTimer);
+  }
+  bracketLiveBadgeHideTimer = setTimeout(() => {
+    bracketLiveBadgeHideTimer = null;
+    badge.classList.remove("is-active");
+  }, BRACKET_LIVE_BADGE_IDLE_HIDE_MS);
+}
 
 function isTournamentPerfEnabled() {
   if (typeof window === "undefined") return false;
@@ -1494,6 +1510,7 @@ function shouldUsePartialRender(prevState, nextState, format) {
 }
 
 function syncFromRemote(incoming) {
+  markBracketLiveUpdating();
   const span = beginTournamentPerfSpan("syncFromRemote", {
     slug: currentSlug || "",
     incomingBytes: estimateJsonSizeBytes(incoming),
@@ -1596,6 +1613,42 @@ function getPromoStripRenderKey(meta) {
 }
 
 let unsubscribeRemoteState = null;
+let pendingRemoteSyncState = null;
+let remoteSyncRafId = null;
+let remoteSyncTimerId = null;
+let lastRemoteSyncAt = 0;
+const REMOTE_SYNC_MIN_INTERVAL_MS = 75;
+
+function flushPendingRemoteSync() {
+  if (!pendingRemoteSyncState) return;
+  const nextState = pendingRemoteSyncState;
+  pendingRemoteSyncState = null;
+  lastRemoteSyncAt = Date.now();
+  syncFromRemote(nextState);
+}
+
+function scheduleRemoteSync(nextState) {
+  pendingRemoteSyncState = nextState;
+  if (remoteSyncRafId != null || remoteSyncTimerId != null) return;
+  const elapsedMs = Date.now() - lastRemoteSyncAt;
+  const waitMs = Math.max(0, REMOTE_SYNC_MIN_INTERVAL_MS - elapsedMs);
+  const run = () => {
+    remoteSyncTimerId = null;
+    if (typeof window !== "undefined" && window.requestAnimationFrame) {
+      remoteSyncRafId = window.requestAnimationFrame(() => {
+        remoteSyncRafId = null;
+        flushPendingRemoteSync();
+      });
+      return;
+    }
+    flushPendingRemoteSync();
+  };
+  if (waitMs > 0) {
+    remoteSyncTimerId = setTimeout(run, waitMs);
+    return;
+  }
+  run();
+}
 
 function subscribeTournamentStateRemote(slug) {
   try {
@@ -1604,6 +1657,15 @@ function subscribeTournamentStateRemote(slug) {
     // ignore
   }
   unsubscribeRemoteState = null;
+  pendingRemoteSyncState = null;
+  if (remoteSyncRafId != null && typeof window !== "undefined") {
+    window.cancelAnimationFrame?.(remoteSyncRafId);
+    remoteSyncRafId = null;
+  }
+  if (remoteSyncTimerId != null) {
+    clearTimeout(remoteSyncTimerId);
+    remoteSyncTimerId = null;
+  }
   if (!slug) return;
 
   const ref = doc(collection(db, TOURNAMENT_STATE_COLLECTION), slug);
@@ -1632,7 +1694,7 @@ function subscribeTournamentStateRemote(slug) {
         return;
       }
 
-      syncFromRemote({
+      scheduleRemoteSync({
         ...data,
         lastUpdated,
       });
