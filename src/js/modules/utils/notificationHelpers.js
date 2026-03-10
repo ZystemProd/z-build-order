@@ -1,5 +1,5 @@
 import { auth, db } from "../../../app.js";
-import { listPublicClans } from "../clan.js";
+import { listPublicClans } from "../clanData.js";
 import { createNotificationDot } from "../notificationDot.js";
 
 export async function checkForJoinRequestNotifications() {
