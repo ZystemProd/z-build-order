@@ -26,6 +26,7 @@ import {
 import { createNotificationDot } from "./notificationDot.js";
 import { showToast } from "./toastHandler.js";
 import { app, db } from "../../app.js";
+import { listPublicClans } from "./clanData.js";
 import { checkForJoinRequestNotifications } from "./utils/notificationHelpers.js";
 import DOMPurify from "dompurify";
 import { logAnalyticsEvent } from "./analyticsHelper.js";
@@ -40,11 +41,6 @@ const CLAN_LOGO_QUALITY = 0.85;
 let currentClanView = null;
 
 export const auth = getAuth();
-
-export async function listPublicClans() {
-  const snap = await getDocs(collection(db, "clans"));
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-}
 
 export async function getUsernameFromUid(uid) {
   const usernamesCol = collection(db, "usernames");

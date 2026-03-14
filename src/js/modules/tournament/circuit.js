@@ -407,17 +407,8 @@ export async function renderCircuitView(
     descEl.textContent = meta?.description || "Circuit overview.";
   }
   if (circuitHero) {
-    const coverUrl = sanitizeUrl(meta?.coverImageUrl || "");
-    if (coverUrl) {
-      circuitHero.classList.add("has-cover");
-      circuitHero.style.setProperty(
-        "--hero-cover-image",
-        `url("${coverUrl}")`
-      );
-    } else {
-      circuitHero.classList.remove("has-cover");
-      circuitHero.style.removeProperty("--hero-cover-image");
-    }
+    circuitHero.classList.remove("has-cover");
+    circuitHero.style.removeProperty("--hero-cover-image");
   }
   const finalSlug = String(meta?.finalTournamentSlug || "").trim();
   if (finalLink) {
@@ -508,16 +499,18 @@ export async function renderCircuitTournamentList(
     const bySlug = new Map((registry || []).map((item) => [item.slug, item]));
     listEl.innerHTML = "";
     const finalSlug = String(meta?.finalTournamentSlug || "").trim();
-    const renderCard = (item, slug) => {
+    const renderListRow = (item, slug) => {
       const li = document.createElement("li");
-      li.className = "tournament-card";
-      const coverUrl = sanitizeUrl(item.coverImageUrl || "");
+      li.className = "tournament-card tournament-list-row circuit-detail-row";
+      const coverUrl = sanitizeUrl(item.coverImageUrlSmall || item.coverImageUrl || "");
       const startLabel = item.startTime
-        ? new Date(item.startTime).toLocaleString()
+        ? new Intl.DateTimeFormat("en-GB", {
+            day: "2-digit",
+            month: "short",
+            hour: "2-digit",
+            minute: "2-digit",
+          }).format(new Date(item.startTime))
         : "TBD";
-      const playerLabel = item.maxPlayers
-        ? `Up to ${item.maxPlayers} players`
-        : "Players TBD";
       const now = Date.now();
       let statusLabel = "TBD";
       let statusClass = "status-tbd";
@@ -531,10 +524,67 @@ export async function renderCircuitTournamentList(
         }
       }
       const hostName = escapeHtml(item.createdByName || "Unknown");
-      const metaBits = [
-        `<span>${escapeHtml(playerLabel)}</span>`,
-        `<span>Host: <span translate="no">${hostName}</span></span>`,
-      ];
+      const modeLabel = escapeHtml(item.mode || "1v1");
+      li.innerHTML = DOMPurify.sanitize(`
+        <div class="card-cover${coverUrl ? " has-image" : ""}"${
+          coverUrl ? ` style="background-image:url('${escapeHtml(coverUrl)}')"` : ""
+        }></div>
+        <div class="content-stack circuit-detail-row-grid">
+          <div class="tournament-list-cell tournament-list-cell-title">
+            <h4 title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</h4>
+          </div>
+          <div class="tournament-list-cell tournament-list-cell-host">
+            <span class="tournament-data-value" translate="no">${hostName}</span>
+          </div>
+          <div class="tournament-list-cell tournament-list-cell-format">
+            <span class="tournament-data-subtle">${escapeHtml(
+              item.format || "Tournament",
+            )}</span>
+          </div>
+          <div class="tournament-list-cell tournament-list-cell-mode">
+            <span class="mode-chip">${modeLabel}</span>
+          </div>
+          <div class="tournament-list-cell tournament-list-cell-start">
+            <span class="tournament-data-value">${escapeHtml(startLabel)}</span>
+          </div>
+          <div class="tournament-list-cell circuit-detail-cell-status">
+            <div class="tournament-list-row-chips">
+              <span class="status-chip ${statusClass}">${statusLabel}</span>
+            </div>
+          </div>
+        </div>
+      `);
+      void updateCircuitTournamentStatus(li, slug);
+      if (onEnterTournament) {
+        li.addEventListener("click", () => onEnterTournament(item.slug, meta?.slug || ""));
+      }
+      return li;
+    };
+
+    const renderFinalCard = (item, slug) => {
+      const li = document.createElement("li");
+      li.className = "tournament-card";
+      const coverUrl = sanitizeUrl(item.coverImageUrl || "");
+      const startLabel = item.startTime
+        ? new Intl.DateTimeFormat("en-GB", {
+            day: "2-digit",
+            month: "short",
+            hour: "2-digit",
+            minute: "2-digit",
+          }).format(new Date(item.startTime))
+        : "TBD";
+      const now = Date.now();
+      let statusLabel = "TBD";
+      let statusClass = "status-tbd";
+      if (item.startTime) {
+        if (item.startTime <= now) {
+          statusLabel = "Started";
+          statusClass = "status-started";
+        } else {
+          statusLabel = "Upcoming";
+          statusClass = "status-upcoming";
+        }
+      }
       li.innerHTML = DOMPurify.sanitize(`
         <div class="card-cover${coverUrl ? " has-image" : ""}"${
           coverUrl ? ` style="background-image:url('${escapeHtml(coverUrl)}')"` : ""
@@ -549,7 +599,9 @@ export async function renderCircuitTournamentList(
         </div>
         <p class="tournament-format">${escapeHtml(item.format || "Tournament")}</p>
         <div class="meta">
-          ${metaBits.join("")}
+          <span>Host: <span translate="no">${escapeHtml(
+            item.createdByName || "Unknown",
+          )}</span></span>
         </div>
       `);
       void updateCircuitTournamentStatus(li, slug);
@@ -647,12 +699,12 @@ export async function renderCircuitTournamentList(
         createdByName: null,
       };
       if (finalSlug && slug === finalSlug && finalListEl && finalCard) {
-        finalListEl.appendChild(renderCard(item, slug));
+        finalListEl.appendChild(renderFinalCard(item, slug));
         finalCard.style.display = "block";
         renderSponsors(item.sponsors || []);
         renderSocials(item.socials || []);
       } else {
-        listEl.appendChild(renderCard(item, slug));
+        listEl.appendChild(renderListRow(item, slug));
       }
     });
     if (!listEl.children.length) {

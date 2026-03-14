@@ -3827,6 +3827,7 @@ async function renderTournamentList() {
   const statTournaments = document.getElementById("statTournaments");
   const statNextStart = document.getElementById("statNextStart");
   const listTitle = document.getElementById("tournamentListTitle");
+  const tableHeader = document.querySelector(".tournament-list-table-header");
   const typeFilter =
     document.querySelector("#tournamentTypeTabs .list-tab.active")?.dataset
       .typeFilter || "tournaments";
@@ -3841,6 +3842,28 @@ async function renderTournamentList() {
     listTitle.textContent =
       typeFilter === "circuits" ? "Circuits" : "Tournaments";
   }
+  if (tableHeader) {
+    tableHeader.innerHTML =
+      typeFilter === "circuits"
+        ? `
+            <span class="tournament-list-header-cell tournament-list-header-title">Circuit</span>
+            <span class="tournament-list-header-cell">Host</span>
+            <span class="tournament-list-header-cell">Events</span>
+            <span class="tournament-list-header-cell">Start</span>
+            <span class="tournament-list-header-cell">End</span>
+            <span class="tournament-list-header-cell">Status</span>
+          `
+        : `
+            <span class="tournament-list-header-cell tournament-list-header-title">Tournament</span>
+            <span class="tournament-list-header-cell">Host</span>
+            <span class="tournament-list-header-cell">Format</span>
+            <span class="tournament-list-header-cell">Mode</span>
+            <span class="tournament-list-header-cell">Start</span>
+            <span class="tournament-list-header-cell">Status</span>
+            <span class="tournament-list-header-cell">Access</span>
+            <span class="tournament-list-header-cell">Progress</span>
+          `;
+  }
   const listCard = listEl?.closest(".tournament-list-card");
   if (listCard) {
     listCard.classList.toggle("is-tournaments", typeFilter !== "circuits");
@@ -3852,17 +3875,97 @@ async function renderTournamentList() {
   if (ownerBtn) {
     ownerBtn.style.display = typeFilter === "circuits" ? "none" : "inline-flex";
   }
+  const renderListLoadingState = (label) => {
+    if (!listEl) return;
+    listEl.innerHTML = DOMPurify.sanitize(`
+      <li class="tournament-list-loading" aria-live="polite" aria-busy="true">
+        <div class="tournament-list-loading-spinner" aria-hidden="true"></div>
+        <div class="tournament-list-loading-text">${escapeHtml(label)}</div>
+      </li>
+    `);
+  };
   const userId = auth?.currentUser?.uid || null;
   const registered = new Set(getRegisteredTournaments());
   if (!listEl) return;
-  listEl.innerHTML = `<li class="muted">Loading tournaments...</li>`;
+  renderListLoadingState(
+    typeFilter === "circuits" ? "Loading circuits..." : "Loading tournaments...",
+  );
   try {
     if (typeFilter === "circuits") {
-      const circuits = await loadCircuitRegistry(true);
-      const circuitItems = (circuits || []).map((item) => ({
-        ...item,
-        type: "circuit",
-      }));
+      const now = Date.now();
+      const [circuits, tournaments] = await Promise.all([
+        loadCircuitRegistry(true),
+        loadTournamentRegistry(true),
+      ]);
+      const tournamentBySlug = new Map(
+        (tournaments || []).map((item) => [item.slug || item.id, item]),
+      );
+      const circuitItems = await Promise.all(
+        (circuits || []).map(async (item) => {
+          const tournamentSlugs = Array.isArray(item.tournaments)
+            ? item.tournaments
+                .map((entry) =>
+                  typeof entry === "string"
+                    ? entry
+                    : entry?.slug || entry?.tournamentSlug || "",
+                )
+                .filter(Boolean)
+            : [];
+          const relatedTournamentMetas = tournamentSlugs
+            .map((slug) => tournamentBySlug.get(slug))
+            .filter(Boolean);
+          const sortedRelatedMetas = relatedTournamentMetas
+            .filter((meta) => Number.isFinite(meta?.startTime))
+            .sort((a, b) => a.startTime - b.startTime);
+          const earliestMeta = sortedRelatedMetas[0] || null;
+          const finalMeta = item.finalTournamentSlug
+            ? tournamentBySlug.get(item.finalTournamentSlug)
+            : null;
+          const coverMeta = finalMeta || earliestMeta || relatedTournamentMetas[0] || null;
+          const finalStartTime = Number.isFinite(finalMeta?.startTime)
+            ? finalMeta.startTime
+            : null;
+          const startTime = Number.isFinite(earliestMeta?.startTime)
+            ? earliestMeta.startTime
+            : null;
+          const finalStarted = finalStartTime && finalStartTime <= now;
+          const finalFinished =
+            finalStarted && item.finalTournamentSlug
+              ? await getTournamentFinishedStatus(item.finalTournamentSlug)
+              : false;
+          let circuitStatusLabel = "Planning";
+          let circuitStatusClass = "status-tbd";
+          if (finalFinished) {
+            circuitStatusLabel = "Finished";
+            circuitStatusClass = "status-finished";
+          } else if (finalStarted) {
+            circuitStatusLabel = "Live";
+            circuitStatusClass = "status-started";
+          } else if (finalStartTime) {
+            circuitStatusLabel = "Scheduled";
+            circuitStatusClass = "status-upcoming";
+          }
+          return {
+            ...item,
+            type: "circuit",
+            finalMeta,
+            finalStartTime,
+            startTime,
+            coverImageUrl: coverMeta ? resolveCoverUrlSmall(coverMeta) : "",
+            circuitStatusLabel,
+            circuitStatusClass,
+          };
+        }),
+      );
+      circuitItems.sort((a, b) => {
+        const aTime = Number.isFinite(a.startTime)
+          ? a.startTime
+          : Number.MAX_SAFE_INTEGER;
+        const bTime = Number.isFinite(b.startTime)
+          ? b.startTime
+          : Number.MAX_SAFE_INTEGER;
+        return aTime - bTime || String(a.name || "").localeCompare(String(b.name || ""));
+      });
       if (!circuitItems.length) {
         listEl.innerHTML = `<li class="muted">No circuits found.</li>`;
         setTournamentListItems([], { mode: "circuits" });
@@ -3871,29 +3974,58 @@ async function renderTournamentList() {
           mode: "circuits",
           renderItem: (item, targetList) => {
             const li = document.createElement("li");
-            li.className = "tournament-card circuit-card";
+            li.className =
+              "tournament-card tournament-list-row circuit-card circuit-list-row";
             const tournamentCount = item.tournaments?.length || 0;
-            const description = item.description || "Circuit points race.";
             const hostName = escapeHtml(item.createdByName || "Unknown");
-            const metaBits = [
-              `<span>${escapeHtml(`${tournamentCount} tournaments`)}</span>`,
-              `<span>Host: <span translate="no">${hostName}</span></span>`,
-            ];
-            if (item.finalTournamentSlug) {
-              metaBits.unshift(
-                `<span>${escapeHtml(`Finals: ${item.finalTournamentSlug}`)}</span>`,
-              );
-            }
+            const coverUrl = sanitizeUrl(item.coverImageUrl || "");
+            const startLabel = item.startTime
+              ? new Intl.DateTimeFormat("en-GB", {
+                  day: "2-digit",
+                  month: "short",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                }).format(new Date(item.startTime))
+              : "TBD";
+            const endLabel = item.finalStartTime
+              ? new Intl.DateTimeFormat("en-GB", {
+                  day: "2-digit",
+                  month: "short",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                }).format(new Date(item.finalStartTime))
+              : "TBD";
             li.innerHTML = DOMPurify.sanitize(`
-              <div class="card-cover">
-                <span class="status-chip status-circuit status-chip-overlay">Circuit</span>
+              <div class="card-cover${coverUrl ? " has-image" : ""}"${
+                coverUrl
+                  ? ` style="background-image:url('${escapeHtml(coverUrl)}')"`
+                  : ""
+              }>
               </div>
-              <div class="content-stack">
-                <div class="card-top">
-                  <h4>${escapeHtml(item.name)}</h4>
+              <div class="content-stack circuit-list-row-grid">
+                <div class="tournament-list-cell tournament-list-cell-title">
+                  <h4 title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</h4>
                 </div>
-                <div class="meta">
-                  ${metaBits.join("")}
+                <div class="tournament-list-cell tournament-list-cell-host">
+                  <span class="tournament-data-value" translate="no">${hostName}</span>
+                </div>
+                <div class="tournament-list-cell circuit-list-cell-events">
+                  <span class="tournament-data-value">${escapeHtml(
+                    `${tournamentCount} event${tournamentCount === 1 ? "" : "s"}`,
+                  )}</span>
+                </div>
+                <div class="tournament-list-cell circuit-list-cell-start">
+                  <span class="tournament-data-value">${escapeHtml(startLabel)}</span>
+                </div>
+                <div class="tournament-list-cell circuit-list-cell-end">
+                  <span class="tournament-data-value">${escapeHtml(endLabel)}</span>
+                </div>
+                <div class="tournament-list-cell circuit-list-cell-status">
+                  <div class="tournament-list-row-chips">
+                    <span class="status-chip ${escapeHtml(
+                      item.circuitStatusClass,
+                    )}">${escapeHtml(item.circuitStatusLabel)}</span>
+                  </div>
                 </div>
               </div>
             `);
@@ -3968,14 +4100,34 @@ async function renderTournamentList() {
         .map((row) => row.item);
     }
 
-    const sorted = filtered.sort((a, b) => {
-      const aHasStart = Number.isFinite(a.startTime);
-      const bHasStart = Number.isFinite(b.startTime);
-      if (aHasStart !== bHasStart) return aHasStart ? -1 : 1;
-      const aTime = aHasStart ? a.startTime : 0;
-      const bTime = bHasStart ? b.startTime : 0;
-      return aTime - bTime;
-    });
+    const rowsWithStatus = await Promise.all(
+      filtered.map(async (item) => {
+        const hasStarted = item.startTime && item.startTime <= now;
+        return {
+          item,
+          finished: hasStarted
+            ? await getTournamentFinishedStatus(item.slug)
+            : false,
+        };
+      }),
+    );
+    const rankTournamentRow = (row) => {
+      const startTime = Number.isFinite(row.item?.startTime) ? row.item.startTime : null;
+      if (row.finished) return 2;
+      if (startTime && startTime <= now) return 0;
+      if (startTime && startTime > now) return 1;
+      return 3;
+    };
+    const sorted = rowsWithStatus
+      .sort((a, b) => {
+        const rankDiff = rankTournamentRow(a) - rankTournamentRow(b);
+        if (rankDiff !== 0) return rankDiff;
+        const aTime = Number.isFinite(a.item?.startTime) ? a.item.startTime : 0;
+        const bTime = Number.isFinite(b.item?.startTime) ? b.item.startTime : 0;
+        if (rankTournamentRow(a) === 2) return bTime - aTime;
+        return aTime - bTime;
+      })
+      .map((row) => row.item);
     const listItems = sorted.map((item) => ({ ...item, type: "tournament" }));
 
     if (!listItems.length) {
@@ -4004,7 +4156,7 @@ async function renderTournamentList() {
         },
         renderItem: (item, targetList) => {
           const li = document.createElement("li");
-          li.className = "tournament-card";
+          li.className = "tournament-card tournament-list-row";
           li.dataset.slug = item.slug;
           const startLabel = item.startTime
             ? new Intl.DateTimeFormat("en-GB", {
@@ -4032,38 +4184,53 @@ async function renderTournamentList() {
             : "status-open";
           const overlayChip = `<span class="status-chip ${statusClass} status-chip-overlay">${statusLabel}</span>`;
           const accessChip = `<span class="status-chip ${accessClass} status-chip-access">${accessLabel}</span>`;
+          const formatLabel = item.format || "Tournament";
+          const modeLabel = item.mode || "1v1";
           li.innerHTML = DOMPurify.sanitize(`
             <div class="card-cover${coverUrl ? " has-image" : ""}"${
               coverUrl
                 ? ` style="background-image:url('${escapeHtml(coverUrl)}')"`
                 : ""
             }>
-              ${overlayChip}
-              ${accessChip}
-              <div class="time-block time-block-cover">
-                <span class="time-value">${escapeHtml(startLabel)}</span>
-              </div>
             </div>
-            <div class="content-stack">
-              <div class="card-top">
-                <h4>${escapeHtml(item.name)}</h4>
+            <div class="content-stack tournament-list-row-grid">
+              <div class="tournament-list-cell tournament-list-cell-title">
+                <h4 title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</h4>
               </div>
-              <div class="meta">
-                <span>Host: <span translate="no">${escapeHtml(
+              <div class="tournament-list-cell tournament-list-cell-host">
+                <span class="tournament-data-value" translate="no">${escapeHtml(
                   item.createdByName || "Unknown",
-                )}</span></span>
+                )}</span>
               </div>
-              <div class="tournament-progress" data-slug="${escapeHtml(
-                item.slug,
-              )}">
-                <span class="progress-label">Progress</span>
-                <div class="progress-track">
-                  <div class="progress-fill" style="width:0%"></div>
+              <div class="tournament-list-cell tournament-list-cell-format">
+                <span class="tournament-data-subtle">${escapeHtml(formatLabel)}</span>
+              </div>
+              <div class="tournament-list-cell tournament-list-cell-mode">
+                <span class="mode-chip">${escapeHtml(modeLabel)}</span>
+              </div>
+              <div class="tournament-list-cell tournament-list-cell-start">
+                <span class="tournament-data-value">${escapeHtml(startLabel)}</span>
+              </div>
+              <div class="tournament-list-cell tournament-list-cell-status">
+                <div class="tournament-list-row-chips">
+                  ${overlayChip}
                 </div>
-                <div class="progress-meta">Loading progress…</div>
               </div>
-              <div class="time-block time-block-row">
-                <span class="time-value">${escapeHtml(startLabel)}</span>
+              <div class="tournament-list-cell tournament-list-cell-access">
+                <div class="tournament-list-row-chips">
+                  ${accessChip}
+                </div>
+              </div>
+              <div class="tournament-list-cell tournament-list-cell-progress">
+                <div class="tournament-progress" data-slug="${escapeHtml(
+                  item.slug,
+                )}">
+                  <span class="progress-label">Progress</span>
+                  <div class="progress-track">
+                    <div class="progress-fill" style="width:0%"></div>
+                  </div>
+                  <div class="progress-meta">Loading progress…</div>
+                </div>
               </div>
             </div>
           `);
