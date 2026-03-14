@@ -325,20 +325,19 @@
             </div>
           </div>
           <div class="tournament-list-slider">
-            <button id="tournamentListPrev" class="slider-btn" type="button" aria-label="Previous tournaments">
-              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M15.5 4.5 8 12l7.5 7.5-1.5 1.5L5 12l9-9 1.5 1.5z" />
-              </svg>
-            </button>
             <div class="tournament-list-viewport">
+              <div class="tournament-list-table-header" aria-hidden="true">
+                <span class="tournament-list-header-cell tournament-list-header-title">Tournament</span>
+                <span class="tournament-list-header-cell">Host</span>
+                <span class="tournament-list-header-cell">Format</span>
+                <span class="tournament-list-header-cell">Mode</span>
+                <span class="tournament-list-header-cell">Start</span>
+                <span class="tournament-list-header-cell">Status</span>
+                <span class="tournament-list-header-cell">Access</span>
+                <span class="tournament-list-header-cell">Progress</span>
+              </div>
               <ul id="tournamentList" class="tournament-list"></ul>
             </div>
-            <button id="tournamentListNext" class="slider-btn" type="button" aria-label="Next tournaments">
-              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="m8.5 4.5 1.5-1.5 9 9-9 9-1.5-1.5L16 12 8.5 4.5z" />
-              </svg>
-            </button>
-            <div class="tournament-list-pagination" aria-hidden="true"></div>
           </div>
         </div>
       </section>
@@ -397,7 +396,7 @@
               <div class="circuit-final-grid">
                 <div class="circuit-final-card" id="circuitFinalCard" style="display:none;">
                   <p class="eyebrow">Circuit Final</p>
-                  <ul id="circuitFinalTournamentList" class="tournament-list circuit-tournament-list"></ul>
+                  <ul id="circuitFinalTournamentList" class="tournament-list"></ul>
                 </div>
                 <div class="circuit-sponsor-card" id="circuitSponsorCard" style="display:none;">
                   <p class="eyebrow">Sponsors</p>
@@ -416,7 +415,15 @@
                 </div>
                 <button id="refreshCircuitBtn" class="cta ghost small">Refresh</button>
               </div>
-              <ul id="circuitTournamentList" class="tournament-list circuit-tournament-list"></ul>
+              <div class="tournament-list-table-header circuit-tournament-table-header" aria-hidden="true">
+                <span class="tournament-list-header-cell tournament-list-header-title">Tournament</span>
+                <span class="tournament-list-header-cell">Host</span>
+                <span class="tournament-list-header-cell">Format</span>
+                <span class="tournament-list-header-cell">Mode</span>
+                <span class="tournament-list-header-cell">Start</span>
+                <span class="tournament-list-header-cell">Status</span>
+              </div>
+              <ul id="circuitTournamentList" class="tournament-list"></ul>
             </div>
             <div class="card">
               <div class="card-header">
